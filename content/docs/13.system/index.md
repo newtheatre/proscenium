@@ -22,9 +22,10 @@ System** in the console, and the console itself opens on an overview at **Manage
   the console.
 - **"What is waiting could not be read"**: the counts did not arrive, so the overview says so
   rather than showing nothing waiting. Open another console screen and come back.
-- **"The messages that did not arrive could not be read"**, or **"Tonight and the set-up still
-  to do could not be read"**: that part of the overview failed to load. Reload the page; if it
-  keeps happening, report it with the megaphone button.
+- **"The messages that did not arrive could not be read"**, **"Tonight and the set-up still to
+  do could not be read"**, or **"Whether a restore drill is due could not be read"**: that part
+  of the overview failed to load, so it cannot say whether anything is wrong. Reload the page;
+  if it keeps happening, report it with the megaphone button.
 
 ## Who reaches the console
 
@@ -74,7 +75,7 @@ with nothing in it for you is not drawn at all.
 | Access declarations to verify | the Accessibility Officer | [Access profiles](/docs/box-office/access-profiles) |
 | Room requests to decide | the Manager and the Theatre Manager | [Room requests](/docs/spaces/room-requests) |
 | Training requests to answer | whoever reads the training catalogue, and a department lead for their own departments | [Requests](/docs/training/requests) |
-| Pass requests to fulfil | the Front of House Manager | [Pass desk](/docs/box-office/pass-desk) |
+| Pass requests to fulfil, for a pass on sale | the Front of House Manager | [Pass desk](/docs/box-office/pass-desk) |
 
 The IT Manager holds every permission, so sees every line.
 
