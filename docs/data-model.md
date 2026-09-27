@@ -240,6 +240,8 @@ a holder and never usable for the last-administrator guard. It needs no column a
 own: the account's first way in or first sign-in (A-116) is what makes it held.
 The retired `BOX_OFFICE` role was folded into `FOH_MANAGER` in place by migration 0116, the later
 expiry winning for a holder of both, each moved grant audited as `role.merged` (0090, A-133).
+The retired `FRONT_OF_HOUSE` role granted nothing, so migration 0127 deleted its grants rather than
+folding them anywhere, each deletion audited first as `role.retired` (A-134).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·
