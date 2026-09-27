@@ -133,6 +133,7 @@ const listedNote = (id: string): string | null => listedNotes.value[id]?.trim() 
         v-model="listedNotes[attempt.id]"
         placeholder="If you are abandoning this: what happened to the money the reader took?"
         class="mt-2 w-full"
+        :aria-label="`What happened to the ${saysMoney(attempt.expectedTotalPence)} charge at ${timeOf(attempt.createdAt)}`"
         :data-test="`sumup-open-note-${attempt.id}`"
       />
       <div class="mt-2 flex flex-wrap gap-2">

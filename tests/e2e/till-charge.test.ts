@@ -467,6 +467,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, '[data-test="till-open"]')
     const [first, second] = ids
     await waitFor(view, `document.querySelector('[data-test="sumup-open-note-${first}"]') && document.querySelector('[data-test="sumup-open-note-${second}"]')`)
+    // Named for the charge it answers, since a placeholder is no name to a screen reader.
+    expect(await view.evaluate<string>(`document.querySelector('[data-test="sumup-open-note-${first}"]').getAttribute('aria-label')`)).toContain('£2.50')
     await fill(view, `[data-test="sumup-open-note-${first}"]`, 'Refunded on the reader at the bar')
     await click(view, `[data-test="sumup-open-abandoned-${first}"]`)
     await waitFor(view, `!document.querySelector('[data-test="sumup-open-${first}"]')`)
