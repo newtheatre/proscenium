@@ -79,7 +79,7 @@ const expectedRows = computed<ExpectedRow[]>(() => {
 const expectedColumns: TableColumn<ExpectedRow>[] = [
   {
     id: 'label',
-    header: 'Where it was taken',
+    header: 'Takings',
     cell: ({ row }) => h('span', { class: row.original.strong ? 'font-semibold' : undefined }, row.original.label),
   },
   {
