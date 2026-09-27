@@ -16,6 +16,26 @@ const FACTS: ViewerFacts = {
   membershipState: { kind: 'current', until: '2027-07-31' },
 }
 
+const reads: string[] = []
+Object.assign(globalThis, {
+  liveGrants: async (id: string) => {
+    reads.push(id)
+    return id === 'u-committee' ? [{ role: 'BAR_MANAGER', expiresAt: null }] : []
+  },
+  longestTerm: async () => null,
+  configValue: async () => 14,
+  onShiftTonight: async () => false,
+  keepsBarTab: async () => false,
+  liveLeads: async () => [],
+  trainerStandingOf: async () => ({ trainer: false, supervisor: false }),
+  londonToday: () => '2026-09-27',
+  permissionsFor: (grants: { role: string }[]) => new Set(grants.length ? ['night.till', 'bar.read'] : []),
+})
+// Loaded by a built path so the tests project does not type the file against Nitro's globals.
+const { viewerFacts } = await import(['..', '..', 'server', 'utils', 'viewer-facts'].join('/')) as {
+  viewerFacts: (event: unknown, accountId: string) => Promise<ViewerFacts>
+}
+
 describe('one set of viewer facts for the session and the ability resolver', () => {
   test('the session answers every fact the resolver holds, bar the id, which rides in user', () => {
     const { id: _, ...shared } = FACTS
@@ -38,8 +58,11 @@ describe('one set of viewer facts for the session and the ability resolver', () 
     }
   })
 
-  // An ability checked three times in one request asks for the viewer three times.
-  test('the facts are read once per request, however often an ability asks', async () => {
-    expect(await Bun.file('server/utils/viewer-facts.ts').text()).toContain('event.context.viewerFacts')
+  test('each read is for the account it names, with its permissions sorted, and never lent to another', async () => {
+    reads.length = 0
+    const event = { context: {} }
+    expect(await viewerFacts(event, 'u-committee')).toMatchObject({ id: 'u-committee', permissions: ['bar.read', 'night.till'], holdsRole: true })
+    expect(await viewerFacts(event, 'u-member')).toMatchObject({ id: 'u-member', permissions: [], holdsRole: false })
+    expect(reads).toEqual(['u-committee', 'u-member'])
   })
 })

@@ -243,8 +243,8 @@ becomes interactive.
   `server/plugins/authorisation.ts` from the account row and its live grants,
   `app/plugins/authorization.ts` from the account snapshot. The server resolver and
   `GET /api/auth/session`, which fills that snapshot, both read one set of facts:
-  `viewerFacts(event, accountId)` in `server/utils/viewer-facts.ts`, once per request (held on
-  `event.context`), so a fact added for one reaches the other. Neither reads authority from the
+  `viewerFacts(event, accountId)` in `server/utils/viewer-facts.ts`, read live on every call, so a
+  fact added for one reaches the other. Neither reads authority from the
   cookie, and neither replaces `requirePermission`, which also holds the MFA gate (0040). The
   `Viewer` also carries `membershipState` (`current`, `grace`, `lapsed` or `none`, never two
   booleans), and `member` and `memberOrGrace` read it; navigation is not filtered by either, so a

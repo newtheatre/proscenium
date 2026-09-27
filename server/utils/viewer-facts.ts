@@ -2,23 +2,9 @@ import { londonDay, membershipState } from '#shared/utils/membership'
 import type { ViewerFacts } from '#shared/utils/viewer-facts'
 import type { H3Event } from 'h3'
 
-declare module 'h3' {
-  interface H3EventContext {
-    viewerFacts?: { accountId: string, facts: Promise<ViewerFacts> }
-  }
-}
-
-// Read once per request: an ability checked several times asks for the viewer each time, and
-// derived authority is read live from the account, never from a grant (0009).
-export function viewerFacts(event: H3Event, accountId: string): Promise<ViewerFacts> {
-  const held = event.context.viewerFacts
-  if (held?.accountId === accountId) return held.facts
-  const facts = readViewerFacts(event, accountId)
-  event.context.viewerFacts = { accountId, facts }
-  return facts
-}
-
-async function readViewerFacts(event: H3Event, accountId: string): Promise<ViewerFacts> {
+// Read live from the account on every call, never held: a handler that changes one of these and
+// then asks again must see the change, and derived authority is never a grant (0009).
+export async function viewerFacts(event: H3Event, accountId: string): Promise<ViewerFacts> {
   const [grants, term, graceDays, onShift, keepsTab, leads, standing] = await Promise.all([
     liveGrants(accountId),
     longestTerm(accountId),
