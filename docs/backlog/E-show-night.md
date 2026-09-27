@@ -389,7 +389,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As the theatre, I want any unclosed night to close itself within 24 hours, marked as such, so that the paper trail exists even when nobody pressed the button.
 - Depends on: E-124
 - Acceptance criteria:
-  1. A scheduled job closes any performance still open 24 hours after its show night ended, compiling the report from the same queries as E-123.
+  1. A scheduled job closes any performance still open 24 hours after its show night ended, compiling the report from the same queries as E-123. Amended 27 September 2026: only performances from the first show night the new system ran for real, `AUTO_CLOSE_FROM_NIGHT`, set at cutover. The final import brings years of performances with no report, and none of them is frozen or mailed; until the night is set, nothing closes itself.
   2. An auto-closed report is marked auto-closed, carries no human signatory, and lists unmet checklist items with no exceptions recorded.
   3. Auto-closed reports distribute to the same recipients with a distinct subject line, and each auto-close appears in the FOH officer's digest: an unclosed night is a visible event, not a silent repair.
   4. The job attributes its actions to system and is idempotent: the unique report key means a re-run can never produce a second report.
