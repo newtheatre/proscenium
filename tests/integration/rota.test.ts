@@ -164,7 +164,7 @@ describe('an external venue is staffed ad hoc, never from a template (E-101 crit
 
       run(database, addShiftStatement('shift-external', {
         performanceId: tonight.performanceId, role: 'DUTY_MANAGER', slot: 1,
-      }, 'actor', OFFSETS))
+      }, 'actor', OFFSETS, GATE))
 
       const added = shiftsOn(database, tonight.performanceId)
       expect(added.map(shift => `${shift.role}:${shift.slot}:${shift.status}`)).toEqual(['DUTY_MANAGER:1:OPEN'])
@@ -1402,6 +1402,23 @@ describe('the training gate rides the claim and the assignment (#1302, E-104 cri
       open(database, 'shift-open', tonight.performanceId)
 
       expect(run(database, claimShiftStatement('shift-open', who, 'CONFIRMED', { moduleId: null, today: TODAY }))).toHaveLength(0)
+    })
+  })
+
+  // An ad hoc shift naming somebody is confirmed at once, as an assignment is (E-107 criterion 5).
+  test('an officer\'s ad hoc shift naming somebody without a current record adds nothing; naming nobody adds it open', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const untrained = person(database, 'untrained')
+      const trainedOne = claimant(database, 'trained')
+      const add = (id: string, userId?: string, slot = 1): unknown[] =>
+        run(database, addShiftStatement(id, { performanceId: tonight.performanceId, role: 'DOOR', slot, userId }, 'officer', OFFSETS, GATE))
+
+      expect(add('shift-untrained', untrained)).toHaveLength(0)
+      expect(add('shift-trained', trainedOne, 2)).toHaveLength(1)
+      expect(add('shift-open', undefined, 3)).toHaveLength(1)
+      expect(shiftsOn(database, tonight.performanceId).map(shift => `${shift.id}:${shift.status}`).sort())
+        .toEqual(['shift-open:OPEN', 'shift-trained:CONFIRMED'])
     })
   })
 

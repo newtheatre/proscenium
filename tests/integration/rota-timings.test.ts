@@ -20,6 +20,8 @@ import type { SQL } from 'drizzle-orm'
 // 0078). The SQL and `shiftWindow()` compute the same window, which is what these compare.
 
 const DEFAULTS = { startBeforeDoorsMinutes: 30, endAfterEndMinutes: 30 }
+// The bar's training gate, as the add route hands it to the write (E-107 criterion 5, #1302).
+const BAR_GATE = { moduleId: 'ADMN-102', today: '2026-10-12' }
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
   const database = await createTestDatabase()
@@ -223,10 +225,15 @@ describe('the performance\'s own clock moves its windows (E-131 criterion 1)', (
         { role: 'BAR', count: 1, startsBeforeDoorsMinutes: 60, endsAfterEndMinutes: 60 },
       ])
       const userId = person(database, 'added')
+      database.batch([
+        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'ADMN', 'Administration'],
+        ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'ADMN-102', 'ADMN', 'MODULE', 'Bar induction'],
+        [`INSERT INTO training_records (id, user_id, module_id, awarded_on, source) VALUES ('tr-added', ?, 'ADMN-102', '2025-09-01', 'SIGNOFF')`, userId],
+      ])
 
       run(database, addShiftStatement('shift-added', {
         performanceId: tonight.performanceId, role: 'BAR', slot: 2, userId,
-      }, 'actor', DEFAULTS))
+      }, 'actor', DEFAULTS, BAR_GATE))
 
       const [shift] = rows<TimedShift>(database,
         'SELECT role, slot, starts_at, ends_at FROM shifts WHERE id = ?', 'shift-added')
@@ -258,7 +265,7 @@ describe('a template left on an external venue never sets a window (E-101 criter
   test('a shift added by hand takes the house defaults', async () => {
     await withDatabase(async (database) => {
       const tonight = externalWithStaleTemplate(database)
-      run(database, addShiftStatement('shift-away', { performanceId: tonight.performanceId, role: 'BAR', slot: 1 }, 'actor', DEFAULTS))
+      run(database, addShiftStatement('shift-away', { performanceId: tonight.performanceId, role: 'BAR', slot: 1 }, 'actor', DEFAULTS, BAR_GATE))
 
       const [shift] = timesOn(database, tonight.performanceId)
       expect({ starts_at: shift!.starts_at, ends_at: shift!.ends_at }).toEqual(defaultWindow(tonight.startsAt))
