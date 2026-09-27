@@ -18,6 +18,7 @@ import {
   officerBypassEntry,
   officerBypassTarget,
   outsideWindowRefusal,
+  recordsReadFor,
   saysOfficerBypass,
 } from '#shared/utils/night-authority'
 import type { Viewer } from '#shared/utils/abilities'
@@ -165,6 +166,24 @@ describe('the bypass is recorded when the officer acts, not when a screen opens 
   test('the role check the hub makes records nothing, since it is a read', async () => {
     const source = await Bun.file('server/api/tonight/authority.get.ts').text()
     expect(source).not.toContain('recordsRead')
+  })
+
+  // The house route serves the door and the bar the same view, so it records by the role that
+  // resolved: the wording it asked for is decrypted for the door and the duty manager alone.
+  test('recordsRead may name the roles whose read decrypts, and nothing is recorded by default', () => {
+    expect(recordsReadFor(undefined, 'DOOR')).toBe(false)
+    expect(recordsReadFor(true, 'BAR')).toBe(true)
+    const onlyTheDoor = (role: NightRole): boolean => role === 'DOOR'
+    expect(recordsReadFor(onlyTheDoor, 'DOOR')).toBe(true)
+    expect(recordsReadFor(onlyTheDoor, 'BAR')).toBe(false)
+  })
+
+  test('the house route records an officer only for the read that decrypts access wording', async () => {
+    const route = await Bun.file('server/api/tonight/house.get.ts').text()
+    expect(route).toContain('{ recordsRead: role => Boolean(asked) && seesAccessTonight(role) }')
+    expect(route).toContain('tonightView(performanceId, withAccess)')
+    const guard = await Bun.file('server/utils/night-authority.ts').text()
+    expect(guard.match(/recordsReadFor\(options\.recordsRead, /g)?.length).toBe(2)
   })
 })
 
