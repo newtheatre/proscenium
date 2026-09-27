@@ -13,6 +13,7 @@ import {
   OFFICER_BYPASS_ACTION,
   bypassIsRecorded,
   claimedShiftRefusal,
+  mostSpecificRefusal,
   nightAuthorityRefusal,
   officerBypassEntry,
   officerBypassTarget,
@@ -20,7 +21,7 @@ import {
   saysOfficerBypass,
 } from '#shared/utils/night-authority'
 import type { Viewer } from '#shared/utils/abilities'
-import type { NightRole } from '#shared/utils/night-authority'
+import type { NightRefusalKind, NightRole } from '#shared/utils/night-authority'
 
 // The officer branch of shift-scoped authority (E-111, 0044). What the guard does with a request
 // is pinned end to end in tests/e2e/night-authority.test.ts; this is the vocabulary it stands on.
@@ -181,6 +182,52 @@ describe('the night report says who stood in for which role, and beside what (00
   test('an officer whose account has gone is still a bypass, named as an officer', () => {
     expect(saysOfficerBypass({ role: 'BAR', officerName: null, confirmedShift: false }))
       .toBe('Bar: an officer stood in by officer role, with no confirmed bar shift')
+  })
+})
+
+// A screen more than one role reaches shows the refusal about the caller's own position, never
+// merely the last role asked (E-111, issue 1303).
+describe('the most specific refusal wins across several roles (E-111)', () => {
+  const refusal = (kind: NightRefusalKind, role: NightRole) => ({ kind, role })
+
+  test('the hours of a shift held beat anything else', () => {
+    expect(mostSpecificRefusal([refusal('NO_SHIFT', 'DUTY_MANAGER'), refusal('CLAIMED', 'DOOR'), refusal('OUTSIDE_WINDOW', 'BAR')]))
+      .toEqual(refusal('OUTSIDE_WINDOW', 'BAR'))
+  })
+
+  test('a refusal about the request or an officer\'s standing beats a claim, and a claim beats no shift', () => {
+    expect(mostSpecificRefusal([refusal('CLAIMED', 'DOOR'), refusal('ASKED', 'DUTY_MANAGER')])).toEqual(refusal('ASKED', 'DUTY_MANAGER'))
+    expect(mostSpecificRefusal([refusal('NO_SHIFT', 'DUTY_MANAGER'), refusal('CLAIMED', 'DOOR'), refusal('NO_SHIFT', 'BAR')]))
+      .toEqual(refusal('CLAIMED', 'DOOR'))
+  })
+
+  test('among equals the first role asked wins, and nothing is nothing', () => {
+    expect(mostSpecificRefusal([refusal('NO_SHIFT', 'DUTY_MANAGER'), refusal('NO_SHIFT', 'BAR')])).toEqual(refusal('NO_SHIFT', 'DUTY_MANAGER'))
+    expect(mostSpecificRefusal([])).toBeUndefined()
+  })
+})
+
+describe('several roles at once carry the single-role guard\'s options (0098)', () => {
+  test('recordsRead reaches every role tried, so a multi-role read of access wording records', async () => {
+    const source = await Bun.file('server/utils/night-authority.ts').text()
+    expect(source).toMatch(/export async function requireAnyNightAuthority\([^)]*options: NightAuthorityOptions = \{\}/)
+  })
+
+  // An officer on a door shift resolves the log as DOOR, yet the review route still takes their duty
+  // manager bypass, so the action follows the layout's check of that role, not the log's answer.
+  test('the incident review is offered from the duty manager role check, not from the log\'s one answer', async () => {
+    const source = await Bun.file('app/pages/tonight/incidents/index.vue').text()
+    expect(source).toContain('nightAuthority.value.roles.includes(\'DUTY_MANAGER\')')
+    expect(source).toContain('v-if="offersReview && !entry.reviewed"')
+    expect(source).not.toContain('resolvedRole')
+  })
+
+  test('the screens more than one role reaches ask once, with no role, and show what comes back', async () => {
+    for (const page of ['app/pages/tonight/incidents/index.vue', 'app/pages/tonight/age-checks/index.vue']) {
+      const source = await Bun.file(page).text()
+      expect(source).not.toContain('for (const role of NIGHT_ROLES)')
+      expect(source).toContain('\'/api/tonight/authority\'')
+    }
   })
 })
 

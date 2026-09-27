@@ -4,7 +4,8 @@ import { activePerformanceId } from '#shared/utils/tonight'
 // What tonight's screens ask before they render anything: who am I here, and what do I cover.
 // Guarded, because a screen that asks this is about to do something (E-111 criterion 5).
 const scope = z.object({
-  role: z.enum(NIGHT_ROLES),
+  // None asks for any of the three: a shift before a bypass, and the most specific refusal.
+  role: z.enum(NIGHT_ROLES).optional(),
   night: z.string().refine(isShowNight, 'a show night is labelled YYYY-MM-DD').optional(),
   venueId: z.string().min(1).optional(),
   performanceId: z.string().min(1).optional(),
@@ -12,7 +13,9 @@ const scope = z.object({
 
 export default defineEventHandler(async (event) => {
   const { role, ...narrowed } = await getValidatedQueryOrThrow(event, scope)
-  const resolved = await requireNightAuthority(event, role, narrowed)
+  const resolved = role
+    ? await requireNightAuthority(event, role, narrowed)
+    : await requireAnyNightAuthority(event, [...NIGHT_ROLES], narrowed)
 
   // A picker needs a title and a curtain, and a screen opening cold needs to know which house is
   // running now, so the ids alone were never enough (issue 901).

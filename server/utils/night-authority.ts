@@ -1,6 +1,7 @@
 import type { H3Event } from 'h3'
 import type { AccountRow } from '#server/utils/accounts'
-import type { NightAuthorityVia, NightRole, NightScope } from '#shared/utils/night-authority'
+import type { Authority } from '#server/utils/authorise'
+import type { NightAuthorityVia, NightRefusalKind, NightRole, NightScope } from '#shared/utils/night-authority'
 
 // Shift-scoped authority, the guard every show-night route calls (E-111). A confirmed shift is
 // tried first and the officer bypass falls through only when no shift covers the request (0044).
@@ -140,58 +141,66 @@ async function recordOfficerBypass(actorId: string, night: string, covered: Nigh
 // it is recorded as an act would be (0098).
 export interface NightAuthorityOptions { recordsRead?: boolean }
 
-// Hiding a link is never the enforcement (E-111 criterion 5), and the night is `showNightOf`'s
-// alone, so authority expires at 04:00 with nothing to revoke and no second boundary anywhere.
-export async function requireNightAuthority(
-  event: H3Event,
-  role: NightRole,
-  scope: NightScope = {},
-  options: NightAuthorityOptions = {},
-): Promise<NightAuthority> {
-  // Identity first, so a signed-out caller is told that and cannot read tonight's date off which
-  // refusal it gets back.
-  const resolved = await authority(event)
+interface Caller { resolved: Authority, tonight: string }
+interface Refusal { kind: NightRefusalKind, error: unknown }
 
+// Identity first, so a signed-out caller is told that and cannot read tonight's date off which
+// refusal it gets back; then the night asked about, which is tonight or nothing (E-111 criterion 2).
+async function callerTonight(event: H3Event, scope: NightScope): Promise<Caller> {
+  const resolved = await authority(event)
   const tonight = currentShowNight()
   if (scope.night !== undefined && !isShowNight(scope.night)) {
     throw createError({ statusCode: 400, statusMessage: 'That is not a show night' })
   }
-  // A screen left open past 04:00 asks about the night it was showing, and this is where that is
-  // refused: authority covers tonight and nothing else (E-111 criterion 2).
+  // A screen left open past 04:00 asks about the night it was showing, and this is where it is refused.
   if (scope.night !== undefined && scope.night !== tonight) {
     throw createError({ statusCode: 403, statusMessage: 'Show-night tools open for tonight only, and that night has ended' })
   }
+  return { resolved, tonight }
+}
 
+// The shift branch alone (0044): the authority a confirmed shift in its window gives, or what the
+// lookup found short of it, so a refusal is only worked out when one is thrown (0078).
+async function throughShift(event: H3Event, { resolved, tonight }: Caller, role: NightRole, scope: NightScope): Promise<NightAuthority | ShiftBranch> {
   const held = await shiftHeldTonight(event, resolved.account.id, role, tonight, scope)
-  if (held.coverage) {
-    return {
-      account: resolved.account,
-      night: tonight,
-      role,
-      venueId: held.coverage.venueId,
-      performanceIds: held.coverage.performanceIds,
-      via: 'SHIFT',
-      shiftId: held.shiftId,
-      openingId: held.coverage.openingId,
-    }
+  if (!held.coverage) return held
+  return {
+    account: resolved.account,
+    night: tonight,
+    role,
+    venueId: held.coverage.venueId,
+    performanceIds: held.coverage.performanceIds,
+    via: 'SHIFT',
+    shiftId: held.shiftId,
+    openingId: held.coverage.openingId,
   }
+}
 
-  // Somebody holding tonight's shift at the wrong hour is told the hours, not sent to find an
-  // officer they do not need; an officer holding one keeps their bypass all the same (0078).
-  if (!resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) {
-    if (held.outsideWindow) throw createError(outsideWindowRefusal(held.outsideWindow))
-    // A claim still waiting is named, with who confirms it, rather than refused as no shift at all.
-    if (await claimedShiftTonight(resolved.account.id, role, tonight, scope)) throw createError(claimedShiftRefusal(role))
-    throw createError(nightAuthorityRefusal(role))
+// Somebody holding tonight's shift at the wrong hour is told the hours, and a claim still waiting
+// is named with who confirms it, rather than either being refused as no shift at all (issue 1303).
+async function shiftRefusal({ resolved, tonight }: Caller, role: NightRole, scope: NightScope, held: ShiftBranch): Promise<Refusal> {
+  if (held.outsideWindow) return { kind: 'OUTSIDE_WINDOW', error: createError(outsideWindowRefusal(held.outsideWindow)) }
+  if (await claimedShiftTonight(resolved.account.id, role, tonight, scope)) {
+    return { kind: 'CLAIMED', error: createError(claimedShiftRefusal(role)) }
   }
-  // A bypass is a standing grant being used, so it carries the gate that grant carries elsewhere
-  // (A-112). A shift will not, because a shift is not a grant (0044).
+  return { kind: 'NO_SHIFT', error: createError(nightAuthorityRefusal(role)) }
+}
+
+const isAuthority = (answer: NightAuthority | ShiftBranch): answer is NightAuthority => 'via' in answer
+
+// The officer branch (0044), for a caller holding the role's permission: a standing grant being
+// used, so it carries the second factor that grant carries elsewhere (A-112).
+async function throughBypass(
+  event: H3Event,
+  { resolved, tonight }: Caller,
+  role: NightRole,
+  scope: NightScope,
+  options: NightAuthorityOptions,
+): Promise<NightAuthority> {
   await requireSecondFactorIfPrivileged(event, resolved)
-
   const covered = await coverage(tonight, role, scope)
   // Recorded when the officer acts, never when a screen merely looks (0098).
   if (bypassIsRecorded(event.method, options.recordsRead)) await recordOfficerBypass(resolved.account.id, tonight, covered, role)
-
   return {
     account: resolved.account,
     night: tonight,
@@ -203,18 +212,53 @@ export async function requireNightAuthority(
   }
 }
 
-// For a screen more than one role reaches (E-118 criterion 4). Tried in order, first success
-// wins; a signed-out caller is told that immediately rather than asked again for each role.
-export async function requireAnyNightAuthority(event: H3Event, roles: NightRole[], scope: NightScope = {}): Promise<NightAuthority> {
-  let refusal: unknown
+// Hiding a link is never the enforcement (E-111 criterion 5), and the night is `showNightOf`'s
+// alone, so authority expires at 04:00 with nothing to revoke and no second boundary anywhere.
+export async function requireNightAuthority(
+  event: H3Event,
+  role: NightRole,
+  scope: NightScope = {},
+  options: NightAuthorityOptions = {},
+): Promise<NightAuthority> {
+  const caller = await callerTonight(event, scope)
+  const answer = await throughShift(event, caller, role, scope)
+  if (isAuthority(answer)) return answer
+  // An officer holding tonight's shift at the wrong hour keeps their bypass all the same (0078).
+  if (!caller.resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) throw (await shiftRefusal(caller, role, scope, answer)).error
+  return throughBypass(event, caller, role, scope, options)
+}
+
+// For a screen more than one role reaches (E-118 criterion 4). Every role's shift is tried before
+// any role's bypass, so an officer on shift resolves as the shift and records no bypass (0098).
+export async function requireAnyNightAuthority(
+  event: H3Event,
+  roles: NightRole[],
+  scope: NightScope = {},
+  options: NightAuthorityOptions = {},
+): Promise<NightAuthority> {
+  const caller = await callerTonight(event, scope)
+  const short: { role: NightRole, held: ShiftBranch }[] = []
+  const refusals: Refusal[] = []
   for (const role of roles) {
     try {
-      return await requireNightAuthority(event, role, scope)
+      const answer = await throughShift(event, caller, role, scope)
+      if (isAuthority(answer)) return answer
+      short.push({ role, held: answer })
     }
     catch (error) {
-      if ((error as { statusCode?: number }).statusCode === 401) throw error
-      refusal = error
+      refusals.push({ kind: 'ASKED', error })
     }
   }
-  throw refusal
+  for (const role of roles) {
+    if (!caller.resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) continue
+    try {
+      return await throughBypass(event, caller, role, scope, options)
+    }
+    catch (error) {
+      refusals.push({ kind: 'ASKED', error })
+    }
+  }
+  // The refusal about the caller's own position, never merely the last role asked (issue 1303).
+  for (const { role, held } of short) refusals.push(await shiftRefusal(caller, role, scope, held))
+  throw mostSpecificRefusal(refusals)?.error ?? createError(nightAuthorityRefusal('DUTY_MANAGER'))
 }

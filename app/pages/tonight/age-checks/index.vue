@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NIGHT_ROLES } from '#shared/utils/night-authority'
 import { AGE_CHECK_OUTCOMES, ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { saysClock } from '#shared/utils/when'
 import { saysPerformanceChoice } from '#shared/utils/tonight'
@@ -39,18 +38,17 @@ const authorised = ref(false)
 const authorityFailure = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 
+// One question for any of tonight's roles: the server tries a shift before a bypass and answers a
+// refusal about the caller's own position, never the last role's (E-111).
 async function resolveAuthority(): Promise<void> {
-  for (const role of NIGHT_ROLES) {
-    try {
-      const resolved = await request<{ performances: CoveredPerformance[] }>('/api/tonight/authority', { query: { role } })
-      performances.value = resolved.performances
-      authorised.value = true
-      authorityFailure.value = null
-      return
-    }
-    catch (refused) {
-      authorityFailure.value = refusalText(refused)
-    }
+  try {
+    const resolved = await request<{ performances: CoveredPerformance[] }>('/api/tonight/authority')
+    performances.value = resolved.performances
+    authorised.value = true
+    authorityFailure.value = null
+  }
+  catch (refused) {
+    authorityFailure.value = refusalText(refused)
   }
 }
 
