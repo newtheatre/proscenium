@@ -8,7 +8,8 @@ import type { PerformanceTimes, ShiftOffsets } from './rota-times'
 export interface PerformanceOnStage extends PerformanceTimes {
   performanceId: string
   roomId: string
-  showTitle: string
+  // Null for a show nobody has published, which is nowhere public (D-121).
+  showTitle: string | null
 }
 
 export interface PerformanceClosure extends Blackout {
@@ -16,23 +17,34 @@ export interface PerformanceClosure extends Blackout {
   performanceId: string
 }
 
-const PREFIX = 'performance:'
+export interface Overlapping {
+  id: string
+  title: string
+  status: string
+  startsAt: number
+  endsAt: number
+  bookedBy: string | null
+}
+
+// The officers' list, which names the show whether or not it is published (rooms.read only).
+export interface ListedPerformanceClosure extends PerformanceClosure {
+  room: string
+  venue: string
+  show: string
+  published: boolean
+  overlapping: Overlapping[]
+}
 
 // The house's default offsets rather than any one role's: the room is shut for the evening, not
 // for one role's shift in it.
 export function performanceClosure(performance: PerformanceOnStage, offsets: ShiftOffsets): PerformanceClosure {
   const window = shiftWindow(performance, offsets)
   return {
-    id: `${PREFIX}${performance.performanceId}`,
+    id: `performance:${performance.performanceId}`,
     performanceId: performance.performanceId,
     roomId: performance.roomId,
-    reason: `${performance.showTitle} is on`,
+    reason: `${performance.showTitle ?? 'A performance'} is on`,
     startsAt: window.startsAt,
     endsAt: window.endsAt,
   }
-}
-
-// An officer's closure can be reopened; a performance's goes only when the performance does.
-export function isPerformanceClosure(blackout: Blackout): blackout is PerformanceClosure {
-  return blackout.id.startsWith(PREFIX)
 }

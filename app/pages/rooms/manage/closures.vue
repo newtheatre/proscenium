@@ -4,6 +4,7 @@ import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { BLACKOUT_REASON_LIMIT, saysSpan } from '#shared/utils/blackouts'
 import { blackoutsList } from '#shared/utils/blackouts-list'
 import { fromLondonWallClock } from '#shared/utils/london'
+import type { ListedPerformanceClosure } from '#shared/utils/performance-closures'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Closures', middleware: 'console', docs: '/docs/spaces/closures' })
@@ -63,14 +64,11 @@ watch(error, (raised) => {
   if (raised) failure.value = listFailureFrom(raised, 'The closures could not be read.')
 })
 
-interface Overlapping { id: string, title: string, status: string, startsAt: number, endsAt: number, bookedBy: string | null }
-interface PerformanceClosure { id: string, performanceId: string, room: string, venue: string, reason: string, startsAt: number, endsAt: number, overlapping: Overlapping[] }
-
 // Derived from the programme rather than set here, so it is listed and never reopened (issue 1347).
 const { data: performed, error: performedError, refresh: refreshPerformed } = await useAsyncData(
   'rooms-performance-closures',
-  () => request<{ items: PerformanceClosure[] }>('/api/admin/rooms/blackouts/performances'),
-  { default: () => ({ items: [] as PerformanceClosure[] }) },
+  () => request<{ items: ListedPerformanceClosure[] }>('/api/admin/rooms/blackouts/performances'),
+  { default: () => ({ items: [] as ListedPerformanceClosure[] }) },
 )
 const performedFailure = useListFailure(performedError, 'The closures performances make could not be read.')
 
@@ -273,7 +271,7 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
         v-else-if="performed.items.length === 0"
         class="text-sm text-muted"
       >
-        No performance closes a room before bookings close.
+        No performance closes a room as far ahead as bookings open.
       </p>
       <ul
         v-else
@@ -286,7 +284,15 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
           :data-test="`performance-closure-${item.performanceId}`"
         >
           <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <span class="font-medium">{{ item.room }}: {{ item.reason }}</span>
+            <span class="font-medium">
+              {{ item.room }}: {{ item.show }} is on
+              <UBadge
+                v-if="!item.published"
+                color="neutral"
+                variant="subtle"
+                size="sm"
+              >Not yet published</UBadge>
+            </span>
             <span class="text-sm text-muted">{{ spanOf(item) }}</span>
           </div>
           <p class="text-xs text-muted">

@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { decisionForm } from '#shared/utils/approvals'
+import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { formatLondon } from '#shared/utils/london'
 import type { DecisionOutcome, PendingRow } from '#server/utils/approvals'
+import type { H3Event } from 'h3'
 
 // Approve or reject requests, one or a batch.
 export default defineEventHandler(async (event) => {
@@ -22,6 +24,11 @@ export default defineEventHandler(async (event) => {
 
   const outcomes: DecisionOutcome[] = []
   for (const id of input.ids) {
+    const closed = input.action === 'APPROVE' ? await closedFor(event, before.get(id), input.roomId) : null
+    if (closed) {
+      outcomes.push({ id, ok: false, why: 'closed', says: closed })
+      continue
+    }
     outcomes.push(input.action === 'APPROVE'
       ? await approveOne(id, account.id, input.roomId, now)
       : await rejectOne(id, account.id, input.reason!, now))
@@ -88,6 +95,15 @@ async function tellRequesters(
       },
     })
   }
+}
+
+// An officer's closure rejects what is pending under it when it is made, but a performance's
+// writes nothing, so a request made before the show was set is refused here (issue 1347).
+async function closedFor(event: H3Event, row: PendingRow | undefined, intoRoom: string | null): Promise<string | null> {
+  if (!row) return null
+  const roomId = intoRoom ?? row.roomId
+  const shut = blackoutOver(await closuresAcross(event, row.startsAt, row.endsAt, roomId), roomId, row)
+  return shut ? saysClosed(shut) : null
 }
 
 async function roomName(id: string): Promise<string | null> {

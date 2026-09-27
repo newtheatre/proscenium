@@ -1771,14 +1771,17 @@ performance that is not cancelled, draft included, closes its venue's room over 
 with the house's default offsets (0078): from `SHIFT_START_BEFORE_DOORS_MINUTES` before doors to
 `SHIFT_END_AFTER_CURTAIN_DOWN_MINUTES` after the curtain comes down. `performancesOnRoomsQuery()`
 in `server/utils/performance-closures.ts` reads the performances for a span in one statement,
-padded a day either side of it, and the exact overlap is tested on the computed windows.
-`closuresAcross()` in `server/utils/blackouts.ts` joins them to an officer's closures, and every
-reader that refuses or shows a closure calls it: availability, a booking, a request, a series, a
-change to a pending request and a bump's alternatives. A booking made before the room was attached
-or the performance scheduled is not cancelled; `GET /api/admin/rooms/blackouts/performances`
-(`rooms.read`) lists each closure to the booking horizon with the bookings it overlaps, and the
-Closures screen shows them read-only. Cancelling the performance, or detaching the room, is what
-reopens it.
+filtered in SQL on that window with the offsets bound once, so no doors time or offset can put a
+closure outside the read. A show that is not published is nowhere public (D-121), so its closure
+reads "A performance is on"; only the officers' list names it. `closuresAcross()` in
+`server/utils/blackouts.ts` joins them to an officer's closures, and every write or read that
+could put somebody in a closed room calls it: availability, a booking, a request, a series, a
+change to a pending request, approving a request (into its own room or another), a bump and a
+bump's alternatives. Each check is a read before the write, not a predicate on it. A booking made
+before the room was attached or the performance scheduled is not cancelled;
+`GET /api/admin/rooms/blackouts/performances` (`rooms.read`) lists each closure to the booking
+horizon with the bookings it overlaps, and the Closures screen shows them read-only. Cancelling the
+performance, or detaching the room, is what reopens it.
 
 | Function | Answers |
 | --- | --- |

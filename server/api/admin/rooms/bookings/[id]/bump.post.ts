@@ -1,3 +1,4 @@
+import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { bumpForm, refusalToBump } from '#shared/utils/tiers'
 import { formatLondon } from '#shared/utils/london'
 
@@ -21,6 +22,17 @@ export default defineEventHandler(async (event) => {
 
   const claimant = await findById(input.userId)
   if (!claimant) throw createError({ statusCode: 422, statusMessage: 'That account does not exist' })
+
+  // The claimant is handed the displaced booking's own slot, so a closure over it refuses the
+  // bump as it would refuse the claimant booking it themselves (issue 1347).
+  const shut = blackoutOver(await closuresAcross(event, displaced.startsAt, displaced.endsAt, displaced.roomId), displaced.roomId, displaced)
+  if (shut) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: saysClosed(shut),
+      data: { failures: [{ reason: 'ROOM_CLOSED', says: saysClosed(shut) }] },
+    })
+  }
 
   const offer = nearestTo(displaced, await alternativesFor(displaced, event))
 
