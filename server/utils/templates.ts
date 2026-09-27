@@ -1834,8 +1834,13 @@ The Nottingham New Theatre`,
     const capNote = (at: unknown): string => at !== null ? ` (capped at ${String(at)} this run)` : ''
     const warnings = `${String(context.window)} first warnings and ${String(context.final)} final warnings sent this run${capNote(context.warningsCappedAt)}.`
     const anonymiseNote = capNote(context.anonymisationsCappedAt)
+    // A held-back account is said here, since this is the report anyone reads (A-120 criterion 6).
+    const refused = Number(context.refused ?? 0)
+    const refusedNote = refused === 1
+      ? ' 1 due account was refused and is left for the next run.'
+      : refused > 1 ? ` ${String(refused)} due accounts were refused and are left for the next run.` : ''
     const line = context.armed
-      ? `${String(context.anonymised)} accounts anonymised${anonymiseNote}.`
+      ? `${String(context.anonymised)} accounts anonymised${anonymiseNote}.${refusedNote}`
       : `${String(context.wouldAnonymise)} accounts would have been anonymised${anonymiseNote}. Retention is still in rehearsal mode: nothing was anonymised.`
     return {
       subject: 'Retention sweep digest',

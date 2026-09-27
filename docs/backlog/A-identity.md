@@ -331,6 +331,12 @@ Open questions for the committee:
   3. "Usable" excludes disabled and anonymised accounts: a disabled second admin does not satisfy the guard.
   4. The retention sweep (A-126) exempts administrator accounts entirely.
   5. The guard is enforced server-side in the same transaction as the mutation it blocks, so no race can slip past it.
+  6. Added 27 September 2026 (the review of issue 1355's guard): an account holding no usable
+     Administrator grant is never refused by this guard, even while no usable Administrator
+     exists at all. Taking it away leaves the system exactly as able to administer itself as
+     before, and refusing it would stop every erasure, a member's own included, until one is
+     restored. A sweep that erases accounts counts an account it is refused and carries on to
+     the next, so one refusal never stops the rest of a run.
 - Source: Prompt Book A-4; audit SD-7, SD-9.
 
 ## A-121: Search and triage accounts from the admin directory

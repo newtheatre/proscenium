@@ -82,11 +82,11 @@ function anItManager(now: number, also: SQL): SQL {
 }
 
 // strandingBy's rule for a statement to carry: taking this account's IT Manager standing away
-// still leaves a usable one whose grant cannot lapse, or, if it holds none, any usable one.
+// leaves a usable one whose grant cannot lapse, or it holds none to take (A-120 criterion 6).
 export function keepsAnItManagerWhere(userId: string, now: number): SQL {
   const other = sql`${schema.roleGrants.userId} <> ${userId}`
   return sql`(${anItManager(now, sql`${other} and ${schema.roleGrants.expiresAt} is null`)}
-    or (${anItManager(now, other)} and not ${anItManager(now, sql`${schema.roleGrants.userId} = ${userId}`)}))`
+    or not ${anItManager(now, sql`${schema.roleGrants.userId} = ${userId}`)})`
 }
 
 // protectedGrantRefusal's rule: another usable IT Manager holds a permanent grant, or this one is

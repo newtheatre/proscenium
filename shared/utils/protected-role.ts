@@ -14,8 +14,9 @@ export type StrandingAct = 'revoking' | 'disabling' | 'erasing' | 'merging'
 // What taking one account's IT Manager standing away would leave, read from the usable holders.
 export function strandingBy(holders: readonly ProtectedHolder[], userId: string): Stranding | null {
   const others = holders.filter(holder => holder.userId !== userId)
-  if (others.length === 0) return 'last'
+  // Not a usable holder, so nothing is taken, even from a system with none (A-120 criterion 6).
   if (others.length === holders.length) return null
+  if (others.length === 0) return 'last'
   return others.some(holder => holder.expiresAt === null) ? null : 'dated'
 }
 

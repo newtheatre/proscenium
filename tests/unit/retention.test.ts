@@ -88,3 +88,23 @@ describe('days until the threshold (criteria 1, 2)', () => {
     expect(daysUntilRetentionThreshold(lastActive, 3, now)).toBeGreaterThan(0)
   })
 })
+
+// A-120 criterion 6: a refused erasure is counted and the run carries on; a fault is not a refusal.
+describe('the sweeps carry on past a refused erasure, and only a refusal', () => {
+  test('both erasing sweeps erase through the one helper', async () => {
+    expect(await Bun.file('server/utils/retention.ts').text()).toContain('await eraseEach(')
+    expect(await Bun.file('server/utils/unverified.ts').text()).toContain('await eraseEach(')
+  })
+
+  test('the helper counts the guard\'s 409 and throws anything else, so a fault still stops the run', async () => {
+    const source = await Bun.file('server/utils/erasure.ts').text()
+    expect(source).toMatch(/export async function eraseEach\(/)
+    expect(source).toMatch(/if \(!isError\(error\) \|\| error\.statusCode !== 409\) throw error\s*refused \+= 1/)
+    // The loser of a race is answered alreadyErased, which is neither an erasure nor a refusal.
+    expect(source).toMatch(/if \(\(await eraseAccount\(id, null\)\)\.erased\) erased \+= 1/)
+  })
+
+  test('the digest reports what was refused', async () => {
+    expect(await Bun.file('server/utils/retention.ts').text()).toContain('refused: run.refused,')
+  })
+})

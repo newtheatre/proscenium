@@ -94,6 +94,7 @@ const EVERYTHING: TemplateContext = {
   warningsCappedAt: null,
   armed: true,
   anonymised: 1,
+  refused: 0,
   wouldAnonymise: 1,
   anonymisationsCappedAt: null,
   subject: 'The get-in moves to Sunday',
@@ -404,6 +405,12 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     const dry = render('retention-digest', { ...EVERYTHING, armed: false })
     expect(dry.html).toContain('Retention is still in rehearsal mode: nothing was anonymised')
     expect(dry.html).not.toContain('dry-run')
+
+    // A-120 criterion 6: the digest is the report anyone reads, so a held-back account is in it.
+    const held = render('retention-digest', { ...EVERYTHING, refused: 3 })
+    expect(held.text).toContain('3 due accounts were refused and are left for the next run.')
+    expect(render('retention-digest', { ...EVERYTHING, refused: 1 }).text).toContain('1 due account was refused and is left for the next run.')
+    expect(render('retention-digest', EVERYTHING).text).not.toContain('refused')
 
     const quiet = render('training-expiry-digest', { ...EVERYTHING, expiring: [], expired: [] })
     expect(flat(quiet.html)).toContain('If this email ever stops arriving, the monthly sweep has stopped running')

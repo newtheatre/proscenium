@@ -1,4 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
+import { isError } from 'h3'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
 import { erasureStatements } from '#shared/utils/erasure'
 
@@ -34,6 +35,23 @@ export async function eraseAccount(userId: string, actorId: string | null): Prom
   if (logged.length === 0) return { erased: false, alreadyErased: true }
 
   return { erased: true, alreadyErased: false }
+}
+
+// A system sweep's erasures: the guard's refusal (409) is counted and the run goes on (A-120
+// criterion 6). Anything else is a fault, thrown so the run stops where the log can show it.
+export async function eraseEach(ids: readonly string[]): Promise<{ erased: number, refused: number }> {
+  let erased = 0
+  let refused = 0
+  for (const id of ids) {
+    try {
+      if ((await eraseAccount(id, null)).erased) erased += 1
+    }
+    catch (error) {
+      if (!isError(error) || error.statusCode !== 409) throw error
+      refused += 1
+    }
+  }
+  return { erased, refused }
 }
 
 // A tombstone that still answers to its old address would be no tombstone at all.
