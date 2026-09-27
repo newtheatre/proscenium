@@ -126,6 +126,13 @@ export function bypassIsRecorded(method: string, recordsRead = false): boolean {
   return recordsRead || !['GET', 'HEAD'].includes(method.toUpperCase())
 }
 
+// A read several roles reach decrypts for some of them only, so it may name which (0098).
+export type RecordsRead = boolean | ((role: NightRole) => boolean)
+
+export function recordsReadFor(recordsRead: RecordsRead | undefined, role: NightRole): boolean {
+  return typeof recordsRead === 'function' ? recordsRead(role) : recordsRead === true
+}
+
 const BYPASS_ROLE_WORDS: Record<NightRole, string> = { DUTY_MANAGER: 'duty manager', DOOR: 'door', BAR: 'bar' }
 
 export interface OfficerBypassLine { role: NightRole, officerName: string | null, confirmedShift: boolean }

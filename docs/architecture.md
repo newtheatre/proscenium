@@ -924,8 +924,11 @@ permission, never through the bypass (0102). Planning the rota is not one of the
 are what open `/rota/manage/**` (0046). Every officer resolution that acts writes
 `night.officer-bypass`: a `GET` or `HEAD` records nothing, unless it passes `recordsRead`, which
 only the glance's request for tonight's access wording does (`GET /api/tonight/duty-manager?access=1`,
-the one read that decrypts an access profile; without the flag the route returns no wording and the
-hub's poll records nothing), and every other method records (0098, through `bypassIsRecorded`). It is written once per account, night, venue and role, held by a partial unique index rather than by reading
+or `GET /api/tonight/house?access=1` for the door's read of it, the one read that decrypts an access
+profile; without the flag neither route returns wording and the hub's poll records nothing), and
+every other method records (0098, through `bypassIsRecorded`). `recordsRead` may be a predicate on
+the role that resolved (`recordsReadFor()`): the house route passes one, since the same read
+decrypts nothing for the bar. It is written once per account, night, venue and role, held by a partial unique index rather than by reading
 before writing; the row's detail carries every performance that venue ran that night, and on a
 bar opening an empty list and the `openingId` the officer let themselves into (0077). Holding one
 of the three does not admit anybody to the console: `reachConsole` reads the standing permissions
@@ -1256,7 +1259,9 @@ manager's route refuses, drawing none of the comp requests, the rota, the backst
 close. The door's strip under the camera reads it too, for the numbers. The access wording rides
 it only when the caller asks (`?access=1`, which only the glance sends) and `seesAccessTonight()`
 says the resolved role may read it, the door and the duty manager, never the bar (D-127 criterion
-3), so the hub's and the strip's 20-second polls never decrypt a profile. The door is tried first,
+3), so the hub's and the strip's 20-second polls never decrypt a profile. An officer is recorded
+standing in for exactly that read and no other, the role that resolved deciding, so a Bar
+Manager's glance records nothing (0098). The door is tried first,
 so a volunteer holding a door shift resolves as the door. A ticket scan's verdict carries the
 agreed wording for a booking holding a live access or companion ticket (`doorAccessWording()`,
 `server/utils/door-access.ts`, sharing `holdsLiveAccessTicket()` with the glance), and nothing for
