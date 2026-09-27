@@ -138,7 +138,9 @@ a callout saying what has moved, and the callout goes when the picture is retake
 
 - `bun run check docs` fails when a page is missing its front matter, shows a picture that is not
   in the repository, links to a page that does not exist, or a picture is shown by no page.
-- `bun run check content-tokens` fails on a token naming an unknown or sensitive key.
+- `bun run check content-tokens` fails on a token naming an unknown or sensitive key, and on a
+  unit word straight after a token whose value already carries it ("15 minutes"): write
+  `{{ HOLD_RELEASE_MINUTES_BEFORE }} before curtain`, never `}} minutes before curtain`.
 - `bun run check comments` fails on an em dash.
 - `tests/unit/docs-links.test.ts` fails when a screen names a page that does not exist, or a
   console or member destination names none.
