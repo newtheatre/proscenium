@@ -28,6 +28,7 @@ const links = computed(() => [
     <div class="dark">
       <UHeader
         title="The Nottingham New Theatre"
+        :menu="{ title: 'Menu', description: 'The pages of the site.' }"
         :ui="{ root: 'bg-default' }"
       >
         <template #title>

@@ -88,6 +88,7 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
       resizable
       :default-size="SIDEBAR_DEFAULT_SIZE"
       :max-size="SIDEBAR_MAX_SIZE"
+      :menu="{ title: 'Console', description: 'The screens your roles open.' }"
     >
       <template #header>
         <NuxtLink

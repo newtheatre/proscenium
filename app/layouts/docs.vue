@@ -29,6 +29,7 @@ const sections = computed(() => {
     <div class="dark">
       <UHeader
         title="The Nottingham New Theatre"
+        :menu="{ title: 'Documentation', description: 'Every page of the documentation.' }"
         :ui="{ root: 'bg-default' }"
       >
         <template #title>
