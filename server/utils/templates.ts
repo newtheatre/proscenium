@@ -1704,18 +1704,17 @@ The Nottingham New Theatre`,
     const when = String(context.when)
     const partySize = Number(context.partySize)
     const entryUrl = String(context.entryUrl)
-    const seats = partySize === 1 ? '1 seat' : `${partySize} seats`
     return {
       subject: `You are on the waiting list for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>You are on the waiting list for ${show}, ${when}, for ${seats}. We will email you the moment
-seats free up, in the order people joined.</p>
+<p>You are on the waiting list for ${show}, ${when}, for ${plural(partySize, 'seat')}. We will
+email you the moment seats free up, in the order people joined.</p>
 <p><a href="${entryUrl}">See your place on the list</a></p>
 <p>Changed your mind? Leave the waiting list from the same page.</p>`),
       text: `Hello ${context.name},
 
-You are on the waiting list for ${show}, ${when}, for ${seats}. We will email you the moment
-seats free up, in the order people joined.
+You are on the waiting list for ${show}, ${when}, for ${plural(partySize, 'seat')}. We will
+email you the moment seats free up, in the order people joined.
 
 Your place on the list: ${entryUrl}
 

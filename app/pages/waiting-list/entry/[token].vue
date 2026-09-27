@@ -89,8 +89,8 @@ async function leave(): Promise<void> {
     removed.value = true
   }
   catch {
-    // The route refuses a forged, rotated or purged token alike, and cannot tell them apart:
-    // one sentence covers all three without guessing which happened.
+    // Only a link that no longer verifies (a forged one, or a rotated secret) or a failed request
+    // lands here: leaving twice, or after the purge, answers ok, since the remove is idempotent.
     leaveFailure.value = 'That link has already been used or is no longer valid.'
   }
   finally {
@@ -101,7 +101,7 @@ async function leave(): Promise<void> {
 // An offer standing right now costs the next person their turn; a plain place on the list does
 // not, so the consequence says which it is (D-113 criteria 3 and 6).
 const leaveConsequence = computed(() => (data.value?.status === 'OFFERED'
-  ? 'Your first refusal on the seat passes to the next person on the list, or to the door, and this link stops working.'
+  ? 'Your first refusal on the seat passes to the next person on the list, or to the door, and it can no longer be claimed.'
   : 'Your place on the list goes, and we stop emailing you about this performance.'))
 
 useSeoMeta({ title: 'Your waiting-list entry' })
