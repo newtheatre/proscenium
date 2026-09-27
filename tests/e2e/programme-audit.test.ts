@@ -107,9 +107,11 @@ describe.skipIf(skip !== null)('a refused name or address write leaves no audit 
   }, CASE_TIMEOUT_MS)
 
   test('pass types, whose price points move only with the write', async () => {
+    // A pass covers at least one show, so each is given one to cover.
+    const showId = await created('/api/admin/shows', { title: 'Pass cover', slug: `pass-cover-${tag()}` })
     const window = { validFrom: 1_900_000_000, validUntil: 1_910_000_000 }
-    const one = { name: `Season ${tag()}`, slug: `season-${tag()}`, ...window, prices: [{ label: 'Standard', price: 4500 }], showIds: [] }
-    const two = { name: `Flexi ${tag()}`, slug: `flexi-${tag()}`, ...window, prices: [{ label: 'Standard', price: 3000 }], showIds: [] }
+    const one = { name: `Season ${tag()}`, slug: `season-${tag()}`, ...window, prices: [{ label: 'Standard', price: 4500 }], showIds: [showId] }
+    const two = { name: `Flexi ${tag()}`, slug: `flexi-${tag()}`, ...window, prices: [{ label: 'Standard', price: 3000 }], showIds: [showId] }
     const { showIds: _shows, ...rest } = two
     const other = await refusedTwice('pass-type', '/api/admin/pass-types', one, two, {
       ...rest, slug: one.slug, status: 'DRAFT', prices: [{ label: 'Changed', price: 1 }],
