@@ -48,7 +48,7 @@ const year = new Date().getFullYear()
     >
       <template #left>
         <div class="flex flex-col gap-3">
-          <SiteWordmark gold />
+          <SiteWordmark class="self-start" />
           <p class="max-w-xs text-sm text-muted">
             The country's only entirely student-run theatre, in {{ SITE_ADDRESS.addressLocality }}.
           </p>

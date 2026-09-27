@@ -102,6 +102,14 @@ describe('the favicon, logos and merge source come across (K-126 criterion 1)', 
     expect((meta.images ?? []).map(image => image.width)).toEqual(expect.arrayContaining([16, 32, 48]))
   })
 
+  // The chrome draws the logo at header height, so it ships trimmed rather than on a 1920 canvas.
+  test('the chrome logo is a trimmed WebP (criterion 6)', async () => {
+    const meta = imageMeta(await read(join(PUBLIC, 'images/logos/anniversary-white-trimmed.webp')))
+    expect(meta.type).toBe('webp')
+    expect(meta.height).toBeLessThanOrEqual(128)
+    expect((meta.width ?? 0) / (meta.height ?? 1)).toBeGreaterThan(4)
+  })
+
   test('the touch icon is the 180 pixel square Safari asks for', async () => {
     expect(imageMeta(await read(join(PUBLIC, 'apple-touch-icon.png')))).toMatchObject({ type: 'png', width: 180, height: 180 })
   })

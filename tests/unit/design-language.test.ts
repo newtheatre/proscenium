@@ -178,14 +178,15 @@ describe('nothing is drawn over show artwork (J-111)', () => {
   })
 })
 
-// The theatre's name is read, not decoration, so the eyebrow clears the small-text floor rather
-// than sitting at 9.6px in the muted foreground (K-101).
-describe('the wordmark eyebrow is readable (K-101)', () => {
-  test('it is neither sub-11px nor muted', async () => {
+// The header and footer carry the theatre's own logo, not the name set in the house type, and the
+// logo's alt text is the anchor's only name (K-126 criterion 6).
+describe('the wordmark is the logo (K-126 criterion 6)', () => {
+  test('SiteWordmark draws the trimmed white logo, named for a screen reader', async () => {
     const source = await Bun.file('app/components/SiteWordmark.vue').text()
-    const eyebrow = source.slice(source.indexOf('The Nottingham') - 200, source.indexOf('The Nottingham'))
-    expect(eyebrow).not.toContain('text-[0.6rem]')
-    expect(eyebrow).not.toContain('text-muted')
+    const image = source.match(/<img\b[^>]*>/)?.[0] ?? ''
+    expect(image).toContain('src="/images/logos/anniversary-white-trimmed.webp"')
+    expect(image).toContain('alt="The Nottingham New Theatre"')
+    expect(source).not.toContain('nnt-headline')
   })
 })
 
