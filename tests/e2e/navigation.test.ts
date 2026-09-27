@@ -139,3 +139,37 @@ describe.skipIf(skip !== null)('the members area and account settings split (K-1
     expect(html).toContain('href="/account/access"')
   })
 })
+
+// Issue 1358: the overview lists what waits for the caller and what is unfinished, from the same
+// counts the sidebar reads, and only what the caller could act on.
+describe.skipIf(skip !== null)('the overview is what waits for the caller (issue 1358)', () => {
+  async function read<T>(cookie: string, path: string): Promise<{ status: number, body: T }> {
+    const answer = await fetch(`${app.baseURL}${path}`, { headers: { cookie } })
+    return { status: answer.status, body: await answer.json() as T }
+  }
+
+  test('an administrator is counted every queue, a training manager only the requests they answer', async () => {
+    const everything = await read<{ counts: Record<string, number> }>(officer.cookie, '/api/admin/waiting')
+    expect(everything.status).toBe(200)
+    expect(Object.keys(everything.body.counts).sort()).toEqual(['access-profiles', 'membership-claims', 'pass-requests', 'room-requests', 'training-requests'])
+    for (const count of Object.values(everything.body.counts)) expect(Number.isInteger(count)).toBe(true)
+
+    expect((await read<{ counts: Record<string, number> }>(trainer.cookie, '/api/admin/waiting')).body.counts).toEqual({ 'training-requests': expect.any(Number) })
+    expect((await read<{ counts: Record<string, number> }>(member.cookie, '/api/admin/waiting')).body.counts).toEqual({})
+  })
+
+  test('tonight is offered to whoever may open its screens, and set-up to whoever can finish it', async () => {
+    const officerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(officer.cookie, '/api/admin/overview')
+    expect(officerView.status).toBe(200)
+    expect(Array.isArray(officerView.body.tonight)).toBe(true)
+    expect(Array.isArray(officerView.body.setUp)).toBe(true)
+
+    const trainerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(trainer.cookie, '/api/admin/overview')
+    expect(trainerView.body.tonight).toBeNull()
+    expect(trainerView.body.setUp).toEqual([])
+  })
+
+  test('the placeholder is gone from the overview', async () => {
+    expect((await shell(officer.cookie)).html).not.toContain('The rest of this screen arrives')
+  })
+})

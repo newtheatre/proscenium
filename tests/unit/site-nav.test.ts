@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { ABILITY_PERMISSIONS, canWorkTonight, keepBarTab, signedIn, viewReports } from '#shared/utils/abilities'
 import { contentPathOf } from '#shared/utils/docs-paths'
 import { PERMISSIONS } from '#shared/utils/roles'
-import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, memberNavActive, navCount } from '#shared/utils/site-nav'
+import { ACCOUNT_NAV, CONSOLE_HOME, CONSOLE_NAV, HEADER_NAV, MY_NAV, NAV_COUNTS, NAV_QUEUES, NAV_SECTIONS, PUBLIC_GROUPS, PUBLIC_NAV, SHELL_NAV, entryFor, groupFor, memberNavActive, navCount } from '#shared/utils/site-nav'
 
 // The navigation conventions are a test rather than a review habit (0040), the same way the admin
 // component conventions are (0032). What review still judges is whether a label reads well.
@@ -331,6 +331,29 @@ describe('a waiting count rides the entry that opens it', () => {
     expect(navCount(people.items, { 'membership-claims': 0 })).toBe(0)
     expect(navCount(people.items, {})).toBe(0)
     expect(navCount(people.items.filter(entry => entry.to !== '/people/members'), { 'membership-claims': 4 })).toBe(0)
+  })
+
+  // Issue 1358: the five queues an officer works, each counted where it is opened.
+  test('room, training and pass requests are counted on the entries that open them', () => {
+    expect(NAV_COUNTS).toEqual(['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests'])
+    const counted = CONSOLE_NAV.flatMap(group => group.items).filter(entry => entry.count)
+    expect(Object.fromEntries(counted.map(entry => [entry.count, entry.to]))).toEqual({
+      'membership-claims': '/people/members',
+      'access-profiles': '/box-office/access-profiles',
+      'room-requests': '/rooms/manage/requests',
+      'training-requests': '/training/manage/requests',
+      'pass-requests': '/box-office/desk-passes',
+    })
+  })
+
+  test('each queue is named in words and opens on the entry that carries its count', () => {
+    for (const count of NAV_COUNTS) {
+      const queue = NAV_QUEUES[count]
+      expect(queue.says).not.toContain('-')
+      expect(entryFor(queue.to.split('?')[0]!)?.count).toBe(count)
+    }
+    // The register opens on its claims queue, not on the members it lists.
+    expect(NAV_QUEUES['membership-claims'].to).toBe('/people/members?filter=awaiting-record')
   })
 })
 
