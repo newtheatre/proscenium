@@ -65,7 +65,7 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 | Screen | A shift of | Or the role |
 | --- | --- | --- |
 | The door | Door, or the duty manager's own shift on that performance | Front of house manager |
-| Checklist, Night report, Backstage, and the glance's comp requests, rota and backstage code | Duty manager | Front of house manager |
+| Checklist, Night report, Backstage, Message tonight's audience, and the glance's comp requests, rota and backstage code | Duty manager | Front of house manager |
 | The till | Bar | Bar manager |
 | Tonight at a glance and the hub's house numbers (access wording for the door and duty manager only), Contacts and incidents, Challenge 25 | Any of the three | Either |
 | Emergency (the duty manager's number only for tonight's team at that venue) | None: anyone signed in | None |
@@ -106,16 +106,16 @@ Each tile appears where your own shift or role opens it, and your own job comes 
 until the curtain comes down on the performance you are looking at, and **Night report** after it,
 reading **Sign off and close**, since that is where the night ends. The rest follow in the order
 they are pressed on a night: **Door**, **Till**, **Tonight at a glance**, **Checklist**, **Night
-report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, and **Emergency**, always
-there and always last. While a stocktake is open, a bar shift also sees **Stocktake** straight
-after **Till**, to count into it (see [Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)).
-Until the phone knows your roles, or with no signal, every tile shows, and
-each screen still checks for itself. The **Checklist** tile says what is left on it: **3 pre-show
-items left** before the house opens, **2 post-show items left** after, **All ticked** when nothing
-is outstanding. On a matinee day the **Tonight at a glance**, **Checklist**, **Night report** and
-**Contacts and incidents** tiles carry the house you chose on the switcher, so each opens on it. The
-line at the foot of the hub is the rule the whole night runs on: the door never sells tickets;
-unpaid and walk-up customers go to the bar.
+report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, **Message tonight's
+audience** (the duty manager's), and **Emergency**, always there and always last. While a stocktake
+is open, a bar shift also sees **Stocktake** straight after **Till**, to count into it (see
+[Stocktakes](/docs/bar/stocktakes#counting-on-a-bar-shift)). Until the phone knows your roles, or
+with no signal, every tile shows, and each screen still checks for itself. The **Checklist** tile
+says what is left on it: **3 pre-show items left** before the house opens, **2 post-show items
+left** after, **All ticked** when nothing is outstanding. On a matinee day the **Tonight at a
+glance**, **Checklist**, **Night report** and **Contacts and incidents** tiles carry the house you
+chose on the switcher, so each opens on it. The line at the foot of the hub is the rule the whole
+night runs on: the door never sells tickets; unpaid and walk-up customers go to the bar.
 
 The duty manager also sees **Waiting on you** above the tiles whenever a comp request is
 waiting, with its value, who asked and **Approve** or **Decline**, the same queue
@@ -142,6 +142,9 @@ required pre-show checklist item that is still not done.
   ::
   ::card{icon="i-lucide-list-checks" title="Checklist" to="/docs/tonight/checklist"}
   The pre-show and post-show checklist, exceptions, and closing the night.
+  ::
+  ::card{icon="i-lucide-megaphone" title="Message tonight's audience" to="/docs/tonight/message-tonight-s-audience"}
+  Telling tonight's ticket holders or rota something, at once.
   ::
   ::card{icon="i-lucide-file-signature" title="Night report" to="/docs/tonight/night-report"}
   Tonight's report as it fills in, what is left after the curtain, and Sign off and close.

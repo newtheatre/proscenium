@@ -11,7 +11,7 @@ const ids = (tiles: { id: string }[]): string[] => tiles.map(tile => tile.id)
 
 describe('the hub shows the tiles the viewer\'s own authority opens (E-112 criterion 1)', () => {
   test('while the roles are unknown, or the phone is offline, every tile shows', () => {
-    expect(ids(hubTiles(null))).toEqual(['door', 'till', 'glance', 'checklist', 'report', 'age-checks', 'backstage', 'contacts', 'emergency'])
+    expect(ids(hubTiles(null))).toEqual(['door', 'till', 'glance', 'checklist', 'report', 'age-checks', 'backstage', 'contacts', 'message', 'emergency'])
     expect(hubTiles(null).some(tile => tile.gold)).toBe(false)
   })
 
@@ -29,12 +29,12 @@ describe('the hub shows the tiles the viewer\'s own authority opens (E-112 crite
 
   test('the duty manager leads with the glance and holds the night\'s own screens', () => {
     const tiles = hubTiles(['DUTY_MANAGER'])
-    expect(ids(tiles)).toEqual(['glance', 'checklist', 'report', 'age-checks', 'backstage', 'contacts', 'emergency'])
+    expect(ids(tiles)).toEqual(['glance', 'checklist', 'report', 'age-checks', 'backstage', 'contacts', 'message', 'emergency'])
     expect(tiles[0]).toEqual({ id: 'glance', gold: true })
   })
 
   test('holding more than one role shows each one\'s screens, the duty manager\'s job first', () => {
-    expect(ids(hubTiles(['DOOR', 'DUTY_MANAGER']))).toEqual(['glance', 'door', 'checklist', 'report', 'age-checks', 'backstage', 'contacts', 'emergency'])
+    expect(ids(hubTiles(['DOOR', 'DUTY_MANAGER']))).toEqual(['glance', 'door', 'checklist', 'report', 'age-checks', 'backstage', 'contacts', 'message', 'emergency'])
   })
 
   test('no role tonight leaves Emergency, always there', () => {
@@ -46,7 +46,7 @@ describe('the hub shows the tiles the viewer\'s own authority opens (E-112 crite
 describe('after the curtain the duty manager\'s hub leads with the night report', () => {
   test('the report tile moves to the front, in gold, and the glance follows it', () => {
     const tiles = hubTiles(['DUTY_MANAGER'], true)
-    expect(ids(tiles)).toEqual(['report', 'glance', 'checklist', 'age-checks', 'backstage', 'contacts', 'emergency'])
+    expect(ids(tiles)).toEqual(['report', 'glance', 'checklist', 'age-checks', 'backstage', 'contacts', 'message', 'emergency'])
     expect(tiles.filter(tile => tile.gold).map(tile => tile.id)).toEqual(['report'])
   })
 

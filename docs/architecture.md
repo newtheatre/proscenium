@@ -1439,6 +1439,26 @@ no clock to set, the case moves the two houses around the real now instead, the 
 hour off on whichever side of now the show night has room (0014), and waits out 04:00 if begun in
 the night's last two minutes.
 
+**Messaging tonight's audience (0101, H-108 criterion 10).** `/tonight/message` is the duty
+manager's composer, a hub tile of theirs. `GET /api/tonight/message/audience`,
+`POST /api/tonight/message/preview` and `POST /api/tonight/message` each call
+`requireNightAuthority(event, 'DUTY_MANAGER', { performanceId })`, so a confirmed shift inside its
+window opens them. The Front of House Manager's bypass is recorded once per night, venue and role on
+the preview or the send, each a POST; the count is a read and records nothing (0044, 0098). The
+audience is one of that performance's two (`server/utils/night-message.ts`): its ticket holders
+through `performanceTicketHoldersQuery()`, the announce composer's own resolver (0089), or its rota,
+`performanceRotaQuery()`, the claimed and confirmed slots on it. Every message goes at once as the
+transactional type (`nightMessageType()`), one `notify()` a recipient, each copy claimed first under
+`nightMessageClaim()`, the page's draft key and the person (0048), so a second press of the same
+draft reaches only those not yet reached. The send is `comms.announcement.sent` with the
+performance, the audience, the count newly reached and `via`, never the words (0011), written in a
+`finally` so a press that fails part-way still records the copies it sent. The console composer at
+`/comms/announce` now offers **When it goes** in place of its safety tick: `sendTimingOptions()`
+names now or the next digest, with the plain type's window read live from its topic key by the
+audience route, and `defaultSendTiming()` resets it on every change of audience (kind, role,
+session, show or performance), now for a performance on tonight's show night and the digest
+otherwise, so Send now never outlives the audience that chose it.
+
 ### The Challenge 25 register (E-118)
 
 `server/db/schema/show-night.ts` adds `age_checks`, append-only like `incidents` (0010): hand-

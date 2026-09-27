@@ -1051,8 +1051,10 @@ nobody on the list ever sees another's address, and writes one audit entry namin
 the audience (with the role, session, performance or show it names) and the count, never the
 subject or body.
 
-Flagging a safety notice sends it as a different, transactional message type: it ignores the
-recipient's preference entirely, the same as a ticket or a refund would.
+Choosing **Send now** under **When it goes** sends it as a different, transactional message type:
+it ignores the recipient's preference entirely, the same as a ticket or a refund would. On a show
+night, tonight's duty manager sends to one of tonight's performances' ticket holders or rota from
+`/tonight/message`, always as the transactional type (0101).
 
 Ticket holders are everyone whose booking is held, collected or admitted at the door, with at
 least one ticket not refunded, on a performance whose show night is tonight or later; for a show,
@@ -1085,8 +1087,8 @@ Answered on 23 September 2026 from the code, for the question in issue 1213:
 - **Cancelling a performance does not email its ticket holders.** It cancels the rota and emails
   each person holding a claimed or confirmed shift `shift.performance-cancelled`, and it reports
   how many tickets are owed a refund; the audience is not told. To tell them, send an
-  announcement to the performance's ticket holders from `/comms/announce`, as a safety notice if
-  it must arrive at once and regardless of preference.
+  announcement to the performance's ticket holders from `/comms/announce`, choosing Send now if
+  it must arrive at once and regardless of preference, or, on the night, from `/tonight/message`.
 
 The full catalogue of what is sent, by type, is the operator page **What the theatre sends**
 (`content/docs/12.communications/3.what-the-theatre-sends.md`).

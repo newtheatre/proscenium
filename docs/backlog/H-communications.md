@@ -162,6 +162,16 @@ Stories: 15 total (9 MVP, 5 V2, 1 Later).
      its preference, and a safety notice is transactional exactly as criterion 3 allows; both come
      from the box office identity and both reach a guest's unverified address, the reach a booking
      confirmation already has (0089). Criteria 2, 4, 5 and 6 apply unchanged.
+  10. Tonight's duty manager may message tonight's audience (0101, issue 1327). From
+     `/tonight/message`, tonight's confirmed duty manager inside their shift's window, or the Front
+     of House Manager through the recorded officer bypass, sends to one of tonight's performances,
+     its ticket holders (criterion 8's audience) or its rota (the claimed and confirmed slots on
+     it), and to nobody else. The count comes first and a preview before the send, and every such
+     message goes at once, as the transactional type, whatever the recipient's preferences. The
+     composer at `/comms/announce` says when a message goes before it goes: now, or with the
+     recipient's other messages in the topic's next digest, starting on now while the performance
+     chosen is on tonight's show night and back on the digest for any other choice. Pressing send
+     again for the same draft after a dropped connection reaches only those not yet reached (0048).
 - Source: Prompt Book H-1; audit RM-1 (all admins emailed each request, subject to preferences), PR-10 (night reports emailed to configured recipients). Criterion 7 comes from the console review of 21 September 2026 (issue 1151 item 10). Criteria 8 and 9 come from feedback issue 1213 (a safety notice has to reach the audience, not only the membership), accepted as drafted by the IT Manager on 23 September 2026.
 
 ## H-109: Templates and Europe/London formatting

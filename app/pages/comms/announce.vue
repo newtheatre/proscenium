@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { AUDIENCE_KINDS, AUDIENCE_LABELS, isTicketHolderAudience, saysAnnouncementSent, saysAudienceCount } from '#shared/utils/announcements'
+import { AUDIENCE_KINDS, AUDIENCE_LABELS, isTicketHolderAudience, saysAnnouncementSent, saysAudienceCount, sendTimingOptions, defaultSendTiming } from '#shared/utils/announcements'
 import { ROLES, saysRole } from '#shared/utils/roles'
 import { saysClock, saysDay } from '#shared/utils/when'
-import type { AnnounceShowOption, AudienceKind } from '#shared/utils/announcements'
+import type { AnnounceShowOption, AudienceKind, SendTiming } from '#shared/utils/announcements'
 
 definePageMeta({ layout: 'console', title: 'Announce', middleware: 'console', docs: '/docs/communications/announce' })
 
@@ -16,7 +16,9 @@ const show = ref<AnnounceShowOption | null>(null)
 const performanceId = ref<string | undefined>(undefined)
 const subject = ref('')
 const body = ref('')
-const safetyNotice = ref(false)
+// When it goes, said before it goes: now is the transactional type (issue 1327, H-108 criterion 3).
+const timing = ref<SendTiming>('WITH_DIGEST')
+const safetyNotice = computed(() => timing.value === 'NOW')
 
 const failure = ref<string | null>(null)
 const previewing = ref(false)
@@ -45,6 +47,20 @@ const performanceItems = computed(() => (show.value?.performances ?? []).map(per
   value: performance.id,
 })))
 
+// Send now for tonight's performance, the digest for anything else, read afresh on every change of
+// audience, so Send now never outlives the audience it was chosen for.
+function defaultTiming(): SendTiming {
+  const chosen = kind.value === 'PERFORMANCE_TICKET_HOLDERS' ? performanceId.value : undefined
+  const startsAt = show.value?.performances.find(performance => performance.id === chosen)?.startsAt ?? null
+  return defaultSendTiming(startsAt, new Date())
+}
+
+// Each source by name, not `audience`: a change of kind clears the performance after that
+// computed's watcher has run, and the audience then no longer reads it to fire again.
+watch([kind, role, sessionId, showId, performanceId], () => {
+  timing.value = defaultTiming()
+})
+
 // A different show is a different run, so a performance picked from the last one is dropped.
 function chooseShow(chosen: AnnounceShowOption | null): void {
   show.value = chosen
@@ -61,15 +77,19 @@ watch(kind, () => {
 
 const request = useRequestFetch()
 
+interface AudienceCount { count: number, digestMinutes: number }
+
 // Answered from the audience alone, so the count is on screen before a word is written
 // (criterion 7). Never cached: an audience is resolved from live data every time it is asked.
 const { data: counted, status: countStatus } = await useAsyncData(
   () => `announce-audience-${JSON.stringify(audience.value)}`,
   () => (audienceReady.value
-    ? request<{ count: number }>('/api/admin/comms/announcements/audience', { query: audience.value })
+    ? request<AudienceCount>('/api/admin/comms/announcements/audience', { query: audience.value })
     : Promise.resolve(null)),
-  { watch: [audience], default: (): { count: number } | null => null, getCachedData: () => undefined },
+  { watch: [audience], default: (): AudienceCount | null => null, getCachedData: () => undefined },
 )
+
+const timingItems = computed(() => sendTimingOptions(ticketHolders.value, counted.value?.digestMinutes ?? null))
 
 const ready = computed(() =>
   subject.value.trim().length > 0
@@ -78,7 +98,7 @@ const ready = computed(() =>
 
 // A fresh count and rendering every time the message or the audience changes: a stale preview
 // naming yesterday's audience is worse than none (criterion 4).
-watch([kind, role, sessionId, showId, performanceId, subject, body, safetyNotice], () => {
+watch([kind, role, sessionId, showId, performanceId, subject, body, timing], () => {
   preview.value = null
   sent.value = null
 })
@@ -104,7 +124,7 @@ async function runPreview(): Promise<void> {
 function startAnother(): void {
   subject.value = ''
   body.value = ''
-  safetyNotice.value = false
+  timing.value = defaultTiming()
   sent.value = null
   preview.value = null
 }
@@ -254,14 +274,15 @@ async function send(): Promise<void> {
       />
     </UFormField>
 
-    <UCheckbox
-      v-model="safetyNotice"
-      data-test="announce-safety"
-      label="This is a safety notice"
-      :description="ticketHolders
-        ? 'Reaches every ticket holder at once, regardless of their bookings preference, the same as a ticket or a refund does.'
-        : 'Reaches the audience regardless of their announcement preference, the same as a ticket or a refund does.'"
-    />
+    <UFormField
+      label="When it goes"
+      data-test="announce-timing"
+    >
+      <URadioGroup
+        v-model="timing"
+        :items="timingItems"
+      />
+    </UFormField>
 
     <div class="flex flex-wrap items-center gap-3">
       <UButton
