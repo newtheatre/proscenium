@@ -23,7 +23,7 @@ export async function discountNamed(name: string, exceptId?: string): Promise<Di
 
 // The name predicate rides the UPDATE, so a rename onto a name somebody is taking at the same
 // moment refuses rather than reaching the unique index (0003, 0006); audited in its batch (0049).
-export function renameDiscountStatement(edit: { id: string, name: string, percent: number, actorId: string }): SQL {
+export function updateDiscountStatement(edit: { id: string, name: string, percent: number, actorId: string }): SQL {
   return sql`
     UPDATE discounts
     SET name = ${edit.name}, percent = ${edit.percent}, updated_by = ${edit.actorId}, updated_at = unixepoch()

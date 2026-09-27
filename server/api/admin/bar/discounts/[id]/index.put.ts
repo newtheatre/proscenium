@@ -26,12 +26,12 @@ export default defineEventHandler(async (event) => {
       percent: [held.percent, input.percent],
     }),
   })
-  const updated = await auditedWrite(
-    db.all(renameDiscountStatement({ id, name: input.name, percent: input.percent, actorId: resolved.account.id })),
+  const applied = await auditedWrite(
+    db.all<{ id: string }>(updateDiscountStatement({ id, name: input.name, percent: input.percent, actorId: resolved.account.id })),
     entry,
   )
 
-  if (!updated) {
+  if (!applied) {
     const taken = await discountNamed(input.name, id)
     if (!taken) throw noSuch('discount')
     throw createError({ statusCode: 409, statusMessage: `A discount is already called ${taken.name}` })

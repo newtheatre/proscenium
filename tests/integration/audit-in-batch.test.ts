@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { auditIfChanged } from '#server/utils/audit'
-import { renameDiscountStatement } from '#server/utils/discounts'
+import { updateDiscountStatement } from '#server/utils/discounts'
 import { pruneLapsedStatements } from '#server/utils/role-prune'
 import { openRegisterStatement } from '#server/utils/training-register-open'
 import { auditEntry } from '#shared/utils/audit'
@@ -32,7 +32,7 @@ describe('editing a bar discount audits only the edit that landed (F-117)', () =
   const edit = (database: TestDatabase, id: string, name: string): void => {
     const entry = auditEntry({ actorId: 'u-1', action: 'bar.discount.updated', target: `bar-discount:${id}` })
     database.batch([
-      boundStatement(database, renameDiscountStatement({ id, name, percent: 15, actorId: 'u-1' })),
+      boundStatement(database, updateDiscountStatement({ id, name, percent: 15, actorId: 'u-1' })),
       boundStatement(database, auditIfChanged(entry)),
     ])
   }
@@ -55,22 +55,23 @@ describe('editing a bar discount audits only the edit that landed (F-117)', () =
 })
 
 describe('opening a register audits the open that landed, once (G-115 criterion 4)', () => {
-  const open = (database: TestDatabase, auditId: string): void => {
-    const entry = { ...auditEntry({ actorId: 'u-1', action: 'register.opened', target: 'session:s-1' }), id: auditId }
+  const open = (database: TestDatabase, actorId: string, at: number): void => {
     database.batch([
-      boundStatement(database, openRegisterStatement('s-1', 'u-1', 1000)),
-      boundStatement(database, auditIfChanged(entry)),
+      boundStatement(database, openRegisterStatement('s-1', actorId, at)),
+      boundStatement(database, auditIfChanged(auditEntry({ actorId, action: 'register.opened', target: 'session:s-1' }))),
     ])
   }
 
-  test('a second open, from another device, changes nothing and writes no second audit row', async () => {
+  test('a second open, from another device, leaves the first stamp and writes no second audit row', async () => {
     await withDatabase((database) => {
       insert(database, 'users', { id: 'u-1', email: 'trainer@example.invalid', name: 'A Trainer' })
+      insert(database, 'users', { id: 'u-2', email: 'officer@example.invalid', name: 'The Training Officer' })
       insert(database, 'training_sessions', { id: 's-1', held_on: '2027-01-14', starts_at: '19:00', ends_at: '21:00', capacity: 20, trainer_id: 'u-1' })
 
-      open(database, 'a-1')
-      open(database, 'a-2')
-      expect(rows(database, 'SELECT register_opened_by AS by FROM training_sessions WHERE id = ?', 's-1')).toEqual([{ by: 'u-1' }])
+      open(database, 'u-1', 1000)
+      open(database, 'u-2', 2000)
+      expect(rows(database, 'SELECT register_opened_by AS by, register_opened_at AS at FROM training_sessions WHERE id = ?', 's-1'))
+        .toEqual([{ by: 'u-1', at: 1000 }])
       expect(trail(database, 'register.opened')).toHaveLength(1)
     })
   })

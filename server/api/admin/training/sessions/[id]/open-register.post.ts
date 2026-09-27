@@ -44,12 +44,13 @@ export default defineEventHandler(async (event) => {
 
   if (session.registerOpenedAt !== null) return { ok: true, alreadyOpen: true }
 
-  const opened = await auditedWrite(db.all(openRegisterStatement(id, resolved.account.id, Math.floor(Date.now() / 1000))), auditEntry({
+  const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'register.opened',
     target: `session:${id}`,
     detail: { heldOn: session.heldOn },
-  }))
+  })
+  const opened = await auditedWrite(db.all<{ id: string }>(openRegisterStatement(id, resolved.account.id, Math.floor(Date.now() / 1000))), entry)
 
   return { ok: true, alreadyOpen: !opened }
 })
