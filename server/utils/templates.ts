@@ -1703,20 +1703,23 @@ The Nottingham New Theatre`,
     const show = String(context.show)
     const when = String(context.when)
     const partySize = Number(context.partySize)
-    const removeUrl = String(context.removeUrl)
+    const entryUrl = String(context.entryUrl)
     const seats = partySize === 1 ? '1 seat' : `${partySize} seats`
     return {
       subject: `You are on the waiting list for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>You are on the waiting list for ${show}, ${when}, for ${seats}. We will email you the moment
 seats free up, in the order people joined.</p>
-<p>Changed your mind? <a href="${removeUrl}">Leave the waiting list</a>.</p>`),
+<p><a href="${entryUrl}">See your place on the list</a></p>
+<p>Changed your mind? Leave the waiting list from the same page.</p>`),
       text: `Hello ${context.name},
 
 You are on the waiting list for ${show}, ${when}, for ${seats}. We will email you the moment
 seats free up, in the order people joined.
 
-Leave the waiting list: ${removeUrl}
+Your place on the list: ${entryUrl}
+
+Changed your mind? Leave the waiting list from the same page.
 
 The Nottingham New Theatre`,
     }
@@ -1727,8 +1730,7 @@ The Nottingham New Theatre`,
     const show = String(context.show)
     const when = String(context.when)
     const expires = String(context.expires)
-    const claimUrl = String(context.claimUrl)
-    const removeUrl = String(context.removeUrl)
+    const entryUrl = String(context.entryUrl)
     const partySize = Number(context.partySize)
     const one = partySize === 1
     return {
@@ -1737,17 +1739,17 @@ The Nottingham New Theatre`,
 <p>${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'has' : 'have'} come free, and you
 have first refusal until <strong>${expires}</strong>. Nothing is kept for you until you claim;
 after that time ${one ? 'it passes' : 'they pass'} to the next person on the list, or to the door.</p>
-<p><a href="${claimUrl}">Claim my ${one ? 'seat' : 'seats'}</a></p>
-<p>Not coming after all? <a href="${removeUrl}">Leave the waiting list</a>.</p>`),
+<p><a href="${entryUrl}">Claim my ${one ? 'seat' : 'seats'}</a></p>
+<p>Not coming after all? Leave the waiting list from the same page.</p>`),
       text: `Hello ${context.name},
 
 ${plural(partySize, 'seat')} for ${show}, ${when}, ${one ? 'has' : 'have'} come free, and you
 have first refusal until ${expires}. Nothing is kept for you until you claim; after that time
 ${one ? 'it passes' : 'they pass'} to the next person on the list, or to the door.
 
-Claim your ${one ? 'seat' : 'seats'}: ${claimUrl}
+Claim your ${one ? 'seat' : 'seats'}: ${entryUrl}
 
-Leave the waiting list: ${removeUrl}
+Not coming after all? Leave the waiting list from the same page.
 
 The Nottingham New Theatre`,
     }

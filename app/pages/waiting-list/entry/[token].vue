@@ -3,9 +3,10 @@ import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { partySizeMismatchReason } from '#shared/utils/waiting-list'
+import { plural } from '#shared/utils/text'
 
-// Where a waiting-list link opens: WAITING says so, OFFERED lets it be claimed (D-113 criteria
-// 2, 4), and CLAIMED, LAPSED and REMOVED are terminal states with nothing left to do here.
+// Where every waiting-list email opens (issue 1340): WAITING says so, OFFERED lets it be claimed
+// (D-113 criteria 2, 4), and CLAIMED, LAPSED and REMOVED offer what else is on instead.
 
 interface TicketType { id: string, name: string, description: string | null, price: number }
 
@@ -120,7 +121,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
 
     <div
       v-if="removed"
-      class="mt-8"
+      class="mt-8 space-y-4"
       data-test="waiting-list-removed"
     >
       <UAlert
@@ -128,6 +129,13 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         variant="subtle"
         description="You have left the waiting list."
       />
+      <UButton
+        to="/whats-on"
+        variant="subtle"
+        data-test="waiting-list-whats-on"
+      >
+        See what's on
+      </UButton>
     </div>
 
     <div
@@ -220,8 +228,8 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         color="neutral"
         variant="subtle"
         icon="i-lucide-clock"
-        title="Still on the list"
-        description="We will email you the moment a seat frees up."
+        :title="`Still on the list for ${plural(data!.partySize, 'seat')}`"
+        description="We will email you the moment enough seats free up, in the order people joined."
       />
       <UButton
         variant="link"
@@ -235,7 +243,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
 
     <div
       v-else
-      class="mt-8"
+      class="mt-8 space-y-4"
       data-test="waiting-list-settled"
     >
       <UAlert
@@ -247,6 +255,13 @@ useSeoMeta({ title: 'Your waiting-list entry' })
             ? 'These seats have already been claimed.'
             : 'You already left this waiting list.'"
       />
+      <UButton
+        to="/whats-on"
+        variant="subtle"
+        data-test="waiting-list-whats-on"
+      >
+        See what's on
+      </UButton>
     </div>
 
     <ConfirmModal

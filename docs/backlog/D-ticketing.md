@@ -349,8 +349,10 @@ Open questions:
   3. An unclaimed offer lapses on its window and the next entry is offered; each offer and lapse
      is recorded, and the claim is race-safe so one freed ticket can never be claimed twice.
   4. Waiting-list entries for a performance are purged after that performance's night; the booker
-     can remove themselves at any time from a link in every email. A link that no longer resolves
-     says so on the page, on both the leave page and the entry page's own leave button.
+     can remove themselves at any time from the entry page every email links to. A link that no
+     longer resolves says so on the page, including from the entry page's own leave button.
+     Amended 27 September 2026 (issue 1340): there is no separate leave page; its old links open
+     the entry page, which names the list and, once left, offers what else is on.
   5. The desk sees the list's length and next entries on the performance screen, and can offer to
      the list manually.
   6. The join screen names the show and the night it is a list for before it asks for anything,

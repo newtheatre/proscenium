@@ -13,8 +13,8 @@ export interface WaitingListJoinedContext {
   token: string
 }
 
-// Criterion 1's confirmation, and criterion 4's removal link, which every waiting-list email
-// carries regardless of what it is otherwise about.
+// Criterion 1's confirmation. Every waiting-list email links the entry page, which names the list
+// and leaves through a named confirmation (criterion 4, issue 1340).
 export async function sendWaitingListJoined(event: H3Event | undefined, context: WaitingListJoinedContext): Promise<void> {
   await notify(event, {
     userId: context.userId,
@@ -24,7 +24,7 @@ export async function sendWaitingListJoined(event: H3Event | undefined, context:
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       partySize: context.partySize,
-      removeUrl: `${useRuntimeConfig(event).public.baseURL}/waiting-list/leave/${context.token}`,
+      entryUrl: `${useRuntimeConfig(event).public.baseURL}/waiting-list/entry/${context.token}`,
     },
   })
 }
@@ -38,10 +38,9 @@ export interface WaitingListOfferedContext {
   token: string
 }
 
-// Criterion 2's offer email: one link claims, the same link (D-110 style, self-service) shows
-// the offer if opened again before it lapses.
+// Criterion 2's offer email: one link claims or leaves, and shows the offer again if opened before
+// it lapses.
 export async function sendWaitingListOffered(event: H3Event | undefined, context: WaitingListOfferedContext): Promise<void> {
-  const base = useRuntimeConfig(event).public.baseURL
   await notify(event, {
     userId: context.userId,
     type: 'waiting-list.offered',
@@ -51,8 +50,7 @@ export async function sendWaitingListOffered(event: H3Event | undefined, context
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       expires: formatLondon(new Date(context.expiresAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       partySize: context.partySize,
-      claimUrl: `${base}/waiting-list/entry/${context.token}`,
-      removeUrl: `${base}/waiting-list/leave/${context.token}`,
+      entryUrl: `${useRuntimeConfig(event).public.baseURL}/waiting-list/entry/${context.token}`,
     },
   })
 }
