@@ -97,10 +97,10 @@ function offerFor(performanceId: string): { status: string, offerExpiresAt: numb
   }
 }
 
-function entriesFor(performanceId: string): { id: string, status: string }[] {
+function entriesFor(performanceId: string): { id: string, status: string, reservationId: string | null }[] {
   const database = new Database(app.databaseFile, { readonly: true })
   try {
-    return database.query('SELECT id, status FROM waiting_list WHERE performance_id = ?').all(performanceId) as { id: string, status: string }[]
+    return database.query('SELECT id, status, claimed_reservation_id AS reservationId FROM waiting_list WHERE performance_id = ?').all(performanceId) as { id: string, status: string, reservationId: string | null }[]
   }
   finally {
     database.close()
@@ -459,13 +459,6 @@ describe.skipIf(skip !== null)('an offer and a claim are recorded once, however 
     expect(entry?.status).toBe('CLAIMED')
     const trail = trailFor('waiting-list.claimed', entry!.id)
     expect(trail).toHaveLength(1)
-    const database = new Database(app.databaseFile, { readonly: true })
-    try {
-      const row = database.query('SELECT claimed_reservation_id AS reservationId FROM waiting_list WHERE id = ?').get(entry!.id) as { reservationId: string }
-      expect(JSON.parse(trail[0]!.detail ?? '{}')).toEqual({ reservationId: row.reservationId })
-    }
-    finally {
-      database.close()
-    }
+    expect(JSON.parse(trail[0]!.detail ?? '{}')).toEqual({ reservationId: entry!.reservationId })
   }, CASE_TIMEOUT_MS)
 })
