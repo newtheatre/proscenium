@@ -1251,8 +1251,10 @@ query builders, each bound to one performance id and nothing that grows with a t
 `tonightPerformanceQuery` for the show and its warnings. "Sold" rides `heldSeatsSubquery` from
 `server/utils/capacity.ts`, never a second count of `tickets`, which
 `tests/unit/capacity-guard.test.ts` refuses outright (D-105 criterion 2); "admitted" is
-`reservations.status = 'DOOR'`, set by a pass scan (D-126) or an ordinary ticket scan (E-127
-criterion 3) at `/tonight/door`, both below.
+`admittedSeatsSubquery`, the unrefunded seats on a booking whose status is `DOOR`, set by a pass
+scan (D-126) or an ordinary ticket scan (E-127 criterion 3) at `/tonight/door`, both below. Both
+count seats, so the glance's "to come" is people still expected, the desk's own rule (D-114
+criterion 7). The night report's attendance counts seats the same way on every line.
 
 `GET /api/tonight/house` (issue 1307) is the same performance view for any of tonight's three
 roles, through `requireAnyNightAuthority()` and `tonightView()` in `server/utils/tonight-house.ts`,

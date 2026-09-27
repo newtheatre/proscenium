@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { checklistFor } from './checklist'
-import { heldSeatsSubquery } from './capacity'
+import { admittedSeatsSubquery, admittedWalkUpSeatsSubquery, heldSeatsSubquery, noShowSeatsSubquery } from './capacity'
 import { cardSalesQuery } from './reconciliation'
 import { DOOR_COVER_ACTION, NIGHT_ROLES, OFFICER_BYPASS_ACTION, doorCoverTarget, officerBypassTarget } from '#shared/utils/night-authority'
 import { showNightBounds } from '#shared/utils/show-night'
@@ -23,26 +23,25 @@ export interface ReportAttendance {
   fellowshipAdmissions: number
 }
 
-// A no-show is paid, never admitted and still holds an unrefunded ticket, derived and never written
-// (issue 1296). A walk-up is a door-source booking; `passAdmissions` is `admitted`'s subset (D-126).
+// Every figure is seats, as sold is, never bookings, each from the capacity rule's own helpers;
+// `passAdmissions` is `admitted`'s subset (D-126).
 export function reportAttendanceQuery(performanceId: string): SQL {
   return sql`
     SELECT
       ${heldSeatsSubquery(sql`${performanceId}`)} AS sold,
-      (SELECT count(*) FROM reservations WHERE performance_id = ${performanceId} AND status = 'DOOR') AS admitted,
-      (SELECT count(*) FROM reservations r WHERE r.performance_id = ${performanceId} AND (r.status = 'NO_SHOW'
-        OR (r.status = 'COLLECTED' AND EXISTS (SELECT 1 FROM tickets t WHERE t.reservation_id = r.id AND t.refunded_at IS NULL)))) AS noShows,
-      (SELECT count(*) FROM reservations WHERE performance_id = ${performanceId} AND status = 'DOOR' AND source = 'DOOR') AS walkUps,
+      ${admittedSeatsSubquery(sql`${performanceId}`)} AS admitted,
+      ${noShowSeatsSubquery(sql`${performanceId}`)} AS noShows,
+      ${admittedWalkUpSeatsSubquery(sql`${performanceId}`)} AS walkUps,
       (SELECT count(*) FROM reservations r
        JOIN tickets t ON t.reservation_id = r.id
        JOIN pass_admissions a ON a.ticket_id = t.id
-       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR') AS passAdmissions,
+       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR' AND t.refunded_at IS NULL) AS passAdmissions,
       (SELECT count(*) FROM reservations r
        JOIN tickets t ON t.reservation_id = r.id
        JOIN pass_admissions a ON a.ticket_id = t.id
        JOIN passes p ON p.id = a.pass_id
        JOIN pass_types pt ON pt.id = p.pass_type_id
-       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR' AND pt.slug = 'fellowship') AS fellowshipAdmissions
+       WHERE r.performance_id = ${performanceId} AND r.status = 'DOOR' AND t.refunded_at IS NULL AND pt.slug = 'fellowship') AS fellowshipAdmissions
   `
 }
 
