@@ -10,6 +10,8 @@ export interface Shot {
   height?: number
   // Page-context JavaScript run before capture, for opening a modal or picking a filter.
   after?: string
+  // An expression waited for after `after`, for a page that has to look before it is ready.
+  ready?: string
   annotations: Annotation[]
 }
 

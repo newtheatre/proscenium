@@ -11,7 +11,13 @@ function desk(showsFrom: number): { clicks: () => number, run: () => void } {
   const document = {
     querySelector: (selector: string) => {
       if (selector.includes('desk-performance')) return clicks >= showsFrom ? {} : null
-      if (selector.includes('desk-next-night')) return { click: () => { clicks += 1 } }
+      if (selector.includes('desk-next-night')) {
+        return {
+          click: () => {
+            clicks += 1
+          },
+        }
+      }
       return null
     },
   }
