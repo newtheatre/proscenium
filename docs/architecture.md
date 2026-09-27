@@ -1457,7 +1457,10 @@ D-126 and E-127 criterion 3 gave it something to link from and into.
 and the same partial unique index (`incidents_one_correction`) as `age_checks`.
 
 A near miss (E-117) is not a second table: `severity = 'NEAR_MISS'` on the same `incidents` row
-is criterion 3's "distinct type". `POST /api/tonight/incidents/near-miss` takes `nearMissForm`,
+is criterion 3's "distinct type". Nor is it a second form since issue 1317: `/tonight/incidents`
+pins one Log something sheet whose kind (`LOG_KINDS`, `DEFAULT_LOG_KIND` in
+`shared/utils/incidents.ts`) starts on Near miss, and `logRoute()` sends a near miss to its own
+route and anything else to the log's. `POST /api/tonight/incidents/near-miss` takes `nearMissForm`,
 which asks for a category and a sentence and nothing else (criteria 1, 2): no `severity` field
 exists on the input, no `happenedAt` either, since a near miss is always logged as it happens,
 against the trigger it would otherwise block. The route fixes `severity` itself; anything a
@@ -1995,7 +1998,9 @@ the door, the till and the registers inherit the conditions rather than each rem
 
 | Component | Props | What it guarantees |
 | --- | --- | --- |
-| `NightScreen` | `title`, `hint?`, `stale?`, `busy?` | The column caps at `max-w-md` and lays out from 360 pixels up, so the desktop view is the adaptation. Its `actions` slot is pinned to the bottom of the viewport, which is where a thumb rests. |
+| `NightScreen` | `title`, `hint?`, `empty?`, `stale?`, `busy?`, `refused?` | The column caps at `max-w-md` and lays out from 360 pixels up, so the desktop view is the adaptation. Its `actions` slot is pinned to the bottom of the viewport, which is where a thumb rests. The hint shows the first time the screen opens on the phone, or while `empty`, and not otherwise (`nightHintShows()`, issue 1317); the phone remembers it in `localStorage`, and one that cannot shows it every time. |
+| `NightSheet` | `open`, `title`, `primary?`, `primaryColor?`, `primaryDisabled?`, `loading?`, `@primary` | Every show-night overlay (issue 1317): a `UDrawer` from the foot, its title and nothing else above the work, the focus on the first `data-sheet-first` choice, else the body's first field, else Back (`data-sheet-back`), never a corner cross or the footer primary, and the primary full width in the footer with Back beneath it. |
+| `NightChoices` | `v-model`, `label`, `options`, `testId`, `columns?` | A sheet's choice as 48 pixel tiles, never a dropdown; the first tile carries the sheet's opening focus. |
 | `NightAction` | `label`, `icon?`, `color?`, `disabled?`, `loading?`, `to?`, `@press` | At least 48 by 48 pixels, full width, and reachable by a single tap: no hover state, no long press, no second finger. |
 | `NightStale` | `at?`, `busy?` | "Last synced HH:MM" in Europe/London, or "Not yet synced" when nothing has loaded. It is never hidden, because a screen holding nothing is when its age matters most. Words and an icon, never colour alone. |
 

@@ -154,7 +154,7 @@ consequences list. The sidebar carries fifty-four, which is why each group split
 and Set-up first (0082): search finds a screen whose name you already know, and the sections are
 what make an unfamiliar one findable at all.
 
-Nine rules follow:
+Eleven rules follow:
 
 1. **A permanently dark region is marked `dark`.** The public header and footer are stage black
    in both colour modes. That is one class on the subtree, after which every semantic token
@@ -184,9 +184,10 @@ Nine rules follow:
    the curtain, on any screen: after it the duty manager's own job is the night report, which leads
    the hub, is what the glance pins, and pins Sign off and close itself (`curtainIsDown()`, issue
    1315). A titled block is `NightBlock`, a single number is `NightKpi`, a checklist row is
-   `NightChecklistItems` (Tick, and a quiet "Can't do this?" line for the exception) and the
-   matinee-day picker is `NightPerformanceSwitcher`; none of the five is in the expressive kit, and
-   all five are show-night only.
+   `NightChecklistItems` (Tick, and a quiet "Can't do this?" line for the exception), an overlay is
+   `NightSheet` with `NightChoices` for its choices (rule 11) and the matinee-day picker is
+   `NightPerformanceSwitcher`, one row per house stacked, never a sideways scroll; none of the seven
+   is in the expressive kit, and all seven are show-night only.
 4. **The show-night screens are phone-first and work offline.** They cache their night on open
    and render from cache when the network drops (`architecture.md`, module K). Anything that only
    looks right on a desk monitor is wrong for the surface it is on. Every control on one clears
@@ -262,7 +263,7 @@ Nine rules follow:
    below it are already the question. A refusal from the route renders inside the modal above
    its footer, `ConfirmModal`'s `failure` prop where it is one and a `UAlert` at the top of the
    body where it is a form, and the page's own alert is hidden while a modal is open. The
-   show-night kit is not bound by this: it keeps its own register (rule 3).
+   show-night kit is not bound by this: its overlays are sheets (rule 11).
 10. **A console screen says what it is for in one sentence, and the documentation says the
     rest.** The navbar carries the title, so no screen draws a `UPageHeader` of its own; beneath
     it comes at most one line of plain prose, above the first table or form. An officer who
@@ -271,7 +272,20 @@ Nine rules follow:
     has to act on, a refusal, a warning about the data in front of them or an empty result: one
     that is always there is furniture, and it is read the second time and never again.
     `tests/unit/admin-conventions.test.ts` holds the rule, against named lists that may shrink
-    and may not grow (K-123 criterion 11, issue 1151 item 2).
+    and may not grow (K-123 criterion 11, issue 1151 item 2). The night shell keeps the same rule
+    for the line under a screen's name: `NightScreen` shows its `hint` the first time the screen
+    opens on a phone, or while the screen has nothing on it yet (`empty`, `nightHintShows()`), and
+    every other time the screen starts with its work (issue 1317).
+11. **A show-night overlay is a sheet, not the desk modal.** `NightSheet` rises from the foot of
+    the phone with its title and nothing else above the work: no description, no corner cross to
+    aim for. A choice is `NightChoices`, tiles of 48 pixels two across, never a dropdown; the focus
+    opens on the first choice, or the body's first field where there is none, and on Back where
+    there is neither, so Enter never fires a reset or an approval unasked; the primary is full
+    width in the footer with Back beneath it. A choice that is itself the action, such as the right call
+    on the backstage board, needs no primary. The incident log is one sheet, Log something, whose
+    kind is a choice with Near miss chosen already. `tests/unit/night-sheet.test.ts` holds the
+    rule for every overlay the show-night screens own (issue 1317, K-102). The till's own dialogues
+    are the bar's and move to the sheet with it; until they do they are the one exception.
 
 ## Photography and show artwork
 

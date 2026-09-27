@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { nightHintSeenKey, nightHintShows } from '#shared/utils/night-shell'
+
 // One show-night screen: the work, and the actions pinned under the thumb (K-102). The screen's
 // own name goes to the layout's header, so the show title and the back arrow are never repeated.
 const props = defineProps<{
   title: string
   hint?: string
+  // Nothing on the screen yet: the one state besides first use that still shows the hint.
+  empty?: boolean
   stale?: Date | number | string | null
   busy?: boolean
   // Set when this screen refused the viewer: one card in place of the work, and no live controls
@@ -12,6 +16,19 @@ const props = defineProps<{
 }>()
 
 setNightEyebrow(() => props.title)
+
+// Taken as seen until the phone says otherwise, so the server never draws a hint the phone then
+// takes away; a phone that cannot remember shows it every time (issue 1317).
+const seenBefore = ref(true)
+onMounted(() => {
+  seenBefore.value = !firstUseOnDevice(nightHintSeenKey(props.title))
+})
+const showsHint = computed(() => Boolean(props.hint) && nightHintShows({ empty: props.empty ?? false, seenBefore: seenBefore.value }))
+// Remembered once drawn on a screen that loaded for this viewer, so a refusal or a failed first
+// load never uses the hint up.
+watch(() => showsHint.value && !props.refused && props.stale != null, (drawn) => {
+  if (drawn) rememberHint(nightHintSeenKey(props.title))
+})
 </script>
 
 <template>
@@ -29,7 +46,7 @@ setNightEyebrow(() => props.title)
     />
 
     <p
-      v-if="hint && !refused"
+      v-if="showsHint && !refused"
       class="text-sm text-muted"
       data-test="night-hint"
     >

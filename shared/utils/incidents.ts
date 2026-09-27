@@ -12,6 +12,16 @@ export type Category = (typeof CATEGORIES)[number]
 export const SEVERITIES = ['NOTE', 'NEAR_MISS', 'INCIDENT', 'SERIOUS'] as const
 export type Severity = (typeof SEVERITIES)[number]
 
+// The one Log something sheet's kinds, a near miss first and already chosen: the low-friction
+// report is the one the committee most wants (E-117, issue 1317).
+export const LOG_KINDS: readonly Severity[] = ['NEAR_MISS', 'NOTE', 'INCIDENT', 'SERIOUS']
+export const DEFAULT_LOG_KIND: Severity = 'NEAR_MISS'
+
+// A near miss keeps its own route: always now, one sentence, no severity to triage (E-117 2).
+export function logRoute(kind: Severity): string {
+  return kind === 'NEAR_MISS' ? '/api/tonight/incidents/near-miss' : '/api/tonight/incidents'
+}
+
 export function saysCategory(category: Category): string {
   if (category === 'MEDICAL') return 'Medical'
   if (category === 'BEHAVIOUR') return 'Behaviour'

@@ -62,38 +62,37 @@ async function changeTo(milestoneTypeId: string): Promise<void> {
     Next call: {{ next.label }}
   </UButton>
 
-  <UModal
+  <!-- A tap on the right call is the change itself, so the sheet has no primary of its own. -->
+  <NightSheet
     v-model:open="changing"
-    title="Change the call"
-    :description="changeable ? `Sent as ${changeable.milestoneLabel}. Pick what it should have been.` : ''"
+    :title="changeable ? `Sent as ${changeable.milestoneLabel}: change it to` : 'Change the call'"
   >
-    <template #body>
-      <div
-        class="space-y-3"
-        data-test="board-change-form"
-      >
-        <UAlert
-          v-if="changeFailure"
-          color="error"
-          variant="subtle"
-          :description="changeFailure"
-          data-test="board-change-failure"
-        />
-        <div class="grid grid-cols-2 gap-2">
-          <UButton
-            v-for="type in milestoneTypes.filter(one => one.id !== changeable?.milestoneTypeId)"
-            :key="type.id"
-            color="neutral"
-            variant="outline"
-            size="lg"
-            class="min-h-12"
-            :data-test="`board-change-to-${type.id}`"
-            @click="changeTo(type.id)"
-          >
-            {{ type.label }}
-          </UButton>
-        </div>
+    <div
+      class="space-y-3"
+      data-test="board-change-form"
+    >
+      <UAlert
+        v-if="changeFailure"
+        color="error"
+        variant="subtle"
+        :description="changeFailure"
+        data-test="board-change-failure"
+      />
+      <div class="grid grid-cols-2 gap-2">
+        <UButton
+          v-for="(type, index) in milestoneTypes.filter(one => one.id !== changeable?.milestoneTypeId)"
+          :key="type.id"
+          color="neutral"
+          variant="outline"
+          size="lg"
+          class="min-h-12"
+          :data-sheet-first="index === 0 ? '' : undefined"
+          :data-test="`board-change-to-${type.id}`"
+          @click="changeTo(type.id)"
+        >
+          {{ type.label }}
+        </UButton>
       </div>
-    </template>
-  </UModal>
+    </div>
+  </NightSheet>
 </template>

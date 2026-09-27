@@ -87,8 +87,8 @@ desk, on any day: take the person's booking reference and pass it to the Front o
 1. **The badge** says how you got in: **On shift** with your first name, or **Officer** when a
    role opened the screen with no shift behind it.
 2. **The performance switcher** appears only when the venue runs more than one performance
-   tonight, a matinee and an evening. The clock picks the house whose doors are open now; a press
-   holds your choice until you press another.
+   tonight, a matinee and an evening, one row per house so none hides off the edge. The clock picks
+   the house whose doors are open now; a press holds your choice until you press another.
 3. **The house numbers** are the three words every show-night screen uses for the house:
    **sold** (tickets sold, paid or not) against capacity, **in** (people admitted through the
    door) and **seats left** (capacity less sold, or **No cap** where the house is uncapped).

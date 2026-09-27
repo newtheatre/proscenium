@@ -273,7 +273,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Story: As anyone working tonight, I want to report a near miss in two taps and a sentence so that the reports we get reflect the culture we want.
 - Depends on: E-115
 - Acceptance criteria:
-  1. From any show-night screen, a near miss is one tap to open, one tap to pick a category and one sentence of free text; no severity triage, no further mandatory fields.
+  1. From any show-night screen, a near miss is one tap to open, one tap to pick a category and one sentence of free text; no severity triage, no further mandatory fields. Trimmed 27 September 2026 (issue 1317): a near miss is a kind, not a form of its own. The incident log's one Log something sheet opens with Near miss already chosen, so it is still one tap to open, one to pick a category and one sentence, filed through its own route with no severity.
   2. Submitting a near miss never blocks or interrupts any other flow.
   3. Near misses land in the incident log as a distinct append-only type, attributed to the reporter, and count on the night report.
   4. Near misses are included in the safety officer's digests and in the season trend queries (E-126).

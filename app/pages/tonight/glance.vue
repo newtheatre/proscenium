@@ -176,24 +176,12 @@ onUnmounted(() => {
         :description="`Showing what was last loaded: ${failure}`"
       />
 
-      <div
+      <NightPerformanceSwitcher
         v-if="performances.length > 1"
-        class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
-        data-test="performance-switcher"
-      >
-        <UButton
-          v-for="performance in performances"
-          :key="performance.performanceId"
-          size="sm"
-          class="min-h-12 shrink-0"
-          :color="performance.performanceId === selectedId ? 'primary' : 'neutral'"
-          :variant="performance.performanceId === selectedId ? 'solid' : 'subtle'"
-          :data-test="`choose-${performance.performanceId}`"
-          @click="chosenId = performance.performanceId"
-        >
-          {{ performance.showTitle }}, {{ timeOf(performance.startsAt) }}
-        </UButton>
-      </div>
+        :performances="performances"
+        :selected-id="selectedId"
+        @choose="chosenId = $event"
+      />
 
       <template v-if="selected && kpis">
         <NightBlock
