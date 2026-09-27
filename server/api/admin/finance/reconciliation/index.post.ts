@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
     target: `z-reading:${input.night}`,
     detail: {
       night: input.night,
-      readerPence: input.readerPence,
+      readerPence: prepared.readerPence,
       expectedPence: prepared.expectedPence,
       variancePence: prepared.variancePence,
       writtenOff: input.writtenOff,
@@ -42,11 +42,14 @@ export default defineEventHandler(async (event) => {
 
   const current = await currentReading(input.night)
   if (!current || current.id !== prepared.id) {
+    const settled = input.writtenOff && current !== null && current.id === input.supersedesId && current.writtenOff
     throw createError({
       statusCode: 409,
-      statusMessage: input.supersedesId
-        ? 'That reading is no longer the live one for this night'
-        : 'Somebody else just recorded this night\'s first reading',
+      statusMessage: settled
+        ? 'That reading is already written off'
+        : input.supersedesId
+          ? 'That reading is no longer the live one for this night'
+          : 'Somebody else just recorded this night\'s first reading',
     })
   }
 

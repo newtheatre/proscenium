@@ -83,6 +83,8 @@ const figures = computed(() => (data.value
       </template>
     </AdminToolbar>
 
+    <MoneyNightsNeedingYou />
+
     <UAlert
       v-if="summaryFailure"
       data-test="summary-failure"
@@ -137,6 +139,19 @@ const figures = computed(() => (data.value
             </dd>
           </div>
         </dl>
+        <p
+          v-if="data.unreconciledNights > 0"
+          class="text-sm text-warning"
+          data-test="unreconciled-nights"
+        >
+          The open variance leaves out {{ plural(data.unreconciledNights, 'night') }} in this period with no Z
+          reading yet, so their variance is not known.
+          <ULink
+            v-if="mayDrillDown"
+            to="/money/reconciliation"
+            class="underline"
+          >Reconcile them</ULink>
+        </p>
       </section>
     </template>
   </div>

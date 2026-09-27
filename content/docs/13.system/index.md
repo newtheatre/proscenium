@@ -3,7 +3,7 @@ title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
 audience: committee
-updatedOn: 2026-09-26
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -55,6 +55,13 @@ push provider returned a failure), **Not sent** (the message was suppressed befo
 reason: **muted this topic**, **has not proved their address**, **the account is gone**, **the
 account was erased**, or **no reason recorded**. A failure here is a person who was not told
 something, so it belongs in front of the committee rather than in a log nobody opens.
+
+**Needs you: nights to reconcile** appears only when a night is waiting, and only to somebody who
+reads the money records, such as the Treasurer. It lists every night that took card money with no
+Z reading recorded, and every night whose reading still disagrees with what we expect, oldest
+first and never cut short. Each night links straight to its
+[daily reconciliation](/docs/money/daily-reconciliation). The money dashboard carries the same
+list.
 
 **Published shows nobody has assessed for content warnings** appears only when there is at least
 one, and only to somebody holding a ticketing permission. A published show with no warnings and

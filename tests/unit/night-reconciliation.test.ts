@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { nightsWithTakings, outstandingNights, zReadingStatement } from '#server/utils/night-reconciliation'
+import { nightsWithTakings, outstandingNights, resolvedReaderPence, zReadingStatement } from '#server/utils/night-reconciliation'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { recordZReadingForm } from '#shared/utils/night-reconciliation'
+import { liveVariance, nightFromQuery, nightsNeedingYou, nightsWithin, reconciliationHref, recordZReadingForm, zNightQuery } from '#shared/utils/night-reconciliation'
 import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 
 // I-104: the reader keys in what it shows; a variance needs a note before it can be recorded,
@@ -29,6 +29,108 @@ describe('a Z reading takes a night and what the reader showed', () => {
     expect(recordZReadingForm.safeParse({
       night: '2026-09-15', readerPence: 5000, supersedesId: 'z-1', note: 'Corrected mistyped figure',
     }).success).toBe(true)
+  })
+
+  // Issue 1360: a write-off accepts the reading as it stands, so nobody retypes the figure.
+  test('a write-off needs a note and what it resolves, and no reader figure', () => {
+    expect(recordZReadingForm.safeParse({
+      night: '2026-09-15', supersedesId: 'z-1', note: 'Accepted: a refund given in cash', writtenOff: true,
+    }).success).toBe(true)
+  })
+
+  test('anything else still needs the reader figure', () => {
+    expect(recordZReadingForm.safeParse({ night: '2026-09-15', supersedesId: 'z-1', note: 'Mistyped' }).success).toBe(false)
+  })
+})
+
+// Issue 1360: the figure a write-off records is the reading it resolves, read back rather than
+// retyped; a different figure is a correction, and says so.
+describe('the reader figure a reading records', () => {
+  const reading = { night: '2026-09-15', writtenOff: false }
+
+  function refusal(fn: () => unknown): string {
+    try {
+      fn()
+    }
+    catch (error) {
+      return (error as { statusMessage?: string }).statusMessage ?? 'refused'
+    }
+    return ''
+  }
+
+  test('a correction or a first reading records what was typed', () => {
+    expect(resolvedReaderPence({ ...reading, readerPence: 4200 }, null)).toBe(4200)
+    expect(resolvedReaderPence({ ...reading, readerPence: 4200, supersedesId: 'z-1' }, { readerPence: 5000 })).toBe(4200)
+  })
+
+  test('a write-off records the figure of the reading it resolves', () => {
+    expect(resolvedReaderPence({ ...reading, writtenOff: true, supersedesId: 'z-1', note: 'Accepted' }, { readerPence: 5000 })).toBe(5000)
+    expect(resolvedReaderPence({ ...reading, writtenOff: true, readerPence: 5000, supersedesId: 'z-1', note: 'Accepted' }, { readerPence: 5000 })).toBe(5000)
+  })
+
+  test('a write-off with a different figure is refused as the correction it is', () => {
+    expect(refusal(() => resolvedReaderPence({ ...reading, writtenOff: true, readerPence: 4000, supersedesId: 'z-1', note: 'x' }, { readerPence: 5000 })))
+      .toContain('correct')
+  })
+
+  test('a write-off with no reading to resolve is refused', () => {
+    expect(refusal(() => resolvedReaderPence({ ...reading, writtenOff: true, note: 'x' }, null))).toContain('names the variance')
+  })
+
+  // The button said "Write off £X": a sale landing since would write off a different sum under the
+  // same note, so a moved expected figure refuses, quoting both (0005's rule, sale.ts's shape).
+  test('a write-off whose screen expected another figure is refused, quoting both', () => {
+    const said = refusal(() => zReadingStatement(
+      { ...reading, readerPence: 5000, supersedesId: 'z-1', note: 'Accepted', writtenOff: true, expectedPence: 4200 }, 'u-1', 4500))
+    expect(said).toContain('£42.00')
+    expect(said).toContain('£45.00')
+    expect(refusal(() => zReadingStatement(
+      { ...reading, readerPence: 5000, supersedesId: 'z-1', note: 'Accepted', writtenOff: true, expectedPence: 4500 }, 'u-1', 4500))).toBe('')
+  })
+})
+
+// Issue 1360: a night is reached by its address from wherever it is listed, and the screen says
+// the variance as the figure is typed rather than after Record.
+describe('the reconciliation screen\'s own arithmetic', () => {
+  test('a night comes from the address, or the screen opens on tonight', () => {
+    expect(nightFromQuery('2026-09-05', '2026-09-27')).toBe('2026-09-05')
+    expect(nightFromQuery(['2026-09-05'], '2026-09-27')).toBe('2026-09-05')
+    expect(nightFromQuery('5 September', '2026-09-27')).toBe('2026-09-27')
+    expect(nightFromQuery(undefined, '2026-09-27')).toBe('2026-09-27')
+  })
+
+  test('an impossible date in the address is no night at all', () => {
+    expect(nightFromQuery('2026-13-45', '2026-09-27')).toBe('2026-09-27')
+    expect(nightFromQuery('2026-02-30', '2026-09-27')).toBe('2026-09-27')
+    expect(recordZReadingForm.safeParse({ night: '2026-02-30', readerPence: 0 }).success).toBe(false)
+    expect(zNightQuery.safeParse({ night: '2026-13-45' }).success).toBe(false)
+    expect(zNightQuery.safeParse({ night: '2026-09-05' }).success).toBe(true)
+  })
+
+  // Issue 1360: "Open variance £0.00" beside nights with no reading reads as all clear.
+  test('the nights with no reading are counted within the dashboard\'s own range', () => {
+    const missing = [{ night: '2026-08-31' }, { night: '2026-09-05' }, { night: '2026-09-30' }, { night: '2026-10-01' }]
+    expect(nightsWithin(missing, '2026-09-01', '2026-09-30')).toBe(2)
+    expect(nightsWithin([], '2026-09-01', '2026-09-30')).toBe(0)
+  })
+
+  test('a listed night links to its own reconciliation', () => {
+    expect(reconciliationHref('2026-09-05')).toBe('/money/reconciliation?night=2026-09-05')
+  })
+
+  test('the variance is the reader less the expected figure, and nothing until a figure is typed', () => {
+    expect(liveVariance(5000, 4200)).toBe(800)
+    expect(liveVariance(4200, 4200)).toBe(0)
+    expect(liveVariance(null, 4200)).toBeNull()
+  })
+
+  test('the nights needing you are one list, oldest first, each saying why', () => {
+    expect(nightsNeedingYou({ missing: [{ night: '2026-09-05' }, { night: '2026-09-23' }], openVariance: [{ night: '2026-09-12' }] }))
+      .toEqual([
+        { night: '2026-09-05', says: 'No reading' },
+        { night: '2026-09-12', says: 'Open variance' },
+        { night: '2026-09-23', says: 'No reading' },
+      ])
   })
 })
 

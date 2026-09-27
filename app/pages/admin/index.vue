@@ -112,6 +112,8 @@ onMounted(() => {
       </ul>
     </UPageCard>
 
+    <MoneyNightsNeedingYou />
+
     <UPageCard
       v-if="unassessed.total > 0"
       title="Published shows nobody has assessed for content warnings"

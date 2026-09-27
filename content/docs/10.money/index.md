@@ -3,7 +3,7 @@ title: Money
 description: The money dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
 audience: committee
-updatedOn: 2026-09-26
+updatedOn: 2026-09-27
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -66,9 +66,17 @@ Box Office Manager gave it on the [seasons](/docs/box-office/seasons) screen.
    dashboard's range.
 4. **Refunds**, **Forgone comps**, **Forgone discounts** and **Open variance**: the money
    handed back, the value given away rather than taken, and the sum of every night's reader
-   reading that still disagrees with the ledger and has not been written off.
+   reading that still disagrees with the ledger and has not been written off. A night with no
+   reading has no variance to add yet, so when the period holds any, a line beneath says how many
+   the open variance leaves out, and the Treasurer's copy links to reconciling them.
 
 The range the figures cover is printed above them, from and to, as London dates.
+
+Beneath the period controls, **Needs you: nights to reconcile** lists every night that took card
+money with no Z reading, and every night whose reading still disagrees with what we expect,
+whatever period is chosen. Each night links to its
+[daily reconciliation](/docs/money/daily-reconciliation). It is shown to somebody who reads the
+money records, and only while a night is waiting; the console overview carries the same list.
 
 ## The pages
 

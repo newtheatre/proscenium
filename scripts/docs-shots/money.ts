@@ -52,7 +52,7 @@ export const money: Shot[] = [
       { selector: '[data-test="reconciliation-night"]', label: 'Night' },
       { selector: '[data-test="expected-total"]', label: 'Expected total' },
       { selector: '[data-test="section-current"]', label: 'Current reading' },
-      { selector: '[data-test="reader-pence"]', label: 'Reader figure, in pence' },
+      { selector: '[data-test="reader-pence"]', label: 'Reader figure' },
       { selector: '[data-test="record-reading"]', label: 'Record' },
     ],
   },

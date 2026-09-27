@@ -60,4 +60,7 @@ export interface SeasonSummary {
   compsPence: number
   discountsPence: number
   openVariancePence: number
+  // Nights in the range with takings and no reading: their variance is not known, so the open
+  // variance beside it is not the whole story (I-104 criterion 5, issue 1360).
+  unreconciledNights: number
 }

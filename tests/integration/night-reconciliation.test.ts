@@ -187,6 +187,22 @@ describe('the resolution chain (criterion 4)', () => {
       expect(read(database, loser.statement)).toEqual([])
     })
   })
+
+  // A written-off reading is settled: writing it off again restates nothing, so the statement
+  // refuses it on its own predicate, whatever a stale screen sends (0003).
+  test('a write-off of a reading already written off inserts nothing, and a correction still may', async () => {
+    await withDatabase(async (database) => {
+      const first = record(database, NIGHT, 500, 0, { note: 'High' })
+      const writeOff = zReadingStatement({ night: NIGHT, readerPence: 500, supersedesId: first, writtenOff: true, note: 'Accepted' }, 'treasurer', 0)
+      read(database, writeOff.statement)
+
+      const again = zReadingStatement({ night: NIGHT, readerPence: 500, supersedesId: writeOff.id, writtenOff: true, note: 'Again' }, 'treasurer', 0)
+      expect(read(database, again.statement)).toEqual([])
+
+      const correction = zReadingStatement({ night: NIGHT, readerPence: 0, supersedesId: writeOff.id, writtenOff: false }, 'treasurer', 0)
+      expect(read(database, correction.statement)).toEqual([{ id: correction.id }])
+    })
+  })
 })
 
 describe('open variances, never truncated (criterion 5)', () => {

@@ -15,6 +15,57 @@ const PERIOD_FORM = 'app/composables/usePeriodForm.ts'
 const PERIOD_FIELDS = 'app/components/PeriodFields.vue'
 
 const MONEY_SCREENS = [MONEY, SHOWS, REPORTS, RECONCILIATION]
+const OVERVIEW = 'app/pages/admin/index.vue'
+const NEEDS_YOU = 'app/components/money/NightsNeedingYou.vue'
+
+// Issue 1360 (I-104 criteria 4 and 5): a night needing a reading is where the Treasurer looks,
+// linked to its own reconciliation; a variance is said as the figure is typed; a write-off is a note.
+describe('nights needing a reading are listed where the Treasurer looks', () => {
+  test('the money dashboard and the overview both carry the linked list', async () => {
+    for (const path of [MONEY, OVERVIEW]) expect(await read(path)).toContain('<MoneyNightsNeedingYou')
+    const band = await read(NEEDS_YOU)
+    expect(band).toContain('reconciliationHref(')
+    expect(band).toContain('/api/admin/finance/reconciliation/outstanding')
+    expect(band).toContain('viewFinanceReports')
+  })
+
+  test('the reconciliation screen reads its night from the address and keeps it there', async () => {
+    const source = await read(RECONCILIATION)
+    expect(source).toContain('nightFromQuery(route.query.night')
+    expect(source).toMatch(/navigateTo\(\{ query: \{ \.\.\.route\.query, night/)
+  })
+
+  test('the variance is shown as the figure is typed, and Record waits for a note it needs', async () => {
+    const source = await read(RECONCILIATION)
+    expect(source).toContain('liveVariance(')
+    expect(source).toContain('data-test="live-variance"')
+    expect(source).toContain('noteMissing')
+    expect(source).toContain('data-test="reader-zero"')
+  })
+
+  test('correct, check again and write off are separate actions, and a write-off retypes nothing', async () => {
+    const source = await read(RECONCILIATION)
+    for (const action of ['correct-reading', 'check-again', 'write-off']) expect(source).toContain(`data-test="${action}"`)
+    expect(source).not.toContain('<UCheckbox')
+    expect(source).toMatch(/writtenOff: true,\s*note:/)
+    expect(source).toMatch(/writtenOff: true,\s*note: [^\n]+\n\s*expectedPence:/)
+  })
+
+  test('a figure or a note typed for one night never carries into another', async () => {
+    expect(await read(RECONCILIATION)).toMatch(/watch\(night, \(\) => \{[^}]*readerFigure\.value = ''[^}]*writeOffNote\.value = ''/)
+  })
+
+  test('the night open on the screen is the only one shown as active in the list', async () => {
+    expect(await read(NEEDS_YOU)).toContain('exact-query')
+  })
+
+  // Issue 1360: "Open variance £0.00" beside nights with no reading reads as all clear.
+  test('the dashboard says how many nights in its range have no reading beside the open variance', async () => {
+    const source = await read(MONEY)
+    expect(source).toContain('data-test="unreconciled-nights"')
+    expect(source).toContain('unreconciledNights')
+  })
+})
 
 describe('an account says where it was reached from (A-121 criterion 6)', () => {
   test('the page carries the way back to the directory', async () => {
