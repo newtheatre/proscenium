@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MY_TILES, orderMyTiles, saysMembershipSentence } from '#shared/utils/my-summary'
+import { MY_THINGS_TO_DO, MY_TILES, orderMyTiles, saysMembershipSentence, splitMyTiles } from '#shared/utils/my-summary'
 import type { MySummary } from '#shared/utils/my-summary'
 
 // The overview leads with what is soonest, then the standing tiles (K-127 criterion 6), and a
@@ -72,6 +72,50 @@ describe('the overview leads with what is soonest (K-127 criterion 6, issue 1153
     const order = orderMyTiles(summary)
     expect([...order].sort()).toEqual([...MY_TILES].sort())
     expect(order.slice(0, 3)).toEqual(['shift', 'room', 'training'])
+  })
+})
+
+// Issue 1153 item 3: a tile with nothing behind it took a card of its own. Those become one list,
+// each line saying what would be there and the one action that fills it (K-127 criterion 6).
+describe('empty tiles become one list of things you can do (K-127 criterion 6, issue 1153 item 3)', () => {
+  const EMPTY: MySummary = {
+    ...BASE,
+    membership: { state: 'none', until: null, claim: null },
+    training: { held: 0, available: 0, nextStep: null, nextSession: null },
+  }
+
+  test('with nothing behind them, every tile but membership is a line on the list, in the standing order', () => {
+    const { tiles, things } = splitMyTiles(EMPTY)
+    expect(tiles).toEqual(['membership'])
+    expect(things).toEqual(['shift', 'room', 'training', 'passes', 'notifications', 'show'])
+  })
+
+  test('a tile with something behind it stays a tile, and keeps its place by what is soonest', () => {
+    const summary: MySummary = {
+      ...EMPTY,
+      room: { bookingId: 'b1', roomName: 'Studio', startsAt: WEDNESDAY, endsAt: WEDNESDAY + hours(2), purpose: null, cancellable: true },
+      passes: { active: [{ id: 'p1', typeName: 'Season pass', covers: null, status: 'ACTIVE' }], request: null },
+    }
+    const { tiles, things } = splitMyTiles(summary)
+    expect(tiles).toEqual(['room', 'membership', 'passes'])
+    expect(things).toEqual(['shift', 'training', 'notifications', 'show'])
+  })
+
+  test('on shift tonight with no shift to show is still a tile: it is where tonight is reached', () => {
+    expect(splitMyTiles({ ...EMPTY, onShiftTonight: true }).tiles).toContain('shift')
+  })
+
+  test('a pass request alone keeps the passes tile, since it has something to say', () => {
+    expect(splitMyTiles({ ...EMPTY, passes: { active: [], request: { state: 'PENDING' } } }).tiles).toContain('passes')
+  })
+
+  test('every line says what would be there and names one action with somewhere to go', () => {
+    for (const thing of splitMyTiles(EMPTY).things) {
+      const line = MY_THINGS_TO_DO[thing as keyof typeof MY_THINGS_TO_DO]
+      expect(`${thing}: ${line.says.endsWith('.')}`).toBe(`${thing}: true`)
+      expect(`${thing}: ${line.to.startsWith('/')}`).toBe(`${thing}: true`)
+      expect(line.label.length).toBeGreaterThan(0)
+    }
   })
 })
 
