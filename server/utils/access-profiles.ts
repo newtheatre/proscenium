@@ -70,7 +70,7 @@ function shapeDeclaration(row: AccessProfileRow, payload: AccessProfilePayload, 
 }
 
 function shapeOwn(row: AccessProfileRow, payload: AccessProfilePayload, now: number): OwnAccessProfile {
-  return { ...shapeDeclaration(row, payload, now), declineReason: payload.declineReason }
+  return { ...shapeDeclaration(row, payload, now), declineReason: payload.declineReason, version: row.encryptionIv }
 }
 
 export async function ownAccessProfile(userId: string, now = Date.now()): Promise<OwnAccessProfile | null> {
@@ -116,9 +116,14 @@ function monthsFromNow(now: number, months: number): number {
 
 export interface DeclareOutcome { repended: boolean }
 
+// The declaration the member's page read, matched again at the write: every decision re-encrypts,
+// so an officer's verify or decline since the page loaded changes the IV and refuses the save (0003).
+export const savePredicate = (status: string, version: string | null) =>
+  sql`status = ${status} AND encryption_iv IS ${version}`
+
 // Only the owner calls this, so it is the one reinstatement path from withdrawal (D-127 criterion
 // 5). A save that changes nothing leaves a current profile as it is, bar the consent (criterion 7).
-export async function declareAccessProfile(event: H3Event, userId: string, input: DeclareAccessProfileInput): Promise<DeclareOutcome> {
+export async function declareAccessProfile(event: H3Event, userId: string, input: DeclareAccessProfileInput, version: string | null): Promise<DeclareOutcome> {
   const now = Math.floor(Date.now() / 1000)
   const existing = await rowFor(userId)
 
@@ -153,18 +158,20 @@ export async function declareAccessProfile(event: H3Event, userId: string, input
   }
 
   const write = existing
-    ? db.update(schema.accessProfiles).set(values).where(eq(schema.accessProfiles.userId, userId))
+    ? db.update(schema.accessProfiles).set(values)
+        .where(and(eq(schema.accessProfiles.userId, userId), savePredicate(existing.status, version)))
+        .returning({ userId: schema.accessProfiles.userId })
     : db.insert(schema.accessProfiles).values({ userId, ...values, createdAt: now })
+        .onConflictDoNothing()
+        .returning({ userId: schema.accessProfiles.userId })
 
-  await db.batch([
-    write,
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: userId,
-      action: 'access-profile.updated',
-      target: `user:${userId}`,
-      detail: { wasVerified: existing?.status === 'VERIFIED' },
-    })),
-  ])
+  const applied = await auditedWrite(write, auditEntry({
+    actorId: userId,
+    action: 'access-profile.updated',
+    target: `user:${userId}`,
+    detail: { wasVerified: existing?.status === 'VERIFIED' },
+  }))
+  if (!applied) throw createError({ statusCode: 409, statusMessage: 'Your access requirements changed while you were saving. Look at them again, then save.' })
   return { repended: true }
 }
 

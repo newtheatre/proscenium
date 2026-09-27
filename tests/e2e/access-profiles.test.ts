@@ -100,9 +100,15 @@ function declaration(over: Record<string, unknown> = {}): Record<string, unknown
   }
 }
 
+// A save names the declaration it was made over, as the page does, and none for a first one (0003).
+async function declare(member: TestMember, over: Record<string, unknown> = {}): Promise<Response> {
+  const current = await own(member)
+  return send('PUT', '/api/account/access-profile', { ...declaration(over), version: current ? current.version : null }, member.cookie)
+}
+
 describe.skipIf(skip !== null)('a patron declares their own profile (criterion 1)', () => {
   test('flags, companions and a note are accepted and read back', async () => {
-    expect((await send('PUT', '/api/account/access-profile', declaration(), patron.cookie)).status).toBe(200)
+    expect((await declare(patron)).status).toBe(200)
 
     const answered = await send('GET', '/api/account/access-profile', undefined, patron.cookie)
     const { profile } = await answered.json() as { profile: { status: string, flags: Record<string, boolean>, companions: number } }
@@ -112,7 +118,7 @@ describe.skipIf(skip !== null)('a patron declares their own profile (criterion 1
   })
 
   test('more than two companions is refused', async () => {
-    expect((await send('PUT', '/api/account/access-profile', declaration({ companions: 3 }), patron.cookie)).status).toBe(400)
+    expect((await declare(patron, { companions: 3 })).status).toBe(400)
   })
 
   test('the stored payload is not the plaintext note: encrypted at rest (criterion 4, 0050)', async () => {
@@ -173,7 +179,7 @@ describe.skipIf(skip !== null)('a save re-pends only on a real change (criterion
     const before = await own()
     expect(before.status).toBe('VERIFIED')
 
-    const saved = await send('PUT', '/api/account/access-profile', declaration(AS_VERIFIED), patron.cookie)
+    const saved = await declare(patron, AS_VERIFIED)
     expect(saved.status).toBe(200)
     expect(await saved.json()).toMatchObject({ repended: false })
 
@@ -193,10 +199,10 @@ describe.skipIf(skip !== null)('a save re-pends only on a real change (criterion
   })
 
   test('a consent change riding an unchanged save does not re-pend either', async () => {
-    expect((await send('PUT', '/api/account/access-profile', declaration({ ...AS_VERIFIED, consent: false }), patron.cookie)).status).toBe(200)
+    expect((await declare(patron, { ...AS_VERIFIED, consent: false })).status).toBe(200)
     expect(await own()).toMatchObject({ status: 'VERIFIED', consentGiven: false })
 
-    expect((await send('PUT', '/api/account/access-profile', declaration(AS_VERIFIED), patron.cookie)).status).toBe(200)
+    expect((await declare(patron, AS_VERIFIED)).status).toBe(200)
     expect(await own()).toMatchObject({ status: 'VERIFIED', consentGiven: true })
   })
 
@@ -222,7 +228,7 @@ describe.skipIf(skip !== null)('a save re-pends only on a real change (criterion
   }, 120_000)
 
   test('a real change goes back to the officer and retires the wording until it is verified again', async () => {
-    const changed = await send('PUT', '/api/account/access-profile', declaration({ ...AS_VERIFIED, companions: 2 }), patron.cookie)
+    const changed = await declare(patron, { ...AS_VERIFIED, companions: 2 })
     expect(changed.status).toBe(200)
     expect(await changed.json()).toMatchObject({ repended: true })
     expect(await own()).toMatchObject({ status: 'PENDING', fohNote: null, expiresAt: null })
@@ -248,7 +254,7 @@ describe.skipIf(skip !== null)('the owner is told, and told nothing declared or 
 
   test('a decline needs a reason, keeps it in the encrypted payload for the owner, and says only that there is one', async () => {
     declined = await registerMember(app, 'declined', generatePassword())
-    expect((await send('PUT', '/api/account/access-profile', declaration(), declined.cookie)).status).toBe(200)
+    expect((await declare(declined)).status).toBe(200)
 
     const bare = await withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${declined.id}/decline`, {}, accessOfficer.cookie))
     expect(bare.status).toBe(400)
@@ -276,7 +282,7 @@ describe.skipIf(skip !== null)('the owner is told, and told nothing declared or 
   })
 
   test('saving a declined profile again, unchanged, asks to be checked again and clears the reason', async () => {
-    const saved = await send('PUT', '/api/account/access-profile', declaration({ accessCardNumber: null }), declined.cookie)
+    const saved = await declare(declined, { accessCardNumber: null })
     expect(await saved.json()).toMatchObject({ repended: true })
     expect(await own(declined)).toMatchObject({ status: 'PENDING', declineReason: null })
   })
@@ -287,7 +293,7 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
 
   async function declared(prefix: string): Promise<TestMember> {
     const member = await registerMember(app, prefix, generatePassword())
-    expect((await send('PUT', '/api/account/access-profile', declaration(), member.cookie)).status).toBe(200)
+    expect((await declare(member)).status).toBe(200)
     return member
   }
 
@@ -309,7 +315,7 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
   test('a member\'s change after the officer read refuses the verification, and the change stands', async () => {
     const member = await declared('changed-under')
     const seen = await versionOf(member.id)
-    expect((await send('PUT', '/api/account/access-profile', declaration({ companions: 2, requesterNote: 'Uses a wheelchair and a stick' }), member.cookie)).status).toBe(200)
+    expect((await declare(member, { companions: 2, requesterNote: 'Uses a wheelchair and a stick' })).status).toBe(200)
 
     const stale = await verifyAs(member.id, seen)
     expect(stale.status).toBe(409)
@@ -322,7 +328,7 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
   test('the same holds for a decline', async () => {
     const member = await declared('declined-under')
     const seen = await versionOf(member.id)
-    expect((await send('PUT', '/api/account/access-profile', declaration({ companions: 0 }), member.cookie)).status).toBe(200)
+    expect((await declare(member, { companions: 0 })).status).toBe(200)
 
     const stale = await withoutSecondFactor(() =>
       send('POST', `/api/admin/access-profiles/${member.id}/decline`, { reason: 'Could not check the card', version: seen }, accessOfficer.cookie))
@@ -340,20 +346,53 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
     expect((await verifyAs(member.id, seen)).status).toBe(200)
   })
 
-  test('a member\'s save racing an officer\'s verify: the save is never lost, and a verify on the old declaration never lands after it', async () => {
+  test('a member\'s save racing an officer\'s verify: exactly one lands, and the other is refused', async () => {
     for (let round = 0; round < 4; round++) {
       const member = await declared(`raced-${round}`)
       const seen = await versionOf(member.id)
       const [saved, verified] = await Promise.all([
-        send('PUT', '/api/account/access-profile', declaration({ companions: 2, requesterNote: `Round ${round}` }), member.cookie),
+        send('PUT', '/api/account/access-profile', { ...declaration({ companions: 2, requesterNote: `Round ${round}` }), version: seen }, member.cookie),
         verifyAs(member.id, seen),
       ])
-      expect(saved.status).toBe(200)
-      expect([200, 409]).toContain(verified.status)
+      expect([saved.status, verified.status].sort()).toEqual([200, 409])
 
-      // Either the verify landed first and the save re-pended it, or the save landed first and the verify was refused.
-      expect(await own(member)).toMatchObject({ status: 'PENDING', companions: 2, requesterNote: `Round ${round}`, fohNote: null })
+      // Whichever landed first stands, and the other was made over a declaration that has gone.
+      expect(await own(member)).toMatchObject(saved.status === 200
+        ? { status: 'PENDING', companions: 2, requesterNote: `Round ${round}`, fohNote: null }
+        : { status: 'VERIFIED', companions: 1, fohNote: 'Aisle seat' })
     }
+  })
+})
+
+describe.skipIf(skip !== null)('a member\'s save lands only over the declaration their page read (criterion 7, 0003)', () => {
+  const SAVE_RACED = 'Your access requirements changed while you were saving. Look at them again, then save.'
+
+  test('a form opened before the officer verified is refused, and the verification and its wording stand', async () => {
+    const member = await registerMember(app, 'stale-form', generatePassword())
+    expect((await declare(member)).status).toBe(200)
+    const opened = (await own(member)).version
+    expect((await decide(member.id, 'verify', { fohNote: 'Aisle seat' })).status).toBe(200)
+
+    // The page still holds the card number the officer's sighting cleared.
+    const stale = await send('PUT', '/api/account/access-profile', { ...declaration(), version: opened }, member.cookie)
+    expect(stale.status).toBe(409)
+    expect((await stale.json() as { statusMessage?: string }).statusMessage).toBe(SAVE_RACED)
+    expect(await own(member)).toMatchObject({ status: 'VERIFIED', fohNote: 'Aisle seat', accessCardNumber: null })
+  })
+
+  test('a save without the version its page read is refused as incomplete', async () => {
+    const member = await registerMember(app, 'unversioned-save', generatePassword())
+    expect((await send('PUT', '/api/account/access-profile', declaration(), member.cookie)).status).toBe(400)
+  })
+
+  test('two first declarations racing leave one profile and one entry, and neither fails', async () => {
+    const member = await registerMember(app, 'first-race', generatePassword())
+    const answers = await race(2, () => send('PUT', '/api/account/access-profile', { ...declaration(), version: null }, member.cookie))
+    const statuses = answers.map(answer => answer.status)
+    expect(statuses.every(status => status === 200 || status === 409)).toBe(true)
+    expect(statuses).toContain(200)
+    expect(count('SELECT count(*) AS n FROM access_profiles WHERE user_id = ?', member.id)).toBe(1)
+    expect(count(`SELECT count(*) AS n FROM audit_log WHERE action = 'access-profile.updated' AND target = ?`, `user:${member.id}`)).toBe(1)
   })
 })
 
@@ -397,7 +436,7 @@ describe.skipIf(skip !== null)('withdrawal and reinstatement (criterion 5)', () 
   })
 
   test('the owner declaring again is the one sanctioned way back in', async () => {
-    expect((await send('PUT', '/api/account/access-profile', declaration({ companions: 0 }), patron.cookie)).status).toBe(200)
+    expect((await declare(patron, { companions: 0 })).status).toBe(200)
     const answered = await send('GET', '/api/account/access-profile', undefined, patron.cookie)
     const { profile } = await answered.json() as { profile: { status: string } }
     expect(profile.status).toBe('PENDING')
@@ -409,7 +448,7 @@ describe.skipIf(skip !== null)('GDPR erasure deletes the profile immediately, no
     const password = generatePassword()
     const gone = await registerMember(app, 'erasable', password)
 
-    expect((await send('PUT', '/api/account/access-profile', declaration(), gone.cookie)).status).toBe(200)
+    expect((await declare(gone)).status).toBe(200)
     expect(row('SELECT user_id FROM access_profiles WHERE user_id = ?', gone.id)).toBeDefined()
 
     expect((await send('POST', '/api/account/close', { email: gone.email }, gone.cookie)).status).toBe(200)

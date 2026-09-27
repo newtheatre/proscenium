@@ -66,6 +66,7 @@ async function verifiedPatron(): Promise<TestMember> {
     requesterNote: 'Uses a wheelchair',
     accessCardNumber: null,
     consent: true,
+    version: null,
   }, holder.cookie)).status).toBe(200)
 
   const read = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${holder.id}`, undefined, officer.cookie))
