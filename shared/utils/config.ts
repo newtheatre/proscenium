@@ -293,7 +293,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 3,
     workshop: 'spaces-and-training',
-    describes: 'Working days needed before a room we do not manage is wanted. Weekends and bank holidays do not count; the booking itself may still fall on one.',
+    describes: 'Working days needed before a Students\' Union room is wanted. Weekends and bank holidays do not count; the booking itself may still fall on one.',
   },
   BANK_HOLIDAYS: {
     schema: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),

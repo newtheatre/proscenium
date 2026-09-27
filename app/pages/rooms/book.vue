@@ -449,7 +449,7 @@ useSeoMeta({ title: 'Book a room' })
           label="What the room is for"
           name="purpose"
           required
-          description="What you need the room to be like. It is what a room we do not manage is judged suitable for."
+          description="What you need the room to be like. It is what a Students' Union room is judged suitable for."
         >
           <PurposeChips
             v-model="state.purpose"

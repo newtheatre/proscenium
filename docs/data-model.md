@@ -2178,9 +2178,11 @@ answers a question the other side never asks.
 
 **One name on every screen.** A member asks for *a Students' Union room* (`SU_ROOM_ASK`) and both
 sides list *Students' Union rooms* (`SU_ROOMS`); a status says whose move it is, "Waiting on the
-Theatre Manager" or "Waiting on the Students' Union" (issue 1346). Prose that describes rather than
-names, such as "a room we do not manage" in an email, stays. The identifiers keep `external`,
-which is the domain word and is not read by anybody outside this repository.
+Theatre Manager" or "Waiting on the Students' Union" (issue 1346). The emails, the audit label,
+the "Moved to a Students' Union room" state, the notice setting and the personal-data notes say the
+same. "A room we do not manage" survives only in code comments and decision titles, which no
+member reads. The identifiers keep `external`, which is the domain word and is not read by anybody
+outside this repository.
 
 The lifecycle is `REQUESTED → AWAITING_EXTERNAL → CONFIRMED`, with `refuse-assignment` looping back
 to the union and `reject`/`cancel` ending it. Every write is guarded on the status it read (0006).

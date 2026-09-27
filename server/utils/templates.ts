@@ -1124,16 +1124,16 @@ The Nottingham New Theatre`,
   },
 
   'external-received': (context: TemplateContext): Rendered => ({
-    subject: `Asked for: a room we do not manage, ${String(context.when)}`,
+    subject: `Asked for: a Students' Union room, ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for a room we do not manage, ${context.when}, is with the ${saysRole('THEATRE_MANAGER')}, who
+<p>Your request for a Students' Union room, ${context.when}, is with the ${saysRole('THEATRE_MANAGER')}, who
 fills in the Students' Union's form.</p>
 <p>${context.title}</p>
 <p>The Students' Union decides which room we get, so nothing is held yet. You will hear when the
 form is in, and again when they answer.</p>`),
     text: `Hello ${context.name},
 
-Your request for a room we do not manage, ${String(context.when)}, is with the ${saysRole('THEATRE_MANAGER')},
+Your request for a Students' Union room, ${String(context.when)}, is with the ${saysRole('THEATRE_MANAGER')},
 who fills in the Students' Union's form.
 
 ${String(context.title)}
@@ -1145,14 +1145,14 @@ The Nottingham New Theatre`,
   }),
 
   'external-raised': (context: TemplateContext): Rendered => ({
-    subject: `A room we do not manage has been asked for: ${String(context.when)}`,
+    subject: `A Students' Union room has been asked for: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>${context.who} has asked for a room we do not manage, ${context.when}.</p>
+<p>${context.who} has asked for a Students' Union room, ${context.when}.</p>
 <p>${context.title}</p>
 <p><a href="${String(context.queueUrl)}">Fill in the form</a></p>`),
     text: `Hello ${context.name},
 
-${String(context.who)} has asked for a room we do not manage, ${String(context.when)}.
+${String(context.who)} has asked for a Students' Union room, ${String(context.when)}.
 
 ${String(context.title)}
 
@@ -1213,13 +1213,13 @@ The Nottingham New Theatre`,
   'external-rejected': (context: TemplateContext): Rendered => ({
     subject: `Not being requested: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for a room we do not manage, for ${context.title}, ${context.when}, is not being
+<p>Your request for a Students' Union room, for ${context.title}, ${context.when}, is not being
 sent.</p>
 <p>Why: ${context.reason}</p>
 <p><a href="${String(context.roomsUrl)}">Find another slot</a></p>`),
     text: `Hello ${context.name},
 
-Your request for a room we do not manage, for ${String(context.title)}, ${String(context.when)},
+Your request for a Students' Union room, for ${String(context.title)}, ${String(context.when)},
 is not being sent.
 
 Why: ${String(context.reason)}
@@ -1250,9 +1250,9 @@ The Nottingham New Theatre`,
   'external-waiting': (context: TemplateContext): Rendered => {
     const formIsIn = context.formIsIn === true
     return {
-      subject: `Still waiting: a room we do not manage, ${String(context.when)}`,
+      subject: `Still waiting: a Students' Union room, ${String(context.when)}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>${context.who} asked for a room we do not manage, ${context.when}, and it has been waiting.</p>
+<p>${context.who} asked for a Students' Union room, ${context.when}, and it has been waiting.</p>
 <p>${context.title}</p>
 <p>${formIsIn
   ? 'The form is in with the Students\' Union, so this may need chasing with them.'
@@ -1260,7 +1260,7 @@ The Nottingham New Theatre`,
 <p><a href="${String(context.queueUrl)}">Open the queue</a></p>`),
       text: `Hello ${context.name},
 
-${String(context.who)} asked for a room we do not manage, ${String(context.when)}, and it has been
+${String(context.who)} asked for a Students' Union room, ${String(context.when)}, and it has been
 waiting.
 
 ${String(context.title)}
@@ -1306,7 +1306,7 @@ The Nottingham New Theatre`,
       subject: `Asked for: ${String(context.room)}, ${String(context.when)}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${context.title}, ${context.when}, has moved into <strong>${context.room}</strong>, one of ours,
-rather than waiting on a room we do not manage.</p>
+rather than waiting on a Students' Union room.</p>
 <p>${settled
   ? 'It is confirmed, and the room is held for you.'
   : 'It still needs a decision, because it falls outside the booking rules, so it is in the queue.'}</p>
@@ -1314,7 +1314,7 @@ rather than waiting on a room we do not manage.</p>
       text: `Hello ${context.name},
 
 ${String(context.title)}, ${String(context.when)}, has moved into ${String(context.room)}, one of
-ours, rather than waiting on a room we do not manage.
+ours, rather than waiting on a Students' Union room.
 
 ${settled
   ? 'It is confirmed, and the room is held for you.'

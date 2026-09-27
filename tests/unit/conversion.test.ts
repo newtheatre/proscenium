@@ -10,9 +10,9 @@ describe('a moved row never reads as cancelled', () => {
     expect(saysBookingState({ status: 'CANCELLED', convertedToRequestId: null })).toBe('Cancelled')
   })
 
-  test('one moved to a room we do not manage says so instead', () => {
+  test('one moved to a Students\' Union room says so instead', () => {
     expect(saysBookingState({ status: 'CANCELLED', convertedToRequestId: 'req-1' }))
-      .toBe('Moved to a room we do not manage')
+      .toBe('Moved to a Students\' Union room')
   })
 
   test('and the same on the other side', () => {
