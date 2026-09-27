@@ -973,9 +973,11 @@ holding a confirmed shift there, and as "tonight's duty manager" to anybody else
 
 `requireAnyNightAuthority` and `nightAuthorityIfAny` share one `firstAuthority` step (every role's
 shift, then door cover, then any bypass). The guard, short of authority, works out the most
-specific refusal from what that step handed back; the probe answers null instead, for a screen
+specific refusal from what that step handed back; the probe answers null instead for a refusal
+(every refusal a step throws is a 4xx) and throws a fault of 500 or above. It is for a screen
 anyone signed in may read that only adds what tonight's team may see, so it never pays for a
-refusal nobody reads (the emergency card, issue 1310).
+refusal nobody reads (the emergency card, issue 1310). It refuses nobody, so it is not one of the
+guards `tests/unit/night-authority.test.ts` accepts: the emergency route is exempted by name.
 
 `GET /api/tonight/authority?role=&night=&venueId=&performanceId=` is that resolution as a route; with
 no `role` it asks `requireAnyNightAuthority` over all three and answers with the `role` that
@@ -1623,8 +1625,9 @@ venue counts only once its performance tonight carries a shift that is not cance
 listed, its fields null, so nobody is shown another building's address. Each card carries two
 derived fields. `dutyManagers` is `dutyManagersOnCall` over the venue's team, but only where
 `nightAuthorityIfAny(event, ['DUTY_MANAGER', 'DOOR', 'BAR'], { venueId })` answers, and it is
-null otherwise, so a number stays with tonight's team and its holder's consent (A-114); those
-venues lead the list. `firstAidersTonight` is
+null otherwise: a refusal answers null, and a fault is thrown, so a device keeps the copy it has
+rather than a 200 without its numbers. A number stays with tonight's team and its holder's
+consent (A-114); those venues lead the list. `firstAidersTonight` is
 `firstAidersTonightQuery` over the venue's confirmed shifts and confirmed bar-opening slots,
 grouped a person and read against a current record of `FIRST_AID_MODULE` (read with
 `configValueIfSet`), and is null while that key is unset, which is the screen's cue to show the

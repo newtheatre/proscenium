@@ -144,7 +144,7 @@ export interface NightAuthorityOptions { recordsRead?: RecordsRead }
 interface Caller { resolved: Authority, tonight: string }
 interface Refusal { kind: NightRefusalKind, error: unknown }
 
-const isAuthority = (answer: NightAuthority | ShiftBranch): answer is NightAuthority => 'via' in answer
+const isAuthority = (answer: NightAuthority | ShiftBranch | ShortOfAuthority): answer is NightAuthority => 'via' in answer
 
 // Identity first, so a signed-out caller is told that and cannot read tonight's date off which
 // refusal it gets back; then the night asked about, which is tonight or nothing (E-111 criterion 2).
@@ -321,15 +321,15 @@ export async function requireAnyNightAuthority(
 ): Promise<NightAuthority> {
   const caller = await callerTonight(event, scope)
   const found = await firstAuthority(event, caller, roles, scope, options)
-  if (isNightAuthority(found)) return found
+  if (isAuthority(found)) return found
   // The refusal about the caller's own position, never merely the last role asked (issue 1303).
-  const refusals = [...found.refusals]
-  for (const { role, held } of found.short) refusals.push(await shiftRefusal(caller, role, scope, held))
+  const { short, refusals } = found
+  for (const { role, held } of short) refusals.push(await shiftRefusal(caller, role, scope, held))
   throw mostSpecificRefusal(refusals)?.error ?? createError(nightAuthorityRefusal('DUTY_MANAGER'))
 }
 
 // The same steps for a screen anyone signed in may read, which only adds what tonight's team may
-// see: null where the guard would refuse, without working out a refusal nobody reads.
+// see: null where the guard would refuse, without working out the refusal; a fault is thrown.
 export async function nightAuthorityIfAny(
   event: H3Event,
   roles: NightRole[],
@@ -337,9 +337,9 @@ export async function nightAuthorityIfAny(
   options: NightAuthorityOptions = {},
 ): Promise<NightAuthority | null> {
   const found = await firstAuthority(event, await callerTonight(event, scope), roles, scope, options)
-  return isNightAuthority(found) ? found : null
-}
-
-function isNightAuthority(found: NightAuthority | ShortOfAuthority): found is NightAuthority {
-  return 'via' in found
+  if (isAuthority(found)) return found
+  // A step that failed is not a refusal: thrown, so a phone keeps the numbers it last had (A-114).
+  const failed = found.refusals.find(({ error }) => ((error as { statusCode?: number }).statusCode ?? 500) >= 500)
+  if (failed) throw failed.error
+  return null
 }
