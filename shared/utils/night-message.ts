@@ -32,14 +32,35 @@ export const nightMessageForm = nightAudienceAsked.extend({
   draftKey: z.uuid(),
 })
 
+// Every copy of one draft from one sender, so a retry takes over only its own claims (0108).
+export function nightMessageDraftPrefix(draftKey: string, senderId: string): string {
+  return `night-message:${draftKey}:${senderId}:`
+}
+
 // One copy of one draft to one person: the claim a retry of the same draft finds already held.
-export function nightMessageClaim(draftKey: string, userId: string): string {
-  return `night-message:${draftKey}:${userId}`
+export function nightMessageClaim(draftKey: string, senderId: string, userId: string): string {
+  return `${nightMessageDraftPrefix(draftKey, senderId)}${userId}`
+}
+
+// A claim younger than this may still be sending, so a retry leaves it alone (0108).
+export const NIGHT_MESSAGE_TAKEOVER_SECONDS = 30
+
+export interface NightMessageOutcome {
+  count: number
+  alreadyOut: number
+  resent: number
+  stillSending: number
 }
 
 // A retry of a draft everyone already has reaches nobody, and says so rather than "Sent to 0".
-export function saysNightMessageSent(count: number): string {
-  return count === 0 ? 'Everyone in this audience already has it' : `Sent to ${plural(count, 'person', 'people')}`
+export function saysNightMessageSent(outcome: NightMessageOutcome): string {
+  const parts: string[] = []
+  if (outcome.count > 0) parts.push(`Sent to ${plural(outcome.count, 'person', 'people')}`)
+  else if (outcome.stillSending === 0) parts.push('Everyone in this audience already has it')
+  if (outcome.resent > 0) parts.push(`${plural(outcome.resent, 'copy', 'copies')} resent after an interrupted send`)
+  if (outcome.alreadyOut > 0) parts.push(`${plural(outcome.alreadyOut, 'copy', 'copies')} already out`)
+  if (outcome.stillSending > 0) parts.push(`${plural(outcome.stillSending, 'copy is', 'copies are')} still being sent; try again in a minute`)
+  return parts.join('; ')
 }
 
 export type NightMessageInput = z.output<typeof nightMessageForm>
