@@ -514,8 +514,8 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     expect((await request(app, 'GET', '/api/till/earlier', undefined, onShift.cookie)).status).toBe(403)
   })
 
-  // A closed night's charge is not offered as recorded: the sale needs that night's till open, and
-  // how a late card charge lands in the ledger waits on a decision (question 15).
+  // A closed night's charge is not offered as recorded at the till: the Treasurer records it on
+  // that night's Daily reconciliation (question 15, F-124 criterion 9).
   test('the bar manager closes last night\'s till from tonight\'s, then answers its charge the Treasurer now records', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-earlier', screenPassword)
@@ -562,6 +562,72 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     await click(view, `[data-test="earlier-abandoned-${charge}"]`)
     await waitFor(view, `!document.querySelector('[data-test="earlier-attempt-${charge}"]')`)
     view.close()
+  }, 120_000)
+})
+
+// Question 15, option 1 (F-124 criterion 9): the Treasurer records a charge a closed till left, as
+// the sale it was on its own night, against the total the screen showed (0005).
+describe.skipIf(skip !== null)('the Treasurer records a card charge left on a closed till', () => {
+  function read<T>(statement: string, ...parameters: string[]): T[] {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return database.query(statement).all(...parameters) as T[]
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('the Treasurer records it once; the bar is refused, and so is a stale total', async () => {
+    const treasurer = await registerMember(app, 'till-late-treasurer', generatePassword())
+    await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
+    const late = programme('till-late-charge')
+    const { variantId } = await aSellableProduct(450)
+
+    const opened = await (await openTill(late.venueId, bar.cookie)).json() as { session: { id: string } }
+    const started = await request(app, 'POST', '/api/till/payments', { venueId: late.venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 450, kind: 'TYPED' }, bar.cookie)
+    expect(started.status).toBe(200)
+    const { id: charge } = await started.json() as { id: string }
+    // Nobody answered it before close: a closed till only ever holds a mismatch (close refuses otherwise).
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`UPDATE sumup_attempts SET status = 'MISMATCH', error = 'Nobody answered' WHERE id = ?`).run(charge)
+      database.query(`INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_by, signed_via)
+        VALUES (?, ?, ?, ?, 'Signed before the charge was found', '{}', ?, 'SHIFT')`).run(`report-${charge}`, late.performanceId, late.venueId, night, bar.id)
+    }
+    finally {
+      database.close()
+    }
+    expect((await closeTill(opened.session.id, bar.cookie, 450, 'The reader holds a charge nobody answered')).status).toBe(200)
+
+    const record = (as: string, expectedTotalPence: number): Promise<Response> =>
+      request(app, 'POST', `/api/admin/finance/late-charges/${charge}`, { expectedTotalPence }, as)
+
+    expect((await record(bar.cookie, 450)).status).toBe(403)
+
+    const stale = await record(treasurer.cookie, 400)
+    expect(stale.status).toBe(409)
+    const refusal = await message(stale)
+    expect(refusal).toContain('£4.00')
+    expect(refusal).toContain('£4.50')
+
+    const recorded = await record(treasurer.cookie, 450)
+    expect(recorded.status).toBe(200)
+    const outcome = await recorded.json() as { status: string, receipt: { entryId: string } | null }
+    expect(outcome.status).toBe('SUCCEEDED')
+    const entryId = outcome.receipt!.entryId
+
+    const [attempt] = read<{ createdAt: number }>('SELECT created_at AS createdAt FROM sumup_attempts WHERE id = ?', charge)
+    expect(read('SELECT happened_at AS happenedAt, till_session_id AS sessionId, total_pence AS totalPence FROM ledger_entries WHERE id = ?', entryId))
+      .toEqual([{ happenedAt: attempt!.createdAt, sessionId: opened.session.id, totalPence: 450 }])
+    expect(read<{ actorId: string }>(`SELECT actor_id AS actorId FROM audit_log WHERE action = 'bar.till.sale.late' AND target = ?`, `ledger-entry:${entryId}`))
+      .toEqual([{ actorId: treasurer.id }])
+    expect(read<{ note: string }>('SELECT note FROM night_report_addenda WHERE report_id = ?', `report-${charge}`)[0]?.note).toContain('£4.50')
+
+    const again = await record(treasurer.cookie, 450)
+    expect(again.status).toBe(409)
+    expect(read('SELECT id FROM sumup_attempts WHERE id = ? AND entry_id = ?', charge, entryId)).toHaveLength(1)
+    expect(read(`SELECT id FROM audit_log WHERE action = 'bar.till.sale.late' AND detail LIKE ?`, `%${charge}%`)).toHaveLength(1)
   }, 120_000)
 })
 
