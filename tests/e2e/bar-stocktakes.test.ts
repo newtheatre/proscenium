@@ -6,7 +6,8 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
-import { click, fill, fillNumber, openSignedOutView, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { DRAWN_TARGET, click, fill, fillNumber, openSignedOutView, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX } from '#shared/utils/night-shell'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
@@ -872,6 +873,41 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
       expect(line.figures.left).toBeGreaterThanOrEqual(line.fields.right)
       expect(line.fields.top).toBeLessThan(line.name.bottom)
       expect(line.figures.top).toBeLessThan(line.fields.bottom)
+    }
+    finally {
+      screen?.close()
+      await apply(opened.stocktake.id)
+    }
+  }, 120_000)
+
+  // The shell's 48 pixel floor must not reach a switch's track, which keeps its proportions; its row
+  // is the target instead, and a tap anywhere on that row turns the filter on (design-language rule 4).
+  test('the Only uncounted switch on tonight\'s screen is drawn as a switch, and its whole row is the target', async () => {
+    const item = await anItem()
+    const opened = await open()
+    let screen: Bun.WebView | undefined
+    try {
+      screen = await signedIn(NIGHT_VIEWPORT_PX, 740)
+      await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${item.id}"]`)
+      const track = await screen.evaluate<{ width: number, height: number }>(`(() => {
+        const rect = document.querySelector('[data-test="uncounted-only-filter"]').getBoundingClientRect()
+        return { width: rect.width, height: rect.height }
+      })()`)
+      expect(track.height).toBeLessThan(NIGHT_TAP_TARGET_PX)
+      expect(track.width).toBeGreaterThanOrEqual(track.height * 1.5)
+
+      const row = await screen.evaluate<{ width: number, height: number, reaches: boolean }>(
+        `${DRAWN_TARGET}(document.querySelector('[data-test="uncounted-only-filter"]'))`,
+      )
+      expect(row.height).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+      expect(row.width).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
+      expect(row.reaches).toBe(true)
+
+      await screen.evaluate(`(() => {
+        const box = document.querySelector('[data-test="uncounted-only-filter"]').parentElement.parentElement.getBoundingClientRect()
+        document.elementFromPoint(box.right - 2, box.top + 2).click()
+      })()`)
+      await waitFor(screen, `document.querySelector('[data-test="uncounted-only-filter"]').getAttribute('aria-checked') === 'true'`)
     }
     finally {
       screen?.close()

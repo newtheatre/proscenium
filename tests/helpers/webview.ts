@@ -604,3 +604,16 @@ export async function signOut(view: Bun.WebView): Promise<void> {
 export async function navLabels(view: Bun.WebView): Promise<string[]> {
   return view.evaluate<string[]>(`[...document.querySelectorAll('nav a, nav button')].map(node => node.innerText.trim()).filter(Boolean)`)
 }
+
+// A switch, checkbox or radio keeps its drawn size on a show-night screen, and its target is its
+// row, counted only where a tap on the row lands on the control or its label (design-language rule 4).
+export const DRAWN_CHOICE = '[role="switch"], [role="checkbox"], [role="radio"]'
+export const DRAWN_TARGET = `(control => {
+  const row = control.parentElement?.parentElement
+  if (!row) return { width: 0, height: 0, reaches: false }
+  row.scrollIntoView({ block: 'center' })
+  const box = row.getBoundingClientRect()
+  const owns = hit => Boolean(hit) && (control.contains(hit) || [...control.labels].some(label => label.contains(hit)))
+  const corners = [[box.left + 2, box.top + 2], [box.right - 2, box.top + 2], [box.left + 2, box.bottom - 2], [box.right - 2, box.bottom - 2]]
+  return { width: box.width, height: box.height, reaches: corners.every(([x, y]) => owns(document.elementFromPoint(x, y))) }
+})`

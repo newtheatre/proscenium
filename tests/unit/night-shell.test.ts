@@ -304,6 +304,39 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
       expect(`${layout}: ${(await read(layout)).includes(SHELL_CLASS)}`).toBe(`${layout}: true`)
     }
   })
+
+  // Reka draws a switch, a checkbox and a radio as a button with a role. Floored, a switch's track is
+  // a 48 pixel circle (issue 1520), so those keep their drawn size and their row is the target.
+  const DRAWN_ROLES = ['switch', 'checkbox', 'radio'] as const
+  const FLOOR = `min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`
+
+  async function shellRules(): Promise<{ selector: string, body: string }[]> {
+    const theme = (await read(TOKEN_SOURCE)).replace(/\/\*[\s\S]*?\*\//g, '')
+    return [...theme.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, selector, body]) => ({ selector: selector!.trim().replace(/\s+/g, ' '), body: body! }))
+      .filter(rule => rule.selector.startsWith(`.${SHELL_CLASS} `))
+  }
+
+  test('a switch, checkbox or radio is left out of the element floor, so it keeps the size it is drawn at', async () => {
+    const floors = (await shellRules()).filter(rule => /\bbutton\b/.test(rule.selector) && rule.body.includes(FLOOR))
+    expect(floors).toHaveLength(1)
+    const selector = floors[0]!.selector
+    const exempt = selector.includes(':not(') ? selector.slice(selector.indexOf(':not(')) : ''
+    for (const role of DRAWN_ROLES) expect(`${role}: ${exempt.includes(`[role="${role}"]`)}`).toBe(`${role}: true`)
+  })
+
+  test('the row of a switch, checkbox or radio carries the floor, and its label spans that row', async () => {
+    const rules = await shellRules()
+    const rows = rules.filter(rule => rule.selector.includes(':has(') && !rule.selector.includes('::after') && rule.body.includes(FLOOR))
+    expect(rows).toHaveLength(1)
+    const row = rows[0]!
+    expect(row.body).toContain(`min-width: ${NIGHT_TAP_TARGET_PX / 16}rem`)
+    expect(row.body).toContain('position: relative')
+    for (const role of DRAWN_ROLES) expect(`${role}: ${row.selector.includes(`[role="${role}"]`)}`).toBe(`${role}: true`)
+    const overlay = rules.find(rule => rule.selector.startsWith(row.selector) && rule.selector.endsWith('[data-slot="label"]::after'))
+    expect(overlay?.body).toContain('position: absolute')
+    expect(overlay?.body).toContain('inset: 0')
+  })
 })
 
 // Issue 1521: the hub served every tile, then pruned them once the roles came back after mount. The
