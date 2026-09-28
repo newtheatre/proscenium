@@ -535,12 +535,45 @@ describe.skipIf(skip !== null)('a variant attaches at most one choice group, wit
     const itemId = await anItem({ name: named('Tonic') })
     const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
     const choiceOf = async () => (await variants(productId)).find(variant => variant.id === id)?.components.find(component => component.choiceGroupId === groupId)
+    const spirit = await anItem({ name: named('Whisky') })
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId: spirit, qty: 50 }] })
 
     expect((await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true, optional: true })).status).toBe(200)
     expect((await choiceOf())?.choiceOptional).toBe(true)
 
     await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true })
     expect((await choiceOf())?.choiceOptional).toBe(false)
+  })
+
+  // Issue 1529: served without its choice, a size with no item of its own would sell an empty glass.
+  test('a size whose choice is all it pours cannot take it as optional, and the refusal names the size', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId, { servingKind: 'single', label: 'Cola glass' })
+    const itemId = await anItem({ name: named('Cola') })
+    const groupId = await addChoiceGroup([{ itemId, qty: 200 }])
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true })
+
+    const refused = await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true, optional: true })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('Cola glass')
+
+    const choice = (await variants(productId)).find(variant => variant.id === id)?.components.find(component => component.choiceGroupId === groupId)
+    expect(choice?.choiceOptional).toBe(false)
+  })
+
+  test('the last item cannot come off a size whose choice is optional, and the refusal names the size', async () => {
+    const productId = await aProduct()
+    const id = await addVariant(productId, { servingKind: 'double', label: 'Double' })
+    const spirit = await anItem({ name: named('Whisky') })
+    const groupId = await addChoiceGroup([{ itemId: await anItem({ name: named('Soda') }), qty: 200 }])
+    await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId: spirit, qty: 50 }] })
+    await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true, optional: true })
+
+    const refused = await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [] })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('Double')
+    const items = (await variants(productId)).find(variant => variant.id === id)?.components.filter(component => component.itemId !== null)
+    expect(items?.map(component => component.itemId)).toEqual([spirit])
   })
 
   test('attaching a second group replaces the first rather than adding to it', async () => {

@@ -308,7 +308,11 @@ describe.skipIf(skip !== null)('the screen', () => {
     const { productId, variantId } = await aSellableProduct({ name: named('Screen whisky') })
     const itemId = await anItem({ name: named('Screen soda') })
     const groupId = await created(await send('POST', '/api/admin/bar/choice-groups', { name: named('Screen mixer'), options: [{ itemId, qty: 50 }] }))
+    // Only a size with an item of its own may be served without its choice (issue 1529).
+    const spirit = await anItem({ name: named('Screen whisky') })
+    await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId: spirit, qty: 25 }] })
     await send('PUT', `/api/admin/bar/variants/${variantId}/choice`, { choiceGroupId: groupId, qty: 1, includedInPrice: true, optional: true })
+    await activate(productId)
     await openTill(venueId)
 
     const view = await openSignedOutView(app.baseURL)
