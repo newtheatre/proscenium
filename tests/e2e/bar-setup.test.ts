@@ -1,12 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
+import { saysNoChoice } from '#shared/utils/sale'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
+import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillNumber, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
+import type { SaleVariant } from '#shared/utils/sale'
 
 // F-127 through the real screen: one pass of /bar/products/new per shape, each ending with the
 // product the till can actually sell.
@@ -198,6 +201,59 @@ describe.skipIf(skip !== null)('a cocktail is set up from its ingredients (F-127
     finally {
       view.close()
     }
+  }, 120_000)
+})
+
+describe.skipIf(skip !== null)('a spirit set up as neat-able sells with no mixer (issue 1528, F-112 criterion 3)', () => {
+  test('the set-up\'s own switch makes the till offer "No mixer", and the neat serve sells', async () => {
+    const categoryName = named('Spirits')
+    const categoryId = await aCategory(categoryName)
+    const ginName = named('Gin')
+    const tonicName = named('Tonic')
+    const ginId = await anItem(ginName)
+    await anItem(tonicName)
+    await send('POST', '/api/admin/bar/movements', { itemId: ginId, kind: 'DELIVERY', qty: 700, costPence: 1800 })
+    const productName = named('House gin')
+
+    const view = await signedInBarManager()
+    try {
+      await visit(view, `${app.baseURL}/bar/products/new`, '[data-test="shape-cards"]')
+      await click(view, `[data-test="category-${categoryId}"]`)
+      await click(view, '[data-test="shape-recipe"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-form"]')`)
+
+      await fill(view, '[data-test="setup-name"]', productName)
+      await pickOption(view, '[data-test="setup-category"]', categoryName)
+      await pickOption(view, '[data-test="component-item-0"]', ginName)
+      await fillNumber(view, '[data-test="component-qty-0"]', '25')
+      await fillNumber(view, '[data-test="setup-recipe-price"]', '4')
+
+      await click(view, '[data-test="setup-choice"]')
+      await waitFor(view, `document.querySelector('[data-test="choice-name"]')`)
+      await fill(view, '[data-test="choice-name"]', 'Mixer')
+      await pickOption(view, '[data-test="choice-item-0"]', tonicName)
+      await fillNumber(view, '[data-test="choice-qty-0"]', '150')
+      await click(view, '[data-test="choice-optional"]')
+
+      await click(view, '[data-test="setup-submit"]')
+      await waitFor(view, `location.pathname.startsWith('/bar/products/') && !location.pathname.endsWith('/new')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    const sold = await tillProduct(productName) as unknown as { variants: SaleVariant[] } | null
+    const [single] = sold?.variants ?? []
+    expect(single?.choice?.optional).toBe(true)
+    expect(saysNoChoice(single!.choice!)).toBe('No mixer')
+
+    const answered = await sellOnTheTill(app, {
+      venueId,
+      lines: [{ variantId: single!.id, qty: 1 }],
+      expectedTotalPence: 400,
+      ageCheck: { outcome: 'NOT_REQUIRED' },
+    }, barManager.cookie)
+    expect(answered.status).toBe(200)
   }, 120_000)
 })
 

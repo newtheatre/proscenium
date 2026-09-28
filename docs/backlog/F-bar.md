@@ -736,7 +736,12 @@ Open questions:
   4. One submission writes the stocked item (new, or an existing one chosen by name), the product,
      its variants, its components, any choice-group attachment and the opening price rows in one
      batch, with one audit row per object created. A name collision, or any other refusal, leaves
-     nothing behind.
+     nothing behind. Amended 28 September 2026 (issue 1528): the choice-group attachment carries
+     F-112 criterion 3's optional flag, asked by the product page's own **Can be served without
+     one** switch, so a spirit set up neat-able sells with "No mixer" from its first night. As on
+     the product page (issue 1529), an optional choice needs a stocked item of the size's own to
+     stand on: one with none is refused, naming the size, since its neat serve would be an empty
+     glass.
   5. The product goes ACTIVE when every active size resolves a price and every component resolves
      to an active stocked item, and HIDDEN otherwise, with the reason naming the sizes or
      ingredients that did not resolve.

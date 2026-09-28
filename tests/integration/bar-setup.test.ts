@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test'
+import { componentsQuery } from '#server/utils/bar'
+import { readTillServings, tillServingsQuery } from '#server/utils/bar-linkage'
 import { planProductSetup } from '#server/utils/bar-setup'
 import { checkIdRefusal, productSetupForm, restrictedStockOf } from '#shared/utils/bar'
-import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows, sql } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
+import type { TillServingsRow } from '#server/utils/bar-linkage'
 import type { SetupContext, SetupPlan } from '#server/utils/bar-setup'
 import type { ProductSetupInput } from '#shared/utils/bar'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -117,10 +120,32 @@ const NEGRONI: ProductSetupInput = {
   },
 } as ProductSetupInput
 
+// A spirit with a mixer, ticked as neat-able on the set-up itself (issue 1528).
+const GIN: ProductSetupInput = {
+  shape: 'RECIPE',
+  product: {
+    name: 'Gin',
+    categoryId: 'cat-cocktails',
+    sort: 0,
+    staffedOnly: false,
+    ageRestricted: true,
+    allergenState: 'NONE',
+    allergenNote: null,
+  },
+  serving: { servingKind: 'single', label: 'Single', pricePence: 350 },
+  components: [{ itemId: 'item-gin', qty: 25 }],
+  choice: {
+    group: { name: 'Mixer', options: [{ itemId: 'item-tonic', qty: 150 }] },
+    qty: 1,
+    includedInPrice: true,
+    optional: true,
+  },
+} as ProductSetupInput
+
 function spirits(database: TestDatabase): void {
   for (const [id, name] of [
     ['item-gin', 'Gin'], ['item-campari', 'Campari'], ['item-vermouth', 'Vermouth'],
-    ['item-orange', 'Orange'], ['item-lemon', 'Lemon'],
+    ['item-orange', 'Orange'], ['item-lemon', 'Lemon'], ['item-tonic', 'Tonic'],
   ] as const) {
     insert(database, 'bar_items', { id, name, unit: id.startsWith('item-o') || id.endsWith('lemon') ? 'ITEM' : 'ML' })
   }
@@ -250,6 +275,54 @@ describe('one submission sets up a whole product (F-127 criterion 4)', () => {
       { ...HOUSE_RED, item: { mode: 'EXISTING', itemId: 'item-red' }, opening: { qty: 4500, costPence: 650 } } as ProductSetupInput,
       context(),
     )).toThrow()
+  })
+})
+
+describe('a size set up to be served without its choice sells neat (issue 1528, F-112 criterion 3)', () => {
+  const choiceRows = (database: TestDatabase) =>
+    rows(database, 'SELECT choice_optional FROM variant_components WHERE choice_group_id IS NOT NULL')
+
+  test('the tick is written with the size\'s choice, and a choice not ticked stays required', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      spirits(database)
+      apply(database, planProductSetup(GIN, context()))
+      expect(choiceRows(database)).toEqual([{ choice_optional: 1 }])
+    })
+    await withDatabase((database) => {
+      bar(database)
+      spirits(database)
+      apply(database, planProductSetup(NEGRONI, context()))
+      expect(choiceRows(database)).toEqual([{ choice_optional: 0 }])
+    })
+  })
+
+  test('the sale path reads it as the attach form\'s own flag', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      spirits(database)
+      const plan = planProductSetup(GIN, context())
+      apply(database, plan)
+      const [statement, ...parameters] = boundStatement(database, componentsQuery(sql`SELECT id FROM product_variants`))
+      expect(rows(database, statement, ...parameters)).toContainEqual(
+        expect.objectContaining({ variantId: plan.variantIds[0], choiceGroupId: plan.choiceGroupId, choiceOptional: 1 }),
+      )
+    })
+  })
+
+  test('with no mixer on the shelf, the till still sells the spirit neat', async () => {
+    await withDatabase((database) => {
+      bar(database)
+      spirits(database)
+      const plan = planProductSetup(GIN, context())
+      apply(database, plan)
+      insert(database, 'stock_movements', { id: 'm-gin', item_id: 'item-gin', qty: 700, kind: 'DELIVERY', actor_id: 'user-1' })
+
+      const [statement, ...parameters] = boundStatement(database, tillServingsQuery())
+      const till = readTillServings(rows<TillServingsRow>(database, statement, ...parameters))
+      expect(plan.status).toBe('ACTIVE')
+      expect(till.sizes.get(plan.variantIds[0]!)).toBe(28)
+    })
   })
 })
 

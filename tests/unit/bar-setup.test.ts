@@ -260,6 +260,30 @@ describe('one payload per shape, validated before anything is written (F-127 cri
     expect(parsed.success && parsed.data.shape === 'RECIPE' && parsed.data.choice?.qty).toBe(1)
   })
 
+  // Issue 1528: the product page's own switch, so a spirit set up here is already neat-able.
+  test('a recipe\'s choice may be served without one, and is required unless it says so', () => {
+    const choice = { group: { name: 'Mixer', options: [{ itemId: 'item-tonic', qty: 150 }] } }
+    const plain = aRecipe({ choice })
+    const neat = aRecipe({ choice: { ...choice, optional: true } })
+    expect(plain.success && plain.data.shape === 'RECIPE' && plain.data.choice).toMatchObject({ optional: false })
+    expect(neat.success && neat.data.shape === 'RECIPE' && neat.data.choice).toMatchObject({ optional: true })
+    expect(aRecipe({ choice: { ...choice, optional: 'yes' } }).success).toBe(false)
+  })
+
+  // The product page's rule (issue 1529): served neat, a size pours its own items alone, so an
+  // optional choice needs one to stand on or it sells an empty glass.
+  test('an optional choice on a size with no stocked item of its own is refused, naming the size', () => {
+    const refused = aRecipe({
+      serving: { servingKind: 'single', label: 'Single', pricePence: 350 },
+      components: [],
+      choice: { group: { name: 'Mixer', options: [{ itemId: 'item-tonic', qty: 150 }] }, optional: true },
+    })
+    expect(refused.success).toBe(false)
+    expect(refused.error?.issues.map(issue => issue.message)).toContain(
+      'Single depletes no stocked item of its own, so served without its choice it would sell an empty glass: add an ingredient first',
+    )
+  })
+
   test('a choice group with no options is refused', () => {
     expect(aRecipe({ choice: { group: { name: 'Mixer', options: [] } } }).success).toBe(false)
   })
