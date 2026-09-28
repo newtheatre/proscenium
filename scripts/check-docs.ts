@@ -5,8 +5,10 @@
 import { join } from 'node:path'
 import { DOCS_AUDIENCES } from '#shared/utils/docs-audience'
 import { DOCS_ROOT, HELP_ROOT, contentPathOf } from '#shared/utils/docs-paths'
+import { backlogProblems } from './lib/backlog-counts'
 
 const IMAGES = 'public/images/docs'
+const BACKLOG = 'docs/backlog'
 const REQUIRED = ['title', 'description', 'module', 'updatedBy'] as const
 
 function files(pattern: string, cwd: string): string[] {
@@ -81,13 +83,26 @@ for (const folder of new Set(pages.filter(file => file.includes('/')).map(file =
   if (!/^title:\s*\S/m.test(await navigation.text())) problems.push(`${DOCS_ROOT}/${folder}/.navigation.yml  has no title`)
 }
 
+const modules: Record<string, string> = {}
+for (const file of files('*.md', BACKLOG).filter(file => file !== 'README.md')) {
+  modules[file] = await Bun.file(join(BACKLOG, file)).text()
+}
+const backlog = backlogProblems(await Bun.file(join(BACKLOG, 'README.md')).text(), modules)
+
 if (problems.length) {
   console.error('check-docs: the operator documentation has drifted from its own conventions.\n')
   for (const problem of problems) console.error(`  ${problem}`)
   console.error('\nEvery page carries title, description, module, audience, updatedOn and updatedBy; every')
   console.error(`picture it shows lives under ${IMAGES} and is shown by some page; every /docs or /help link`)
   console.error('lands on a page; every section folder has a .navigation.yml with a title (0076).')
-  process.exit(1)
 }
 
-console.log(`check-docs: ${everyPage.length} page(s), ${pictures.size} picture(s), all accounted for.`)
+if (backlog.length) {
+  console.error(`${problems.length ? '\n' : ''}check-docs: the backlog index disagrees with its module files.\n`)
+  for (const problem of backlog) console.error(`  ${BACKLOG}  ${problem}`)
+  console.error(`\nRecount by the rule beside the table in ${BACKLOG}/README.md, and name every resolved story.`)
+}
+
+if (problems.length || backlog.length) process.exit(1)
+
+console.log(`check-docs: ${everyPage.length} page(s), ${pictures.size} picture(s), all accounted for; the backlog index agrees with ${Object.keys(modules).length} module file(s).`)

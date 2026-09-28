@@ -29,13 +29,14 @@ story means, the tracker for where it stands. Never let the two disagree silentl
 1. **A new story** starts in the backlog file (next free id in its block: MVP from x-101, V2
    from x-201, Later from x-301), then gets its issue, sub-issue link to the module epic,
    labels, milestone and board fields. Update the counts line in the backlog file and the
-   table in `docs/backlog/README.md`.
+   table in `docs/backlog/README.md`; `bun run check docs` fails a table that disagrees.
 2. **Re-phasing** (MVP to V2 at a gate review, for example) changes the backlog file's Phase
    line, the issue's phase label, its milestone and the board Phase field, all in one pass;
    the argument for the move is recorded in the backlog file's open questions.
 3. **Resolving without building** (constraint or spike outcome): the backlog story keeps its
    id and gains a Resolution block; the issue is closed as not planned with a comment naming
-   the reason; the epic body's resolved list gains a line. Counts reconcile.
+   the reason; the epic body's resolved list gains a line. Counts reconcile, and the index's
+   resolved list in `docs/backlog/README.md` names the story.
 4. **Closing built work**: the story issue closes when its acceptance criteria are pinned by
    passing tests and the change is merged; the closing comment links the pull request. Epic
    progress bars update themselves.

@@ -42,7 +42,9 @@ Twelve steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
 10. `check audit`: a privileged route with no audit write, or an action written but never
     registered.
 11. `check docs`: an operator documentation page missing its provenance, a picture or a link that
-    resolves to nothing, or a section with no navigation entry (0076).
+    resolves to nothing, or a section with no navigation entry (0076); and a backlog index whose
+    table disagrees with the stories its module files hold, by the rule beside the table in
+    `docs/backlog/README.md`.
 
 `test:e2e` is **not** a CI gate. It runs nightly and on demand (0029), and a full run takes minutes
 rather than seconds.
