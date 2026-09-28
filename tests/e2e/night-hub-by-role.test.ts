@@ -75,6 +75,41 @@ describe.skipIf(skip !== null)('the hub by the viewer\'s own job (issue 1304)', 
     }
   }, CASE_TIMEOUT_MS)
 
+  // A phone's slow answer, stood in for by holding the page's own authority reads; every set of
+  // tiles the hub draws on the way is recorded, since the flicker is in the frames between.
+  test('arriving from elsewhere on the site, the hub never draws a tile it then takes away (issue 1521)', async () => {
+    const view = await signedIn(door)
+    try {
+      await visit(view, `${app.baseURL}/my`, '[data-test="on-shift-bar"]')
+      await view.evaluate(`(() => {
+        const real = window.fetch
+        window.fetch = (input, init) => String(typeof input === 'string' ? input : input.url).includes('/api/tonight/authority')
+          ? new Promise(resolve => setTimeout(resolve, 1500)).then(() => real(input, init))
+          : real(input, init)
+        window.hubDrawn = []
+        new MutationObserver(() => {
+          const hub = document.querySelector('[data-test="tonight-hub"]')
+          if (!hub) return
+          const drawn = [...hub.querySelectorAll(':scope > a')].map(tile => tile.getAttribute('data-test'))
+          if (document.querySelector('[data-test="hub-no-role"]')) drawn.push('hub-no-role')
+          if (JSON.stringify(drawn) !== JSON.stringify(window.hubDrawn.at(-1))) window.hubDrawn.push(drawn)
+        }).observe(document.body, { childList: true, subtree: true })
+        return true
+      })()`)
+      await click(view, '[data-test="on-shift-bar"] a[href="/tonight"]')
+      await waitFor(view, `${tileIds}.length === 5`)
+
+      const own = ['tile-door', 'tile-glance', 'tile-age-checks', 'tile-contacts', 'tile-emergency']
+      expect(await view.evaluate<string[]>(tileIds)).toEqual(own)
+      const drawn = await view.evaluate<string[][]>('window.hubDrawn')
+      expect(drawn[0]).toEqual(['tile-emergency'])
+      expect(drawn.flat().filter(id => !own.includes(id))).toEqual([])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('nobody on shift gets Emergency and one card with their rota', async () => {
     const view = await signedIn(nobody)
     try {

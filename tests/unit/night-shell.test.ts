@@ -347,6 +347,12 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     expect(await read(LAYOUT)).not.toContain('resolveNightAuthority()')
   })
 
+  test('while the shell asks behind the page, it says so, and the hub draws only what every answer keeps', async () => {
+    expect(await read('app/composables/useNightShell.ts')).toContain('asking: true')
+    const hub = await read('app/pages/tonight/index.vue')
+    expect(hub).toContain('authority.value.asking ? hubTilesWhileAsking() :')
+  })
+
   test('the first read is lazy on a phone, so a navigation inside the shell is never held on the network', async () => {
     const served = await read('app/composables/useServedRead.ts')
     expect(served).toContain('{ lazy: true }')
