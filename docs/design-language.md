@@ -198,9 +198,14 @@ Eleven rules follow:
    for it field by field. The shells stand on `min-h-dvh` rather than `min-h-screen`, and the
    pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and home
    indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
-   holds all three. A screen that refuses the viewer passes `refused` to `NightScreen`, which draws
-   `NightRefusal` in place of the work: where you stand, tonight's duty manager by first name, and
-   Back to tonight, with none of the refused screen's controls left to press (issue 1304).
+   holds all three. Every page on the `tonight` layout is a capped column at any window width
+   (`max-w-md` for a show-night screen, `max-w-xl` for the training register), so anything in it
+   that changes shape with width keys to its own container, with `@container` and an `@` variant as
+   the desk results do (rule 6), and never to the window, whose variants fire while the column is
+   still a phone's width (issue 1520). `tests/unit/night-shell.test.ts` holds this too. A screen
+   that refuses the viewer passes `refused` to `NightScreen`, which draws `NightRefusal` in place
+   of the work: where you stand, tonight's duty manager by first name, and Back to tonight, with
+   none of the refused screen's controls left to press (issue 1304).
 5. **Navigation is declared once and filtered by ability.** Every destination in the console
    sidebar, the member sub-nav (`MY_NAV`), account settings (`ACCOUNT_NAV`), the account menu, the
    public header (`HEADER_NAV`, a derived slice of `PUBLIC_NAV`) and the footer comes from

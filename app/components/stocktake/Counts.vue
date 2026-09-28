@@ -160,7 +160,9 @@ const FIELD = {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <!-- A container, because the show-night column is a phone's at any window: a line lays out by
+       the width it is given, never the window's (issue 1520). -->
+  <div class="@container space-y-6">
     <div
       class="space-y-6"
       data-test="stocktake-lines"
@@ -184,7 +186,7 @@ const FIELD = {
           <li
             v-for="line in group.lines"
             :key="line.itemId"
-            class="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,20rem)_minmax(0,14rem)] sm:items-center"
+            class="grid gap-3 p-3 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,20rem)_minmax(0,14rem)] @3xl:items-center"
             :data-test="`line-${line.itemId}`"
           >
             <div class="min-w-0">
@@ -247,7 +249,7 @@ const FIELD = {
               </UBadge>
             </div>
 
-            <div class="space-y-0.5 text-sm sm:text-right">
+            <div class="space-y-0.5 text-sm @3xl:text-right">
               <template v-if="!open || counted(line)">
                 <p
                   v-if="open && byContainer(line)"

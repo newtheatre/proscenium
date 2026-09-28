@@ -49,7 +49,10 @@ function saved(line: StocktakeLine): void {
       console, and it appears here for tonight's bar shift to count into.
     </p>
 
-    <template v-else>
+    <div
+      v-else
+      class="space-y-4"
+    >
       <p class="text-sm text-muted">
         Each count saves when you leave its field or press Enter, with your name on it. The Bar
         Manager or the Front of House Manager checks every line before applying the count.
@@ -61,6 +64,6 @@ function saved(line: StocktakeLine): void {
         :open="true"
         @saved="saved"
       />
-    </template>
+    </div>
   </NightScreen>
 </template>
