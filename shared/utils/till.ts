@@ -116,3 +116,15 @@ export function recallTillVenue(store: Pick<NightCacheStore, 'getItem'>, night: 
 export function rememberedBarAnswers(refusal: number | undefined, queried: string | undefined, remembered: string | undefined): boolean {
   return refusal === 400 && !queried && Boolean(remembered)
 }
+
+export type TillRefusalStep = 'SHOW' | 'WAIT_FOR_DEVICE' | 'ASK_WITH_DEVICE' | 'FORGET_DEVICE'
+
+export interface TillRefusalContext { queried?: string, remembered?: string, usingDevice: boolean, deviceRead: boolean }
+
+// The served page cannot read this phone's memory of tonight's bar, so the guard's question waits for
+// it rather than drawing a picker the memory then takes away (issue 1521).
+export function tillRefusalStep(refusal: number | undefined, at: TillRefusalContext): TillRefusalStep {
+  if (at.usingDevice) return 'FORGET_DEVICE'
+  if (refusal === 400 && !at.queried && !at.deviceRead) return 'WAIT_FOR_DEVICE'
+  return rememberedBarAnswers(refusal, at.queried, at.remembered) ? 'ASK_WITH_DEVICE' : 'SHOW'
+}

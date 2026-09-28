@@ -181,6 +181,12 @@ export async function refreshNightCache<T>(store: NightCacheStore, key: NightCac
   return stored ?? { key, night: nightCacheKeyParts(key)!.night, cachedAt: at.getTime(), data }
 }
 
+// A copy the server rendered into the page is as old as its read: it replaces an older one on the
+// device, never a newer one the phone has fetched since (issue 1521).
+export function servedCopyWins(heldAt: number | null, servedAt: number): boolean {
+  return heldAt === null || servedAt > heldAt
+}
+
 export interface NightRequest {
   newest: () => boolean
   answers: () => boolean

@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, getCurrentInstance, onMounted, ref, watch } from 'vue'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
@@ -100,7 +100,8 @@ export function useTillTickets(venueId: Ref<string | null>) {
     if (!walkUpPerformanceId.value && performances.length === 1) walkUpPerformanceId.value = performances[0]!.id
   }, { immediate: true })
 
-  watch(walkUpPerformanceId, async (performanceId) => {
+  async function loadWalkUpOptions(): Promise<void> {
+    const performanceId = walkUpPerformanceId.value
     walkUpOptions.value = []
     walkUpQty.value = {}
     walkUpOptionsFailure.value = null
@@ -112,7 +113,15 @@ export function useTillTickets(venueId: Ref<string | null>) {
     catch (refused) {
       walkUpOptionsFailure.value = refusalText(refused)
     }
-  })
+  }
+  watch([walkUpPerformanceId, venueId], loadWalkUpOptions)
+  // On a served page the house and the bar are both known as this is set up, so the watcher never sees
+  // them change; outside a component there is nothing to mount.
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      if (walkUpPerformanceId.value && venueId.value) void loadWalkUpOptions()
+    })
+  }
 
   function bumpWalkUp(typeId: string, by: number): void {
     walkUpQty.value[typeId] = Math.max(0, Math.min(20, (walkUpQty.value[typeId] ?? 0) + by))

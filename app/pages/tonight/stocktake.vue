@@ -10,20 +10,31 @@ interface OpenStocktake { stocktake: Stocktake | null, lines: StocktakeLine[] }
 
 const request = useRequestFetch()
 
-const { data, error } = await useAsyncData(
-  'tonight-stocktake',
-  () => request<OpenStocktake>('/api/admin/bar/stocktakes/open'),
-  { default: () => ({ stocktake: null, lines: [] }) as OpenStocktake },
-)
+const open = ref<OpenStocktake>({ stocktake: null, lines: [] })
+const failure = ref<string | null>(null)
+const refusal = ref<string | null>(null)
 
-setNightSubject(() => ({ title: 'Stocktake', meta: data.value.stocktake ? `Opened ${saysWhen(data.value.stocktake.openedAt)}` : null }))
+function apply(answered: SettledRead<OpenStocktake>): void {
+  if (answered.kind === 'FAILED') {
+    failure.value = answered.failure
+    // Somebody not on tonight's bar is refused the screen in place of the work (issue 1304).
+    refusal.value = refusalOf(answered)
+    return
+  }
+  open.value = answered.value
+  failure.value = null
+  refusal.value = null
+}
 
-// Somebody not on tonight's bar is refused the screen in place of the work (issue 1304).
-const refusal = computed(() => (error.value && refusalStatus(error.value) === 403 ? refusalText(error.value) : null))
+// In the served page, so the count, the line saying none is open or the refusal is what a phone
+// paints first, and a tap from the hub never waits on the network (issue 1521).
+const waiting = useServedRead('tonight-stocktake', () => settleRead(() => request<OpenStocktake>('/api/admin/bar/stocktakes/open')), apply)
+
+setNightSubject(() => ({ title: 'Stocktake', meta: open.value.stocktake ? `Opened ${saysWhen(open.value.stocktake.openedAt)}` : null }))
 
 // Each line saves on its own, and the register's answer replaces that one line only (issue 1321).
 function saved(line: StocktakeLine): void {
-  data.value = { ...data.value, lines: data.value.lines.map(one => (one.itemId === line.itemId ? line : one)) }
+  open.value = { ...open.value, lines: open.value.lines.map(one => (one.itemId === line.itemId ? line : one)) }
 }
 </script>
 
@@ -31,26 +42,18 @@ function saved(line: StocktakeLine): void {
   <NightScreen
     title="Stocktake"
     :refused="refusal"
+    :busy="waiting"
   >
     <UAlert
-      v-if="error"
+      v-if="failure"
       data-test="stocktake-refusal"
       color="error"
       variant="subtle"
-      :description="refusalText(error)"
+      :description="failure"
     />
 
-    <p
-      v-else-if="!data.stocktake"
-      class="text-sm text-muted"
-      data-test="no-stocktake"
-    >
-      No stocktake is open. The Bar Manager or the Front of House Manager opens one from the
-      console, and it appears here for tonight's bar shift to count into.
-    </p>
-
     <div
-      v-else
+      v-else-if="open.stocktake"
       class="space-y-4"
     >
       <p class="text-sm text-muted">
@@ -59,11 +62,20 @@ function saved(line: StocktakeLine): void {
       </p>
 
       <StocktakeCounts
-        :stocktake-id="data.stocktake.id"
-        :lines="data.lines"
+        :stocktake-id="open.stocktake.id"
+        :lines="open.lines"
         :open="true"
         @saved="saved"
       />
     </div>
+
+    <p
+      v-else-if="!waiting"
+      class="text-sm text-muted"
+      data-test="no-stocktake"
+    >
+      No stocktake is open. The Bar Manager or the Front of House Manager opens one from the
+      console, and it appears here for tonight's bar shift to count into.
+    </p>
   </NightScreen>
 </template>

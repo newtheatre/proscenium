@@ -215,6 +215,8 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     onMounted(() => {
       document.addEventListener('visibilitychange', returnToTab)
       void resume(deps.returnedAttemptId ?? null)
+      // A session the served page carried was there before the watcher below, which never saw it arrive.
+      if (session.value) void refreshOpenAttempts()
     })
     onBeforeUnmount(() => {
       document.removeEventListener('visibilitychange', returnToTab)

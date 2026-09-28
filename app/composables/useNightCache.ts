@@ -7,6 +7,8 @@ import {
   pruneNightCache,
   readNightCache,
   refreshNightCache,
+  servedCopyWins,
+  writeNightCache,
 } from '#shared/utils/night-cache'
 import type { MaybeRefOrGetter, Ref, ShallowRef } from 'vue'
 import type { NightCacheKey, NightCacheStore } from '#shared/utils/night-cache'
@@ -46,6 +48,7 @@ export interface NightCache<T> {
   live: Ref<boolean>
   recall: () => void
   refresh: () => Promise<void>
+  adopt: (copy: T, at: number) => void
 }
 
 export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: () => Promise<T>, options: NightCacheOptions = {}): NightCache<T> {
@@ -97,6 +100,17 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
     }
   }
 
+  // A copy the server rendered into the page, kept on the device, dated when it was read, unless the
+  // device already holds a newer one. Called once mounted, since the server holds no device store.
+  function adopt(copy: T, at: number): void {
+    if (!servedCopyWins(cachedAt.value, at)) return
+    writeNightCache(store, toValue(key), copy, new Date(at))
+    data.value = copy
+    cachedAt.value = at
+    error.value = null
+    live.value = true
+  }
+
   function open(): void {
     recall()
     if (options.immediate !== false) void refresh()
@@ -107,7 +121,7 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
   if (getCurrentInstance()) onMounted(open)
   watch(() => toValue(key), open)
 
-  return { data, cachedAt, pending, error, live, recall, refresh }
+  return { data, cachedAt, pending, error, live, recall, refresh, adopt }
 }
 
 // What one screen caches for another, so the emergency card is there from the start of the shift

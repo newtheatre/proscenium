@@ -4,6 +4,8 @@ import type { ListFailure } from './useListFailure'
 import type { ResolveOutcome, SumupAttemptStatus } from '#shared/utils/sumup'
 import type { EarlierTillLeftOpen } from '#shared/utils/till'
 
+export type EarlierRead = { kind: 'READ', value: EarlierTillLeftOpen } | { kind: 'FAILED', failure: ListFailure }
+
 // What ended nights left open, for the Bar Manager on tonight's till (F-102 criterion 5, issue
 // 1316). Read only for the standing role, since no shift reaches back into a night.
 export function useTillEarlier() {
@@ -17,14 +19,24 @@ export function useTillEarlier() {
   // A charge taken and not recorded is abandoned only with a word on where the money went.
   const notes = ref<Record<string, string>>({})
 
-  async function refresh(): Promise<void> {
-    if (!offered.value) return
+  // Null for anybody but the Bar Manager, who alone is asked.
+  async function read(): Promise<EarlierRead | null> {
+    if (!offered.value) return null
     try {
-      left.value = await request<EarlierTillLeftOpen>('/api/till/earlier')
+      return { kind: 'READ', value: await request<EarlierTillLeftOpen>('/api/till/earlier') }
     }
     catch (refused) {
-      failure.value = listFailureFrom(refused)
+      return { kind: 'FAILED', failure: listFailureFrom(refused) }
     }
+  }
+
+  function apply(answered: EarlierRead | null): void {
+    if (answered?.kind === 'READ') left.value = answered.value
+    else if (answered) failure.value = answered.failure
+  }
+
+  async function refresh(): Promise<void> {
+    apply(await read())
   }
 
   async function answer(id: string, outcome: ResolveOutcome): Promise<void> {
@@ -47,7 +59,5 @@ export function useTillEarlier() {
     }
   }
 
-  onMounted(refresh)
-
-  return { offered, left, failure, answering, notes, refresh, answer }
+  return { offered, left, failure, answering, notes, read, apply, refresh, answer }
 }

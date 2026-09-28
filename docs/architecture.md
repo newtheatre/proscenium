@@ -1365,8 +1365,15 @@ waits for and ships in the page, so the first load shows none either; on a navig
 shell it arrives after the screen draws, which says Syncing meanwhile, rather than holding the phone
 on the network. Every read on the screens served this way settles through `settleRead()`
 (`app/utils/refusal.ts`), and the hub's staleness through `hubHouseAfter()` in
-`shared/utils/night-hub.ts` (issue 1521); the night report still reads the older way, which
-`docs/known-issues.md` records. A caller `requireNightAuthority` refuses is shown the hub's own
+`shared/utils/night-hub.ts` (issue 1521); the night report, the till, the bar shift's stocktake
+and a refusal card's help line read the same way. The till serves only what the server holds: its
+session and bar (`useTillSession()`), the Bar Manager's earlier nights, and the catalogue, read on
+the server alone and kept by the phone's night cache once mounted unless its own copy is newer
+(`useNightCache().adopt()`, `servedCopyWins()`). Its basket, its queued writes and its card attempts
+stay the device's (K-103, K-104, 0096), as does the list of unanswered charges, which leaves out the
+one this phone is waiting on. A night that asks which bar and names none in the address cannot be
+served, since the answer is this phone's memory (`tillRefusalStep()` in `shared/utils/till.ts`): the
+served page says Syncing, with no picker and no Open till, until the phone has read it. A caller `requireNightAuthority` refuses is shown the hub's own
 fallback links instead of a failure banner, which is how `/tonight` still serves a DOOR or BAR shift
 holder who is not tonight's duty manager. Content warnings, the latecomer policy and the age
 guidance are read straight from `showWarnings()` and the show row, the same source the public show
@@ -1952,7 +1959,10 @@ names what is still open or what moved, and the reread list shows it. A
 the refusal itself when authority lists no house to choose. The screen asks `GET
 /api/tonight/authority` for `DUTY_MANAGER` on the performance it shows, asking again on a switch,
 so an officer standing in is told before signing that the sign-off records as such (0044),
-whatever shift they hold elsewhere. The staffing bypass lines are the night's, shown above the
+whatever shift they hold elsewhere. The draft and that answer arrive in the served page
+(`useServedRead()`, keyed by the performance asked for); opened with no performance, the answer is
+the shell's own unscoped one, reused through `askNightAuthority()`, and the curtain is judged by the
+read's own moment until the page has mounted (`useNightClock()`), then every half minute. The staffing bypass lines are the night's, shown above the
 slots and never beside one, because the audit entries they read name no shift; a report frozen
 before 0098 carries only the duty manager's flag, and the screen still shows it, and one frozen
 before issue 1326's seat rule reached the night report counts in, no-shows and walk-ups by booking.
@@ -2143,6 +2153,7 @@ answered, and `cache.error` is the failure that left the screen stale rather tha
 | An answer or failure landing after a newer request's has answered is dropped; one landing first is kept. | A screen asks again on focus, after a sale and on a session change, and the slowest answer is not the freshest: a read taken before a sale must not replace one taken after it, yet a newer request that fails must not blank one that answered (criteria 2 and 5). |
 | A successful load sweeps every other night's entries. | A night ends at 04:00 and takes its cache with it; nothing else on the device is touched. |
 | Unreadable, foreign-version or foreign-key entries read as nothing cached. | A screen that throws on an entry an older build wrote is worse than one that reloads. |
+| `cache.adopt(copy, at)` keeps a copy the server rendered into the page, dated when it was read, unless the device already holds a newer one (`servedCopyWins()`). | The till's grid arrives in the served page; once mounted the phone keeps that copy for when the Wi-Fi drops rather than asking again for the same answer, and a copy it fetched since is never replaced by an older one (issue 1521). |
 | `primeNightCache(key, load)` caches what another screen will need. | The emergency card is cached from the start of the shift rather than from the first visit to it (criterion 3, E-113 criterion 2). |
 | The store is `localStorage`, falling back to memory when a device refuses it. | A screen that cannot cache still has to render, and the fallback lives as long as the tab. |
 
