@@ -1028,8 +1028,9 @@ The show-night shell asks it once for each role, and once with none, from
 (`asksNightAuthority()` in `shared/utils/night-shell.ts`, issue 1521), keeping each answer as it
 came. It is awaited only while the server renders a `/tonight` screen, so the served page draws the
 hub's tiles, the on-shift badge and the running house already, and hydration takes that answer from
-the payload. A phone is never held on it: arriving from another layout, it is asked behind the page
-and the hub draws every tile until it lands, as with no signal. A page that only wears the shell
+the payload. A phone is never held on it: arriving from another layout, it is asked behind the page,
+the state says `asking` meanwhile, and the hub draws only Emergency (`hubTilesWhileAsking()`) until
+it lands, so no tile is drawn and then taken away. A page that only wears the shell
 (the SumUp return, a session register) is not held on the server either and asks behind itself on
 the phone. A signed-out viewer is not asked about at all, since every role would answer 401, which
 says nothing. The screens that need a role's own answer (the door's covered houses, the duty

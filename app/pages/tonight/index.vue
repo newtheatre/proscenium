@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, curtainIsDown, hubHouseAfter, hubHouseRefused, hubKpis, hubTiles, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, curtainIsDown, hubHouseAfter, hubHouseRefused, hubKpis, hubTiles, hubTilesWhileAsking, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
 import type { ChecklistEntry, TonightChecklist } from '#shared/utils/checklist'
 import type { HubHouse, HubHouseRead, HubHouseState, HubTileId } from '#shared/utils/night-hub'
@@ -29,12 +29,13 @@ const chosenId = ref<string | null>(null)
 let timer: ReturnType<typeof setInterval> | undefined
 
 // Resolved before a served `/tonight` render; on a phone arriving from elsewhere it lands after the
-// first paint, and every tile shows until it does (issue 1304, issue 1521).
+// first paint, and nothing drawn by role shows until it does (issue 1304, issue 1521).
 const authority = useNightAuthority()
-const dutyManager = computed(() => authority.value.roles.includes('DUTY_MANAGER'))
+const settled = computed(() => !authority.value.asking)
+const dutyManager = computed(() => settled.value && authority.value.roles.includes('DUTY_MANAGER'))
 // A count open for tonight's bar shift to take (decision 0099), asked only of somebody on the bar
 // and again with every poll, so the tile comes and goes as a stocktake is opened and applied.
-const onTheBar = computed(() => authority.value.known && authority.value.roles.includes('BAR'))
+const onTheBar = computed(() => settled.value && authority.value.known && authority.value.roles.includes('BAR'))
 
 async function readHouse(): Promise<HubHouseRead<HouseTonight>> {
   // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
@@ -115,8 +116,8 @@ const scoped = (to: string): string => selectedId.value ? `${to}?performanceId=$
 const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value, now.value / 1000) : false)
 // Each tile where the viewer's own authority opens it; every tile where no role could be answered,
 // signed out or with no signal, since each screen guards itself anyway (issue 1304, E-111 5).
-const tiles = computed(() => hubTiles(authority.value.known ? authority.value.roles : null, curtainDown.value))
-const noRole = computed(() => authority.value.known && authority.value.roles.length === 0)
+const tiles = computed(() => authority.value.asking ? hubTilesWhileAsking() : hubTiles(authority.value.known ? authority.value.roles : null, curtainDown.value))
+const noRole = computed(() => settled.value && authority.value.known && authority.value.roles.length === 0)
 
 const HUB_TILES: Record<HubTileId | 'stocktake', { label: string, hint: string, icon: string, to: string, scoped: boolean }> = {
   'door': { label: 'Door', hint: 'QR · ref · name', icon: 'i-lucide-scan-line', to: '/tonight/door', scoped: false },

@@ -209,6 +209,12 @@ export function hubTiles(roles: readonly NightRole[] | null, curtainDown = false
   return own ? [{ id: own, gold: true }, ...rest] : rest
 }
 
+// While the roles are still being asked on a phone: only the tiles every answer keeps, so nothing
+// drawn before the answer is taken away when it lands (issue 1521).
+export function hubTilesWhileAsking(): { id: HubTileId, gold: boolean }[] {
+  return HUB_TILE_ORDER.filter(id => HUB_TILE_ROLES[id] === 'ANYONE').map(id => ({ id, gold: false }))
+}
+
 // Its running time and intervals past curtain up, or curtain up itself where none is recorded,
 // 0078's own fallback. Nothing that ends the night is pinned before it (issue 1315).
 export function curtainIsDown(performance: PerformanceTimes, at: number): boolean {
