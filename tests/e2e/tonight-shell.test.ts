@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, lastSyncedLabel } from '#shared/utils/night-shell'
-import { DRAWN_CHOICE, DRAWN_TARGET, click, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
-import type { AppUnderTest } from '#tests/helpers/webview'
+import { NIGHT_TARGETS, click, openView, shortOfFloor, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import type { AppUnderTest, NightTarget } from '#tests/helpers/webview'
 
 // K-102 in a real browser, at the size of the phone the story names. The hub is the one screen
 // that exists; the door and the till inherit these rules by being built from the same primitives.
@@ -228,33 +228,18 @@ describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 ite
 // Rule 4 of docs/design-language.md, measured rather than asserted from the source: every control
 // on a show-night screen clears 48 by 48, not only the primary actions (issue 1150 item 15).
 describe.skipIf(skip !== null)('the target floor holds for every control (K-102, issue 1150 item 15)', () => {
-  // The till is audited by its own suites; these are the screens outside it.
+  // The till is audited by its own suites, and the stocktake, the one screen with a switch, beside its
+  // fixture in tests/e2e/bar-stocktakes.test.ts; these are the screens outside both.
   const SCREENS = ['/tonight', '/tonight/glance', '/tonight/board', '/tonight/incidents', '/tonight/age-checks', '/tonight/emergency']
-
-  // Zero-sized elements are the ones a `v-if` has taken out, which are not controls anybody can
-  // miss; everything with a box on the page is measured, a drawn choice by its row.
-  const CONTROLS = `(() => {
-    const seen = []
-    for (const node of document.querySelectorAll('button, input, select, textarea, [role="combobox"], a[href]')) {
-      const rect = node.getBoundingClientRect()
-      if (rect.width === 0 || rect.height === 0) continue
-      if (getComputedStyle(node).display === 'inline') continue
-      const what = node.getAttribute('data-test') ?? node.tagName.toLowerCase()
-      if (node.matches(${JSON.stringify(DRAWN_CHOICE)})) seen.push({ what, ...${DRAWN_TARGET}(node) })
-      else seen.push({ what, width: rect.width, height: rect.height, reaches: true })
-    }
-    return JSON.stringify(seen)
-  })()`
 
   for (const path of SCREENS) {
     test(`every control on ${path} is a thumb-sized target`, async () => {
       const view = await openView(PHONE)
       try {
         await visit(view, `${app.baseURL}${path}`)
-        const controls = JSON.parse(await view.evaluate<string>(CONTROLS)) as { what: string, width: number, height: number, reaches: boolean }[]
+        const controls = JSON.parse(await view.evaluate<string>(NIGHT_TARGETS)) as NightTarget[]
         expect(controls.length).toBeGreaterThan(0)
-        const short = controls.filter(one => one.height < NIGHT_TAP_TARGET_PX || one.width < NIGHT_TAP_TARGET_PX || !one.reaches)
-        expect(short.map(one => `${one.what} ${Math.round(one.width)}x${Math.round(one.height)}${one.reaches ? '' : ', a tap on its row misses it'}`)).toEqual([])
+        expect(shortOfFloor(controls, NIGHT_TAP_TARGET_PX)).toEqual([])
       }
       finally {
         view.close()

@@ -6,9 +6,9 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
-import { DRAWN_TARGET, click, fill, fillNumber, openSignedOutView, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { DRAWN_TARGET, NIGHT_TARGETS, click, fill, fillNumber, openSignedOutView, shortOfFloor, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX } from '#shared/utils/night-shell'
-import type { AppUnderTest } from '#tests/helpers/webview'
+import type { AppUnderTest, NightTarget } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
@@ -903,11 +903,51 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
       expect(row.width).toBeGreaterThanOrEqual(NIGHT_TAP_TARGET_PX)
       expect(row.reaches).toBe(true)
 
-      await screen.evaluate(`(() => {
-        const box = document.querySelector('[data-test="uncounted-only-filter"]').parentElement.parentElement.getBoundingClientRect()
-        document.elementFromPoint(box.right - 2, box.top + 2).click()
+      // A point only the overlay can answer: in the row, but clear of both the label's box and the
+      // track's, above the track or in the gap before the label. Without the overlay a tap there is lost.
+      const spot = await screen.evaluate<{ x: number, y: number, row: Box, label: Box, track: Box } | null>(`(() => {
+        const control = document.querySelector('[data-test="uncounted-only-filter"]')
+        const plain = rect => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom })
+        const row = plain(control.parentElement.parentElement.getBoundingClientRect())
+        const label = plain(control.labels[0].getBoundingClientRect())
+        const track = plain(control.getBoundingClientRect())
+        const inside = (box, x, y) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
+        const candidates = [
+          [(track.left + track.right) / 2, (row.top + track.top) / 2],
+          [(track.left + track.right) / 2, (track.bottom + row.bottom) / 2],
+          [(track.right + label.left) / 2, (row.top + row.bottom) / 2],
+        ]
+        const found = candidates.find(([x, y]) => inside(row, x, y) && !inside(label, x, y) && !inside(track, x, y))
+        return found ? { x: found[0], y: found[1], row, label, track } : null
       })()`)
+      expect(spot).not.toBeNull()
+      const at = spot!
+      const within = (box: Box): boolean => at.x >= box.left && at.x <= box.right && at.y >= box.top && at.y <= box.bottom
+      expect(within(at.row)).toBe(true)
+      expect(within(at.label)).toBe(false)
+      expect(within(at.track)).toBe(false)
+      expect(await screen.evaluate<string>(`document.querySelector('[data-test="uncounted-only-filter"]').getAttribute('aria-checked')`)).toBe('false')
+      await screen.evaluate(`document.elementFromPoint(${at.x}, ${at.y}).click()`)
       await waitFor(screen, `document.querySelector('[data-test="uncounted-only-filter"]').getAttribute('aria-checked') === 'true'`)
+    }
+    finally {
+      screen?.close()
+      await apply(opened.stocktake.id)
+    }
+  }, 120_000)
+
+  // The one show-night screen with a drawn choice, so the floor test's rule for one is proved here,
+  // beside the stocktake it needs: the switch passes by its row, and every other control by its box.
+  test('every control on tonight\'s stocktake is a thumb-sized target, the switch by its row', async () => {
+    const item = await anItem()
+    const opened = await open()
+    let screen: Bun.WebView | undefined
+    try {
+      screen = await signedIn(NIGHT_VIEWPORT_PX, 740)
+      await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${item.id}"]`)
+      const controls = JSON.parse(await screen.evaluate<string>(NIGHT_TARGETS)) as NightTarget[]
+      expect(controls.map(one => one.what)).toContain('uncounted-only-filter')
+      expect(shortOfFloor(controls, NIGHT_TAP_TARGET_PX)).toEqual([])
     }
     finally {
       screen?.close()

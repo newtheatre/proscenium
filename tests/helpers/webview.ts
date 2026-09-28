@@ -605,15 +605,48 @@ export async function navLabels(view: Bun.WebView): Promise<string[]> {
   return view.evaluate<string[]>(`[...document.querySelectorAll('nav a, nav button')].map(node => node.innerText.trim()).filter(Boolean)`)
 }
 
-// A switch, checkbox or radio keeps its drawn size on a show-night screen, and its target is its
-// row, counted only where a tap on the row lands on the control or its label (design-language rule 4).
-export const DRAWN_CHOICE = '[role="switch"], [role="checkbox"], [role="radio"]'
+// Nuxt UI's switch, checkbox and radio keep their drawn size on a show-night screen; the target is
+// the row, counted only where a tap on it lands on the control or its label (design-language rule 4).
+export const DRAWN_CHOICE = '[data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])'
 export const DRAWN_TARGET = `(control => {
-  const row = control.parentElement?.parentElement
-  if (!row) return { width: 0, height: 0, reaches: false }
+  const row = control.parentElement?.matches('[data-slot="container"]') ? control.parentElement.parentElement ?? control : control
   row.scrollIntoView({ block: 'center' })
   const box = row.getBoundingClientRect()
-  const owns = hit => Boolean(hit) && (control.contains(hit) || [...control.labels].some(label => label.contains(hit)))
-  const corners = [[box.left + 2, box.top + 2], [box.right - 2, box.top + 2], [box.left + 2, box.bottom - 2], [box.right - 2, box.bottom - 2]]
-  return { width: box.width, height: box.height, reaches: corners.every(([x, y]) => owns(document.elementFromPoint(x, y))) }
+  const labels = [...(control.labels ?? [])]
+  const owns = hit => control.contains(hit) || labels.some(label => label.contains(hit))
+  const pinned = hit => {
+    for (let node = hit; node && node !== document.body; node = node.parentElement) {
+      const place = getComputedStyle(node).position
+      if ((place === 'fixed' || place === 'sticky') && !node.contains(row)) return true
+    }
+    return false
+  }
+  const inset = Math.min(6, box.width / 4, box.height / 4)
+  const points = [[box.left + inset, box.top + inset], [box.right - inset, box.top + inset], [box.left + inset, box.bottom - inset], [box.right - inset, box.bottom - inset]]
+  const hits = points.map(([x, y]) => document.elementFromPoint(x, y)).filter(hit => hit && !pinned(hit))
+  return { width: box.width, height: box.height, reaches: hits.length > 0 && hits.every(owns) }
 })`
+
+export interface NightTarget { what: string, width: number, height: number, reaches: boolean }
+
+// Every control on a show-night page with a box, a drawn choice by its row. Zero-sized elements are
+// the ones a `v-if` has taken out, which are not controls anybody can miss.
+export const NIGHT_TARGETS = `(() => {
+  const seen = []
+  for (const node of document.querySelectorAll('button, input, select, textarea, [role="combobox"], a[href]')) {
+    const rect = node.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) continue
+    if (getComputedStyle(node).display === 'inline') continue
+    const what = node.getAttribute('data-test') ?? node.tagName.toLowerCase()
+    if (node.matches(${JSON.stringify(DRAWN_CHOICE)})) seen.push({ what, ...${DRAWN_TARGET}(node) })
+    else seen.push({ what, width: rect.width, height: rect.height, reaches: true })
+  }
+  return JSON.stringify(seen)
+})()`
+
+// What falls short of the floor, as a line a failing assertion can print.
+export function shortOfFloor(targets: NightTarget[], floor: number): string[] {
+  return targets
+    .filter(one => one.height < floor || one.width < floor || !one.reaches)
+    .map(one => `${one.what} ${Math.round(one.width)}x${Math.round(one.height)}${one.reaches ? '' : ', a tap on its row misses it'}`)
+}

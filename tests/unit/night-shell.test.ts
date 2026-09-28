@@ -305,37 +305,73 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
     }
   })
 
-  // Reka draws a switch, a checkbox and a radio as a button with a role. Floored, a switch's track is
-  // a 48 pixel circle (issue 1520), so those keep their drawn size and their row is the target.
-  const DRAWN_ROLES = ['switch', 'checkbox', 'radio'] as const
+  // Reka draws a switch, a checkbox and a radio as a button with a role. Floored, a switch's track
+  // is a 48 pixel circle (issue 1520), so Nuxt UI's shape of one keeps its size and its row is the target.
+  const DRAWN = '[data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])'
+  const ROW = `.${SHELL_CLASS} :has(> ${DRAWN})`
+  const LABEL = `${ROW} > [data-slot="wrapper"] > [data-slot="label"]`
   const FLOOR = `min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`
 
-  async function shellRules(): Promise<{ selector: string, body: string }[]> {
+  interface ShellRule { selector: string, body: string, layer: string | null }
+
+  // Each innermost rule with the cascade layer it sits in, so its place in the cascade is pinned too.
+  async function shellRules(): Promise<ShellRule[]> {
     const theme = (await read(TOKEN_SOURCE)).replace(/\/\*[\s\S]*?\*\//g, '')
+    const layers: { name: string, from: number, to: number }[] = []
+    for (const opened of theme.matchAll(/@layer\s+([\w-]+)\s*\{/g)) {
+      let depth = 0
+      let at = opened.index + opened[0].length - 1
+      do {
+        if (theme[at] === '{') depth++
+        if (theme[at] === '}') depth--
+        at++
+      } while (depth > 0 && at < theme.length)
+      layers.push({ name: opened[1]!, from: opened.index, to: at })
+    }
     return [...theme.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-      .map(([, selector, body]) => ({ selector: selector!.trim().replace(/\s+/g, ' '), body: body! }))
+      .map(rule => ({
+        selector: rule[1]!.trim().replace(/\s+/g, ' '),
+        body: rule[2]!,
+        layer: layers.find(layer => layer.from < rule.index && rule.index < layer.to)?.name ?? null,
+      }))
       .filter(rule => rule.selector.startsWith(`.${SHELL_CLASS} `))
   }
 
-  test('a switch, checkbox or radio is left out of the element floor, so it keeps the size it is drawn at', async () => {
+  test('the element floor leaves out exactly the drawn choice the row rule covers, and nothing else with its role', async () => {
     const floors = (await shellRules()).filter(rule => /\bbutton\b/.test(rule.selector) && rule.body.includes(FLOOR))
     expect(floors).toHaveLength(1)
-    const selector = floors[0]!.selector
-    const exempt = selector.includes(':not(') ? selector.slice(selector.indexOf(':not(')) : ''
-    for (const role of DRAWN_ROLES) expect(`${role}: ${exempt.includes(`[role="${role}"]`)}`).toBe(`${role}: true`)
+    expect(floors[0]!.selector).toEndWith(`:not(${DRAWN})`)
+    // Unlayered, so it outranks the size utilities Nuxt UI puts on a button.
+    expect(floors[0]!.layer).toBeNull()
   })
 
-  test('the row of a switch, checkbox or radio carries the floor, and its label spans that row', async () => {
+  test('the row of a drawn choice carries the floor, in a layer an instance\'s own classes still override', async () => {
     const rules = await shellRules()
-    const rows = rules.filter(rule => rule.selector.includes(':has(') && !rule.selector.includes('::after') && rule.body.includes(FLOOR))
-    expect(rows).toHaveLength(1)
-    const row = rows[0]!
-    expect(row.body).toContain(`min-width: ${NIGHT_TAP_TARGET_PX / 16}rem`)
-    expect(row.body).toContain('position: relative')
-    for (const role of DRAWN_ROLES) expect(`${role}: ${row.selector.includes(`[role="${role}"]`)}`).toBe(`${role}: true`)
-    const overlay = rules.find(rule => rule.selector.startsWith(row.selector) && rule.selector.endsWith('[data-slot="label"]::after'))
+    const row = rules.find(rule => rule.selector === ROW)
+    expect(row?.body).toContain(FLOOR)
+    expect(row?.body).toContain(`min-width: ${NIGHT_TAP_TARGET_PX / 16}rem`)
+    expect(row?.body).toContain('position: relative')
+    expect(row?.body).not.toContain('align-items')
+    const label = rules.find(rule => rule.selector === LABEL)
+    expect(label?.body).toContain(FLOOR)
+    const own = rules.filter(rule => rule.selector.includes('[role="switch"]') && !rule.selector.includes(':not('))
+    expect(own.length).toBeGreaterThanOrEqual(4)
+    for (const rule of own) expect(`${rule.selector}: ${rule.layer}`).toBe(`${rule.selector}: components`)
+  })
+
+  test('the label spans the row on its ::before, leaving ::after to Nuxt UI\'s required marker', async () => {
+    const rules = await shellRules()
+    const overlay = rules.find(rule => rule.selector === `${LABEL}::before`)
     expect(overlay?.body).toContain('position: absolute')
     expect(overlay?.body).toContain('inset: 0')
+    expect(rules.filter(rule => /\[data-slot="label"\]::?after\b/.test(rule.selector))).toEqual([])
+  })
+
+  test('a link or button in the label or description sits above the overlay, so a tap on it is its own', async () => {
+    const lifted = (await shellRules()).find(rule => rule.selector.startsWith(`${ROW} > [data-slot="wrapper"] :is(`))
+    for (const tag of ['a', 'button']) expect(`${tag}: ${new RegExp(`[(,] ?${tag}[,)]`).test(lifted?.selector ?? '')}`).toBe(`${tag}: true`)
+    expect(lifted?.body).toContain('position: relative')
+    expect(lifted?.body).toContain('z-index: 1')
   })
 })
 

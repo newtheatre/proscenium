@@ -87,24 +87,41 @@
 
 /* The show-night shell's target floor, set once on the body rather than a class per field: every
    control on one clears 48 by 48 (docs/design-language.md rule 4, K-102 criterion 2). */
-.nnt-night :is(button, input, select, textarea, [role="combobox"], a):not([role="switch"], [role="checkbox"], [role="radio"]) {
+.nnt-night :is(button, input, select, textarea, [role="combobox"], a):not([data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])) {
   min-height: 3rem;
   min-width: 3rem;
 }
 
-/* Reka draws a switch, checkbox or radio as a button, which the floor would swell out of shape. It
-   keeps its drawn size; its row is the target, and the label's overlay makes a tap on the row toggle it. */
-.nnt-night :has(> [data-slot="container"] > :is([role="switch"], [role="checkbox"], [role="radio"])) {
-  position: relative;
-  align-items: center;
-  min-height: 3rem;
-  min-width: 3rem;
-}
+/* Nuxt UI's switch, checkbox and radio are Reka buttons the floor would swell, so the row carries it
+   instead. Layered, so Nuxt UI's slots and an instance's `ui` still override it. */
+@layer components {
+  .nnt-night :has(> [data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])) {
+    position: relative;
+    min-height: 3rem;
+    min-width: 3rem;
+  }
 
-.nnt-night :has(> [data-slot="container"] > :is([role="switch"], [role="checkbox"], [role="radio"])) > [data-slot="wrapper"] > [data-slot="label"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
+  .nnt-night [data-slot="container"]:has(> [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])) {
+    min-height: 3rem;
+  }
+
+  .nnt-night :has(> [data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])) > [data-slot="wrapper"] > [data-slot="label"] {
+    min-height: 3rem;
+    align-content: center;
+  }
+
+  /* The label's overlay makes a tap anywhere on the row toggle the control. Its `::after` is Nuxt
+     UI's required marker, so the overlay takes `::before`. */
+  .nnt-night :has(> [data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])) > [data-slot="wrapper"] > [data-slot="label"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .nnt-night :has(> [data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])) > [data-slot="wrapper"] :is(a, button, input, select, textarea, [tabindex]) {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 .dark {
