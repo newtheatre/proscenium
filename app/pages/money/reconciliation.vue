@@ -73,7 +73,7 @@ async function recordLate(charge: SumupAttemptView): Promise<void> {
       body: { expectedTotalPence: charge.expectedTotalPence },
     })
     if (answer.error) toast.add({ title: answer.error, color: 'error' })
-    else toast.add({ title: `${saysMoney(charge.expectedTotalPence)} recorded on this night.`, color: 'success' })
+    else toast.add({ title: `${saysMoney(charge.expectedTotalPence)} recorded on this night`, color: 'success' })
     await Promise.all([refresh(), refreshNuxtData('nights-needing-you')])
   }
   catch (recordError) {
