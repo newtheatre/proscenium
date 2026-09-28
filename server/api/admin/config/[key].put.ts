@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const input = await readValidatedBodyOrThrow(event, body)
-  await requireBlastRadiusConfirmation(event, key, input.confirmation)
+  await requireBlastRadiusConfirmation(event, key, input.confirmation, input.value)
 
   await writeConfigValue(event, resolved.account.id, key, input.value)
   return { ok: true, key, value: input.value }

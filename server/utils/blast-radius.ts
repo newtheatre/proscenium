@@ -7,6 +7,7 @@ import { confirmationOptions } from '#shared/utils/blast-radius'
 import { isWideBlastRadius } from '#shared/utils/config'
 import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import { privilegedWithoutFactor } from './directory'
+import { autoCloseFromPreview } from './night-auto-close'
 import { dueForAnonymisation } from './retention-candidates'
 import type { BlastRadiusPreview } from '#shared/utils/blast-radius'
 import type { ConfigKey } from '#shared/utils/config'
@@ -58,7 +59,8 @@ async function roleHoldersWithoutFactor(): Promise<number> {
   return row?.count ?? 0
 }
 
-const PREVIEWS: Partial<Record<ConfigKey, (event: H3Event | undefined) => Promise<BlastRadiusPreview>>> = {
+// `proposed` is the value the save or revert would write; only a preview that depends on it reads it.
+const PREVIEWS: Partial<Record<ConfigKey, (event: H3Event | undefined, proposed: unknown) => Promise<BlastRadiusPreview>>> = {
   REFUND_PAID_REQUIRES_MANAGER: async () => ({
     count: await officersWithoutRefundApproval(),
     category: 'box office officers who can self-approve a refund without this setting',
@@ -71,18 +73,22 @@ const PREVIEWS: Partial<Record<ConfigKey, (event: H3Event | undefined) => Promis
     count: await roleHoldersWithoutFactor(),
     category: 'role holders who sign in with a password and have no authenticator: any whose role is added here is refused on its screens until they set one up',
   }),
+  AUTO_CLOSE_FROM_NIGHT: async (_event, proposed) => ({
+    count: await autoCloseFromPreview(proposed),
+    category: 'performances from this night on with no night report and past their 24-hour close: the next sweep freezes each and emails its report',
+  }),
 }
 
-export async function blastRadiusPreview(event: H3Event | undefined, key: ConfigKey): Promise<BlastRadiusPreview | null> {
+export async function blastRadiusPreview(event: H3Event | undefined, key: ConfigKey, proposed?: unknown): Promise<BlastRadiusPreview | null> {
   const preview = PREVIEWS[key]
-  return preview ? preview(event) : null
+  return preview ? preview(event, proposed) : null
 }
 
 // A flagged key's write needs its preview echoed back first, by a save or a revert alike: the
 // text is validated, never a checkbox (J-105 criteria 1, 2 and 6).
-export async function requireBlastRadiusConfirmation(event: H3Event, key: ConfigKey, confirmation: string | undefined): Promise<void> {
+export async function requireBlastRadiusConfirmation(event: H3Event, key: ConfigKey, confirmation: string | undefined, proposed: unknown): Promise<void> {
   if (!isWideBlastRadius(key)) return
-  const expected = confirmationOptions(key, await blastRadiusPreview(event, key))
+  const expected = confirmationOptions(key, await blastRadiusPreview(event, key, proposed))
   if (!expected.includes(confirmation ?? '')) {
     throw createError({ statusCode: 400, statusMessage: `Type ${expected.map(value => `"${value}"`).join(' or ')} to confirm this change.` })
   }

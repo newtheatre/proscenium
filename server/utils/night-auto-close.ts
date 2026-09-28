@@ -10,7 +10,7 @@ import { claimNotification, notify } from './notify'
 import { performanceNight } from './performances'
 import { render } from './templates'
 import { auditEntry } from '#shared/utils/audit'
-import { showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
+import { isShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
 
@@ -45,8 +45,22 @@ export function autoCloseDeadline(startsAt: number): { night: string, deadline: 
   return { night, deadline: showNightBounds(night).to.getTime() + 24 * 60 * 60 * 1000 }
 }
 
+// Pure, so the sweep and the save preview share one cut: a candidate past its own deadline.
+export function pastTheirClose(candidates: UnclosedCandidateRow[], at: Date): DuePerformance[] {
+  const due: DuePerformance[] = []
+  for (const candidate of candidates) {
+    const { night, deadline } = autoCloseDeadline(candidate.startsAt)
+    if (at.getTime() >= deadline) due.push({ performanceId: candidate.performanceId, venueId: candidate.venueId, night })
+  }
+  return due
+}
+
+async function dueFrom(from: number, at: Date): Promise<DuePerformance[]> {
+  const candidates = await db.all<UnclosedCandidateRow>(unclosedCandidatesQuery(Math.floor(at.getTime() / 1000), from))
+  return pastTheirClose(candidates, at)
+}
+
 export async function performancesDueAutoClose(at: Date = new Date()): Promise<DuePerformance[]> {
-  const now = Math.floor(at.getTime() / 1000)
   // Unset closes nothing and warns, the nudge to set it; a failed read throws rather than looking
   // like a quiet night.
   const from = autoCloseFrom(await configValueOrUnset(undefined, 'AUTO_CLOSE_FROM_NIGHT'))
@@ -54,14 +68,14 @@ export async function performancesDueAutoClose(at: Date = new Date()): Promise<D
     console.warn('configuration: AUTO_CLOSE_FROM_NIGHT is unset; nights:close closes nothing')
     return []
   }
-  const candidates = await db.all<UnclosedCandidateRow>(unclosedCandidatesQuery(now, from))
+  return dueFrom(from, at)
+}
 
-  const due: DuePerformance[] = []
-  for (const candidate of candidates) {
-    const { night, deadline } = autoCloseDeadline(candidate.startsAt)
-    if (at.getTime() >= deadline) due.push({ performanceId: candidate.performanceId, venueId: candidate.venueId, night })
-  }
-  return due
+// What saving `proposed` would close on the next sweep (J-105 criterion 1): unset or unreadable
+// closes nothing, so it previews nothing.
+export async function autoCloseFromPreview(proposed: unknown, at: Date = new Date()): Promise<number> {
+  const from = typeof proposed === 'string' && isShowNight(proposed) ? autoCloseFrom(proposed) : null
+  return from === null ? 0 : (await dueFrom(from, at)).length
 }
 
 const CLOSING_NOTE = 'Closed automatically: no signatory within 24 hours of the show night ending.'
