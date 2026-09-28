@@ -28,6 +28,7 @@ import { daysAfter } from '#shared/utils/membership'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
 import { currentShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { applyTag } from '#tests/helpers/migrations'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { OpenShiftFilters, OpenShiftRow } from '#server/utils/rota'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -240,10 +241,7 @@ describe('the data migration clears templates already on external venues (E-101 
       template(database, away.id)
       external(database, away.id)
 
-      const migration = await Bun.file('server/db/migrations/sqlite/0115_an_external_venue_holds_no_shift_template.sql').text()
-      for (const statement of migration.split('--> statement-breakpoint')) {
-        if (statement.trim()) database.raw.exec(statement.trim())
-      }
+      await applyTag(database.raw, '0115_an_external_venue_holds_no_shift_template')
 
       expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', away.id)).toEqual([])
       expect(rows(database, 'SELECT 1 FROM shift_templates WHERE venue_id = ?', ours.id).length).toBe(3)

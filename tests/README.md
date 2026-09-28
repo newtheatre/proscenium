@@ -28,6 +28,25 @@ development database are written by the same code (K-120).
 A sink also reads, which is what lets a builder match a row on its natural key and stay
 re-runnable. Nothing else may reach the database from a fixture.
 
+## Migration tests
+
+A migration with a data step, or a table rebuild, is proved against the shape it meets: every
+migration before it, rows seeded in that old shape, then that one migration alone (0010, 0052).
+`tests/helpers/migrations.ts` is the one harness for it, and a test never walks the journal or
+splits a migration file itself.
+
+- `withMigration(name, seed, check)` does the whole round on an in-memory database with foreign
+  keys on; `{ runs: 2 }` applies the migration a second time over its own result, for a data
+  step that claims to be idempotent.
+- `databaseBefore(name)` and `applyTag(database, name)` are the same two halves, for a test that
+  needs its own shape, such as asserting that a migration aborts. `migrationSql(name)` and
+  `execMigration(database, sql)` split the apply further, so that `expect(...).toThrow()` sees
+  only the migration's own statements and never a failed file read.
+- `name` is the whole tag (`0116_the_box_office_role_folds_into_front_of_house`) or the name
+  with its number left off (`_the_front_of_house_role_is_retired`). The name alone lets a test
+  written before its migration lands survive the number the migration is given; the whole tag
+  pins it.
+
 ## The browser suites
 
 `e2e/` drives Chrome through `Bun.WebView` over the DevTools protocol, WebKit on macOS (0022).

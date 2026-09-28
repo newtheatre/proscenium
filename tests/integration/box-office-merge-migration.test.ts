@@ -1,43 +1,14 @@
 import { describe, expect, test } from 'bun:test'
-import { Database } from 'bun:sqlite'
-import { join } from 'node:path'
+import type { Database } from 'bun:sqlite'
 import { isAuditAction } from '#shared/utils/audit-actions'
+import { withMigration } from '#tests/helpers/migrations'
 
 // A-133 criteria 3 and 4 against a scratch database at the shape the merge meets (0090): the
 // grants a real committee holds, then the one migration, then what each holder is left with.
 
-const MIGRATIONS_DIR = 'server/db/migrations/sqlite'
 const MERGE_TAG = '0116_the_box_office_role_folds_into_front_of_house'
 const FUTURE = 2_000_000_000
 const LATER = 2_100_000_000
-
-async function journalTags(): Promise<string[]> {
-  const journal = await Bun.file(join(MIGRATIONS_DIR, 'meta', '_journal.json')).json() as { entries: { tag: string }[] }
-  return journal.entries.map(entry => entry.tag)
-}
-
-function execMigration(raw: Database, sql: string): void {
-  for (const statement of sql.split('--> statement-breakpoint')) {
-    const trimmed = statement.trim()
-    if (trimmed) raw.exec(trimmed)
-  }
-}
-
-async function databaseBeforeMerge(): Promise<Database> {
-  const raw = new Database(':memory:')
-  raw.exec('PRAGMA foreign_keys = ON;')
-  const tags = await journalTags()
-  const cutoff = tags.indexOf(MERGE_TAG)
-  if (cutoff === -1) throw new Error(`${MERGE_TAG} is not in the journal; has it been renumbered?`)
-  for (const tag of tags.slice(0, cutoff)) {
-    execMigration(raw, await Bun.file(join(MIGRATIONS_DIR, `${tag}.sql`)).text())
-  }
-  return raw
-}
-
-async function merge(raw: Database): Promise<void> {
-  execMigration(raw, await Bun.file(join(MIGRATIONS_DIR, `${MERGE_TAG}.sql`)).text())
-}
 
 function person(raw: Database, id: string): void {
   raw.query('INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)').run(id, `${id}@e2e.newtheatre.org.uk`, `Someone ${id}`)
@@ -59,21 +30,9 @@ function grantsOf(raw: Database, userId: string): GrantRow[] {
   `).all(userId) as GrantRow[]
 }
 
-async function withMerged(seed: (raw: Database) => void, check: (raw: Database) => void): Promise<void> {
-  const raw = await databaseBeforeMerge()
-  try {
-    seed(raw)
-    await merge(raw)
-    check(raw)
-  }
-  finally {
-    raw.close()
-  }
-}
-
 describe('the box office role folds into front of house (A-133 criterion 3)', () => {
   test('a box office grant with no front of house grant is renamed, keeping its expiry, granter and note', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'granter')
       person(raw, 'holder')
       grant(raw, 'holder', 'BOX_OFFICE', { expiresAt: FUTURE, grantedBy: 'granter', note: 'Covering until the AGM', warnedAt: 1_750_000_000 })
@@ -90,7 +49,7 @@ describe('the box office role folds into front of house (A-133 criterion 3)', ()
   })
 
   test('a holder of both keeps one front of house grant, the permanent box office one winning', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'holder')
       grant(raw, 'holder', 'BOX_OFFICE', { expiresAt: null })
       grant(raw, 'holder', 'FOH_MANAGER', { expiresAt: FUTURE, warnedAt: 1_750_000_000 })
@@ -103,7 +62,7 @@ describe('the box office role folds into front of house (A-133 criterion 3)', ()
   })
 
   test('the later of two dated expiries wins', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'holder')
       grant(raw, 'holder', 'BOX_OFFICE', { expiresAt: LATER })
       grant(raw, 'holder', 'FOH_MANAGER', { expiresAt: FUTURE })
@@ -113,7 +72,7 @@ describe('the box office role folds into front of house (A-133 criterion 3)', ()
   })
 
   test('an earlier box office expiry leaves the front of house grant exactly as it was', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'holder')
       grant(raw, 'holder', 'BOX_OFFICE', { expiresAt: FUTURE })
       grant(raw, 'holder', 'FOH_MANAGER', { expiresAt: LATER, note: 'Kept', warnedAt: 1_750_000_000 })
@@ -125,7 +84,7 @@ describe('the box office role folds into front of house (A-133 criterion 3)', ()
   })
 
   test('a permanent front of house grant is never shortened by a dated box office one', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'holder')
       grant(raw, 'holder', 'BOX_OFFICE', { expiresAt: LATER })
       grant(raw, 'holder', 'FOH_MANAGER', { expiresAt: null })
@@ -135,7 +94,7 @@ describe('the box office role folds into front of house (A-133 criterion 3)', ()
   })
 
   test('no box office grant is left anywhere, and every other grant is untouched', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'one')
       person(raw, 'two')
       grant(raw, 'one', 'BOX_OFFICE', { expiresAt: FUTURE })
@@ -153,7 +112,7 @@ describe('the box office role folds into front of house (A-133 criterion 3)', ()
 
 describe('each moved grant is audited, with no free text (A-133 criterion 4, 0011)', () => {
   test('one role.merged entry per box office grant, naming both roles and the resulting expiry', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'renamed')
       person(raw, 'folded')
       grant(raw, 'renamed', 'BOX_OFFICE', { expiresAt: FUTURE, note: 'A note that must not travel' })
@@ -173,7 +132,7 @@ describe('each moved grant is audited, with no free text (A-133 criterion 4, 001
   })
 
   test('a database with no box office grant writes no entry at all', async () => {
-    await withMerged((raw) => {
+    await withMigration(MERGE_TAG, (raw) => {
       person(raw, 'holder')
       grant(raw, 'holder', 'FOH_MANAGER', { expiresAt: FUTURE })
     }, (raw) => {
