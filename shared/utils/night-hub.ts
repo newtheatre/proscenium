@@ -103,6 +103,33 @@ export function staleBannerLine(reason: string | null): string {
   return reason ? `Showing what was last loaded: ${reason}` : 'Showing what was last loaded'
 }
 
+// One read of the house, as the hub saw it. A refusal (signed out, no shift tonight) is still a
+// definite answer; anything else, a dropped connection included, is not (E-112 criterion 3).
+export type HubHouseRead<T> = { kind: 'READ', house: T } | { kind: 'REFUSED' } | { kind: 'FAILED', reason: string }
+
+export interface HubHouseState<T> {
+  house: T | null
+  // Epoch milliseconds rather than a Date, so the served page and the hydrating phone hold one value.
+  syncedAt: number | null
+  stale: boolean
+  // What follows the colon in the stale banner; empty leaves the sentence alone.
+  staleReason: string
+}
+
+export const NO_HUB_HOUSE: HubHouseState<never> = { house: null, syncedAt: null, stale: false, staleReason: '' }
+
+export function hubHouseRefused(status: number | undefined, reason: string): HubHouseRead<never> {
+  return status === 401 || status === 403 ? { kind: 'REFUSED' } : { kind: 'FAILED', reason }
+}
+
+// The served read and every poll after it go through here. A failure keeps the last numbers on
+// screen and NightStale says how old they are: never a spinner (E-112 criterion 3).
+export function hubHouseAfter<T>(state: HubHouseState<T>, read: HubHouseRead<T>, at: number): HubHouseState<T> {
+  if (read.kind === 'READ') return { house: read.house, syncedAt: at, stale: false, staleReason: '' }
+  if (read.kind === 'REFUSED') return { ...state, syncedAt: at, stale: false, staleReason: '' }
+  return { ...state, stale: true, staleReason: read.reason }
+}
+
 // Whether the door can admit pass holders without thinking. Three states, because a volunteer at
 // 19:20 needs an answer and not a ratio; the numbers themselves sit beside it either way.
 export function passPressureAdvice(covering: number, headroom: number | null): string {

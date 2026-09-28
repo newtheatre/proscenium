@@ -105,10 +105,12 @@ describe('a hint is for an empty or first-use screen (issue 1317, K-101)', () =>
     expect(await read('app/pages/tonight/incidents/index.vue')).not.toContain('Every entry is timed and named, and lands')
   })
 
-  // Empty means loaded and empty: before the first load a screen is not empty, only unread.
+  // Empty means loaded and empty: before the first read, served or on the phone, a screen is unread.
   test('a screen is empty only once its first load has come back with nothing', async () => {
     for (const path of ['app/pages/tonight/incidents/index.vue', 'app/pages/tonight/age-checks/index.vue', 'app/pages/tonight/checklist/index.vue']) {
-      expect(`${path}: ${(await read(path)).includes(':empty="!busy && items.length === 0"')}`).toBe(`${path}: true`)
+      const source = await read(path)
+      expect(`${path}: ${source.includes(':empty="!settling && items.length === 0"')}`).toBe(`${path}: true`)
+      expect(`${path}: ${source.includes('const settling = computed(() => busy.value || waiting.value)')}`).toBe(`${path}: true`)
     }
   })
 

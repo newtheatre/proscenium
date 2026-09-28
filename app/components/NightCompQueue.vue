@@ -32,18 +32,34 @@ const ticketComps = ref<PendingComp[] | null>(null)
 const barComps = ref<PendingBarComp[] | null>(null)
 const viewer = useViewer()
 
-async function loadComps(performanceId: string): Promise<void> {
+interface Queues { tickets: PendingComp[] | null, bar: PendingBarComp[] | null }
+
+// Null with no house to ask about, which leaves the queues as they were.
+async function readComps(performanceId: string | null): Promise<Queues | null> {
+  if (!performanceId) return null
   const [tickets, bar] = await Promise.all([
-    request<{ items: PendingComp[] }>('/api/box-office/desk/comp-requests', { query: { performanceId } }).catch(() => null),
-    request<{ requests: PendingBarComp[] }>('/api/till/comp-requests', { query: { performanceId } }).catch(() => null),
+    settleRead(() => request<{ items: PendingComp[] }>('/api/box-office/desk/comp-requests', { query: { performanceId } })),
+    settleRead(() => request<{ requests: PendingBarComp[] }>('/api/till/comp-requests', { query: { performanceId } })),
   ])
-  ticketComps.value = tickets?.items.filter(one => !one.expired) ?? null
-  barComps.value = bar?.requests.filter(one => !one.request.expired) ?? null
+  return {
+    tickets: tickets.kind === 'READ' ? tickets.value.items.filter(one => !one.expired) : null,
+    bar: bar.kind === 'READ' ? bar.value.requests.filter(one => !one.request.expired) : null,
+  }
+}
+
+function apply(queues: Queues | null): void {
+  if (!queues) return
+  ticketComps.value = queues.tickets
+  barComps.value = queues.bar
 }
 
 async function refresh(): Promise<void> {
-  if (props.performanceId) await loadComps(props.performanceId)
+  apply(await readComps(props.performanceId))
 }
+
+// In the served page, so a waiting ask is there from the first paint rather than pushing the
+// screen down once it arrives (issue 1521).
+useServedRead(`night-comp-queue-${props.testId}`, () => readComps(props.performanceId), apply)
 
 const pendingComps = computed(() => [
   ...(ticketComps.value ?? []).map(one => ({ queue: 'TICKET' as const, request: one, priced: null })),
@@ -122,7 +138,6 @@ async function declineComp(): Promise<void> {
 const POLL_MS = 20_000
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
-  refresh()
   timer = setInterval(refresh, POLL_MS)
 })
 onUnmounted(() => {

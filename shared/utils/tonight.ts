@@ -23,6 +23,12 @@ export function activePerformanceId<T extends RunningPerformance>(performances: 
   return active.performanceId
 }
 
+// The house a screen opens on from the authority route's list: the one it marks running now, else
+// tonight's first, never whichever id sorted first (issue 901).
+export function openingHouseId(performances: readonly { id: string, active: boolean }[]): string | null {
+  return (performances.find(one => one.active) ?? performances[0])?.id ?? null
+}
+
 // What a show-night picker puts on a performance. A database id tells a volunteer at the door
 // nothing about which house they are admitting into (issue 901).
 export interface PerformanceChoice { showTitle: string, startsAt: number }

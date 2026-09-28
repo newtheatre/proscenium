@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { readTeamRow } from '#server/utils/tonight'
-import { activePerformanceId, contactRoster, saysPerformanceChoice, saysTeamHolder, telHref } from '#shared/utils/tonight'
+import { activePerformanceId, contactRoster, openingHouseId, saysPerformanceChoice, saysTeamHolder, telHref } from '#shared/utils/tonight'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
 // The duty manager's tonight screen (E-112). What the database returns is proved against the
@@ -142,5 +142,20 @@ describe('who is on tonight, for the contacts block (E-112 criterion 2)', () => 
   test('a number dials without its spacing', () => {
     expect(telHref('07700 900 123')).toBe('tel:07700900123')
     expect(telHref('+44 7700 900123')).toBe('tel:+447700900123')
+  })
+})
+
+// The door, the audience message and the Challenge 25 form each open on one house, by one rule.
+describe('the house a screen opens on (issue 901, issue 1521)', () => {
+  test('the one running now, wherever it sorts', () => {
+    expect(openingHouseId([{ id: 'matinee', active: false }, { id: 'evening', active: true }])).toBe('evening')
+  })
+
+  test('before any house is running, tonight\'s first', () => {
+    expect(openingHouseId([{ id: 'matinee', active: false }, { id: 'evening', active: false }])).toBe('matinee')
+  })
+
+  test('nothing running tonight, no house', () => {
+    expect(openingHouseId([])).toBeNull()
   })
 })

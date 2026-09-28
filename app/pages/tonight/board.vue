@@ -27,33 +27,42 @@ const seen = ref<Seen[]>([])
 const presets = ref<Preset[]>([])
 const milestoneTypes = ref<MilestoneType[]>([])
 const boardCode = ref<string | null>(null)
-const syncedAt = ref<Date | null>(null)
-const busy = ref(true)
+const syncedAt = ref<number | null>(null)
 const failure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const freeText = ref('')
 
+interface Board { messages: Message[], seen: Seen[], presets: Preset[], milestoneTypes: MilestoneType[] }
+
+const request = useRequestFetch()
+
 // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
-async function load(): Promise<void> {
-  try {
-    const answered = await useRequestFetch()<{ messages: Message[], seen: Seen[], presets: Preset[], milestoneTypes: MilestoneType[] }>('/api/tonight/board/messages')
-    messages.value = answered.messages
-    seen.value = answered.seen
-    presets.value = answered.presets
-    milestoneTypes.value = answered.milestoneTypes
-    syncedAt.value = new Date()
-    failure.value = null
-    refusal.value = null
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-    // Refused outright: one card, none of the board's controls (issue 1304).
-    if (refusalStatus(error) === 403) refusal.value = failure.value
-  }
-  finally {
-    busy.value = false
-  }
+function read(): Promise<SettledRead<Board>> {
+  return settleRead(() => request<Board>('/api/tonight/board/messages'))
 }
+
+function apply(answered: SettledRead<Board>): void {
+  if (answered.kind === 'FAILED') {
+    failure.value = answered.failure
+    // Refused outright: one card, none of the board's controls (issue 1304).
+    refusal.value = refusalOf(answered) ?? refusal.value
+    return
+  }
+  messages.value = answered.value.messages
+  seen.value = answered.value.seen
+  presets.value = answered.value.presets
+  milestoneTypes.value = answered.value.milestoneTypes
+  syncedAt.value = answered.at
+  failure.value = null
+  refusal.value = null
+}
+
+async function load(): Promise<void> {
+  apply(await read())
+}
+
+// In the served page, so a refused viewer never sees the board's controls first (issue 1521).
+const waiting = useServedRead('tonight-board', read, apply)
 
 async function loadCode(): Promise<void> {
   try {
@@ -66,7 +75,6 @@ async function loadCode(): Promise<void> {
 const POLL_MS = 5_000
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
-  load()
   timer = setInterval(load, POLL_MS)
 })
 onUnmounted(() => {
@@ -170,9 +178,13 @@ async function reset(): Promise<void> {
     title="Backstage"
     :refused="refusal"
     :stale="syncedAt"
-    :busy="busy"
+    :busy="waiting"
   >
-    <div class="space-y-5">
+    <!-- Nothing to press until the board has answered, since it may yet refuse this viewer. -->
+    <div
+      v-if="!waiting"
+      class="space-y-5"
+    >
       <UAlert
         v-if="failure"
         data-test="board-failure"
@@ -373,7 +385,10 @@ async function reset(): Promise<void> {
       </div>
     </div>
 
-    <template #actions>
+    <template
+      v-if="!waiting"
+      #actions
+    >
       <!-- The board's own first action is a call, so the composer is what sits under the thumb;
            Reset lives under the list, where a red pinned button cannot be hit by mistake. -->
       <form

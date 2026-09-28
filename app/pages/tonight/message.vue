@@ -2,6 +2,7 @@
 import { saysAudienceCount } from '#shared/utils/announcements'
 import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, saysNightMessageSent } from '#shared/utils/night-message'
 import type { NightAudience } from '#shared/utils/night-message'
+import { openingHouseId } from '#shared/utils/tonight'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/message-tonight-s-audience' })
 useSeoMeta({ title: 'Message tonight\'s audience' })
@@ -12,8 +13,7 @@ const route = useRoute()
 const request = useRequestFetch()
 const toast = useToast()
 
-const busy = ref(true)
-const syncedAt = ref<Date | null>(null)
+const syncedAt = ref<number | null>(null)
 const failure = ref<string | null>(null)
 // Refused outright: one card, and nothing left to send (issue 1304).
 const refusal = ref<string | null>(null)
@@ -22,25 +22,11 @@ const refusal = ref<string | null>(null)
 // chosen here (0101, E-127); the hub hands over the one it was showing.
 const houses = ref<House[]>([])
 const handedOver = typeof route.query.performanceId === 'string' ? route.query.performanceId : null
-// Set once authority answers, so the watch below asks for the count exactly once on mount.
 const performanceId = ref<string | null>(null)
 const choices = computed(() => houses.value.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt })))
 
-async function resolveAuthority(): Promise<void> {
-  try {
-    const answered = await request<{ performances: House[] }>('/api/tonight/authority', { query: { role: 'DUTY_MANAGER' } })
-    houses.value = answered.performances
-    performanceId.value = handedOver ?? (answered.performances.find(one => one.active) ?? answered.performances[0])?.id ?? null
-    refusal.value = null
-    syncedAt.value = new Date()
-  }
-  catch (refused) {
-    if (refusalStatus(refused) === 403) refusal.value = refusalText(refused)
-    else failure.value = refusalText(refused)
-  }
-  finally {
-    busy.value = false
-  }
+function chosenHouse(among: House[]): string | null {
+  return handedOver ?? openingHouseId(among)
 }
 
 const audience = ref<NightAudience | null>('TICKET_HOLDERS')
@@ -48,22 +34,57 @@ const audienceOptions = NIGHT_AUDIENCES.map(value => ({ value, label: NIGHT_AUDI
 const count = ref<number | null>(null)
 // Its own line, so a count that failed says so and clears on the next one; `failure` is authority's.
 const countFailure = ref<string | null>(null)
+// Which house and audience the count on screen answers, so the served count is not asked twice.
+let countedFor: string | null = null
+
+function countKey(house: string | null, whom: NightAudience | null): string | null {
+  return house && whom ? `${house}:${whom}` : null
+}
+
+function readCount(house: string, whom: NightAudience): Promise<SettledRead<{ count: number }>> {
+  return settleRead(() => request<{ count: number }>('/api/tonight/message/audience', { query: { performanceId: house, audience: whom } }))
+}
+
+function applyCount(answered: SettledRead<{ count: number }>, asked: string | null): void {
+  countedFor = asked
+  count.value = answered.kind === 'READ' ? answered.value.count : null
+  countFailure.value = answered.kind === 'FAILED' ? answered.failure : null
+}
 
 // The count comes before the message (H-108 criterion 7), asked again whenever the house or the
 // audience changes, never cached.
 async function loadCount(): Promise<void> {
+  const house = performanceId.value
+  const whom = audience.value
+  const asked = countKey(house, whom)
+  if (asked !== null && asked === countedFor) return
+  countedFor = null
   count.value = null
   countFailure.value = null
-  if (!performanceId.value || !audience.value) return
-  try {
-    count.value = (await request<{ count: number }>('/api/tonight/message/audience', { query: { performanceId: performanceId.value, audience: audience.value } })).count
-  }
-  catch (refused) {
-    countFailure.value = refusalText(refused)
-  }
+  if (!house || !whom) return
+  applyCount(await readCount(house, whom), asked)
 }
 
-onMounted(resolveAuthority)
+// In the served page with the first count, so the form or the refusal is what a phone paints first.
+// A house the hub handed over is counted beside the authority read; otherwise authority names it.
+const waiting = useServedRead('tonight-message', async () => {
+  const whom = audience.value
+  const counting = (house: string | null) => house && whom ? readCount(house, whom).then(read => ({ asked: countKey(house, whom), read })) : null
+  const [authority, handedCount] = await Promise.all([askNightAuthority('DUTY_MANAGER'), counting(handedOver)])
+  const counted = handedCount ?? (authority.kind === 'READ' ? await counting(chosenHouse(authority.value.performances)) : null)
+  return { authority, counted }
+}, ({ authority, counted }) => {
+  refusal.value = refusalOf(authority)
+  if (authority.kind === 'FAILED') {
+    if (!refusal.value) failure.value = authority.failure
+    return
+  }
+  houses.value = authority.value.performances
+  syncedAt.value = authority.at
+  if (counted) applyCount(counted.read, counted.asked)
+  performanceId.value = chosenHouse(authority.value.performances)
+})
+
 watch([performanceId, audience], loadCount)
 
 const subject = ref('')
@@ -135,9 +156,11 @@ function startAnother(): void {
     :refused="refusal"
     hint="It goes at once to everyone you choose, whatever their preferences."
     :stale="syncedAt"
-    :busy="busy"
+    :busy="waiting"
   >
+    <!-- Nothing to write until authority has answered, since it may yet refuse this viewer. -->
     <div
+      v-if="!waiting"
       class="space-y-4"
       data-test="night-message"
     >
@@ -235,7 +258,10 @@ function startAnother(): void {
       </NightBlock>
     </div>
 
-    <template #actions>
+    <template
+      v-if="!waiting"
+      #actions
+    >
       <NightAction
         v-if="preview"
         :label="`Send to ${plural(preview.count, 'person', 'people')}`"

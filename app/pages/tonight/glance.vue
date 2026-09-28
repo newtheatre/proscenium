@@ -41,10 +41,9 @@ const POLL_MS = 20_000
 const route = useRoute()
 const request = useRequestFetch()
 const data = ref<DutyManagerTonight | null>(null)
-const syncedAt = ref<Date | null>(null)
+const syncedAt = ref<number | null>(null)
 const failure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
-const asked = ref(false)
 
 // The hub hands the house over in the query, so a matinee day opens on the one that was chosen
 // there rather than on whatever the clock would have picked (E-127 criterion 2).
@@ -56,49 +55,59 @@ let timer: ReturnType<typeof setInterval> | undefined
 // controls, and the access wording only at the door (issue 1307, D-127 criterion 3).
 const dutyManager = ref(false)
 
-async function load(): Promise<void> {
-  try {
-    data.value = await request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } })
-    dutyManager.value = true
-    syncedAt.value = new Date()
-    failure.value = null
-    refusal.value = null
-  }
-  catch (refused) {
-    if (refusalStatus(refused) === 403) {
-      await loadReadOnly()
-      return
-    }
+// The duty manager's read first; refused that, the same house read-only. Only a 403 on the read-only
+// read is a refusal, and a failure of the first leaves any refusal on screen as it was (issue 1304).
+type GlanceRead
+  = { kind: 'READ', data: DutyManagerTonight, dutyManager: boolean, at: number }
+    | { kind: 'FAILED', failure: string, refusal?: string | null, at: number }
+
+const authority = useNightAuthority()
+
+async function read(): Promise<GlanceRead> {
+  // Served, the shell's answer is from this very request, so a known refusal needs no second asking;
+  // a poll asks again, since a duty manager's window can open while the glance is open (0078).
+  const refusedHere = import.meta.server && authority.value.known && !authority.value.roles.includes('DUTY_MANAGER')
+  if (!refusedHere) {
+    const managing = await settleRead(() => request<DutyManagerTonight>('/api/tonight/duty-manager', { query: { access: 1 } }))
+    if (managing.kind === 'READ') return { kind: 'READ', data: managing.value, dutyManager: true, at: managing.at }
     // The last-fetched values stay on screen; NightStale says they are no longer current.
-    failure.value = refusalText(refused)
+    if (!refusalOf(managing)) return { kind: 'FAILED', failure: managing.failure, at: managing.at }
   }
-  finally {
-    asked.value = true
-  }
+  const reading = await settleRead(() => request<DutyManagerTonight>('/api/tonight/house', { query: { access: 1 } }))
+  if (reading.kind === 'READ') return { kind: 'READ', data: reading.value, dutyManager: false, at: reading.at }
+  return { kind: 'FAILED', failure: reading.failure, refusal: refusalOf(reading), at: reading.at }
 }
 
-async function loadReadOnly(): Promise<void> {
-  try {
-    data.value = await request<DutyManagerTonight>('/api/tonight/house', { query: { access: 1 } })
-    dutyManager.value = false
-    syncedAt.value = new Date()
-    failure.value = null
-    refusal.value = null
+const { now, stamp } = useNightClock()
+
+function apply(answered: GlanceRead): void {
+  stamp(answered.at)
+  if (answered.kind === 'FAILED') {
+    failure.value = answered.failure
+    if (answered.refusal !== undefined) refusal.value = answered.refusal
+    return
   }
-  catch (refused) {
-    failure.value = refusalText(refused)
-    // No shift tonight at all: one card in place of the glance (issue 1304).
-    refusal.value = refusalStatus(refused) === 403 ? failure.value : null
-  }
+  data.value = answered.data
+  dutyManager.value = answered.dutyManager
+  syncedAt.value = answered.at
+  failure.value = null
+  refusal.value = null
 }
+
+async function load(): Promise<void> {
+  apply(await read())
+}
+
+// The duty manager's controls are in the served page from the first paint, or never there at all.
+const waiting = useServedRead('tonight-glance', read, apply)
 
 const performances = computed(() => data.value?.performances ?? [])
-const activeId = computed(() => activePerformanceId(performances.value, Date.now() / 1000))
+const activeId = computed(() => activePerformanceId(performances.value, now.value / 1000))
 const selectedId = computed(() => chosenId.value ?? activeId.value)
 const selected = computed(() => performances.value.find(one => one.performanceId === selectedId.value) ?? null)
 const kpis = computed(() => selected.value ? hubKpis(selected.value.house) : null)
 // Read afresh on every poll, since `selected` is a new object each time (issue 1315, 0078).
-const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value, Date.now() / 1000) : false)
+const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value, now.value / 1000) : false)
 
 setNightSubject(() => ({
   title: selected.value?.showTitle ?? 'Tonight',
@@ -144,7 +153,6 @@ function hideCode(): void {
 }
 
 onMounted(() => {
-  load()
   timer = setInterval(load, POLL_MS)
 })
 onUnmounted(() => {
@@ -157,7 +165,7 @@ onUnmounted(() => {
     title="Tonight at a glance"
     :refused="refusal"
     :stale="syncedAt"
-    :busy="!asked"
+    :busy="waiting"
   >
     <div class="space-y-4">
       <UAlert
@@ -417,7 +425,7 @@ onUnmounted(() => {
       </template>
 
       <p
-        v-if="asked && performances.length === 0 && !failure"
+        v-if="!waiting && performances.length === 0 && !failure"
         class="text-muted"
       >
         Nothing running tonight.
@@ -441,7 +449,7 @@ onUnmounted(() => {
         icon="i-lucide-refresh-cw"
         color="neutral"
         variant="outline"
-        :loading="!asked"
+        :loading="waiting"
         @press="load()"
       />
     </template>

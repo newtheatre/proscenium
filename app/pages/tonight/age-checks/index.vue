@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AGE_CHECK_OUTCOMES, ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { saysClock } from '#shared/utils/when'
-import { saysPerformanceChoice } from '#shared/utils/tonight'
+import { openingHouseId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/challenge-25' })
@@ -22,16 +22,11 @@ interface Entry {
   createdAt: number
 }
 
-interface Listing { items: Entry[], total: number }
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
 
-const request = useRequestFetch()
 const toast = useToast()
 
-const syncedAt = ref<Date | null>(null)
-const failure = ref<string | null>(null)
-const busy = ref(true)
-const items = ref<Entry[]>([])
+const { items, failure, syncedAt, busy, read: readRegister, apply: applyRegister, load } = useNightLog<Entry>('/api/tonight/age-checks')
 // Whether anything running tonight authorises the register at all (0009's own limit, not a
 // property of an entry: the row's own `performanceId` may still be null either way).
 const authorised = ref(false)
@@ -40,42 +35,27 @@ const authorityFailure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const performances = ref<CoveredPerformance[]>([])
 
-// One question for any of tonight's roles: the server tries a shift before a bypass and answers a
-// refusal about the caller's own position, never the last role's (E-111).
-async function resolveAuthority(): Promise<void> {
-  try {
-    const resolved = await request<{ performances: CoveredPerformance[] }>('/api/tonight/authority')
-    performances.value = resolved.performances
-    authorised.value = true
-    authorityFailure.value = null
-    refusal.value = null
+function applyAuthority(answered: SettledRead<NightAuthorityAnswer>): void {
+  refusal.value = refusalOf(answered)
+  if (answered.kind === 'FAILED') {
+    authorityFailure.value = answered.failure
+    return
   }
-  catch (refused) {
-    authorityFailure.value = refusalText(refused)
-    refusal.value = refusalStatus(refused) === 403 ? authorityFailure.value : null
-  }
+  performances.value = answered.value.performances
+  authorised.value = true
+  authorityFailure.value = null
 }
 
-async function load(): Promise<void> {
-  busy.value = true
-  failure.value = null
-  try {
-    const listed = await request<Listing>('/api/tonight/age-checks', { query: { pageSize: 100 } })
-    items.value = listed.items
-    syncedAt.value = new Date()
-  }
-  catch (refused) {
-    failure.value = refusalText(refused)
-  }
-  finally {
-    busy.value = false
-  }
-}
-
-onMounted(async () => {
-  await resolveAuthority()
-  await load()
+// In the served page, so the register or the refusal is what a phone paints first. Asked with no
+// role: the server tries a shift before a bypass and refuses about the caller's own position (E-111).
+const waiting = useServedRead('tonight-age-checks', async () => {
+  const [authority, register] = await Promise.all([askNightAuthority('ANY'), readRegister()])
+  return { authority, register }
+}, (served) => {
+  applyAuthority(served.authority)
+  applyRegister(served.register)
 })
+const settling = computed(() => busy.value || waiting.value)
 
 const performanceOptions = computed(() => [
   { label: 'No performance (checked outside a show)', value: '' },
@@ -93,7 +73,7 @@ interface FormState {
 }
 
 const blankForm = (): FormState => ({
-  performanceId: (performances.value.find(one => one.active) ?? performances.value[0])?.id ?? '',
+  performanceId: openingHouseId(performances.value) ?? '',
   outcome: 'ACCEPTED',
   idType: null,
   reason: null,
@@ -225,9 +205,9 @@ async function submitCorrect(): Promise<void> {
       title="Challenge 25 register"
       :refused="refusal"
       hint="Every entry stays visible once filed. A mistake is corrected with a new entry, never an edit."
-      :empty="!busy && items.length === 0"
+      :empty="!settling && items.length === 0"
       :stale="syncedAt"
-      :busy="busy"
+      :busy="settling"
     >
       <UAlert
         v-if="failure"
@@ -238,7 +218,7 @@ async function submitCorrect(): Promise<void> {
       />
 
       <UAlert
-        v-else-if="!authorised"
+        v-else-if="!authorised && !waiting"
         data-test="age-checks-authority-failure"
         color="warning"
         variant="subtle"
@@ -251,7 +231,7 @@ async function submitCorrect(): Promise<void> {
         data-test="age-checks-list"
       >
         <p
-          v-if="items.length === 0"
+          v-if="!waiting && items.length === 0"
           class="text-muted"
         >
           Nothing logged yet tonight.
@@ -292,7 +272,11 @@ async function submitCorrect(): Promise<void> {
         </div>
       </div>
 
-      <template #actions>
+      <!-- Nothing to log until authority has answered, since it may yet refuse this viewer. -->
+      <template
+        v-if="!waiting"
+        #actions
+      >
         <NightAction
           label="Log a check"
           icon="i-lucide-id-card"
