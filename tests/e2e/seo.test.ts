@@ -108,11 +108,11 @@ describe.skipIf(skip !== null)('what a crawler is told (K-125 criteria 2 and 6)'
     // Anchored to the host, so /policies/rooms is not mistaken for /rooms.
     const listed = (path: string, beneath = false): RegExp =>
       new RegExp(`<loc>https?:\\/\\/[^/<]+${path.replace(/\//g, '\\/')}${beneath ? '(\\/[^<]*)?' : ''}<\\/loc>`)
-    for (const path of ['/', '/whats-on', '/policies/booking', '/policies/rooms', '/training/modules', `/shows/${slug}`]) {
+    for (const path of ['/', '/whats-on', '/about', '/history', '/technical-specification', '/policies/booking', '/policies/rooms', '/training/modules', `/shows/${slug}`]) {
       expect(sitemap).toMatch(listed(path))
     }
-    // A placeholder page is not offered, and nothing behind an account is.
-    for (const path of ['/about', '/history', '/admin', '/account', '/sign-in', '/docs', '/tonight', '/rooms']) {
+    // Nothing behind an account is offered.
+    for (const path of ['/admin', '/account', '/sign-in', '/docs', '/tonight', '/rooms']) {
       expect(sitemap).not.toMatch(listed(path, true))
     }
   }, CASE_TIMEOUT_MS)

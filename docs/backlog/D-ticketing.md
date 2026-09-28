@@ -100,6 +100,19 @@ Open questions:
      the header's links and the footer's columns both drop it. A stand-in sentence is never
      written into front matter; an unwritten field is left absent, and the furniture it would have
      filled does not render.
+  7. Added 27 September 2026 (committee direction): about carries a short history pointing to the
+     history project (`history.newtheatre.org.uk`), the committee as the constitution lists it,
+     one row per role with its holder and address, where general enquiries go (the box office
+     address), and the building's closure pointing to `savennt.com`. A holder or address not yet
+     supplied reads as a bracketed gap in the body, never an invented name. History carries the
+     same short history at more length and points to the project for everything else.
+  8. Added 27 September 2026: the technical page describes the spaces the theatre performs in
+     (the Studio alone for now) with location, capacity and step-free access, and sends every
+     request for a detailed specification to the technical address rather than publishing an
+     equipment list that goes stale. These pages are the exception to J-111 criterion 2: a venue's
+     capacity is a fact about a room, not policy, and is stated in prose.
+  9. Added 27 September 2026: about and history are header destinations, and the technical page
+     keeps its address under the label "Technical information".
 - Source: Prompt Book D-1; committee direction 26 August (Nuxt Content with Studio-style
   editing); audit PR-1; Get-In part 2 (content pages: rebuild)
 

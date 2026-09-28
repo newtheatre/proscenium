@@ -22,12 +22,8 @@ const PAGES = [
   { path: '/about', title: 'About us' },
   { path: '/history', title: 'Our history' },
   { path: '/get-involved', title: 'Get involved' },
-  { path: '/technical-specification', title: 'Technical specification' },
+  { path: '/technical-specification', title: 'Technical information' },
 ]
-
-// Get involved is written: its hero, its tiles and its steps are the page, and the home page and
-// the error page both offer it. The other three are still the committee's to write.
-const UNWRITTEN = PAGES.filter(page => page.path !== '/get-involved')
 
 describe.skipIf(skip !== null)('editorial pages render from content markdown (D-103)', () => {
   for (const { path, title } of PAGES) {
@@ -38,32 +34,39 @@ describe.skipIf(skip !== null)('editorial pages render from content markdown (D-
     })
   }
 
-  for (const { path } of UNWRITTEN) {
-    test(`${path} states that it awaits committee copy`, async () => {
-      expect(await (await fetch(`${app.baseURL}${path}`)).text()).toContain('Awaiting committee copy')
+  // D-103 criteria 7 to 9: all four are written, so none carries the placeholder banner.
+  for (const { path } of PAGES) {
+    test(`${path} no longer says it awaits committee copy`, async () => {
+      expect(await (await fetch(`${app.baseURL}${path}`)).text()).not.toContain('Awaiting committee copy')
     })
   }
+
+  // D-103 criterion 7: a gap in the committee table reads as a gap, brackets and all.
+  test('/about renders every constitutional role, with its unsupplied names bracketed', async () => {
+    const html = await (await fetch(`${app.baseURL}/about`)).text()
+    expect(html).toContain('[name goes here]')
+    expect(html).toContain('Events and Engagement Coordinator')
+    expect(html).toContain('href="https://savennt.com/"')
+  })
 
   test('a path with no matching content page is a 404, not a blank screen', async () => {
     const response = await fetch(`${app.baseURL}/no-such-editorial-page`)
     expect(response.status).toBe(404)
   })
 
-  // D-103 criterion 6: neither end of the shell links a page awaiting copy. The pages stay
-  // reachable by address, which is how an editor previews one.
-  test('neither the header nor the footer links a page that still awaits committee copy', async () => {
+  // D-103 criterion 9: about and history are header destinations, and every written page is in
+  // the footer's columns.
+  test('the header links about and history, and the footer links every editorial page', async () => {
     const html = await (await fetch(`${app.baseURL}/`)).text()
     const footer = html.slice(html.indexOf('data-test="footer-links"'))
     const header = html.slice(0, html.indexOf('data-test="footer-links"'))
 
-    for (const { path } of UNWRITTEN) {
-      expect(`footer ${path}: ${footer.includes(`href="${path}"`)}`).toBe(`footer ${path}: false`)
-      expect(`header ${path}: ${header.includes(`href="${path}"`)}`).toBe(`header ${path}: false`)
+    for (const path of ['/about', '/history', '/get-involved']) {
+      expect(`header ${path}: ${header.includes(`href="${path}"`)}`).toBe(`header ${path}: true`)
     }
-
-    // The written pages are still reached from both ends.
-    expect(header).toContain('href="/get-involved"')
-    expect(footer).toContain('href="/get-involved"')
+    for (const { path } of PAGES) {
+      expect(`footer ${path}: ${footer.includes(`href="${path}"`)}`).toBe(`footer ${path}: true`)
+    }
     expect(footer).toContain('href="/policies/booking"')
     expect(footer).toContain('href="/whats-on"')
   })
