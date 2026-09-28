@@ -3,8 +3,9 @@ import { saysWhenLong } from '#shared/utils/when'
 import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
-import { emergencyCardsFor, saysFirstAiders } from '#shared/utils/venue-emergency'
-import type { FirstAider } from '#shared/utils/venue-emergency'
+import { telHref } from '#shared/utils/tonight'
+import { emergencyCalls, emergencyCardsFor, firstCallOf, saysCall, saysFirstAiders } from '#shared/utils/venue-emergency'
+import type { FirstAider, PinnedCall } from '#shared/utils/venue-emergency'
 
 definePageMeta({ layout: 'tonight', middleware: 'signed-in', docs: '/docs/tonight/emergency' })
 useSeoMeta({ title: 'Emergency card' })
@@ -22,6 +23,8 @@ interface Card {
   firePanel: string | null
   what3words: string | null
   notes: string | null
+  firstCallName: string | null
+  firstCallPhone: string | null
   updatedAt: number | null
   firstAidersTonight: FirstAider[] | null
   // Null: the reader is not on tonight's team at this venue, so no number is theirs (A-114).
@@ -48,6 +51,22 @@ const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emerg
 // this request, the other as old as the last successful one. Its numbers are only its fetcher's.
 const cards = computed(() => emergencyCardsFor(cache.data.value ?? served.value, account.value.user?.id ?? null))
 const asOfAt = computed(() => cache.data.value ? cache.cachedAt.value : Date.now())
+
+// Every venue keeps 999, beside whoever its card rings first (issue 1519, 0106).
+const calls = computed(() => emergencyCalls(cards.value ?? []))
+
+// Served as links, so a phone that never runs the script still dials; once it runs, a tap names
+// the call in a sheet and only the sheet's own button dials (0106).
+const confirming = ref<PinnedCall | null>(null)
+const confirmOpen = ref(false)
+
+function confirm(event: MouseEvent, call: PinnedCall): void {
+  event.preventDefault()
+  confirming.value = call
+  confirmOpen.value = true
+}
+
+const firstCallName = (card: Card): string => firstCallOf(card).name
 
 function asOf(at: number): string {
   return saysWhenLong(at)
@@ -106,7 +125,7 @@ function isolation(one: Card): string[] {
             data-test="emergency-999"
           >
             <h3 class="mb-3 font-mono text-xs tracking-[0.2em] text-error uppercase">
-              Read to 999
+              Read to {{ firstCallName(card) }}
             </h3>
             <p
               v-if="card.address"
@@ -132,17 +151,20 @@ function isolation(one: Card): string[] {
             </p>
           </section>
 
-          <!-- The order to ring in, on the card rather than in anybody's head: 999 is pinned under
-               the thumb and this says who follows it (E-113, issue 1150 item 14). -->
+          <!-- The order to ring in, on the card rather than in anybody's head: the first call is
+               pinned under the thumb and this says who follows it (E-113, issue 1150 item 14). -->
           <section
             class="rounded-xl bg-elevated p-4"
             data-test="emergency-duty-manager"
           >
             <h3 class="mb-2 font-semibold">
-              After 999
+              After {{ firstCallName(card) }}
             </h3>
-            <p class="text-lg">
-              Call 999 first, then tell the duty manager.
+            <p
+              class="text-lg"
+              data-test="emergency-order"
+            >
+              Call {{ firstCallName(card) }} first, then tell the duty manager.
             </p>
             <ul
               v-if="card.dutyManagers?.length"
@@ -155,7 +177,7 @@ function isolation(one: Card): string[] {
               >
                 <span class="font-mono text-lg">{{ one.phone }}</span>
                 <UButton
-                  :to="`tel:${one.phone}`"
+                  :to="telHref(one.phone)"
                   color="error"
                   variant="subtle"
                   icon="i-lucide-phone"
@@ -267,11 +289,35 @@ function isolation(one: Card): string[] {
 
     <template #actions>
       <NightAction
-        label="Call 999"
+        v-for="(call, index) in calls"
+        :key="call.digits"
+        :label="call.label"
         icon="i-lucide-phone-call"
         color="error"
-        to="tel:999"
+        :variant="index === 0 ? 'solid' : 'outline'"
+        :to="call.href"
+        :data-test="`emergency-call-${call.digits}`"
+        @press="confirm($event, call)"
       />
     </template>
+
+    <!-- Closed without clearing the call, so the dialling link is still there as the tap lands. -->
+    <NightSheet
+      v-model:open="confirmOpen"
+      :title="confirming ? `Call ${confirming.name}?` : ''"
+      :primary="confirming ? `Call ${confirming.phone}` : undefined"
+      primary-color="error"
+      :primary-to="confirming?.href"
+      primary-test-id="emergency-call-now"
+      @primary="confirmOpen = false"
+    >
+      <p
+        v-if="confirming"
+        class="text-lg"
+        data-test="emergency-call-says"
+      >
+        {{ saysCall(confirming) }}
+      </p>
+    </NightSheet>
   </NightScreen>
 </template>

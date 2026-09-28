@@ -40,3 +40,16 @@ export function nightHintShows(state: { empty: boolean, seenBefore: boolean }): 
 export function nightHintSeenKey(title: string): string {
   return `nnt-night-hint:${title}`
 }
+
+export type NightAuthorityAsk = 'await' | 'background' | 'skip'
+
+// Awaited only while the server renders a `/tonight` screen; a phone is never held on the network,
+// and a page that merely wears the shell (a payment return, a register) never waits on it (issue 1521).
+export function asksNightAuthority(move: { to: unknown, from: unknown, path: string, server: boolean, hydrating: boolean }): NightAuthorityAsk {
+  if (move.to !== 'tonight') return 'skip'
+  const screen = move.path === '/tonight' || move.path.startsWith('/tonight/')
+  if (move.server) return screen ? 'await' : 'skip'
+  // Hydrating a screen the server already answered for; anything else asks behind the page.
+  if (move.hydrating) return screen ? 'skip' : 'background'
+  return move.from === 'tonight' ? 'skip' : 'background'
+}

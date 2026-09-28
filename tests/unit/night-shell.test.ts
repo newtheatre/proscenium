@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, ref } from 'vue'
-import { NIGHT_STALE_AFTER_MS, NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, lastSyncedLabel, nightFreshness, staleAnnouncement } from '#shared/utils/night-shell'
+import { NIGHT_STALE_AFTER_MS, NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, asksNightAuthority, lastSyncedLabel, nightFreshness, staleAnnouncement } from '#shared/utils/night-shell'
 import { bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from '#composables/useNightHeader'
 import type { NightHeaderState } from '#composables/useNightHeader'
 
@@ -15,6 +15,44 @@ const component = (name: string): Promise<string> => read(`app/components/${name
 
 // Anything that only exists under a pointer, or needs a second finger or a held press.
 const POINTER_ONLY = /\bhover:|group-hover:|@(mouseenter|mouseover|mouseleave|dblclick|contextmenu|touchstart|touchend)\b|v-on:(mouseenter|mouseover|contextmenu)/
+
+// Anything keyed to the window's width: `sm:` to `2xl:`, arbitrary `min-[...]:` and `max-[...]:`,
+// and a width `@media` rule. A container's `@md:` or `@min-[...]:` passes, as does any other media query.
+const WINDOW_WIDTH = /(?<![\w@-])(?:max-)?(?:sm|md|lg|xl|2xl):|(?<![\w@-])(?:min|max)-\[[^\]]+\]:|@media[^{]*\bwidth\b/
+
+const STOCKTAKE_COUNTS = 'app/components/stocktake/Counts.vue'
+
+// Nuxt's own names for the application's components, from the declarations `nuxt prepare` writes
+// on install, so the walk below never has to reimplement Nuxt's naming.
+async function componentFiles(): Promise<Map<string, string>> {
+  const declared = await read('.nuxt/components.d.ts')
+  const named = new Map<string, string>()
+  for (const [, name, path] of declared.matchAll(/export const (\w+): typeof import\("\.\.\/(app\/components\/[^"]+\.vue)"\)/g)) {
+    named.set(name!, path!)
+    named.set(name!.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), path!)
+  }
+  return named
+}
+
+// Every file drawn inside the tonight layout, with its source: the layout, each page on it, and
+// every component those reach by tag, in either case.
+async function tonightTree(): Promise<Map<string, string>> {
+  const named = await componentFiles()
+  const tag = new RegExp(`<(?:Lazy|lazy-)?(${[...named.keys()].join('|')})[\\s/>]`, 'g')
+  const queue = [LAYOUT]
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages', onlyFiles: true })) {
+    if (/layout:\s*'tonight'/.test(await read(`app/pages/${entry}`))) queue.push(`app/pages/${entry}`)
+  }
+  const tree = new Map<string, string>()
+  while (queue.length > 0) {
+    const file = queue.pop()!
+    if (tree.has(file)) continue
+    const source = await read(file)
+    tree.set(file, source)
+    for (const [, name] of source.matchAll(tag)) queue.push(named.get(name!)!)
+  }
+  return tree
+}
 
 describe('the stale label (K-102, "last synced HH:MM")', () => {
   test('is London wall-clock time in summer', () => {
@@ -93,19 +131,29 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(source).not.toContain('UDashboard')
   })
 
-  // The desktop layout is the adaptation: the column is capped and centred, and nothing in the
-  // shell starts from a wide layout and squeezes down.
-  test('the shell adapts upwards from the phone, never downwards from a desk', async () => {
-    const files = [LAYOUT, ...COMPONENTS.map(name => `app/components/${name}.vue`)]
+  // Issue 1520: every page on the tonight layout is a capped column at any window width, so what
+  // changes shape inside it must key to its container; a window variant fires while it is still narrow.
+  test('every page on the tonight layout is a capped column, laid out by container and never by window', async () => {
+    expect(await component('NightScreen')).toMatch(/\bmax-w-/)
+    const tree = await tonightTree()
+    expect([...tree.keys()]).toContain(STOCKTAKE_COUNTS)
     const offenders: string[] = []
-    for (const file of files) {
-      const source = await read(file)
+    for (const [file, source] of tree) {
+      if (file.startsWith('app/pages/') && !source.includes('<NightScreen') && !/\bmax-w-/.test(source)) {
+        offenders.push(`${file}: neither a NightScreen nor a capped column`)
+      }
       source.split('\n').forEach((line, index) => {
-        if (/\bmax-(sm|md|lg|xl):/.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
+        if (WINDOW_WIDTH.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
       })
     }
     expect(offenders).toEqual([])
-    expect(await component('NightScreen')).toMatch(/\bmax-w-/)
+  })
+
+  // Whether the three columns fit is proved in a browser (tests/e2e/bar-stocktakes.test.ts).
+  test('a stocktake line takes its columns from its container', async () => {
+    const source = await read(STOCKTAKE_COUNTS)
+    expect(source).toMatch(/class="@container\b/)
+    expect(source).toMatch(/@3xl:grid-cols-/)
   })
 
   // The hub is the exception, and only the hub: it is the navigation rather than a screen with
@@ -254,6 +302,92 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
     expect(theme).toContain(`min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`)
     for (const layout of LAYOUTS) {
       expect(`${layout}: ${(await read(layout)).includes(SHELL_CLASS)}`).toBe(`${layout}: true`)
+    }
+  })
+})
+
+// Issue 1521: the hub served every tile, then pruned them once the roles came back after mount. The
+// roles are asked before the first screen draws, and a screen's first data rides the served page.
+describe('a show-night screen is served as the viewer will use it (issue 1521)', () => {
+  const move = (to: unknown, from: unknown, path: string, server: boolean, hydrating: boolean): string =>
+    asksNightAuthority({ to, from, path, server, hydrating })
+
+  test('the server waits for the roles on a /tonight screen, so the served page carries them', () => {
+    expect(move('tonight', undefined, '/tonight', true, false)).toBe('await')
+    expect(move('tonight', undefined, '/tonight/door', true, false)).toBe('await')
+  })
+
+  test('a page that only wears the shell never holds its render on them', () => {
+    expect(move('tonight', undefined, '/pay/return/abc', true, false)).toBe('skip')
+    expect(move('tonight', undefined, '/training/sessions/s1/register', true, false)).toBe('skip')
+    expect(move('tonight', undefined, '/tonightly', true, false)).toBe('skip')
+  })
+
+  test('hydrating, a /tonight screen keeps the server\'s answer, and a page that only wears the shell asks behind itself', () => {
+    expect(move('tonight', undefined, '/tonight', false, true)).toBe('skip')
+    expect(move('tonight', undefined, '/pay/return/abc', false, true)).toBe('background')
+  })
+
+  test('a phone arriving from another layout asks behind the page and is never held; within the shell the answer stands', () => {
+    expect(move('tonight', 'member', '/tonight', false, false)).toBe('background')
+    expect(move('tonight', undefined, '/tonight/glance', false, false)).toBe('background')
+    expect(move('tonight', 'tonight', '/tonight/door', false, false)).toBe('skip')
+  })
+
+  test('nothing outside the shell asks', () => {
+    expect(move('member', 'tonight', '/my', true, false)).toBe('skip')
+    expect(move(undefined, undefined, '/', false, false)).toBe('skip')
+  })
+
+  test('the roles are asked by a route middleware that awaits only when told to, never from a mount', async () => {
+    const middleware = await read('app/middleware/night-authority.global.ts')
+    expect(middleware).toContain('if (ask === \'await\') await resolveNightAuthority()')
+    expect(middleware).toContain('void resolveNightAuthority()')
+    expect(await read('app/composables/useNightShell.ts')).not.toContain('onMounted')
+    expect(await read(LAYOUT)).not.toContain('resolveNightAuthority()')
+  })
+
+  test('the first read is lazy on a phone, so a navigation inside the shell is never held on the network', async () => {
+    const served = await read('app/composables/useServedRead.ts')
+    expect(served).toContain('{ lazy: true }')
+    expect(served).toContain('onServerPrefetch(')
+  })
+
+  test('a screen\'s served authority reuses the answer the shell asked in the same request, and a phone asks afresh', async () => {
+    const shell = await read('app/composables/useNightShell.ts')
+    expect(shell).toContain('const seeded = import.meta.server ? useNightAuthority().value.answers[role] : undefined')
+    for (const [path, role] of [['app/pages/tonight/door/index.vue', 'DOOR'], ['app/pages/tonight/message.vue', 'DUTY_MANAGER'], ['app/pages/tonight/incidents/index.vue', 'ANY'], ['app/pages/tonight/age-checks/index.vue', 'ANY']] as const) {
+      expect(`${path}: ${(await read(path)).includes(`askNightAuthority('${role}')`)}`).toBe(`${path}: true`)
+    }
+  })
+
+  test('Syncing follows the read itself, so a read that ends in any way takes it down', async () => {
+    expect(await read('app/composables/useServedRead.ts')).toContain('served.status.value === \'pending\'')
+  })
+
+  const SERVED = [
+    'app/pages/tonight/index.vue',
+    'app/pages/tonight/glance.vue',
+    'app/pages/tonight/door/index.vue',
+    'app/pages/tonight/board.vue',
+    'app/pages/tonight/checklist/index.vue',
+    'app/pages/tonight/incidents/index.vue',
+    'app/pages/tonight/age-checks/index.vue',
+    'app/pages/tonight/message.vue',
+    'app/components/NightCompQueue.vue',
+  ]
+
+  test.each(SERVED)('%s reads its first data while the server renders, and holds no navigation for it', async (path) => {
+    const source = await read(path)
+    expect(source).toContain('useServedRead(')
+    expect(source).not.toContain('await useAsyncData(')
+  })
+
+  test('the hub and the glance judge the running house by one clock', async () => {
+    for (const path of ['app/pages/tonight/index.vue', 'app/pages/tonight/glance.vue']) {
+      const source = await read(path)
+      expect(`${path}: ${source.includes('useNightClock()')}`).toBe(`${path}: true`)
+      expect(`${path}: ${source.includes('Date.now() / 1000')}`).toBe(`${path}: false`)
     }
   })
 })

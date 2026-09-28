@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { HUB_KPI_LABELS, checklistHint, curtainIsDown, hubKpis, hubTiles, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, curtainIsDown, hubHouseAfter, hubHouseRefused, hubKpis, hubTiles, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
 import type { ChecklistEntry, TonightChecklist } from '#shared/utils/checklist'
-import type { HubHouse, HubTileId } from '#shared/utils/night-hub'
+import type { HubHouse, HubHouseRead, HubHouseState, HubTileId } from '#shared/utils/night-hub'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight' })
 useSeoMeta({ title: 'Tonight' })
@@ -24,73 +24,76 @@ interface HouseTonight { night: string, venueId: string, performances: Performan
 const POLL_MS = 20_000
 
 const request = useRequestFetch()
-const data = ref<HouseTonight | null>(null)
-const checklist = ref<ChecklistEntry[]>([])
-const syncedAt = ref<Date | null>(null)
-// Two pieces, because a refusal that said nothing of its own is still staleness: the reason is
-// what follows the colon, and an empty one leaves the sentence alone.
-const stale = ref(false)
-const staleReason = ref('')
-const asked = ref(false)
-
 const chosenId = ref<string | null>(null)
 
 let timer: ReturnType<typeof setInterval> | undefined
 
+// Resolved before a served `/tonight` render; on a phone arriving from elsewhere it lands after the
+// first paint, and every tile shows until it does (issue 1304, issue 1521).
 const authority = useNightAuthority()
 const dutyManager = computed(() => authority.value.roles.includes('DUTY_MANAGER'))
+// A count open for tonight's bar shift to take (decision 0099), asked only of somebody on the bar
+// and again with every poll, so the tile comes and goes as a stocktake is opened and applied.
+const onTheBar = computed(() => authority.value.known && authority.value.roles.includes('BAR'))
+
+async function readHouse(): Promise<HubHouseRead<HouseTonight>> {
+  // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
+  const read = await settleRead(() => request<HouseTonight>('/api/tonight/house'), '')
+  return read.kind === 'READ' ? { kind: 'READ', house: read.value } : hubHouseRefused(read.status, read.failure)
+}
 
 // The duty manager's alone to read: any other shift would be refused on every poll. Best-effort,
 // since E-114 criterion 6 is a warning and never blocks the house numbers above it.
-async function loadChecklist(): Promise<void> {
-  if (!dutyManager.value) return
-  try {
-    checklist.value = (await request<TonightChecklist>('/api/tonight/checklist')).items
-  }
-  catch {
-    // The banner keeps what it last read.
-  }
+async function readChecklist(): Promise<ChecklistEntry[] | null> {
+  if (!dutyManager.value) return null
+  const read = await settleRead(() => request<TonightChecklist>('/api/tonight/checklist'))
+  return read.kind === 'READ' ? read.value.items : null
 }
 
-// Neither fetch depends on the other's answer, so they run together. The checklist one still
-// runs before house open, so its banner has data the instant `houseOpen` turns true.
-async function load(): Promise<void> {
-  // The house is every role's to read, so a door or bar shift sees the numbers too (issue 1307).
-  const [houseFetch] = await Promise.allSettled([request<HouseTonight>('/api/tonight/house'), loadChecklist()])
-
-  if (houseFetch.status === 'fulfilled') {
-    data.value = houseFetch.value
-    syncedAt.value = new Date()
-    stale.value = false
-  }
-  else {
-    // No shift tonight at all: the tiles below stand on their own, since each screen guards
-    // itself (E-111 criterion 5). Still a definite answer, so it still counts as synced.
-    if (refusalStatus(houseFetch.reason) === 403 || refusalStatus(houseFetch.reason) === 401) {
-      syncedAt.value = new Date()
-      stale.value = false
-    }
-    // Anything else, including a dropped connection: the last-fetched values stay on screen,
-    // and NightStale is what says they are no longer current. Never a spinner (criterion 3).
-    else {
-      stale.value = true
-      staleReason.value = refusalText(houseFetch.reason, '')
-    }
-  }
-
-  asked.value = true
+async function readStocktake(): Promise<boolean> {
+  if (!onTheBar.value) return false
+  const read = await settleRead(() => request<{ stocktake: unknown }>('/api/admin/bar/stocktakes/open'))
+  return read.kind === 'READ' && read.value.stocktake !== null
 }
 
-// The roles arrive after the first load, so the duty manager's banner need not wait for a poll.
-watch(dutyManager, (holds) => {
-  if (holds) loadChecklist()
+interface HubRead { house: HubHouseRead<HouseTonight>, checklist: ChecklistEntry[] | null, stocktakeOpen: boolean, at: number }
+
+// None depends on another's answer, so they run together. The checklist is read before house
+// open too, so its banner has data the instant `houseOpen` turns true.
+async function readHub(): Promise<HubRead> {
+  const [house, items, stocktakeOpen] = await Promise.all([readHouse(), readChecklist(), readStocktake()])
+  return { house, checklist: items, stocktakeOpen, at: Date.now() }
+}
+
+const shown = ref<HubHouseState<HouseTonight>>({ ...NO_HUB_HOUSE })
+// A null read keeps what the banner last had.
+const checklist = ref<ChecklistEntry[]>([])
+const stocktakeOpen = ref(false)
+const { now, stamp } = useNightClock()
+
+function apply(read: HubRead): void {
+  shown.value = hubHouseAfter(shown.value, read.house, read.at)
+  if (read.checklist) checklist.value = read.checklist
+  stocktakeOpen.value = read.stocktakeOpen
+  stamp(read.at)
+}
+
+const waiting = useServedRead('tonight-hub', readHub, apply)
+
+// Roles that land after the first read, on a phone arriving from elsewhere, need not wait a poll.
+watch(dutyManager, async () => {
+  const items = await readChecklist()
+  if (items) checklist.value = items
+})
+watch(onTheBar, async (holds) => {
+  if (holds) stocktakeOpen.value = await readStocktake()
 })
 
-const performances = computed(() => data.value?.performances ?? [])
+const performances = computed(() => shown.value.house?.performances ?? [])
 
 // The clock chooses until somebody taps, and then the tap holds: a duty manager looking at the
 // matinee while the evening's doors open is looking at it deliberately (E-127 criterion 2).
-const activeId = computed(() => activePerformanceId(performances.value, Date.now() / 1000))
+const activeId = computed(() => activePerformanceId(performances.value, now.value / 1000))
 const selectedId = computed(() => chosenId.value ?? activeId.value)
 const selected = computed(() => performances.value.find(one => one.performanceId === selectedId.value) ?? null)
 
@@ -102,19 +105,16 @@ setNightSubject(() => ({
 }))
 
 // From house open: doors, or curtain where none is set (E-114 criterion 6).
-const houseOpen = computed(() => {
-  const now = Date.now() / 1000
-  return performances.value.some(performance => now >= (performance.doorsAt ?? performance.startsAt))
-})
+const houseOpen = computed(() => performances.value.some(performance => now.value / 1000 >= (performance.doorsAt ?? performance.startsAt)))
 const incompletePre = computed(() => checklist.value.filter(item => item.phase === 'PRE' && item.required && !item.done))
 
 // Only the screens that already take a performance carry it; the rest resolve tonight's own.
 const scoped = (to: string): string => selectedId.value ? `${to}?performanceId=${selectedId.value}` : to
 
 // After the house on screen comes down, the duty manager's own job is the report (issue 1315).
-const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value, Date.now() / 1000) : false)
-// Each tile where the viewer's own authority opens it; every tile until the roles are known, or
-// with no signal, since each screen guards itself anyway (issue 1304, E-111 criterion 5).
+const curtainDown = computed(() => selected.value ? curtainIsDown(selected.value, now.value / 1000) : false)
+// Each tile where the viewer's own authority opens it; every tile where no role could be answered,
+// signed out or with no signal, since each screen guards itself anyway (issue 1304, E-111 5).
 const tiles = computed(() => hubTiles(authority.value.known ? authority.value.roles : null, curtainDown.value))
 const noRole = computed(() => authority.value.known && authority.value.roles.length === 0)
 
@@ -139,33 +139,16 @@ function tileHint(id: HubTileId | 'stocktake'): string {
   return HUB_TILES[id].hint
 }
 
-// A count open for tonight's bar shift to take (decision 0099), asked only of somebody on the bar
-// and again with every poll, so the tile comes and goes as a stocktake is opened and applied.
-const onTheBar = computed(() => authority.value.known && authority.value.roles.includes('BAR'))
-const stocktakeOpen = ref(false)
-async function checkStocktake(): Promise<void> {
-  try {
-    stocktakeOpen.value = (await request<{ stocktake: unknown }>('/api/admin/bar/stocktakes/open')).stocktake !== null
-  }
-  catch {
-    stocktakeOpen.value = false
-  }
-}
-watch(onTheBar, (holds) => {
-  if (holds) void checkStocktake()
-}, { immediate: true })
-
 // The Stocktake tile follows the till's while a count is open (0099).
 const shownTiles = computed(() => tiles.value.flatMap(tile =>
   tile.id === 'till' && stocktakeOpen.value ? [tile, { id: 'stocktake' as const, gold: false }] : [tile]))
 
-function poll(): void {
-  load()
-  if (onTheBar.value) void checkStocktake()
+async function poll(): Promise<void> {
+  apply(await readHub())
 }
 
+// The first read is the served one, or the one under way, so the first poll waits its turn.
 onMounted(() => {
-  load()
   timer = setInterval(poll, POLL_MS)
 })
 onUnmounted(() => {
@@ -177,17 +160,17 @@ onUnmounted(() => {
   <div class="mx-auto w-full max-w-md space-y-4">
     <div class="flex justify-end">
       <NightStale
-        :at="syncedAt"
-        :busy="!asked"
+        :at="shown.syncedAt"
+        :busy="waiting"
       />
     </div>
 
     <UAlert
-      v-if="stale"
+      v-if="shown.stale"
       data-test="tonight-stale-warning"
       color="warning"
       variant="subtle"
-      :description="staleBannerLine(staleReason)"
+      :description="staleBannerLine(shown.staleReason)"
     />
 
     <UAlert

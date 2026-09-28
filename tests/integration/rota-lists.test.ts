@@ -332,6 +332,8 @@ const emergencyCard = (overrides: Partial<EmergencyCardInput> = {}): EmergencyCa
   firePanel: null,
   what3words: null,
   notes: null,
+  firstCallName: null,
+  firstCallPhone: null,
   ...overrides,
 })
 

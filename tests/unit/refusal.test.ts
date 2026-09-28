@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { enrolPath, needsReauthentication, refusalText, writeFailureText } from '../../app/utils/refusal'
+import { enrolPath, needsReauthentication, refusalOf, refusalText, settleRead, writeFailureText } from '../../app/utils/refusal'
 
 // $fetch's own shape for an h3 createError: the response body lands whole on .data, and a
 // route's own `data:` payload (createError's second-level data) nests one level further under it.
@@ -78,5 +78,43 @@ describe('writeFailureText tells a transport failure apart from an ordinary refu
     const error = new TypeError('Failed to fetch')
     expect(writeFailureText(error, 'Check the last sale before ringing it up again.'))
       .toBe('The connection dropped, so it may or may not have gone through. Check the last sale before ringing it up again.')
+  })
+})
+
+// Every show-night read settles through one helper, so "a 403 alone is a refusal" is written once
+// and a served read can never throw into the page (issue 1304, issue 1521).
+describe('a settled show-night read', () => {
+  const refused = (statusCode: number, statusMessage: string): unknown => ({ statusCode, data: { statusMessage } })
+
+  test('an answer is read, and stamped', async () => {
+    const settled = await settleRead(async () => ({ count: 3 }))
+    expect(settled.kind).toBe('READ')
+    expect(settled.kind === 'READ' ? settled.value : null).toEqual({ count: 3 })
+    expect(typeof settled.at).toBe('number')
+    expect(refusalOf(settled)).toBeNull()
+  })
+
+  test('a 403 is a refusal, in the route\'s own words', async () => {
+    const settled = await settleRead(async () => {
+      throw refused(403, 'This needs a confirmed door shift')
+    })
+    expect(settled).toMatchObject({ kind: 'FAILED', failure: 'This needs a confirmed door shift', status: 403 })
+    expect(refusalOf(settled)).toBe('This needs a confirmed door shift')
+  })
+
+  test('anything else keeps the screen: a failure, never a refusal', async () => {
+    const settled = await settleRead(async () => {
+      throw refused(400, 'Choose a performance')
+    })
+    expect(settled).toMatchObject({ kind: 'FAILED', status: 400 })
+    expect(refusalOf(settled)).toBeNull()
+  })
+
+  test('no answer at all takes the caller\'s fallback, which may be nothing', async () => {
+    const settled = await settleRead(async () => {
+      throw new TypeError('fetch failed')
+    }, '')
+    expect(settled).toMatchObject({ kind: 'FAILED', failure: '', status: undefined })
+    expect(refusalOf(settled)).toBeNull()
   })
 })

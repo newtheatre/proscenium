@@ -11,11 +11,11 @@ useSeoMeta({ title: 'Checklist' })
 const route = useRoute()
 const request = useRequestFetch()
 
-const syncedAt = ref<Date | null>(null)
+const syncedAt = ref<number | null>(null)
 const failure = ref<string | null>(null)
 // Refused outright: one card, and nothing left to tick (issue 1304).
 const refusal = ref<string | null>(null)
-const busy = ref(true)
+const busy = ref(false)
 const items = ref<ChecklistEntry[]>([])
 // Read from the server on every load: Sign off and close on the night report is what closes it
 // (issue 1315), and this screen only says so.
@@ -38,40 +38,62 @@ const choices = computed(() => authority.value.performances.map(one => ({
 })))
 const ambiguous = ref(false)
 
-async function load(): Promise<void> {
-  busy.value = true
+// Whether the read named a house decides what a 400 means: with none named, more than one is running.
+interface ChecklistRead { named: boolean, settled: SettledRead<TonightChecklist> }
+
+async function read(): Promise<ChecklistRead> {
+  const named = performanceId.value
+  const settled = await settleRead(() => request<TonightChecklist>(
+    '/api/tonight/checklist',
+    { query: named ? { performanceId: named } : {} },
+  ))
+  return { named: named !== null, settled }
+}
+
+// Each outcome says both whether the switcher shows and whether the refusal does, so a house chosen
+// after either never leaves the other on screen beside it.
+function apply({ named, settled }: ChecklistRead): void {
   failure.value = null
-  try {
-    const listed = await request<TonightChecklist>(
-      '/api/tonight/checklist',
-      { query: performanceId.value ? { performanceId: performanceId.value } : {} },
-    )
-    performanceId.value = listed.performanceId
-    items.value = listed.items
-    close.value = listed.close
-    till.value = listed.till
+  if (settled.kind === 'READ') {
+    performanceId.value = settled.value.performanceId
+    items.value = settled.value.items
+    close.value = settled.value.close
+    till.value = settled.value.till
     ambiguous.value = false
     refusal.value = null
-    syncedAt.value = new Date()
+    syncedAt.value = settled.at
   }
-  catch (refused) {
-    // More than one house is running and nothing named one: the switcher is the answer, not a
-    // refusal with nothing to tap (issue 1150 item 4).
-    if (!performanceId.value && refusalStatus(refused) === 400) ambiguous.value = true
-    else if (refusalStatus(refused) === 403) refusal.value = refusalText(refused)
-    else failure.value = refusalText(refused)
+  // More than one house is running and nothing named one: the switcher is the answer, not a
+  // refusal with nothing to tap (issue 1150 item 4).
+  else if (!named && settled.status === 400) {
+    ambiguous.value = true
+    refusal.value = null
+  }
+  else if (settled.status === 403) {
+    refusal.value = refusalOf(settled)
+    ambiguous.value = false
+  }
+  else failure.value = settled.failure
+}
+
+async function load(): Promise<void> {
+  busy.value = true
+  try {
+    apply(await read())
   }
   finally {
     busy.value = false
   }
 }
 
+// In the served page, so the list, the switcher or the refusal is what a phone paints first.
+const waiting = useServedRead('tonight-checklist', read, apply)
+const settling = computed(() => busy.value || waiting.value)
+
 function choose(chosen: string): void {
   performanceId.value = chosen
   load()
 }
-
-onMounted(load)
 
 const preItems = computed(() => items.value.filter(item => item.phase === 'PRE'))
 const postItems = computed(() => items.value.filter(item => item.phase === 'POST'))
@@ -85,9 +107,9 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
     title="Checklist"
     :refused="refusal"
     hint="Tick each item, or say why it cannot be done tonight. The night closes from the night report."
-    :empty="!busy && items.length === 0"
+    :empty="!settling && items.length === 0"
     :stale="syncedAt"
-    :busy="busy"
+    :busy="settling"
   >
     <UAlert
       v-if="failure"
@@ -114,7 +136,7 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
     </div>
 
     <div
-      v-else
+      v-else-if="!waiting"
       class="space-y-6"
       data-test="checklist-list"
     >

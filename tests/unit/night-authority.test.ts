@@ -249,8 +249,10 @@ describe('several roles at once carry the single-role guard\'s options (0098)', 
     for (const page of ['app/pages/tonight/incidents/index.vue', 'app/pages/tonight/age-checks/index.vue']) {
       const source = await Bun.file(page).text()
       expect(source).not.toContain('for (const role of NIGHT_ROLES)')
-      expect(source).toContain('\'/api/tonight/authority\'')
+      expect(source).toContain('askNightAuthority(\'ANY\')')
     }
+    // With no role the route itself ranks the refusals (issue 1411); `ANY` is that question.
+    expect(await Bun.file('app/composables/useNightShell.ts').text()).toContain('{ query: role === \'ANY\' ? {} : { role } }')
   })
 })
 

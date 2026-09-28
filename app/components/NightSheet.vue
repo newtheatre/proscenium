@@ -11,6 +11,8 @@ defineProps<{
   loading?: boolean
   // Where a screen already names its own controls, so its tests and pictures keep finding them.
   primaryTestId?: string
+  // A link for the primary, where the choice leaves the app, such as a telephone call.
+  primaryTo?: string
 }>()
 
 const emit = defineEmits<{ primary: [] }>()
@@ -50,6 +52,7 @@ const content = { onOpenAutoFocus: focusFirst }
         class="min-h-12"
         :loading="loading"
         :disabled="primaryDisabled"
+        :to="primaryTo"
         :data-test="primaryTestId"
         @click="emit('primary')"
       >

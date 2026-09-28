@@ -40,6 +40,8 @@ async function cardTonight(event: H3Event, venue: VenueTonight, from: number, to
     firePanel: card?.firePanel ?? null,
     what3words: card?.what3words ?? null,
     notes: card?.notes ?? null,
+    firstCallName: card?.firstCallName ?? null,
+    firstCallPhone: card?.firstCallPhone ?? null,
     updatedAt: card?.updatedAt ?? null,
     firstAidersTonight: derived satisfies FirstAider[] | null,
     dutyManagers,
