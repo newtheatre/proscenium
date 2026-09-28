@@ -1,5 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { newId } from './accounts'
+import { auditWhere, entryLanded } from './audit'
 import { derivedAllergens, itemAllergenState, pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, poursRestrictedSwitchedOffPredicate } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
 import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
@@ -10,6 +12,7 @@ import { barProductsList } from '#shared/utils/bar-products-list'
 import { aliasColumns, count, predicate, whereFrom, yesNo } from './list-filters'
 import type { AllergenAnswer, BarCategory, BarProduct, CategoryPrice, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
 import type { ListQuery } from '#shared/utils/list-filters'
+import type { AuditRow } from '#shared/utils/audit'
 import type { ListClause, Reference } from './list-filters'
 
 // Reading the bar's catalogue and its stock. Two questions the module leans on live here: what a
@@ -636,6 +639,73 @@ export async function retiredOptionsOf(choiceGroupId: string): Promise<string[]>
     ORDER BY i.name COLLATE NOCASE
   `)
   return rows.map(row => row.name)
+}
+
+// Served without its choice, a size pours its own stocked items alone, so an optional choice needs
+// at least one to stand on (F-112 criterion 3). Asked on the write, never from an earlier read (0003).
+function ownRecipeHeld(variantId: string): SQL {
+  return sql`EXISTS (SELECT 1 FROM variant_components WHERE variant_id = ${variantId} AND item_id IS NOT NULL)`
+}
+
+// Emptying a size's stocked items leaves its choice alone to deplete: refused while that choice is
+// optional, or on a product on the till with no choice to stand in (F-128 criterion 1).
+function recipeMayEmpty(variantId: string): SQL {
+  return sql`
+    NOT EXISTS (SELECT 1 FROM variant_components WHERE variant_id = ${variantId} AND choice_group_id IS NOT NULL AND choice_optional = 1)
+    AND (
+      EXISTS (SELECT 1 FROM variant_components WHERE variant_id = ${variantId} AND choice_group_id IS NOT NULL)
+      OR NOT EXISTS (
+        SELECT 1 FROM bar_products p JOIN product_variants v ON v.product_id = p.id
+        WHERE v.id = ${variantId} AND p.status = 'ACTIVE'
+      )
+    )
+  `
+}
+
+export interface AttachedChoice {
+  choiceGroupId: string
+  qty: number
+  includedInPrice: boolean
+  optional: boolean
+}
+
+// `logged` is the entry under the batch's one condition, answering with its id; each write lands
+// only if it did, so a refused change leaves what the size had in place (0049).
+export interface GatedWrite {
+  logged: SQL
+  writes: SQL[]
+}
+
+export function attachChoiceStatements(variantId: string, choice: AttachedChoice | null, entry: AuditRow): GatedWrite {
+  return {
+    logged: auditWhere(entry, choice?.optional ? ownRecipeHeld(variantId) : sql`1`),
+    writes: [
+      sql`DELETE FROM variant_components WHERE variant_id = ${variantId} AND choice_group_id IS NOT NULL AND ${entryLanded(entry)}`,
+      ...(choice
+        ? [sql`
+            INSERT INTO variant_components (id, variant_id, choice_group_id, qty, included_in_price, choice_optional)
+            SELECT ${newId()}, ${variantId}, ${choice.choiceGroupId}, ${choice.qty}, ${choice.includedInPrice ? 1 : 0}, ${choice.optional ? 1 : 0}
+            WHERE ${entryLanded(entry)}
+          `]
+        : []),
+    ],
+  }
+}
+
+// The same shape for the stocked items. One insert per line named, so the parameters are bounded
+// by the request rather than by the table (0003).
+export function recipeStatements(variantId: string, components: { itemId: string, qty: number }[], entry: AuditRow): GatedWrite {
+  return {
+    logged: auditWhere(entry, components.length === 0 ? recipeMayEmpty(variantId) : sql`1`),
+    writes: [
+      sql`DELETE FROM variant_components WHERE variant_id = ${variantId} AND item_id IS NOT NULL AND ${entryLanded(entry)}`,
+      ...components.map(component => sql`
+        INSERT INTO variant_components (id, variant_id, item_id, qty)
+        SELECT ${newId()}, ${variantId}, ${component.itemId}, ${component.qty}
+        WHERE ${entryLanded(entry)}
+      `),
+    ],
+  }
 }
 
 // The whole series, newest first, with the row today resolves to marked (F-116 criterion 5).

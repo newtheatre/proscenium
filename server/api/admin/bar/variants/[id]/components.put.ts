@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { londonDayOf } from '#shared/utils/ledger'
 import { componentsForm, saysQuantity } from '#shared/utils/bar'
-import type { BatchItem } from 'drizzle-orm/batch'
+import type { ProductVariant } from '#shared/utils/bar'
 
 // Set what pouring one of these consumes. Editing affects future sales only: movements already
 // written are never restated (F-113 criterion 4).
@@ -14,16 +14,18 @@ export default defineEventHandler(async (event) => {
 
   const { components } = await readValidatedBodyOrThrow(event, componentsForm)
 
-  // An ACTIVE size needs something a sale can deplete (F-128). A choice group already attached
-  // stands in for a stocked item, so an empty submission only refuses when nothing else covers it.
+  // Served without its choice, a size pours its own items alone (F-112 criterion 3). An ACTIVE
+  // one needs something a sale can deplete, and a choice group stands in for an item (F-128).
+  const emptyRefusal = (variant: ProductVariant): string => variant.components.some(component => component.choiceOptional)
+    ? `${variant.label} can be served without its choice, so it needs a stocked item of its own or it would sell an empty glass: keep one, or untick Can be served without one under Change choice first`
+    : `${variant.label} is on the till, so it needs something for a sale to deplete: give it a stocked item or a choice group`
+
   if (components.length === 0) {
     const product = await productById(held.productId)
     const hasChoiceGroup = held.components.some(component => component.choiceGroupId !== null)
-    if (product?.status === 'ACTIVE' && !hasChoiceGroup) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: `${held.label} is on the till, so it needs something for a sale to deplete: give it a stocked item or a choice group`,
-      })
+    const optional = held.components.some(component => component.choiceOptional)
+    if (optional || (product?.status === 'ACTIVE' && !hasChoiceGroup)) {
+      throw createError({ statusCode: 409, statusMessage: emptyRefusal(held) })
     }
   }
 
@@ -46,25 +48,23 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar.variant.recipe.changed',
+    target: `bar-variant:${id}`,
+    detail: { components: components.length, depletes: components.map(component => component.itemId) },
+  })
+
   // The choice a variant offers is F-113's to set, so this replaces the stocked ingredients and
   // leaves any choice group where it is.
-  const statements: BatchItem<'sqlite'>[] = [
-    db.delete(schema.variantComponents).where(sql`variant_id = ${id} AND item_id IS NOT NULL`),
-    ...components.map(component => db.insert(schema.variantComponents).values({
-      id: newId(),
-      variantId: id,
-      itemId: component.itemId,
-      qty: component.qty,
-    })),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar.variant.recipe.changed',
-      target: `bar-variant:${id}`,
-      detail: { components: components.length, depletes: components.map(component => component.itemId) },
-    })),
-  ]
+  const { logged, writes } = recipeStatements(id, components, entry)
+  const [landed] = await db.batch([db.all<{ id: string }>(logged), ...writes.map(statement => db.run(statement))])
 
-  await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
+  // Refused on the write only when a change landed after the read above: say what it is now.
+  if ((landed as { id: string }[]).length === 0) {
+    const now = await variantById(id, londonDayOf(new Date()))
+    throw createError({ statusCode: 409, statusMessage: emptyRefusal(now ?? held) })
+  }
 
   const after = await variantById(id, londonDayOf(new Date()))
   return {

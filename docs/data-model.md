@@ -1676,7 +1676,10 @@ CHECK positive · `included_in_price` bool (the free mixer, 0017) · `choice_opt
 choice row only: the size may be served with none of the group, a spirit neat, so the sale depletes
 its own recipe alone and the size's servings are not held to the options. The allergen answer still
 reads every option, so a neat serve never makes an unanswered mixer read as clean (issue 1314; nullable and
-read as false, since a NOT NULL add would rebuild the table). UNIQUE (`variant_id`, `item_id`);
+read as false, since a NOT NULL add would rebuild the table). Only a size with a stocked item of its
+own may carry it, so a neat serve always pours something: `attachChoiceStatements` refuses the flag
+on a size without one, and `recipeStatements` refuses taking the last one off while it is set, both
+on the write rather than from an earlier read (`server/utils/bar.ts`, issue 1529). UNIQUE (`variant_id`, `item_id`);
 a partial UNIQUE on `variant_id` where `choice_group_id IS NOT NULL` holds a variant to at most
 one choice group (F-113 criterion 2). One level deep by construction: no column here can name
 another product (F-113 criterion 1).
@@ -1686,8 +1689,8 @@ another product (F-113 criterion 1).
 `item_id` → bar_items restrict · `qty` CHECK positive · `sort`, UNIQUE per group and item.
 `POST /api/admin/bar/choice-groups` creates a group with its options in one batch, refusing a
 retired item; `PUT /api/admin/bar/variants/[id]/choice` attaches one to a variant with its own
-`qty` and `included_in_price`, or clears it, replacing rather than adding a second (F-113
-criterion 2).
+`qty`, `included_in_price` and `choice_optional`, or clears it, replacing rather than adding a
+second (F-113 criterion 2).
 
 ### variant_prices  APPEND-ONLY
 `id` PK · `variant_id` cascade · `price_pence` CHECK not negative · `effective_from` civil date,
