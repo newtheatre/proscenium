@@ -126,4 +126,4 @@ the prose around the numbers, not a value.
 | Page | What is needed |
 | --- | --- |
 | `content/get-involved.md` | How joining, auditioning and the technical and production roles actually work this year. |
-| `content/committee.yml` | This year's holder of each role, and a role address for the Marketing Coordinators, Company Stage Managers and Company Technical Directors if they have one. The role addresses shipped are the old site's and need confirming. Move `updatedOn` with every edit (0107). |
+| `content/committee.yml` | Each year after the elections: every role's holders and any change of role address, with `updatedOn` moved to the day of the edit (0107). The 2026/27 committee was entered on 28 September 2026. |
