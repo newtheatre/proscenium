@@ -354,7 +354,7 @@ const columns: TableColumn<AdminVenue>[] = [
             label="Address for audiences"
             name="address"
             hint="Optional"
-            description="Where the audience comes to. The emergency card keeps its own address to read to 999."
+            description="Where the audience comes to. The emergency card keeps its own address to read out in an emergency."
           >
             <UInput
               v-model="state.address"

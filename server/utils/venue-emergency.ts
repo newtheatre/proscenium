@@ -18,12 +18,13 @@ export function recordCardStatement(venueId: string, input: EmergencyCardInput, 
   const statement = sql`
     INSERT INTO venue_emergency_info (
       id, venue_id, address, assembly_point, exits, isolation_points,
-      first_aid_kit, defibrillator, first_aiders, fire_panel, what3words, notes, updated_by
+      first_aid_kit, defibrillator, first_aiders, fire_panel, what3words, notes,
+      first_call_name, first_call_phone, updated_by
     )
     VALUES (
       ${id}, ${venueId}, ${input.address}, ${input.assemblyPoint}, ${input.exits}, ${input.isolationPoints},
       ${input.firstAidKit}, ${input.defibrillator}, ${input.firstAiders}, ${input.firePanel},
-      ${input.what3words}, ${input.notes}, ${updatedBy}
+      ${input.what3words}, ${input.notes}, ${input.firstCallName}, ${input.firstCallPhone}, ${updatedBy}
     )
     RETURNING id
   `
@@ -44,6 +45,8 @@ export interface EmergencyCard {
   firePanel: string | null
   what3words: string | null
   notes: string | null
+  firstCallName: string | null
+  firstCallPhone: string | null
   updatedByName: string
   updatedAt: number
 }
@@ -55,7 +58,8 @@ const CARD_COLUMNS = sql`
   e.assembly_point AS assemblyPoint, e.exits AS exits, e.isolation_points AS isolationPoints,
   e.first_aid_kit AS firstAidKit, e.defibrillator AS defibrillator, e.first_aiders AS firstAiders,
   e.fire_panel AS firePanel,
-  e.what3words AS what3words, e.notes AS notes, u.name AS updatedByName, e.updated_at AS updatedAt
+  e.what3words AS what3words, e.notes AS notes, e.first_call_name AS firstCallName,
+  e.first_call_phone AS firstCallPhone, u.name AS updatedByName, e.updated_at AS updatedAt
 `
 
 // The latest row per venue is the current card: no supersede reference to chase, since nothing

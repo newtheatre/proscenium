@@ -125,7 +125,7 @@ export async function claimedShiftTonight(userId: string, role: ShiftRole, night
 
 export interface OnCall { name: string, phone: string }
 
-// Who the emergency card says to ring after 999 (E-113): tonight's own confirmed duty managers,
+// Who the emergency card says to ring after the first call (E-113): tonight's confirmed duty managers,
 // deduplicated so one person across both of a matinee day's houses is one number (E-112).
 export function dutyManagersOnCall(team: readonly TonightTeamMember[]): OnCall[] {
   const seen = new Map<string, OnCall>()

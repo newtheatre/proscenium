@@ -11,7 +11,7 @@ withDefaults(defineProps<{
   to?: string
 }>(), { color: 'primary', variant: 'solid' })
 
-const emit = defineEmits<{ press: [] }>()
+const emit = defineEmits<{ press: [event: MouseEvent] }>()
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const emit = defineEmits<{ press: [] }>()
     data-test="night-action"
     :aria-label="label"
     class="min-h-12 min-w-12 justify-center text-lg font-semibold"
-    @click="emit('press')"
+    @click="emit('press', $event)"
   >
     {{ label }}
   </UButton>

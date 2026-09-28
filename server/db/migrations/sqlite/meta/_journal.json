@@ -897,6 +897,13 @@
       "when": 1790514377316,
       "tag": "0127_the_front_of_house_role_is_retired",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "6",
+      "when": 1790522286585,
+      "tag": "0128_a_venue_card_names_who_to_ring_first",
+      "breakpoints": true
     }
   ]
 }

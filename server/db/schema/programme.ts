@@ -52,6 +52,9 @@ export const venueEmergencyInfo = sqliteTable('venue_emergency_info', {
   firePanel: text('fire_panel'),
   what3words: text('what3words'),
   notes: text('notes'),
+  // Who to ring before 999, such as estates security on campus: both or neither (0106).
+  firstCallName: text('first_call_name'),
+  firstCallPhone: text('first_call_phone'),
   updatedBy: text('updated_by').notNull().references(() => users.id, { onDelete: 'restrict' }),
   updatedAt: integer('updated_at').notNull().default(now),
 }, table => [
