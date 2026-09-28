@@ -113,9 +113,10 @@ mapping is the migration's, in `migration/role-map.json`, and is not a runtime s
 
 ## Editorial copy the committee must supply
 
-Not a setting: prose, not a number, and there is no default to propose (D-103). Each page ships
+Not a setting: prose, not a number, and there is no default to propose (D-103). A page ships
 marked `placeholder: true` until its copy lands, and clearing the flag is then a content edit,
-not a release.
+not a release. About, history and the technical page were written on 27 September 2026
+(criteria 7 to 9); what they still lack is below.
 
 The two policy pages are a different case, and are not in this table: `content/policies/rooms.md`
 and `content/policies/booking.md` quote the live settings for every number they state (0012,
@@ -124,7 +125,5 @@ the prose around the numbers, not a value.
 
 | Page | What is needed |
 | --- | --- |
-| `content/technical-specification.md` | Venue capacities, stage and wing dimensions, rigging, power and access, checked against the building rather than the old estate's copy, which may no longer be accurate. |
-| `content/history.md` | The theatre's founding, and which productions and seasons the committee wants remembered. |
 | `content/get-involved.md` | How joining, auditioning and the technical and production roles actually work this year. |
-| `content/about.md` | Its "Who we are" and "What we do" sections are folklore already stated informally; a proposed default is safe here, but the committee's own wording is what should ship. |
+| `content/committee.yml` | Each year after the elections: every role's holders and any change of role address, with `updatedOn` moved to the day of the edit (0107). The 2026/27 committee was entered on 28 September 2026. |
