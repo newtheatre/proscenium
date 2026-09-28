@@ -6,28 +6,6 @@ import { HEADER_NAV, PUBLIC_NAV } from '#shared/utils/site-nav'
 
 const PAGES = ['about', 'history', 'technical-specification', 'get-involved']
 
-// Section 4 of the 2026/27 constitution, in its order.
-const COMMITTEE = [
-  'President',
-  'Secretary and Welfare Officer',
-  'Treasurer',
-  'Front of House Manager',
-  'In-House Coordinator',
-  'Studio Coordinator',
-  'Creatives Coordinator',
-  'External Relations Manager',
-  'Marketing Coordinator',
-  'Social and Fundraising Coordinator',
-  'Theatre Manager',
-  'Company Stage Manager',
-  'Company Technical Director',
-  'Technical Manager',
-  'Company Workshop Manager',
-  'Costume, Props and Make-Up Manager',
-  'Archivist',
-  'Events and Engagement Coordinator',
-]
-
 const read = (slug: string): Promise<string> => Bun.file(`content/${slug}.md`).text()
 const frontOf = (source: string): string => source.slice(0, source.indexOf('\n---', 4))
 const bodyOf = (source: string): string => source.slice(source.indexOf('\n---', 4) + 4)
@@ -55,20 +33,11 @@ describe('about says who we are, who runs it and where the building stands (D-10
     expect(await read('about')).toContain('](mailto:boxoffice@newtheatre.org.uk)')
   })
 
-  test('the committee table carries every constitutional role, each with a holder and an address', async () => {
-    const rows = bodyOf(await read('about')).split('\n').filter(line => line.startsWith('| ') && !line.startsWith('| Role') && !line.startsWith('| ---'))
-    const cells = rows.map(row => row.split('|').slice(1, -1).map(cell => cell.trim()))
-    expect(cells.map(row => row[0])).toEqual(COMMITTEE)
-    const incomplete = cells.filter(row => row.length !== 3 || !row[1] || !row[2]).map(row => row[0])
-    expect(incomplete).toEqual([])
-  })
-
-  // No holder is named until the committee supplies one. The brackets are escaped, since MDC
-  // reads a bare [text] as a span and drops them.
-  test('a holder not yet supplied is a bracketed gap', async () => {
+  // 0107: the table is drawn from content/committee.yml, never typed into the page.
+  test('the committee is drawn from the data file, not typed into the prose', async () => {
     const body = bodyOf(await read('about'))
-    expect(body).toContain('\\[name goes here\\]')
-    expect(body).not.toMatch(/(?<!\\)\[(name|address) goes here/)
+    expect(body).toContain('::committee-table')
+    expect(body).not.toContain('| President')
   })
 })
 
@@ -92,6 +61,12 @@ describe('the technical page describes the space and routes the detail (D-103 cr
     const body = bodyOf(await read('technical-specification'))
     expect(body).toContain('](mailto:technical@newtheatre.org.uk)')
     expect(body).not.toMatch(/^#+ .*(lighting|sound|rig|dimmer|desk)/im)
+  })
+
+  // D-103 criterion 10: the officer is named from the committee file, so the handover edits one file.
+  test('it names the technical officers by token rather than in prose', async () => {
+    const body = bodyOf(await read('technical-specification'))
+    expect(body).toContain('{{COMMITTEE_TECHNICAL_MANAGER_NAME}}')
   })
 })
 

@@ -103,8 +103,11 @@ export interface PolicyKeyState {
   value?: unknown
 }
 
-// An address rather than a rule (J-110 criterion 6): a link, never marked unenforced.
-export const isAddressKey = (key: string): boolean => key.endsWith('_URL')
+// An address rather than a rule (J-110 criterion 6): a link, never marked unenforced. An `_EMAIL`
+// is a mail address, which the committee's tokens quote (0107).
+export const isAddressKey = (key: string): boolean => key.endsWith('_URL') || key.endsWith('_EMAIL')
+
+const hrefFor = (key: string, address: string): string => key.endsWith('_EMAIL') ? `mailto:${address}` : address
 
 // Said, not omitted: the page tells an address nobody has named from a token that failed.
 const UNSET_ADDRESS: PolicyValue = { text: '', enforced: true }
@@ -151,7 +154,7 @@ function span(node: { test: string, key: string, css: string, text: string, titl
 function nodesFor(key: string, values: PolicyValues): unknown[] {
   const value = values[key]
   if (value && isAddressKey(key)) {
-    return value.text ? ['a', { 'href': value.text, 'class': VALUE_CLASS, 'data-test': 'policy-link', 'data-key': key }, value.text] : ['span', {}, '']
+    return value.text ? ['a', { 'href': hrefFor(key, value.text), 'class': VALUE_CLASS, 'data-test': 'policy-link', 'data-key': key }, value.text] : ['span', {}, '']
   }
   if (!value) {
     return span({

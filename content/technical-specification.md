@@ -18,6 +18,9 @@ usually held back for front of house, and there is step-free access.
 ## Detailed specifications
 
 For plans, lighting and sound equipment, power and get-in arrangements, write to
-[technical@newtheatre.org.uk](mailto:technical@newtheatre.org.uk). Your message reaches the
-committee members responsible for the technical side of the theatre, who will send you the
-current specification.
+[technical@newtheatre.org.uk](mailto:technical@newtheatre.org.uk) and we will send you the current
+specification.
+
+Our Technical Manager, {{COMMITTEE_TECHNICAL_MANAGER_NAME}}, and our Company Technical Directors,
+{{COMMITTEE_COMPANY_TECHNICAL_DIRECTOR_NAME}}, look after the technical side of the theatre and can
+tell you more.

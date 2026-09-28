@@ -41,12 +41,19 @@ describe.skipIf(skip !== null)('editorial pages render from content markdown (D-
     })
   }
 
-  // D-103 criterion 7: a gap in the committee table reads as a gap, brackets and all.
-  test('/about renders every constitutional role, with its unsupplied names bracketed', async () => {
+  // D-103 criteria 7 and 10: the table is drawn from content/committee.yml and says how fresh it is.
+  test('/about draws the committee from its data file and dates it', async () => {
     const html = await (await fetch(`${app.baseURL}/about`)).text()
-    expect(html).toContain('[name goes here]')
+    expect(html).toContain('data-test="committee-table"')
     expect(html).toContain('Events and Engagement Coordinator')
+    expect(html).toContain('data-test="committee-updated"')
     expect(html).toContain('href="https://savennt.com/"')
+  })
+
+  test('/technical-specification names the Technical Manager from the committee file', async () => {
+    const html = await (await fetch(`${app.baseURL}/technical-specification`)).text()
+    expect(html).toContain('data-key="COMMITTEE_TECHNICAL_MANAGER_NAME"')
+    expect(html).not.toContain('data-test="policy-error"')
   })
 
   test('a path with no matching content page is a 404, not a blank screen', async () => {

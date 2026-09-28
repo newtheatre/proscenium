@@ -103,8 +103,8 @@ Open questions:
   7. Added 27 September 2026 (committee direction): about carries a short history pointing to the
      history project (`history.newtheatre.org.uk`), the committee as the constitution lists it,
      one row per role with its holder and address, where general enquiries go (the box office
-     address), and the building's closure pointing to `savennt.com`. A holder or address not yet
-     supplied reads as a bracketed gap in the body, never an invented name. History carries the
+     address), and the building's closure pointing to `savennt.com`. A holder not yet supplied
+     reads as a bracketed gap, never an invented name. History carries the
      same short history at more length and points to the project for everything else.
   8. Added 27 September 2026: the technical page describes the spaces the theatre performs in
      (the Studio alone for now) with location, capacity and step-free access, and sends every
@@ -113,6 +113,14 @@ Open questions:
      capacity is a fact about a room, not policy, and is stated in prose.
   9. Added 27 September 2026: about and history are header destinations, and the technical page
      keeps its address under the label "Technical information".
+  10. Added 28 September 2026 (0107): the committee is `content/committee.yml`, a data collection
+      of the constitution's roles, each with its holders and role address, and an `updatedOn`
+      date. About draws its table from it and states that date; any page names an officer by
+      `{{COMMITTEE_<KEY>_NAME}}` or `{{COMMITTEE_<KEY>_EMAIL}}`, and `bun run check` refuses one
+      the file cannot answer. An unsupplied name reads `[name goes here]`; a role with no address
+      drops the sentence quoting it.
+  11. Added 28 September 2026 (0107): from 1 September, a page quoting the committee says "This
+      content may be out of date" when the file was last updated before that year's 1 August.
 - Source: Prompt Book D-1; committee direction 26 August (Nuxt Content with Studio-style
   editing); audit PR-1; Get-In part 2 (content pages: rebuild)
 

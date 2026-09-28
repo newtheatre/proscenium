@@ -4,9 +4,16 @@ description: Who the Nottingham New Theatre is, who runs it, and how to get in t
 banner: /images/banners/about.webp
 ---
 
-The Nottingham New Theatre is a student-run theatre at the University of Nottingham and a society
-of the University of Nottingham Students' Union. Every show we stage is directed, produced,
-designed, built, lit, stage managed and sold by students.
+The Nottingham New Theatre is a student-run theatre at the University of Nottingham, and a
+student-run service of the University of Nottingham Students' Union. Every show we stage is
+directed, produced, designed, built, lit, stage managed and sold by students.
+
+## What we do
+
+Our year runs through the In-House and Studio seasons, with Creatives alongside them, and we take
+work to the Edinburgh Festival Fringe and, when the membership chooses, the National Student Drama
+Festival. We also run StuFF, the Student Fringe Festival. Every member can take part, whatever
+their experience.
 
 ## Our history
 
@@ -26,29 +33,10 @@ building is at [savennt.com](https://savennt.com/).
 
 ## The committee
 
-The theatre is run by a committee elected by the membership each year, under the society's
-constitution.
+The theatre is run by a committee elected by the membership each year, under our constitution.
 
-| Role | Name | Contact |
-| --- | --- | --- |
-| President | \[name goes here\] | \[address goes here\] |
-| Secretary and Welfare Officer | \[name goes here\] | \[address goes here\] |
-| Treasurer | \[name goes here\] | \[address goes here\] |
-| Front of House Manager | \[name goes here\] | \[address goes here\] |
-| In-House Coordinator | \[name goes here\] | \[address goes here\] |
-| Studio Coordinator | \[name goes here\] | \[address goes here\] |
-| Creatives Coordinator | \[name goes here\] | \[address goes here\] |
-| External Relations Manager | \[name goes here\] | \[address goes here\] |
-| Marketing Coordinator | \[name goes here\], \[name goes here\] | \[address goes here\] |
-| Social and Fundraising Coordinator | \[name goes here\] | \[address goes here\] |
-| Theatre Manager | \[name goes here\] | \[address goes here\] |
-| Company Stage Manager | \[name goes here\], \[name goes here\] | \[address goes here\] |
-| Company Technical Director | \[name goes here\], \[name goes here\] | \[address goes here\] |
-| Technical Manager | \[name goes here\] | \[address goes here\] |
-| Company Workshop Manager | \[name goes here\] | \[address goes here\] |
-| Costume, Props and Make-Up Manager | \[name goes here\] | \[address goes here\] |
-| Archivist | \[name goes here\] | \[address goes here\] |
-| Events and Engagement Coordinator | \[name goes here\] | \[address goes here\] |
+::committee-table
+::
 
 ## Getting in touch
 

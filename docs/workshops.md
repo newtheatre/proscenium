@@ -126,4 +126,4 @@ the prose around the numbers, not a value.
 | Page | What is needed |
 | --- | --- |
 | `content/get-involved.md` | How joining, auditioning and the technical and production roles actually work this year. |
-| `content/about.md` | The name and the contact address of each committee role for the year, which read `[name goes here]` and `[address goes here]` until supplied; the table's roles are the constitution's (D-103 criterion 7). |
+| `content/committee.yml` | This year's holder of each role, and a role address for the Marketing Coordinators, Company Stage Managers and Company Technical Directors if they have one. The role addresses shipped are the old site's and need confirming. Move `updatedOn` with every edit (0107). |
