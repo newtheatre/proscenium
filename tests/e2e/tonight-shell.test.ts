@@ -232,14 +232,17 @@ describe.skipIf(skip !== null)('the target floor holds for every control (K-102,
   const SCREENS = ['/tonight', '/tonight/glance', '/tonight/board', '/tonight/incidents', '/tonight/age-checks', '/tonight/emergency']
 
   // Zero-sized elements are the ones a `v-if` has taken out, which are not controls anybody can
-  // miss; everything with a box on the page is measured.
+  // miss; everything with a box on the page is measured, a switch, checkbox or radio by its hit area.
   const CONTROLS = `(() => {
     const seen = []
     for (const node of document.querySelectorAll('button, input, select, textarea, [role="combobox"], a[href]')) {
       const rect = node.getBoundingClientRect()
       if (rect.width === 0 || rect.height === 0) continue
       if (getComputedStyle(node).display === 'inline') continue
-      seen.push({ what: node.getAttribute('data-test') ?? node.tagName.toLowerCase(), width: rect.width, height: rect.height })
+      const hit = node.matches('[data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])') ? getComputedStyle(node, '::after') : null
+      const width = hit ? Math.max(rect.width, parseFloat(hit.width) || 0) : rect.width
+      const height = hit ? Math.max(rect.height, parseFloat(hit.height) || 0) : rect.height
+      seen.push({ what: node.getAttribute('data-test') ?? node.tagName.toLowerCase(), width, height })
     }
     return JSON.stringify(seen)
   })()`

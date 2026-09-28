@@ -206,9 +206,14 @@ Eleven rules follow:
    foyer does not aim, and a secondary control missed twice costs more than the room it saved.
    That floor is one rule, `.nnt-night` in `app/assets/css/theme.css`, and the two show-night
    layouts put the class on the body so a teleported modal is inside it too; a screen never asks
-   for it field by field. The shells stand on `min-h-dvh` rather than `min-h-screen`, and the
-   pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and home
-   indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
+   for it field by field. A switch, a checkbox or a radio differs in how it meets the floor, not
+   in whether it does: stretched to 48 by 48, a switch's track draws as a circle and a checkbox as
+   a tile, so its drawn size stays Nuxt UI's and `theme.css` gives it an invisible hit area of at
+   least 48 by 48 centred on it instead, which a tap anywhere inside toggles (issue 1520;
+   `tests/e2e/bar-stocktakes.test.ts` measures it on the stocktake's Only uncounted switch). The
+   shells stand on `min-h-dvh` rather than `min-h-screen`, and the pinned area pads by
+   `env(safe-area-inset-bottom)`, so a phone's own browser chrome and home indicator never sit on
+   top of the action under the thumb. `tests/unit/night-shell.test.ts`
    holds all three. Every page on the `tonight` layout is a capped column at any window width
    (`max-w-md` for a show-night screen, `max-w-xl` for the training register), so anything in it
    that changes shape with width keys to its own container, with `@container` and an `@` variant as

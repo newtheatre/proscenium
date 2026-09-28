@@ -304,6 +304,24 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
       expect(`${layout}: ${(await read(layout)).includes(SHELL_CLASS)}`).toBe(`${layout}: true`)
     }
   })
+
+  // Issue 1520: stretched to the floor, a switch's track draws as a circle. Whether the hit area
+  // reaches 48 by 48 is measured in a browser (tests/e2e/bar-stocktakes.test.ts).
+  test('a switch, checkbox or radio keeps its drawn size and meets the floor through a hit area', async () => {
+    const rules = [...(await read(TOKEN_SOURCE)).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, selector, body]) => ({ selector: selector!.replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: body! }))
+      .filter(rule => rule.selector.startsWith(`.${SHELL_CLASS} `))
+    const floor = `min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`
+    const hit = `max(100%, ${NIGHT_TAP_TARGET_PX / 16}rem)`
+    const drawn = rules.find(rule => rule.body.includes(floor))!
+    const area = rules.find(rule => rule.selector.endsWith('::after'))
+    for (const role of ['switch', 'checkbox', 'radio']) {
+      expect(`${role}: ${drawn.selector.includes(':not(') && drawn.selector.includes(`[role="${role}"]`)}`).toBe(`${role}: true`)
+      expect(`${role}: ${area?.selector.includes(`[role="${role}"]`)}`).toBe(`${role}: true`)
+    }
+    expect(area?.body).toContain(`width: ${hit}`)
+    expect(area?.body).toContain(`height: ${hit}`)
+  })
 })
 
 // Issue 1521: the hub served every tile, then pruned them once the roles came back after mount. The

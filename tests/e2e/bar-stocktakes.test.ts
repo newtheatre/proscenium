@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { sqliteTarget } from '#tests/helpers/database'
+import { NIGHT_TAP_TARGET_PX } from '#shared/utils/night-shell'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
@@ -872,6 +873,54 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
       expect(line.figures.left).toBeGreaterThanOrEqual(line.fields.right)
       expect(line.fields.top).toBeLessThan(line.name.bottom)
       expect(line.figures.top).toBeLessThan(line.fields.bottom)
+    }
+    finally {
+      screen?.close()
+      await apply(opened.stocktake.id)
+    }
+  }, 120_000)
+
+  interface SwitchTarget { width: number, height: number, missed: string[] }
+
+  // A thumb landing anywhere in the floor's square, centred on the drawn track, lands on the switch.
+  const switchTarget = (screen: Bun.WebView): Promise<SwitchTarget> => screen.evaluate<SwitchTarget>(`(() => {
+    const toggle = document.querySelector('[data-test="uncounted-only-filter"]')
+    const drawn = toggle.getBoundingClientRect()
+    const x = drawn.left + drawn.width / 2
+    const y = drawn.top + drawn.height / 2
+    const reach = ${NIGHT_TAP_TARGET_PX / 2} - 0.5
+    const corners = { 'top left': [x - reach, y - reach], 'top right': [x + reach, y - reach], 'bottom left': [x - reach, y + reach], 'bottom right': [x + reach, y + reach] }
+    const missed = Object.entries(corners).filter(([, [cx, cy]]) => !toggle.contains(document.elementFromPoint(cx, cy))).map(([where]) => where)
+    return { width: drawn.width, height: drawn.height, missed }
+  })()`)
+
+  // Rule 4 of docs/design-language.md: stretched to the floor, a track is a 48 px circle, so a
+  // switch keeps its drawn shape and meets the floor through its hit area (K-102 criterion 2).
+  test('the Only uncounted switch draws as a switch on tonight\'s screen and still takes a 48 by 48 tap', async () => {
+    const item = await anItem()
+    const opened = await open()
+    let screen: Bun.WebView | undefined
+    try {
+      screen = await signedIn(1280, 800)
+      const found: string[] = []
+      for (const [width, height] of [[1280, 800], [360, 740]] as const) {
+        if (width !== 1280) await screen.resize(width, height)
+        await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${item.id}"]`)
+        const target = await switchTarget(screen)
+        const where = `${width}px`
+        if (target.width <= target.height) found.push(`${where}: the track is ${Math.round(target.width)} by ${Math.round(target.height)}`)
+        if (target.height >= NIGHT_TAP_TARGET_PX) found.push(`${where}: the track is drawn ${Math.round(target.height)}px tall`)
+        for (const corner of target.missed) found.push(`${where}: a tap at the ${corner} of the floor misses the switch`)
+      }
+      expect(found).toEqual([])
+
+      const before = await screen.evaluate<string>(`document.querySelector('[data-test="uncounted-only-filter"]').getAttribute('aria-checked')`)
+      await screen.evaluate(`(() => {
+        const drawn = document.querySelector('[data-test="uncounted-only-filter"]').getBoundingClientRect()
+        document.elementFromPoint(drawn.left + drawn.width / 2, drawn.top + drawn.height / 2 - ${NIGHT_TAP_TARGET_PX / 2} + 1).click()
+        return true
+      })()`)
+      await waitFor(screen, `document.querySelector('[data-test="uncounted-only-filter"]').getAttribute('aria-checked') !== ${JSON.stringify(before)}`)
     }
     finally {
       screen?.close()
