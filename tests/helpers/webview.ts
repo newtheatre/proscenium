@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs'
+import { NIGHT_DRAWN_CHOICE } from '#shared/utils/night-shell'
 import { hubDirFor } from './hub-dir'
 import { resetDatabase } from './reset-database'
 import { createServerLog, readServerLog } from './server-log'
@@ -607,8 +608,7 @@ export async function navLabels(view: Bun.WebView): Promise<string[]> {
 
 // Nuxt UI's switch, checkbox and radio keep their drawn size on a show-night screen; the target is
 // the row, counted only where a tap on it lands on the control or its label (design-language rule 4).
-export const DRAWN_CHOICE = '[data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])'
-export const DRAWN_TARGET = `(control => {
+const DRAWN_TARGET = `control => {
   const row = control.parentElement?.matches('[data-slot="container"]') ? control.parentElement.parentElement ?? control : control
   row.scrollIntoView({ block: 'center' })
   const box = row.getBoundingClientRect()
@@ -625,20 +625,21 @@ export const DRAWN_TARGET = `(control => {
   const points = [[box.left + inset, box.top + inset], [box.right - inset, box.top + inset], [box.left + inset, box.bottom - inset], [box.right - inset, box.bottom - inset]]
   const hits = points.map(([x, y]) => document.elementFromPoint(x, y)).filter(hit => hit && !pinned(hit))
   return { width: box.width, height: box.height, reaches: hits.length > 0 && hits.every(owns) }
-})`
+}`
 
 export interface NightTarget { what: string, width: number, height: number, reaches: boolean }
 
 // Every control on a show-night page with a box, a drawn choice by its row. Zero-sized elements are
 // the ones a `v-if` has taken out, which are not controls anybody can miss.
 export const NIGHT_TARGETS = `(() => {
+  const drawnTarget = ${DRAWN_TARGET}
   const seen = []
   for (const node of document.querySelectorAll('button, input, select, textarea, [role="combobox"], a[href]')) {
     const rect = node.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) continue
     if (getComputedStyle(node).display === 'inline') continue
     const what = node.getAttribute('data-test') ?? node.tagName.toLowerCase()
-    if (node.matches(${JSON.stringify(DRAWN_CHOICE)})) seen.push({ what, ...${DRAWN_TARGET}(node) })
+    if (node.matches(${JSON.stringify(NIGHT_DRAWN_CHOICE)})) seen.push({ what, ...drawnTarget(node) })
     else seen.push({ what, width: rect.width, height: rect.height, reaches: true })
   }
   return JSON.stringify(seen)
