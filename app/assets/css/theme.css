@@ -87,9 +87,31 @@
 
 /* The show-night shell's target floor, set once on the body rather than a class per field: every
    control on one clears 48 by 48 (docs/design-language.md rule 4, K-102 criterion 2). */
-.nnt-night :is(button, input, select, textarea, [role="combobox"], a) {
+.nnt-night :is(button, input, select, textarea, [role="combobox"], a):not(:is([role="switch"], [role="checkbox"], [role="radio"])[data-slot="base"]) {
   min-height: 3rem;
   min-width: 3rem;
+}
+
+/* Stretched to the floor, a switch's track draws as a circle: a switch, checkbox or radio keeps
+   its drawn size and meets the floor through a hit area centred on it (rule 4, issue 1520). */
+.nnt-night :is([role="switch"], [role="checkbox"], [role="radio"])[data-slot="base"] {
+  position: relative;
+  overflow: visible;
+}
+
+.nnt-night :is([role="switch"], [role="checkbox"], [role="radio"])[data-slot="base"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 3rem);
+  height: max(100%, 3rem);
+  translate: -50% -50%;
+}
+
+/* Unclipped, so the hit area reaches past the drawn edge; the fill rounds itself instead. */
+.nnt-night :is([role="checkbox"], [role="radio"])[data-slot="base"] > [data-slot="indicator"] {
+  border-radius: inherit;
 }
 
 .dark {
