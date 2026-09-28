@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
-import { TILL_VENUE_DEVICE_KEY, chargePaths, recallTillVenue, rememberTillVenue, rememberedBarAnswers, saysTillLeftOpen, tillScopeForm } from '#shared/utils/till'
+import { TILL_VENUE_DEVICE_KEY, chargePaths, recallTillVenue, rememberTillVenue, rememberedBarAnswers, saysTillLeftOpen, tillRefusalStep, tillScopeForm } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -158,6 +158,42 @@ describe('the remembered bar answers only the guard\'s own question (F-125, issu
   test('a bar named in the link, or nothing remembered, leaves the question to the picker', () => {
     expect(rememberedBarAnswers(400, 'venue-2', 'venue-1')).toBe(false)
     expect(rememberedBarAnswers(400, undefined, undefined)).toBe(false)
+  })
+})
+
+// Issue 1521: the served page cannot know which bar this phone opened, so a night that asks which bar
+// waits for the phone rather than serving a picker the phone's memory then takes away.
+describe('what the till does with the guard\'s refusal, served or on the phone (F-125, issue 1257, issue 1521)', () => {
+  const asked = (refusal: number | undefined, over: Partial<Parameters<typeof tillRefusalStep>[1]> = {}): string =>
+    tillRefusalStep(refusal, { usingDevice: false, deviceRead: true, ...over })
+
+  test('until the phone\'s memory has been read, the guard\'s question waits for it rather than drawing a picker', () => {
+    expect(asked(400, { deviceRead: false })).toBe('WAIT_FOR_DEVICE')
+    expect(asked(400, { deviceRead: false, remembered: 'venue-1' })).toBe('WAIT_FOR_DEVICE')
+  })
+
+  test('a bar the phone remembers answers the question once read', () => {
+    expect(asked(400, { remembered: 'venue-1' })).toBe('ASK_WITH_DEVICE')
+  })
+
+  test('with nothing remembered, the question is the picker', () => {
+    expect(asked(400)).toBe('SHOW')
+  })
+
+  test('a bar named in the address is never second-guessed by the phone', () => {
+    expect(asked(400, { queried: 'venue-2', remembered: 'venue-1' })).toBe('SHOW')
+    expect(asked(400, { queried: 'venue-2', deviceRead: false })).toBe('SHOW')
+  })
+
+  test('any other refusal is drawn as it is, served or not', () => {
+    expect(asked(403, { deviceRead: false })).toBe('SHOW')
+    expect(asked(403, { remembered: 'venue-1' })).toBe('SHOW')
+    expect(asked(undefined, { deviceRead: false })).toBe('SHOW')
+  })
+
+  test('a remembered bar that no longer answers is dropped, whatever the refusal', () => {
+    expect(asked(403, { usingDevice: true, remembered: 'venue-1' })).toBe('FORGET_DEVICE')
+    expect(asked(undefined, { usingDevice: true, remembered: 'venue-1' })).toBe('FORGET_DEVICE')
   })
 })
 

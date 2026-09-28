@@ -74,7 +74,10 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
   5. A show-night screen serves the viewer's authority and its first data in the page itself, so
      what a phone paints before any script runs is the screen the viewer will use: no tile, control
      or badge is drawn and then taken away, or held back and then added. Added 27 September 2026
-     (issue 1521).
+     (issue 1521). Extended 28 September 2026 to the night report, the till, the bar shift's
+     stocktake and a refusal card's help line: the till serves its session, its bar and its
+     catalogue, while its basket, its queued writes and its card attempts stay the device's own
+     (K-103, 0096), and a night that asks which bar waits for the phone's memory of it.
 - Source: Prompt Book K-1, P8 (show night is hostile territory); audit PR-5, PR-9; Get-In part 5
   (standards)
 

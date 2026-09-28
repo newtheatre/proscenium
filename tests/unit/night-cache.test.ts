@@ -12,6 +12,7 @@ import {
   pruneNightCache,
   readNightCache,
   refreshNightCache,
+  servedCopyWins,
   writeNightCache,
 } from '#shared/utils/night-cache'
 import type { NightCacheKey, NightCacheStore } from '#shared/utils/night-cache'
@@ -195,6 +196,22 @@ describe('a failed load never overwrites what the screen is showing (criterion 2
   })
 })
 
+// Issue 1521: a copy the server rendered into the page is as fresh as the moment it was read, so it
+// wins over an older one on the device and loses to a newer one.
+describe('a served copy against the device\'s own', () => {
+  const at = Date.parse('2026-10-17T18:12:00Z')
+
+  test('nothing on the device, or something older, and the served copy wins', () => {
+    expect(servedCopyWins(null, at)).toBe(true)
+    expect(servedCopyWins(at - 60_000, at)).toBe(true)
+  })
+
+  test('a device copy as new or newer keeps its place', () => {
+    expect(servedCopyWins(at, at)).toBe(false)
+    expect(servedCopyWins(at + 60_000, at)).toBe(false)
+  })
+})
+
 describe('a night ends and its cache goes with it', () => {
   test('other nights are dropped, tonight is kept, and nothing else is touched', () => {
     const store = memoryNightCacheStore()
@@ -294,6 +311,36 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
   })
 
   // The trap, at the screen: a duty manager switching venue reads their own house, not the other.
+  test('a copy the server rendered replaces an older one on the device, dated when it was read', async () => {
+    await inScope(() => {
+      const store = memoryNightCacheStore()
+      writeNightCache(store, key, { admitted: 3 }, new Date('2026-10-17T18:12:00Z'))
+      const read = Date.parse('2026-10-17T18:20:00Z')
+
+      const cache = useNightCache<{ admitted: number }>(key, () => Promise.resolve({ admitted: 9 }), { store, immediate: false })
+      cache.recall()
+      cache.adopt({ admitted: 7 }, read)
+
+      expect(cache.data.value).toEqual({ admitted: 7 })
+      expect(cache.cachedAt.value).toBe(read)
+      expect(readNightCache(store, key)).toMatchObject({ data: { admitted: 7 }, cachedAt: read })
+    })
+  })
+
+  test('a served copy older than the device\'s own leaves the device\'s on screen and in store', async () => {
+    await inScope(() => {
+      const store = memoryNightCacheStore()
+      writeNightCache(store, key, { admitted: 3 }, new Date('2026-10-17T18:20:00Z'))
+
+      const cache = useNightCache<{ admitted: number }>(key, () => Promise.resolve({ admitted: 9 }), { store, immediate: false })
+      cache.recall()
+      cache.adopt({ admitted: 1 }, Date.parse('2026-10-17T18:12:00Z'))
+
+      expect(cache.data.value).toEqual({ admitted: 3 })
+      expect(readNightCache(store, key)?.data).toEqual({ admitted: 3 })
+    })
+  })
+
   test('moving venue reads the other venue, never the one already on screen', async () => {
     await inScope(async () => {
       const store = memoryNightCacheStore()

@@ -356,7 +356,7 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
   test('a screen\'s served authority reuses the answer the shell asked in the same request, and a phone asks afresh', async () => {
     const shell = await read('app/composables/useNightShell.ts')
     expect(shell).toContain('const seeded = import.meta.server ? useNightAuthority().value.answers[role] : undefined')
-    for (const [path, role] of [['app/pages/tonight/door/index.vue', 'DOOR'], ['app/pages/tonight/message.vue', 'DUTY_MANAGER'], ['app/pages/tonight/incidents/index.vue', 'ANY'], ['app/pages/tonight/age-checks/index.vue', 'ANY']] as const) {
+    for (const [path, role] of [['app/pages/tonight/door/index.vue', 'DOOR'], ['app/pages/tonight/message.vue', 'DUTY_MANAGER'], ['app/pages/tonight/incidents/index.vue', 'ANY'], ['app/pages/tonight/age-checks/index.vue', 'ANY'], ['app/pages/tonight/report.vue', 'DUTY_MANAGER']] as const) {
       expect(`${path}: ${(await read(path)).includes(`askNightAuthority('${role}')`)}`).toBe(`${path}: true`)
     }
   })
@@ -375,6 +375,10 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     'app/pages/tonight/age-checks/index.vue',
     'app/pages/tonight/message.vue',
     'app/components/NightCompQueue.vue',
+    'app/pages/tonight/report.vue',
+    'app/pages/tonight/till/index.vue',
+    'app/pages/tonight/stocktake.vue',
+    'app/components/NightRefusal.vue',
   ]
 
   test.each(SERVED)('%s reads its first data while the server renders, and holds no navigation for it', async (path) => {
@@ -388,6 +392,62 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
       const source = await read(path)
       expect(`${path}: ${source.includes('useNightClock()')}`).toBe(`${path}: true`)
       expect(`${path}: ${source.includes('Date.now() / 1000')}`).toBe(`${path}: false`)
+    }
+  })
+
+  test('the night report opens Sign off and close by the same clock, the read\'s own moment until mounted', async () => {
+    const source = await read('app/pages/tonight/report.vue')
+    expect(source).toContain('useNightClock()')
+    expect(source).not.toContain('Date.now() / 1000')
+  })
+
+  // Each onMounted(...) call's own text, found by its brackets, so a poll set up beside it is not read as one.
+  function mountedCalls(source: string): string[] {
+    const calls: string[] = []
+    for (let from = source.indexOf('onMounted('); from !== -1; from = source.indexOf('onMounted(', from + 1)) {
+      let depth = 0
+      let at = from + 'onMounted'.length
+      for (; at < source.length; at++) {
+        if (source[at] === '(') depth++
+        else if (source[at] === ')' && --depth === 0) break
+      }
+      calls.push(source.slice(from, at + 1))
+    }
+    return calls
+  }
+
+  const FIRST_READS = [
+    'app/pages/tonight/report.vue',
+    'app/pages/tonight/till/index.vue',
+    'app/composables/useTillSession.ts',
+    'app/composables/useTillEarlier.ts',
+    'app/components/NightRefusal.vue',
+  ]
+
+  test.each(FIRST_READS)('%s no longer takes its first read once mounted', async (path) => {
+    for (const call of mountedCalls(await read(path))) {
+      expect(call).not.toMatch(/\$fetch|\brequest\b|\bload\w*\b|\brefresh\b/)
+    }
+  })
+
+  test('the till serves its session, its bar\'s answer and the Bar Manager\'s earlier nights in one read', async () => {
+    const till = await read('app/pages/tonight/till/index.vue')
+    expect(till).toContain('useServedRead(\'tonight-till')
+    expect(till).toContain('readEarlier()')
+    expect(await read('app/composables/useTillEarlier.ts')).not.toContain('onMounted(')
+  })
+
+  test('the till\'s catalogue rides the served page, and the device keeps whichever copy is newer', async () => {
+    const catalogue = await read('app/composables/useTillCatalogue.ts')
+    expect(catalogue).toContain('.adopt(')
+    expect(await read('app/composables/useNightCache.ts')).toContain('servedCopyWins(')
+  })
+
+  test('the basket, queued writes and card attempts stay the device\'s, and are never served', async () => {
+    const till = await read('app/pages/tonight/till/index.vue')
+    const served = till.slice(till.indexOf('useServedRead('), till.indexOf('\n})', till.indexOf('useServedRead(')))
+    for (const device of ['useTillBasket', 'useSumUpCharge', 'useWriteQueue', 'sumup.', 'basket']) {
+      expect(`${device}: ${served.includes(device)}`).toBe(`${device}: false`)
     }
   })
 })
