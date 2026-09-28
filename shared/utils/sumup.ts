@@ -1,6 +1,7 @@
 import { saysMoney } from './bar'
 import { saleForm } from './sale'
 import { z } from 'zod'
+import type { Permission } from './roles'
 
 // The hand-off of a basket to the SumUp app and what comes back (F-124, 0069). Pure: the URL the
 // app is opened with, the query it returns, and which attempt transitions are allowed.
@@ -123,6 +124,29 @@ export const resolveAttemptForm = z.object({
 })
 
 export type ResolveAttemptInput = z.output<typeof resolveAttemptForm>
+
+// A charge an earlier night's closed till left unanswered is the Treasurer's to record as a sale
+// on its own night (question 15, F-124 criterion 9): finance.write, which ADMIN also holds.
+export const LATE_CHARGE_PERMISSION = 'finance.write' satisfies Permission
+
+// The screen sends the charge's total as it showed it, so a stale screen records nothing (0005).
+export const recordLateChargeForm = z.object({
+  expectedTotalPence: z.number().int().nonnegative(),
+})
+
+// A sale recorded after its night's till closed: when the reader took it, and who recorded it when.
+export interface LateAddition {
+  entryId: string
+  totalPence: number
+  chargedAt: number
+  recordedAt: number
+  recordedByName: string | null
+  venueName: string | null
+}
+
+export function lateChargeTotalRefusal(sentPence: number, chargedPence: number): string {
+  return `The screen said ${saysMoney(sentPence)}; this charge is ${saysMoney(chargedPence)}. Nothing was recorded: read the night again.`
+}
 
 // Every transition an attempt may make, and by whom (criterion 5). Anything not here is refused,
 // so a callback and a staff answer cannot both advance one row.

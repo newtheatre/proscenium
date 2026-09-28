@@ -514,8 +514,8 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     expect((await request(app, 'GET', '/api/till/earlier', undefined, onShift.cookie)).status).toBe(403)
   })
 
-  // A closed night's charge is not offered as recorded: the sale needs that night's till open, and
-  // how a late card charge lands in the ledger waits on a decision (question 15).
+  // A closed night's charge is not offered as recorded at the till: the Treasurer records it on
+  // that night's Daily reconciliation (question 15, F-124 criterion 9).
   test('the bar manager closes last night\'s till from tonight\'s, then answers its charge the Treasurer now records', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-earlier', screenPassword)

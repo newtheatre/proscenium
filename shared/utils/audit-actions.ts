@@ -313,6 +313,7 @@ const CATALOGUE = {
   'bar.item.deleted': { label: 'Stocked item deleted', module: 'bar' },
   'bar.till.opened': { label: 'Till session opened', module: 'bar' },
   'bar.till.sale': { label: 'Till sale completed', module: 'bar' },
+  'bar.till.sale.late': { label: 'Card sale recorded after its night\'s till closed', module: 'bar' },
   'bar.till.closed': { label: 'Till session closed', module: 'bar' },
   'bar.sumup.started': { label: 'Card charge started, on SumUp or keyed into the reader', module: 'bar' },
   'bar.sumup.claimed': { label: 'Card charge answer claimed for recording', module: 'bar' },

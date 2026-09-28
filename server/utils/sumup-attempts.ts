@@ -9,14 +9,15 @@ import { commitSale } from './sale'
 import { openSessionFor, requireOpenSession } from './till'
 import { qrTokenFor, verifyQrToken } from './qr-tokens'
 import { ATTEMPT_COLUMNS, UNRESOLVED, earlierUnresolvedAttemptsQuery, openAttemptsOn, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
+import { lateAdditionsQuery, lateChargesQuery, lateClaimStatement, lateSaleTiming } from './late-charge'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDayOf } from '#shared/utils/ledger'
-import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
+import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, attemptMayMove, isTerminalAttempt, lateChargeTotalRefusal, sumupLaunchUrl } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SaleInput, SaleReceipt } from '#shared/utils/sale'
 import type { EarlierTillLeftOpen } from '#shared/utils/till'
-import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView, SumupResolution, SumupReturnInput } from '#shared/utils/sumup'
+import type { LateAddition, ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView, SumupResolution, SumupReturnInput } from '#shared/utils/sumup'
 
 // One card charge (F-124, 0069, 0096): handed to the SumUp app or keyed into the reader, its
 // conditional transitions, and the answer that posts the sale through the one `commitSale`.
@@ -120,6 +121,15 @@ export async function unresolvedAttempts(night: string): Promise<SumupAttemptVie
 export async function earlierUnresolvedAttempts(tonight: string): Promise<EarlierTillLeftOpen['attempts']> {
   const rows = await db.all<AttemptRow & { sessionOpen: number }>(earlierUnresolvedAttemptsQuery(tonight))
   return rows.map(row => ({ ...view(row), night: row.night, sessionOpen: Boolean(row.sessionOpen) }))
+}
+
+// For Daily reconciliation: the night's charges its closed tills left, and the sales recorded late.
+export async function lateCharges(night: string): Promise<SumupAttemptView[]> {
+  return (await db.all<AttemptRow>(lateChargesQuery(night))).map(view)
+}
+
+export async function lateAdditions(night: string): Promise<LateAddition[]> {
+  return db.all<LateAddition>(lateAdditionsQuery(night))
 }
 
 export function basketOf(row: AttemptRow): AttemptBasket {
@@ -340,6 +350,60 @@ export async function resolveAttempt(row: AttemptRow, outcome: ResolveOutcome, s
   const moved = await move(row.id, from === 'COMPLETING' ? 'STARTED' : from, 'ABANDONED', { resolution: 'STAFF', resolvedBy: by.actorId, note }, by.actorId)
   if (!moved) throw createError({ statusCode: 409, statusMessage: `That attempt is ${row.status.toLowerCase()} and cannot be abandoned now` })
   return { status: 'ABANDONED', receipt: null, error: null }
+}
+
+// The Treasurer's answer to a charge whose night's till is closed (question 15, F-124 criterion 9):
+// the sale on its own night, on its own session, audited as late in the recorder's name.
+export async function recordLateCharge(row: AttemptRow, expectedTotalPence: number, recorderId: string, by: Omit<CompletionActor, 'actorId' | 'resolution'>): Promise<CompletionOutcome> {
+  if (expectedTotalPence !== row.expectedTotalPence) {
+    throw createError({ statusCode: 409, statusMessage: lateChargeTotalRefusal(expectedTotalPence, row.expectedTotalPence) })
+  }
+  const claimed = await auditedWrite(db.all(lateClaimStatement(row.id, expectedTotalPence, recorderId)), auditEntry({
+    actorId: recorderId,
+    action: 'bar.sumup.claimed',
+    target: `sumup-attempt:${row.id}`,
+    detail: { from: row.status, to: 'COMPLETING', resolution: 'STAFF', smpTxCode: null },
+  }))
+  if (!claimed) {
+    throw createError({ statusCode: 409, statusMessage: 'That charge has been answered, or its night\'s till reopened, since the screen was read. Read the night again.' })
+  }
+
+  const basket = basketOf(row)
+  const timing = lateSaleTiming(row.createdAt)
+  let receipt: SaleReceipt
+  try {
+    receipt = await commitSale(
+      basket.sale.lines, timing.on, basket.sale.expectedTotalPence, basket.sale.ageCheck, basket.sale.discountId, null,
+      {
+        actorId: row.createdBy,
+        sessionId: row.tillSessionId,
+        attemptId: row.id,
+        venueId: basket.venueId,
+        night: basket.night,
+        performanceId: basket.performanceId,
+        performanceIds: basket.performanceIds,
+        baseURL: by.baseURL,
+        event: by.event,
+        at: timing.at,
+        lateRecorderId: recorderId,
+      },
+      { tickets: basket.sale.tickets, walkUps: basket.sale.walkUps, walkUpGuest: basket.sale.walkUpGuest },
+    )
+  }
+  catch (error) {
+    const statusCode = (error as { statusCode?: number }).statusCode
+    if (statusCode !== undefined && statusCode < 500) {
+      const message = (error as { statusMessage?: string }).statusMessage ?? 'The sale could not be recorded'
+      await move(row.id, 'COMPLETING', 'MISMATCH', { error: message, resolvedBy: recorderId }, recorderId)
+      return { status: 'MISMATCH', receipt: null, error: message }
+    }
+    await move(row.id, 'COMPLETING', 'STARTED', {}, recorderId)
+    throw error
+  }
+  const recorded = receipt.entryId === null
+    ? await recordPostedSale(row.id, null, recorderId)
+    : (await attemptById(row.id))?.entryId === receipt.entryId
+  return { status: 'SUCCEEDED', receipt, error: recorded ? null : DUPLICATE }
 }
 
 // Minutes since the answer that began the recording, for a completion that never finished.

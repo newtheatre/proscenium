@@ -62,6 +62,7 @@ const REPORT: NightReport = {
   bypasses: [],
   covers: [],
   bar: { revenuePence: 0, itemsSold: 0 },
+  lateAdditions: [],
   access: { verified: 0 },
   checklist: [],
 }
