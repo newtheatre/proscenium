@@ -75,7 +75,7 @@ const PREVIEWS: Partial<Record<ConfigKey, (event: H3Event | undefined, proposed:
   }),
   AUTO_CLOSE_FROM_NIGHT: async (_event, proposed) => ({
     count: await autoCloseFromPreview(proposed),
-    category: 'performances from this night on with no night report and past their 24-hour close: the next sweep freezes each and emails its report',
+    category: 'performances from this night on with no night report and past their 24-hour close: overnight, each is frozen and its report emailed',
   }),
 }
 
