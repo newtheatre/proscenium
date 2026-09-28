@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { boundFrom } from '../../scripts/seed/statements'
-import { lateAddendumStatement, lateAdditionsQuery, lateChargesQuery, lateClaimStatement, lateSaleAudit, lateSaleAuditStatement, lateSaleTiming } from '#server/utils/late-charge'
+import { LATE_RECORD_INTERRUPTED, lateAddendumStatement, lateAdditionsQuery, lateChargesQuery, lateClaimStatement, lateSaleAudit, lateSaleAuditStatement, lateSaleTiming } from '#server/utils/late-charge'
 import { cardSalesQuery } from '#server/utils/reconciliation'
-import { LATE_CHARGE_PERMISSION, lateChargeTotalRefusal } from '#shared/utils/sumup'
+import { stuckAttemptsQuery } from '#server/utils/sumup-queries'
+import { ABILITY_PERMISSIONS } from '#shared/utils/abilities'
+import { lateChargeTotalRefusal } from '#shared/utils/sumup'
 import { permissionsFor } from '#shared/utils/roles'
 import { showNightOpensAt } from '#shared/utils/show-night'
 import { londonDayOf } from '#shared/utils/ledger'
@@ -156,22 +158,28 @@ describe('the audit marks it late, naming who recorded it and when', () => {
     })
   })
 
-  test('a night already signed off gains an addendum saying so', async () => {
+  // The report's bar figure is the whole night's, so the other house's report moved too.
+  test('every report already signed off that night gains an addendum, whichever bar took it', async () => {
     await withDatabase(async (database) => {
       const night = leftUnanswered(database)
+      const other = tonightsPerformance(database, { night: EARLIER, suffix: 'other' })
       insert(database, 'night_reports', {
         id: 'r-1', performance_id: night.performanceId, venue_id: night.venueId, night: EARLIER,
         closing_note: 'A quiet night', report: '{}', signed_by: 'u-bar', signed_via: 'SHIFT',
       })
+      insert(database, 'night_reports', {
+        id: 'r-2', performance_id: other.performanceId, venue_id: other.venueId, night: EARLIER,
+        closing_note: 'The other house', report: '{}', signed_by: 'u-bar', signed_via: 'SHIFT',
+      })
       run(database, lateClaimStatement('att-1', 450, 'u-treasurer'))
       const entryId = await postLate(database, night)
-      run(database, lateAddendumStatement({ id: 'add-1', venueId: night.venueId, night: EARLIER, entryId, addedBy: 'u-treasurer', totalPence: 450, chargedAt: CHARGED_AT }))
+      run(database, lateAddendumStatement({ id: 'add-1', night: EARLIER, entryId, addedBy: 'u-treasurer', totalPence: 450, chargedAt: CHARGED_AT }))
 
-      const [addendum] = rows<{ reportId: string, note: string, addedBy: string }>(database,
-        'SELECT report_id AS reportId, note, added_by AS addedBy FROM night_report_addenda')
-      expect(addendum).toMatchObject({ reportId: 'r-1', addedBy: 'u-treasurer' })
-      expect(addendum!.note).toContain('Late addition')
-      expect(addendum!.note).toContain('£4.50')
+      const addenda = rows<{ reportId: string, note: string, addedBy: string }>(database,
+        'SELECT report_id AS reportId, note, added_by AS addedBy FROM night_report_addenda ORDER BY report_id')
+      expect(addenda.map(addendum => [addendum.reportId, addendum.addedBy])).toEqual([['r-1', 'u-treasurer'], ['r-2', 'u-treasurer']])
+      expect(addenda[0]!.note).toContain('Late addition')
+      expect(addenda[0]!.note).toContain('£4.50')
     })
   })
 })
@@ -188,6 +196,22 @@ describe('the Treasurer alone records it, against the total the screen showed (0
     expect(refusal).toContain('£4.50')
   })
 
+  // Review F1: STARTED past the sweep's window would be abandoned with the money never recorded.
+  test('a late record interrupted part-way stays mismatched, out of the sweep and still retryable', async () => {
+    await withDatabase((database) => {
+      leftUnanswered(database)
+      expect(LATE_RECORD_INTERRUPTED.status).toBe('MISMATCH')
+      run(database, lateClaimStatement('att-1', 450, 'u-treasurer'))
+      database.batch([['UPDATE sumup_attempts SET status = ?, error = ? WHERE id = ? AND status = \'COMPLETING\'', LATE_RECORD_INTERRUPTED.status, LATE_RECORD_INTERRUPTED.error, 'att-1']])
+
+      const muchLater = CHARGED_AT + 7 * 24 * 3600
+      expect(run(database, stuckAttemptsQuery(muchLater, 120))).toEqual([])
+      expect(run<{ id: string, error: string }>(database, lateChargesQuery(EARLIER)).map(row => [row.id, row.error]))
+        .toEqual([['att-1', LATE_RECORD_INTERRUPTED.error]])
+      expect(run(database, lateClaimStatement('att-1', 450, 'u-treasurer'))).toHaveLength(1)
+    })
+  })
+
   test('a charge already answered, or already posted, is not claimed again', async () => {
     await withDatabase((database) => {
       leftUnanswered(database)
@@ -198,14 +222,14 @@ describe('the Treasurer alone records it, against the total the screen showed (0
 
   test('only a finance.write holder may record it: the Treasurer and ADMIN, never the bar', () => {
     const now = new Date()
-    const holds = (role: Role): boolean => permissionsFor([{ role, expiresAt: null }], now).has(LATE_CHARGE_PERMISSION)
-    expect(LATE_CHARGE_PERMISSION).toBe('finance.write')
+    const holds = (role: Role): boolean => permissionsFor([{ role, expiresAt: null }], now).has('finance.write')
+    expect(ABILITY_PERMISSIONS.recordLateCharges).toBe('finance.write')
     expect(holds('TREASURER')).toBe(true)
     expect(holds('ADMIN')).toBe(true)
     for (const role of ['BAR_MANAGER', 'FOH_MANAGER', 'COMMITTEE', 'THEATRE_MANAGER'] as Role[]) expect(holds(role)).toBe(false)
 
     const route = readFileSync('server/api/admin/finance/late-charges/[id].post.ts', 'utf8')
-    expect(route).toContain('requirePermission(event, LATE_CHARGE_PERMISSION)')
+    expect(route).toContain('requirePermission(event, \'finance.write\')')
     expect(route.indexOf('requirePermission(')).toBeLessThan(route.indexOf('recordLateCharge('))
   })
 })

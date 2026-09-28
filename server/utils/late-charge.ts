@@ -12,6 +12,13 @@ import type { AuditRow } from '#shared/utils/audit'
 
 export const LATE_SALE_ACTION = 'bar.till.sale.late'
 
+// A late record the server failed part-way stays where the Treasurer can retry it: MISMATCH is out
+// of the sweep's reach, where STARTED past its window would be abandoned with nothing recorded.
+export const LATE_RECORD_INTERRUPTED = {
+  status: 'MISMATCH',
+  error: 'Recording the sale was interrupted; check the reader before retrying',
+} as const
+
 // No till open for the charge's bar and night: while one is, the bar records it the usual way.
 const tillClosed = (table: string): SQL => sql`NOT EXISTS (
   SELECT 1 FROM till_sessions s WHERE s.venue_id = ${sql.raw(table)}.venue_id AND s.night = ${sql.raw(table)}.night AND s.closed_at IS NULL
@@ -71,14 +78,15 @@ export function lateSaleAuditStatement(row: AuditRow, entryId: string): SQL {
   `
 }
 
-// A report already signed off is frozen, so each one at that bar that night gains an addendum.
-export function lateAddendumStatement(input: { id: string, venueId: string, night: string, entryId: string, addedBy: string, totalPence: number, chargedAt: number }): SQL {
+// Every report signed off that night gains an addendum, whatever its venue: each froze the
+// night-wide bar figure the late sale has since moved (`reportBarSummary`).
+export function lateAddendumStatement(input: { id: string, night: string, entryId: string, addedBy: string, totalPence: number, chargedAt: number }): SQL {
   const note = `Late addition: a card sale of ${saysMoney(input.totalPence)} the reader took at ${saysClock(input.chargedAt)}, recorded after the till closed.`
   return sql`
     INSERT INTO night_report_addenda (id, report_id, note, added_by)
     SELECT ${input.id} || '-' || r.id, r.id, ${note}, ${input.addedBy}
     FROM night_reports r
-    WHERE r.venue_id = ${input.venueId} AND r.night = ${input.night}
+    WHERE r.night = ${input.night}
       AND EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${input.entryId})
   `
 }

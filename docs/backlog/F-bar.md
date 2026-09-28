@@ -659,7 +659,7 @@ Open questions:
      and a mismatch refuses quoting both figures (0005). The trail marks it late
      (`bar.till.sale.late`, naming who recorded it and when), Daily reconciliation lists it under
      **Late additions**, and the night report shows it as a late addition, or as an addendum to
-     each report already signed off for that bar and night.
+     each report already signed off for that night (each froze the night-wide bar figure it moves).
 - Source: SumUp Payment Switch (developer.sumup.com/terminal-payments/payment-switch, and the
   sumup-android-url-scheme and sumup-ios-url-scheme references); decision 0069; Matt's
   direction, 13 September 2026; issue 1257 (a cancelled charge on Android returned in a new tab);

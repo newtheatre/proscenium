@@ -1,7 +1,6 @@
 import { saysMoney } from './bar'
 import { saleForm } from './sale'
 import { z } from 'zod'
-import type { Permission } from './roles'
 
 // The hand-off of a basket to the SumUp app and what comes back (F-124, 0069). Pure: the URL the
 // app is opened with, the query it returns, and which attempt transitions are allowed.
@@ -124,10 +123,6 @@ export const resolveAttemptForm = z.object({
 })
 
 export type ResolveAttemptInput = z.output<typeof resolveAttemptForm>
-
-// A charge an earlier night's closed till left unanswered is the Treasurer's to record as a sale
-// on its own night (question 15, F-124 criterion 9): finance.write, which ADMIN also holds.
-export const LATE_CHARGE_PERMISSION = 'finance.write' satisfies Permission
 
 // The screen sends the charge's total as it showed it, so a stale screen records nothing (0005).
 export const recordLateChargeForm = z.object({

@@ -298,6 +298,10 @@ function writeOff(): Promise<void> {
             <span class="font-semibold">{{ saysMoney(charge.expectedTotalPence) }}</span>
             · {{ charge.venueName }} {{ saysClock(charge.createdAt) }}<span v-if="charge.createdByName"> · {{ charge.createdByName }}</span>
             · {{ saysAttemptStatus(charge.status, charge.kind) }}
+            <span
+              v-if="charge.error"
+              class="block text-xs text-muted"
+            >{{ charge.error }}</span>
           </p>
           <UButton
             v-if="mayRecordLate"

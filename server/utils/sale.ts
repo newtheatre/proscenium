@@ -784,7 +784,7 @@ export async function commitSale(
         const chargedAt = Math.floor(context.at.getTime() / 1000)
         const sale = { recorderId: context.lateRecorderId, entryId: posted.id, attemptId: context.attemptId, venueId: context.venueId, night: context.night, chargedAt }
         statements.push(db.run(lateSaleAuditStatement(lateSaleAudit(sale), posted.id)))
-        statements.push(db.run(lateAddendumStatement({ id: newId(), venueId: context.venueId, night: context.night, entryId: posted.id, addedBy: context.lateRecorderId, totalPence: soldTotalPence, chargedAt })))
+        statements.push(db.run(lateAddendumStatement({ id: newId(), night: context.night, entryId: posted.id, addedBy: context.lateRecorderId, totalPence: soldTotalPence, chargedAt })))
       }
     }
     entryId = posted.id

@@ -1,9 +1,9 @@
-import { LATE_CHARGE_PERMISSION, recordLateChargeForm } from '#shared/utils/sumup'
+import { recordLateChargeForm } from '#shared/utils/sumup'
 
-// "Payment went through" on a charge whose night's till is closed: the Treasurer's to record, as a
-// sale on that night, against the total the screen showed (question 15, F-124 criterion 9, 0005).
+// "Payment went through" on a charge whose night's till is closed: the Treasurer's, or ADMIN's, to
+// record as a sale on that night, against the total the screen showed (F-124 criterion 9, 0005).
 export default defineEventHandler(async (event) => {
-  const resolved = await requirePermission(event, LATE_CHARGE_PERMISSION)
+  const resolved = await requirePermission(event, 'finance.write')
   const id = getRouterParam(event, 'id') ?? ''
   const input = await readValidatedBodyOrThrow(event, recordLateChargeForm)
 
