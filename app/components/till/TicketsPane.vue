@@ -147,7 +147,10 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
       </div>
     </NightBlock>
 
-    <NightBlock title="Walk-up">
+    <NightBlock
+      title="Walk-up"
+      class="@container"
+    >
       <USelect
         v-if="tonightsPerformances.length > 1"
         v-model="walkUpPerformanceId"
@@ -217,7 +220,7 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
       <p class="mt-4 text-xs text-muted">
         Their name and email are optional. With them, the booking's QR is emailed; without, the pass on screen is theirs to photograph.
       </p>
-      <div class="mt-2 grid gap-2 sm:grid-cols-2">
+      <div class="mt-2 grid gap-2 @sm:grid-cols-2">
         <UInput
           v-model="walkUpGuestName"
           placeholder="Name"

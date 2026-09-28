@@ -209,6 +209,8 @@ describe.skipIf(skip !== null)('what each show-night screen pins (issue 1150 ite
     }
   }, CASE_TIMEOUT_MS)
 
+  // A link a phone with no script can still dial; a tap on the hydrated screen opens the sheet
+  // that dials instead (issue 1519, 0106), which `venue-emergency.test.ts` drives.
   test('the emergency card pins Call 999 as a dialling link', async () => {
     const view = await openView(PHONE)
     try {

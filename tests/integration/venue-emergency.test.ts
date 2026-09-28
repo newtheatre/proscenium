@@ -46,6 +46,8 @@ const card = (overrides: Partial<EmergencyCardInput> = {}): EmergencyCardInput =
   firePanel: null,
   what3words: null,
   notes: null,
+  firstCallName: null,
+  firstCallPhone: null,
   ...overrides,
 })
 
@@ -99,6 +101,27 @@ describe('recording a version (criterion 1)', () => {
         'SELECT id, assembly_point FROM venue_emergency_info WHERE venue_id = ? ORDER BY updated_at', venue.id)
       expect(history).toHaveLength(2)
       expect(history[0]).toMatchObject({ id: 'vei-1', assembly_point: 'The old assembly point' })
+    })
+  })
+})
+
+// Issue 1519: who a campus venue rings first survives the round trip, on the night and on the
+// committee's overview alike, and a card that names nobody still reads null for both.
+describe('who to ring first (issue 1519)', () => {
+  test('a named first call comes back on the current card and the overview', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const campus = testVenue(database, { suffix: 'campus' })
+      const town = testVenue(database, { suffix: 'town' })
+      run(database, recordCardStatement(campus.id, card({ firstCallName: 'University Security', firstCallPhone: '0115 951 8888' }), officer, 'vei-campus').statement)
+      run(database, recordCardStatement(town.id, card(), officer, 'vei-town').statement)
+
+      const [current] = run(database, currentCardQuery(campus.id))
+      expect(current).toMatchObject({ firstCallName: 'University Security', firstCallPhone: '0115 951 8888' })
+
+      const found = run(database, currentCardsQuery(everyCard(), 25, 0)) as { venueId: string, firstCallName: string | null, firstCallPhone: string | null }[]
+      expect(found.find(row => row.venueId === campus.id)).toMatchObject({ firstCallName: 'University Security', firstCallPhone: '0115 951 8888' })
+      expect(found.find(row => row.venueId === town.id)).toMatchObject({ firstCallName: null, firstCallPhone: null })
     })
   })
 })

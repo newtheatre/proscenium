@@ -662,6 +662,9 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
      behind `nnt-scrim` (`docs/design-language.md`, photography rule 1).
   5. No image is referenced that does not exist: a unit test resolves every `/images/` path
      under `app/` and `content/` against `public/`.
+  6. The header, the footer and the way in draw the white anniversary logo through
+     `SiteWordmark`, trimmed of its canvas, rather than the name set in the house type. Added
+     27 September 2026.
 - Source: Pre-cutover review, 10 September 2026. `unified/main` had no `public/` directory and
   referenced no image.
 

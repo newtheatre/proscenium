@@ -292,6 +292,24 @@ export async function openSignedOutView(baseURL: string, size?: { width: number,
   return view
 }
 
+// Signed in through the form as a person would be. A view that fails to sign in is closed here,
+// since the caller never receives it to close.
+export async function signInView(baseURL: string, email: string, password: string, size?: { width: number, height: number }): Promise<Bun.WebView> {
+  const view = await openSignedOutView(baseURL, size)
+  try {
+    await visit(view, `${baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', email)
+    await fill(view, 'form input[type="password"]', password)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    return view
+  }
+  catch (failure) {
+    view.close()
+    throw failure
+  }
+}
+
 // Polls a boolean expression until it holds. Every assertion about a rendered screen needs this,
 // because navigation and hydration both finish after the call that started them.
 export async function waitFor(view: Bun.WebView, expression: string, timeoutMs = SETTLE_TIMEOUT_MS): Promise<void> {

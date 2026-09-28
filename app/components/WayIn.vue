@@ -10,7 +10,7 @@
         class="dark mb-8 flex justify-center text-default"
         data-test="way-in-wordmark"
       >
-        <SiteWordmark gold />
+        <SiteWordmark />
       </div>
 
       <UPageCard>

@@ -673,7 +673,7 @@ useSeoMeta({ title: 'Rota' })
       title="Claim the duty manager shift"
       verb="Claim"
       color="primary"
-      consequence="Tonight's team at that venue see a shared number on the team list, and the duty manager's on the emergency card, to ring after 999. Your answer also sets the phone switch on your profile, where you can change it."
+      consequence="Tonight's team at that venue see a shared number on the team list, and the duty manager's on the emergency card, to ring after the emergency call. Your answer also sets the phone switch on your profile, where you can change it."
       :loading="claiming !== null"
       :disabled="shareNumber === undefined"
       :failure="claimFailure"

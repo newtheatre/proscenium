@@ -16,6 +16,44 @@ const component = (name: string): Promise<string> => read(`app/components/${name
 // Anything that only exists under a pointer, or needs a second finger or a held press.
 const POINTER_ONLY = /\bhover:|group-hover:|@(mouseenter|mouseover|mouseleave|dblclick|contextmenu|touchstart|touchend)\b|v-on:(mouseenter|mouseover|contextmenu)/
 
+// Anything keyed to the window's width: `sm:` to `2xl:`, arbitrary `min-[...]:` and `max-[...]:`,
+// and a width `@media` rule. A container's `@md:` or `@min-[...]:` passes, as does any other media query.
+const WINDOW_WIDTH = /(?<![\w@-])(?:max-)?(?:sm|md|lg|xl|2xl):|(?<![\w@-])(?:min|max)-\[[^\]]+\]:|@media[^{]*\bwidth\b/
+
+const STOCKTAKE_COUNTS = 'app/components/stocktake/Counts.vue'
+
+// Nuxt's own names for the application's components, from the declarations `nuxt prepare` writes
+// on install, so the walk below never has to reimplement Nuxt's naming.
+async function componentFiles(): Promise<Map<string, string>> {
+  const declared = await read('.nuxt/components.d.ts')
+  const named = new Map<string, string>()
+  for (const [, name, path] of declared.matchAll(/export const (\w+): typeof import\("\.\.\/(app\/components\/[^"]+\.vue)"\)/g)) {
+    named.set(name!, path!)
+    named.set(name!.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase(), path!)
+  }
+  return named
+}
+
+// Every file drawn inside the tonight layout, with its source: the layout, each page on it, and
+// every component those reach by tag, in either case.
+async function tonightTree(): Promise<Map<string, string>> {
+  const named = await componentFiles()
+  const tag = new RegExp(`<(?:Lazy|lazy-)?(${[...named.keys()].join('|')})[\\s/>]`, 'g')
+  const queue = [LAYOUT]
+  for (const entry of new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages', onlyFiles: true })) {
+    if (/layout:\s*'tonight'/.test(await read(`app/pages/${entry}`))) queue.push(`app/pages/${entry}`)
+  }
+  const tree = new Map<string, string>()
+  while (queue.length > 0) {
+    const file = queue.pop()!
+    if (tree.has(file)) continue
+    const source = await read(file)
+    tree.set(file, source)
+    for (const [, name] of source.matchAll(tag)) queue.push(named.get(name!)!)
+  }
+  return tree
+}
+
 describe('the stale label (K-102, "last synced HH:MM")', () => {
   test('is London wall-clock time in summer', () => {
     expect(lastSyncedLabel(new Date('2026-07-15T18:42:00Z'))).toBe('Last synced 19:42')
@@ -93,19 +131,29 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(source).not.toContain('UDashboard')
   })
 
-  // The desktop layout is the adaptation: the column is capped and centred, and nothing in the
-  // shell starts from a wide layout and squeezes down.
-  test('the shell adapts upwards from the phone, never downwards from a desk', async () => {
-    const files = [LAYOUT, ...COMPONENTS.map(name => `app/components/${name}.vue`)]
+  // Issue 1520: every page on the tonight layout is a capped column at any window width, so what
+  // changes shape inside it must key to its container; a window variant fires while it is still narrow.
+  test('every page on the tonight layout is a capped column, laid out by container and never by window', async () => {
+    expect(await component('NightScreen')).toMatch(/\bmax-w-/)
+    const tree = await tonightTree()
+    expect([...tree.keys()]).toContain(STOCKTAKE_COUNTS)
     const offenders: string[] = []
-    for (const file of files) {
-      const source = await read(file)
+    for (const [file, source] of tree) {
+      if (file.startsWith('app/pages/') && !source.includes('<NightScreen') && !/\bmax-w-/.test(source)) {
+        offenders.push(`${file}: neither a NightScreen nor a capped column`)
+      }
       source.split('\n').forEach((line, index) => {
-        if (/\bmax-(sm|md|lg|xl):/.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
+        if (WINDOW_WIDTH.test(line)) offenders.push(`${file}:${index + 1}  ${line.trim()}`)
       })
     }
     expect(offenders).toEqual([])
-    expect(await component('NightScreen')).toMatch(/\bmax-w-/)
+  })
+
+  // Whether the three columns fit is proved in a browser (tests/e2e/bar-stocktakes.test.ts).
+  test('a stocktake line takes its columns from its container', async () => {
+    const source = await read(STOCKTAKE_COUNTS)
+    expect(source).toMatch(/class="@container\b/)
+    expect(source).toMatch(/@3xl:grid-cols-/)
   })
 
   // The hub is the exception, and only the hub: it is the navigation rather than a screen with

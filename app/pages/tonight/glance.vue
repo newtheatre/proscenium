@@ -4,7 +4,7 @@ import { saysClock } from '#shared/utils/when'
 import { HUB_KPI_LABELS, curtainIsDown, groupedBoardCode, housePercentLine, hubKpis, nightHeaderLine, passPressureAdvice, runningTimeLine, saysSeatsLeft } from '#shared/utils/night-hub'
 import { saysLatecomerPolicy } from '#shared/utils/programme'
 import { saysShiftRole } from '#shared/utils/rota'
-import { activePerformanceId, saysTeamHolder } from '#shared/utils/tonight'
+import { activePerformanceId, saysTeamHolder, telHref } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 import type { ShiftRole } from '#shared/utils/rota'
 
@@ -359,7 +359,7 @@ onUnmounted(() => {
                 {{ member.name }}
                 <UButton
                   v-if="member.phone"
-                  :to="`tel:${member.phone}`"
+                  :to="telHref(member.phone)"
                   variant="subtle"
                   icon="i-lucide-phone"
                   class="min-h-12 min-w-12 justify-center"

@@ -1,17 +1,17 @@
 <script setup lang="ts">
-// The house wordmark, in one place because the header and the footer both draw it. Plain text
-// rather than a link: `UHeader` and `UFooter` wrap it in their own anchor already (0021).
-defineProps<{ gold?: boolean }>()
+// The house logo, in one place because the header, the footer and the way in all draw it. Plain
+// image rather than a link: `UHeader` and `UFooter` wrap it in their own anchor already (0021).
 </script>
 
 <template>
-  <span
-    class="flex flex-col leading-none"
+  <!-- White on stage black: every caller sits inside a `dark` subtree. The alt text is the name the
+       wrapping anchor is read by. -->
+  <img
+    src="/images/logos/anniversary-white-trimmed.webp"
+    alt="The Nottingham New Theatre"
+    width="650"
+    height="128"
+    class="block h-7 w-auto sm:h-9"
     data-test="site-wordmark"
   >
-    <!-- The theatre's name is read, not decoration, so it clears the small-text floor and takes a
-         foreground that measures against stage black rather than the muted one (K-101). -->
-    <span class="font-mono text-xs uppercase tracking-[0.18em] text-toned">The Nottingham</span>
-    <span class="nnt-headline text-lg">New <span :class="gold ? 'text-secondary' : ''">Theatre</span></span>
-  </span>
 </template>

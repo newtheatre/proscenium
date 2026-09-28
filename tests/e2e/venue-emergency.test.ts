@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -51,6 +51,8 @@ interface TonightCard {
   firePanel: string | null
   firstAiders: string | null
   firstAidersTonight: { firstName: string, roles: string[] }[] | null
+  firstCallName: string | null
+  firstCallPhone: string | null
   dutyManagers: { name: string, phone: string }[] | null
 }
 
@@ -222,4 +224,75 @@ describe.skipIf(skip !== null)('tonight\'s first aiders on the card (issue 1310)
     const card = await cardAt(member.cookie, house.venueId)
     expect(card?.firstAidersTonight).toEqual([{ firstName: aider.name.split(' ')[0]!, roles: ['BAR'] }])
   })
+})
+
+// Issue 1519: at a campus venue estates security is rung first, and no emergency call dials on
+// the first tap. 999 stays on the screen for every venue.
+describe.skipIf(skip !== null)('who to ring first (issue 1519)', () => {
+  const address = 'The Nottingham New Theatre, Cherry Tree Hill, University Park, Nottingham NG7 2RD'
+  const security = { firstCallName: 'University Security', firstCallPhone: '0115 951 8888' }
+
+  test('a card files who to ring first, and a name with no number is refused', async () => {
+    const path = `/api/admin/venues/${house.venueId}/emergency`
+    expect((await send('PUT', path, { address, firstCallName: 'University Security' })).status).toBe(400)
+    expect((await send('PUT', path, { address, firstCallPhone: '0115 951 8888' })).status).toBe(400)
+    expect((await send('PUT', path, { address, assemblyPoint: 'Campus', ...security })).status).toBe(200)
+
+    const card = await cardAt(foh.cookie, house.venueId)
+    expect(card).toMatchObject(security)
+  })
+
+  // Served as links, so a phone that never runs the script can still ring; the sheet is the
+  // hydrated screen's (0106).
+  test('the served screen reads to security and offers 999 too, each as a link that works unscripted', async () => {
+    await send('PUT', `/api/admin/venues/${house.venueId}/emergency`, { address, ...security })
+
+    const page = await send('GET', '/tonight/emergency', undefined, foh.cookie)
+    const html = await page.text()
+    expect(html).toContain('Read to University Security')
+    expect(html).toContain('Call University Security')
+    expect(html).toContain('Call 999')
+    expect(html).toContain('href="tel:01159518888"')
+    expect(html).toContain('href="tel:999"')
+  })
+
+  test('a card that names nobody reads to 999, as it always has', async () => {
+    await send('PUT', `/api/admin/venues/${house.venueId}/emergency`, { address })
+
+    const card = await cardAt(foh.cookie, house.venueId)
+    expect(card).toMatchObject({ firstCallName: null, firstCallPhone: null })
+    const html = await (await send('GET', '/tonight/emergency', undefined, foh.cookie)).text()
+    expect(html).toContain('Read to 999')
+    expect(html).not.toContain('Call University Security')
+  })
+
+  test('a tap opens a sheet naming the number, and only the sheet\'s own button dials it', async () => {
+    await send('PUT', `/api/admin/venues/${house.venueId}/emergency`, { address, ...security })
+    const password = generatePassword()
+    const reader = await registerMember(app, 'emergency-caller', password)
+
+    const view = await openSignedOutView(app.baseURL, { width: 360, height: 740 })
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', reader.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+
+      await visit(view, `${app.baseURL}/tonight/emergency`, '[data-test="emergency-call-01159518888"]')
+      await click(view, '[data-test="emergency-call-01159518888"]')
+      await waitFor(view, `document.querySelector('[data-test="emergency-call-now"]')`)
+      expect(new URL(await view.evaluate<string>('location.href')).pathname).toBe('/tonight/emergency')
+      expect(await view.evaluate<string>(`document.querySelector('[data-test="emergency-call-now"]').getAttribute('href')`)).toBe('tel:01159518888')
+      expect(await textOf(view, '[role="dialog"]')).toContain('0115 951 8888')
+
+      await click(view, '[data-sheet-back]')
+      await waitFor(view, `!document.querySelector('[data-test="emergency-call-now"]')`)
+      await click(view, '[data-test="emergency-call-999"]')
+      await waitFor(view, `document.querySelector('[data-test="emergency-call-now"]')?.getAttribute('href') === 'tel:999'`)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 })

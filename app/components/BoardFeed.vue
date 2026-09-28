@@ -32,8 +32,9 @@ const sideTone: Record<BoardSide, string> = { FOH: 'text-secondary', BACKSTAGE: 
 
 <template>
   <NightBlock title="Current state">
+    <!-- Stacked at any window: both ends read the board in a phone-wide column (issue 1520). -->
     <div
-      class="grid gap-4 sm:grid-cols-[3fr_2fr]"
+      class="grid gap-4"
       data-test="board-current"
     >
       <div>
@@ -53,7 +54,7 @@ const sideTone: Record<BoardSide, string> = { FOH: 'text-secondary', BACKSTAGE: 
         </p>
       </div>
 
-      <div class="sm:text-right">
+      <div>
         <p class="text-lg">
           {{ other }}:
           <span
