@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysWhenLong } from '#shared/utils/when'
-import { nightCacheKey } from '#shared/utils/night-cache'
+import { nightCacheKey, servedCopyWins } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 import { telHref } from '#shared/utils/tonight'
@@ -36,21 +36,31 @@ interface Cards { viewerId: string, cards: Card[] }
 const request = useRequestFetch()
 const { account } = useAccount()
 
-// Rendered into the HTML, so a first-ever visit with no signal still carries the address to read
-// out (E-113 criterion 4). A failed read leaves `data` null: the empty state, not a 500.
-const { data: served } = await useAsyncData('tonight-emergency', () => request<Cards>('/api/tonight/emergency'), {
-  default: () => null as Cards | null,
-})
-
 // The same whole-night key `app/layouts/tonight.vue` primes: the device's own last-cached cards
 // open the screen with no round trip at all (criterion 2).
 const key = nightCacheKey({ screen: 'emergency-cards', night: currentShowNight(), wholeNight: true })
 const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emergency'))
 
-// The served copy until the device has something of its own, then the device's: one is as old as
-// this request, the other as old as the last successful one. Its numbers are only its fetcher's.
-const cards = computed(() => emergencyCardsFor(cache.data.value ?? served.value, account.value.user?.id ?? null))
-const asOfAt = computed(() => cache.data.value ? cache.cachedAt.value : Date.now())
+// A phone navigating here renders nothing the server sent, so it opens on the device's copy at once
+// rather than on mount; a hydrating one must match the served page first.
+if (import.meta.client && !useNuxtApp().isHydrating) cache.recall()
+
+// Rendered into the HTML, so a first-ever visit with no signal still carries the address to read
+// out (E-113 criterion 4). The server alone asks: a phone has its own copy and refreshes it.
+const served = shallowRef<{ cards: Cards, at: number } | null>(null)
+useServedRead('tonight-emergency', async () => import.meta.server ? await settleRead(() => request<Cards>('/api/tonight/emergency')) : null, (read) => {
+  if (read?.kind === 'READ') served.value = { cards: read.value, at: read.at }
+})
+
+// Whichever copy is newer, the served one or the device's; its numbers are only its fetcher's.
+const shown = computed(() => {
+  const held = cache.data.value
+  const copy = served.value
+  if (copy && (!held || servedCopyWins(cache.cachedAt.value, copy.at))) return copy
+  return held ? { cards: held, at: cache.cachedAt.value } : null
+})
+const cards = computed(() => emergencyCardsFor(shown.value?.cards ?? null, account.value.user?.id ?? null))
+const asOfAt = computed(() => shown.value?.at ?? null)
 
 // Every venue keeps 999, beside whoever its card rings first (issue 1519, 0106).
 const calls = computed(() => emergencyCalls(cards.value ?? []))

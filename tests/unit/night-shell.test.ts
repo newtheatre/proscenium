@@ -379,6 +379,7 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     'app/pages/tonight/till/index.vue',
     'app/pages/tonight/stocktake.vue',
     'app/components/NightRefusal.vue',
+    'app/pages/tonight/emergency.vue',
   ]
 
   test.each(SERVED)('%s reads its first data while the server renders, and holds no navigation for it', async (path) => {

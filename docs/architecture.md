@@ -1365,8 +1365,8 @@ waits for and ships in the page, so the first load shows none either; on a navig
 shell it arrives after the screen draws, which says Syncing meanwhile, rather than holding the phone
 on the network. Every read on the screens served this way settles through `settleRead()`
 (`app/utils/refusal.ts`), and the hub's staleness through `hubHouseAfter()` in
-`shared/utils/night-hub.ts` (issue 1521); the night report, the till, the bar shift's stocktake
-and a refusal card's help line read the same way. The till serves only what the server holds: its
+`shared/utils/night-hub.ts` (issue 1521); the night report, the till, the bar shift's stocktake,
+the emergency card and a refusal card's help line read the same way. The till serves only what the server holds: its
 session and bar (`useTillSession()`), the Bar Manager's earlier nights, and the catalogue, read on
 the server alone and kept by the phone's night cache once mounted unless its own copy is newer
 (`useNightCache().adopt()`, `servedCopyWins()`). Its basket, its queued writes and its card attempts
@@ -1732,7 +1732,11 @@ with a whole-night key (screen `emergency-cards`), so any show-night screen, not
 `/tonight/emergency` itself, leaves every venue's card cached from the first screen anybody
 signed in opens. `/tonight/emergency` then reads that same key through `useNightCache`, which is
 what makes the card open with no round trip after a device restart, exactly the old estate's gap
-the criterion names. Whole-night rather than venue-scoped, since the answer already holds every
+the criterion names. The server render also reads the cards into the page through
+`useServedRead()`, so a first-ever visit with no signal still carries every address (E-113
+criterion 4); a phone navigating from another screen opens on the device's copy during setup, with
+no network wait, and only the server asks for the served one. Whichever of the two is newer is
+drawn (`servedCopyWins()`), and the device's refresh follows once mounted. Whole-night rather than venue-scoped, since the answer already holds every
 venue running tonight. A phone may be shared, so the copy it keeps is stamped with `viewerId` and
 the screen shows its duty managers' numbers only to that account (`emergencyCardsFor`); anybody
 else sees the same cards without them. Signing out (`AuthStatus.vue`) clears every night key on
