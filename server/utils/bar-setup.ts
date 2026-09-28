@@ -191,8 +191,9 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
       }
       if (choiceGroupId && input.choice) {
         statements.push(sql`
-          INSERT INTO variant_components (id, variant_id, choice_group_id, qty, included_in_price)
-          SELECT ${context.newId()}, ${variantId}, ${choiceGroupId}, ${input.choice.qty}, ${input.choice.includedInPrice ? 1 : 0}
+          INSERT INTO variant_components (id, variant_id, choice_group_id, qty, included_in_price, choice_optional)
+          SELECT ${context.newId()}, ${variantId}, ${choiceGroupId}, ${input.choice.qty}, ${input.choice.includedInPrice ? 1 : 0},
+                 ${input.choice.optional ? 1 : 0}
           WHERE ${variantLanded}
         `)
       }

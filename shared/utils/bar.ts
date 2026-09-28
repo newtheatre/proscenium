@@ -495,11 +495,10 @@ const setupDeliveryForm = z.strictObject({
   costPence: deliveryCostField,
 })
 
-const setupChoiceForm = z.object({
-  group: choiceGroupForm,
-  qty: z.number().int().positive('A depletion is a quantity of something').max(MAX_MOVEMENT_QTY).default(1),
-  includedInPrice: z.boolean().default(false),
-})
+// The attach form's own fields, so the set-up asks nothing the product page would not (issue 1528).
+const setupChoiceForm = variantChoiceForm
+  .pick({ qty: true, includedInPrice: true, optional: true })
+  .extend({ group: choiceGroupForm })
 
 const DEFAULT_SERVING = { servingKind: 'item', label: 'Each', pricePence: null } as const
 
@@ -550,6 +549,14 @@ export const productSetupForm = z.discriminatedUnion('shape', [
     const items = value.components.map(component => component.itemId)
     if (new Set(items).size !== items.length) {
       ctx.addIssue({ code: 'custom', message: 'A stocked item appears once in a recipe, at the quantity a serving uses', path: ['components'] })
+    }
+    // Served neat, a size pours its own items alone: the product page's rule too (issue 1529).
+    if (value.choice?.optional && items.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `${value.serving.label} depletes no stocked item of its own, so served without its choice it would sell an empty glass: add an ingredient first`,
+        path: ['choice', 'optional'],
+      })
     }
   }
 })

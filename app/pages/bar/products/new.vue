@@ -130,7 +130,7 @@ interface SizeRow {
 const preset = ref<MeasurePresetId | null>(null)
 const sizes = ref<SizeRow[]>([])
 const components = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 25 }])
-const choice = reactive({ offered: false, name: '', includedInPrice: false, qty: 1 })
+const choice = reactive({ offered: false, name: '', includedInPrice: false, optional: false, qty: 1 })
 const choiceOptions = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 1 }])
 const opening = reactive({ offered: false, qty: 1, costPounds: null as number | null })
 
@@ -402,6 +402,7 @@ function body(): Record<string, unknown> {
           },
           qty: choice.qty,
           includedInPrice: choice.includedInPrice,
+          optional: choice.optional,
         }
       : null,
   }
@@ -1051,6 +1052,13 @@ function moveFocus(step: number): void {
               label="The choice is included in the price"
               description="The mixer costs nothing extra and still depletes stock."
               data-test="choice-included"
+            />
+
+            <USwitch
+              v-model="choice.optional"
+              label="Can be served without one"
+              description="Ticked for a spirit that may be served neat: the till offers no mixer as an answer, and pours nothing from the group."
+              data-test="choice-optional"
             />
           </div>
         </div>
