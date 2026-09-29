@@ -266,7 +266,7 @@ export async function openView(size?: { width: number, height: number }): Promis
 }
 
 const SETTLE_TIMEOUT_MS = 15_000
-const INTERACTIVE_TIMEOUT_MS = 120_000
+const INTERACTIVE_TIMEOUT_MS = 50_000
 
 // Mounted is not interactive: until Suspense resolves the screen is server-rendered markup with
 // no listeners, and the marker must be inside the page, because chrome is patched before it.
