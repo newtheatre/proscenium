@@ -1,2 +1,2 @@
 [test]
-preload = ["./tests/helpers/busy-timeout.ts"]
+preload = ["./tests/helpers/busy-timeout.ts", "./tests/helpers/log-refusals.ts"]
