@@ -176,6 +176,8 @@ describe.skipIf(skip !== null)('the catalogue answers without an account (G-128)
 
   test('a signed-in member can request a module directly from the catalogue card (G-129)', async () => {
     const id = await addModule({ name: 'Rigging a lantern' })
+    // A linked card puts its hook on the link laid over it, so the card is the link's parent.
+    const card = `[data-slot="root"]:has(> [data-test="catalogue-module-${id}"])`
     const view = await openView()
     try {
       await visit(view, `${app.baseURL}/sign-in`)
@@ -186,10 +188,10 @@ describe.skipIf(skip !== null)('the catalogue answers without an account (G-128)
 
       await visit(view, `${app.baseURL}/training/modules`, '[data-test="catalogue-page"]')
       await waitFor(view, `document.body.innerText.includes('Rigging a lantern')`, 30_000)
-      await click(view, `[data-test="catalogue-module-${id}"] [data-test="request-module"]`)
+      await click(view, `${card} [data-test="request-module"]`)
       await waitFor(view, `document.querySelector('[data-test="ask-note"]')`, 30_000)
       await click(view, '[data-test="ask-submit"]')
-      await waitFor(view, `document.querySelector('[data-test="catalogue-module-${id}"] [data-test="module-requested"]')`, 30_000)
+      await waitFor(view, `document.querySelector('${card} [data-test="module-requested"]')`, 30_000)
 
       // Clicking the request control did not also follow the card's own link.
       expect(await view.evaluate<string>('window.location.pathname')).toBe('/training/modules')
