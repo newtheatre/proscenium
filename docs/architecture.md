@@ -1510,8 +1510,14 @@ audience is one of that performance's two (`server/utils/night-message.ts`): its
 through `performanceTicketHoldersQuery()`, the announce composer's own resolver (0089), or its rota,
 `performanceRotaQuery()`, the claimed and confirmed slots on it. Every message goes at once as the
 transactional type (`nightMessageType()`), one `notify()` a recipient, each copy claimed first under
-`nightMessageClaim()`, the page's draft key and the person (0048), so a second press of the same
-draft reaches only those not yet reached. The send is `comms.announcement.sent` with the
+`nightMessageClaim()`, the page's draft key, the sender and the person (0048), so a second press of
+the same draft reaches only those not yet reached. A press first takes over the sender's own claims
+on that draft still `PENDING` 30 seconds after they were made, a send cut off between its claim and
+its `notify()`: `takeOverInterruptedQuery()` is one conditional `UPDATE` that moves each to
+`FAILED_FINAL` and renames its claim off the key, so the loop claims and sends that person afresh
+(0108). `created_at` is only read for the age: nothing updates it, and the takeover leaves it
+alone for the H-105 backoff and the retention prune. The answer is `{ count, alreadyOut, resent,
+stillSending }` (`draftClaimsQuery()`), and `saysNightMessageSent()` words it. The send is `comms.announcement.sent` with the
 performance, the audience, the count newly reached and `via`, never the words (0011), written in a
 `finally` so a press that fails part-way still records the copies it sent. The console composer at
 `/comms/announce` now offers **When it goes** in place of its safety tick: `sendTimingOptions()`
