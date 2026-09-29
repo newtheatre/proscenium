@@ -8,6 +8,7 @@ import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { CompRequest } from '#shared/utils/comps'
 import type { PricedBasket, SaleProduct, SaleReceipt } from '#shared/utils/sale'
 import type { ChargedReceipt } from '~/composables/useSumUpCharge'
+import type { ServedCatalogue } from '~/composables/useTillCatalogue'
 import type { AgeCheckStep } from '~/components/till/Challenge25Modal.vue'
 
 definePageMeta({ layout: 'tonight', docs: '/docs/tonight/till' })
@@ -20,6 +21,7 @@ const {
   failure,
   failureStatus,
   busy,
+  settled,
   session,
   venueId,
   sumupEnabled,
@@ -43,6 +45,8 @@ const {
   closing,
   openCloseModal,
   confirmClose,
+  read: readTill,
+  settle: settleTill,
 } = useTillSession()
 
 // What ended nights left open, for the Bar Manager alone; a till closed from it leaves the list.
@@ -51,6 +55,8 @@ const {
   failure: earlierFailure,
   answering: earlierAnswering,
   notes: earlierNotes,
+  read: readEarlier,
+  apply: applyEarlier,
   refresh: refreshEarlier,
   answer: answerEarlier,
 } = useTillEarlier()
@@ -58,10 +64,32 @@ async function confirmAnyClose(): Promise<void> {
   if (await confirmClose()) await refreshEarlier()
 }
 
+const request = useRequestFetch()
+const servedCatalogue = shallowRef<ServedCatalogue | null>(null)
+
+// In the served page: whether tonight's till is open and at which bar, its grid, and what earlier
+// nights left open. Set up before the composables below only so their first refresh is not doubled.
+useServedRead('tonight-till', async () => {
+  const [{ till, catalogue }, earlier] = await Promise.all([
+    readTill().then(async (till) => {
+      const status = till.status.kind === 'READ' ? till.status.value : null
+      return { till, catalogue: await readServedCatalogue(request, status?.session ?? null, status?.venueId ?? null) }
+    }),
+    readEarlier(),
+  ])
+  return { till, earlier, catalogue }
+}, (served) => {
+  servedCatalogue.value = served.catalogue
+  settleTill(served.till)
+  applyEarlier(served.earlier)
+})
+
 // The catalogue, held on the device so venue Wi-Fi dropping mid-service never blanks the grid
 // (K-103).
 const {
   catalogue,
+  sale,
+  saleAt,
   categories,
   products,
   productsIn,
@@ -69,7 +97,7 @@ const {
   selectedDiscountId,
   tabHolders,
   selectedTabHolderId,
-} = useTillCatalogue(session, venueId)
+} = useTillCatalogue(session, venueId, servedCatalogue)
 
 // The device's own answer, not a probe: pricing is a round trip, so what the till can say about
 // a dropped connection is what it can charge on (K-103, issue 1150 item 7).
@@ -110,7 +138,7 @@ const {
   walkUpGuest,
   walkUpGuestIncomplete,
   resetTickets,
-} = useTillTickets(venueId)
+} = useTillTickets(venueId, session)
 
 const {
   basket,
@@ -157,6 +185,13 @@ const {
   requestPrice: body => $fetch<PricedBasket>('/api/till/price', { method: 'POST', body }),
   recordAgeCheck: body => $fetch('/api/tonight/age-checks', { method: 'POST', body }),
   online,
+})
+
+// Nothing about the session is drawn until the screen has its answer, so no Open till comes and goes.
+const tillClosed = computed(() => settled.value && !session.value)
+const hint = computed(() => {
+  if (tillClosed.value) return 'One till for the whole night. Everyone at this bar sells against it.'
+  return session.value && basketEmpty.value ? 'Tap an item to add it; one with several sizes asks which. Quantities and lines are editable before payment.' : undefined
 })
 
 // A collapsed reminder above the pinned actions, so checking the basket does not mean scrolling
@@ -505,7 +540,7 @@ const chargedOn = computed(() => {
 
 // Before the bar's first count, whoever can take a stocktake is told how many drinks the charge would
 // refuse (issue 1297, 0080); a shift cannot open one, so it is not shown one.
-const uncounted = computed(() => (catalogue.data.value && can(useViewer().value, takeStocktakes) ? uncountedProducts(catalogue.data.value) : 0))
+const uncounted = computed(() => (sale.value && can(useViewer().value, takeStocktakes) ? uncountedProducts(sale.value) : 0))
 
 // A walk-up's door pass, printed from the counter laptop (F-123 criterion 4).
 function printPass(): void {
@@ -552,12 +587,10 @@ const basketBindings = computed(() => ({
   <div>
     <NightScreen
       title="Till"
-      :hint="session
-        ? (basketEmpty ? 'Tap an item to add it; one with several sizes asks which. Quantities and lines are editable before payment.' : undefined)
-        : 'One till for the whole night. Everyone at this bar sells against it.'"
-      :empty="!session"
-      :stale="session ? catalogue.cachedAt.value : syncedAt"
-      :busy="busy || catalogue.pending.value"
+      :hint="hint"
+      :empty="tillClosed"
+      :stale="session ? saleAt : syncedAt"
+      :busy="busy || !settled || (catalogue.pending.value && !sale)"
       :refused="failure && !needsVenue && !failure.enrolPath && failureStatus === 403 ? failure.message : null"
     >
       <TillEarlierNights
@@ -662,7 +695,7 @@ const basketBindings = computed(() => ({
         />
 
         <p
-          v-if="catalogue.data.value && products.length === 0"
+          v-if="sale && products.length === 0"
           data-test="catalogue-empty"
           class="text-sm text-muted"
         >
@@ -902,7 +935,7 @@ const basketBindings = computed(() => ({
       </div>
 
       <div
-        v-else
+        v-else-if="tillClosed"
         class="space-y-3"
       >
         <p data-test="till-closed">
@@ -1047,7 +1080,7 @@ const basketBindings = computed(() => ({
           />
         </template>
         <NightAction
-          v-if="!session"
+          v-if="tillClosed"
           label="Open till"
           icon="i-lucide-lock-open"
           :loading="busy"

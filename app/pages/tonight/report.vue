@@ -4,12 +4,13 @@ import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
 import { OFFICER_SIGN_OFF_NOTICE, holdsTheClose, openAtClose, saysSignOffOpens, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
+import { newestRequest } from '#shared/utils/night-cache'
 import { saysTeamHolder } from '#shared/utils/tonight'
 import { saysClock, saysDay } from '#shared/utils/when'
 import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { LateAddition } from '#shared/utils/sumup'
 import type { Category, Severity } from '#shared/utils/incidents'
-import type { OfficerBypassLine } from '#shared/utils/night-authority'
+import type { NightAuthorityVia, OfficerBypassLine } from '#shared/utils/night-authority'
 import type { NightReportSigner } from '#shared/utils/night-signoff'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
@@ -38,76 +39,101 @@ interface Report {
   signedOff: { closingNote: string, signedByName: string | null, signedVia: NightReportSigner, signedAt: number } | null
   addenda: { id: string, note: string, addedByName: string, addedAt: number }[]
 }
-interface Choice { id: string, showTitle: string, startsAt: number }
 
 const route = useRoute()
 const request = useRequestFetch()
 const toast = useToast()
 
-const syncedAt = ref<Date | null>(null)
-const busy = ref(true)
+const syncedAt = ref<number | null>(null)
+const busy = ref(false)
 const failure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const report = ref<Report | null>(null)
 const performanceId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
 const ambiguous = ref(false)
+const { now, stamp } = useNightClock()
 
 // Asked for the duty manager's own role: the layout's badge prefers any shift, and a door shift
 // held alongside the officer role would hide that this sign-off is a stand-in (0044).
-const via = ref<'SHIFT' | 'OFFICER' | null>(null)
+const via = ref<NightAuthorityVia | null>(null)
 const choices = ref<{ performanceId: string, showTitle: string, startsAt: number }[]>([])
 
-let asking = 0
+const asking = newestRequest()
 
 // Scoped to the performance on screen, because a shift on the other house must not hide that
-// this one is signed as a stand-in; only the unscoped answer lists the houses to choose from.
-async function loadAuthority(): Promise<void> {
-  const mine = ++asking
-  const asked = performanceId.value
-  try {
-    const query = asked ? { role: 'DUTY_MANAGER', performanceId: asked } : { role: 'DUTY_MANAGER' }
-    const answered = await request<{ via: 'SHIFT' | 'OFFICER', performances: Choice[] }>('/api/tonight/authority', { query })
-    if (mine !== asking) return
-    via.value = answered.via
-    if (!asked) choices.value = answered.performances.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt }))
-  }
-  catch {
-    if (mine === asking) via.value = null
-  }
+// this one is signed as a stand-in; only the unscoped answer, the shell's own, lists the houses.
+function readAuthority(asked: string | null): Promise<SettledRead<NightAuthorityAnswer>> {
+  return askNightAuthority('DUTY_MANAGER', asked ?? undefined)
 }
 
+function applyAuthority(asked: string | null, answered: SettledRead<NightAuthorityAnswer>): void {
+  if (answered.kind === 'FAILED') {
+    via.value = null
+    return
+  }
+  via.value = answered.value.via
+  if (!asked) choices.value = answered.value.performances.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt }))
+}
+
+async function loadAuthority(): Promise<void> {
+  const mine = asking()
+  const asked = performanceId.value
+  const answered = await readAuthority(asked)
+  if (mine.newest()) applyAuthority(asked, answered)
+}
+
+function readDraft(asked: string | null): Promise<SettledRead<Report>> {
+  return settleRead(() => request<Report>('/api/tonight/report', { query: asked ? { performanceId: asked } : {} }))
+}
+
+function applyDraft(asked: string | null, answered: SettledRead<Report>): void {
+  stamp(answered.at)
+  if (answered.kind === 'FAILED') {
+    ambiguous.value = !asked && answered.status === 400
+    failure.value = answered.failure
+    // Refused outright: one card, and no sign-off left to press (issue 1304).
+    refusal.value = refusalOf(answered)
+    return
+  }
+  report.value = answered.value
+  performanceId.value = answered.value.performanceId
+  ambiguous.value = false
+  failure.value = null
+  refusal.value = null
+  syncedAt.value = answered.at
+}
+
+// The refusal card stays through a re-read, as before, so a refused viewer is never shown the work.
 async function load(): Promise<void> {
   busy.value = true
   failure.value = null
+  ambiguous.value = false
   try {
-    const read = await request<Report>('/api/tonight/report', { query: performanceId.value ? { performanceId: performanceId.value } : {} })
-    report.value = read
-    performanceId.value = read.performanceId
-    ambiguous.value = false
-    refusal.value = null
-    syncedAt.value = new Date()
-  }
-  catch (refused) {
-    ambiguous.value = !performanceId.value && refusalStatus(refused) === 400
-    failure.value = refusalText(refused)
-    // Refused outright: one card, and no sign-off left to press (issue 1304).
-    refusal.value = refusalStatus(refused) === 403 ? failure.value : null
+    const asked = performanceId.value
+    applyDraft(asked, await readDraft(asked))
   }
   finally {
     busy.value = false
   }
 }
 
+// In the served page, so the draft, the houses to choose between or the refusal is what a phone
+// paints first; a switch between houses reads again on the phone.
+const waiting = useServedRead(`tonight-report-${performanceId.value ?? 'tonight'}`, async () => {
+  const asked = performanceId.value
+  const [authority, draft] = await Promise.all([readAuthority(asked), readDraft(asked)])
+  return { asked, authority, draft }
+}, (served) => {
+  applyAuthority(served.asked, served.authority)
+  applyDraft(served.asked, served.draft)
+})
+const settling = computed(() => busy.value || waiting.value)
+
 function choose(chosen: string): void {
   performanceId.value = chosen
   loadAuthority()
   load()
 }
-
-onMounted(() => {
-  loadAuthority()
-  load()
-})
 
 const signedOff = computed(() => report.value?.signedOff ?? null)
 const incidents = computed(() => (report.value?.incidents ?? []).filter(one => one.supersededBy === null))
@@ -137,19 +163,18 @@ const figures = computed(() => {
   ]
 })
 
-// Read every half minute, so Sign off and close arrives when the curtain comes down on a screen
-// already open. A draft that names no curtain is never held back by one (0078).
-const now = ref(Date.now() / 1000)
+// Read every half minute once mounted, so Sign off and close arrives when the curtain comes down on a
+// screen already open. A draft that names no curtain is never held back by one (0078).
 let clock: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
-  clock = setInterval(() => (now.value = Date.now() / 1000), 30_000)
+  clock = setInterval(() => stamp(Date.now()), 30_000)
 })
 onUnmounted(() => {
   if (clock) clearInterval(clock)
 })
 
 const curtainDownAt = computed(() => report.value?.curtainDownAt ?? null)
-const curtainDown = computed(() => curtainDownAt.value === null || now.value >= curtainDownAt.value)
+const curtainDown = computed(() => curtainDownAt.value === null || now.value >= curtainDownAt.value * 1000)
 // After the curtain the post-show items sit here with Tick in place, and the incidents are the
 // sign-off's own to review (issue 1315, E-114 criterion 3).
 const openItems = computed(() => openAtClose(report.value?.checklist ?? []))
@@ -192,7 +217,7 @@ async function signOff(): Promise<void> {
     :refused="refusal"
     hint="The report fills itself in. After the curtain, answer what is left, add a closing note, and sign off and close."
     :stale="syncedAt"
-    :busy="busy"
+    :busy="settling"
   >
     <div
       v-if="ambiguous && choices.length > 0"

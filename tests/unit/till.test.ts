@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
-import { TILL_VENUE_DEVICE_KEY, chargePaths, recallTillVenue, rememberTillVenue, rememberedBarAnswers, saysTillLeftOpen, tillScopeForm } from '#shared/utils/till'
+import { TILL_VENUE_DEVICE_KEY, chargePaths, heldTillVenue, recallTillVenue, saysTillLeftOpen, tillRefusalStep, tillScopeForm, tillVenueExpires } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -93,43 +93,43 @@ function aStore() {
 
 describe('the device remembers tonight\'s bar, and only tonight\'s (F-124 criterion 3, 0014, issue 1257)', () => {
   test('a bar remembered tonight is recalled tonight', () => {
-    const store = aStore()
-    rememberTillVenue(store, '2026-09-24', 'venue-1')
-    expect(recallTillVenue(store, '2026-09-24')).toBe('venue-1')
+    expect(heldTillVenue({ night: '2026-09-24', venueId: 'venue-1' }, '2026-09-24')).toBe('venue-1')
   })
 
   test('the next show night asks again rather than opening last night\'s bar', () => {
+    expect(heldTillVenue({ night: '2026-09-24', venueId: 'venue-1' }, '2026-09-25')).toBeNull()
+  })
+
+  test('something unreadable is nothing remembered, not a throw', () => {
+    expect(heldTillVenue(null, '2026-09-24')).toBeNull()
+    expect(heldTillVenue('venue-1', '2026-09-24')).toBeNull()
+    expect(heldTillVenue({ night: '2026-09-24', venueId: 7 }, '2026-09-24')).toBeNull()
+  })
+
+  test('the cookie ends with its show night, at 04:00 London the next morning', () => {
+    // 04:00 BST on Friday 25 September 2026 is 03:00 UTC.
+    expect(tillVenueExpires('2026-09-24').toISOString()).toBe('2026-09-25T03:00:00.000Z')
+  })
+
+  test('a bar an earlier build kept on the device is read once, tonight\'s only', () => {
     const store = aStore()
-    rememberTillVenue(store, '2026-09-24', 'venue-1')
+    store.setItem(TILL_VENUE_DEVICE_KEY, JSON.stringify({ night: '2026-09-24', venueId: 'venue-1' }))
+    expect(recallTillVenue(store, '2026-09-24')).toBe('venue-1')
     expect(recallTillVenue(store, '2026-09-25')).toBeNull()
-  })
-
-  test('a later choice replaces the earlier one', () => {
-    const store = aStore()
-    rememberTillVenue(store, '2026-09-24', 'venue-1')
-    rememberTillVenue(store, '2026-09-24', 'venue-2')
-    expect(recallTillVenue(store, '2026-09-24')).toBe('venue-2')
-  })
-
-  test('something unreadable under the key is nothing remembered, not a throw', () => {
-    const store = aStore()
     store.setItem(TILL_VENUE_DEVICE_KEY, 'not json')
-    expect(recallTillVenue(store, '2026-09-24')).toBeNull()
-    store.setItem(TILL_VENUE_DEVICE_KEY, JSON.stringify({ night: '2026-09-24', venueId: 7 }))
     expect(recallTillVenue(store, '2026-09-24')).toBeNull()
   })
 
   test('a device that refuses storage still opens the till', () => {
     const refusing = {
-      getItem: () => { throw new Error('denied') },
-      setItem: () => { throw new Error('denied') },
+      getItem: (): string | null => {
+        throw new Error('denied')
+      },
     }
-    expect(() => rememberTillVenue(refusing, '2026-09-24', 'venue-1')).not.toThrow()
     expect(recallTillVenue(refusing, '2026-09-24')).toBeNull()
   })
 })
 
-// Decision 0096, F-124 criterion 1 as amended: one charge button under the thumb, whichever path.
 describe('the till shows one way to charge, and keying by hand is the fallback link (0096)', () => {
   test('a phone with the hand-off offers SumUp, with keying the figure as the secondary link', () => {
     expect(chargePaths(true, false)).toEqual({ primary: 'sumup', secondary: 'typed' })
@@ -145,19 +145,34 @@ describe('the till shows one way to charge, and keying by hand is the fallback l
   })
 })
 
-describe('the remembered bar answers only the guard\'s own question (F-125, issue 1257)', () => {
-  test('a night that resolves its bar unaided never reaches for the device', () => {
-    expect(rememberedBarAnswers(403, undefined, 'venue-1')).toBe(false)
-    expect(rememberedBarAnswers(401, undefined, 'venue-1')).toBe(false)
-  })
+// The remembered bar answers only the guard's own question, and one that is refused is forgotten
+// (F-125, issue 1257). A cookie, so the served page asks it too (issue 1521).
+describe('what the till does with the guard\'s refusal (F-125, issue 1257, issue 1521)', () => {
+  const asked = (refusal: number | undefined, over: Partial<Parameters<typeof tillRefusalStep>[1]> = {}): string =>
+    tillRefusalStep(refusal, { usingDevice: false, ...over })
 
   test('the guard asking which bar is answered by tonight\'s remembered one', () => {
-    expect(rememberedBarAnswers(400, undefined, 'venue-1')).toBe(true)
+    expect(asked(400, { remembered: 'venue-1' })).toBe('ASK_WITH_DEVICE')
   })
 
-  test('a bar named in the link, or nothing remembered, leaves the question to the picker', () => {
-    expect(rememberedBarAnswers(400, 'venue-2', 'venue-1')).toBe(false)
-    expect(rememberedBarAnswers(400, undefined, undefined)).toBe(false)
+  test('with nothing remembered, the question is the picker', () => {
+    expect(asked(400)).toBe('SHOW')
+    expect(asked(400, { remembered: null })).toBe('SHOW')
+  })
+
+  test('a bar named in the address is never second-guessed by the phone', () => {
+    expect(asked(400, { queried: 'venue-2', remembered: 'venue-1' })).toBe('SHOW')
+  })
+
+  test('a night that resolves its bar unaided never reaches for the device', () => {
+    expect(asked(403, { remembered: 'venue-1' })).toBe('SHOW')
+    expect(asked(401, { remembered: 'venue-1' })).toBe('SHOW')
+    expect(asked(undefined, { remembered: 'venue-1' })).toBe('SHOW')
+  })
+
+  test('a remembered bar that no longer answers is dropped, whatever the refusal', () => {
+    expect(asked(403, { usingDevice: true, remembered: 'venue-1' })).toBe('FORGET_DEVICE')
+    expect(asked(undefined, { usingDevice: true, remembered: 'venue-1' })).toBe('FORGET_DEVICE')
   })
 })
 

@@ -7,14 +7,13 @@ defineProps<{ says: string }>()
 
 interface TeamMember { role: string, filled: boolean, name: string | null }
 
-// Tonight's team answers any of the three roles; somebody with none reads the job instead.
+const request = useRequestFetch()
+
+// Tonight's team answers any of the three roles; somebody with none reads the job instead. In the
+// served page, so the line names the duty manager from the first paint (issue 1521).
 const team = ref<TeamMember[] | null>(null)
-onMounted(async () => {
-  try {
-    const answered = await $fetch<{ performances: { team: TeamMember[] }[] }>('/api/tonight/team')
-    team.value = answered.performances.flatMap(one => one.team)
-  }
-  catch { /* the job is named instead of the person */ }
+useServedRead('night-refusal-team', () => settleRead(() => request<{ performances: { team: TeamMember[] }[] }>('/api/tonight/team')), (answered) => {
+  if (answered.kind === 'READ') team.value = answered.value.performances.flatMap(one => one.team)
 })
 </script>
 

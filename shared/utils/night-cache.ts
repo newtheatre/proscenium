@@ -181,6 +181,12 @@ export async function refreshNightCache<T>(store: NightCacheStore, key: NightCac
   return stored ?? { key, night: nightCacheKeyParts(key)!.night, cachedAt: at.getTime(), data }
 }
 
+// A copy the server rendered is from this very request, so it stands until the phone's own read has
+// answered this visit; a device copy alone is a navigation's. No two clocks are compared (issue 1521).
+export function nightCopyShown<T>(served: T | null, device: T | null, fetchedHere: boolean): T | null {
+  return fetchedHere ? device : (served ?? device)
+}
+
 export interface NightRequest {
   newest: () => boolean
   answers: () => boolean

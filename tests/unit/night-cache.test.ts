@@ -9,6 +9,7 @@ import {
   newestRequest,
   nightCacheKey,
   nightCacheKeyParts,
+  nightCopyShown,
   pruneNightCache,
   readNightCache,
   refreshNightCache,
@@ -195,6 +196,24 @@ describe('a failed load never overwrites what the screen is showing (criterion 2
   })
 })
 
+// Issue 1521: a copy the server rendered is from this very request, so it stands until the phone's own
+// read answers; a device copy alone is a navigation's. No clock is compared with another.
+describe('a served copy against the device\'s own', () => {
+  test('the served copy stands over whatever the device holds, however its clock reads', () => {
+    expect(nightCopyShown('served', 'device', false)).toBe('served')
+    expect(nightCopyShown('served', null, false)).toBe('served')
+  })
+
+  test('with nothing served, a navigation draws the device\'s copy', () => {
+    expect(nightCopyShown(null, 'device', false)).toBe('device')
+    expect(nightCopyShown(null, null, false)).toBeNull()
+  })
+
+  test('once the phone\'s own read has answered this visit, its copy is drawn', () => {
+    expect(nightCopyShown('served', 'device', true)).toBe('device')
+  })
+})
+
 describe('a night ends and its cache goes with it', () => {
   test('other nights are dropped, tonight is kept, and nothing else is touched', () => {
     const store = memoryNightCacheStore()
@@ -290,6 +309,36 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
       expect(cache.live.value).toBe(true)
       expect(readNightCache(store, key)?.data).toEqual({ admitted: 9 })
       expect(readNightCache(store, lastNight)).toBeNull()
+    })
+  })
+
+  test('a served copy is shown over the device\'s until this visit\'s own read answers, and a failure after it keeps that answer', async () => {
+    await inScope(async () => {
+      const store = memoryNightCacheStore()
+      writeNightCache(store, key, { admitted: 3 }, new Date('2026-10-17T18:12:00Z'))
+      const served = ref({ data: { admitted: 5 }, at: Date.parse('2026-10-17T18:00:00Z') })
+      let fails = false
+      const cache = useNightCache<{ admitted: number }>(key, () => fails ? Promise.reject(new Error('offline')) : Promise.resolve({ admitted: 9 }), { store, immediate: false, served })
+
+      cache.recall()
+      expect(cache.shown.value).toEqual({ admitted: 5 })
+      expect(cache.shownAt.value).toBe(served.value.at)
+      await cache.refresh()
+      expect(cache.shown.value).toEqual({ admitted: 9 })
+      fails = true
+      await cache.refresh()
+      expect(cache.shown.value).toEqual({ admitted: 9 })
+    })
+  })
+
+  test('with nothing served, the device\'s copy is what is shown', async () => {
+    await inScope(() => {
+      const store = memoryNightCacheStore()
+      writeNightCache(store, key, { admitted: 3 }, new Date('2026-10-17T18:12:00Z'))
+      const cache = useNightCache<{ admitted: number }>(key, () => Promise.resolve({ admitted: 9 }), { store, immediate: false, served: ref(null) })
+      cache.recall()
+      expect(cache.shown.value).toEqual({ admitted: 3 })
+      expect(cache.shownAt.value).toBe(Date.parse('2026-10-17T18:12:00Z'))
     })
   })
 

@@ -1,6 +1,7 @@
 import { listFailureFrom } from './useListFailure'
 import { can, workTheTill } from '#shared/utils/abilities'
 import type { ListFailure } from './useListFailure'
+import type { SettledRead } from '~/utils/refusal'
 import type { ResolveOutcome, SumupAttemptStatus } from '#shared/utils/sumup'
 import type { EarlierTillLeftOpen } from '#shared/utils/till'
 
@@ -17,14 +18,18 @@ export function useTillEarlier() {
   // A charge taken and not recorded is abandoned only with a word on where the money went.
   const notes = ref<Record<string, string>>({})
 
+  // Null for anybody but the Bar Manager, who alone is asked.
+  function read(): Promise<SettledRead<EarlierTillLeftOpen, ListFailure> | null> {
+    return offered.value ? settleReadWith(() => request<EarlierTillLeftOpen>('/api/till/earlier'), listFailureFrom) : Promise.resolve(null)
+  }
+
+  function apply(answered: SettledRead<EarlierTillLeftOpen, ListFailure> | null): void {
+    if (answered?.kind === 'READ') left.value = answered.value
+    else if (answered) failure.value = answered.failure
+  }
+
   async function refresh(): Promise<void> {
-    if (!offered.value) return
-    try {
-      left.value = await request<EarlierTillLeftOpen>('/api/till/earlier')
-    }
-    catch (refused) {
-      failure.value = listFailureFrom(refused)
-    }
+    apply(await read())
   }
 
   async function answer(id: string, outcome: ResolveOutcome): Promise<void> {
@@ -47,7 +52,5 @@ export function useTillEarlier() {
     }
   }
 
-  onMounted(refresh)
-
-  return { offered, left, failure, answering, notes, refresh, answer }
+  return { offered, left, failure, answering, notes, read, apply, refresh, answer }
 }

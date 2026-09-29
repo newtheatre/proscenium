@@ -398,9 +398,9 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
 
   test('a screen\'s served authority reuses the answer the shell asked in the same request, and a phone asks afresh', async () => {
     const shell = await read('app/composables/useNightShell.ts')
-    expect(shell).toContain('const seeded = import.meta.server ? useNightAuthority().value.answers[role] : undefined')
-    for (const [path, role] of [['app/pages/tonight/door/index.vue', 'DOOR'], ['app/pages/tonight/message.vue', 'DUTY_MANAGER'], ['app/pages/tonight/incidents/index.vue', 'ANY'], ['app/pages/tonight/age-checks/index.vue', 'ANY']] as const) {
-      expect(`${path}: ${(await read(path)).includes(`askNightAuthority('${role}')`)}`).toBe(`${path}: true`)
+    expect(shell).toContain('import.meta.server && !performanceId ? useNightAuthority().value.answers[role] : undefined')
+    for (const [path, role] of [['app/pages/tonight/door/index.vue', 'DOOR'], ['app/pages/tonight/message.vue', 'DUTY_MANAGER'], ['app/pages/tonight/incidents/index.vue', 'ANY'], ['app/pages/tonight/age-checks/index.vue', 'ANY'], ['app/pages/tonight/report.vue', 'DUTY_MANAGER']] as const) {
+      expect(`${path}: ${(await read(path)).includes(`askNightAuthority('${role}'`)}`).toBe(`${path}: true`)
     }
   })
 
@@ -418,6 +418,11 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     'app/pages/tonight/age-checks/index.vue',
     'app/pages/tonight/message.vue',
     'app/components/NightCompQueue.vue',
+    'app/pages/tonight/report.vue',
+    'app/pages/tonight/till/index.vue',
+    'app/pages/tonight/stocktake.vue',
+    'app/components/NightRefusal.vue',
+    'app/pages/tonight/emergency.vue',
   ]
 
   test.each(SERVED)('%s reads its first data while the server renders, and holds no navigation for it', async (path) => {
@@ -426,11 +431,38 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     expect(source).not.toContain('await useAsyncData(')
   })
 
-  test('the hub and the glance judge the running house by one clock', async () => {
-    for (const path of ['app/pages/tonight/index.vue', 'app/pages/tonight/glance.vue']) {
+  test('the hub, the glance and the night report judge the running house and the curtain by one clock', async () => {
+    for (const path of ['app/pages/tonight/index.vue', 'app/pages/tonight/glance.vue', 'app/pages/tonight/report.vue']) {
       const source = await read(path)
       expect(`${path}: ${source.includes('useNightClock()')}`).toBe(`${path}: true`)
       expect(`${path}: ${source.includes('Date.now() / 1000')}`).toBe(`${path}: false`)
+    }
+  })
+
+  // An onMounted whose first act is a read is the shape issue 1521 removed: the page then paints first.
+  const READS_ON_MOUNT = /onMounted\(\s*(async\s*)?(\(\)\s*=>\s*\{?\s*(return\s+|void\s+|await\s+)?)?(load\w*|refresh\w*|\$fetch|request)\b/
+
+  test.each([
+    'app/pages/tonight/report.vue',
+    'app/pages/tonight/till/index.vue',
+    'app/composables/useTillSession.ts',
+    'app/composables/useTillEarlier.ts',
+    'app/components/NightRefusal.vue',
+  ])('%s takes no first read once mounted', async (path) => {
+    expect(await read(path)).not.toMatch(READS_ON_MOUNT)
+  })
+
+  test('a watcher set up after the served read fills its source also runs once mounted, through one helper', async () => {
+    for (const path of ['app/composables/useTillCatalogue.ts', 'app/composables/useSumUpCharge.ts', 'app/composables/useTillTickets.ts']) {
+      expect(`${path}: ${(await read(path)).includes('watchSinceMount(')}`).toBe(`${path}: true`)
+    }
+  })
+
+  test('the basket and card attempts stay the device\'s, and are never served', async () => {
+    const till = await read('app/pages/tonight/till/index.vue')
+    const served = till.slice(till.indexOf('useServedRead('), till.indexOf('\n})', till.indexOf('useServedRead(')))
+    for (const device of ['useTillBasket', 'useSumUpCharge', 'sumup.', 'basket']) {
+      expect(`${device}: ${served.includes(device)}`).toBe(`${device}: false`)
     }
   })
 })

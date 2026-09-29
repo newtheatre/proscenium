@@ -1,4 +1,5 @@
 import { saysMoney } from './bar'
+import { showNightBounds } from './show-night'
 import { plural } from './text'
 import { z } from 'zod'
 import type { NightCacheStore } from './night-cache'
@@ -91,28 +92,41 @@ export function chargePaths(sumupAvailable: boolean, onTab: boolean): { primary:
 }
 
 // The bar this device opened tonight, so a bare link to the till (the SumUp app's return in a
-// fresh tab, issue 1257) opens there rather than asking again. Kept for its show night only (0014).
-export const TILL_VENUE_DEVICE_KEY = 'nnt-till-venue'
+// fresh tab, issue 1257) opens there rather than asking. A cookie, so the served page opens it too.
+export const TILL_VENUE_COOKIE = 'nnt-till-venue'
 
-export function rememberTillVenue(store: Pick<NightCacheStore, 'setItem'>, night: string, venueId: string): void {
-  try {
-    store.setItem(TILL_VENUE_DEVICE_KEY, JSON.stringify({ night, venueId }))
-  }
-  catch { /* a device that keeps nothing asks which bar again */ }
+export interface HeldTillVenue { night: string, venueId: string }
+
+// Tonight's remembered bar: another night's, or anything unreadable, is nothing remembered (0014).
+export function heldTillVenue(held: unknown, night: string): string | null {
+  const one = held as { night?: unknown, venueId?: unknown } | null | undefined
+  return one?.night === night && typeof one.venueId === 'string' ? one.venueId : null
 }
+
+// Kept until the night it names ends at 04:00 London, and not a moment longer (0014).
+export function tillVenueExpires(night: string): Date {
+  return showNightBounds(night).to
+}
+
+// Where an earlier build kept it on the device, read once so a phone mid-night keeps its bar.
+export const TILL_VENUE_DEVICE_KEY = 'nnt-till-venue'
 
 export function recallTillVenue(store: Pick<NightCacheStore, 'getItem'>, night: string): string | null {
   try {
-    const held = JSON.parse(store.getItem(TILL_VENUE_DEVICE_KEY) ?? 'null') as { night?: unknown, venueId?: unknown } | null
-    return held?.night === night && typeof held.venueId === 'string' ? held.venueId : null
+    return heldTillVenue(JSON.parse(store.getItem(TILL_VENUE_DEVICE_KEY) ?? 'null'), night)
   }
   catch {
     return null
   }
 }
 
-// Only the guard's own question (400, no bar named) is answered from the device; a night the
-// server resolves unaided opens where it says, so a stale memory cannot pick the wrong bar.
-export function rememberedBarAnswers(refusal: number | undefined, queried: string | undefined, remembered: string | undefined): boolean {
-  return refusal === 400 && !queried && Boolean(remembered)
+export type TillRefusalStep = 'SHOW' | 'ASK_WITH_DEVICE' | 'FORGET_DEVICE'
+
+export interface TillRefusalContext { queried?: string, remembered?: string | null, usingDevice: boolean }
+
+// Only the guard's own question (400, no bar named) is answered from the device, so a night the
+// server resolves unaided opens where it says; a remembered bar that is refused is forgotten.
+export function tillRefusalStep(refusal: number | undefined, at: TillRefusalContext): TillRefusalStep {
+  if (at.usingDevice) return 'FORGET_DEVICE'
+  return refusal === 400 && !at.queried && at.remembered ? 'ASK_WITH_DEVICE' : 'SHOW'
 }

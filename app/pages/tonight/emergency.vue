@@ -37,20 +37,19 @@ const request = useRequestFetch()
 const { account } = useAccount()
 
 // Rendered into the HTML, so a first-ever visit with no signal still carries the address to read
-// out (E-113 criterion 4). A failed read leaves `data` null: the empty state, not a 500.
-const { data: served } = await useAsyncData('tonight-emergency', () => request<Cards>('/api/tonight/emergency'), {
-  default: () => null as Cards | null,
-})
+// out (E-113 criterion 4); a phone navigating here opens on its own copy instead.
+const served = shallowRef<{ data: Cards, at: number } | null>(null)
+useServedRead('tonight-emergency', () => settleRead(() => request<Cards>('/api/tonight/emergency')), (read) => {
+  if (read.kind === 'READ') served.value = { data: read.value, at: read.at }
+}, { serverOnly: true })
 
 // The same whole-night key `app/layouts/tonight.vue` primes: the device's own last-cached cards
-// open the screen with no round trip at all (criterion 2).
+// open a navigation with no round trip at all (criterion 2), and the served ones stand until its refresh.
 const key = nightCacheKey({ screen: 'emergency-cards', night: currentShowNight(), wholeNight: true })
-const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emergency'))
+const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emergency'), { served, hydrating: useNuxtApp().isHydrating })
 
-// The served copy until the device has something of its own, then the device's: one is as old as
-// this request, the other as old as the last successful one. Its numbers are only its fetcher's.
-const cards = computed(() => emergencyCardsFor(cache.data.value ?? served.value, account.value.user?.id ?? null))
-const asOfAt = computed(() => cache.data.value ? cache.cachedAt.value : Date.now())
+// Its numbers are only its fetcher's (A-114).
+const cards = computed(() => emergencyCardsFor(cache.shown.value, account.value.user?.id ?? null))
 
 // Every venue keeps 999, beside whoever its card rings first (issue 1519, 0106).
 const calls = computed(() => emergencyCalls(cards.value ?? []))
@@ -92,7 +91,7 @@ function isolation(one: Card): string[] {
 <template>
   <NightScreen
     title="Emergency"
-    :stale="asOfAt"
+    :stale="cache.shownAt.value"
     :busy="cache.pending.value && !cards"
   >
     <div class="space-y-4">

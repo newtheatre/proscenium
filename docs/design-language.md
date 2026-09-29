@@ -188,8 +188,11 @@ Eleven rules follow:
    a lazy `useAsyncData` with `useRequestFetch()` that the server render waits for and a navigation
    inside the shell does not, the screen saying Syncing and drawing nothing it may yet take away
    until it lands. So the served page draws no tile, control or badge that is then taken away, or
-   added once it has painted (issue 1521, K-102 criterion 5). A page that only wears the shell, the
-   SumUp return or a session register, never waits on the roles. Polling stays on the client, and a
+   added once it has painted (issue 1521, K-102 criterion 5). What belongs to the device is never
+   served: the till's basket and card attempts arrive once mounted. The bar a phone opened tonight
+   is its own too, but kept in a cookie the server reads, so a night that asks which bar serves the
+   remembered bar's till rather than a picker. A page that only wears the shell, the SumUp return
+   or a session register, never waits on the roles. Polling stays on the client, and a
    clock-dependent choice (the running house, doors open, the curtain) is judged by the read's own
    moment until the page has mounted (`useNightClock()`). The duty manager's comp requests wait on
    the hub too, as `NightCompQueue` under Waiting on you (issue 1304). Nothing that ends the night

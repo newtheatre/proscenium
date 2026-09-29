@@ -113,13 +113,14 @@ async function readNightAuthority(): Promise<NightAuthority> {
   }
 }
 
-function askNightAuthorityWith(request: ReturnType<typeof useRequestFetch>, role: NightAuthorityAsk): Promise<SettledRead<NightAuthorityAnswer>> {
-  return settleRead(() => request<NightAuthorityAnswer>('/api/tonight/authority', { query: role === 'ANY' ? {} : { role } }))
+function askNightAuthorityWith(request: ReturnType<typeof useRequestFetch>, role: NightAuthorityAsk, performanceId?: string): Promise<SettledRead<NightAuthorityAnswer>> {
+  const query = { ...(role === 'ANY' ? {} : { role }), ...(performanceId ? { performanceId } : {}) }
+  return settleRead(() => request<NightAuthorityAnswer>('/api/tonight/authority', { query }))
 }
 
-// A screen's own authority, as of this visit. A served render reuses the answer the shell asked in the
-// same request; a phone always asks afresh, since a shift opens only in its window (0078, E-111).
-export function askNightAuthority(role: NightAuthorityAsk): Promise<SettledRead<NightAuthorityAnswer>> {
-  const seeded = import.meta.server ? useNightAuthority().value.answers[role] : undefined
-  return seeded ? Promise.resolve(seeded) : askNightAuthorityWith(useRequestFetch(), role)
+// A screen's own authority, as of this visit, for tonight or one house. A served render reuses the
+// shell's unscoped answer from the same request; a phone always asks afresh (0078, E-111).
+export function askNightAuthority(role: NightAuthorityAsk, performanceId?: string): Promise<SettledRead<NightAuthorityAnswer>> {
+  const seeded = import.meta.server && !performanceId ? useNightAuthority().value.answers[role] : undefined
+  return seeded ? Promise.resolve(seeded) : askNightAuthorityWith(useRequestFetch(), role, performanceId)
 }

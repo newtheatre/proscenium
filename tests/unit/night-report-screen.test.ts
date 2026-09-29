@@ -76,7 +76,7 @@ describe('the report screen (issue 1053)', () => {
 describe('the officer warning and the switcher read the performance on screen (0044)', () => {
   test('authority is asked for the performance being signed off, and again on a switch', async () => {
     const source = await Bun.file(PAGE).text()
-    expect(source).toContain('{ role: \'DUTY_MANAGER\', performanceId: asked }')
+    expect(source).toContain('askNightAuthority(\'DUTY_MANAGER\', asked ?? undefined)')
     expect(source).toMatch(/function choose\(chosen: string\): void \{[^}]*loadAuthority\(\)/)
   })
 
