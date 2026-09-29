@@ -2309,8 +2309,12 @@ the in-application `health:watch` task alerts if it stays unhealthy.
 CI gates, eleven of them: `build`, `typecheck`, `lint`, `typecheck:bun`, `test`, and the six
 checkers (comments, migrations, content tokens, ledger, notifications, audit). `typecheck` and
 `typecheck:bun` are separate compilers over separate projects, and passing one says nothing about
-the other. `test:e2e` runs on every pull request into `unified/main`, in ten slices
-(`E2E_SLICE`, `scripts/run-tests.ts`), and each slice is a required check on `unified/main` (0109).
+the other. They run as parallel jobs behind one required check, `ci` (0110). `test:e2e` runs on every
+pull request into `unified/main`, in ten slices (`E2E_SLICE`, `scripts/run-tests.ts`), and each
+slice is a required check on `unified/main` (0109). A scope step (`scripts/lib/ci-scope.ts`) reads
+the pull request's diff: documentation alone skips build, typecheck, lint and the browser suites,
+a change reaching no browser journey skips the suites, and a change to suites alone runs just those
+(`E2E_SUITES`). Anything its allowlist does not name runs everything.
 
 ## Testing (0016)
 

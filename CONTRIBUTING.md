@@ -20,7 +20,10 @@ repository at speed. Read this before your first change.
 
 ## CI gates (all green before merge, no exemptions)
 
-Twelve steps, in `.github/workflows/ci.yml`. Run all of them before opening a pull request.
+Twelve steps, in `.github/workflows/ci.yml`, run as parallel jobs behind one required check named
+`ci` (0110). Run all of them before opening a pull request. A pull request touching documentation
+alone (`docs/`, and Markdown outside `content/`) skips `build`, `typecheck` and `lint`, since
+nothing it changes reaches the application; `test` and the checks always run.
 
 1. `build`.
 2. `typecheck`, the Nuxt application, and `typecheck:bun`, a separate compiler over `tests/`,
@@ -49,7 +52,11 @@ Twelve steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
 `test:e2e` runs on every pull request into `unified/main` and on demand, in ten slices
 (`E2E_SLICE=i/10`), each on its own runner with its own dev server; the nightly schedule
 registers only once `unified/main` is the default branch. Each slice is a required check (0109). A
-slice takes under ten minutes, inside a 60-minute limit.
+slice takes under ten minutes, inside a 60-minute limit. A pull request runs only the suites it can
+reach (0110, `scripts/lib/ci-scope.ts`): none for a change to documentation, the unit or
+integration tests, the checkers, or a workflow other than `e2e.yml`; only the suites it edits when
+those are its only other files (`E2E_SUITES`); every suite for anything else. A slice with nothing
+in scope still starts and reports, so the required checks never wait.
 
 Documentation drift is a defect and fails review, but no script checks it: a change to behaviour
 without a change to its document is caught by a person. That includes the in-app operator

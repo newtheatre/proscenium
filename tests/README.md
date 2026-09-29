@@ -25,6 +25,10 @@ builder for the dev server's own database. `scripts/seed/` holds the builders th
 seed composes, and `tests/helpers/` holds the small ones a suite needs, so a fixture and a
 development database are written by the same code (K-120).
 
+Each `createTestDatabase()` is a copy of one migrated image, made the first time a run asks for one
+(0110): its own database, with every table and trigger the journal builds, for the cost of a copy
+rather than a replay of every migration. The migration tests below still migrate for real.
+
 A sink also reads, which is what lets a builder match a row on its natural key and stay
 re-runnable. Nothing else may reach the database from a fixture.
 
@@ -52,3 +56,7 @@ splits a migration file itself.
 `e2e/` drives Chrome through `Bun.WebView` over the DevTools protocol, WebKit on macOS (0022).
 One dev server is shared across a shard and the isolation is the database, emptied between
 suites. A suite with no usable browser reports a skip rather than passing.
+
+`E2E_SUITES` (paths, space-separated) narrows `bun run test:e2e` to those suites before the slices
+are dealt. CI sets it for a pull request that edits suites alone (0110); a name that is not a suite
+is refused rather than run as nothing.
