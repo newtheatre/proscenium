@@ -971,8 +971,10 @@ describe.skipIf(skip !== null)('the screens', () => {
     // The console shell renders no <main>, so each screen names an element of its own.
     await visit(view, `${app.baseURL}/bar/products`, '[data-test="bar-products-table"]')
     expect(await textOf(view, '[data-test="bar-products-table"]')).toContain(productName)
-    // #908 item 2: the retire-versus-delete copy reads as a sentence, matching box-office/venues.
-    expect(await textOf(view, 'body')).toContain('A product nothing has ever been sold as can be deleted outright.')
+    // #908 item 2: the retire-versus-delete copy reads as a sentence. It lives on the screen's
+    // documentation page now, which the navbar's help opens (K-123, issue 1151 item 2).
+    await visit(view, `${app.baseURL}/docs/bar/products`, '[data-test="docs-body"]')
+    expect(await textOf(view, '[data-test="docs-body"]')).toContain('A product nothing has ever been sold as can be deleted outright.')
 
     await visit(view, `${app.baseURL}/bar/stock`, '[data-test="bar-items-table"]')
     const stock = await textOf(view, '[data-test="bar-items-table"]')
@@ -1025,6 +1027,8 @@ describe.skipIf(skip !== null)('the screens', () => {
     const productId = await addProduct(categoryId)
     const variantId = await addVariant(productId, { servingKind: '175ml', label: '175ml' })
     await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 175 }] })
+    // A measure is offered only once a product on the till pours it (issue 1350).
+    expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
 
     const view = await openSignedOutView(app.baseURL, { width: 375, height: 812 })
     await visit(view, `${app.baseURL}/sign-in`)
