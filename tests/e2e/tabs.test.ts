@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -27,7 +27,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'tab-bar-manager', barManagerPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
   barStaff = await registerMember(app, 'tab-bar-staff', barStaffPassword)
 }, BOOT_TIMEOUT_MS)
 
@@ -97,7 +97,7 @@ const aCategory = async (): Promise<string> => {
   return (await answered.json() as { id: string }).id
 }
 
-async function aSellableProduct(pricePence = 500): Promise<{ variantId: string }> {
+async function aSellableProduct(pricePence = 500): Promise<{ productId: string, variantId: string }> {
   const categoryId = await aCategory()
   const productAnswered = await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId })
   const { id: productId } = await productAnswered.json() as { id: string }
@@ -105,7 +105,7 @@ async function aSellableProduct(pricePence = 500): Promise<{ variantId: string }
   const { id: variantId } = await variantAnswered.json() as { id: string }
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() })
   await putOnTheTill(send, productId)
-  return { variantId }
+  return { productId, variantId }
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, tabHolderId: string | null, as = barStaff.cookie): Promise<Response> =>
@@ -365,7 +365,7 @@ describe.skipIf(skip !== null)('a tab charge is credit extended, not money taken
 describe.skipIf(skip !== null)('the screen', () => {
   test('picking a tab holder charges credit, not the reader, and the confirmation names the balance', async () => {
     const { venueId, performanceId } = programme(`tabs-screen-${crypto.randomUUID().slice(0, 6)}`)
-    const { variantId } = await aSellableProduct(500)
+    const { productId } = await aSellableProduct(500)
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
@@ -378,8 +378,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="tab-holder-${member.id}"]')`)
     await click(view, `[data-test="tab-holder-${member.id}"]`)
     await waitFor(view, `document.querySelector('[aria-label^="Put"]')`)
@@ -394,7 +394,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // too, or the pinned action keeps naming the tab (F-122 criterion 5).
   test('adding a booking after a tab holder is chosen clears it, so the charge goes to the reader', async () => {
     const { venueId, performanceId } = programme(`tabs-clear-${crypto.randomUUID().slice(0, 6)}`)
-    const { variantId } = await aSellableProduct(500)
+    const { productId } = await aSellableProduct(500)
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
@@ -409,8 +409,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="tab-holder-${member.id}"]')`)
     await click(view, `[data-test="tab-holder-${member.id}"]`)
     await waitFor(view, `document.querySelector('[aria-label^="Put"]')`)

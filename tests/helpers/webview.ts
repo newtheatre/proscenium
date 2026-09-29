@@ -324,7 +324,9 @@ export async function waitFor(view: Bun.WebView, expression: string, timeoutMs =
   const seen = await view.evaluate<string>(`location.pathname + ': ' + (document.body?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 240)`).catch(() => 'unreadable')
   // What any alert, dialogue or failure notice said: the reason is usually there, not at the top.
   const said = await view.evaluate<string>(`[...document.querySelectorAll('[role="alert"], [role="status"], [role="dialog"], [data-test*="failure"], [data-test*="refus"]')].map(el => el.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' | ').slice(0, 400)`).catch(() => '')
-  throw new Error(`timed out waiting for ${expression} (at ${seen})${said ? ` (notices: ${said})` : ''}`)
+  // The show-night actions on offer, since a missing one is often only named differently.
+  const offered = await view.evaluate<string>(`[...document.querySelectorAll('[data-test="night-action"]')].map(el => el.getAttribute('aria-label') ?? '').filter(Boolean).join(' | ').slice(0, 200)`).catch(() => '')
+  throw new Error(`timed out waiting for ${expression} (at ${seen})${said ? ` (notices: ${said})` : ''}${offered ? ` (actions: ${offered})` : ''}`)
 }
 
 // A plain value assignment is invisible to v-model: Vue listens for the event, and the native

@@ -515,27 +515,35 @@ describe.skipIf(skip !== null)('the screen', () => {
     const uncountedAfter = opened.lines.length - 1
 
     const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', barManager.email)
-    await fill(view, 'form input[type="password"]', barPassword)
-    await click(view, 'form button[type="submit"]')
-    await finishSignIn(app, view, barManager.email)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
-    await fillNumber(view, `[data-test="counted-${item.id}"]`, '7')
-    await waitFor(view, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
-    expect(await countedOf(opened.stocktake.id, item.id)).toBe(7)
+      await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await fillNumber(view, `[data-test="counted-${item.id}"]`, '7')
+      const state = `document.querySelector('[data-test="line-state-${item.id}"]')`
+      await waitFor(view, `${state} && !${state}.textContent.includes('Saving')`)
+      expect(await textOf(view, `[data-test="line-state-${item.id}"]`)).toContain('Saved')
+      expect(await countedOf(opened.stocktake.id, item.id)).toBe(7)
 
-    await click(view, '[data-test="open-apply"]')
-    await waitFor(view, `document.querySelector('[data-test="apply-summary"]')`)
-    expect(await textOf(view, '[data-test="apply-counted"]')).toContain('1')
-    expect(await textOf(view, '[data-test="apply-uncounted"]')).toContain(String(uncountedAfter))
-    // 7 counted against 10 expected, at 480 pence each: -3 * 480.
-    expect(await textOf(view, '[data-test="apply-net-variance"]')).toContain('14.40')
+      await click(view, '[data-test="open-apply"]')
+      await waitFor(view, `document.querySelector('[data-test="apply-summary"]')`)
+      expect(await textOf(view, '[data-test="apply-counted"]')).toContain('1')
+      expect(await textOf(view, '[data-test="apply-uncounted"]')).toContain(String(uncountedAfter))
+      // 7 counted against 10 expected, at 480 pence each: -3 * 480.
+      expect(await textOf(view, '[data-test="apply-net-variance"]')).toContain('14.40')
 
-    await click(view, '[data-test="confirm-apply"]')
-    await waitFor(view, `!document.querySelector('[data-test="open-apply"]')`)
-    view.close()
+      await click(view, '[data-test="confirm-apply"]')
+      await waitFor(view, `!document.querySelector('[data-test="open-apply"]')`)
+    }
+    finally {
+      view.close()
+      // One stocktake is open at a time, so one left open here would starve every later test.
+      await apply(opened.stocktake.id)
+    }
 
     const posted = movementsFor(item.id).filter(m => m.kind === 'STOCKTAKE')
     expect(posted).toHaveLength(1)
