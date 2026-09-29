@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -30,7 +30,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'tickets-bar', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {

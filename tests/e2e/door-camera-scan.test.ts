@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -27,7 +27,7 @@ beforeAll(async () => {
   admin = await adminSession(app)
   doorPassword = generatePassword()
   door = await registerMember(app, 'door-camera', doorPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: door.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, door, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -74,7 +74,7 @@ async function signIn(view: Bun.WebView): Promise<void> {
   await fill(view, 'form input[type="email"]', door.email)
   await fill(view, 'form input[type="password"]', doorPassword)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+  await finishSignIn(app, view, door.email)
 }
 
 const resolve = (scanned: string): Promise<Response> =>
@@ -149,7 +149,7 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
       await fill(view, 'form input[type="email"]', door.email)
       await fill(view, 'form input[type="password"]', doorPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, door.email)
 
       // The headless view opens no camera, which is exactly criterion 5's fallback.
       await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')

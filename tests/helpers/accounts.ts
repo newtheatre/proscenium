@@ -67,6 +67,59 @@ export function forgetSpentStep(app: AppUnderTest, email: string): void {
   }
 }
 
+// The member's own authenticator, enrolled and confirmed through the routes, once: a second call
+// answers the secret already held, which only this helper's first call can know.
+const secrets = new Map<string, string>()
+
+export async function enrolAuthenticator(app: AppUnderTest, member: TestMember): Promise<string> {
+  const known = secrets.get(`${app.databaseFile}:${member.email}`)
+  if (known) return known
+  const { codeForStep, stepFor } = await import('#shared/utils/totp')
+  const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, member.cookie)).json() as { secret: string }
+  await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, member.cookie)
+  forgetSpentStep(app, member.email)
+  secrets.set(`${app.databaseFile}:${member.email}`, secret)
+  return secret
+}
+
+async function currentCode(app: AppUnderTest, email: string, secret: string): Promise<string> {
+  const { codeForStep, stepFor } = await import('#shared/utils/totp')
+  forgetSpentStep(app, email)
+  return codeForStep(secret, stepFor(new Date()))
+}
+
+// A password sign-in through the routes, answering the challenge for a member this file enrolled;
+// the answer carrying the session cookie is what comes back.
+export async function signInCookie(app: AppUnderTest, email: string, password: string): Promise<Response> {
+  const signedIn = await request(app, 'POST', '/api/auth/sign-in', { email, password })
+  const secret = secrets.get(`${app.databaseFile}:${email}`)
+  if (!secret || signedIn.headers.get('set-cookie')) return signedIn
+  const { attemptId } = await signedIn.json() as { attemptId: string }
+  return request(app, 'POST', '/api/auth/mfa/challenge', { attemptId, code: await currentCode(app, email, secret) })
+}
+
+// After the password on the sign-in form: an enrolled member is asked for a code, which this
+// answers; either way it returns once the account menu shows.
+export async function finishSignIn(app: AppUnderTest, view: Bun.WebView, email: string): Promise<void> {
+  const { fillPin, waitFor } = await import('./webview')
+  const menu = `document.querySelector('[data-test="account-menu"]')`
+  const asked = `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`
+  await waitFor(view, `${menu} || ${asked}`)
+  const secret = secrets.get(`${app.databaseFile}:${email}`)
+  if (secret && await view.evaluate(`Boolean(${asked})`)) {
+    await fillPin(view, '[data-test="mfa-challenge"] input', await currentCode(app, email, secret))
+  }
+  await waitFor(view, menu)
+}
+
+// A role on the second-factor list is refused on every screen until its holder has an
+// authenticator (A-112), so a privileged grant enrols one first, as a real officer must.
+export async function grantRole(app: AppUnderTest, member: TestMember, role: string, as: string): Promise<Response> {
+  const { CONFIG_KEYS } = await import('#shared/utils/config')
+  if ((CONFIG_KEYS.PRIVILEGED_ROLES.default as readonly string[]).includes(role)) await enrolAuthenticator(app, member)
+  return request(app, 'POST', '/api/admin/roles', { userId: member.id, role }, as)
+}
+
 export interface RegisterOptions {
   /** Leave the address unproven, for a suite that is testing what that refuses. */
   verify?: boolean

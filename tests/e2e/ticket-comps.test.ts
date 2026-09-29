@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, forgetSpentStep, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -28,7 +28,7 @@ beforeAll(async () => {
   officer = await adminSession(app)
 
   boxOffice = await registerMember(app, 'comp-desk', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   // MANAGER is privileged (0037/A-112): requirePermission needs a confirmed second factor
   // before ticketing.write is honoured at all, not only ticketing.manage.
@@ -171,7 +171,7 @@ describe.skipIf(skip !== null)('asking for a comp (criterion 1)', () => {
     const requestId = await requestedComp(id)
 
     const dutyManager = await registerMember(app, 'comp-duty', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
+    await grantRole(app, dutyManager, 'FOH_MANAGER', officer.cookie)
     confirmDutyManagerShift(performanceId, dutyManager.id)
 
     expect((await approve(requestId, dutyManager.cookie)).status).toBe(200)
@@ -241,7 +241,7 @@ describe.skipIf(skip !== null)('approval is claimed atomically (criterion 2)', (
     const requestId = await requestedComp(id)
 
     const dutyManager = await registerMember(app, 'comp-race-duty', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: dutyManager.id, role: 'FOH_MANAGER' }, officer.cookie)
+    await grantRole(app, dutyManager, 'FOH_MANAGER', officer.cookie)
     confirmDutyManagerShift(performanceId, dutyManager.id)
 
     const [first, second] = await Promise.all([approve(requestId, ticketingManager.cookie), approve(requestId, dutyManager.cookie)])

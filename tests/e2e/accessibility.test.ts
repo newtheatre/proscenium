@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { adminSession, forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
@@ -94,7 +94,7 @@ async function signedInView(): Promise<Bun.WebView> {
   await fill(view, 'form input[type="email"]', email)
   await fill(view, 'form input[type="password"]', password)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+  await finishSignIn(app, view, email)
   return view
 }
 
@@ -193,7 +193,7 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
     const barPassword = generatePassword()
     const bar = await registerMember(app, 'a11y-till-bar', barPassword)
     const officer = await adminSession(app)
-    await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, officer.cookie)
+    await grantRole(app, bar, 'BAR_MANAGER', officer.cookie)
 
     const database = new Database(app.databaseFile)
     let venueId: string
@@ -211,7 +211,7 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
       await fill(view, 'form input[type="email"]', bar.email)
       await fill(view, 'form input[type="password"]', barPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+      await finishSignIn(app, view, bar.email)
 
       expect(await violationsOn(view, `/tonight/till?venueId=${venueId}`, '[data-test="till-panes"]')).toEqual([])
 

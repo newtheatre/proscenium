@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { saysMoney } from '#shared/utils/bar'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -25,7 +25,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   bar = await registerMember(app, 'reconcile-bar', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, bar, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {

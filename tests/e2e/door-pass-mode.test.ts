@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -30,7 +30,7 @@ beforeAll(async () => {
   admin = await adminSession(app)
   doorPassword = generatePassword()
   door = await registerMember(app, 'door-pass-mode', doorPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: door.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, door, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -159,7 +159,7 @@ describe.skipIf(skip !== null)('a pass found through the door\'s one field (issu
       await fill(view, 'form input[type="email"]', door.email)
       await fill(view, 'form input[type="password"]', doorPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, door.email)
 
       await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
       // D-126 criterion 2's wording stands whether or not a card is on screen, as one line in
