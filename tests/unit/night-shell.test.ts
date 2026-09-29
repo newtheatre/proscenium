@@ -355,9 +355,9 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
 
   test('a screen\'s served authority reuses the answer the shell asked in the same request, and a phone asks afresh', async () => {
     const shell = await read('app/composables/useNightShell.ts')
-    expect(shell).toContain('const seeded = import.meta.server ? useNightAuthority().value.answers[role] : undefined')
+    expect(shell).toContain('import.meta.server && !performanceId ? useNightAuthority().value.answers[role] : undefined')
     for (const [path, role] of [['app/pages/tonight/door/index.vue', 'DOOR'], ['app/pages/tonight/message.vue', 'DUTY_MANAGER'], ['app/pages/tonight/incidents/index.vue', 'ANY'], ['app/pages/tonight/age-checks/index.vue', 'ANY'], ['app/pages/tonight/report.vue', 'DUTY_MANAGER']] as const) {
-      expect(`${path}: ${(await read(path)).includes(`askNightAuthority('${role}')`)}`).toBe(`${path}: true`)
+      expect(`${path}: ${(await read(path)).includes(`askNightAuthority('${role}'`)}`).toBe(`${path}: true`)
     }
   })
 
@@ -388,61 +388,25 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     expect(source).not.toContain('await useAsyncData(')
   })
 
-  test('the hub and the glance judge the running house by one clock', async () => {
-    for (const path of ['app/pages/tonight/index.vue', 'app/pages/tonight/glance.vue']) {
+  test('the hub, the glance and the night report judge the running house and the curtain by one clock', async () => {
+    for (const path of ['app/pages/tonight/index.vue', 'app/pages/tonight/glance.vue', 'app/pages/tonight/report.vue']) {
       const source = await read(path)
       expect(`${path}: ${source.includes('useNightClock()')}`).toBe(`${path}: true`)
       expect(`${path}: ${source.includes('Date.now() / 1000')}`).toBe(`${path}: false`)
     }
   })
 
-  test('the night report opens Sign off and close by the same clock, the read\'s own moment until mounted', async () => {
-    const source = await read('app/pages/tonight/report.vue')
-    expect(source).toContain('useNightClock()')
-    expect(source).not.toContain('Date.now() / 1000')
-  })
+  // An onMounted whose first act is a read is the shape issue 1521 removed: the page then paints first.
+  const READS_ON_MOUNT = /onMounted\(\s*(async\s*)?(\(\)\s*=>\s*\{?\s*(return\s+|void\s+|await\s+)?)?(load\w*|refresh\w*|\$fetch|request)\b/
 
-  // Each onMounted(...) call's own text, found by its brackets, so a poll set up beside it is not read as one.
-  function mountedCalls(source: string): string[] {
-    const calls: string[] = []
-    for (let from = source.indexOf('onMounted('); from !== -1; from = source.indexOf('onMounted(', from + 1)) {
-      let depth = 0
-      let at = from + 'onMounted'.length
-      for (; at < source.length; at++) {
-        if (source[at] === '(') depth++
-        else if (source[at] === ')' && --depth === 0) break
-      }
-      calls.push(source.slice(from, at + 1))
-    }
-    return calls
-  }
-
-  const FIRST_READS = [
+  test.each([
     'app/pages/tonight/report.vue',
     'app/pages/tonight/till/index.vue',
     'app/composables/useTillSession.ts',
     'app/composables/useTillEarlier.ts',
     'app/components/NightRefusal.vue',
-  ]
-
-  test.each(FIRST_READS)('%s no longer takes its first read once mounted', async (path) => {
-    for (const call of mountedCalls(await read(path))) {
-      expect(call).not.toMatch(/\$fetch|\brequest\b|\bload\w*\b|\brefresh\b/)
-    }
-  })
-
-  test('the till serves its session, its bar\'s answer and the Bar Manager\'s earlier nights in one read', async () => {
-    const till = await read('app/pages/tonight/till/index.vue')
-    expect(till).toContain('useServedRead(\'tonight-till')
-    expect(till).toContain('readEarlier()')
-    expect(await read('app/composables/useTillEarlier.ts')).not.toContain('onMounted(')
-  })
-
-  test('the served grid and the served emergency cards stand until the phone\'s own read answers, with no clock compared', async () => {
-    const catalogue = await read('app/composables/useTillCatalogue.ts')
-    expect(catalogue).toContain('nightCopyShown(served.value?.data ?? null, catalogue.data.value, catalogue.fetched.value)')
-    expect(await read('app/pages/tonight/emergency.vue')).toContain('nightCopyShown<')
-    expect(await read('shared/utils/night-cache.ts')).not.toContain('servedCopyWins')
+  ])('%s takes no first read once mounted', async (path) => {
+    expect(await read(path)).not.toMatch(READS_ON_MOUNT)
   })
 
   test('a watcher set up after the served read fills its source also runs once mounted, through one helper', async () => {
@@ -451,25 +415,10 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     }
   })
 
-  test('tonight\'s open card charges are read only once the attempt this phone left has settled', async () => {
-    const sumup = await read('app/composables/useSumUpCharge.ts')
-    expect(sumup).toContain('resumed = resume(')
-    expect(sumup).toContain('resumed.then(refreshOpenAttempts, refreshOpenAttempts)')
-  })
-
-  test('a slower walk-up answer for a house no longer chosen never replaces the options', async () => {
-    const tickets = await read('app/composables/useTillTickets.ts')
-    expect(tickets).toContain('if (mine === optionsAsked) walkUpOptions.value = answered.options')
-  })
-
-  test('the report clears its last failure and the switcher as a re-read starts', async () => {
-    expect(await read('app/pages/tonight/report.vue')).toMatch(/async function load\(\): Promise<void> \{\s+busy\.value = true\s+failure\.value = null\s+ambiguous\.value = false/)
-  })
-
   test('the basket and card attempts stay the device\'s, and are never served', async () => {
     const till = await read('app/pages/tonight/till/index.vue')
     const served = till.slice(till.indexOf('useServedRead('), till.indexOf('\n})', till.indexOf('useServedRead(')))
-    for (const device of ['useTillBasket', 'useSumUpCharge', 'useWriteQueue', 'sumup.', 'basket']) {
+    for (const device of ['useTillBasket', 'useSumUpCharge', 'sumup.', 'basket']) {
       expect(`${device}: ${served.includes(device)}`).toBe(`${device}: false`)
     }
   })

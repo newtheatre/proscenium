@@ -312,18 +312,33 @@ describe('what a screen holding one of these sees (criteria 2 and 3)', () => {
     })
   })
 
-  test('a load that answers says so for the rest of the visit, and a failure after it does not undo it', async () => {
+  test('a served copy is shown over the device\'s until this visit\'s own read answers, and a failure after it keeps that answer', async () => {
     await inScope(async () => {
       const store = memoryNightCacheStore()
+      writeNightCache(store, key, { admitted: 3 }, new Date('2026-10-17T18:12:00Z'))
+      const served = ref({ data: { admitted: 5 }, at: Date.parse('2026-10-17T18:00:00Z') })
       let fails = false
-      const cache = useNightCache<{ admitted: number }>(key, () => fails ? Promise.reject(new Error('offline')) : Promise.resolve({ admitted: 9 }), { store, immediate: false })
-      expect(cache.fetched.value).toBe(false)
+      const cache = useNightCache<{ admitted: number }>(key, () => fails ? Promise.reject(new Error('offline')) : Promise.resolve({ admitted: 9 }), { store, immediate: false, served })
+
+      cache.recall()
+      expect(cache.shown.value).toEqual({ admitted: 5 })
+      expect(cache.shownAt.value).toBe(served.value.at)
       await cache.refresh()
-      expect(cache.fetched.value).toBe(true)
+      expect(cache.shown.value).toEqual({ admitted: 9 })
       fails = true
       await cache.refresh()
-      expect(cache.live.value).toBe(false)
-      expect(cache.fetched.value).toBe(true)
+      expect(cache.shown.value).toEqual({ admitted: 9 })
+    })
+  })
+
+  test('with nothing served, the device\'s copy is what is shown', async () => {
+    await inScope(() => {
+      const store = memoryNightCacheStore()
+      writeNightCache(store, key, { admitted: 3 }, new Date('2026-10-17T18:12:00Z'))
+      const cache = useNightCache<{ admitted: number }>(key, () => Promise.resolve({ admitted: 9 }), { store, immediate: false, served: ref(null) })
+      cache.recall()
+      expect(cache.shown.value).toEqual({ admitted: 3 })
+      expect(cache.shownAt.value).toBe(Date.parse('2026-10-17T18:12:00Z'))
     })
   })
 

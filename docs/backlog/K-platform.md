@@ -77,7 +77,7 @@ Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
      (issue 1521). Extended 28 September 2026 to the night report, the till, the bar shift's
      stocktake, the emergency card and a refusal card's help line: the till serves its session, its
      bar and its catalogue, while its basket and its card attempts stay the device's own (K-103,
-     0096), and a night that asks which bar waits for the phone's memory of it.
+     0096), and on a night that asks which bar the served page opens the bar this phone remembers.
 - Source: Prompt Book K-1, P8 (show night is hostile territory); audit PR-5, PR-9; Get-In part 5
   (standards)
 

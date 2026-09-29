@@ -2,20 +2,21 @@ import { listFailureFrom } from './useListFailure'
 import { deviceNightCacheStore } from './useNightCache'
 import { closeVariancePence } from '#shared/utils/reconciliation'
 import { currentShowNight } from '#shared/utils/show-night'
-import { recallTillVenue, rememberTillVenue, tillRefusalStep } from '#shared/utils/till'
+import { TILL_VENUE_COOKIE, TILL_VENUE_DEVICE_KEY, heldTillVenue, recallTillVenue, tillRefusalStep, tillVenueExpires } from '#shared/utils/till'
 import type { ListFailure } from './useListFailure'
 import type { SettledRead } from '~/utils/refusal'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
-import type { TillRefusalStep, TillSession, TillVenueOption } from '#shared/utils/till'
+import type { HeldTillVenue, TillSession, TillVenueOption } from '#shared/utils/till'
 
 export interface TillStatus { night: string, venueId: string, session: TillSession | null, sumupEnabled: boolean }
 
-// Settled as `settleRead` settles, keeping the enrol path a refusal carries (issue 897).
-export type TillStatusRead
-  = { kind: 'READ', value: TillStatus, at: number }
-    | { kind: 'FAILED', failure: ListFailure, status: number | undefined, at: number }
-
-export interface TillRead { status: TillStatusRead, venues: SettledRead<{ venues: TillVenueOption[] }> | null }
+export interface TillRead {
+  // Settled keeping the enrol path a refusal carries (issue 897).
+  status: SettledRead<TillStatus, ListFailure>
+  // Whether the answer came from the bar this device remembers, or that bar was refused and is dropped.
+  device: 'UNUSED' | 'USED' | 'FORGOTTEN'
+  venues: SettledRead<{ venues: TillVenueOption[] }> | null
+}
 
 // The till's session lifecycle (F-102, F-118): opening, the periodic re-sync, and the close flow
 // with its expected-versus-actual figure. Everything else on the screen waits on this.
@@ -25,11 +26,12 @@ export function useTillSession() {
   // Optional: names which venue when more than one runs tonight, which the route already resolves
   // unaided on the (typical) night only one does. Multi-venue bars are their own story (F-202).
   const queriedVenueId = computed(() => (typeof route.query.venueId === 'string' ? route.query.venueId : undefined))
-  // The bar this device opened tonight, read on mount, answers the guard's "which bar?" so the SumUp
-  // app's return on a bare link does not ask again (issue 1257); `usingDevice` says it did.
-  const deviceVenueId = ref<string | undefined>(undefined)
+  // The bar this device opened tonight, in a night-scoped cookie the server reads too, answers the
+  // guard's "which bar?" so the SumUp app's return on a bare link does not ask again (issue 1257).
+  const held = useCookie<HeldTillVenue | null>(TILL_VENUE_COOKIE, { sameSite: 'lax', expires: tillVenueExpires(currentShowNight()), default: () => null })
+  const rememberedVenueId = computed(() => heldTillVenue(held.value, currentShowNight()))
   const usingDevice = ref(false)
-  const requestedVenueId = computed(() => queriedVenueId.value ?? (usingDevice.value ? deviceVenueId.value : undefined))
+  const requestedVenueId = computed(() => queriedVenueId.value ?? (usingDevice.value ? rememberedVenueId.value ?? undefined : undefined))
   const syncedAt = ref<number | null>(null)
   // Carries the enrol path a console list already reads the same way (0040, issue 897).
   const failure = ref<ListFailure | null>(null)
@@ -39,58 +41,57 @@ export function useTillSession() {
   const session = ref<TillSession | null>(null)
   const venueId = ref<string | null>(null)
   const sumupEnabled = ref(false)
-  // Whether the screen has an answer it can draw: until then it draws neither Open till nor a
-  // picker, since the served page cannot know which bar this phone opened (issue 1521).
+  // Whether the screen has an answer to draw: until then, on a navigation, neither Open till nor a picker.
   const settled = ref(false)
-  const deviceRead = ref(false)
-  let heldForDevice: TillRead | null = null
 
-  function stepAfter(refusal: number | undefined): TillRefusalStep {
-    return tillRefusalStep(refusal, { queried: queriedVenueId.value, remembered: deviceVenueId.value, usingDevice: usingDevice.value, deviceRead: deviceRead.value })
+  // Written on the phone alone, where the till opened or the bar was picked.
+  function remember(night: string, venue: string): void {
+    if (import.meta.client) held.value = { night, venueId: venue }
   }
 
+  function forgetDeviceVenue(): void {
+    usingDevice.value = false
+    if (import.meta.client) held.value = null
+  }
+
+  function askTill(venue: string | undefined): Promise<SettledRead<TillStatus, ListFailure>> {
+    return settleReadWith(() => request<TillStatus>('/api/till', { query: { venueId: venue } }), listFailureFrom)
+  }
+
+  // Asked unaided first, so a night the server resolves opens where it says; the remembered bar
+  // answers only the guard's own question, and the venues ride along wherever the picker is the answer.
   async function read(): Promise<TillRead> {
-    let status: TillStatusRead
-    try {
-      status = { kind: 'READ', value: await request<TillStatus>('/api/till', { query: { venueId: requestedVenueId.value } }), at: Date.now() }
+    const queried = queriedVenueId.value
+    const remembered = rememberedVenueId.value
+    let status = await askTill(queried)
+    let device: TillRead['device'] = 'UNUSED'
+    if (status.kind === 'FAILED' && tillRefusalStep(status.status, { queried, remembered, usingDevice: false }) === 'ASK_WITH_DEVICE') {
+      const viaDevice = await askTill(remembered ?? undefined)
+      if (viaDevice.kind === 'READ') {
+        status = viaDevice
+        device = 'USED'
+      }
+      else if (tillRefusalStep(viaDevice.status, { queried, remembered, usingDevice: true }) === 'FORGET_DEVICE') {
+        device = 'FORGOTTEN'
+      }
     }
-    catch (refused) {
-      status = { kind: 'FAILED', failure: listFailureFrom(refused), status: refusalStatus(refused), at: Date.now() }
-    }
-    // The venues ride the same read wherever the picker may be the answer, so it needs no second trip.
-    const picks = status.kind === 'FAILED' && status.status === 400 && ['SHOW', 'WAIT_FOR_DEVICE'].includes(stepAfter(status.status))
-    const venuesRead = picks ? await settleRead(() => request<{ venues: TillVenueOption[] }>('/api/till/venues')) : null
-    return { status, venues: venuesRead }
+    const asksWhichBar = status.kind === 'FAILED' && status.status === 400
+    const venuesRead = asksWhichBar ? await settleRead(() => request<{ venues: TillVenueOption[] }>('/api/till/venues')) : null
+    return { status, device, venues: venuesRead }
   }
 
-  // Awaited through any second question it asks, so `busy` covers the whole answer.
-  async function settle(answered: TillRead): Promise<void> {
+  function settle(answered: TillRead): void {
+    if (answered.device === 'FORGOTTEN') forgetDeviceVenue()
+    usingDevice.value = answered.device === 'USED'
     const { status } = answered
+    settled.value = true
     if (status.kind === 'READ') {
       session.value = status.value.session
       venueId.value = status.value.venueId
       sumupEnabled.value = status.value.sumupEnabled
       syncedAt.value = status.at
-      failure.value = null
-      failureStatus.value = null
-      settled.value = true
-      // The server holds no device store, so only the phone remembers the bar it opened.
-      if (import.meta.client) rememberTillVenue(deviceNightCacheStore(), status.value.night, status.value.venueId)
+      if (queriedVenueId.value) remember(status.value.night, status.value.venueId)
       return
-    }
-    const step = stepAfter(status.status)
-    if (step === 'WAIT_FOR_DEVICE') {
-      heldForDevice = answered
-      return
-    }
-    if (step === 'ASK_WITH_DEVICE') {
-      usingDevice.value = true
-      return load()
-    }
-    // A remembered bar that no longer answers is dropped, and the till asks as if it had none.
-    if (step === 'FORGET_DEVICE') {
-      forgetDeviceVenue()
-      return load()
     }
     failure.value = status.failure
     failureStatus.value = status.status ?? null
@@ -102,16 +103,10 @@ export function useTillSession() {
     if (status.status === 403 && venues.value.length > 0) venueAsked.value = true
     // 400 is the guard asking which venue, so the screen answers with a picker rather than
     // leaving a volunteer to decode a refusal (F-125, 0077).
-    if (status.status === 400) {
-      if (answered.venues) applyVenues(answered.venues)
-      else await loadVenues()
+    if (status.status === 400 && answered.venues) {
+      venueAsked.value = true
+      applyVenues(answered.venues)
     }
-    settled.value = true
-  }
-
-  // The served first read's way in: it cannot await, and on the server nothing it settles asks again.
-  function apply(answered: TillRead): void {
-    void settle(answered)
   }
 
   async function whileBusy(work: () => Promise<void>): Promise<void> {
@@ -130,11 +125,6 @@ export function useTillSession() {
     return whileBusy(async () => settle(await read()))
   }
 
-  function forgetDeviceVenue(): void {
-    deviceVenueId.value = undefined
-    usingDevice.value = false
-  }
-
   // The way out of a remembered bar: the picker, exactly as if the device had never chosen.
   async function changeVenue(): Promise<void> {
     forgetDeviceVenue()
@@ -150,7 +140,6 @@ export function useTillSession() {
   const needsVenue = computed(() => venueAsked.value && !session.value)
 
   function applyVenues(answered: SettledRead<{ venues: TillVenueOption[] }>): void {
-    venueAsked.value = true
     if (answered.kind === 'FAILED') {
       venuesFailure.value = answered.failure
       return
@@ -174,26 +163,24 @@ export function useTillSession() {
     await load()
   }
 
-  async function open(): Promise<void> {
-    busy.value = true
+  function open(): Promise<void> {
     failure.value = null
     failureStatus.value = null
-    try {
-      const opened = await request<{ session: TillSession }>('/api/till', {
-        method: 'POST',
-        body: { venueId: requestedVenueId.value },
-      })
-      session.value = opened.session
-      syncedAt.value = Date.now()
-      rememberTillVenue(deviceNightCacheStore(), opened.session.night, opened.session.venueId)
-    }
-    catch (refused) {
-      failure.value = listFailureFrom(refused)
-      failureStatus.value = refusalStatus(refused) ?? null
-    }
-    finally {
-      busy.value = false
-    }
+    return whileBusy(async () => {
+      try {
+        const opened = await request<{ session: TillSession }>('/api/till', {
+          method: 'POST',
+          body: { venueId: requestedVenueId.value },
+        })
+        session.value = opened.session
+        syncedAt.value = Date.now()
+        remember(opened.session.night, opened.session.venueId)
+      }
+      catch (refused) {
+        failure.value = listFailureFrom(refused)
+        failureStatus.value = refusalStatus(refused) ?? null
+      }
+    })
   }
 
   // The expected figure before anyone commits to closing (F-102 criterion 4, F-118 criterion 3).
@@ -281,14 +268,18 @@ export function useTillSession() {
     }
   }
 
-  // The phone's memory of tonight's bar, which only answers the guard's own question: a first read
-  // that asked it, served or not, is settled now that it can be.
+  // An earlier build kept the bar in the device store: carried over once to the cookie, and asked
+  // again with it where the till is asking which bar.
   onMounted(() => {
-    deviceVenueId.value = recallTillVenue(deviceNightCacheStore(), currentShowNight()) ?? undefined
-    deviceRead.value = true
-    const held = heldForDevice
-    heldForDevice = null
-    if (held) void whileBusy(() => settle(held))
+    const store = deviceNightCacheStore()
+    const legacy = recallTillVenue(store, currentShowNight())
+    try {
+      store.removeItem(TILL_VENUE_DEVICE_KEY)
+    }
+    catch { /* a device that refuses its store has nothing to carry over */ }
+    if (!legacy || rememberedVenueId.value) return
+    held.value = { night: currentShowNight(), venueId: legacy }
+    if (needsVenue.value && !queriedVenueId.value) void load()
   })
 
   return {
@@ -308,7 +299,7 @@ export function useTillSession() {
     needsVenue,
     chooseVenue,
     read,
-    apply,
+    settle,
     load,
     open,
     closing,

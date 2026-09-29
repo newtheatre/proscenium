@@ -1,14 +1,15 @@
-import { getCurrentInstance, onMounted, ref, shallowRef, toValue, watch } from 'vue'
+import { computed, getCurrentInstance, onMounted, ref, shallowRef, toValue, watch } from 'vue'
 import {
   MalformedNightCacheKeyError,
   NIGHT_CACHE_PREFIX,
   memoryNightCacheStore,
   newestRequest,
+  nightCopyShown,
   pruneNightCache,
   readNightCache,
   refreshNightCache,
 } from '#shared/utils/night-cache'
-import type { MaybeRefOrGetter, Ref, ShallowRef } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter, Ref, ShallowRef } from 'vue'
 import type { NightCacheKey, NightCacheStore } from '#shared/utils/night-cache'
 
 // A show-night screen's data, held on the device so venue Wi-Fi dropping never blanks it (K-103).
@@ -32,33 +33,45 @@ export function deviceNightCacheStore(): NightCacheStore {
   return fallback
 }
 
-export interface NightCacheOptions {
+export interface ServedCopy<T> { data: T, at: number }
+
+export interface NightCacheOptions<T = unknown> {
   store?: NightCacheStore
   // Off for a screen that loads on an action rather than on open.
   immediate?: boolean
+  // A copy the server rendered into the page: shown until this visit's own read answers, so the
+  // device's copy is not read on mount beside it, nor ever compared with it by clock (issue 1521).
+  served?: Ref<ServedCopy<T> | null>
+  // False on a navigation, with no served page to match: the device's copy is then read at setup.
+  hydrating?: boolean
 }
 
 export interface NightCache<T> {
   data: ShallowRef<T | null>
   cachedAt: Ref<number | null>
+  // What the screen draws, and as of when: the served copy or the device's (`nightCopyShown`).
+  shown: ComputedRef<T | null>
+  shownAt: ComputedRef<number | null>
   pending: Ref<boolean>
   error: Ref<Error | null>
   live: Ref<boolean>
   recall: () => void
   refresh: () => Promise<void>
-  // Whether any load has answered during this visit, which a failure after it does not undo.
-  fetched: Ref<boolean>
 }
 
-export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: () => Promise<T>, options: NightCacheOptions = {}): NightCache<T> {
+export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: () => Promise<T>, options: NightCacheOptions<T> = {}): NightCache<T> {
   const store = options.store ?? deviceNightCacheStore()
   const data = shallowRef<T | null>(null)
   const cachedAt = ref<number | null>(null)
   const pending = ref(false)
   const error = ref<Error | null>(null)
   const live = ref(false)
+  // Whether any load has answered during this visit, which a failure after it does not undo.
   const fetched = ref(false)
   const ask = newestRequest()
+  const served = options.served
+  const shown = computed(() => nightCopyShown(served?.value?.data ?? null, data.value, fetched.value))
+  const shownAt = computed(() => nightCopyShown(served?.value?.at ?? null, cachedAt.value, fetched.value))
 
   // What the device holds, with no round trip. A screen shows this before it asks for anything,
   // which is what makes an offline open a full render rather than a spinner.
@@ -101,17 +114,21 @@ export function useNightCache<T>(key: MaybeRefOrGetter<NightCacheKey>, loader: (
     }
   }
 
-  function open(): void {
-    recall()
+  function open(recalled = false): void {
+    if (!recalled) recall()
     if (options.immediate !== false) void refresh()
   }
 
-  // After mount, never during setup: the server holds no device store, so reading one into the
-  // first render would be a hydration mismatch on every night screen.
-  if (getCurrentInstance()) onMounted(open)
-  watch(() => toValue(key), open)
+  // On a navigation nothing served has to match, so the device's copy is drawn from the first render.
+  const recalledAtSetup = options.hydrating === false && typeof window !== 'undefined' && getCurrentInstance() !== null
+  if (recalledAtSetup) recall()
 
-  return { data, cachedAt, pending, error, live, recall, refresh, fetched }
+  // Otherwise after mount, never during setup: the server holds no device store, so reading one into
+  // the first render would be a hydration mismatch; beside a served copy it is not read at all.
+  if (getCurrentInstance()) onMounted(() => open(recalledAtSetup || served?.value != null))
+  watch(() => toValue(key), () => open())
+
+  return { data, cachedAt, shown, shownAt, pending, error, live, recall, refresh }
 }
 
 // What one screen caches for another, so the emergency card is there from the start of the shift

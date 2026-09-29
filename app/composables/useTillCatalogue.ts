@@ -1,4 +1,4 @@
-import { nightCacheKey, nightCopyShown } from '#shared/utils/night-cache'
+import { nightCacheKey } from '#shared/utils/night-cache'
 import { currentShowNight } from '#shared/utils/show-night'
 import { useNightCache } from './useNightCache'
 import { watchSinceMount } from '../utils/watch-since-mount'
@@ -16,10 +16,10 @@ function readSaleCatalogue(request: ReturnType<typeof useRequestFetch>, venueId:
   return request<SaleCatalogue>('/api/till/products', { query: { venueId: venueId ?? undefined } })
 }
 
-// For the served page alone, and only over an open session; a failed read serves no grid, and the
-// phone's own copy and refresh take over once mounted. `request` is the page's, taken during setup.
+// For the served page alone, and only over an open session: a phone navigating here draws its own
+// copy and refreshes it (K-103). `request` is the page's, taken during setup.
 export async function readServedCatalogue(request: ReturnType<typeof useRequestFetch>, session: TillSession | null, venueId: string | null): Promise<ServedCatalogue | null> {
-  if (!session || !venueId) return null
+  if (import.meta.client || !session || !venueId) return null
   const read = await settleRead(() => readSaleCatalogue(request, venueId))
   return read.kind === 'READ' ? { data: read.value, at: read.at } : null
 }
@@ -31,7 +31,9 @@ export function useTillCatalogue(session: Ref<TillSession | null>, venueId: Ref<
 
   // Whole-night, not venue-scoped: products, variants and prices are estate-wide (F-202).
   const catalogueKey = computed(() => nightCacheKey({ screen: 'till-products', night: currentShowNight(), wholeNight: true }))
-  const catalogue = useNightCache<SaleCatalogue>(catalogueKey, () => readSaleCatalogue(request, venueId.value), { immediate: false })
+  // The served grid is this request's own, so it stays on screen until the phone's refresh answers;
+  // the device's copy, perhaps another bar's stock, is drawn only on a navigation with nothing served.
+  const catalogue = useNightCache<SaleCatalogue>(catalogueKey, () => readSaleCatalogue(request, venueId.value), { immediate: false, served, hydrating: useNuxtApp().isHydrating })
 
   // The grid's stock labels trail the shelf from the moment they load, so coming back to the till
   // (from the SumUp app, say) reads them again (F-128 criterion 8).
@@ -41,10 +43,8 @@ export function useTillCatalogue(session: Ref<TillSession | null>, venueId: Ref<
   onMounted(() => document.addEventListener('visibilitychange', onReturn))
   onBeforeUnmount(() => document.removeEventListener('visibilitychange', onReturn))
 
-  // The served grid is this request's own, so it stays on screen until the phone's refresh answers;
-  // the device's copy, perhaps another bar's stock, is drawn only on a navigation with nothing served.
-  const sale = computed(() => nightCopyShown(served.value?.data ?? null, catalogue.data.value, catalogue.fetched.value))
-  const saleAt = computed(() => nightCopyShown(served.value?.at ?? null, catalogue.cachedAt.value, catalogue.fetched.value))
+  const sale = catalogue.shown
+  const saleAt = catalogue.shownAt
   const categories = computed(() => sale.value?.categories ?? [])
   const products = computed(() => sale.value?.products ?? [])
   const productsIn = (categoryId: string): SaleProduct[] => products.value.filter(product => product.categoryId === categoryId)

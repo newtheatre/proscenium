@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysWhenLong } from '#shared/utils/when'
-import { nightCacheKey, nightCopyShown } from '#shared/utils/night-cache'
+import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 import { telHref } from '#shared/utils/tonight'
@@ -36,27 +36,20 @@ interface Cards { viewerId: string, cards: Card[] }
 const request = useRequestFetch()
 const { account } = useAccount()
 
-// The same whole-night key `app/layouts/tonight.vue` primes: the device's own last-cached cards
-// open the screen with no round trip at all (criterion 2).
-const key = nightCacheKey({ screen: 'emergency-cards', night: currentShowNight(), wholeNight: true })
-const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emergency'))
-
-// A phone navigating here renders nothing the server sent, so it opens on the device's copy at once
-// rather than on mount; a hydrating one must match the served page first.
-if (import.meta.client && !useNuxtApp().isHydrating) cache.recall()
-
 // Rendered into the HTML, so a first-ever visit with no signal still carries the address to read
-// out (E-113 criterion 4). The server alone asks: a phone has its own copy and refreshes it.
-const served = shallowRef<{ cards: Cards, at: number } | null>(null)
-useServedRead('tonight-emergency', async () => import.meta.server ? await settleRead(() => request<Cards>('/api/tonight/emergency')) : null, (read) => {
-  if (read?.kind === 'READ') served.value = { cards: read.value, at: read.at }
-})
+// out (E-113 criterion 4); a phone navigating here opens on its own copy instead.
+const served = shallowRef<{ data: Cards, at: number } | null>(null)
+useServedRead('tonight-emergency', () => settleRead(() => request<Cards>('/api/tonight/emergency')), (read) => {
+  if (read.kind === 'READ') served.value = { data: read.value, at: read.at }
+}, { serverOnly: true })
 
-// The served cards are this request's own, so they stand until the phone's refresh answers; the
-// device's copy is drawn only on a navigation, with nothing served. Its numbers are only its fetcher's.
-const shown = computed(() => nightCopyShown<{ cards: Cards, at: number | null }>(served.value, cache.data.value ? { cards: cache.data.value, at: cache.cachedAt.value } : null, cache.fetched.value))
-const cards = computed(() => emergencyCardsFor(shown.value?.cards ?? null, account.value.user?.id ?? null))
-const asOfAt = computed(() => shown.value?.at ?? null)
+// The same whole-night key `app/layouts/tonight.vue` primes: the device's own last-cached cards
+// open a navigation with no round trip at all (criterion 2), and the served ones stand until its refresh.
+const key = nightCacheKey({ screen: 'emergency-cards', night: currentShowNight(), wholeNight: true })
+const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emergency'), { served, hydrating: useNuxtApp().isHydrating })
+
+// Its numbers are only its fetcher's (A-114).
+const cards = computed(() => emergencyCardsFor(cache.shown.value, account.value.user?.id ?? null))
 
 // Every venue keeps 999, beside whoever its card rings first (issue 1519, 0106).
 const calls = computed(() => emergencyCalls(cards.value ?? []))
@@ -98,7 +91,7 @@ function isolation(one: Card): string[] {
 <template>
   <NightScreen
     title="Emergency"
-    :stale="asOfAt"
+    :stale="cache.shownAt.value"
     :busy="cache.pending.value && !cards"
   >
     <div class="space-y-4">

@@ -4,6 +4,7 @@ import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
 import { OFFICER_SIGN_OFF_NOTICE, holdsTheClose, openAtClose, saysSignOffOpens, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
+import { newestRequest } from '#shared/utils/night-cache'
 import { saysTeamHolder } from '#shared/utils/tonight'
 import { saysClock } from '#shared/utils/when'
 import type { ChecklistEntry } from '#shared/utils/checklist'
@@ -53,13 +54,12 @@ const { now, stamp } = useNightClock()
 const via = ref<NightAuthorityVia | null>(null)
 const choices = ref<{ performanceId: string, showTitle: string, startsAt: number }[]>([])
 
-let asking = 0
+const asking = newestRequest()
 
 // Scoped to the performance on screen, because a shift on the other house must not hide that
 // this one is signed as a stand-in; only the unscoped answer, the shell's own, lists the houses.
 function readAuthority(asked: string | null): Promise<SettledRead<NightAuthorityAnswer>> {
-  if (!asked) return askNightAuthority('DUTY_MANAGER')
-  return settleRead(() => request<NightAuthorityAnswer>('/api/tonight/authority', { query: { role: 'DUTY_MANAGER', performanceId: asked } }))
+  return askNightAuthority('DUTY_MANAGER', asked ?? undefined)
 }
 
 function applyAuthority(asked: string | null, answered: SettledRead<NightAuthorityAnswer>): void {
@@ -72,10 +72,10 @@ function applyAuthority(asked: string | null, answered: SettledRead<NightAuthori
 }
 
 async function loadAuthority(): Promise<void> {
-  const mine = ++asking
+  const mine = asking()
   const asked = performanceId.value
   const answered = await readAuthority(asked)
-  if (mine === asking) applyAuthority(asked, answered)
+  if (mine.newest()) applyAuthority(asked, answered)
 }
 
 function readDraft(asked: string | null): Promise<SettledRead<Report>> {

@@ -1,10 +1,9 @@
 import { listFailureFrom } from './useListFailure'
 import { can, workTheTill } from '#shared/utils/abilities'
 import type { ListFailure } from './useListFailure'
+import type { SettledRead } from '~/utils/refusal'
 import type { ResolveOutcome, SumupAttemptStatus } from '#shared/utils/sumup'
 import type { EarlierTillLeftOpen } from '#shared/utils/till'
-
-export type EarlierRead = { kind: 'READ', value: EarlierTillLeftOpen } | { kind: 'FAILED', failure: ListFailure }
 
 // What ended nights left open, for the Bar Manager on tonight's till (F-102 criterion 5, issue
 // 1316). Read only for the standing role, since no shift reaches back into a night.
@@ -20,17 +19,11 @@ export function useTillEarlier() {
   const notes = ref<Record<string, string>>({})
 
   // Null for anybody but the Bar Manager, who alone is asked.
-  async function read(): Promise<EarlierRead | null> {
-    if (!offered.value) return null
-    try {
-      return { kind: 'READ', value: await request<EarlierTillLeftOpen>('/api/till/earlier') }
-    }
-    catch (refused) {
-      return { kind: 'FAILED', failure: listFailureFrom(refused) }
-    }
+  function read(): Promise<SettledRead<EarlierTillLeftOpen, ListFailure> | null> {
+    return offered.value ? settleReadWith(() => request<EarlierTillLeftOpen>('/api/till/earlier'), listFailureFrom) : Promise.resolve(null)
   }
 
-  function apply(answered: EarlierRead | null): void {
+  function apply(answered: SettledRead<EarlierTillLeftOpen, ListFailure> | null): void {
     if (answered?.kind === 'READ') left.value = answered.value
     else if (answered) failure.value = answered.failure
   }

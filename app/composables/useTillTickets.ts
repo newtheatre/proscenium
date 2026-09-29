@@ -3,14 +3,16 @@ import { watchSinceMount } from '../utils/watch-since-mount'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
+import { newestRequest } from '#shared/utils/night-cache'
 import type { TillBooking, WalkUpOption } from '#shared/utils/sale'
 import type { ScannerFailure } from '#shared/utils/door'
+import type { TillSession } from '#shared/utils/till'
 import type { WalkUpLine } from './useTillBasket'
 
 // The Tickets pane (F-122, F-123): a booking found by camera, reference or name, and a walk-up
 // built from tonight's houses here. Held apart from the drinks basket, unit-testable on its own.
 
-export function useTillTickets(venueId: Ref<string | null>) {
+export function useTillTickets(venueId: Ref<string | null>, session: Ref<TillSession | null>) {
   const cameraOpen = ref(false)
   const cameraNote = ref<string | null>(null)
   const lookupTerm = ref('')
@@ -101,24 +103,25 @@ export function useTillTickets(venueId: Ref<string | null>) {
     if (!walkUpPerformanceId.value && performances.length === 1) walkUpPerformanceId.value = performances[0]!.id
   }, { immediate: true })
 
-  // Each read numbered, so a slower answer for a house no longer chosen never prices the walk-up.
-  let optionsAsked = 0
+  // The newest read alone may answer, so a slower one for a house no longer chosen never prices the
+  // walk-up; read only over an open session, never on a closed till.
+  const optionsRead = newestRequest()
   async function loadWalkUpOptions(): Promise<void> {
-    const mine = ++optionsAsked
+    const mine = optionsRead()
     const performanceId = walkUpPerformanceId.value
     walkUpOptions.value = []
     walkUpQty.value = {}
     walkUpOptionsFailure.value = null
-    if (!performanceId || !venueId.value) return
+    if (!performanceId || !venueId.value || !session.value) return
     try {
       const answered = await $fetch<{ options: WalkUpOption[] }>('/api/till/walk-up-options', { query: { venueId: venueId.value, performanceId } })
-      if (mine === optionsAsked) walkUpOptions.value = answered.options
+      if (mine.newest()) walkUpOptions.value = answered.options
     }
     catch (refused) {
-      if (mine === optionsAsked) walkUpOptionsFailure.value = refusalText(refused)
+      if (mine.newest()) walkUpOptionsFailure.value = refusalText(refused)
     }
   }
-  watchSinceMount([walkUpPerformanceId, venueId], loadWalkUpOptions)
+  watchSinceMount([walkUpPerformanceId, venueId, () => session.value?.id ?? null], loadWalkUpOptions)
 
   function bumpWalkUp(typeId: string, by: number): void {
     walkUpQty.value[typeId] = Math.max(0, Math.min(20, (walkUpQty.value[typeId] ?? 0) + by))

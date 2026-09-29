@@ -1366,19 +1366,25 @@ shell it arrives after the screen draws, which says Syncing meanwhile, rather th
 on the network. Every read on the screens served this way settles through `settleRead()`
 (`app/utils/refusal.ts`), and the hub's staleness through `hubHouseAfter()` in
 `shared/utils/night-hub.ts` (issue 1521); the night report, the till, the bar shift's stocktake,
-the emergency card and a refusal card's help line read the same way. The till serves only what the
-server holds: its session and bar (`useTillSession()`), the Bar Manager's earlier nights, and the
-catalogue, read on the server alone. The served grid is this request's own, so it stays on screen,
-with no Syncing, until the phone's background refresh on mount answers; the phone's cached copy,
-which is whole-night and may carry another bar's stock, is drawn only on a navigation with nothing
-served (`nightCopyShown()` in `shared/utils/night-cache.ts`, which compares no clocks). Its basket
-and its card attempts stay the device's (K-103, 0096), as does the list of unanswered charges, read
-only once the attempt this phone left has settled and leaving that one out. A night that asks which
-bar and names none in the address cannot be served, since the answer is this phone's memory
-(`tillRefusalStep()` in `shared/utils/till.ts`): the served page says Syncing, with no picker and no
-Open till, until the phone has read it. A watcher set up after a served read has filled its source
-never sees it change, so the till's refreshes, its open charges and its walk-up options run through
-`watchSinceMount()` (`app/utils/watch-since-mount.ts`), once on mount and on every change after. A
+the emergency card and a refusal card's help line read the same way, a console list's failure
+through `settleReadWith()` with its enrol path. The till serves only what the server holds: its
+session and bar (`useTillSession()`), the Bar Manager's earlier nights, and the catalogue, read on
+the server alone (`useServedRead()`'s `serverOnly`, and `readServedCatalogue()` for the grid inside
+the till's read). A served copy is this request's own, so `useNightCache(..., { served })` shows it,
+with no Syncing, until the phone's own refresh answers, and does not read the device's copy beside
+it; the device's copy, which is whole-night and may carry another bar's stock, is drawn only on a
+navigation with nothing served, and then from setup (`nightCopyShown()` in
+`shared/utils/night-cache.ts`, which compares no clocks). The till's basket and its card attempts
+stay the device's (K-103, 0096), as does the list of unanswered charges, read only once the attempt
+this phone left has settled and leaving that one out. The bar this device opened tonight is kept in
+a night-scoped cookie, `nnt-till-venue` (not httpOnly, SameSite Lax, ending at 04:00 London), written
+only on the phone when a till opens or a bar is picked and cleared when that bar is refused, so the
+server reads it too: on a night that asks which bar, the served page opens the remembered one
+(`tillRefusalStep()` in `shared/utils/till.ts`), still asking unaided first so a night the server
+resolves opens where it says. A bar an earlier build kept in the device store is carried over once on
+mount. A watcher set up after a served read has filled its source never sees it change, so the
+till's refreshes, its open charges and its walk-up options run through `watchSinceMount()`
+(`app/utils/watch-since-mount.ts`), once on mount and on every change after. A
 caller `requireNightAuthority` refuses is shown the hub's own
 fallback links instead of a failure banner, which is how `/tonight` still serves a DOOR or BAR shift
 holder who is not tonight's duty manager. Content warnings, the latecomer policy and the age
@@ -1742,8 +1748,8 @@ the criterion names. The server render also reads the cards into the page throug
 `useServedRead()`, so a first-ever visit with no signal still carries every address (E-113
 criterion 4); a phone navigating from another screen opens on the device's copy during setup, with
 no network wait, and only the server asks for the served one. The served cards stand until the
-phone's own refresh answers (`nightCopyShown()`), never compared by clock with the device's copy.
-Whole-night rather than venue-scoped, since the answer already holds every
+phone's own refresh answers (`useNightCache`'s `served`), never compared by clock with the device's
+copy. Whole-night rather than venue-scoped, since the answer already holds every
 venue running tonight. A phone may be shared, so the copy it keeps is stamped with `viewerId` and
 the screen shows its duty managers' numbers only to that account (`emergencyCardsFor`); anybody
 else sees the same cards without them. Signing out (`AuthStatus.vue`) clears every night key on
@@ -2164,7 +2170,7 @@ answered, and `cache.error` is the failure that left the screen stale rather tha
 | An answer or failure landing after a newer request's has answered is dropped; one landing first is kept. | A screen asks again on focus, after a sale and on a session change, and the slowest answer is not the freshest: a read taken before a sale must not replace one taken after it, yet a newer request that fails must not blank one that answered (criteria 2 and 5). |
 | A successful load sweeps every other night's entries. | A night ends at 04:00 and takes its cache with it; nothing else on the device is touched. |
 | Unreadable, foreign-version or foreign-key entries read as nothing cached. | A screen that throws on an entry an older build wrote is worse than one that reloads. |
-| `cache.fetched` says a load has answered during this visit, and a failure after it does not undo it. | A screen served a copy by the server shows that copy until its own read lands (`nightCopyShown()`), then the device's, without comparing the server's clock with the phone's (issue 1521). |
+| `served` is a copy the server rendered into the page: `cache.shown` and `cache.shownAt` are it until a load answers during this visit, then the device's, and beside it the device's copy is not read on mount; with `hydrating: false`, a navigation, the device's copy is read at setup. | The page the server sent is this request's own and must be drawn as sent; the phone's copy may be older, or another bar's, and the server's clock is never compared with the phone's (`nightCopyShown()`, issue 1521). |
 | `primeNightCache(key, load)` caches what another screen will need. | The emergency card is cached from the start of the shift rather than from the first visit to it (criterion 3, E-113 criterion 2). |
 | The store is `localStorage`, falling back to memory when a device refuses it. | A screen that cannot cache still has to render, and the fallback lives as long as the tab. |
 

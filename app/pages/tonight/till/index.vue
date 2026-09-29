@@ -46,7 +46,7 @@ const {
   openCloseModal,
   confirmClose,
   read: readTill,
-  apply: applyTill,
+  settle: settleTill,
 } = useTillSession()
 
 // What ended nights left open, for the Bar Manager alone; a till closed from it leaves the list.
@@ -68,16 +68,19 @@ const request = useRequestFetch()
 const servedCatalogue = shallowRef<ServedCatalogue | null>(null)
 
 // In the served page: whether tonight's till is open and at which bar, its grid, and what earlier
-// nights left open. Before the composables below, so hydration settles it ahead of their watchers.
-const syncing = useServedRead('tonight-till', async () => {
-  const [till, earlier] = await Promise.all([readTill(), readEarlier()])
-  const status = till.status.kind === 'READ' ? till.status.value : null
-  // On the server alone: a phone navigating here draws its own copy and refreshes it (K-103).
-  const catalogue = import.meta.server ? await readServedCatalogue(request, status?.session ?? null, status?.venueId ?? null) : null
+// nights left open. Set up before the composables below only so their first refresh is not doubled.
+useServedRead('tonight-till', async () => {
+  const [{ till, catalogue }, earlier] = await Promise.all([
+    readTill().then(async (till) => {
+      const status = till.status.kind === 'READ' ? till.status.value : null
+      return { till, catalogue: await readServedCatalogue(request, status?.session ?? null, status?.venueId ?? null) }
+    }),
+    readEarlier(),
+  ])
   return { till, earlier, catalogue }
 }, (served) => {
   servedCatalogue.value = served.catalogue
-  applyTill(served.till)
+  settleTill(served.till)
   applyEarlier(served.earlier)
 })
 
@@ -135,7 +138,7 @@ const {
   walkUpGuest,
   walkUpGuestIncomplete,
   resetTickets,
-} = useTillTickets(venueId)
+} = useTillTickets(venueId, session)
 
 const {
   basket,
@@ -182,6 +185,13 @@ const {
   requestPrice: body => $fetch<PricedBasket>('/api/till/price', { method: 'POST', body }),
   recordAgeCheck: body => $fetch('/api/tonight/age-checks', { method: 'POST', body }),
   online,
+})
+
+// Nothing about the session is drawn until the screen has its answer, so no Open till comes and goes.
+const tillClosed = computed(() => settled.value && !session.value)
+const hint = computed(() => {
+  if (tillClosed.value) return 'One till for the whole night. Everyone at this bar sells against it.'
+  return session.value && basketEmpty.value ? 'Tap an item to add it; one with several sizes asks which. Quantities and lines are editable before payment.' : undefined
 })
 
 // A collapsed reminder above the pinned actions, so checking the basket does not mean scrolling
@@ -577,12 +587,10 @@ const basketBindings = computed(() => ({
   <div>
     <NightScreen
       title="Till"
-      :hint="!settled ? undefined : session
-        ? (basketEmpty ? 'Tap an item to add it; one with several sizes asks which. Quantities and lines are editable before payment.' : undefined)
-        : 'One till for the whole night. Everyone at this bar sells against it.'"
-      :empty="settled && !session"
+      :hint="hint"
+      :empty="tillClosed"
       :stale="session ? saleAt : syncedAt"
-      :busy="busy || syncing || !settled || (catalogue.pending.value && !sale)"
+      :busy="busy || !settled || (catalogue.pending.value && !sale)"
       :refused="failure && !needsVenue && !failure.enrolPath && failureStatus === 403 ? failure.message : null"
     >
       <TillEarlierNights
@@ -927,7 +935,7 @@ const basketBindings = computed(() => ({
       </div>
 
       <div
-        v-else-if="settled"
+        v-else-if="tillClosed"
         class="space-y-3"
       >
         <p data-test="till-closed">
@@ -1072,7 +1080,7 @@ const basketBindings = computed(() => ({
           />
         </template>
         <NightAction
-          v-if="settled && !session"
+          v-if="tillClosed"
           label="Open till"
           icon="i-lucide-lock-open"
           :loading="busy"
