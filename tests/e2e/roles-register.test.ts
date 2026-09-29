@@ -5,7 +5,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysDay, saysDayLong } from '#shared/utils/when'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openView, pickPerson, skipReason, startApp, textOf, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // The role register, end to end (A-131). What it grants, what it refuses and what the page says
@@ -303,8 +303,8 @@ describe.skipIf(skip !== null)('a grant carries its expiry, its note and its his
 // form and its challenge, the way an officer does.
 async function signedInView(): Promise<Bun.WebView> {
   const view = await openView({ width: 1280, height: 800 })
-  await view.navigate(`${app.baseURL}/sign-in`)
-  await waitFor(view, `document.querySelector('form input[type="email"]')`)
+  // Hydrated before the address is typed: the form reveals the password only then (0103).
+  await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', officer.email)
   await fill(view, 'form input[type="password"]', password)
   await click(view, 'form button[type="submit"]')
