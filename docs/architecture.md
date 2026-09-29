@@ -546,7 +546,11 @@ Reading the table:
 - A conditional write's audit row rides the write's own batch and only what it changed (0049),
   through one of four shapes in `server/utils/audit.ts`. `auditedWrite(write, entry)` batches
   the write with `auditIfChanged(entry)`, an insert conditioned on `changes() = 1`, and answers
-  whether it applied; `auditIfChanged` goes directly after the write when the batch holds more.
+  whether it applied, read from the rows the write returns: it refuses, before anything runs, a
+  write that returns none (`db.run`, or a builder without `.returning()`), since that would read
+  as not applied after it had landed (#1562). `tests/helpers/d1.ts` binds `@nuxthub/db` to a test
+  database, so an integration test can call such a function end to end (`audited-write.test.ts`).
+  `auditIfChanged` goes directly after the write when the batch holds more.
   `auditWhere(entry, condition)` writes under any condition and answers with the row it wrote:
   first in a batch, under the batch's one guard, it says whether the whole batch applied (the
   ticket edit, whose writes are then gated on `entryLanded`, since its guard reads what they

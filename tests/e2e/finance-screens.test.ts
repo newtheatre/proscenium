@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
+import { saysDay } from '#shared/utils/when'
 import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -88,8 +89,7 @@ describe.skipIf(skip !== null)('/money: the dashboard over one of the theatre\'s
 })
 
 describe.skipIf(skip !== null)('/money/periods: the preview shown before closing (I-107 criterion 5)', () => {
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-  test.skip('a clear range previews with nothing blocking, and the treasurer closes it', async () => {
+  test('a clear range previews with nothing blocking, and the treasurer closes it', async () => {
     const fromDay = '2019-01-01'
     const toDay = '2019-01-31'
 
@@ -103,9 +103,7 @@ describe.skipIf(skip !== null)('/money/periods: the preview shown before closing
     expect(closed.status).toBe(200)
   })
 
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-
-  test.skip('an open variance inside the range is named in the preview, and closing still succeeds around it', async () => {
+  test('an open variance inside the range is named in the preview, and closing still succeeds around it', async () => {
     const fromDay = '2019-02-01'
     const toDay = '2019-02-28'
     zReading('2019-02-15', 50)
@@ -127,8 +125,7 @@ describe.skipIf(skip !== null)('/money/periods: the preview shown before closing
 })
 
 describe.skipIf(skip !== null)('/money/periods: reopening with the range typed back (I-107 criterion 4)', () => {
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-  test.skip('the treasurer closes, box office cannot reopen, and an administrator reopens with the matching range', async () => {
+  test('the treasurer closes, box office cannot reopen, and an administrator reopens with the matching range', async () => {
     const fromDay = '2019-04-01'
     const toDay = '2019-04-30'
     const closed = await send('POST', '/api/admin/finance/periods', { fromDay, toDay }, treasurer.cookie)
@@ -142,8 +139,7 @@ describe.skipIf(skip !== null)('/money/periods: reopening with the range typed b
 })
 
 describe.skipIf(skip !== null)('/money/exports: editing a mapping before the CSV reads it (I-108 criteria 1, 2, 3)', () => {
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-  test.skip('the treasurer edits the mapping and the export carries it, with a proper header row', async () => {
+  test('the treasurer edits the mapping and the export carries it, with a proper header row', async () => {
     const database = new Database(app.databaseFile)
     try {
       database.query(`
@@ -186,9 +182,7 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     expect((await send('GET', '/api/admin/finance/season?kind=SEASON&year=2020', undefined, treasurer.cookie)).status).toBe(400)
   })
 
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-
-  test.skip('the summary answers a term as the range the term itself carries', async () => {
+  test('the summary answers a term as the range the term itself carries', async () => {
     const defined = await send('POST', '/api/admin/finance/terms', { label: 'Autumn 2019', fromDay: '2019-09-23', toDay: '2019-12-13' }, treasurer.cookie)
     expect(defined.status).toBe(200)
 
@@ -198,9 +192,7 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     expect(summary).toMatchObject({ fromDay: '2019-09-23', toDay: '2019-12-13' })
   })
 
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-
-  test.skip('the screen offers the term, and its money column is headed Amount rather than Pence', async () => {
+  test('the screen offers the term, and its money column is headed Amount rather than Pence', async () => {
     await send('POST', '/api/admin/finance/terms', { label: 'Spring 2020', fromDay: '2020-01-13', toDay: '2020-03-27' }, treasurer.cookie)
 
     const view = await openSignedOutView(app.baseURL)
@@ -215,12 +207,14 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     expect(await textOf(view, '[data-test="section-revenue"] thead')).toContain('Amount')
     expect(await textOf(view, '[data-test="section-revenue"] thead')).not.toContain('Pence')
 
-    await pickOption(view, '[data-test="period-kind"]', 'TERM')
+    await pickOption(view, '[data-test="period-kind"]', 'Term')
     await pickOption(view, '[data-test="period-term"]', 'Spring 2020')
-    await waitFor(view, `document.body.innerText.includes('2020-01-13 to 2020-03-27')`)
+    // The screens say a day in words, as everywhere else (the range, then the list of terms).
+    const range = `${saysDay('2020-01-13', { year: true })} to ${saysDay('2020-03-27', { year: true })}`
+    await waitFor(view, `document.body.innerText.includes(${JSON.stringify(range)})`)
 
     await visit(view, `${app.baseURL}/money/periods`, '[data-test="defined-terms"]')
-    expect(await textOf(view, '[data-test="defined-terms"]')).toContain('Spring 2020: 2020-01-13 to 2020-03-27')
+    expect(await textOf(view, '[data-test="defined-terms"]')).toContain(`Spring 2020: ${saysDay('2020-01-13')} to ${saysDay('2020-03-27')}`)
     view.close()
   }, 120_000)
 })

@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
       pricePence: input.pricePence,
       effectiveFrom: input.effectiveFrom,
       createdBy: resolved.account.id,
-    }),
+    }).returning({ id: schema.variantPrices.id }),
     auditEntry({
       actorId: resolved.account.id,
       action: 'bar.variant.price.set',
