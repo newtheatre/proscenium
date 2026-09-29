@@ -124,12 +124,14 @@ describe.skipIf(skip !== null)('a matinee and an evening at one venue, end to en
       performanceId: string
       ageChecks: { accepted: number }
       bar: { revenuePence: number, itemsSold: number, nightCardSalesPence: number }
+      takings: { bar: { tenders: { tender: string, totalPence: number }[] } }
       staffing: { role: string, name: string | null }[]
     }
     const eveningReport = await (await send('GET', `/api/tonight/report?performanceId=${eveningId}`, undefined, dm.cookie)).json() as {
       performanceId: string
       ageChecks: { accepted: number }
       bar: { revenuePence: number, itemsSold: number, nightCardSalesPence: number }
+      takings: { bar: { tenders: { tender: string, totalPence: number }[] } }
       staffing: { role: string, name: string | null }[]
     }
 
@@ -142,6 +144,8 @@ describe.skipIf(skip !== null)('a matinee and an evening at one venue, end to en
     expect(eveningReport.ageChecks).toMatchObject({ accepted: 1 })
     expect(eveningReport.bar).toMatchObject({ revenuePence: 0, itemsSold: 0 })
     // The till-close figure is the night's, quoted once on each report and labelled so (#1572).
+    expect(matineeReport.takings.bar.tenders).toEqual([{ tender: 'CARD', totalPence: 250 }])
+    expect(eveningReport.takings.bar.tenders).toEqual([])
     expect(matineeReport.bar.nightCardSalesPence).toBe(250)
     expect(eveningReport.bar.nightCardSalesPence).toBe(250)
     expect(eveningReport.staffing.find(row => row.role === 'DUTY_MANAGER')?.name).toBe(dm.name)

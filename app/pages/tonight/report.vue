@@ -132,7 +132,7 @@ const figures = computed(() => {
       { label: 'Discounts given', value: saysMoney(desk.discountsPence + bar.discountsPence) },
       { label: 'Bar items sold', value: String(read.bar.itemsSold) },
       // The reader serves the whole night, so its figure is labelled as the night's, not this show's.
-      ...(read.bar.nightCardSalesPence === undefined ? [] : [{ label: 'Bar card sales, whole night', value: saysMoney(read.bar.nightCardSalesPence) }]),
+      ...(read.bar.nightCardSalesPence === undefined ? [] : [{ label: 'Drinks on card, whole night', value: saysMoney(read.bar.nightCardSalesPence) }]),
     ] },
   ]
 })

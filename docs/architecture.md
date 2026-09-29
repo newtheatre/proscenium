@@ -1476,9 +1476,11 @@ against tonight's bar windows at the venue (F-126, 0078, `performanceForSale()` 
 session stays correct by design (criterion 5, `till_sessions` keyed to `venue_id` and `night`
 exactly as the criterion asks). `reportBarSummary(performanceId, night)` counts the bar's revenue
 and items from `ledger_lines.performance_id` (`reportBarForPerformanceQuery()`), and beside them
-quotes `cardSalesQuery(night)`, till-close's own figure, as `nightCardSalesPence`, labelled on the
-screen as the whole night's: one reader serves every performance that night (#1572, F-118
-criterion 4, E-127 criterion 4).
+quotes `cardSalesQuery(night)`, till-close's own figure, as `nightCardSalesPence`, shown as "Drinks
+on card, whole night", the till close's own words: one reader serves every performance that night
+(#1572, F-118 criterion 4, E-127 criterion 4). `reportTakings()` scopes the bar's tenders, comps
+and discounts to the performance the same way; a tab settlement carries no `performance_id`, so it
+leaves the per-performance tenders and only the till close counts it.
 
 Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) waited on D-126
 building `/tonight/door` at all, corrected onto this story's own dependency line, which omitted

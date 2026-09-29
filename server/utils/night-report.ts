@@ -5,7 +5,6 @@ import { admittedSeatsSubquery, admittedWalkUpSeatsSubquery, heldSeatsSubquery, 
 import { cardSalesQuery } from './reconciliation'
 import { lateAdditionsQuery } from './late-charge'
 import { DOOR_COVER_ACTION, NIGHT_ROLES, OFFICER_BYPASS_ACTION, doorCoverTarget, officerBypassTarget } from '#shared/utils/night-authority'
-import { showNightBounds } from '#shared/utils/show-night'
 import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { LateAddition } from '#shared/utils/sumup'
@@ -65,16 +64,11 @@ export async function reportAttendance(performanceId: string): Promise<ReportAtt
 
 export interface TenderTotal { tender: string, totalPence: number }
 
-// A performance's own lines for the desk; the whole show night's for the bar, since a basket
-// sells for the night and a matinee-plus-evening leaves performance_id null (F-118, E-127).
-type TakingsScope = { performanceId: string } | { night: string }
+// A performance's own lines, the desk's and the bar's alike: a bar sale carries its performance (#1572).
+type TakingsScope = { performanceId: string }
 
 function scopeWindow(scope: TakingsScope): SQL {
-  if ('performanceId' in scope) return sql`ll.performance_id = ${scope.performanceId}`
-  const { from, to } = showNightBounds(scope.night)
-  const fromAt = Math.floor(from.getTime() / 1000)
-  const toAt = Math.floor(to.getTime() / 1000)
-  return sql`le.happened_at >= ${fromAt} AND le.happened_at < ${toAt}`
+  return sql`ll.performance_id = ${scope.performanceId}`
 }
 
 // One row per tender actually used; a tender nobody took tonight is simply absent; the caller
@@ -115,8 +109,8 @@ async function takingsFor(scope: TakingsScope, source: 'DESK' | 'TILL'): Promise
   return { tenders, compsPence: foregone?.compsPence ?? 0, discountsPence: foregone?.discountsPence ?? 0 }
 }
 
-export async function reportTakings(performanceId: string, night: string): Promise<ReportTakings> {
-  const [desk, bar] = await Promise.all([takingsFor({ performanceId }, 'DESK'), takingsFor({ night }, 'TILL')])
+export async function reportTakings(performanceId: string): Promise<ReportTakings> {
+  const [desk, bar] = await Promise.all([takingsFor({ performanceId }, 'DESK'), takingsFor({ performanceId }, 'TILL')])
   return { desk, bar }
 }
 
@@ -335,7 +329,7 @@ export interface NightReport {
 export async function compileNightReport(performanceId: string, venueId: string, night: string): Promise<NightReport> {
   const [attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, covers, bar, access, checklist, lateAdditions] = await Promise.all([
     reportAttendance(performanceId),
-    reportTakings(performanceId, night),
+    reportTakings(performanceId),
     reportIncidents(performanceId),
     reportAgeChecks(performanceId),
     reportMilestones(venueId, night),
