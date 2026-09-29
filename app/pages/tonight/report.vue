@@ -27,7 +27,7 @@ interface Report {
   staffing: { shiftId: string, role: ShiftRole, slot: number, status: ShiftStatus, name: string | null, officerBypass?: boolean }[]
   bypasses?: OfficerBypassLine[]
   covers?: { name: string | null }[]
-  // A report frozen before #1572 carries no night figure.
+  // Absent from a report frozen before the bar was read per performance.
   bar: { revenuePence: number, itemsSold: number, nightCardSalesPence?: number }
   // Absent from a report frozen before late additions were read.
   lateAdditions?: LateAddition[]
