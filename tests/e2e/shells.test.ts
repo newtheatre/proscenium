@@ -163,7 +163,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     // away, and a session planted by script is refused over one another suite left behind.
     const view = await signInView(app, deskOfficer.email, deskOfficerPassword, { width: 1280, height: 800 })
     try {
-      await visit(view, `${app.baseURL}/dev`)
+      await visit(view, `${app.baseURL}/dev`, '[data-test="account-menu"]')
       const href = await view.evaluate<string | null>(`(() => {
         const header = document.querySelector('aside a[href="/admin"], nav a[href="/admin"]')
         return header ? header.getAttribute('href') : null
