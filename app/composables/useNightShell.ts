@@ -48,6 +48,8 @@ export interface NightAuthority {
   refusal: string | null
   // Each answer as it came, for a screen's served first read to reuse within the same request.
   answers: Partial<Record<NightAuthorityAsk, SettledRead<NightAuthorityAnswer>>>
+  // Being asked behind the page on a phone: the roles above are not yet this visit's (issue 1521).
+  asking: boolean
 }
 
 export function useNightAuthority(): Ref<NightAuthority> {
@@ -55,23 +57,31 @@ export function useNightAuthority(): Ref<NightAuthority> {
 }
 
 function unknownNightAuthority(): NightAuthority {
-  return { roles: [], via: null, performances: [], known: false, refusal: null, answers: {} }
+  return { roles: [], via: null, performances: [], known: false, refusal: null, answers: {}, asking: false }
 }
 
 // Which of tonight's roles the viewer actually holds, asked of the server rather than read from a
 // standing grant (0009, 0044). Hiding a tile is never the enforcement: every route guards itself.
 export async function resolveNightAuthority(): Promise<void> {
-  const request = useRequestFetch()
   const resolved = useNightAuthority()
+  resolved.value = { ...resolved.value, asking: true }
+  try {
+    resolved.value = await readNightAuthority()
+  }
+  finally {
+    // A read that throws must not leave the hub drawing Emergency alone for the rest of the visit.
+    resolved.value.asking = false
+  }
+}
+
+async function readNightAuthority(): Promise<NightAuthority> {
+  const request = useRequestFetch()
   const { account, refresh } = useAccount()
 
   // Signed out, every role answers 401, which says nothing; the phone's snapshot is checked first,
   // as `signed-in` does, since a session may have begun since it was read.
   if (import.meta.client && !account.value.signedIn) await refresh().catch(() => undefined)
-  if (!account.value.signedIn) {
-    resolved.value = unknownNightAuthority()
-    return
-  }
+  if (!account.value.signedIn) return unknownNightAuthority()
 
   // A role check is a read, so it records no officer bypass however often a screen makes it (0098).
   // With no role the server ranks the three refusals and names the most specific (issue 1411).
@@ -92,13 +102,14 @@ export async function resolveNightAuthority(): Promise<void> {
   const said = held.length === 0 && known && any.kind === 'FAILED' ? any.failure : null
   // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both; a duty
   // manager covering the door is on their own shift, so cover reads as a shift too (0095).
-  resolved.value = {
+  return {
     roles: held.map(one => one.role),
     via: held.some(one => one.via !== 'OFFICER') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
     performances: held[0]?.performances ?? [],
     known,
     refusal: hubRefusal(said),
     answers,
+    asking: false,
   }
 }
 

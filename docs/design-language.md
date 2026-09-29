@@ -179,7 +179,8 @@ Eleven rules follow:
    card each: each tile appears where the viewer's own resolved authority opens it (`hubTiles()`),
    the viewer's own job first and in gold, the rest in the order a night taps them, Emergency always
    and last and red. Where no role could be answered, signed out or with no signal, every tile
-   shows, since each screen guards itself; with no role at all the hub is one card and My rota. A
+   shows, since each screen guards itself; with no role at all the hub is one card and My rota;
+   while the roles are still being asked on arrival, only Emergency, which every answer keeps. A
    show-night screen is served as the viewer will use it, and a phone is never held on the network
    to get there: the shell's middleware (`app/middleware/night-authority.global.ts`) awaits the
    viewer's roles only while the server renders a `/tonight` screen, and asks them behind the page

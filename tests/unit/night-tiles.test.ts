@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { curtainIsDown, hubTiles, whoCanHelpTonight } from '#shared/utils/night-hub'
+import { curtainIsDown, hubTiles, hubTilesWhileAsking, whoCanHelpTonight } from '#shared/utils/night-hub'
 import { NIGHT_ROLES, claimedShiftRefusal, nightAuthorityRefusal, outsideWindowRefusal } from '#shared/utils/night-authority'
 import { hubRefusal, rolesThatReach, saysScreenIsFor } from '#shared/utils/refusals'
 import { viewAccounts, viewProgramme } from '#shared/utils/abilities'
+import type { NightRole } from '#shared/utils/night-authority'
 
 // Issue 1304: the hub is shaped by the viewer's own job, a refused screen says who can help, and a
 // signed-in refusal names the role that opens the screen.
@@ -39,6 +40,24 @@ describe('the hub shows the tiles the viewer\'s own authority opens (E-112 crite
 
   test('no role tonight leaves Emergency, always there', () => {
     expect(hubTiles([])).toEqual([{ id: 'emergency', gold: false }])
+  })
+})
+
+// Issue 1521: a phone arriving from elsewhere asks behind the page, and what it draws meanwhile stays.
+describe('while the roles are being asked, the hub draws only what every answer keeps (E-112 criterion 1)', () => {
+  test('that is Emergency alone, and nothing in gold', () => {
+    expect(hubTilesWhileAsking()).toEqual([{ id: 'emergency', gold: false }])
+  })
+
+  test('no answer, and no clock, takes any of it away', () => {
+    const answers: (readonly NightRole[] | null)[] = [null, [], ...NIGHT_ROLES.map(role => [role]), [...NIGHT_ROLES]]
+    for (const roles of answers) {
+      for (const curtainDown of [false, true]) {
+        const drawn = hubTiles(roles, curtainDown)
+        const lost = hubTilesWhileAsking().filter(tile => !drawn.some(kept => kept.id === tile.id && kept.gold === tile.gold))
+        expect(`${JSON.stringify(roles)} ${curtainDown}: ${ids(lost)}`).toBe(`${JSON.stringify(roles)} ${curtainDown}: `)
+      }
+    }
   })
 })
 
