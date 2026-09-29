@@ -5,7 +5,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysDay, saysDayLong } from '#shared/utils/when'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, pickPerson, skipReason, startApp, textOf, typeSearch, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // The role register, end to end (A-131). What it grants, what it refuses and what the page says
@@ -320,8 +320,8 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
     const holder = await person('onscreen')
     const view = await signedInView()
     try {
-      await view.navigate(`${app.baseURL}/people/roles?role=is:FOH_MANAGER`)
-      await waitFor(view, `document.querySelector('[data-test="role-tiles"]')`)
+      // Visited, so the page is live: a button pressed before hydration has no handler behind it.
+      await visit(view, `${app.baseURL}/people/roles?role=is:FOH_MANAGER`, '[data-test="role-tiles"]')
       expect(await textOf(view, '[data-test="role-tiles"]')).toContain('Front of House Manager')
 
       // Issue #1355: the default names its date, so a grant made in July is seen to end within weeks.
@@ -330,7 +330,8 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
 
       await pickPerson(view, '[data-test="grant-person"]', holder.email.split('@')[0]!, holder.name)
       await click(view, '[data-test="grant-submit"]')
-      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(holder.name)})`)
+      // The table, not the page: the picker already shows the chosen name before the grant lands.
+      await waitFor(view, `document.querySelector('[data-test="holders-table"]')?.innerText.includes(${JSON.stringify(holder.name)})`)
 
       expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)?.role).toBe('FOH_MANAGER')
       // And the register shows the year, which is what makes a lapse next summer read as one.
@@ -340,7 +341,8 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
       await click(view, `[data-test="revoke-${holder.id}-FOH_MANAGER"]`)
       await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-verb"]')`)
       await click(view, '[data-test="confirm-revoke-role-verb"]')
-      await waitFor(view, `!document.body.innerText.includes(${JSON.stringify(holder.name)})`)
+      // The table, not the page: the revoked toast names the person while it shows.
+      await waitFor(view, `!document.querySelector('[data-test="holders-table"]')?.innerText.includes(${JSON.stringify(holder.name)})`)
       expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)).toBeUndefined()
     }
     finally {
@@ -351,8 +353,7 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
   test('the register refuses the last administrator out loud rather than silently (criterion 7)', async () => {
     const view = await signedInView()
     try {
-      await view.navigate(`${app.baseURL}/people/roles?role=is:ADMIN`)
-      await waitFor(view, `document.querySelector('[data-test="holders-table"]')`)
+      await visit(view, `${app.baseURL}/people/roles?role=is:ADMIN`, '[data-test="holders-table"]')
       const self = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
 
       // K-123: the refusal renders in the confirmation, not in a page alert behind its overlay.
@@ -449,12 +450,10 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
     const email = registrableAddress('screen-incoming')
     const view = await signedInView()
     try {
-      await view.navigate(`${app.baseURL}/people/roles?role=is:BAR_MANAGER`)
-      await waitFor(view, `document.querySelector('[data-test="grant-form"]')`)
+      await visit(view, `${app.baseURL}/people/roles?role=is:BAR_MANAGER`, '[data-test="grant-form"]')
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
 
-      await click(view, '[data-test="grant-person"] input')
-      await fill(view, '[data-test="grant-person"] input', email)
+      await typeSearch(view, '[data-test="grant-person"] input', email)
       await waitFor(view, `document.querySelector('[data-test="grant-nobody-found"]')`, 20_000)
       await click(view, '[data-test="grant-nobody-found"]')
       await waitFor(view, `document.querySelector('[data-test="grant-by-email"]')`)
@@ -468,7 +467,7 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
       await waitFor(view, `document.querySelector('[data-test="grant-person"]')`)
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
 
-      await fill(view, '[data-test="grant-person"] input', registrableAddress('screen-again'))
+      await typeSearch(view, '[data-test="grant-person"] input', registrableAddress('screen-again'))
       await waitFor(view, `document.querySelector('[data-test="grant-nobody-found"]')`, 20_000)
       await click(view, '[data-test="grant-nobody-found"]')
       await click(view, '[data-test="grant-search-again"]')
