@@ -220,7 +220,8 @@ describe.skipIf(skip !== null)('the close compares the reader with the whole nig
 })
 
 describe.skipIf(skip !== null)('the night report carries the same figure, never a retyped one (criterion 4)', () => {
-  test('the report\'s bar revenue equals the reconciliation\'s own card sales', async () => {
+  // The till-close figure is the night's, quoted on the report as the night's (#1572).
+  test('the report\'s night card figure equals the reconciliation\'s own card sales', async () => {
     const { venueId, performanceId } = programme(`reconcile-report-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct(725)
     const opened = await (await openTill(venueId, performanceId)).json() as { session: { id: string } }
@@ -231,8 +232,8 @@ describe.skipIf(skip !== null)('the night report carries the same figure, never 
 
     const reported = await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, officer.cookie)
     expect(reported.status).toBe(200)
-    const report = await reported.json() as { bar: { revenuePence: number, itemsSold: number } }
-    expect(report.bar.revenuePence).toBe(reconciliation.bar.cardSalesPence)
+    const report = await reported.json() as { bar: { revenuePence: number, itemsSold: number, nightCardSalesPence: number } }
+    expect(report.bar.nightCardSalesPence).toBe(reconciliation.bar.cardSalesPence)
     expect(report.bar.itemsSold).toBe(1)
   })
 })

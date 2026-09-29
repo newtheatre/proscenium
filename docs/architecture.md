@@ -1474,7 +1474,11 @@ sale on a day with more than one performance names its house from the instant it
 against tonight's bar windows at the venue (F-126, 0078, `performanceForSale()` in
 `server/utils/sale.ts`), so each report's bar summary reads its own house, while the shared till
 session stays correct by design (criterion 5, `till_sessions` keyed to `venue_id` and `night`
-exactly as the criterion asks).
+exactly as the criterion asks). `reportBarSummary(performanceId, night)` counts the bar's revenue
+and items from `ledger_lines.performance_id` (`reportBarForPerformanceQuery()`), and beside them
+quotes `cardSalesQuery(night)`, till-close's own figure, as `nightCardSalesPence`, labelled on the
+screen as the whole night's: one reader serves every performance that night (#1572, F-118
+criterion 4, E-127 criterion 4).
 
 Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) waited on D-126
 building `/tonight/door` at all, corrected onto this story's own dependency line, which omitted
@@ -1907,7 +1911,7 @@ real SQL:
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
 | Milestones | `backstage_messages` | Venue and night, not performance: the board is E-120's own scope, so a matinee day's two reports read the same timeline and the reader judges which call belonged to which house from the clock. Closes the known-issues gap E-121 criterion 1 left open. |
 | Staffing | `shifts`, `audit_log` | One row per stamped slot, unfilled ones naming nobody. Beside it, `bypasses`: one line per `night.officer-bypass` row on the three targets `requireNightAuthority` writes for the venue's night (`night:{night}:{venueId}:{role}`), matched against this performance inside the bypass's own recorded `performanceIds`, naming the role, the officer and whether a confirmed shift of that role was on the performance (0098). And `covers`: the duty manager who covered the door, from the `night.door-cover` row for the venue's night whose `performanceIds` hold this performance (0095). |
-| Bar summary | `ledger_lines` | Revenue and items sold from this performance's `TILL`-sourced lines, alongside takings rather than instead of it. |
+| Bar summary | `ledger_lines` | Revenue and items sold from this performance's `TILL`-sourced lines, by `performance_id`, alongside takings rather than instead of it; and the night's till-close card figure, once, labelled as the whole night's (#1572). |
 | Access | `access_profiles`, `reservations`, `tickets` | A verified count only, never a need or an identity (criterion 3, D-127 criterion 3's own counts-only rule). |
 
 `GET /api/tonight/report` takes an optional `performanceId`; a venue running more than one

@@ -361,6 +361,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   2. Every figure derives from ledger and register queries at compile time, never a stored total; comps and discounts appear as foregone revenue, never as silent gaps.
   3. The access section carries counts only; a report can never contain an access need or the identity of an access-ticket holder.
   4. Before close, the report is viewable as a live draft that recomputes on each view.
+  5. Added 29 September 2026 (#1572, the IT Manager): the bar section counts only this performance's own bar sales, read from the ledger by each sale's performance, and also quotes the till-close card figure once, labelled as the whole night's, so the Z reading is still carried (F-118 criterion 4) and each performance keeps its own report (E-127 criterion 4).
 - Source: Prompt Book E-5, P4; audit PR-10 (report snapshot carries, now fully derived).
 
 ## E-124: Sign-off, freeze and distribution

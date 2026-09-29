@@ -45,7 +45,7 @@ const REPORT: NightReport = {
   staffing: [],
   bypasses: [],
   covers: [],
-  bar: { revenuePence: 0, itemsSold: 0 },
+  bar: { revenuePence: 0, itemsSold: 0, nightCardSalesPence: 0 },
   lateAdditions: [],
   access: { verified: 0 },
   checklist: [],
