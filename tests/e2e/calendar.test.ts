@@ -299,9 +299,10 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
     try {
       await signInOn(view, planner.email, password)
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
-      await waitFor(view, `document.querySelector('[data-test="calendar-failure"]')`, 30_000)
+      // A refused read shows the one failure card every list screen shares.
+      await waitFor(view, `document.querySelector('[data-test="read-failure"]')`, 30_000)
 
-      expect(await textOf(view, '[data-test="calendar-failure"]')).toContain('shorter')
+      expect(await textOf(view, '[data-test="read-failure"]')).toContain('shorter')
       expect(await textOf(view, 'body')).not.toContain('No rooms are bookable yet')
     }
     finally {
