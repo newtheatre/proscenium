@@ -4,6 +4,8 @@
 - Date: 2026-08-30
 - Amended: 29 September 2026 by 0109, under which the end-to-end suites run on every pull request
   into `unified/main`, held from gating until they are green, rather than nightly.
+- Amended: by 0110, under which `bun run test` copies one migrated schema per test rather than
+  migrating afresh, and takes seconds rather than under one.
 
 ## Context
 
