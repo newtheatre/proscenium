@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-08-30
+- Amended: 29 September 2026 by 0109, under which the end-to-end suites run on every pull request
+  into `unified/main`, held from gating until they are green, rather than nightly.
 
 ## Context
 
