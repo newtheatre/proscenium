@@ -7,6 +7,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillDate, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-119: sales, GP, variance, comp and discount reports, read live from the ledger, with a
@@ -88,7 +89,7 @@ async function aStockedProduct(pricePence: number, bottlePence: number): Promise
   await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 50 }] })
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return { variantId, itemId }
 }
 

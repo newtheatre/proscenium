@@ -8,6 +8,7 @@ import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { answerCharge, sellOnTheTill, startTypedCharge } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-122, F-123 and F-124 through the real routes: ticket money rides the bar's own ledger entry,
@@ -96,7 +97,7 @@ async function aSellableProduct(): Promise<{ variantId: string }> {
   const productId = await created(await send('POST', '/api/admin/bar/products', { name: named('Lemonade'), categoryId }))
   const variantId = await created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }))
   expect((await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 250, effectiveFrom: today() })).status).toBe(200)
-  expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
+  expect((await putOnTheTill(send, productId)).status).toBe(200)
   return { variantId }
 }
 

@@ -8,6 +8,7 @@ import { answerCharge, startTypedCharge } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { race } from '#tests/helpers/race'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-110: a comp sale requires a prior request with a reason; approval belongs to tonight's duty
@@ -91,7 +92,7 @@ async function aSellableProduct(pricePence = 500, ageRestricted = false): Promis
   const { id: variantId } = await variantAnswered.json() as { id: string }
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return { variantId, productId }
 }
 
@@ -325,7 +326,7 @@ describe.skipIf(skip !== null)('a comp sale writes a zero-value payment with ful
     await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 50 }] })
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
     await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 500, effectiveFrom: today })
-    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+    await putOnTheTill(send, productId)
 
     await openTill(venueId, performanceId)
     confirmShift(performanceId, 'DUTY_MANAGER', barManager.id)

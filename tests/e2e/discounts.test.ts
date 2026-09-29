@@ -7,6 +7,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-117: a discount is a capped percentage, editable in place, snapshotted onto every ledger
@@ -89,7 +90,7 @@ async function aSellableProduct(): Promise<{ variantId: string }> {
   const variantAnswered = await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' })
   const { id: variantId } = await variantAnswered.json() as { id: string }
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 500, effectiveFrom: today() })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return { variantId }
 }
 

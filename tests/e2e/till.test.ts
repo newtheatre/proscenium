@@ -11,6 +11,7 @@ import { currentShowNight } from '#shared/utils/show-night'
 import { officerBypassTarget } from '#shared/utils/night-authority'
 import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX } from '#shared/utils/night-shell'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-101 and F-102 through the real routes, both branches of E-111's guard: a confirmed BAR shift
@@ -128,7 +129,7 @@ async function aSellableProduct(pricePence: number, ageRestricted = false): Prom
   const variantAnswered = await request(app, 'POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }, admin.cookie)
   const { id: variantId } = await variantAnswered.json() as { id: string }
   await request(app, 'POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() }, admin.cookie)
-  await request(app, 'POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' }, admin.cookie)
+  await putOnTheTill((method, path, body) => request(app, method, path, body, admin.cookie), productId)
   return { productId, variantId }
 }
 

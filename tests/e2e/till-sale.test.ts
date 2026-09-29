@@ -6,6 +6,7 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-103 and F-107 through the real routes and the real screen: what the till may sell right now,
@@ -74,7 +75,7 @@ const aProductIn = async (categoryId: string, over: Record<string, unknown> = {}
   created(await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId, ...over }))
 
 const activate = (productId: string): Promise<Response> =>
-  send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  putOnTheTill(send, productId)
 
 const addVariant = async (productId: string, over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single', ...over }))
