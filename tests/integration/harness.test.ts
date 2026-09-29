@@ -24,6 +24,38 @@ describe('the integration harness', () => {
     finally { database.close() }
   })
 
+  // Every test database is a copy of one migrated image (0110); it must be the schema a real
+  // migration builds, and no copy may see another's rows.
+  test('a test database carries the whole migrated schema, and is its own', async () => {
+    const migrated = new Database(':memory:')
+    const first = await createTestDatabase()
+    const second = await createTestDatabase()
+    try {
+      await applyMigrations(migrated)
+      const schema = 'SELECT type, name, sql FROM sqlite_master ORDER BY type, name'
+      expect(first.raw.query(schema).all()).toEqual(migrated.query(schema).all())
+
+      first.raw.exec('CREATE TABLE probe (id INTEGER PRIMARY KEY)')
+      first.batch([['INSERT INTO probe (id) VALUES (?)', 1]])
+      expect(rows(second, `SELECT name FROM sqlite_master WHERE name = 'probe'`)).toEqual([])
+      expect((second.raw.query('PRAGMA foreign_keys').get() as { foreign_keys: number }).foreign_keys).toBe(1)
+    }
+    finally {
+      migrated.close()
+      first.close()
+      second.close()
+    }
+  })
+
+  test('an append-only table refuses a change in a test database', async () => {
+    const database = await createTestDatabase()
+    try {
+      database.raw.exec(`INSERT INTO audit_log (id, action) VALUES ('a1', 'test.action')`)
+      expect(() => database.raw.exec(`UPDATE audit_log SET action = 'test.other' WHERE id = 'a1'`)).toThrow()
+    }
+    finally { database.close() }
+  })
+
   // Atomicity is batch only (0001, 0003), so a failing statement must leave nothing behind.
   test('a batch is all or nothing', async () => {
     const database = await createTestDatabase()
