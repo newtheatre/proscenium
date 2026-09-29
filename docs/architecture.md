@@ -365,8 +365,10 @@ A period (a term, a season, a year, any range the treasurer names) closes as a r
 never as a flag on the entries it covers: closing cannot mutate what it closes, the same rule
 that keeps the ledger itself append-only (0010). The enforcement is a single trigger,
 `ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`: a day is locked if
-the latest `period_locks` row covering it (ordered by `created_at`) is `CLOSED`, whatever its
-close and reopen history. `runLedgerBatch()` catches the trigger's refusal and turns it into a
+the latest `period_locks` row covering it (ordered by `created_at`, then by `rowid`, the order rows
+were written in, since two in one second must not fall to a random id: #1567, migration 0129) is
+`CLOSED`, whatever its close and reopen history. `isDayLocked()`, `isRangeClosed()` and
+`reopenPeriod()` read the latest row the same way. `runLedgerBatch()` catches the trigger's refusal and turns it into a
 409; every one of the six modules that call `postEntry()` now goes through it, so a closed period
 is refused at the write for the whole estate, not for whichever caller remembered to check.
 
