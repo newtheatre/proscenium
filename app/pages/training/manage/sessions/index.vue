@@ -471,7 +471,7 @@ const columns: TableColumn<Session>[] = [
           data-test="add-session"
           icon="i-lucide-plus"
           :disabled="teachable.length === 0"
-          @click="begin"
+          @click="begin()"
         >
           Schedule a session
         </UButton>
