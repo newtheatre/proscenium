@@ -117,7 +117,7 @@ function movementsFor(itemId: string): { qty: number, kind: string, refTable: st
 
 // The Bar Manager, signed in on a screen of the given size.
 const signedIn = (width = 375, height = 812): Promise<Bun.WebView> =>
-  signInView(app.baseURL, barManager.email, barPassword, { width, height })
+  signInView(app, barManager.email, barPassword, { width, height })
 
 describe.skipIf(skip !== null)('opening a stocktake captures on-hand at that moment (F-115 criterion 1)', () => {
   test('a line is captured with the current on-hand, unaffected by a later delivery', async () => {
