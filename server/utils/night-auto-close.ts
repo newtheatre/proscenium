@@ -20,7 +20,7 @@ import type { SQL } from 'drizzle-orm'
 export interface UnclosedCandidateRow { performanceId: string, venueId: string, startsAt: number }
 
 // Bounded to performances that have started since the first night the system ran; the 24-hour
-// cut itself is computed per row in `performancesDueAutoClose`, timezone-aware (0014).
+// cut itself is computed per row in `pastTheirClose`, timezone-aware (0014).
 export function unclosedCandidatesQuery(now: number, from: number): SQL {
   return sql`
     SELECT p.id AS performanceId, p.venue_id AS venueId, p.starts_at AS startsAt
@@ -74,8 +74,8 @@ export async function performancesDueAutoClose(at: Date = new Date()): Promise<D
 // What saving `proposed` would close on the next sweep (J-105 criterion 1): unset or unreadable
 // closes nothing, so it previews nothing.
 export async function autoCloseFromPreview(proposed: unknown, at: Date = new Date()): Promise<number> {
-  const from = typeof proposed === 'string' && isShowNight(proposed) ? autoCloseFrom(proposed) : null
-  return from === null ? 0 : (await dueFrom(from, at)).length
+  if (typeof proposed !== 'string' || !isShowNight(proposed)) return 0
+  return (await dueFrom(showNightOpensAt(proposed), at)).length
 }
 
 const CLOSING_NOTE = 'Closed automatically: no signatory within 24 hours of the show night ending.'

@@ -48,8 +48,8 @@ async function officersWithoutRefundApproval(): Promise<number> {
   return row?.count ?? 0
 }
 
-// A preview is read before the new list is known, so this counts every role holder a role added
-// to PRIVILEGED_ROLES would refuse until they set up an authenticator (A-112, issue 1357).
+// Ignores the proposed list: this counts every role holder any role added to PRIVILEGED_ROLES
+// would refuse until they set up an authenticator (A-112, issue 1357).
 export function roleHoldersWithoutFactorQuery(now: number): SQL {
   return sql`SELECT count(*) AS count FROM ${schema.users} WHERE ${privilegedWithoutFactor([...ROLES], now)}`
 }
