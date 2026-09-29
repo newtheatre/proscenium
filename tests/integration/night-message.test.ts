@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { performanceTicketHoldersQuery } from '#server/utils/announcements'
-import { draftClaimsQuery, nightAudienceQuery, performanceRotaQuery, takeOverInterruptedQuery } from '#server/utils/night-message'
+import { TAKEN_OVER, draftClaimsQuery, nightAudienceQuery, performanceRotaQuery, takeOverInterruptedQuery } from '#server/utils/night-message'
 import { nightMessageClaim } from '#shared/utils/night-message'
 import { showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -133,8 +133,8 @@ describe('a retry takes over its own interrupted claims, and nothing else (0108)
     return rows<{ userId: string }>(database, query, ...parameters).map(row => row.userId).sort()
   }
 
-  function row(database: TestDatabase, id: string): { status: string, claim: string, created_at: number } {
-    return rows<{ status: string, claim: string, created_at: number }>(database, 'SELECT status, claim, created_at FROM notification_log WHERE id = ?', id)[0]!
+  function row(database: TestDatabase, id: string): { status: string, error: string | null, claim: string, created_at: number } {
+    return rows<{ status: string, error: string | null, claim: string, created_at: number }>(database, 'SELECT status, error, claim, created_at FROM notification_log WHERE id = ?', id)[0]!
   }
 
   // What the send's loop does next: claimNotification's own insert, refused while the key is held.
@@ -150,7 +150,7 @@ describe('a retry takes over its own interrupted claims, and nothing else (0108)
       const stuck = claimRow(database, claim, 'PENDING', 31, recipient)
 
       expect(takeOver(database)).toEqual([recipient])
-      expect(row(database, stuck)).toMatchObject({ status: 'FAILED_FINAL', claim: `interrupted:${claim}:${stuck}`, created_at: NOW - 31 })
+      expect(row(database, stuck)).toMatchObject({ status: 'FAILED_FINAL', error: TAKEN_OVER, claim: `interrupted:${claim}:${stuck}`, created_at: NOW - 31 })
       expect(claimAgain(database, claim, recipient)).toBe(true)
     })
   })

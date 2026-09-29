@@ -7,7 +7,7 @@ import { claimNotification, notify } from './notify'
 import { render } from './templates'
 import { auditEntry } from '#shared/utils/audit'
 import { messageType } from '#shared/utils/notifications'
-import { NIGHT_MESSAGE_TAKEOVER_SECONDS, nightMessageClaim, nightMessageDraftPrefix, nightMessageType } from '#shared/utils/night-message'
+import { nightMessageClaim, nightMessageDraftPrefix, nightMessageType } from '#shared/utils/night-message'
 import { showNightOpensAt } from '#shared/utils/show-night'
 import type { Rendered } from './templates'
 import type { NightAuthorityVia } from '#shared/utils/night-authority'
@@ -47,29 +47,37 @@ export async function previewNightMessage(input: NightMessageInput, night: strin
   return { count: ids.length, rendered }
 }
 
-export const TAKEN_OVER = 'Interrupted before its outcome was recorded; a retry of the same draft sent it again (0108).'
+// A claim younger than this may still be sending, so a retry leaves it alone (0108).
+const TAKEOVER_SECONDS = 30
+
+export const TAKEN_OVER = 'Interrupted before its outcome was recorded; taken over by a retry of the same draft (0108).'
+
+// Every claim starting with the prefix, as a range so the claim index serves it; the prefix ends
+// in ':', and ';' is the next character, so the upper bound takes nothing else.
+function ownDraftClaims(draftKey: string, senderId: string): SQL {
+  const prefix = nightMessageDraftPrefix(draftKey, senderId)
+  return sql`claim >= ${prefix} AND claim < ${`${prefix.slice(0, -1)};`}`
+}
 
 // This sender's own claims on this draft still PENDING past the takeover age, freed in the one
 // statement that takes them: renamed off the key, so the loop claims afresh (0003, 0108).
 export function takeOverInterruptedQuery(draftKey: string, senderId: string, now: number): SQL {
-  const prefix = nightMessageDraftPrefix(draftKey, senderId)
   return sql`
     UPDATE notification_log
     SET status = 'FAILED_FINAL', error = ${TAKEN_OVER}, claim = 'interrupted:' || claim || ':' || id
-    WHERE substr(claim, 1, ${prefix.length}) = ${prefix}
+    WHERE ${ownDraftClaims(draftKey, senderId)}
       AND status = 'PENDING'
-      AND created_at <= ${now - NIGHT_MESSAGE_TAKEOVER_SECONDS}
+      AND created_at <= ${now - TAKEOVER_SECONDS}
     RETURNING user_id AS userId
   `
 }
 
 // What this draft already holds once the takeover has run: copies out, and copies still in flight.
 export function draftClaimsQuery(draftKey: string, senderId: string): SQL {
-  const prefix = nightMessageDraftPrefix(draftKey, senderId)
   return sql`
     SELECT coalesce(sum(status != 'PENDING'), 0) AS alreadyOut, coalesce(sum(status = 'PENDING'), 0) AS stillSending
     FROM notification_log
-    WHERE substr(claim, 1, ${prefix.length}) = ${prefix}
+    WHERE ${ownDraftClaims(draftKey, senderId)}
   `
 }
 

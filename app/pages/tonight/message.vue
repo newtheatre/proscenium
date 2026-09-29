@@ -199,7 +199,7 @@ function startAnother(): void {
         variant="subtle"
         icon="i-lucide-send"
         :title="saysNightMessageSent(sent)"
-        :description="sent.stillSending ? 'Press Send again in a minute: nobody who already has it gets it twice.' : 'What went out is below, as it was sent.'"
+        :description="sent.stillSending ? 'Nobody who already has it gets it twice.' : 'What went out is below, as it was sent.'"
         data-test="night-message-sent"
       >
         <template #actions>

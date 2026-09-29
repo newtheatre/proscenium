@@ -42,9 +42,6 @@ export function nightMessageClaim(draftKey: string, senderId: string, userId: st
   return `${nightMessageDraftPrefix(draftKey, senderId)}${userId}`
 }
 
-// A claim younger than this may still be sending, so a retry leaves it alone (0108).
-export const NIGHT_MESSAGE_TAKEOVER_SECONDS = 30
-
 export interface NightMessageOutcome {
   count: number
   alreadyOut: number

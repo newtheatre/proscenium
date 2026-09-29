@@ -25,7 +25,8 @@ share a draft key.
 seconds after they were made.** At the start of every send, one conditional `UPDATE` with the
 whole predicate on the statement (0003) takes them: the claim begins with this draft and this
 sender, the status is `PENDING`, and `created_at` is at least 30 seconds old. It moves each to
-`FAILED_FINAL`, says in `error` that the send was interrupted and taken over, and renames its
+`FAILED_FINAL`, says in `error` that the send was interrupted and taken over (not that it was
+resent: the person may have left the audience since, or the loop may stop first), and renames its
 claim to `interrupted:<claim>:<row id>`, which frees the key. The send's loop then claims that
 person again in the ordinary way, with a fresh row, and sends. Two retries racing each take a
 row at most once, since the first changes its status; and the loop's own claim still lets only
@@ -33,7 +34,9 @@ one of them send.
 
 **The claim key names the sender.** `nightMessageClaim(draftKey, senderId, userId)` is
 `night-message:<draft>:<sender>:<recipient>`, so "same draft, same sender" is one prefix,
-compared with `substr()` rather than `LIKE`, which D1 caps at 50 characters of pattern.
+compared as a range on `claim` (from the prefix up to the same prefix ending `;`, the character
+after `:`), which the claim index serves, rather than `LIKE`, which D1 caps at 50 characters of
+pattern.
 
 **`created_at` is safe to read for the 30 seconds.** `claimNotification()` writes it once, the
 moment of the claim, and nothing updates it: `notify()` and the H-105 retry move the status by
