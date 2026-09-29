@@ -5,6 +5,10 @@ import { londonClock } from './london'
 export const NIGHT_VIEWPORT_PX = 360
 export const NIGHT_TAP_TARGET_PX = 48
 
+// Nuxt UI's switch, checkbox or radio: a Reka button inside its container slot. The shell's floor
+// leaves exactly this out and gives its row the target instead (docs/design-language.md rule 4).
+export const NIGHT_DRAWN_CHOICE = '[data-slot="container"] > [data-slot="base"]:is([role="switch"], [role="checkbox"], [role="radio"])'
+
 /** What NightStale shows: the London minute the screen's data last came from. */
 export function lastSyncedLabel(at: Date | number | string | null | undefined): string {
   if (at === null || at === undefined) return 'Not yet synced'

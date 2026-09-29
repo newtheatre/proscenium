@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, ref } from 'vue'
-import { NIGHT_STALE_AFTER_MS, NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, asksNightAuthority, lastSyncedLabel, nightFreshness, staleAnnouncement } from '#shared/utils/night-shell'
+import { NIGHT_DRAWN_CHOICE, NIGHT_STALE_AFTER_MS, NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, asksNightAuthority, lastSyncedLabel, nightFreshness, staleAnnouncement } from '#shared/utils/night-shell'
 import { bindNightEyebrow, bindNightFallbackSubject, bindNightSubject } from '#composables/useNightHeader'
 import type { NightHeaderState } from '#composables/useNightHeader'
 
@@ -282,6 +282,7 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
   const LAYOUTS = ['app/layouts/tonight.vue', 'app/layouts/backstage.vue']
   const TOKEN_SOURCE = 'app/assets/css/theme.css'
   const SHELL_CLASS = 'nnt-night'
+  const theme = read(TOKEN_SOURCE)
 
   test('both show-night layouts take the dynamic viewport height, never the fixed one', async () => {
     for (const layout of LAYOUTS) {
@@ -297,12 +298,48 @@ describe('the show-night shell stands on the visible viewport (K-102, design-lan
   })
 
   test('the target floor is one rule for the shell, not a class per field', async () => {
-    const theme = await read(TOKEN_SOURCE)
-    expect(theme).toContain(`.${SHELL_CLASS} `)
-    expect(theme).toContain(`min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`)
+    const css = await theme
+    expect(css).toContain(`.${SHELL_CLASS} `)
+    expect(css).toContain(`min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`)
     for (const layout of LAYOUTS) {
       expect(`${layout}: ${(await read(layout)).includes(SHELL_CLASS)}`).toBe(`${layout}: true`)
     }
+  })
+
+  // Reka draws a switch, a checkbox and a radio as a button with a role. Floored, a switch's track
+  // is a 48 pixel circle (issue 1520), so Nuxt UI's shape of one keeps its size and its row is the target.
+  const layers = theme.then((css) => {
+    const opened = css.indexOf('@layer components {')
+    let depth = 0
+    let at = css.indexOf('{', opened)
+    do {
+      if (css[at] === '{') depth++
+      if (css[at] === '}') depth--
+      at++
+    } while (depth > 0 && at < css.length)
+    return { layered: css.slice(opened, at), unlayered: css.slice(0, opened) + css.slice(at) }
+  })
+  const FLOOR = `min-height: ${NIGHT_TAP_TARGET_PX / 16}rem`
+
+  test('the unlayered element floor leaves out exactly the drawn choice, so anything else with its role keeps it', async () => {
+    const { unlayered } = await layers
+    expect(unlayered).toContain(`:is(button, input, select, textarea, [role="combobox"], a):not(${NIGHT_DRAWN_CHOICE}) {\n  ${FLOOR};`)
+  })
+
+  test('the drawn choice\'s row rules sit in the components layer, and the floor does not', async () => {
+    const { layered, unlayered } = await layers
+    expect(layered).toContain(`:has(> ${NIGHT_DRAWN_CHOICE})`)
+    expect(unlayered).not.toContain(`:has(> ${NIGHT_DRAWN_CHOICE})`)
+    expect(layered).not.toContain(':is(button, input')
+  })
+
+  test('the label is 48 pixels tall and spans the row on its ::before, with a link or button lifted above it', async () => {
+    const { layered } = await layers
+    expect(layered).toMatch(new RegExp(`\\[data-slot="label"\\] \\{[^}]*${FLOOR}`))
+    expect(layered).toMatch(/\[data-slot="label"\]::before \{[^}]*position: absolute;[^}]*inset: 0;/)
+    expect(layered).toMatch(/:is\(a, button, \[tabindex\]\) \{[^}]*position: relative;[^}]*z-index: 1;/)
+    // Nuxt UI draws the required marker on the label's ::after.
+    expect(await theme).not.toContain('[data-slot="label"]::after')
   })
 })
 

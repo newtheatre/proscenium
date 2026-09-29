@@ -206,10 +206,22 @@ Eleven rules follow:
    foyer does not aim, and a secondary control missed twice costs more than the room it saved.
    That floor is one rule, `.nnt-night` in `app/assets/css/theme.css`, and the two show-night
    layouts put the class on the body so a teleported modal is inside it too; a screen never asks
-   for it field by field. The shells stand on `min-h-dvh` rather than `min-h-screen`, and the
-   pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and home
-   indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
-   holds all three. Every page on the `tonight` layout is a capped column at any window width
+   for it field by field. A Nuxt UI switch, checkbox or radio meets the floor by its row, not by
+   the control it draws: Reka renders each as a button, and floored, a switch's track became a 48
+   pixel circle (issue 1520). The element floor leaves out exactly that shape (a `base` button with
+   one of those roles inside its `container` slot), so any other control with such a role,
+   hand-rolled or from another component, keeps the floor. A second set of rules, in the
+   `components` layer so Nuxt UI's own slots and an instance's `ui` can still override them, gives
+   the control's container and its label a 48 pixel minimum height and the row a 48 pixel minimum
+   width, and spreads the label over the whole row on its `::before` (its `::after` is Nuxt UI's
+   required marker), so a tap anywhere on the row toggles the control; a link or button in the
+   label or description sits above that overlay. Such a control on a show-night screen therefore
+   always carries a `label`: one without has no row to tap, and the floor test counts it short.
+   That test runs on tonight's stocktake, the one show-night screen with a switch, in
+   `tests/e2e/bar-stocktakes.test.ts`. The shells stand on `min-h-dvh` rather than `min-h-screen`,
+   and the pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and
+   home indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
+   holds all of these. Every page on the `tonight` layout is a capped column at any window width
    (`max-w-md` for a show-night screen, `max-w-xl` for the training register), so anything in it
    that changes shape with width keys to its own container, with `@container` and an `@` variant as
    the desk results do (rule 6), and never to the window, whose variants fire while the column is
