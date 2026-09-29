@@ -178,7 +178,7 @@ describe.skipIf(skip !== null)('a tab tender is offered only for authorised hold
 })
 
 // Issue 1264: a live grant of a named role authorises, and lapses with the grant (0009).
-function grantRole(userId: string, role: string, expiresAt: number): void {
+function writeGrant(userId: string, role: string, expiresAt: number): void {
   const database = new Database(app.databaseFile)
   try {
     database.query('INSERT OR REPLACE INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)')
@@ -200,8 +200,8 @@ describe.skipIf(skip !== null)('a holder of a named role may run up a tab while 
     const lapsed = await aMember()
     const outsider = await aMember()
     const now = Math.floor(Date.now() / 1000)
-    grantRole(holder.id, 'COMMITTEE', now + 86_400)
-    grantRole(lapsed.id, 'COMMITTEE', now - 60)
+    writeGrant(holder.id, 'COMMITTEE', now + 86_400)
+    writeGrant(lapsed.id, 'COMMITTEE', now - 60)
     await authorise([])
     expect((await authoriseRoles(['COMMITTEE'])).status).toBe(200)
 

@@ -566,51 +566,55 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     void third
 
     const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', barManager.email)
-    await fill(view, 'form input[type="password"]', barPassword)
-    await click(view, 'form button[type="submit"]')
-    await finishSignIn(app, view, barManager.email)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${first.id}"]`)
+      await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${first.id}"]`)
 
-    // A count of 750 or 1750 needs more than thirty pixels: no steppers, filling the cell.
-    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').getAttribute('placeholder') === 'Uncounted'`)
-    await waitFor(view, `document.querySelector('[data-test="count-fields-${first.id}"]').querySelectorAll('button').length === 0`)
-    expect(await textOf(view, `[data-test="uncounted-badge-${first.id}"]`)).toContain('Uncounted')
+      // A count of 750 or 1750 needs more than thirty pixels: no steppers, filling the cell.
+      await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').getAttribute('placeholder') === 'Uncounted'`)
+      await waitFor(view, `document.querySelector('[data-test="count-fields-${first.id}"]').querySelectorAll('button').length === 0`)
+      expect(await textOf(view, `[data-test="uncounted-badge-${first.id}"]`)).toContain('Uncounted')
 
-    await fillNumber(view, `[data-test="counted-${first.id}"]`, '7')
-    await waitFor(view, `!document.querySelector('[data-test="uncounted-badge-${first.id}"]')`)
+      await fillNumber(view, `[data-test="counted-${first.id}"]`, '7')
+      await waitFor(view, `!document.querySelector('[data-test="uncounted-badge-${first.id}"]')`)
 
-    // The uncounted-only filter drops the line just counted and keeps the one still blank.
-    await click(view, '[data-test="uncounted-only-filter"]')
-    await waitFor(view, `!document.querySelector('[data-test="counted-${first.id}"]')`)
-    expect(await textOf(view, '[data-test="stocktake-lines"]')).toContain(second.name)
-    await click(view, '[data-test="uncounted-only-filter"]')
-    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]')`)
+      // The uncounted-only filter drops the line just counted and keeps the one still blank.
+      await click(view, '[data-test="uncounted-only-filter"]')
+      await waitFor(view, `!document.querySelector('[data-test="counted-${first.id}"]')`)
+      expect(await textOf(view, '[data-test="stocktake-lines"]')).toContain(second.name)
+      await click(view, '[data-test="uncounted-only-filter"]')
+      await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]')`)
 
-    // Enter moves on to a different row. Which one depends on the random names' sort order, so
-    // that is read back rather than assumed; only a next row's existence is pinned, by the guard.
-    await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').focus()`)
-    await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
-    await waitFor(view, `document.activeElement?.getAttribute('data-test')?.startsWith('counted-') && document.activeElement.getAttribute('data-test') !== 'counted-${first.id}'`)
+      // Enter moves on to a different row. Which one depends on the random names' sort order, so
+      // that is read back rather than assumed; only a next row's existence is pinned, by the guard.
+      await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').focus()`)
+      await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+      await waitFor(view, `document.activeElement?.getAttribute('data-test')?.startsWith('counted-') && document.activeElement.getAttribute('data-test') !== 'counted-${first.id}'`)
 
-    // With the filter on, Enter on a row that is not first must not jump back to whatever the
-    // filter now puts first: typing drops that row out of the filtered list before Enter runs.
-    await click(view, '[data-test="uncounted-only-filter"]')
-    const beforeTyping = await view.evaluate(
-      `[...document.querySelectorAll('[data-test^="counted-"]:not([data-test^="counted-part-"])')].map(el => el.getAttribute('data-test'))`,
-    ) as string[]
-    expect(beforeTyping.length).toBeGreaterThanOrEqual(3)
-    const [, typedInto, expectedNext] = beforeTyping
+      // With the filter on, Enter on a row that is not first must not jump back to whatever the
+      // filter now puts first: typing drops that row out of the filtered list before Enter runs.
+      await click(view, '[data-test="uncounted-only-filter"]')
+      const beforeTyping = await view.evaluate(
+        `[...document.querySelectorAll('[data-test^="counted-"]:not([data-test^="counted-part-"])')].map(el => el.getAttribute('data-test'))`,
+      ) as string[]
+      expect(beforeTyping.length).toBeGreaterThanOrEqual(3)
+      const [, typedInto, expectedNext] = beforeTyping
 
-    await fillNumber(view, `[data-test="${typedInto}"]`, '3')
-    await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').focus()`)
-    await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
-    await waitFor(view, `document.activeElement?.getAttribute('data-test') === '${expectedNext}'`)
-
-    view.close()
-    await apply(opened.stocktake.id)
+      // Typed and entered without leaving the field: a blur would commit it and drop the row first.
+      await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').focus()`)
+      await fill(view, `[data-test="${typedInto}"]`, '3')
+      await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+      await waitFor(view, `document.activeElement?.getAttribute('data-test') === '${expectedNext}'`)
+    }
+    finally {
+      view.close()
+      await apply(opened.stocktake.id)
+    }
   }, 120_000)
 
   test('filtering to only uncounted once every line is counted reads as done, not empty', async () => {

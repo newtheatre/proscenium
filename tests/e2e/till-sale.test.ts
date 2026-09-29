@@ -412,7 +412,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // since the question usually comes after the round is rung up.
   test('the allergen affordance is also on the basket line', async () => {
     const { venueId } = programme('sale-allergen-line')
-    await aProductPouring('Basket line note', 'Contains gluten')
+    const { productId } = await aProductPouring('Basket line note', 'Contains gluten')
     await openTill(venueId)
 
     const view = await openSignedOutView(app.baseURL)
