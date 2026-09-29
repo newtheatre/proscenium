@@ -49,7 +49,7 @@ beforeAll(async () => {
   const firstCookie = (first.headers.get('set-cookie') ?? '').split(';')[0]!
   adminBrowserSecret = (await (await request(app, 'POST', '/api/account/mfa/enrol', {}, firstCookie)).json() as { secret: string }).secret
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(adminBrowserSecret, stepFor(new Date())) }, firstCookie)
-  expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', adminBrowser.email, app.databaseFile]).exitCode).toBe(0)
+  expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', adminBrowser.email, app.databaseFile, '--additional']).exitCode).toBe(0)
 
   const department = `ROT${crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`
   await request(app, 'POST', '/api/admin/training/departments', { code: department, name: 'Rota gating' }, admin.cookie)
