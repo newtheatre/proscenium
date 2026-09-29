@@ -341,7 +341,7 @@ describe.skipIf(skip !== null)('an offer stands until online booking closes, and
     }, '')).status).toBe(200)
 
     expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
-      venueId, startsAt, intervalCount: 0, holdReleaseMinutesBefore: 90,
+      venueId, startsAt, durationMinutes: 120, intervalCount: 0, holdReleaseMinutesBefore: 90,
     })).status).toBe(200)
 
     const offered = await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)
