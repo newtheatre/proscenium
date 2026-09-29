@@ -312,15 +312,23 @@ describe.skipIf(skip !== null)('the screen', () => {
   // 0032: the whole report blanked on every period change rather than dimming.
   test('the report stays on screen across a period change, never blanking', async () => {
     const view = await openSignedOutView(app.baseURL)
+    console.log('[diag stays] step 1 ' + Date.now())
     await visit(view, `${app.baseURL}/sign-in`)
+    console.log('[diag stays] step 2 ' + Date.now())
     await fill(view, 'form input[type="email"]', barManager.email)
+    console.log('[diag stays] step 3 ' + Date.now())
     await fill(view, 'form input[type="password"]', barManagerPassword)
+    console.log('[diag stays] step 4 ' + Date.now())
     await click(view, 'form button[type="submit"]')
+    console.log('[diag stays] step 5 ' + Date.now())
     await finishSignIn(app, view, barManager.email)
 
+    console.log('[diag stays] step 6 ' + Date.now())
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
+    console.log('[diag stays] step 7 ' + Date.now())
     await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)
 
+    console.log('[diag stays] step 8 ' + Date.now())
     await pickOption(view, '[data-test="period-kind"]', 'Week')
     // Present immediately: a refetch dims the table rather than removing the whole report while
     // its new period is pending.
