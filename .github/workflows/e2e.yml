@@ -1,18 +1,30 @@
 name: End-to-end
 
-# Not on every pull request: these drive a real browser against a dev server, take minutes rather
-# than seconds, and are the suite a person runs deliberately (0029).
 on:
+  # A schedule registers only from the default branch, so every pull request into unified/main runs them.
+  pull_request:
+    branches: [unified/main]
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
 
+# A newer push to the same pull request makes the older run's answer moot.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e:
+    name: e2e (${{ matrix.slice }}/10)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
+    strategy:
+      # One slice failing says nothing about the others, and each is read on its own.
+      fail-fast: false
+      matrix:
+        slice: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@v4
 
@@ -23,5 +35,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Keys made for this run alone and thrown away with the runner: nothing stored, nothing shared.
+      - name: Generate this run's keys
+        run: |
+          for key in NUXT_SESSION_PASSWORD NUXT_ACCESS_PROFILE_ENCRYPTION_KEY NUXT_QR_TOKEN_SECRET NUXT_BACKSTAGE_BOARD_SECRET NUXT_WAITING_LIST_TOKEN_SECRET; do
+            value="$(openssl rand -base64 32)"
+            echo "::add-mask::$value"
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done
+
       - name: End-to-end suites
         run: bun run test:e2e
+        env:
+          E2E_SLICE: ${{ matrix.slice }}/10
+
+      # The suites report a 500 without its cause; the server's own log has it.
+      - name: Server log
+        if: failure()
+        run: tail -c 20000 /tmp/nnt-e2e-3101/server.err.log; tail -c 20000 /tmp/nnt-e2e-3101/server.out.log
