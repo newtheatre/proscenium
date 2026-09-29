@@ -69,18 +69,19 @@ describe.skipIf(skip !== null)('the phone-first shell (K-102)', () => {
   test('the hub fits a 360 pixel phone with no sideways scroll', async () => {
     const view = await openView(PHONE)
     try {
-      await visit(view, `${app.baseURL}/tonight`)
+      await visit(view, `${app.baseURL}/tonight`, '[data-test="tonight-hub"]')
       const seen = JSON.parse(await view.evaluate<string>(`JSON.stringify({
         width: window.innerWidth,
         wide: document.documentElement.scrollWidth,
         height: window.innerHeight,
         tall: document.documentElement.scrollHeight,
-      })`)) as { width: number, wide: number, height: number, tall: number }
+        hub: document.querySelector('[data-test="tonight-hub"]').getBoundingClientRect().height,
+      })`)) as { width: number, wide: number, height: number, tall: number, hub: number }
       expect(seen.width).toBe(NIGHT_VIEWPORT_PX)
       expect(seen.wide).toBeLessThanOrEqual(seen.width)
-      // Nor downwards, on a screen holding nothing: a shell that overflows by its own padding
-      // pushes the actions off the bottom before a page has put anything in it.
-      expect(seen.tall).toBeLessThanOrEqual(seen.height)
+      // Nor downwards by the shell's own padding: the Front of House Manager's tiles fill more than
+      // a phone now, so what must fit on one screen is everything around them.
+      expect(seen.tall - seen.hub).toBeLessThanOrEqual(seen.height)
     }
     finally {
       view.close()
