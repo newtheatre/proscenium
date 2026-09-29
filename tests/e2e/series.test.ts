@@ -484,9 +484,12 @@ describe.skipIf(skip !== null)('one message for a series, not one per week (C-11
     await send('POST', `/api/rooms/bookings/${held[0]!.id}/cancel`, { scope: 'series' }, who.cookie)
     expect(sentTo(who.id, 'room.series.cancelled') - before).toBe(1)
 
-    const bodies = await letters(app)
-    const message = bodies.find(body => body.includes('Cancelled: 4 bookings') && body.includes(who.email))
-    expect(message).toBeDefined()
+    // Sent at once, or held for the member's room digest (H-104): either way it names the four.
+    const letter = (await letters(app)).find(body => body.includes('Cancelled: 4 bookings') && body.includes(who.email))
+    const digested = read<{ subject: string }>(
+      `SELECT subject FROM notification_digest_entries WHERE user_id = ? AND type = 'room.series.cancelled' ORDER BY rowid DESC`,
+      who.id)?.subject
+    expect(letter ?? digested).toContain('Cancelled: 4 bookings')
   })
 
   test('cancelling one week sends the ordinary single message', async () => {
@@ -586,7 +589,7 @@ describe.skipIf(skip !== null)('the screens (C-110, C-111)', () => {
       await click(view, '[data-test="series-submit"]')
 
       await waitFor(view, `document.querySelector('[data-test="series-without-refused"]')`, 30_000)
-      expect(await textOf(view, '[data-test="series-refusals"]')).toContain('somebody already has it')
+      expect(await textOf(view, '[data-test="series-refusals"]')).toContain('another member already has it')
       await click(view, '[data-test="series-without-refused"]')
 
       // The second submit carries everything the first did, so it lands on the member's list
@@ -635,6 +638,9 @@ describe.skipIf(skip !== null)('the screens (C-110, C-111)', () => {
     }
   }, 180_000)
 })
+
+// A topic message joins its digest rather than the send log (H-104), so being told counts either.
+const TOLD = '(SELECT user_id, type FROM notification_log UNION ALL SELECT user_id, type FROM notification_digest_entries)'
 
 // C-124. A term is not always all in one room: one week may clash with a production, and moving
 // that week elsewhere must not break up the term.
@@ -691,7 +697,7 @@ describe.skipIf(skip !== null)('a term that mixes both kinds of room', () => {
     const still = occurrencesOf(seriesId).find(one => one.status === 'PENDING_APPROVAL')!
     // Counted as a delta: earlier cases in this file cancel their own terms as the same member.
     const before = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.series.cancelled'`,
+      `SELECT count(*) n FROM ${TOLD} WHERE user_id = ? AND type = 'room.series.cancelled'`,
       member.id)?.n ?? 0
 
     const answered = await send('POST', `/api/rooms/bookings/${still.id}/cancel`, { scope: 'series' }, member.cookie)
@@ -705,7 +711,7 @@ describe.skipIf(skip !== null)('a term that mixes both kinds of room', () => {
 
     // Still one message, naming the weeks, rather than one per week (C-111 criterion 5).
     expect((read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.series.cancelled'`,
+      `SELECT count(*) n FROM ${TOLD} WHERE user_id = ? AND type = 'room.series.cancelled'`,
       member.id)?.n ?? 0) - before).toBe(1)
   })
 })

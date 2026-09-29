@@ -182,6 +182,9 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
   })
 })
 
+// A topic message joins its digest rather than the send log (H-104), so being told counts either.
+const TOLD = '(SELECT user_id, type FROM notification_log UNION ALL SELECT user_id, type FROM notification_digest_entries)'
+
 describe.skipIf(skip !== null)('being told (C-113, the member half)', () => {
   test('a confirmed booking sends a confirmation', async () => {
     const room = await makeRoom()
@@ -209,7 +212,7 @@ describe.skipIf(skip !== null)('being told (C-113, the member half)', () => {
     await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)
 
     const sent = read<{ n: number }>(`
-      SELECT count(*) n FROM notification_log l JOIN users u ON u.id = l.user_id
+      SELECT count(*) n FROM ${TOLD} l JOIN users u ON u.id = l.user_id
       WHERE u.email = ? AND l.type = 'room.booking.cancelled'`, member.email)
     expect(sent?.n).toBeGreaterThan(0)
   })

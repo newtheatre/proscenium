@@ -416,6 +416,9 @@ describe.skipIf(skip !== null)('asking the union again (criterion 5)', () => {
   })
 })
 
+// A topic message joins its digest rather than the send log (H-104), so being told counts either.
+const TOLD = '(SELECT user_id, type FROM notification_log UNION ALL SELECT user_id, type FROM notification_digest_entries)'
+
 describe.skipIf(skip !== null)('turning one down, and withdrawing one', () => {
   test('a rejection carries its reason to the member', async () => {
     const id = await ask()
@@ -442,14 +445,14 @@ describe.skipIf(skip !== null)('turning one down, and withdrawing one', () => {
     await send('POST', `/api/admin/rooms/external-requests/${id}/submit`, { suReference: 'SU-9000' }, officer)
 
     const before = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.withdrawn'`,
+      `SELECT count(*) n FROM ${TOLD} WHERE user_id = ? AND type = 'external.request.withdrawn'`,
       officerId)?.n ?? 0
 
     const answered = await send('POST', `/api/rooms/external-requests/${id}/cancel`, {}, member.cookie)
     expect((await answered.json() as { alreadyRequested: boolean }).alreadyRequested).toBe(true)
 
     expect((read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.withdrawn'`,
+      `SELECT count(*) n FROM ${TOLD} WHERE user_id = ? AND type = 'external.request.withdrawn'`,
       officerId)?.n ?? 0) - before).toBe(1)
   })
 
@@ -630,14 +633,14 @@ describe.skipIf(skip !== null)('a union room reaches the rest of the system', ()
       Math.floor(Date.now() / 1000) - 30 * 86_400, id)
 
     const before = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.waiting'`,
+      `SELECT count(*) n FROM ${TOLD} WHERE user_id = ? AND type = 'external.request.waiting'`,
       officerId)?.n ?? 0
 
     const answered = await send('POST', '/api/dev/sweep-requests', {}, officer)
     expect((await answered.json() as { externalEscalated: number }).externalEscalated).toBeGreaterThan(0)
 
     expect((read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'external.request.waiting'`,
+      `SELECT count(*) n FROM ${TOLD} WHERE user_id = ? AND type = 'external.request.waiting'`,
       officerId)?.n ?? 0) - before).toBeGreaterThan(0)
 
     // Still open: the union may yet answer.

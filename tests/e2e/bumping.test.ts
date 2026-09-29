@@ -227,9 +227,12 @@ describe.skipIf(skip !== null)('the displaced member is told and offered a slot 
       `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.booking.bumped') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.booking.bumped') AS n`,
       member.id)?.n ?? 0) - before).toBe(1)
 
-    const bodies = await letters(app)
-    const message = bodies.find(body => body.includes('The get-in moved') && body.includes(member.email))
-    expect(message).toBeDefined()
+    // Sent at once, or held for the member's room digest (H-104): either way it carries the reason.
+    const letter = (await letters(app)).find(body => body.includes('The get-in moved') && body.includes(member.email))
+    const held = read<{ body: string }>(
+      `SELECT body FROM notification_digest_entries WHERE user_id = ? AND type = 'room.booking.bumped' ORDER BY rowid DESC`,
+      member.id)?.body
+    expect(letter ?? held).toContain('The get-in moved')
   })
 
   test('the offer is never a slot somebody else holds', async () => {
@@ -432,7 +435,7 @@ describe.skipIf(skip !== null)('the officer finds the booking from a list (crite
     expect(body.pages).toBe(1)
     expect(body.items.map(item => item.id)).toEqual([booking])
     expect(Object.keys(body.items[0]!).sort()).toEqual([
-      'attendees', 'endsAt', 'id', 'member', 'noShowId', 'purpose', 'room', 'roomId', 'startsAt', 'status', 'tier', 'title', 'userId',
+      'attendees', 'convertedToRequestId', 'endsAt', 'id', 'member', 'noShowId', 'purpose', 'room', 'roomId', 'startsAt', 'status', 'tier', 'title', 'userId',
     ])
   })
 })
