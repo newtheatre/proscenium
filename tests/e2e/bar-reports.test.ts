@@ -79,7 +79,7 @@ function openTill(venueId: string, performanceId: string, as: string = barStaff.
 async function aStockedProduct(pricePence: number, bottlePence: number): Promise<{ variantId: string, itemId: string }> {
   const categoryAnswered = await send('POST', '/api/admin/bar/categories', { name: named('Spirits') })
   const { id: categoryId } = await categoryAnswered.json() as { id: string }
-  const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700 })
+  const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700, ageRestricted: false })
   const { id: itemId } = await itemAnswered.json() as { id: string }
   await send('POST', '/api/admin/bar/movements', { itemId, qty: 700, kind: 'DELIVERY', costPence: bottlePence })
   const productAnswered = await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId })

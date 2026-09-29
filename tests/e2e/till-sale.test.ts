@@ -84,7 +84,7 @@ const priceVariant = (variantId: string, pricePence: number): Promise<Response> 
   send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() })
 
 const anItem = async (over: Record<string, unknown> = {}): Promise<string> =>
-  created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 200, ...over }))
+  created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 200, ageRestricted: false, ...over }))
 
 // A single, priced, on-the-till size: the shape every till test starts from.
 async function aSellableProduct(over: Record<string, unknown> = {}): Promise<{ productId: string, variantId: string, categoryId: string }> {

@@ -303,7 +303,7 @@ describe.skipIf(skip !== null)('a void credits stock exactly once (criterion 5)'
     const { venueId, performanceId } = programme(`settle-void-stock-${crypto.randomUUID().slice(0, 6)}`)
     const categoryAnswered = await send('POST', '/api/admin/bar/categories', { name: named('Spirits') })
     const { id: categoryId } = await categoryAnswered.json() as { id: string }
-    const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700 })
+    const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700, ageRestricted: false })
     const { id: itemId } = await itemAnswered.json() as { id: string }
     await send('POST', '/api/admin/bar/movements', { itemId, qty: 700, kind: 'DELIVERY' })
     const productAnswered = await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId })

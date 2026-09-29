@@ -80,7 +80,7 @@ const priceVariant = (variantId: string, pricePence: number): Promise<Response> 
   send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() })
 
 const anItem = async (over: Record<string, unknown> = {}): Promise<string> =>
-  created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 1000, ...over }))
+  created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 1000, ageRestricted: false, ...over }))
 
 const deliver = (itemId: string, qty: number): Promise<Response> =>
   send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, costPence: 100 })
