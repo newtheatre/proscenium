@@ -79,6 +79,17 @@ function programme(suffix: string): { venueId: string, showId: string, performan
   }
 }
 
+// A later night at a venue already in use, with nothing on its rota.
+function laterNightAt(venueId: string, suffix: string): string {
+  const database = new Database(app.databaseFile)
+  try {
+    return tonightsPerformance(sqliteTarget(database), { suffix, venueId, night: daysAfter(currentShowNight(), 3) }).performanceId
+  }
+  finally {
+    database.close()
+  }
+}
+
 // A second night at a venue already in use, holding one hand-added shift and no more.
 function partlyStaffedAt(venueId: string, suffix: string): string {
   const database = new Database(app.databaseFile)
@@ -238,11 +249,14 @@ describe.skipIf(skip !== null)('a venue template is the front of house officer\'
     expect(stamp.status).toBe(409)
     expect((await stamp.json() as { statusMessage: string }).statusMessage).toContain('rota board')
 
+    // Saving the template above stamped tonight (issue 1319), so the hand-added shift goes on a
+    // night the venue gained after it went external, which nothing stamps.
+    const later = laterNightAt(away.venueId, 'external-later')
     const added = await send('POST', '/api/admin/rota/shifts/add', {
-      performanceId: away.performanceId, role: 'DUTY_MANAGER', slot: 1,
+      performanceId: later, role: 'DUTY_MANAGER', slot: 1,
     }, foh.cookie)
     expect(added.status).toBe(200)
-    expect(shiftsOn(away.performanceId).map(shift => `${shift.role}:${shift.slot}`)).toEqual(['DUTY_MANAGER:1'])
+    expect(shiftsOn(later).map(shift => `${shift.role}:${shift.slot}`)).toEqual(['DUTY_MANAGER:1'])
   })
 
   test('an ordinary member reads and writes nothing here', async () => {
@@ -457,7 +471,7 @@ describe.skipIf(skip !== null)('the board says when nobody is rostered (issue 13
       database.close()
     }
 
-    const view = await visitAsFoh('/rota/manage/shifts')
+    const view = await visitAsFoh('/rota/manage/shifts', BOARD)
     try {
       await waitFor(view, `!!document.querySelector('[data-test="performance-${ours.performanceId}"]')`)
       expect(await textOf(view, `[data-test="performance-${ours.performanceId}"]`)).toContain('No shifts: nobody is rostered')
@@ -576,7 +590,8 @@ describe.skipIf(skip !== null)('the rota links itself step to step', () => {
       expect(await textOf(view, '[data-test="rota-next-step"]')).toContain('Fill the rota')
 
       await click(view, '[data-test="rota-next-step"]')
-      await waitFor(view, `!!document.querySelector('[data-test="board-from"]')`)
+      // The board's dates sit in its folded filters panel, so the board itself is what arrives.
+      await waitFor(view, `!!document.querySelector(${JSON.stringify(BOARD)})`)
       expect(await view.evaluate<string>('location.pathname')).toBe('/rota/manage/shifts')
     }
     finally {
@@ -599,13 +614,16 @@ async function visitAsAdmin(path: string): Promise<Bun.WebView> {
   return view
 }
 
-async function visitAsFoh(path: string): Promise<Bun.WebView> {
+// The board, or its empty state when nothing falls in its window.
+const BOARD = '[data-test="rota-board"], [data-test="board-empty"]'
+
+async function visitAsFoh(path: string, marker = '[data-test="templates-table"]'): Promise<Bun.WebView> {
   const view = await openSignedOutView(app.baseURL)
   await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', foh.email)
   await fill(view, 'form input[type="password"]', fohPassword)
   await click(view, 'form button[type="submit"]')
   await finishSignIn(app, view, foh.email)
-  await visit(view, `${app.baseURL}${path}`, '[data-test="templates-table"]')
+  await visit(view, `${app.baseURL}${path}`, marker)
   return view
 }
