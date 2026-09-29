@@ -76,7 +76,10 @@ export async function enrolAuthenticator(app: AppUnderTest, member: TestMember):
   if (known) return known
   const { codeForStep, stepFor } = await import('#shared/utils/totp')
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, member.cookie)).json() as { secret: string }
-  await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, member.cookie)
+  const confirmed = await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, member.cookie)
+  // Confirming ends every other session and reissues this one (A-109 criterion 3), so the member
+  // carries the new cookie from here on, and every caller holding it sees the change.
+  member.cookie = (confirmed.headers.get('set-cookie') ?? member.cookie).split(';')[0]!
   forgetSpentStep(app, member.email)
   secrets.set(`${app.databaseFile}:${member.email}`, secret)
   return secret
