@@ -594,9 +594,25 @@ export async function pickOptions(view: Bun.WebView, selector: string, labels: s
 
 // The picker searches the server, so this types, waits for the person to appear, and clicks them.
 export async function pickPerson(view: Bun.WebView, selector: string, term: string, name: string): Promise<void> {
-  await click(view, `${selector} input`)
-  await fill(view, `${selector} input`, term)
-  await waitFor(view, `[...document.querySelectorAll('[role="option"]')].some(option => option.innerText.includes(${JSON.stringify(name)}))`, 20_000)
+  const found = `[...document.querySelectorAll('[role="option"]')].some(option => option.innerText.includes(${JSON.stringify(name)}))`
+  // Focused and sent input alone: a change event, or a re-render taking focus away, empties the
+  // search box, so the term is typed again until the person shows.
+  for (let attempt = 1; ; attempt++) {
+    await waitFor(view, `document.querySelector(${JSON.stringify(`${selector} input`)})`)
+    await view.evaluate(`(() => {
+      const field = document.querySelector(${JSON.stringify(`${selector} input`)})
+      field.focus()
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ${JSON.stringify(term)})
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    try {
+      await waitFor(view, found, 8_000)
+      break
+    }
+    catch (missing) {
+      if (attempt === 3) throw missing
+    }
+  }
   await view.evaluate(`[...document.querySelectorAll('[role="option"]')].find(option => option.innerText.includes(${JSON.stringify(name)})).click()`)
 }
 
