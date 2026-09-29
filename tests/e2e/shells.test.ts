@@ -70,8 +70,8 @@ afterAll(async () => {
 
 // Signed out first: the browser is shared, so a session another suite left would otherwise
 // redirect a way in and change what a public page shows.
-async function inspect<T>(path: string, script: string, cookie?: string): Promise<T> {
-  const view = await openSignedOutView(app.baseURL)
+async function inspect<T>(path: string, script: string, cookie?: string, size?: { width: number, height: number }): Promise<T> {
+  const view = await openSignedOutView(app.baseURL, size)
   try {
     if (cookie) await view.evaluate(`document.cookie = ${JSON.stringify(cookie)}`)
     await view.navigate(`${app.baseURL}${path}`)
@@ -156,11 +156,11 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
   // The one place every console screen agrees on was a bare span, so the sidebar had no way home
   // (0082). On /dev for the same reason the test above is.
   test('the console sidebar header is a link to the overview', async () => {
-    // As an officer: a signed-out view is given no sidebar to carry a header.
+    // As an officer at a desk: a signed-out view has no sidebar, and a narrow one folds it away.
     const href = await inspect<string | null>('/dev', `(() => {
       const header = document.querySelector('aside a[href="/admin"], nav a[href="/admin"]')
       return header ? header.getAttribute('href') : null
-    })()`, officerCookie)
+    })()`, officerCookie, { width: 1280, height: 800 })
     expect(href).toBe('/admin')
   })
 
