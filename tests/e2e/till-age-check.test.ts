@@ -326,7 +326,7 @@ describe.skipIf(skip !== null)('Check ID follows what a line pours, whatever the
   }
 
   const deliver = async (item: { id: string }): Promise<void> => {
-    expect((await send('POST', '/api/admin/bar/movements', { itemId: item.id, kind: 'DELIVERY', qty: 5000, unitCostPence: 1 })).status).toBe(200)
+    expect((await send('POST', '/api/admin/bar/movements', { itemId: item.id, kind: 'DELIVERY', qty: 5000, costPence: 5000 })).status).toBe(200)
   }
 
   // Switched off, so only what it pours can ask for Check ID.
@@ -615,7 +615,7 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
   test('an item switched on after the till loaded asks at the charge, and the sale then goes through', async () => {
     const itemName = named('Cider base')
     const itemId = await created(await send('POST', '/api/admin/bar/items', { name: itemName, unit: 'ML', containerMl: 1000, ageRestricted: false }))
-    expect((await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 5000, unitCostPence: 1 })).status).toBe(200)
+    expect((await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 5000, costPence: 5000 })).status).toBe(200)
     const productId = await aProductIn(await aCategory(), { name: named('Cider'), ageRestricted: false })
     const variantId = await addVariant(productId)
     expect((await priceVariant(variantId, 400)).status).toBe(200)

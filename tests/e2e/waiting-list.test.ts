@@ -77,7 +77,7 @@ async function soonShow(holdReleaseMinutesBefore: number): Promise<{ performance
   const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 })
   const performanceId = (await performance.json() as { id: string }).id
   expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
-    venueId, startsAt, intervalCount: 0, holdReleaseMinutesBefore,
+    venueId, startsAt, durationMinutes: 120, intervalCount: 0, holdReleaseMinutesBefore,
   })).status).toBe(200)
 
   await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
@@ -286,8 +286,9 @@ describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () 
       await click(view, '[data-test="waiting-list-leave"]')
       await waitFor(view, `document.querySelector('[data-test="confirm-leave-waiting-list-verb"]')`)
 
-      // The consequence is stated, not implied by a red button.
-      expect(await textOf(view)).toContain('next person')
+      // The consequence is stated, not implied by a red button: for a place still waiting, the place
+      // goes and the emails stop; only a standing offer passes to the next person (D-113 criterion 6).
+      expect(await textOf(view)).toContain('Your place on the list goes')
 
       await click(view, '[data-test="confirm-leave-waiting-list-back"]')
       expect(entriesFor(performanceId)[0]?.status).toBe('WAITING')

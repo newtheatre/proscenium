@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { PERSONAS } from '#shared/utils/personas'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -60,7 +61,8 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
   test('it printed credentials for everybody it made', () => {
     expect(seeded.length).toBeGreaterThan(0)
-    expect(read<{ n: number }>('SELECT count(*) n FROM users WHERE name LIKE ?', '%(test)%')?.n)
+    // A guest who booked at checkout has no password, so nothing to print (people.ts, `guest`).
+    expect(read<{ n: number }>('SELECT count(*) n FROM users WHERE name LIKE ? AND password IS NOT NULL', '%(test)%')?.n)
       .toBe(seeded.length)
   })
 
@@ -98,18 +100,19 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
 
   // Wave 0 contract (d): every show-night and box-office screen needs a night to open on.
   test('there is a venue, a show, and a performance tonight', () => {
-    expect(read<{ n: number }>('SELECT count(*) n FROM venues')?.n).toBe(1)
+    // One house we run; the seed also makes an external venue, which carries no card.
+    expect(read<{ n: number }>('SELECT count(*) n FROM venues WHERE is_external = 0')?.n).toBe(1)
     expect(read<{ n: number }>('SELECT count(*) n FROM venue_emergency_info')?.n).toBe(1)
-    expect(read<{ n: number }>(`SELECT count(*) n FROM shows WHERE status = 'PUBLISHED'`)?.n).toBe(1)
+    expect(read<{ n: number }>(`SELECT count(*) n FROM shows WHERE status = 'PUBLISHED'`)?.n).toBeGreaterThan(0)
     expect(read<{ n: number }>('SELECT count(*) n FROM ticket_types')?.n).toBeGreaterThan(0)
 
-    const performances = rows<{ starts_at: number }>('SELECT starts_at FROM performances ORDER BY starts_at')
-    expect(performances).toHaveLength(2)
-
+    // The seed fills every screen (past, tonight and to come), so tonight is one of many nights.
     const tonight = showNightBounds(seededNight)
-    expect(performances[0]!.starts_at * 1000).toBeGreaterThanOrEqual(tonight.from.getTime())
-    expect(performances[0]!.starts_at * 1000).toBeLessThan(tonight.to.getTime())
-    expect(performances[1]!.starts_at * 1000).toBeGreaterThan(tonight.to.getTime())
+    const within = (from: number, to: number): number => read<{ n: number }>(
+      'SELECT count(*) n FROM performances WHERE starts_at >= ? AND starts_at < ?', from, to)!.n
+    const [opens, closes] = [tonight.from.getTime() / 1000, tonight.to.getTime() / 1000]
+    expect(within(opens, closes)).toBeGreaterThan(0)
+    expect(within(closes, Number.MAX_SAFE_INTEGER)).toBeGreaterThan(0)
   })
 
   // The till (F-103) needs a real catalogue to show, at Matt's request and outside build-order
@@ -127,7 +130,7 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
       SELECT count(*) n FROM variant_components c
       JOIN product_variants v ON v.id = c.variant_id
       WHERE v.product_id = ? AND c.choice_group_id IS NOT NULL
-    `, gin?.id)?.n).toBe(1)
+    `, gin?.id)?.n).toBe(2)
 
     expect(read<{ n: number }>(`SELECT count(*) n FROM bar_products WHERE allergen_state = 'RECORDED'`)?.n)
       .toBeGreaterThan(0)
@@ -135,7 +138,7 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
 
   // The venue points at the auditorium, and that attachment is all a room ever knows of a venue.
   test('the venue names a room, and no room names a venue (0043)', () => {
-    const venue = read<{ room_id: string | null }>('SELECT room_id FROM venues')
+    const venue = read<{ room_id: string | null }>('SELECT room_id FROM venues WHERE is_external = 0')
     expect(venue?.room_id).not.toBeNull()
     expect(read<{ n: number }>('SELECT count(*) n FROM rooms WHERE id = ?', venue!.room_id)?.n).toBe(1)
     expect(rows<{ name: string }>(`SELECT name FROM pragma_table_info('rooms')`).map(column => column.name))
@@ -148,12 +151,16 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
       `SELECT name, email FROM users WHERE email LIKE '%@e2e.newtheatre.org.uk'`)
 
     expect(names.length).toBeGreaterThan(0)
-    expect(names.filter(person => !person.name.includes('(test)'))).toEqual([])
+    // The development personas (K-124) carry their own mark, `(dev)`, and are listed in the code.
+    const personas = new Set(PERSONAS.map(persona => persona.email))
+    expect(names.filter(person => !person.name.includes('(test)') && !(personas.has(person.email) && person.name.includes('(dev)')))).toEqual([])
     expect(seeded.every(person => person.email.endsWith('@e2e.newtheatre.org.uk'))).toBe(true)
   })
 
   test('running it again adds people rather than duplicating rooms', () => {
     const before = read<{ n: number }>('SELECT count(*) n FROM rooms')!.n
+    const venuesBefore = read<{ n: number }>('SELECT count(*) n FROM venues')!.n
+    const performancesBefore = read<{ n: number }>('SELECT count(*) n FROM performances')!.n
     const barBefore = read<{ n: number }>('SELECT count(*) n FROM bar_products')!.n
     const pricesBefore = read<{ n: number }>('SELECT count(*) n FROM variant_prices')!.n
     const ran = Bun.spawnSync(['bun', 'scripts/seed.ts', app.databaseFile], { stdout: 'pipe', stderr: 'pipe' })
@@ -161,8 +168,8 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
     expect(ran.exitCode).toBe(0)
     expect(read<{ n: number }>('SELECT count(*) n FROM rooms')?.n).toBe(before)
     // Tonight has to stay tonight, so a second run moves the performances rather than adding two.
-    expect(read<{ n: number }>('SELECT count(*) n FROM venues')?.n).toBe(1)
-    expect(read<{ n: number }>('SELECT count(*) n FROM performances')?.n).toBe(2)
+    expect(read<{ n: number }>('SELECT count(*) n FROM venues')?.n).toBe(venuesBefore)
+    expect(read<{ n: number }>('SELECT count(*) n FROM performances')?.n).toBe(performancesBefore)
     // Append-only tables gain no second row either: a rerun is not a correction (0010).
     expect(read<{ n: number }>('SELECT count(*) n FROM bar_products')?.n).toBe(barBefore)
     expect(read<{ n: number }>('SELECT count(*) n FROM variant_prices')?.n).toBe(pricesBefore)

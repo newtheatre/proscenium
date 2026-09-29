@@ -212,7 +212,8 @@ describe.skipIf(skip !== null)('authority is checked on every request, not cache
 
     expect((await openTill(studio.venueId, volunteer.cookie)).status).toBe(200)
 
-    await request(app, 'DELETE', '/api/admin/roles', { userId: volunteer.id, role: 'BAR_MANAGER' }, admin.cookie)
+    // A revoke names its grant in the query: a DELETE body hangs the Workers runtime (0068).
+    expect((await request(app, 'DELETE', `/api/admin/roles?userId=${volunteer.id}&role=BAR_MANAGER`, undefined, admin.cookie)).status).toBe(200)
 
     const refused = await tillStatus(studio.venueId, volunteer.cookie)
     expect(refused.status).toBe(403)
