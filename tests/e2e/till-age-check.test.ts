@@ -610,6 +610,10 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     const shown = await view.evaluate<{ size: number, mono: boolean }>(figure)
     expect(shown.mono).toBe(true)
     expect(shown.size).toBeGreaterThanOrEqual(36)
+
+    // Answered, not left: the browser remembers an unanswered charge and offers it on the next till.
+    await click(view, '[data-test="card-declined"]')
+    await waitFor(view, `document.querySelector('[data-test="charge-failure"]')`)
     view.close()
   }, 120_000)
 

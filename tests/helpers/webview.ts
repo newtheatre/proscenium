@@ -289,6 +289,8 @@ export async function openSignedOutView(baseURL: string, size?: { width: number,
   const view = await openView(size)
   await view.navigate(`${baseURL}/`)
   await waitFor(view, 'document.body')
+  // The browser is shared, so a charge another suite left unanswered would come back on this till.
+  await view.evaluate(`Object.keys(localStorage).filter(key => key.startsWith('nnt-till-sumup')).forEach(key => localStorage.removeItem(key))`)
   await view.evaluate(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)
   return view
 }
@@ -342,17 +344,18 @@ export async function fill(view: Bun.WebView, selector: string, value: string): 
   })()`)
 }
 
-// A number input formats and commits on blur, so a value assigned without one is never read.
-// It has to be focused first: blur() on an element that never held focus fires no event at all.
+// A number input commits on blur, and a change event makes it put its old text back a frame
+// later, so this types, sends input alone, and blurs in the same task (reka-ui NumberFieldInput).
 export async function fillNumber(view: Bun.WebView, selector: string, value: string): Promise<void> {
   await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
-  await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`)
-  await fill(view, selector, value)
-  // A page without the window's focus fires no blur of its own, so the field is told directly.
   await view.evaluate(`(() => {
     const field = document.querySelector(${JSON.stringify(selector)})
-    const focused = document.hasFocus()
+    field.focus()
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ${JSON.stringify(value)})
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    const focused = document.hasFocus() && document.activeElement === field
     field.blur()
+    // A page without the window's focus fires no blur of its own, so the field is told directly.
     if (!focused) field.dispatchEvent(new FocusEvent('blur'))
   })()`)
 }
