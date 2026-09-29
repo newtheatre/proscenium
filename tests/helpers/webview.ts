@@ -129,10 +129,8 @@ export async function startApp(): Promise<AppUnderTest> {
   // A stable path, wiped on the way in rather than out: a crashed run leaves nothing behind.
   const hubDir = hubDirFor(port)
 
-  // Adopted rather than replaced: `bun run test` boots the server before the suites and kills it
-  // after, so what a suite usually finds here is one that is already up.
-  // Asked over HTTP too: a server on ::1 alone leaves 127.0.0.1 bindable, and booting past it wipes
-  // the directory it is serving from.
+  // Adopted, not replaced, and asked over HTTP: a server on ::1 alone leaves 127.0.0.1 bindable,
+  // and booting past it wipes the directory it is serving from.
   const serving = await alreadyServing()
   if (serving || !portIsFree(port)) {
     if (!serving) {
