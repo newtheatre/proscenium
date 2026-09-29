@@ -4,6 +4,8 @@ on:
   # A schedule registers only from the default branch, so every pull request into unified/main runs them.
   pull_request:
     branches: [unified/main]
+  push:
+    branches: [unified/e2e/measure]
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
