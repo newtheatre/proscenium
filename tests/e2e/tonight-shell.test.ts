@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX, lastSyncedLabel } from '#shared/utils/night-shell'
-import { NIGHT_TARGETS, click, openView, shortOfFloor, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { Database } from 'bun:sqlite'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
+import { sqliteTarget } from '#tests/helpers/database'
+import { tonightsPerformance } from '#tests/helpers/programme'
+import { generatePassword } from '#tests/helpers/seed'
+import { NIGHT_TARGETS, click, openView, shortOfFloor, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest, NightTarget } from '#tests/helpers/webview'
 
 // K-102 in a real browser, at the size of the phone the story names. The hub is the one screen
@@ -15,6 +20,21 @@ let app: AppUnderTest
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
+  // Every show-night screen asks a visitor to sign in, so the shell is measured for the Front of
+  // House Manager with a house running; one browser backs every view, so one sign-in holds for all.
+  const admin = await adminSession(app)
+  const password = generatePassword()
+  const officer = await registerMember(app, 'shell', password)
+  await grantRole(app, officer, 'FOH_MANAGER', admin.cookie)
+  const database = new Database(app.databaseFile)
+  try {
+    tonightsPerformance(sqliteTarget(database), { suffix: 'shell' })
+  }
+  finally {
+    database.close()
+  }
+  const signedIn = await signInView(app, officer.email, password)
+  signedIn.close()
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {

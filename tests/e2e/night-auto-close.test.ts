@@ -70,9 +70,10 @@ async function runCloseTask(): Promise<void> {
   expect((await fetch(`${app.baseURL}/_nitro/tasks/nights:close`, { method: 'POST' })).status).toBe(200)
 }
 
-async function mailboxSubjectFor(recipient: string): Promise<string | undefined> {
-  const message = (await letters(app)).find(text => text.startsWith(`To: ${recipient}`))
-  return message?.split('\n').find(line => line.startsWith('Subject: '))?.slice('Subject: '.length)
+// Every subject sent to one address: registering sends its own confirmation first.
+async function mailboxSubjectsFor(recipient: string): Promise<string[]> {
+  return (await letters(app)).filter(text => text.startsWith(`To: ${recipient}`))
+    .map(text => text.split('\n').find(line => line.startsWith('Subject: '))?.slice('Subject: '.length) ?? '')
 }
 
 // Well past its own 24-hour window however long the suite takes to run.
@@ -199,13 +200,13 @@ describe.skipIf(skip !== null)('auto-close within 24 hours (criteria 1, 2, 4)', 
         'SELECT recipient, status FROM night_report_deliveries WHERE report_id = ?', reportRow!.id,
       )
       expect(deliveries).toContainEqual({ recipient, status: 'SENT' })
-      expect(await mailboxSubjectFor(recipient)).toMatch(/auto-closed/i)
+      expect(await mailboxSubjectsFor(recipient)).toContainEqual(expect.stringMatching(/^Nobody signed off the night report: /))
 
       const notified = read<{ id: string }>(
         `SELECT id FROM notification_log WHERE user_id = ? AND type = 'night.auto-closed'`, officer.id,
       )
       expect(notified.length).toBeGreaterThan(0)
-      expect(await mailboxSubjectFor(officer.email)).toMatch(/unclosed night/i)
+      expect(await mailboxSubjectsFor(officer.email)).toContainEqual(expect.stringMatching(/unclosed night/i))
     }
     finally {
       write('DELETE FROM config WHERE key = ?', 'NIGHT_REPORT_ROLES')

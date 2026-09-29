@@ -158,7 +158,7 @@ describe.skipIf(skip !== null)('the roles are not interchangeable (E-111 criteri
   test('the front of house officer does not open the till', async () => {
     const response = await ask(`role=BAR&venueId=${house.venueId}`, foh.cookie)
     expect(response.status).toBe(403)
-    expect(await message(response)).toContain('bar manager')
+    expect(await message(response)).toContain('Bar Manager')
   })
 
   test('the bar manager opens neither the door nor the duty manager screens', async () => {
@@ -178,7 +178,7 @@ describe.skipIf(skip !== null)('the guard is the enforcement, not the navigation
     expect(response.status).toBe(403)
     const refusal = await message(response)
     expect(refusal).toContain('door shift')
-    expect(refusal).toContain('front of house')
+    expect(refusal).toContain('Front of House Manager')
   })
 
   test('a signed-out caller gets no further', async () => {
@@ -493,7 +493,7 @@ describe.skipIf(skip !== null)('the bar opens on a night with nothing running (F
     expect(response.status).toBe(403)
     const refusal = await message(response)
     expect(refusal).toContain('bar opening')
-    expect(refusal).toContain('bar manager')
+    expect(refusal).toContain('Bar Manager')
   })
 })
 

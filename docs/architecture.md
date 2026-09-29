@@ -365,10 +365,12 @@ A period (a term, a season, a year, any range the treasurer names) closes as a r
 never as a flag on the entries it covers: closing cannot mutate what it closes, the same rule
 that keeps the ledger itself append-only (0010). The enforcement is a single trigger,
 `ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`: a day is locked if
-the latest `period_locks` row covering it (ordered by `created_at`) is `CLOSED`, whatever its
-close and reopen history. `runLedgerBatch()` catches the trigger's refusal and turns it into a
-409; every one of the six modules that call `postEntry()` now goes through it, so a closed period
-is refused at the write for the whole estate, not for whichever caller remembered to check.
+the latest `period_locks` row covering it (ordered by `created_at`, then `rowid`, the order rows
+were written in: #1567, migration 0129) is `CLOSED`, whatever its close and reopen history.
+`isDayLocked()`, `isRangeClosed()` and `reopenPeriod()` read the latest row the same way.
+`runLedgerBatch()` catches the trigger's refusal and turns it into a 409; every one of the six
+modules that call `postEntry()` now goes through it, so a closed period is refused at the write
+for the whole estate, not for whichever caller remembered to check.
 
 Reopening (criterion 4, an administrator only, `finance.reopen`) inserts a new `REOPENED` row for
 the same range rather than editing the `CLOSED` one; re-closing after that is another new row.
@@ -546,7 +548,11 @@ Reading the table:
 - A conditional write's audit row rides the write's own batch and only what it changed (0049),
   through one of four shapes in `server/utils/audit.ts`. `auditedWrite(write, entry)` batches
   the write with `auditIfChanged(entry)`, an insert conditioned on `changes() = 1`, and answers
-  whether it applied; `auditIfChanged` goes directly after the write when the batch holds more.
+  whether it applied, read from the rows the write returns: it refuses, before anything runs, a
+  write that returns none (`db.run`, or a builder without `.returning()`), since that would read
+  as not applied after it had landed (#1562). `tests/helpers/d1.ts` binds `@nuxthub/db` to a test
+  database, so an integration test can call such a function end to end (`audited-write.test.ts`).
+  `auditIfChanged` goes directly after the write when the batch holds more.
   `auditWhere(entry, condition)` writes under any condition and answers with the row it wrote:
   first in a batch, under the batch's one guard, it says whether the whole batch applied (the
   ticket edit, whose writes are then gated on `entryLanded`, since its guard reads what they

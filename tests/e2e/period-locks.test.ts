@@ -91,8 +91,7 @@ const collect = (reservationId: string, price = 900): Promise<Response> =>
   send('POST', `/api/box-office/desk/reservations/${reservationId}/collect`, { expectedTotalPence: price, tender: 'CARD' })
 
 describe.skipIf(skip !== null)('a closed period refuses a new collection (criteria 1, 2)', () => {
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-  test.skip('collecting today, with today closed, is refused; reopening lets it through', async () => {
+  test('collecting today, with today closed, is refused; reopening lets it through', async () => {
     const today = londonDayOf(new Date())
     const { reservationId } = await reservedTicket(900)
 
@@ -112,25 +111,27 @@ describe.skipIf(skip !== null)('a closed period refuses a new collection (criter
     expect(collected.status).toBe(200)
   }, CASE_TIMEOUT_MS)
 
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-
-  test.skip('a wrong typed confirmation refuses the reopen and leaves the period closed', async () => {
+  test('a wrong typed confirmation refuses the reopen and leaves the period closed', async () => {
     const today = londonDayOf(new Date())
     const { reservationId } = await reservedTicket(900)
 
     const closed = await send('POST', '/api/admin/finance/periods', { fromDay: today, toDay: today, label: named('Term') })
     const { id: lockId } = await closed.json() as { id: string }
 
-    const wrong = await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: '2000-01-01', confirmToDay: today })
-    expect(wrong.status).toBe(409)
+    try {
+      const wrong = await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: '2000-01-01', confirmToDay: today })
+      expect(wrong.status).toBe(409)
 
-    const stillRefused = await collect(reservationId)
-    expect(stillRefused.status).toBe(409)
+      const stillRefused = await collect(reservationId)
+      expect(stillRefused.status).toBe(409)
+    }
+    finally {
+      // Today is left open again: the suite shares one database, and the next test collects today.
+      await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: today, confirmToDay: today })
+    }
   }, CASE_TIMEOUT_MS)
 
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-
-  test.skip('a collection outside the closed range is unaffected', async () => {
+  test('a collection outside the closed range is unaffected', async () => {
     const { reservationId } = await reservedTicket(900)
 
     const closed = await send('POST', '/api/admin/finance/periods', { fromDay: '2000-01-01', toDay: '2000-01-31' })
@@ -148,9 +149,7 @@ describe.skipIf(skip !== null)('closing and reopening are treasurer and administ
     expect(refused.status).toBe(403)
   }, CASE_TIMEOUT_MS)
 
-  // Skipped until #1562: the write lands, then auditedWrite reads its run result as nothing applied.
-
-  test.skip('the treasurer role closes but cannot reopen', async () => {
+  test('the treasurer role closes but cannot reopen', async () => {
     const treasurer = await registerMember(app, 'treasurer', generatePassword())
     await grantRole(app, treasurer, 'TREASURER', officer.cookie)
 

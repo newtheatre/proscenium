@@ -272,7 +272,7 @@ describe.skipIf(skip !== null)('the security page leads with the viewer\'s next 
   test('a privileged password account is asked for the authenticator its role needs, straight after the ways in', async () => {
     const { email, view } = await registerAndSignIn('asked')
     try {
-      expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile]).exitCode).toBe(0)
+      expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile, '--additional']).exitCode).toBe(0)
       await visit(view, `${app.baseURL}/account/security`, '[data-test="next-step"]')
       expect(await textOf(view, '[data-test="next-step"]')).toContain('Your role needs an authenticator app')
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="next-step"] [data-test="begin"]'))`)).toBe(true)

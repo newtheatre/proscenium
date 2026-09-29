@@ -35,9 +35,18 @@ export function auditIfRow(entry: AuditRow, table: string, id: string): SQL {
 // `then` is what the write cascades to, batched after the entries. Several entries chain, each
 // landing only if the one before it did; an empty list writes no entry.
 export async function auditedWrite(write: BatchItem<'sqlite'>, entries: AuditRow | AuditRow[], ...then: BatchItem<'sqlite'>[]): Promise<boolean> {
+  refuseWithoutRows(write)
   const list = Array.isArray(entries) ? entries : [entries]
   const [rows] = await db.batch([write, ...list.map(one => db.run(auditIfChanged(one))), ...then])
   return Array.isArray(rows) && rows.length > 0
+}
+
+// Success is read from the rows the write returns, so a write returning none would always read as
+// not applied after it had landed (#1562): refused before anything runs. Drizzle's config is internal.
+function refuseWithoutRows(write: BatchItem<'sqlite'>): void {
+  const config = (write as unknown as { config?: { action?: string, returning?: unknown } }).config
+  if (config?.action === 'all' || config?.returning) return
+  throw new Error('auditedWrite needs a statement that returns its rows: db.all(... RETURNING ...) or .returning()')
 }
 
 // True once `entry` is in the trail: a `then` statement gated on it follows only a write that applied.

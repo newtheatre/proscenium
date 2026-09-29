@@ -32,9 +32,10 @@ export async function setNominalMapping(input: NominalMappingInput, actorId: str
   `)
   if (!current) return false
 
-  const write = db.run(sql`
+  const write = db.all<{ kind: string }>(sql`
     UPDATE su_nominal_mappings SET nominal_code = ${input.nominalCode}, updated_by = ${actorId}, updated_at = unixepoch()
     WHERE kind = ${input.kind} AND source = ${input.source}
+    RETURNING kind
   `)
   const entry = auditEntry({
     actorId,

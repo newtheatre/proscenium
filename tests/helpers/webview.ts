@@ -320,7 +320,9 @@ export async function waitFor(view: Bun.WebView, expression: string, timeoutMs =
     if (await view.evaluate<boolean>(`Boolean(${expression})`)) return
     await Bun.sleep(100)
   }
-  throw new Error(`timed out waiting for ${expression}`)
+  // Where the page was and what it said, so a timeout on CI is read rather than rerun.
+  const seen = await view.evaluate<string>(`location.pathname + ': ' + (document.body?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 240)`).catch(() => 'unreadable')
+  throw new Error(`timed out waiting for ${expression} (at ${seen})`)
 }
 
 // A plain value assignment is invisible to v-model: Vue listens for the event, and the native
