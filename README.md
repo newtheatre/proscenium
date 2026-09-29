@@ -69,7 +69,8 @@ bun run build
 `bun run test` is the unit and integration suites, and finishes in under a second. `bun run
 test:e2e` is the slow half: it drives a real browser against a single dev server it boots and owns,
 emptying the database between suites, and names each suite as it starts so a slow run says which
-suite is slow (0029). CI gates on the first; the second runs nightly and on demand.
+suite is slow (0029). CI gates on both; the second runs on every pull request into `unified/main`,
+in ten slices.
 `bun test <file>` still runs one suite on its own.
 
 ### Example data

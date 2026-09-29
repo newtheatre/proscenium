@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs'
 import { NIGHT_DRAWN_CHOICE } from '#shared/utils/night-shell'
 import { hubDirFor } from './hub-dir'
-import { resetDatabase } from './reset-database'
+import { journalInWal, resetDatabase } from './reset-database'
 import { createServerLog, readServerLog } from './server-log'
 import type { Subprocess } from 'bun'
 
@@ -129,12 +129,13 @@ export async function startApp(): Promise<AppUnderTest> {
   // A stable path, wiped on the way in rather than out: a crashed run leaves nothing behind.
   const hubDir = hubDirFor(port)
 
-  // Adopted rather than replaced: `bun run test` boots the server before the suites and kills it
-  // after, so what a suite usually finds here is one that is already up.
-  if (!portIsFree(port)) {
-    if (!await alreadyServing()) {
-      throw new Error(`port ${port} is held by something that is not this app: stop it, or set E2E_BASE_URL`)
-    }
+  // Adopted, not replaced, and asked over HTTP: a server on ::1 alone leaves 127.0.0.1 bindable,
+  // and booting past it wipes the directory it is serving from.
+  const serving = await alreadyServing()
+  if (!serving && !portIsFree(port)) {
+    throw new Error(`port ${port} is held by something that is not this app: stop it, or set E2E_BASE_URL`)
+  }
+  if (serving) {
     const adopted: AppUnderTest = {
       baseURL: BASE_URL,
       databaseFile: `${hubDirFor(port)}/db/sqlite.db`,
@@ -175,6 +176,7 @@ export async function startApp(): Promise<AppUnderTest> {
   // The one boot a run pays for, said out loud: fifteen seconds of silence at the start otherwise
   // looks like a hung suite.
   Bun.write(Bun.stderr, `[e2e] dev server on ${port} ready in ${((Date.now() - began) / 1000).toFixed(1)}s, log in ${hubDir}\n`)
+  journalInWal(`${hubDir}/db/sqlite.db`)
 
   const app: AppUnderTest = {
     baseURL: BASE_URL,

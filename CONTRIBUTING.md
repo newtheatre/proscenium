@@ -46,8 +46,10 @@ Twelve steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
     table disagrees with the stories its module files hold, by the rule beside the table in
     `docs/backlog/README.md`.
 
-`test:e2e` is **not** a CI gate. It runs nightly and on demand (0029), and a full run takes minutes
-rather than seconds.
+`test:e2e` runs on every pull request into `unified/main` and on demand, in ten slices
+(`E2E_SLICE=i/10`), each on its own runner with its own dev server; the nightly schedule
+registers only once `unified/main` is the default branch. Each slice is a required check (0109). A
+slice takes under ten minutes, inside a 60-minute limit.
 
 Documentation drift is a defect and fails review, but no script checks it: a change to behaviour
 without a change to its document is caught by a person. That includes the in-app operator
@@ -125,7 +127,7 @@ old rooms application is the cautionary tale.
 - Three layers, all under Bun 1.4's test tooling: unit tests for pure logic, integration tests
   against a real test database (where the racing tests live), and end-to-end interface tests
   driving the critical journeys (booking, door, till, register, room request) in a browser.
-  The first two gate every merge; the third runs nightly and on demand (0029).
+  The first two gate every merge; the third runs on every pull request into `unified/main`.
 - The register, the ledger and erasure are correct or the system is not shippable; their tests
   are written before their implementations.
 - Every defect found in the old estate's audit becomes a regression test here before its
