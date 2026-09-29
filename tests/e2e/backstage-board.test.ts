@@ -387,7 +387,7 @@ describe.skipIf(skip !== null)('the current state fits the column it is given (i
       wings.close()
     }
 
-    const desk = await signInView(app.baseURL, manager.email, password, { width: 1280, height: 800 })
+    const desk = await signInView(app, manager.email, password, { width: 1280, height: 800 })
     try {
       await visit(desk, `${app.baseURL}/tonight/board`, '[data-test="board-current"]')
       await waitFor(desk, BOTH_CALLS, 30_000)
