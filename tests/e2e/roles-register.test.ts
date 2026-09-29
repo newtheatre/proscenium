@@ -5,7 +5,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysDay, saysDayLong } from '#shared/utils/when'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, pickPerson, skipReason, startApp, textOf, typeSearch, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // The role register, end to end (A-131). What it grants, what it refuses and what the page says
@@ -453,8 +453,7 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
       await waitFor(view, `document.querySelector('[data-test="grant-form"]')`)
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
 
-      await click(view, '[data-test="grant-person"] input')
-      await fill(view, '[data-test="grant-person"] input', email)
+      await typeSearch(view, '[data-test="grant-person"] input', email)
       await waitFor(view, `document.querySelector('[data-test="grant-nobody-found"]')`, 20_000)
       await click(view, '[data-test="grant-nobody-found"]')
       await waitFor(view, `document.querySelector('[data-test="grant-by-email"]')`)
@@ -468,7 +467,7 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
       await waitFor(view, `document.querySelector('[data-test="grant-person"]')`)
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
 
-      await fill(view, '[data-test="grant-person"] input', registrableAddress('screen-again'))
+      await typeSearch(view, '[data-test="grant-person"] input', registrableAddress('screen-again'))
       await waitFor(view, `document.querySelector('[data-test="grant-nobody-found"]')`, 20_000)
       await click(view, '[data-test="grant-nobody-found"]')
       await click(view, '[data-test="grant-search-again"]')

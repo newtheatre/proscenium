@@ -592,19 +592,25 @@ export async function pickOptions(view: Bun.WebView, selector: string, labels: s
   await Bun.sleep(300)
 }
 
+// A search box typed as a person does: focused, then sent input alone, since a change event
+// makes a combobox put back what it last showed.
+export async function typeSearch(view: Bun.WebView, selector: string, term: string): Promise<void> {
+  await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
+  await view.evaluate(`(() => {
+    const field = document.querySelector(${JSON.stringify(selector)})
+    field.focus()
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ${JSON.stringify(term)})
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+}
+
 // The picker searches the server, so this types, waits for the person to appear, and clicks them.
 export async function pickPerson(view: Bun.WebView, selector: string, term: string, name: string): Promise<void> {
   const found = `[...document.querySelectorAll('[role="option"]')].some(option => option.innerText.includes(${JSON.stringify(name)}))`
   // Focused and sent input alone: a change event, or a re-render taking focus away, empties the
   // search box, so the term is typed again until the person shows.
   for (let attempt = 1; ; attempt++) {
-    await waitFor(view, `document.querySelector(${JSON.stringify(`${selector} input`)})`)
-    await view.evaluate(`(() => {
-      const field = document.querySelector(${JSON.stringify(`${selector} input`)})
-      field.focus()
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ${JSON.stringify(term)})
-      field.dispatchEvent(new Event('input', { bubbles: true }))
-    })()`)
+    await typeSearch(view, `${selector} input`, term)
     try {
       await waitFor(view, found, 8_000)
       break
