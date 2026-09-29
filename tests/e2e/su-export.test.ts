@@ -78,7 +78,7 @@ describe.skipIf(skip !== null)('changing a mapping is audited with the from and 
     await send('POST', '/api/admin/finance/nominal-mappings', { kind: 'WALK_UP', source: 'DESK', nominalCode: '4200' }, treasurer.cookie)
 
     const row = read<{ actor_id: string, detail: string }>(
-      `SELECT actor_id, detail FROM audit_log WHERE action = 'finance.nominal-mapping.changed' ORDER BY created_at DESC LIMIT 1`)
+      `SELECT actor_id, detail FROM audit_log WHERE action = 'finance.nominal-mapping.changed' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
     expect(row?.actor_id).toBe(treasurer.id)
     expect(JSON.parse(row!.detail)).toMatchObject({ changes: { nominalCode: { from: '4100', to: '4200' } } })
   })
