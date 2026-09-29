@@ -459,7 +459,7 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
     const dmPassword = generatePassword()
     const dm = await registerMember(app, 'checklist-till-dm', dmPassword)
     const barManager = await registerMember(app, 'checklist-till-bar', generatePassword())
-    await send('POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' })
+    await grantRole(app, barManager, 'BAR_MANAGER', admin.cookie)
     const { venueId, performanceId } = (() => {
       const database = new Database(app.databaseFile)
       try {

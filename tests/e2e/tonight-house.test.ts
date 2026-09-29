@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
@@ -58,7 +58,7 @@ const BLANK_FLAGS = {
 
 async function verifiedPatron(): Promise<TestMember> {
   const officer = await registerMember(app, 'house-access-officer', generatePassword())
-  await send('POST', '/api/admin/roles', { userId: officer.id, role: 'ACCESSIBILITY_OFFICER' })
+  await grantRole(app, officer, 'ACCESSIBILITY_OFFICER', admin.cookie)
   const holder = await registerMember(app, 'house-patron', generatePassword())
   expect((await send('PUT', '/api/account/access-profile', {
     flags: { ...BLANK_FLAGS, levelAccess: true },
