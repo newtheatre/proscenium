@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
+import { registrableAddress } from '#tests/helpers/seed'
 import { click, fill, fillNumber, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -115,7 +116,8 @@ describe.skipIf(skip !== null)('age guidance and warnings travel with the bookin
 
   test('the booking page and the confirmation email say them too', async () => {
     const { performanceId, ticketTypeId, warning } = await guidedShow()
-    const email = `macduff-${crypto.randomUUID().slice(0, 8)}@example.com`
+    // A deliverable address: mail to example.com is never handed over, so no letter would exist.
+    const email = registrableAddress('macduff')
     const answered = await send('POST', '/api/reservations', {
       performanceId,
       lines: [{ ticketTypeId, quantity: 1 }],

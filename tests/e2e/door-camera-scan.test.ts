@@ -157,6 +157,8 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
       // The headless view opens no camera, which is exactly criterion 5's fallback.
       await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
       await waitFor(view, `document.querySelector('[data-test="door-reference"]')`)
+      // The note is written once the camera has refused, which lands after the typed field shows.
+      await waitFor(view, `document.querySelector('[data-test="door-camera-note"]')?.innerText.trim().length > 0`)
       expect((await textOf(view, '[data-test="door-camera-note"]')).toLowerCase()).toContain('type the reference')
 
       // The value a decode hands the screen, put in by hand: the resolve route turns it into the

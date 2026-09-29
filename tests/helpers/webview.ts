@@ -291,7 +291,9 @@ export async function openSignedOutView(baseURL: string, size?: { width: number,
   await waitFor(view, 'document.body')
   // The browser is shared, so a charge another suite left unanswered would come back on this till.
   await view.evaluate(`Object.keys(localStorage).filter(key => key.startsWith('nnt-till-sumup')).forEach(key => localStorage.removeItem(key))`)
-  await view.evaluate(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)
+  // Waited for: a sign-out answering after the case has signed in would clear the new session.
+  await view.evaluate(`(window.__signedOut = false, fetch('/api/auth/sign-out', { method: 'POST' }).finally(() => { window.__signedOut = true }), true)`)
+  await waitFor(view, 'window.__signedOut === true')
   return view
 }
 
