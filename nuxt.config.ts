@@ -230,6 +230,14 @@ export default defineNuxtConfig({
     blob: process.env.NODE_ENV === 'production' ? true : { driver: 'fs', dir: `${HUB_DIR}/blob` },
   },
 
+  // No crons under the harness: a tick that lands mid-suite held the file's lock for the rest of
+  // the shard (docs/known-issues.md). A suite that needs a task runs it by name.
+  hooks: {
+    'nitro:config'(nitroConfig) {
+      if (process.env.E2E_BASE_URL) nitroConfig.scheduledTasks = {}
+    },
+  },
+
   // Adds the WebAuthn ceremony handlers and useWebAuthn, which do not exist without it (A-105).
   // It also refuses to build if @simplewebauthn/* are missing, so the pair are dependencies.
   auth: {
