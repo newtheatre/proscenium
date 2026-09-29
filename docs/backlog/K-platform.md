@@ -9,7 +9,7 @@ the cutover rather than after it. Phasing follows the roadmap: the platform stor
 Phase 1, the migration stories rehearse weekly through Phase 2 and complete at the 31 October
 cutover.
 
-Stories: 33. Phases: 27 MVP, 1 V2, 0 Later, 5 resolved.
+Stories: 36. Phases: 30 MVP, 1 V2, 0 Later, 5 resolved.
 
 ## Open questions
 

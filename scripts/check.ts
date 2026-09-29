@@ -43,7 +43,7 @@ export const CHECKS: Check[] = [
   {
     name: 'docs',
     script: 'scripts/check-docs.ts',
-    describes: 'A documentation page missing its provenance, a picture or link that resolves to nothing, or a section with no navigation entry (J-109, 0076).',
+    describes: 'A documentation page missing its provenance, a picture or link that resolves to nothing, a section with no navigation entry (J-109, 0076), or a backlog index whose counts disagree with its module files.',
   },
 ]
 
