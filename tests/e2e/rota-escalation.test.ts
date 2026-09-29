@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { showNightOf } from '#shared/utils/show-night'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -24,7 +24,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'foh-escalate', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -27,8 +27,8 @@ beforeAll(async () => {
   treasurer = await registerMember(app, 'screens-treasurer', treasurerPassword)
   boxOffice = await registerMember(app, 'screens-box-office', generatePassword())
   committee = await registerMember(app, 'screens-committee', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, treasurer, 'TREASURER', admin.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 }, BOOT_TIMEOUT_MS)
 
@@ -199,7 +199,7 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     await fill(view, 'form input[type="email"]', treasurer.email)
     await fill(view, 'form input[type="password"]', treasurerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, treasurer.email)
 
     await visit(view, `${app.baseURL}/money`, '[data-test="period-kind"]')
     await waitFor(view, `document.querySelector('[data-test="section-revenue"]')`)

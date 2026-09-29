@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -23,7 +23,7 @@ beforeAll(async () => {
   admin = await adminSession(app)
   treasurer = await registerMember(app, 'export-treasurer', generatePassword())
   committee = await registerMember(app, 'export-committee', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
+  await grantRole(app, treasurer, 'TREASURER', admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 
   const database = new Database(app.databaseFile)

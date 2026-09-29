@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -39,9 +39,9 @@ beforeAll(async () => {
   bar = await registerMember(app, 'till-bar', generatePassword())
   bar2 = await registerMember(app, 'till-bar2', generatePassword())
   member = await registerMember(app, 'till-ordinary', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: bar2.id, role: 'BAR_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, bar2, 'BAR_MANAGER', admin.cookie)
 
   house = programme('till-house')
   studio = programme('till-studio')
@@ -207,7 +207,7 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
 describe.skipIf(skip !== null)('authority is checked on every request, not cached (F-101 criterion 3)', () => {
   test('revoking the bar manager role refuses the very next request', async () => {
     const volunteer = await registerMember(app, 'till-revoked', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: volunteer.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, volunteer, 'BAR_MANAGER', admin.cookie)
 
     expect((await openTill(studio.venueId, volunteer.cookie)).status).toBe(200)
 
@@ -331,7 +331,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test('Close till is reached from the overflow menu, not the pinned actions, and still closes the session', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-close', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const closing = programme('till-screen-close')
     await openTill(closing.venueId, screenBar.cookie)
 
@@ -340,7 +340,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="open-close-till"]')`)).toBe(false)
@@ -359,7 +359,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test('Confirm close is disabled while a variance has no note, and enables once one is typed', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-variance', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const closing = programme('till-screen-variance')
     await openTill(closing.venueId, screenBar.cookie)
 
@@ -368,7 +368,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
     await click(view, '[data-test="till-overflow-menu"]')
@@ -396,7 +396,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test('correcting the Z figure clears a note written for the old one', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-correct', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const closing = programme('till-screen-correct')
     await openTill(closing.venueId, screenBar.cookie)
 
@@ -405,7 +405,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
     await click(view, '[data-test="till-overflow-menu"]')
@@ -429,7 +429,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test('a sale landing after the modal opens is caught by the refusal, and the note field catches up', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-refresh', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const closing = programme('till-screen-refresh')
     await openTill(closing.venueId, screenBar.cookie)
     const { variantId } = await aSellableProduct(250)
@@ -439,7 +439,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
     await click(view, '[data-test="till-overflow-menu"]')
@@ -519,7 +519,7 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
   test('the bar manager closes last night\'s till from tonight\'s, then answers its charge the Treasurer now records', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-earlier', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const tonight = programme('till-screen-earlier')
     await openTill(tonight.venueId, screenBar.cookie)
     const id = insertStaleSession(tonight.venueId, '2020-01-03', screenBar.id)
@@ -538,7 +538,7 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${tonight.venueId}`, `[data-test="till-open"]`)
     await waitFor(view, `document.querySelector('[data-test="earlier-close-${id}"]')`)
@@ -580,7 +580,7 @@ describe.skipIf(skip !== null)('the Treasurer records a card charge left on a cl
 
   test('the Treasurer records it once; the bar is refused, and so is a stale total', async () => {
     const treasurer = await registerMember(app, 'till-late-treasurer', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
+    await grantRole(app, treasurer, 'TREASURER', admin.cookie)
     const late = programme('till-late-charge')
     const { variantId } = await aSellableProduct(450)
 
@@ -649,7 +649,7 @@ describe.skipIf(skip !== null)('a till refusal held to a missing second factor',
       await fill(view, 'form input[type="email"]', noFactor.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, noFactor.email)
 
       await visit(view, `${app.baseURL}/tonight/till?venueId=${enrolling.venueId}`, 'body')
       await waitFor(view, `document.querySelector('[data-test="till-failure"]')`)
@@ -679,7 +679,7 @@ describe.skipIf(skip !== null)('a till refusal held to a missing second factor',
       await fill(view, 'form input[type="email"]', noFactor.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, noFactor.email)
 
       await visit(view, `${app.baseURL}/tonight/till?venueId=${working.venueId}`, '[data-test="till-closed"]')
       await waitFor(view, `document.querySelector('[data-test="till-earlier-failure"]')`)
@@ -698,7 +698,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
   test('a bar-only basket can be asked, waited on and given once approved', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-comp-ask', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const comping = programme('till-comp')
     await openTill(comping.venueId, screenBar.cookie)
     const { productId } = await aSellableProduct(300)
@@ -708,7 +708,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
     await click(view, `[data-test="product-${productId}"]`)
@@ -754,7 +754,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
   test('a declined request says why, rather than leaving the till waiting forever', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-comp-decline', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const comping = programme('till-comp-decline')
     await openTill(comping.venueId, screenBar.cookie)
     const { productId } = await aSellableProduct(200)
@@ -764,7 +764,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
     await click(view, `[data-test="product-${productId}"]`)
@@ -791,7 +791,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
   test('a restricted line still needs a Challenge 25 outcome, and the prompt closes once given', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-comp-restricted', screenPassword)
-    await request(app, 'POST', '/api/admin/roles', { userId: screenBar.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
     const comping = programme('till-comp-restricted')
     await openTill(comping.venueId, screenBar.cookie)
     const { productId } = await aSellableProduct(400, true)
@@ -801,7 +801,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await fill(view, 'form input[type="email"]', screenBar.email)
     await fill(view, 'form input[type="password"]', screenPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${comping.venueId}`, `[data-test="till-open"]`)
     await click(view, `[data-test="product-${productId}"]`)
@@ -836,7 +836,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   async function atTheTill(secondCategory = false, size?: { width: number, height: number }): Promise<{ view: Bun.WebView, productId: string }> {
     const password = generatePassword()
     const staff = await registerMember(app, `till-layout-${crypto.randomUUID().slice(0, 6)}`, password)
-    await request(app, 'POST', '/api/admin/roles', { userId: staff.id, role: 'BAR_MANAGER' }, admin.cookie)
+    await grantRole(app, staff, 'BAR_MANAGER', admin.cookie)
     const where = programme(`till-layout-${crypto.randomUUID().slice(0, 6)}`)
     await openTill(where.venueId, staff.cookie)
     const { productId } = await aSellableProduct(300)
@@ -847,7 +847,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     await fill(view, 'form input[type="email"]', staff.email)
     await fill(view, 'form input[type="password"]', password)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, staff.email)
     await visit(view, `${app.baseURL}/tonight/till?venueId=${where.venueId}`, `[data-test="product-${productId}"]`)
     return { view, productId }
   }

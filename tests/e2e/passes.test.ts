@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
@@ -24,7 +24,7 @@ beforeAll(async () => {
   officer = await adminSession(app)
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -355,7 +355,7 @@ async function signedInView(member: TestMember, password: string): Promise<Bun.W
   await fill(view, 'form input[type="email"]', member.email)
   await fill(view, 'form input[type="password"]', password)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  await finishSignIn(app, view, member.email)
   return view
 }
 

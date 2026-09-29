@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -25,7 +25,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'ordinary', generatePassword())
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -259,7 +259,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', boxOffice.email)
     await fill(view, 'form input[type="password"]', boxOfficePassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, boxOffice.email)
 
     // The console shell renders no <main>, so the screen names an element of its own.
     await visit(view, `${app.baseURL}/box-office/ticket-types`, '[data-test="ticket-types-table"]')

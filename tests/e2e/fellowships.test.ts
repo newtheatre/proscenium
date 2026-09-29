@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
+import { forgetSpentStep, grantRole, markVerified, registerMember } from '#tests/helpers/accounts'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
@@ -299,7 +299,7 @@ describe.skipIf(skip !== null)('the lifetime entitlement rides the pass model (0
 
   test('an erased Fellow is refused at the door, not silently admitted (0062)', async () => {
     const doorOfficer = await registerMember(app, 'door-for-fellows', password)
-    await send('POST', '/api/admin/roles', { userId: doorOfficer.id, role: 'FOH_MANAGER' }, cookie)
+    await grantRole(app, doorOfficer, 'FOH_MANAGER', cookie)
 
     const alumna = await registerMember(app, 'erased-entitled', password)
     const { passId } = await (await record(alumna.id)).json() as { passId: string }

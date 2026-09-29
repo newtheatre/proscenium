@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
@@ -28,7 +28,7 @@ beforeAll(async () => {
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'export-box-office', boxOfficePassword)
   committee = await registerMember(app, 'export-committee', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 
   const database = new Database(app.databaseFile)
@@ -141,7 +141,7 @@ describe.skipIf(skip !== null)('the box office shows screen links to the export 
       await fill(view, 'form input[type="email"]', boxOffice.email)
       await fill(view, 'form input[type="password"]', boxOfficePassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+      await finishSignIn(app, view, boxOffice.email)
 
       await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-table"]')
       await waitFor(view, `document.querySelector('[data-test="ticket-export-csv"]')`, 30_000)

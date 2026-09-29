@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -25,7 +25,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'tabs-console-manager', barManagerPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
   member = await registerMember(app, 'tabs-console-ordinary', generatePassword())
 }, BOOT_TIMEOUT_MS)
 
@@ -93,7 +93,7 @@ describe.skipIf(skip !== null)('the tab register lists every holder still carryi
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barManagerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/tabs`, `[data-test="view-tab-${holder.id}"]`)
     expect(await textOf(view, '[data-test="bar-tabs-table"]')).toContain('£5.00')
@@ -119,7 +119,7 @@ describe.skipIf(skip !== null)('the tab register lists every holder still carryi
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barManagerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/tabs`, `[data-test="view-tab-${holder.id}"]`)
     await click(view, `[data-test="view-tab-${holder.id}"]`)
