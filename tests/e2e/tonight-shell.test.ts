@@ -20,9 +20,8 @@ let app: AppUnderTest
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
-  // Every show-night screen sends a signed-out visitor to sign in, so the shell is measured for the
-  // Front of House Manager on a night with a house running; one browser backs every view, so this
-  // one sign-in holds for each view the suite opens.
+  // Every show-night screen asks a visitor to sign in, so the shell is measured for the Front of
+  // House Manager with a house running; one browser backs every view, so one sign-in holds for all.
   const admin = await adminSession(app)
   const password = generatePassword()
   const officer = await registerMember(app, 'shell', password)
