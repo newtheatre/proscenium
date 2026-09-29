@@ -783,8 +783,9 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(choice?.choiceGroupName).toBe(groupName)
     expect(await actionLabels(view, `[data-test="more-${variantId}"]`)).toContain('Change choice')
 
-    // Clearing acts straight from the overflow, no confirmation modal, matching Retire's directness.
+    // Clearing confirms first, as every console destructive does (K-123).
     await chooseAction(view, `[data-test="more-${variantId}"]`, 'Clear choice')
+    await click(view, '[data-test="confirm-clear-choice-verb"]')
     let offered = await actionLabels(view, `[data-test="more-${variantId}"]`)
     for (let attempt = 0; attempt < 10 && offered.includes('Clear choice'); attempt++) {
       offered = await actionLabels(view, `[data-test="more-${variantId}"]`)

@@ -252,7 +252,7 @@ describe.skipIf(skip !== null)('the catalogue screen', () => {
 
     await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="price-source-${variantId}"]`)
     await waitFor(view, `document.querySelector('[data-test="price-source-${variantId}"]')`)
-    expect(await textOf(view, `[data-test="price-source-${variantId}"]`)).toContain('Category default')
+    expect(await textOf(view, `[data-test="price-source-${variantId}"]`)).toContain('Product category default')
 
     await setVariantPrice(variantId, { pricePence: 300 })
     await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="price-source-${variantId}"]`)

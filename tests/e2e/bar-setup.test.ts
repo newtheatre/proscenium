@@ -111,7 +111,8 @@ describe.skipIf(skip !== null)('a can is set up in one pass (F-127 criteria 1, 4
       await click(view, '[data-test="setup-submit"]')
       await waitFor(view, `location.pathname.startsWith('/bar/products/') && !location.pathname.endsWith('/new')`, 30_000)
 
-      expect(await tillSees(productName)).toEqual([{ label: 'Can', pricePence: 300 }])
+      // The till carries more of each size than these two; the two are what the set-up decides.
+      expect(await tillSees(productName)).toMatchObject([{ label: 'Can', pricePence: 300 }])
     }
     finally {
       view.close()
@@ -195,7 +196,7 @@ describe.skipIf(skip !== null)('a cocktail is set up from its ingredients (F-127
       await click(view, '[data-test="setup-submit"]')
       await waitFor(view, `location.pathname.startsWith('/bar/products/') && !location.pathname.endsWith('/new')`, 30_000)
 
-      expect(await tillSees(productName)).toEqual([{ label: 'Each', pricePence: 600 }])
+      expect(await tillSees(productName)).toMatchObject([{ label: 'Each', pricePence: 600 }])
       expect(await textOf(view, 'body')).toContain(ginName)
     }
     finally {
