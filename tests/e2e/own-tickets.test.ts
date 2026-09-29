@@ -56,7 +56,7 @@ async function bookableShow(): Promise<{ title: string, performanceId: string, t
   const title = named('Hedda Gabler')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
   const showId = (await show.json() as { id: string }).id
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: now + 7 * 86_400 })
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: now + 7 * 86_400, durationMinutes: 120 })
   const performanceId = (await performance.json() as { id: string }).id
   const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
   const ticketTypeId = (await type.json() as { id: string }).id

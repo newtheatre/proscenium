@@ -74,7 +74,7 @@ async function soonShow(holdReleaseMinutesBefore: number): Promise<{ performance
   const showId = (await show.json() as { id: string }).id
 
   const startsAt = Math.floor(Date.now() / 1000) + 60 * 60
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt })
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 })
   const performanceId = (await performance.json() as { id: string }).id
   expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
     venueId, startsAt, intervalCount: 0, holdReleaseMinutesBefore,
@@ -110,7 +110,7 @@ function entriesFor(performanceId: string): { id: string, status: string, reserv
 describe.skipIf(skip !== null)('a join is committed only alongside a link the joiner holds (criterion 1)', () => {
   test('the answer says the letter went, and the letter carries the entry link', async () => {
     const { performanceId } = await bookableShow()
-    const email = `waiter-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const email = registrableAddress('waiter')
 
     const answered = await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId,
@@ -133,7 +133,7 @@ describe.skipIf(skip !== null)('a join is committed only alongside a link the jo
 
   test('a second join on the same address is refused and writes nothing more', async () => {
     const { performanceId } = await bookableShow()
-    const email = `twice-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const email = registrableAddress('twice')
     const body = { performanceId, partySize: 1, guest: { name: 'Ada Twice', email } }
 
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, body, '')).status).toBe(200)
@@ -147,7 +147,7 @@ describe.skipIf(skip !== null)('a join is committed only alongside a link the jo
 describe.skipIf(skip !== null)('a claimed offer opens the booking it made (criterion 2)', () => {
   test('claiming lands on the booking page, headed booking made', async () => {
     const { performanceId } = await bookableShow()
-    const email = `claimer-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const email = registrableAddress('claimer')
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada Claimer', email },
     }, '')).status).toBe(200)
@@ -181,7 +181,7 @@ describe.skipIf(skip !== null)('every email opens the entry page, and leaving go
   // Issue 1340: an email sent before the change still carries /leave/, which now opens the entry.
   test('an old leave link redirects to the entry page, which names the show, the night and the party', async () => {
     const { performanceId } = await bookableShow()
-    const email = `old-link-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const email = registrableAddress('old-link')
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 2, guest: { name: 'Ada Oldlink', email },
     }, '')).status).toBe(200)
@@ -268,7 +268,7 @@ describe.skipIf(skip !== null)('the join screen names what it is a list for (cri
 describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () => {
   test('leaving opens a named confirmation, backing out leaves the entry alone, and once left it offers what is on', async () => {
     const { performanceId } = await bookableShow()
-    const email = `asked-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const email = registrableAddress('asked')
 
     const view = await openSignedOutView(app.baseURL)
     try {
@@ -315,7 +315,7 @@ describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () 
 describe.skipIf(skip !== null)('an offer stands until online booking closes, and none is made after (criterion 2)', () => {
   test('an offer made before the cut-off lapses at the cut-off, not at curtain, and says first refusal', async () => {
     const { performanceId, startsAt } = await soonShow(30)
-    const email = `refusal-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const email = registrableAddress('refusal')
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada First', email },
     }, '')).status).toBe(200)
@@ -336,7 +336,7 @@ describe.skipIf(skip !== null)('an offer stands until online booking closes, and
   test('past the cut-off nothing is offered, and a join is refused naming the door', async () => {
     const { performanceId, startsAt } = await soonShow(5)
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
-      performanceId, partySize: 1, guest: { name: 'Ada Early', email: `early-${crypto.randomUUID().slice(0, 8)}@example.invalid` },
+      performanceId, partySize: 1, guest: { name: 'Ada Early', email: registrableAddress('early') },
     }, '')).status).toBe(200)
 
     expect((await send('PUT', `/api/admin/performances/${performanceId}`, {
@@ -348,7 +348,7 @@ describe.skipIf(skip !== null)('an offer stands until online booking closes, and
     expect(offerFor(performanceId)?.status).toBe('WAITING')
 
     const late = await send('POST', `/api/performances/${performanceId}/waiting-list`, {
-      performanceId, partySize: 1, guest: { name: 'Ada Late', email: `late-${crypto.randomUUID().slice(0, 8)}@example.invalid` },
+      performanceId, partySize: 1, guest: { name: 'Ada Late', email: registrableAddress('late') },
     }, '')
     expect(late.status).toBe(409)
     const says = await late.text()
@@ -387,7 +387,7 @@ describe.skipIf(skip !== null)('an exchange offers the seats it frees to the wai
     expect(booked.status).toBe(200)
     const { reference, qrToken } = await booked.json() as { reference: string, qrToken: string }
 
-    const waiter = `waiter-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const waiter = registrableAddress('waiter')
     expect((await send('POST', `/api/performances/${first}/waiting-list`, {
       performanceId: first, partySize: 1, guest: { name: 'Ada Waiter', email: waiter },
     }, '')).status).toBe(200)
@@ -422,7 +422,7 @@ describe.skipIf(skip !== null)('an offer and a claim are recorded once, however 
   test('two offer runs at once make one offer and one trail row', async () => {
     const { performanceId } = await bookableShow()
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
-      performanceId, partySize: 1, guest: { name: 'Ada Raced', email: `raced-${crypto.randomUUID().slice(0, 8)}@example.invalid` },
+      performanceId, partySize: 1, guest: { name: 'Ada Raced', email: registrableAddress('raced') },
     }, '')).status).toBe(200)
 
     const runs = await race(2, () => send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`))
@@ -436,7 +436,7 @@ describe.skipIf(skip !== null)('an offer and a claim are recorded once, however 
 
   test('two claims at once make one booking, and one trail row naming it', async () => {
     const { performanceId } = await bookableShow()
-    const email = `claims-${crypto.randomUUID().slice(0, 8)}@example.invalid`
+    const email = registrableAddress('claims')
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada Twice', email },
     }, '')).status).toBe(200)
