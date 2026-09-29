@@ -433,7 +433,8 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
     const view = await officerView()
     try {
       await visit(view, `${app.baseURL}/training/manage/sessions/${id}`, '[data-test="session-status"]')
-      const heading = await textOf(view, 'h1')
+      // The console's bar heads every page with its title; the session's own heading comes after it.
+      const heading = await view.evaluate<string>(`[...document.querySelectorAll('h1')].at(-1)?.innerText ?? ''`)
       expect(heading).toContain(shortDay(day))
       expect(heading).not.toContain(day)
     }
@@ -532,7 +533,7 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
     const taught = await addModule()
     const added = await addModule()
     const { id } = await (await schedule({ moduleIds: [taught] })).json() as { id: string }
-    write(`UPDATE training_modules SET status = 'RETIRED' WHERE id = ?`, taught)
+    write(`UPDATE modules SET status = 'RETIRED' WHERE id = ?`, taught)
 
     const view = await officerView()
     try {

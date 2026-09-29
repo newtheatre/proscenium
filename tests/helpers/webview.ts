@@ -463,12 +463,27 @@ export async function readDate(view: Bun.WebView, selector: string): Promise<str
 // one: the trigger is opened and the option itself is clicked, the way a person does it.
 async function openMenu(view: Bun.WebView, selector: string): Promise<void> {
   await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
-  await view.evaluate(`(() => {
+  const trigger = `(() => {
     const root = document.querySelector(${JSON.stringify(selector)})
-    const trigger = root.matches('button,[role="combobox"]') ? root : root.querySelector('button,[role="combobox"]')
-    trigger.click()
-  })()`)
-  await waitFor(view, `document.querySelector('[role="option"]')`, 15_000)
+    return root.matches('button,[role="combobox"]') ? root : root.querySelector('button,[role="combobox"]')
+  })()`
+  const anyOption = `document.querySelector('[role="option"]')`
+  // A click toggles, so an open menu is left open. Inside a modal a click can leave it shut, so a
+  // pointer, then the keyboard, follow.
+  const ways = [
+    `(() => { const t = ${trigger}; if (t.getAttribute('aria-expanded') !== 'true') t.click() })()`,
+    `(() => { const t = ${trigger}; for (const type of ['pointerdown', 'pointerup']) t.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: 'mouse', isPrimary: true })); if (t.getAttribute('aria-expanded') !== 'true') t.click() })()`,
+    `(() => { const t = ${trigger}; t.focus(); t.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })()`,
+  ]
+  for (const way of ways) {
+    await view.evaluate(way)
+    const deadline = Date.now() + 3_000
+    while (Date.now() < deadline) {
+      if (await view.evaluate<boolean>(`Boolean(${anyOption})`)) return
+      await Bun.sleep(100)
+    }
+  }
+  await waitFor(view, anyOption, 6_000)
 }
 
 // Reka commits on pointerup rather than on click, and only for a pointer it recognises: a plain
