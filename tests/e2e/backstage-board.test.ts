@@ -280,6 +280,19 @@ describe.skipIf(skip !== null)('front of house holds the other end of the board 
   })
 })
 
+// The current state is the latest call by its sender's clock, and an earlier case dates a
+// correction ahead, so a call a case means to lead with is composed after every one on the board.
+function laterThanEveryCall(): number {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const latest = database.query('SELECT max(composed_at) AS at FROM backstage_messages').get() as { at: number | null }
+    return Math.max(Math.floor(Date.now() / 1000), (latest.at ?? 0) + 1)
+  }
+  finally {
+    database.close()
+  }
+}
+
 // Both ends read the board the same way (criterion 7, amended 14 September 2026): the crew's
 // feed carries front of house's ticks, and the joined screen leads with the current state.
 describe.skipIf(skip !== null)('the wings read the board the way front of house does (E-121 criterion 7)', () => {
@@ -300,7 +313,7 @@ describe.skipIf(skip !== null)('the wings read the board the way front of house 
   })
 
   test('the joined screen leads with the current state, and ticks a call once front of house has seen it', async () => {
-    const composedAt = Math.floor(Date.now() / 1000)
+    const composedAt = laterThanEveryCall()
     const called = await send('POST', '/api/tonight/board/messages', { body: 'Places in five', composedAt }, foh.cookie)
     const { id: fohId } = await called.json() as { id: string }
     const { code } = await (await send('GET', '/api/tonight/board/code', undefined, foh.cookie)).json() as { code: string }
@@ -368,7 +381,7 @@ describe.skipIf(skip !== null)('the current state fits the column it is given (i
     finally {
       database.close()
     }
-    const composedAt = Math.floor(Date.now() / 1000)
+    const composedAt = laterThanEveryCall()
     expect((await send('POST', '/api/tonight/board/messages', { body: FOH_CALL, composedAt }, foh.cookie)).status).toBe(200)
     const { deviceCookie } = await joinAs('Stage left desk')
     expect((await request(app, 'POST', '/api/board/messages', { body: WINGS_CALL, composedAt }, deviceCookie)).status).toBe(200)
