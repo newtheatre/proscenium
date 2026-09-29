@@ -113,7 +113,7 @@ describe.skipIf(skip !== null)('exporting is audited (criterion 4)', () => {
     await send('GET', `/api/admin/tickets/export?performanceId=${performanceId}`, undefined, boxOffice.cookie)
 
     const row = read<{ action: string, actor_id: string, detail: string }>(
-      `SELECT action, actor_id, detail FROM audit_log WHERE action = 'tickets.exported' ORDER BY created_at DESC LIMIT 1`)
+      `SELECT action, actor_id, detail FROM audit_log WHERE action = 'tickets.exported' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
     expect(row?.action).toBe('tickets.exported')
     expect(row?.actor_id).toBe(boxOffice.id)
     expect(JSON.parse(row!.detail)).toMatchObject({ performanceId, rows: 1 })

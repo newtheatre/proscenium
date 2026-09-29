@@ -65,6 +65,16 @@ function query<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+function queryAll<T>(statement: string, ...parameters: unknown[]): T[] {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).all(...parameters as never[]) as T[]
+  }
+  finally {
+    database.close()
+  }
+}
+
 const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice(0, 8)}`
 const slugged = (title: string): string => title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 const nextWeek = (offsetHours = 0): number => Math.floor(Date.now() / 1000) + 7 * 86_400 + offsetHours * 3600
@@ -131,14 +141,15 @@ describe.skipIf(skip !== null)('a covered pass is offered and redeems while rese
     )
     expect(ticket?.pricePaid).toBe(0)
 
-    const line = query<{ kind: string, amountPence: number, performanceId: string | null }>(
+    // The pass's own sale carries its id too, so the admission is found among the pass's lines.
+    const lines = queryAll<{ kind: string, amountPence: number, performanceId: string | null }>(
       'SELECT kind AS kind, amount_pence AS amountPence, performance_id AS performanceId FROM ledger_lines WHERE price_ref = ?', passId,
     )
-    expect(line).toEqual({ kind: 'PASS_ADMISSION', amountPence: 0, performanceId })
+    expect(lines).toContainEqual({ kind: 'PASS_ADMISSION', amountPence: 0, performanceId })
 
     const entry = query<{ source: string, tender: string }>(
       `SELECT e.source AS source, e.tender AS tender FROM ledger_entries e
-       JOIN ledger_lines l ON l.entry_id = e.id WHERE l.price_ref = ?`, passId,
+       JOIN ledger_lines l ON l.entry_id = e.id WHERE l.price_ref = ? AND l.kind = 'PASS_ADMISSION'`, passId,
     )
     expect(entry).toEqual({ source: 'SELF_SERVE', tender: 'NONE' })
 
@@ -154,7 +165,7 @@ describe.skipIf(skip !== null)('a covered pass is offered and redeems while rese
     expect((await send('POST', `/api/passes/${passId}/redeem`, { performanceId }, holder.cookie)).status).toBe(200)
     const again = await send('POST', `/api/passes/${passId}/redeem`, { performanceId }, holder.cookie)
     expect(again.status).toBe(409)
-    expect(await again.text()).toContain('already been redeemed')
+    expect(await again.text()).toContain('already redeemed for this performance')
 
     const total = query<{ total: number }>(
       'SELECT count(*) AS total FROM pass_admissions WHERE pass_id = ? AND performance_id = ?', passId, performanceId,
