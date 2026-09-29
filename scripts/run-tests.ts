@@ -39,6 +39,14 @@ function deal(files: string[]): Shard[] {
   return shards
 }
 
+// `E2E_SLICE=2/6` runs every sixth suite from the second: one CI job a slice, each with its own
+// machine and server.
+function slice(files: string[]): string[] {
+  const [index = 0, of = 0] = (process.env.E2E_SLICE ?? '1/1').split('/').map(Number)
+  if (!Number.isInteger(index) || !Number.isInteger(of) || index < 1 || index > of) throw new Error(`E2E_SLICE must read i/n with 1 <= i <= n, not ${process.env.E2E_SLICE}`)
+  return files.filter((_, position) => position % of === index - 1)
+}
+
 async function stream(shard: Shard, from: ReadableStream<Uint8Array>): Promise<void> {
   const decoder = new TextDecoder()
   const reader = from.getReader()
@@ -196,14 +204,6 @@ if (only.length) {
 }
 
 const began = Date.now()
-// `E2E_SLICE=2/6` runs every sixth suite from the second: one CI job a slice, each with its own
-// machine and server, since one runner takes hours over them all.
-function slice(files: string[]): string[] {
-  const [index, of] = (process.env.E2E_SLICE ?? '1/1').split('/').map(Number)
-  if (!index || !of || index > of) throw new Error(`E2E_SLICE must read i/n with 1 <= i <= n, not ${process.env.E2E_SLICE}`)
-  return files.filter((_, position) => position % of === index - 1)
-}
-
 const passed = await e2e(slice(suites('tests/e2e')))
 
 console.log(`total ${elapsed(began)}`)

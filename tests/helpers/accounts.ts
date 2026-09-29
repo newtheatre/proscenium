@@ -39,8 +39,6 @@ export function markVerified(app: AppUnderTest, email: string): void {
   for (let attempt = 0; ; attempt++) {
     const database = new Database(app.databaseFile)
     try {
-      // Two seconds of retries was shorter than a dev server's slow write holds the file.
-      database.run('PRAGMA busy_timeout = 10000')
       database.query('UPDATE users SET verified = 1 WHERE email = ?').run(email)
       return
     }
@@ -59,7 +57,6 @@ export function markVerified(app: AppUnderTest, email: string): void {
 export function forgetSpentStep(app: AppUnderTest, email: string): void {
   const database = new Database(app.databaseFile)
   try {
-    database.run('PRAGMA busy_timeout = 10000')
     database.query(`
       UPDATE totp_secrets SET last_used_step = NULL
       WHERE user_id = (SELECT id FROM users WHERE email = ?)

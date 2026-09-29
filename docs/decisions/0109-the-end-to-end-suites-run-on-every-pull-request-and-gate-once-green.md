@@ -10,7 +10,7 @@
 run nightly and on demand from `.github/workflows/e2e.yml`. That never happened. GitHub registers
 a `schedule:` trigger only from the default branch, still `main` until cutover, and
 `workflow_dispatch` cannot reach a file that is not there either. So the suites had never run on a
-runner. When they first did, most of them failed: two harness defects, fixed with this record,
+runner. When they first did, most of them failed: harness defects, fixed with this record,
 and a large drift between the fixtures and the product, such as officers with no authenticator
 and shift-eligibility keys never set.
 
@@ -30,8 +30,13 @@ one.
 ## Consequences
 
 - Until then a browser regression is caught only by whoever runs the suites by hand.
-- Every pull request pays ten runners for up to half an hour each once this lands. Cancelling an
-  older run on a newer push keeps that to one run per pull request at a time.
+- Every pull request pays ten runners for about ten minutes each, inside a 60-minute limit, once
+  this lands. Cancelling an older run on a newer push keeps that to one run per pull request at a
+  time.
+- The end-to-end server registers no crons (`E2E_BASE_URL` in `nuxt.config.ts`; a suite runs a
+  task by name), every test-side SQLite file connection waits ten seconds on a lock (`bunfig.toml`
+  preloads `tests/helpers/busy-timeout.ts`), and the harness puts the e2e database in WAL mode.
+  None of this reaches a production build.
 - `CONTRIBUTING.md`, the README and the architecture notes say "on every pull request" rather
   than "nightly", in the pull request that makes it true.
 

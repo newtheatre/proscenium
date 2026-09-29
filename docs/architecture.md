@@ -2310,7 +2310,7 @@ CI gates, eleven of them: `build`, `typecheck`, `lint`, `typecheck:bun`, `test`,
 checkers (comments, migrations, content tokens, ledger, notifications, audit). `typecheck` and
 `typecheck:bun` are separate compilers over separate projects, and passing one says nothing about
 the other. `test:e2e` runs on every pull request into `unified/main`, in ten slices
-(`E2E_SLICE`, `scripts/run-tests.ts`), but is not yet a required check (`docs/known-issues.md`).
+(`E2E_SLICE`, `scripts/run-tests.ts`), and each slice is a required check on `unified/main` (0109).
 
 ## Testing (0016)
 

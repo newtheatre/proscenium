@@ -48,8 +48,8 @@ Twelve steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
 
 `test:e2e` runs on every pull request into `unified/main` and on demand, in ten slices
 (`E2E_SLICE=i/10`), each on its own runner with its own dev server; the nightly schedule
-registers only once `unified/main` is the default branch. It becomes a required check once the
-suites are green (0109); the ones still failing are listed in `docs/known-issues.md`. A slice takes up to half an hour.
+registers only once `unified/main` is the default branch. Each slice is a required check (0109). A
+slice takes under ten minutes, inside a 60-minute limit.
 
 Documentation drift is a defect and fails review, but no script checks it: a change to behaviour
 without a change to its document is caught by a person. That includes the in-app operator

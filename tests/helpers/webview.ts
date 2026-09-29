@@ -132,10 +132,10 @@ export async function startApp(): Promise<AppUnderTest> {
   // Adopted, not replaced, and asked over HTTP: a server on ::1 alone leaves 127.0.0.1 bindable,
   // and booting past it wipes the directory it is serving from.
   const serving = await alreadyServing()
-  if (serving || !portIsFree(port)) {
-    if (!serving) {
-      throw new Error(`port ${port} is held by something that is not this app: stop it, or set E2E_BASE_URL`)
-    }
+  if (!serving && !portIsFree(port)) {
+    throw new Error(`port ${port} is held by something that is not this app: stop it, or set E2E_BASE_URL`)
+  }
+  if (serving) {
     const adopted: AppUnderTest = {
       baseURL: BASE_URL,
       databaseFile: `${hubDirFor(port)}/db/sqlite.db`,
