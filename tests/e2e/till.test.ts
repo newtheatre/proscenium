@@ -133,6 +133,17 @@ async function aSellableProduct(pricePence: number, ageRestricted = false): Prom
   return { productId, variantId }
 }
 
+function hideEveryProduct(): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.run('PRAGMA busy_timeout = 10000')
+    database.query(`UPDATE bar_products SET status = 'HIDDEN' WHERE status = 'ACTIVE'`).run()
+  }
+  finally {
+    database.close()
+  }
+}
+
 let nextSlot = 100
 
 function shiftFor(performanceId: string, role: string, userId: string, status = 'CONFIRMED'): string {
@@ -351,6 +362,9 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
     await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
     await waitFor(view, `document.querySelector('[data-test="confirm-close-till"]')`)
+    // A blank field is not a reading, so the nought the reader shows is keyed in.
+    await fillNumber(view, '[data-test="actual-z-input"]', '0')
+    await waitFor(view, `!document.querySelector('[data-test="confirm-close-till"]').disabled`)
     await click(view, '[data-test="confirm-close-till"]')
     await waitFor(view, `document.querySelector('[data-test="till-closed"]')`)
     view.close()
@@ -653,7 +667,8 @@ describe.skipIf(skip !== null)('a till refusal held to a missing second factor',
       await click(view, 'form button[type="submit"]')
       await finishSignIn(app, view, noFactor.email)
 
-      await visit(view, `${app.baseURL}/tonight/till?venueId=${enrolling.venueId}`, 'body')
+      // No marker to hydrate on a refused screen: the failure itself is what the next line waits for.
+      await view.navigate(`${app.baseURL}/tonight/till?venueId=${enrolling.venueId}`)
       await waitFor(view, `document.querySelector('[data-test="till-failure"]')`)
       const shown = await textOf(view, '[data-test="till-failure"]')
       expect(shown).toMatch(/authenticator/i)
@@ -822,11 +837,11 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await click(view, '[data-test="till-comp-pending-chip"]')
     await waitFor(view, `document.querySelector('[data-test="comp-give"]')`)
     await click(view, '[data-test="comp-give"]')
-    await waitFor(view, `document.querySelector('[data-test="age-check-id-passport"]')`)
-    await click(view, '[data-test="age-check-id-passport"]')
+    await waitFor(view, `document.querySelector('[data-test="age-check-id-PASSPORT"]')`)
+    await click(view, '[data-test="age-check-id-PASSPORT"]')
 
     await waitFor(view, `document.querySelector('[data-test="comp-given-confirmation"]')`)
-    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="age-check-id-passport"]')`)).toBe(false)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="age-check-id-PASSPORT"]')`)).toBe(false)
     view.close()
   }, 120_000)
 })
@@ -841,6 +856,8 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
     await grantRole(app, staff, 'BAR_MANAGER', admin.cookie)
     const where = programme(`till-layout-${crypto.randomUUID().slice(0, 6)}`)
     await openTill(where.venueId, staff.cookie)
+    // The catalogue is every active product, so earlier tests' products leave the till first.
+    hideEveryProduct()
     const { productId } = await aSellableProduct(300)
     if (secondCategory) await aSellableProduct(250)
 
