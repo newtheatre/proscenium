@@ -21,8 +21,10 @@ describe.skipIf(skip !== null)('the application serves a page (0022)', () => {
     const view = await openView()
     try {
       await view.navigate(app.baseURL)
+      // The heading is the centenary line from the committee's mockup (J-111); the name is the title.
       const heading = await view.evaluate<string>('document.querySelector("h1")?.textContent?.trim() ?? ""')
-      expect(heading).toContain('Nottingham New Theatre')
+      expect(heading).toContain('A century of')
+      expect(await view.evaluate<string>('document.title')).toContain('Nottingham New Theatre')
     }
     finally { view.close() }
   })

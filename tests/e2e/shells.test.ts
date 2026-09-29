@@ -44,6 +44,14 @@ async function seedShow(cookie: string): Promise<void> {
   })).json() as { id: string }
   performanceId = performance.id
   await send(`/api/admin/shows/${show.id}/publish`, { published: true, cascadePerformances: true })
+
+  // A listing sticker is earned by a house running low, so every house here reads as one.
+  const limited = await fetch(`${app.baseURL}/api/admin/config/LISTING_LIMITED_THRESHOLD_PERCENT`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ value: 100 }),
+  })
+  expect(limited.status).toBe(200)
 }
 
 beforeAll(async () => {
@@ -58,8 +66,10 @@ afterAll(async () => {
   await app?.stop()
 }, 30_000)
 
+// Signed out first: the browser is shared, so a session another suite left would otherwise
+// redirect a way in and change what a public page shows.
 async function inspect<T>(path: string, script: string): Promise<T> {
-  const view = await openView()
+  const view = await openSignedOutView(app.baseURL)
   try {
     await view.navigate(`${app.baseURL}${path}`)
     return await view.evaluate<T>(script)

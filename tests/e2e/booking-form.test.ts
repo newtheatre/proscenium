@@ -242,9 +242,10 @@ describe.skipIf(skip !== null)('the screen answers everybody the same way (crite
       await visit(view, `${app.baseURL}/book/${first}`, '[data-test="book-page"]')
       await waitFor(view, `document.querySelector('[data-test="night-${second}"]')`)
 
-      expect(await textOf(view, `[data-test="night-${first}"]`)).toContain('Booking this night')
+      // The chosen night's word is set in capitals by its style, which the rendered text carries.
+      expect(await textOf(view, `[data-test="night-${first}"]`)).toMatch(/Booking this night/i)
       expect(await textOf(view, `[data-test="night-${second}"]`)).toContain('Tickets available')
-      expect(await textOf(view, `[data-test="night-${second}"]`)).not.toContain('Booking this night')
+      expect(await textOf(view, `[data-test="night-${second}"]`)).not.toMatch(/Booking this night/i)
     }
     finally {
       view.close()

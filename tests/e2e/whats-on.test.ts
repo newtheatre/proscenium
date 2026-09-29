@@ -649,7 +649,9 @@ describe.skipIf(skip !== null)('the public pages say which nothing they mean (J-
     const otherVenueId = namedVenue(other)
     await publishedShow({ title: named('Ivanov') })
     const elsewhere = await newShow({ title: named('Three Sisters') })
-    await addPerformance(elsewhere.id, { venueId: otherVenueId })
+    // Tomorrow, ahead of the week-out runs the suite has listed by now, so it is on the first page
+    // and its venue is among the filters that page offers.
+    await addPerformance(elsewhere.id, { venueId: otherVenueId, startsAt: nextWeek(-6 * 24) })
     await publish(elsewhere.id)
 
     const view = await openSignedOutView(app.baseURL)

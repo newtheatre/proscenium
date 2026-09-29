@@ -89,7 +89,8 @@ describe.skipIf(skip !== null)('an editorial page reads as a column, not as a wa
   const MEASURE_CEILING = 820
 
   test('the prose column is narrower than the container it sits in', async () => {
-    const view = await openSignedOutView(app.baseURL)
+    // A desk-wide window: the browser's own default is 800 pixels, narrower than the measure.
+    const view = await openSignedOutView(app.baseURL, { width: 1280, height: 800 })
     try {
       await visit(view, `${app.baseURL}/about`, '[data-test="content-body"]')
       const seen = await view.evaluate<string>(`JSON.stringify((() => {
