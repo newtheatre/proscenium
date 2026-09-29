@@ -94,6 +94,15 @@ describe('the settings screen reads as rules', () => {
     expect(await read('server/api/admin/config/[key].put.ts')).toContain('requireBlastRadiusConfirmation(')
   })
 
+  // A preview can turn on the value itself (AUTO_CLOSE_FROM_NIGHT): a save checks the echo against
+  // the value it writes, a revert against the prior value, and the screen previews the same one.
+  test('the save, the revert and the screen preview the value that would actually be written', async () => {
+    expect(await read('server/api/admin/config/[key].put.ts')).toContain('requireBlastRadiusConfirmation(event, key, input.confirmation, input.value)')
+    expect(await read('server/api/admin/config/[key]/revert.post.ts')).toContain('requireBlastRadiusConfirmation(event, key, input?.confirmation, prior.value)')
+    expect(await read('server/api/admin/config/[key]/blast-radius.get.ts')).toContain('(await priorConfigValue(key))?.value')
+    expect(await read(SETTINGS)).toContain(`isRevert ? { revert: 'true' } : { value: JSON.stringify(value) }`)
+  })
+
   // A list stored below the floor would otherwise refuse every save with no way to put it right.
   test('a floor role stored off the list can be ticked back, so the save that repairs it is possible', async () => {
     expect(await read('app/components/settings/RolesField.vue'))

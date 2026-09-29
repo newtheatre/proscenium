@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -23,7 +23,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'backstage-foh', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   // A venue running tonight, so the officer bypass has coverage and joining has a night to
   // try; the fixture itself, not its ids, is what this suite needs (E-111, E-127).

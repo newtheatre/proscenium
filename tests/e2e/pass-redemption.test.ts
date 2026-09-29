@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -25,7 +25,7 @@ beforeAll(async () => {
   officer = await adminSession(app)
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -221,7 +221,7 @@ describe.skipIf(skip !== null)('using a pass lands on its booking, and signing o
       await fill(view, 'form input[type="email"]', holder.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+      await finishSignIn(app, view, holder.email)
 
       await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="redeem-pass"]')
       await click(view, '[data-test="redeem-pass"]')

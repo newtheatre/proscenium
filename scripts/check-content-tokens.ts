@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
-// Every {{TOKEN}} in a content page must name a configuration key a visitor may read, so a policy
-// page always quotes the value the write path enforces (0012). Anything else fails CI.
+// Every {{TOKEN}} in a content page names a configuration key a visitor may read (0012) or a role
+// in the committee file (0107), so a page never quotes what nothing answers. Anything else fails CI.
 
 import { join } from 'node:path'
+import { committeeSchema, committeeTokenProblem, isCommitteeToken } from '#shared/utils/committee'
 import { CONFIG_KEY_NAMES, isConfigKey, isSensitive } from '#shared/utils/config'
 import { policyTokenPattern, policyTokenProblem, repeatedUnitProblem } from '#shared/utils/policy-tokens'
 
@@ -18,6 +19,9 @@ function markdownFiles(): string[] {
   }
 }
 
+// The committee's tokens answer from its data file rather than the settings (0107).
+const committee = committeeSchema.parse(Bun.YAML.parse(await Bun.file(join(DIR, 'committee.yml')).text()))
+
 const problems: string[] = []
 const repeats: string[] = []
 let tokensSeen = 0
@@ -30,6 +34,11 @@ for (const file of pages) {
     for (const match of line.matchAll(policyTokenPattern())) {
       tokensSeen++
       const key = match[1]!
+      if (isCommitteeToken(key)) {
+        const problem = committeeTokenProblem(key, committee)
+        if (problem) problems.push(`${join(DIR, file)}:${index + 1}  ${problem}`)
+        continue
+      }
       const known = isConfigKey(key)
       const problem = policyTokenProblem(key, { known, sensitive: known && isSensitive(key) })
       if (problem) problems.push(`${join(DIR, file)}:${index + 1}  ${problem}`)
@@ -49,6 +58,7 @@ if (problems.length) {
   console.error('publishes a rule the write path does not enforce, which is the drift decision')
   console.error('0012 exists to prevent. Either correct the token or add the key to')
   console.error(`shared/utils/config.ts. Known keys: ${CONFIG_KEY_NAMES.join(', ')}`)
+  console.error(`A COMMITTEE_ token names a role in content/committee.yml: ${committee.roles.map(role => role.key).join(', ')}`)
 }
 
 if (repeats.length) {

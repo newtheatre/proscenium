@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { sqliteTarget } from '#tests/helpers/database'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -145,7 +145,7 @@ describe.skipIf(skip !== null)('closing and reopening are treasurer and administ
 
   test('the treasurer role closes but cannot reopen', async () => {
     const treasurer = await registerMember(app, 'treasurer', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, officer.cookie)
+    await grantRole(app, treasurer, 'TREASURER', officer.cookie)
 
     const closed = await send('POST', '/api/admin/finance/periods', { fromDay: '2000-02-01', toDay: '2000-02-28' }, treasurer.cookie)
     expect(closed.status).toBe(200)

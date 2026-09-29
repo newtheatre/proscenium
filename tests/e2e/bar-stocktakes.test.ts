@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -36,10 +36,10 @@ beforeAll(async () => {
   barShift = await registerMember(app, 'barshift', barShiftPassword)
 
   barManager = await registerMember(app, 'barmanager', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 
   fohManager = await registerMember(app, 'fohmanager', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: fohManager.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, fohManager, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -482,7 +482,7 @@ describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts 
       await fill(screen, 'form input[type="email"]', barShift.email)
       await fill(screen, 'form input[type="password"]', barShiftPassword)
       await click(screen, 'form button[type="submit"]')
-      await waitFor(screen, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, screen, barShift.email)
 
       await visit(screen, `${app.baseURL}/tonight`, '[data-test="tile-stocktake"]')
       await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${item.id}"]`)
@@ -517,7 +517,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
     await fillNumber(view, `[data-test="counted-${item.id}"]`, '7')
@@ -560,7 +560,7 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${first.id}"]`)
 
@@ -614,7 +614,7 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
     await click(view, '[data-test="uncounted-only-filter"]')
@@ -982,7 +982,7 @@ describe.skipIf(skip !== null)('the suggested order list compares live on-hand t
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock/order-list`, '[data-test="order-list-group"]')
     // Scoped to this test's own group: other tests in this shared app leave permanent
@@ -1003,7 +1003,7 @@ describe.skipIf(skip !== null)('the suggested order list compares live on-hand t
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock/order-list`, `[data-test="unconfigured-${item.id}"]`)
     await click(view, `[data-test="unconfigured-${item.id}"]`)

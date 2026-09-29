@@ -117,6 +117,8 @@ export const keepBarTab = defineAbility((viewer: Viewer) => viewer.keepsBarTab)
 export const viewFinanceReports = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read'))
 // Recording a daily Z reading and resolving a variance (I-104).
 export const recordZReadings = defineAbility((viewer: Viewer) => holds(viewer, 'finance.write'))
+// A card charge left on a closed till, recorded as a sale on its own night (question 15).
+export const recordLateCharges = defineAbility((viewer: Viewer) => holds(viewer, 'finance.write'))
 // The money dashboard's aggregates: the treasurer's own full read, or the committee's narrower
 // summary-only one (I-105 criterion 5).
 export const viewSeasonSummary = defineAbility((viewer: Viewer) => holds(viewer, 'finance.read') || holds(viewer, 'finance.summary'))
@@ -214,6 +216,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   manageBarTabs: 'bar.write',
   viewFinanceReports: 'finance.read',
   recordZReadings: 'finance.write',
+  recordLateCharges: 'finance.write',
   viewSeasonSummary: 'finance.summary',
   closeFinancePeriods: 'finance.write',
   manageNominalMappings: 'finance.write',

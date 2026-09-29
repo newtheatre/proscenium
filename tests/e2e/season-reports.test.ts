@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -27,8 +27,8 @@ beforeAll(async () => {
   admin = await adminSession(app)
   foh = await registerMember(app, 'reports-foh', fohPassword)
   bar = await registerMember(app, 'reports-bar', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -158,7 +158,7 @@ describe.skipIf(skip !== null)('/reports, the screen (criterion 5, #1042)', () =
     await fill(view, 'form input[type="email"]', foh.email)
     await fill(view, 'form input[type="password"]', fohPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, foh.email)
     return view
   }
 

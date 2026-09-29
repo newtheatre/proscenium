@@ -5,8 +5,9 @@ import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
 import { OFFICER_SIGN_OFF_NOTICE, holdsTheClose, openAtClose, saysSignOffOpens, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
 import { saysTeamHolder } from '#shared/utils/tonight'
-import { saysClock } from '#shared/utils/when'
+import { saysClock, saysDay } from '#shared/utils/when'
 import type { ChecklistEntry } from '#shared/utils/checklist'
+import type { LateAddition } from '#shared/utils/sumup'
 import type { Category, Severity } from '#shared/utils/incidents'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { NightReportSigner } from '#shared/utils/night-signoff'
@@ -27,6 +28,8 @@ interface Report {
   bypasses?: OfficerBypassLine[]
   covers?: { name: string | null }[]
   bar: { revenuePence: number, itemsSold: number }
+  // Absent from a report frozen before late additions were read.
+  lateAdditions?: LateAddition[]
   access: { verified: number }
   checklist: Pick<ChecklistEntry, 'id' | 'phase' | 'label' | 'required' | 'systemCheck' | 'done' | 'tickedByName' | 'exempted' | 'exemptReason'>[]
   // A draft's alone: when Sign off and close is offered (issue 1315).
@@ -394,6 +397,26 @@ async function signOff(): Promise<void> {
         <p class="text-sm">
           {{ plural(report.access.verified, 'verified access booking') }}.
         </p>
+      </NightBlock>
+
+      <!-- Card sales the Treasurer recorded after the till closed (question 15); once signed off,
+           one arriving later is an addendum instead. -->
+      <NightBlock
+        v-if="report.lateAdditions?.length"
+        title="Late additions"
+        data-test="report-late-additions"
+      >
+        <ul class="space-y-2 text-sm">
+          <li
+            v-for="late in report.lateAdditions"
+            :key="late.entryId"
+          >
+            <p>A card sale of {{ saysMoney(late.totalPence) }} the reader took at {{ saysClock(late.chargedAt) }}<span v-if="late.venueName"> ({{ late.venueName }})</span>.</p>
+            <p class="text-xs text-muted">
+              Recorded by {{ late.recordedByName ?? 'someone since removed' }} on {{ saysDay(late.recordedAt) }} at {{ saysClock(late.recordedAt) }}
+            </p>
+          </li>
+        </ul>
       </NightBlock>
 
       <NightBlock

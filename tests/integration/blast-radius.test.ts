@@ -109,8 +109,8 @@ describe('officersWithoutRefundApprovalQuery counts who self-approves without th
   })
 })
 
-// Issue 1357: PRIVILEGED_ROLES' own preview. A preview is read before the new list is known, so it
-// counts every role holder an added role would refuse until they set up an authenticator.
+// Issue 1357: PRIVILEGED_ROLES' own preview. It ignores the proposed list, counting every role
+// holder any added role would refuse until they set up an authenticator.
 describe('roleHoldersWithoutFactorQuery counts who a role added to the list would refuse', () => {
   const NOW = Math.floor(Date.now() / 1000)
 

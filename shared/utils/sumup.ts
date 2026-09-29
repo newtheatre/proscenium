@@ -124,6 +124,25 @@ export const resolveAttemptForm = z.object({
 
 export type ResolveAttemptInput = z.output<typeof resolveAttemptForm>
 
+// The screen sends the charge's total as it showed it, so a stale screen records nothing (0005).
+export const recordLateChargeForm = z.object({
+  expectedTotalPence: z.number().int().nonnegative(),
+})
+
+// A sale recorded after its night's till closed: when the reader took it, and who recorded it when.
+export interface LateAddition {
+  entryId: string
+  totalPence: number
+  chargedAt: number
+  recordedAt: number
+  recordedByName: string | null
+  venueName: string | null
+}
+
+export function lateChargeTotalRefusal(sentPence: number, chargedPence: number): string {
+  return `The screen said ${saysMoney(sentPence)}; this charge is ${saysMoney(chargedPence)}. Nothing was recorded: read the night again.`
+}
+
 // Every transition an attempt may make, and by whom (criterion 5). Anything not here is refused,
 // so a callback and a staff answer cannot both advance one row.
 const TRANSITIONS: Record<SumupAttemptStatus, SumupAttemptStatus[]> = {

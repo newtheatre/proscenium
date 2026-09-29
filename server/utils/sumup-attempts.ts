@@ -6,17 +6,19 @@ import { createError } from 'h3'
 import { newId } from './accounts'
 import { auditedWrite } from './audit'
 import { commitSale } from './sale'
+import type { SaleContext } from './sale'
 import { openSessionFor, requireOpenSession } from './till'
 import { qrTokenFor, verifyQrToken } from './qr-tokens'
 import { ATTEMPT_COLUMNS, UNRESOLVED, earlierUnresolvedAttemptsQuery, openAttemptsOn, recordPostedSaleStatement, stuckAttemptsQuery } from './sumup-queries'
+import { LATE_RECORD_INTERRUPTED, lateAdditionsQuery, lateChargesQuery, lateClaimStatement, lateSaleTiming } from './late-charge'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDayOf } from '#shared/utils/ledger'
-import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, attemptMayMove, isTerminalAttempt, sumupLaunchUrl } from '#shared/utils/sumup'
+import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, attemptMayMove, isTerminalAttempt, lateChargeTotalRefusal, sumupLaunchUrl } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SaleInput, SaleReceipt } from '#shared/utils/sale'
 import type { EarlierTillLeftOpen } from '#shared/utils/till'
-import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView, SumupResolution, SumupReturnInput } from '#shared/utils/sumup'
+import type { LateAddition, ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView, SumupResolution, SumupReturnInput } from '#shared/utils/sumup'
 
 // One card charge (F-124, 0069, 0096): handed to the SumUp app or keyed into the reader, its
 // conditional transitions, and the answer that posts the sale through the one `commitSale`.
@@ -120,6 +122,15 @@ export async function unresolvedAttempts(night: string): Promise<SumupAttemptVie
 export async function earlierUnresolvedAttempts(tonight: string): Promise<EarlierTillLeftOpen['attempts']> {
   const rows = await db.all<AttemptRow & { sessionOpen: number }>(earlierUnresolvedAttemptsQuery(tonight))
   return rows.map(row => ({ ...view(row), night: row.night, sessionOpen: Boolean(row.sessionOpen) }))
+}
+
+// For Daily reconciliation: the night's charges its closed tills left, and the sales recorded late.
+export async function lateCharges(night: string): Promise<SumupAttemptView[]> {
+  return (await db.all<AttemptRow>(lateChargesQuery(night))).map(view)
+}
+
+export async function lateAdditions(night: string): Promise<LateAddition[]> {
+  return db.all<LateAddition>(lateAdditionsQuery(night))
 }
 
 export function basketOf(row: AttemptRow): AttemptBasket {
@@ -273,21 +284,46 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
   }
 
   const basket = basketOf(row)
+  return commitClaimed(row, {
+    day: londonDayOf(new Date()),
+    session: async () => requireOpenSession(await openSessionFor(basket.venueId, basket.night)).id,
+    actorId: by.actorId,
+    baseURL: by.baseURL,
+    event: by.event,
+    interrupted: { status: 'STARTED', change: {} },
+  })
+}
+
+interface ClaimedCommit {
+  day: string
+  // Looked up inside the catch, so a till that closed meanwhile is a mismatch, not a stuck claim.
+  session: () => Promise<string>
+  actorId: string | null
+  baseURL: string
+  event?: H3Event
+  late?: Pick<SaleContext, 'at' | 'lateRecorderId'>
+  // Where a claim goes on a server failure: back to STARTED for a later answer, or MISMATCH.
+  interrupted: { status: 'STARTED' | 'MISMATCH', change: Move }
+}
+
+// The sale behind a claimed attempt, through the one `commitSale` (criteria 4 and 5).
+async function commitClaimed(row: AttemptRow, commit: ClaimedCommit): Promise<CompletionOutcome> {
+  const basket = basketOf(row)
   let receipt: SaleReceipt
   try {
-    const session = requireOpenSession(await openSessionFor(basket.venueId, basket.night))
     receipt = await commitSale(
-      basket.sale.lines, londonDayOf(new Date()), basket.sale.expectedTotalPence, basket.sale.ageCheck, basket.sale.discountId, null,
+      basket.sale.lines, commit.day, basket.sale.expectedTotalPence, basket.sale.ageCheck, basket.sale.discountId, null,
       {
         actorId: row.createdBy,
-        sessionId: session.id,
+        sessionId: await commit.session(),
         attemptId: row.id,
         venueId: basket.venueId,
         night: basket.night,
         performanceId: basket.performanceId,
         performanceIds: basket.performanceIds,
-        baseURL: by.baseURL,
-        event: by.event,
+        baseURL: commit.baseURL,
+        event: commit.event,
+        ...commit.late,
       },
       { tickets: basket.sale.tickets, walkUps: basket.sale.walkUps, walkUpGuest: basket.sale.walkUpGuest },
     )
@@ -298,17 +334,17 @@ export async function completeAttempt(row: AttemptRow, smp: SumupReturnInput, by
     // which is for a person to resolve (criterion 4). Anything else is retried by a later answer.
     if (statusCode !== undefined && statusCode < 500) {
       const message = (error as { statusMessage?: string }).statusMessage ?? 'The sale could not be recorded'
-      await move(row.id, 'COMPLETING', 'MISMATCH', { error: message, resolvedBy: by.actorId }, by.actorId)
+      await move(row.id, 'COMPLETING', 'MISMATCH', { error: message, resolvedBy: commit.actorId }, commit.actorId)
       return { status: 'MISMATCH', receipt: null, error: message }
     }
-    await move(row.id, 'COMPLETING', 'STARTED', {}, by.actorId)
+    await move(row.id, 'COMPLETING', commit.interrupted.status, commit.interrupted.change, commit.actorId)
     throw error
   }
 
   // The recording rode the sale's own batch (criterion 5), so this reads back what landed, the
   // way the tab cap's own refusal does. A basket that posted no entry records the old way.
   const recorded = receipt.entryId === null
-    ? await recordPostedSale(row.id, null, by.actorId)
+    ? await recordPostedSale(row.id, null, commit.actorId)
     : (await attemptById(row.id))?.entryId === receipt.entryId
   return { status: 'SUCCEEDED', receipt, error: recorded ? null : DUPLICATE }
 }
@@ -340,6 +376,35 @@ export async function resolveAttempt(row: AttemptRow, outcome: ResolveOutcome, s
   const moved = await move(row.id, from === 'COMPLETING' ? 'STARTED' : from, 'ABANDONED', { resolution: 'STAFF', resolvedBy: by.actorId, note }, by.actorId)
   if (!moved) throw createError({ statusCode: 409, statusMessage: `That attempt is ${row.status.toLowerCase()} and cannot be abandoned now` })
   return { status: 'ABANDONED', receipt: null, error: null }
+}
+
+// The Treasurer's answer to a charge whose night's till is closed (question 15, F-124 criterion 9):
+// the sale on its own night, on its own session, audited as late in the recorder's name.
+export async function recordLateCharge(row: AttemptRow, expectedTotalPence: number, recorderId: string, by: Omit<CompletionActor, 'actorId' | 'resolution'>): Promise<CompletionOutcome> {
+  if (expectedTotalPence !== row.expectedTotalPence) {
+    throw createError({ statusCode: 409, statusMessage: lateChargeTotalRefusal(expectedTotalPence, row.expectedTotalPence) })
+  }
+  const claimed = await auditedWrite(db.all(lateClaimStatement(row.id, expectedTotalPence, recorderId)), auditEntry({
+    actorId: recorderId,
+    action: 'bar.sumup.claimed',
+    target: `sumup-attempt:${row.id}`,
+    detail: { from: row.status, to: 'COMPLETING', resolution: 'STAFF', smpTxCode: null },
+  }))
+  if (!claimed) {
+    throw createError({ statusCode: 409, statusMessage: 'That charge has been answered, or its night\'s till reopened, since the screen was read. Read the night again.' })
+  }
+
+  const timing = lateSaleTiming(row.createdAt)
+  return commitClaimed(row, {
+    day: timing.on,
+    session: async () => row.tillSessionId,
+    actorId: recorderId,
+    baseURL: by.baseURL,
+    event: by.event,
+    late: { at: timing.at, lateRecorderId: recorderId },
+    // Every late charge is past the sweep's window, so STARTED would be abandoned unrecorded.
+    interrupted: { status: LATE_RECORD_INTERRUPTED.status, change: { error: LATE_RECORD_INTERRUPTED.error, resolvedBy: recorderId } },
+  })
 }
 
 // Minutes since the answer that began the recording, for a completion that never finished.

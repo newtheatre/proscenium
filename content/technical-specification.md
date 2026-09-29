@@ -1,28 +1,26 @@
 ---
-title: Technical specification
-description: Venue dimensions, rigging and access for anyone planning a get-in.
-placeholder: true
+title: Technical information
+description: The space we perform in, and who to ask for a detailed technical specification.
 ---
 
-This page is a placeholder. The headings below mark out what belongs on it; none of the figures
-or measurements a visiting company would need are on this page yet, and nothing here should be
-used to plan a get-in. The previous specification is not carried over: every figure on this page
-must come from the committee, not from an old document that may no longer be accurate.
+This page covers the basics of the space we perform in. We do not publish an equipment list here,
+because the kit changes from term to term; ask us for the current specification instead.
 
-## Venues
+## Our spaces
 
-Awaiting committee copy: capacity and stage dimensions for each venue.
+Our own building has been closed since 2023, so for now we perform in one space.
 
-## Access and loading
+### The Studio
 
-Awaiting committee copy: get-in routes, parking and the largest entrance a flat can travel
-through.
+The Portland Studio is on University Park, opposite Mooch. It has 62 seats, two of which are
+usually held back for front of house, and there is step-free access.
 
-## Lighting and sound
+## Detailed specifications
 
-Awaiting committee copy: rig, dimmer and desk specifications, and what is and is not permanently
-installed.
+For plans, lighting and sound equipment, power and get-in arrangements, write to
+[technical@newtheatre.org.uk](mailto:technical@newtheatre.org.uk) and we will send you the current
+specification.
 
-## Contacts
-
-Awaiting committee copy: who to contact for a technical query ahead of a get-in.
+Our Technical Manager, {{COMMITTEE_TECHNICAL_MANAGER_NAME}}, and our Company Technical Directors,
+{{COMMITTEE_COMPANY_TECHNICAL_DIRECTOR_NAME}}, look after the technical side of the theatre and can
+tell you more.

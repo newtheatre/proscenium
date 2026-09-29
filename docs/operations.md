@@ -344,7 +344,11 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    `nights:close` sweep closes nothing until it is set, warning in the operator log on every run;
    set too early, it freezes and mails a report for every imported performance after it. When in
    doubt, choose the later night: too late leaves a few new nights to sign off by hand; too early
-   mails imported ones.
+   mails imported ones. The key is wide blast radius (J-105): the save previews how many
+   performances from that night on have no report and are past their 24-hour close, which is
+   what the next sweep would freeze and mail. Expect none, or only the new-system nights nobody
+   has signed off yet; a larger count means the night is too early, so cancel and check it.
+   Type the key's name or the count to save.
 
 9. **Confirm the photographs transform on the host that serves them.** Open the home page on the
    deployed host and check the hero image's `src` starts `/cdn-cgi/image/` and loads. The image
