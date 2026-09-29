@@ -118,11 +118,17 @@ describe.skipIf(skip !== null)('a closed period refuses a new collection (criter
     const closed = await send('POST', '/api/admin/finance/periods', { fromDay: today, toDay: today, label: named('Term') })
     const { id: lockId } = await closed.json() as { id: string }
 
-    const wrong = await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: '2000-01-01', confirmToDay: today })
-    expect(wrong.status).toBe(409)
+    try {
+      const wrong = await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: '2000-01-01', confirmToDay: today })
+      expect(wrong.status).toBe(409)
 
-    const stillRefused = await collect(reservationId)
-    expect(stillRefused.status).toBe(409)
+      const stillRefused = await collect(reservationId)
+      expect(stillRefused.status).toBe(409)
+    }
+    finally {
+      // Today is left open again: the suite shares one database, and the next test collects today.
+      await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: today, confirmToDay: today })
+    }
   }, CASE_TIMEOUT_MS)
 
   test('a collection outside the closed range is unaffected', async () => {

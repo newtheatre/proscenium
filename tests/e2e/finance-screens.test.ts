@@ -206,7 +206,7 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     expect(await textOf(view, '[data-test="section-revenue"] thead')).toContain('Amount')
     expect(await textOf(view, '[data-test="section-revenue"] thead')).not.toContain('Pence')
 
-    await pickOption(view, '[data-test="period-kind"]', 'TERM')
+    await pickOption(view, '[data-test="period-kind"]', 'Term')
     await pickOption(view, '[data-test="period-term"]', 'Spring 2020')
     await waitFor(view, `document.body.innerText.includes('2020-01-13 to 2020-03-27')`)
 
