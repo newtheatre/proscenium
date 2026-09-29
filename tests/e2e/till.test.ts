@@ -341,6 +341,7 @@ describe.skipIf(skip !== null)('closing a session (F-102 criterion 4)', () => {
 describe.skipIf(skip !== null)('the screen', () => {
   // Close till is not a per-sale action, so the thumb zone is Charge and the SumUp hand-off
   // only (K-102 criterion 2).
+
   // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
   test.skip('Close till is reached from the overflow menu, not the pinned actions, and still closes the session', async () => {
     const screenPassword = generatePassword()
@@ -373,6 +374,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
   // F-118 criterion 3: a disagreeing reading needs a note before it can be recorded, so the
   // control that records it waits for one.
+
   // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
   test.skip('Confirm close is disabled while a variance has no note, and enables once one is typed', async () => {
     const screenPassword = generatePassword()
@@ -444,6 +446,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
   // F-118 criterion 3: the server's own recomputed figure is the one that governs, so a sale
   // landing elsewhere while the modal sat open must not leave the note unreachable.
+
   // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
   test.skip('a sale landing after the modal opens is caught by the refusal, and the note field catches up', async () => {
     const screenPassword = generatePassword()
