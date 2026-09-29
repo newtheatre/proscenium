@@ -3,7 +3,7 @@ import {
   reportAccessQuery,
   reportAgeChecksQuery,
   reportAttendanceQuery,
-  reportBarItemsSoldQuery,
+  reportBarForPerformanceQuery,
   reportForegoneQuery,
   reportIncidentsQuery,
   reportMilestonesQuery,
@@ -459,18 +459,21 @@ describe('officer bypasses (criterion 1, 0098)', () => {
   })
 })
 
-describe('the bar summary (criterion 1)', () => {
-  test('sums revenue and items from tonight\'s till lines, the same query till-close reconciles against (F-118 criterion 4)', async () => {
+// #1572: each performance's report counts its own bar sales, read by the sale's performance; the
+// till-close figure is the whole night's, the same query till-close reconciles against (F-118 c4).
+describe('the bar summary (criterion 1, #1572)', () => {
+  test('a performance counts its own bar sales, and the night figure is till-close\'s own', async () => {
     await withDatabase(async (database) => {
-      const tonight = tonightsPerformance(database)
+      const matinee = tonightsPerformance(database, { suffix: 'bar-matinee', curtainHoursAfterNightStart: 10 })
+      const evening = tonightsPerformance(database, { suffix: 'bar-evening', venueId: matinee.venueId, curtainHoursAfterNightStart: 15.5 })
       entry(database, 'e-till', 'TILL', 'CARD')
-      database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty) VALUES (?, ?, ?, ?, ?)',
-        'l-till', 'e-till', 'BAR_ITEM', 450, 2]])
+      database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, performance_id) VALUES (?, ?, ?, ?, ?, ?)',
+        'l-till', 'e-till', 'BAR_ITEM', 450, 2, matinee.performanceId]])
 
-      const [revenue] = read<{ cardSalesPence: number }>(database, cardSalesQuery(tonight.night))
-      const [items] = read<{ itemsSold: number }>(database, reportBarItemsSoldQuery(tonight.night))
-      expect(revenue).toMatchObject({ cardSalesPence: 450 })
-      expect(items).toMatchObject({ itemsSold: 2 })
+      const [night] = read<{ cardSalesPence: number }>(database, cardSalesQuery(matinee.night))
+      expect(night).toMatchObject({ cardSalesPence: 450 })
+      expect(read(database, reportBarForPerformanceQuery(matinee.performanceId))[0]).toMatchObject({ revenuePence: 450, itemsSold: 2 })
+      expect(read(database, reportBarForPerformanceQuery(evening.performanceId))[0]).toMatchObject({ revenuePence: 0, itemsSold: 0 })
     })
   })
 })
