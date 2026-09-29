@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { Database } from 'bun:sqlite'
 import { applyMigrations } from '../../migration/schema'
 
@@ -5,8 +6,8 @@ import { applyMigrations } from '../../migration/schema'
 // The schema is untouched, since the server holds the file open (0029), and audit_log stays.
 const KEPT = new Set(['_hub_migrations', 'audit_log'])
 
-// The dev server is serving from this file while we wipe it, and the journal is `delete` rather
-// than WAL, so its readers and our writer lock each other out. Waiting beats throwing at once.
+// The dev server is serving from this file while we wipe it, so a write can meet its lock.
+// Waiting beats throwing at once.
 const RESET_LOCK_WAIT_MS = 10_000
 const RESET_ATTEMPTS = 5
 
@@ -37,7 +38,22 @@ export function migratedSeeds(): Promise<Map<string, Row[]>> {
   return seeded
 }
 
+// WAL, so a long read on the server no longer blocks a suite's writes, nor theirs its reads
+// (0109). The mode lives in the file, and nothing but the harness ever opens this one.
+export function journalInWal(file: string): void {
+  if (!existsSync(file)) return
+  const database = new Database(file)
+  try {
+    database.run(`PRAGMA busy_timeout = ${RESET_LOCK_WAIT_MS}`)
+    database.run('PRAGMA journal_mode = WAL')
+  }
+  finally {
+    database.close()
+  }
+}
+
 export async function resetDatabase(file: string): Promise<void> {
+  journalInWal(file)
   const seeds = await migratedSeeds()
   const database = new Database(file)
   try {
