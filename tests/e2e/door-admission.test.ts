@@ -109,7 +109,7 @@ describe.skipIf(skip !== null)('scanning an unredeemed pass admits it on the spo
     expect((await send('POST', '/api/tonight/door/passes/scan', { reference, performanceId })).status).toBe(200)
     const again = await send('POST', '/api/tonight/door/passes/scan', { reference, performanceId })
     expect(again.status).toBe(409)
-    expect(await again.text()).toContain('already been admitted')
+    expect(await again.text()).toContain('already admitted')
   }, CASE_TIMEOUT_MS)
 })
 

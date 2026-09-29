@@ -91,9 +91,22 @@ async function currentCode(app: AppUnderTest, email: string, secret: string): Pr
   return codeForStep(secret, stepFor(new Date()))
 }
 
+// Clears one address's sign-in attempts, the bucket `server/api/auth/sign-in.post.ts` counts.
+export function forgetSignInAttempts(app: AppUnderTest, email: string): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.run('PRAGMA busy_timeout = 10000')
+    database.query('DELETE FROM rate_limits WHERE key = ?').run(`sign-in:${email.trim().toLowerCase()}`)
+  }
+  finally {
+    database.close()
+  }
+}
+
 // A password sign-in through the routes, answering the challenge for a member this file enrolled;
 // the answer carrying the session cookie is what comes back.
 export async function signInCookie(app: AppUnderTest, email: string, password: string): Promise<Response> {
+  forgetSignInAttempts(app, email)
   const signedIn = await request(app, 'POST', '/api/auth/sign-in', { email, password })
   const secret = secrets.get(`${app.databaseFile}:${email}`)
   if (!secret || signedIn.headers.get('set-cookie')) return signedIn
@@ -104,10 +117,17 @@ export async function signInCookie(app: AppUnderTest, email: string, password: s
 // After the password on the sign-in form: an enrolled member is asked for a code, which this
 // answers; either way it returns once the account menu shows.
 export async function finishSignIn(app: AppUnderTest, view: Bun.WebView, email: string): Promise<void> {
-  const { fillPin, waitFor } = await import('./webview')
+  const { click, fillPin, waitFor } = await import('./webview')
   const menu = `document.querySelector('[data-test="account-menu"]')`
   const asked = `document.querySelectorAll('[data-test="mfa-challenge"] input').length >= 6`
-  await waitFor(view, `${menu} || ${asked}`)
+  const limited = `document.body.innerText.includes('Too many attempts')`
+  await waitFor(view, `${menu} || ${asked} || ${limited}`)
+  // A suite signs one officer in more often than a person would; A-103's own limit has its own suite.
+  if (await view.evaluate<boolean>(`Boolean(${limited})`)) {
+    forgetSignInAttempts(app, email)
+    await click(view, 'form button[type="submit"]')
+    await waitFor(view, `${menu} || ${asked}`)
+  }
   const secret = secrets.get(`${app.databaseFile}:${email}`)
   if (secret && await view.evaluate(`Boolean(${asked})`)) {
     await fillPin(view, '[data-test="mfa-challenge"] input', await currentCode(app, email, secret))

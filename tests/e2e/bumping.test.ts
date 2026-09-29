@@ -219,12 +219,12 @@ describe.skipIf(skip !== null)('the displaced member is told and offered a slot 
     const booking = await bookAs(room, span(42), member)
 
     const before = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.booking.bumped'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.booking.bumped') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.booking.bumped') AS n`,
       member.id)?.n ?? 0
     await bump(booking, { reason: 'The get-in moved' })
 
     expect((read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.booking.bumped'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.booking.bumped') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.booking.bumped') AS n`,
       member.id)?.n ?? 0) - before).toBe(1)
 
     const bodies = await letters(app)

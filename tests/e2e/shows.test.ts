@@ -741,7 +741,8 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     const { show } = await detail(id)
     const view = await signedIn()
-    await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-table"]')
+    // Searched for by name: the suite's other shows fill more than a page by this point.
+    await visit(view, `${app.baseURL}/box-office/shows?search=${encodeURIComponent(title)}`, '[data-test="shows-table"]')
     await waitFor(view, `document.querySelector('[data-test="shows-table"]').textContent.includes(${JSON.stringify(title)})`)
 
     const rows = await textOf(view, '[data-test="shows-table"]')

@@ -113,7 +113,7 @@ describe.skipIf(skip !== null)('scanning a paid ticket admits it (E-127 criterio
     expect((await send('POST', '/api/tonight/door/tickets/scan', { reference, performanceId: matineeId })).status).toBe(200)
     const again = await send('POST', '/api/tonight/door/tickets/scan', { reference, performanceId: matineeId })
     expect(again.status).toBe(409)
-    expect((await again.text()).toLowerCase()).toContain('already checked in')
+    expect((await again.text()).toLowerCase()).toContain('already admitted')
   }, CASE_TIMEOUT_MS)
 })
 

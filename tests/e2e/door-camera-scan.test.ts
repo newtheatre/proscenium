@@ -50,10 +50,13 @@ const send = (method: string, path: string, body?: unknown, as = door.cookie): P
 
 let counter = 0
 
+const REFERENCE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
+
 function booking(status: string, holderId: string | null = null, seats = 1): string {
   counter += 1
   const id = `r-door-camera-${counter}`
-  const reference = `CAM${String(counter).padStart(3, '0')}`
+  // A reference uses the no-look-alike alphabet (no 0, 1, I or O), or the door reads it as none of ours.
+  const reference = `CAM${[10, 5, 0].map(shift => REFERENCE_ALPHABET[(counter >> shift) & 31]).join('')}`
   const database = new Database(app.databaseFile)
   try {
     database.query('INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)')
