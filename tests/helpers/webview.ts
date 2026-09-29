@@ -500,7 +500,10 @@ const CHOOSE = (label: string): string => `(() => {
     ?? [...document.querySelectorAll('[role="option"]')]
       .find(item => item.innerText.trim().startsWith(wanted))
   if (!option) return false
-  const init = { bubbles: true, cancelable: true, button: 0 }
+  // At the option's own centre: a select ignores a release within a few pixels of where the press
+  // that opened it landed, and an event with no position lands at the corner.
+  const box = option.getBoundingClientRect()
+  const init = { bubbles: true, cancelable: true, button: 0, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 }
   for (const type of ['pointermove', 'pointerdown', 'pointerup', 'click']) {
     option.dispatchEvent(type.startsWith('pointer')
       ? new PointerEvent(type, { ...init, pointerType: 'mouse', isPrimary: true })
