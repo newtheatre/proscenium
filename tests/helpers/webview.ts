@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs'
 import { NIGHT_DRAWN_CHOICE } from '#shared/utils/night-shell'
 import { hubDirFor } from './hub-dir'
-import { resetDatabase } from './reset-database'
+import { journalInWal, resetDatabase } from './reset-database'
 import { createServerLog, readServerLog } from './server-log'
 import type { Subprocess } from 'bun'
 
@@ -176,6 +176,7 @@ export async function startApp(): Promise<AppUnderTest> {
   // The one boot a run pays for, said out loud: fifteen seconds of silence at the start otherwise
   // looks like a hung suite.
   Bun.write(Bun.stderr, `[e2e] dev server on ${port} ready in ${((Date.now() - began) / 1000).toFixed(1)}s, log in ${hubDir}\n`)
+  journalInWal(`${hubDir}/db/sqlite.db`)
 
   const app: AppUnderTest = {
     baseURL: BASE_URL,
