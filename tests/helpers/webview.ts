@@ -322,7 +322,9 @@ export async function waitFor(view: Bun.WebView, expression: string, timeoutMs =
   }
   // Where the page was and what it said, so a timeout on CI is read rather than rerun.
   const seen = await view.evaluate<string>(`location.pathname + ': ' + (document.body?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 240)`).catch(() => 'unreadable')
-  throw new Error(`timed out waiting for ${expression} (at ${seen})`)
+  // What any alert, dialogue or failure notice said: the reason is usually there, not at the top.
+  const said = await view.evaluate<string>(`[...document.querySelectorAll('[role="alert"], [role="dialog"], [data-test*="failure"], [data-test*="refus"]')].map(el => el.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' | ').slice(0, 400)`).catch(() => '')
+  throw new Error(`timed out waiting for ${expression} (at ${seen})${said ? ` (notices: ${said})` : ''}`)
 }
 
 // A plain value assignment is invisible to v-model: Vue listens for the event, and the native
