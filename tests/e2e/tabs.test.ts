@@ -382,9 +382,9 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="tab-holder-${member.id}"]')`)
     await click(view, `[data-test="tab-holder-${member.id}"]`)
-    await waitFor(view, `document.querySelector('[aria-label^="Put"]')`)
+    await waitFor(view, `document.querySelector('[aria-label="Charge the tab"]')`)
 
-    await click(view, `[aria-label^="Put"]`)
+    await click(view, `[aria-label="Charge the tab"]`)
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     expect(await textOf(view, '[data-test="tab-balance-note"]')).toContain('£5.00')
     view.close()
@@ -413,7 +413,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="tab-holder-${member.id}"]')`)
     await click(view, `[data-test="tab-holder-${member.id}"]`)
-    await waitFor(view, `document.querySelector('[aria-label^="Put"]')`)
+    await waitFor(view, `document.querySelector('[aria-label="Charge the tab"]')`)
 
     await view.evaluate(`[...document.querySelectorAll('[role="tab"]')].find(el => el.textContent.includes('Tickets')).click()`)
     await fill(view, '[data-test="ticket-lookup"]', booking.reference)
@@ -423,7 +423,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     // The picker is already hidden by this basket; what this proves is that the holder itself
     // let go, not merely that its control went away.
-    await waitFor(view, `!document.querySelector('[aria-label^="Put"]')`)
+    await waitFor(view, `!document.querySelector('[aria-label="Charge the tab"]')`)
     expect(await textOf(view, '[data-test="basket-split"]')).toContain('£9.00')
 
     // Decision 0096: the reader's charge waits for its answer, where a tab would have posted at once.

@@ -621,21 +621,25 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     const item = await anItem()
     await deliver(item.id, 10)
     const opened = await open()
-    await count(opened.stocktake.id, [{ itemId: item.id, counted: 10 }])
+    // Every line, not just this test's: the stocktake snapshots the whole catalogue.
+    await count(opened.stocktake.id, opened.lines.map(line => ({ itemId: line.itemId, counted: 10 })))
 
     const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', barManager.email)
-    await fill(view, 'form input[type="password"]', barPassword)
-    await click(view, 'form button[type="submit"]')
-    await finishSignIn(app, view, barManager.email)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
-    await click(view, '[data-test="uncounted-only-filter"]')
-    await waitFor(view, `document.querySelector('[data-test="stocktake-lines"]').textContent.includes('Everything is counted')`)
-
-    view.close()
-    await apply(opened.stocktake.id)
+      await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await click(view, '[data-test="uncounted-only-filter"]')
+      await waitFor(view, `document.querySelector('[data-test="stocktake-lines"]').textContent.includes('Everything is counted')`)
+    }
+    finally {
+      view.close()
+      await apply(opened.stocktake.id)
+    }
   }, 120_000)
 })
 
@@ -658,8 +662,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('the expected figure stays hidden until the line is counted', async () => {
@@ -678,8 +682,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('a count typed and left is still there on the next visit', async () => {
@@ -698,8 +702,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('lines sit under their stock group, in 48 px rows, over a footer that stays in view', async () => {
@@ -727,8 +731,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   // F-115 criteria 2 and 6: a cleared line is uncounted again, never a counted nought.
@@ -752,8 +756,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('with only uncounted lines shown, a measured line stays until its open container is in', async () => {
@@ -776,8 +780,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('a count is whole millilitres, so a fraction of a bottle is not kept as one', async () => {
@@ -793,8 +797,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   // F-115 criteria 3 and 4: Apply never confirms over a line the register does not hold.

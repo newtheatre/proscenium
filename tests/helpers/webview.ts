@@ -348,7 +348,13 @@ export async function fillNumber(view: Bun.WebView, selector: string, value: str
   await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
   await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`)
   await fill(view, selector, value)
-  await view.evaluate(`document.querySelector(${JSON.stringify(selector)}).blur()`)
+  // A page without the window's focus fires no blur of its own, so the field is told directly.
+  await view.evaluate(`(() => {
+    const field = document.querySelector(${JSON.stringify(selector)})
+    const focused = document.hasFocus()
+    field.blur()
+    if (!focused) field.dispatchEvent(new FocusEvent('blur'))
+  })()`)
 }
 
 // PinInput is one input per digit, so a six-digit code is six fills and not one.
