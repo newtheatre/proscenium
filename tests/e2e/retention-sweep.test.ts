@@ -60,7 +60,9 @@ const send = (method: string, path: string, body?: unknown): Promise<Response> =
   })
 
 const setConfig = (key: string, value: unknown): Promise<Response> => send('PUT', `/api/admin/config/${key}`, { value })
-const arm = (on: boolean): Promise<Response> => setConfig('RETENTION_ARMED', on)
+// A wide blast radius key: arming or disarming takes the typed echo (J-105 criterion 2).
+const arm = (on: boolean): Promise<Response> =>
+  send('PUT', '/api/admin/config/RETENTION_ARMED', { value: on, confirmation: 'RETENTION_ARMED' })
 
 interface RetentionRun {
   armed: boolean

@@ -176,7 +176,7 @@ describe.skipIf(skip !== null)('a venue template is the front of house officer\'
 
     const entry = trail('shift-template.created', `venue:${house.venueId}`)
     expect(entry?.detail).toMatchObject({
-      changes: { slots: { from: '', to: 'DUTY_MANAGER:1, DOOR:2, BAR:1' } },
+      changes: { slots: { from: '', to: 'DUTY_MANAGER:1:default:default, DOOR:2:default:default, BAR:1:default:default' } },
     })
   })
 
@@ -186,7 +186,7 @@ describe.skipIf(skip !== null)('a venue template is the front of house officer\'
     }, foh.cookie)
 
     expect(trail('shift-template.updated', `venue:${house.venueId}`)?.detail).toMatchObject({
-      changes: { slots: { from: 'DUTY_MANAGER:1, DOOR:2, BAR:1', to: 'DUTY_MANAGER:1, DOOR:3, BAR:1' } },
+      changes: { slots: { from: 'DUTY_MANAGER:1:default:default, DOOR:2:default:default, BAR:1:default:default', to: 'DUTY_MANAGER:1:default:default, DOOR:3:default:default, BAR:1:default:default' } },
     })
 
     await send('PUT', `/api/admin/rota/templates/${house.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
