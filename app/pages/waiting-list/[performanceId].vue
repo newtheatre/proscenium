@@ -140,11 +140,14 @@ useSeoMeta({
       </UButton>
     </div>
 
+    <!-- novalidate: the browser's own check on the address field would stop the submit before
+         the form's messages, so a blank name would never be named beside it (D-113 criterion 6). -->
     <UForm
       v-else
       :schema="schema"
       :state="state"
       class="mt-8 space-y-6"
+      novalidate
       @submit="join"
     >
       <UAlert
