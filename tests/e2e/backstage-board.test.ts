@@ -389,10 +389,16 @@ describe.skipIf(skip !== null)('the current state fits the column it is given (i
 
     const wings = await openView({ width: 1280, height: 800 })
     try {
-      await visit(wings, `${app.baseURL}/board`, '[data-test="board-join-form"]')
-      await fill(wings, '[data-test="board-code-input"]', code)
-      await fill(wings, '[data-test="board-label-input"]', 'Wide wings screen')
-      await click(wings, '[data-test="board-join-submit"]')
+      // The browser is shared, and an earlier case's joined device reopens its board with no
+      // form, so the join happens only when the form is what arrives.
+      await wings.navigate(`${app.baseURL}/board`)
+      await waitFor(wings, `document.querySelector('[data-test="board-join-form"]') || document.querySelector('[data-test="board-current"]')`, 60_000)
+      if (await wings.evaluate<boolean>(`Boolean(document.querySelector('[data-test="board-join-form"]'))`)) {
+        await visit(wings, `${app.baseURL}/board`, '[data-test="board-join-form"]')
+        await fill(wings, '[data-test="board-code-input"]', code)
+        await fill(wings, '[data-test="board-label-input"]', 'Wide wings screen')
+        await click(wings, '[data-test="board-join-submit"]')
+      }
       await waitFor(wings, BOTH_CALLS, 30_000)
       stacked(await wings.evaluate<Box[]>(ENDS))
     }
