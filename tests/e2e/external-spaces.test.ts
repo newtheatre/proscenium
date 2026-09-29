@@ -277,6 +277,8 @@ describe.skipIf(skip !== null)('the screen (C-119)', () => {
       await waitFor(view, `!document.querySelector('[data-test="note-submit"]').disabled`, 30_000)
       await click(view, '[data-test="note-submit"]')
 
+      // The form closes once the note is saved; the words alone can show before the write lands.
+      await waitFor(view, `!document.querySelector('[data-test="note-reason"]')`, 30_000)
       await waitFor(view, `document.body.innerText.includes('fixed table')`, 30_000)
       expect(read<{ verdict: string }>('SELECT verdict FROM external_space_notes WHERE space_id = ?', id)?.verdict)
         .toBe('UNSUITABLE')

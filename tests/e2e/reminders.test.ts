@@ -97,9 +97,12 @@ function placeBooking(userId: string, startsAt: number, status = 'CONFIRMED', ti
 
 const remind = (): Promise<Response> => send('POST', '/api/dev/remind-rooms', {}, officer)
 
+// A topic message joins its digest rather than the send log (H-104), so being told counts either.
+const TOLD = '(SELECT user_id, type FROM notification_log UNION ALL SELECT user_id, type FROM notification_digest_entries)'
+
 function sentTo(userId: string, type: string): number {
   return read<{ n: number }>(
-    'SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = ?', userId, type)?.n ?? 0
+    `SELECT count(*) n FROM ${TOLD} WHERE user_id = ? AND type = ?`, userId, type)?.n ?? 0
 }
 
 // A muted topic is its own outcome rather than an undeliverable address (H-102 criterion 3).

@@ -360,13 +360,16 @@ describe.skipIf(skip !== null)('the approval race (criterion 3)', () => {
   })
 })
 
+// A topic message joins its digest rather than the send log (H-104), so being told counts either.
+const TOLD = '(SELECT user_id, type FROM notification_log UNION ALL SELECT user_id, type FROM notification_digest_entries)'
+
 describe.skipIf(skip !== null)('a batch (criterion 4)', () => {
   test('five requests from one member are approved together and told once', async () => {
     const room = await makeRoom()
     const ids = [20, 21, 22, 23, 24].map(day => placeRequest(room, member.id, soon(day)))
 
     const before = read<{ sent: number }>(
-      `SELECT count(*) AS sent FROM notification_log WHERE user_id = ? AND type = 'room.request.approved'`,
+      `SELECT count(*) AS sent FROM ${TOLD} WHERE user_id = ? AND type = 'room.request.approved'`,
       member.id)?.sent ?? 0
 
     const answered = await send('POST', '/api/admin/rooms/requests/decide', { ids, action: 'APPROVE' }, officer)
@@ -374,7 +377,7 @@ describe.skipIf(skip !== null)('a batch (criterion 4)', () => {
     for (const id of ids) expect(statusOf(id)).toBe('CONFIRMED')
 
     const after = read<{ sent: number }>(
-      `SELECT count(*) AS sent FROM notification_log WHERE user_id = ? AND type = 'room.request.approved'`,
+      `SELECT count(*) AS sent FROM ${TOLD} WHERE user_id = ? AND type = 'room.request.approved'`,
       member.id)?.sent ?? 0
     expect(after - before).toBe(1)
   })
@@ -391,7 +394,7 @@ describe.skipIf(skip !== null)('a batch (criterion 4)', () => {
     ]
 
     const sent = (userId: string): number => read<{ sent: number }>(
-      `SELECT count(*) AS sent FROM notification_log WHERE user_id = ? AND type = 'room.request.rejected'`,
+      `SELECT count(*) AS sent FROM ${TOLD} WHERE user_id = ? AND type = 'room.request.rejected'`,
       userId)?.sent ?? 0
     const before = [sent(member.id), sent(second.id)]
 
