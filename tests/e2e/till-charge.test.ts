@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, query, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, query, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
 import { answerCharge, sellOnTheTill, startTypedCharge } from '#tests/helpers/till'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-104 through the real route and screen: a sale disagreeing with the till's own total is refused,
@@ -29,7 +30,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'charge-ordinary', generatePassword())
 
   barManager = await registerMember(app, 'charge-bar', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -76,7 +77,7 @@ const aProductIn = async (categoryId: string, over: Record<string, unknown> = {}
   created(await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId, ...over }))
 
 const activate = (productId: string): Promise<Response> =>
-  send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  putOnTheTill(send, productId)
 
 const addVariant = async (productId: string, over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single', ...over }))
@@ -368,7 +369,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
     await click(view, `[data-test="variant-${variantId}"]`)
@@ -406,7 +407,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
     await click(view, `[data-test="variant-${variantId}"]`)
@@ -434,7 +435,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
     await click(view, `[data-test="variant-${variantId}"]`)
@@ -476,7 +477,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, '[data-test="till-open"]')
     const [first, second] = ids
@@ -525,7 +526,7 @@ describe.skipIf(skip !== null)('another bar\'s unanswered charge names its bar',
       await fill(view, 'form input[type="email"]', barManager.email)
       await fill(view, 'form input[type="password"]', barPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, barManager.email)
 
       await visit(view, `${app.baseURL}/tonight/till?venueId=${house.venueId}`, '[data-test="till-open"]')
       await waitFor(view, `document.querySelector('[data-test="sumup-open-${atStudio}"]') && document.querySelector('[data-test="sumup-open-${atHouse}"]')`)

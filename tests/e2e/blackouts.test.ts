@@ -202,7 +202,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     const { id } = await booked.json() as { id: string }
 
     const sentBefore = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.blackout.cancelled') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.blackout.cancelled') AS n`,
       member.id)?.n ?? 0
 
     const answered = await closeRoom(room, span(41), 'Emergency maintenance')
@@ -214,7 +214,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     expect(after?.rejection_reason).toContain('Emergency maintenance')
 
     const sentAfter = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.blackout.cancelled') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.blackout.cancelled') AS n`,
       member.id)?.n ?? 0
     expect(sentAfter - sentBefore).toBe(1)
   })
@@ -250,7 +250,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     await book(room, span(44, 13, 1))
 
     const before = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.blackout.cancelled') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.blackout.cancelled') AS n`,
       member.id)?.n ?? 0
 
     const answered = await closeRoom(room, span(44, 8, 8), 'Whole day gone')
@@ -260,7 +260,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     expect(body.told).toBe(1)
 
     const after = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.blackout.cancelled') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.blackout.cancelled') AS n`,
       member.id)?.n ?? 0
     expect(after - before).toBe(1)
   })
@@ -273,7 +273,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     for (const day of [80, 81, 82, 83, 84]) expect((await book(room, span(day))).status).toBe(200)
 
     const before = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.blackout.cancelled') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.blackout.cancelled') AS n`,
       member.id)?.n ?? 0
 
     const answered = await closeRoom(room, {
@@ -286,7 +286,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     expect(body.told).toBe(1)
 
     const after = read<{ n: number }>(
-      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.blackout.cancelled'`,
+      `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.blackout.cancelled') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.blackout.cancelled') AS n`,
       member.id)?.n ?? 0
     expect(after - before).toBe(1)
   })

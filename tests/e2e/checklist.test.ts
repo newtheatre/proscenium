@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { curtainDown, testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { NIGHT_TAP_TARGET_PX } from '#shared/utils/night-shell'
@@ -26,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'checklist-foh', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -401,7 +401,7 @@ describe.skipIf(skip !== null)('the checklist screen on a matinee day (E-127, is
     await fill(view, 'form input[type="email"]', dm.email)
     await fill(view, 'form input[type="password"]', dmPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, dm.email)
     return view
   }
 
@@ -459,7 +459,7 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
     const dmPassword = generatePassword()
     const dm = await registerMember(app, 'checklist-till-dm', dmPassword)
     const barManager = await registerMember(app, 'checklist-till-bar', generatePassword())
-    await send('POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' })
+    await grantRole(app, barManager, 'BAR_MANAGER', admin.cookie)
     const { venueId, performanceId } = (() => {
       const database = new Database(app.databaseFile)
       try {
@@ -490,7 +490,7 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
       await fill(view, 'form input[type="email"]', dm.email)
       await fill(view, 'form input[type="password"]', dmPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, dm.email)
       await visit(view, `${app.baseURL}/tonight/checklist?performanceId=${performanceId}`, '[data-test="checklist-till"]')
       const said = await view.evaluate<string>(`document.querySelector('[data-test="checklist-till"]').innerText`)
       expect(said).toContain('Tonight\'s till is still open')

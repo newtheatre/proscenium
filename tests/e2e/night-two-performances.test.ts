@@ -7,6 +7,7 @@ import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // E-127 criterion 6, end to end: a matinee and an evening at one venue produce two rotas, two
@@ -74,7 +75,7 @@ async function aSellableVariant(): Promise<string> {
   const productId = await created(await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId }))
   const variantId = await created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }))
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 250, effectiveFrom: today() })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return variantId
 }
 
@@ -122,13 +123,15 @@ describe.skipIf(skip !== null)('a matinee and an evening at one venue, end to en
     const matineeReport = await (await send('GET', `/api/tonight/report?performanceId=${matineeId}`, undefined, dm.cookie)).json() as {
       performanceId: string
       ageChecks: { accepted: number }
-      bar: { revenuePence: number, itemsSold: number }
+      bar: { revenuePence: number, itemsSold: number, nightCardSalesPence: number }
+      takings: { bar: { tenders: { tender: string, totalPence: number }[] } }
       staffing: { role: string, name: string | null }[]
     }
     const eveningReport = await (await send('GET', `/api/tonight/report?performanceId=${eveningId}`, undefined, dm.cookie)).json() as {
       performanceId: string
       ageChecks: { accepted: number }
-      bar: { revenuePence: number, itemsSold: number }
+      bar: { revenuePence: number, itemsSold: number, nightCardSalesPence: number }
+      takings: { bar: { tenders: { tender: string, totalPence: number }[] } }
       staffing: { role: string, name: string | null }[]
     }
 
@@ -140,6 +143,11 @@ describe.skipIf(skip !== null)('a matinee and an evening at one venue, end to en
     expect(eveningReport.performanceId).toBe(eveningId)
     expect(eveningReport.ageChecks).toMatchObject({ accepted: 1 })
     expect(eveningReport.bar).toMatchObject({ revenuePence: 0, itemsSold: 0 })
+    // The till-close figure is the night's, quoted once on each report and labelled so (#1572).
+    expect(matineeReport.takings.bar.tenders).toEqual([{ tender: 'CARD', totalPence: 250 }])
+    expect(eveningReport.takings.bar.tenders).toEqual([])
+    expect(matineeReport.bar.nightCardSalesPence).toBe(250)
+    expect(eveningReport.bar.nightCardSalesPence).toBe(250)
     expect(eveningReport.staffing.find(row => row.role === 'DUTY_MANAGER')?.name).toBe(dm.name)
   })
 })

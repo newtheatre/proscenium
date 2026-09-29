@@ -924,7 +924,7 @@ export function roleFloor(key: string): readonly Role[] {
 
 // A save of one of these must preview who it reaches and take a typed echo (J-105 criteria 1, 2).
 // Code rather than a setting, so one plain save cannot empty it (J-105 criterion 5, issue 1357).
-export const WIDE_BLAST_RADIUS = ['REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED', 'PRIVILEGED_ROLES'] as const satisfies readonly ConfigKey[]
+export const WIDE_BLAST_RADIUS = ['REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED', 'PRIVILEGED_ROLES', 'AUTO_CLOSE_FROM_NIGHT'] as const satisfies readonly ConfigKey[]
 
 export function isWideBlastRadius(key: string): boolean {
   return (WIDE_BLAST_RADIUS as readonly string[]).includes(key)

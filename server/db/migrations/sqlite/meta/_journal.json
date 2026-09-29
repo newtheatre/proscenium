@@ -904,6 +904,13 @@
       "when": 1790522286585,
       "tag": "0128_a_venue_card_names_who_to_ring_first",
       "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "6",
+      "when": 1790676459814,
+      "tag": "0129_a_period_lock_tie_goes_to_the_later_row",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, forgetSpentStep, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, forgetSpentStep, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -31,7 +31,7 @@ beforeAll(async () => {
 
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   // Both roles, plus MFA: MANAGER is privileged (0037/A-112). ticketing.manage is now what
   // decides a comp request rather than what collects one (D-117).
@@ -440,7 +440,7 @@ async function signInAsBoxOffice(baseURL: string): ReturnType<typeof openSignedO
   await fill(view, 'form input[type="email"]', boxOffice.email)
   await fill(view, 'form input[type="password"]', boxOfficePassword)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  await finishSignIn(app, view, boxOffice.email)
   return view
 }
 

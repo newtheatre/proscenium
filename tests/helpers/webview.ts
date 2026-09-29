@@ -292,16 +292,17 @@ export async function openSignedOutView(baseURL: string, size?: { width: number,
   return view
 }
 
-// Signed in through the form as a person would be. A view that fails to sign in is closed here,
-// since the caller never receives it to close.
-export async function signInView(baseURL: string, email: string, password: string, size?: { width: number, height: number }): Promise<Bun.WebView> {
-  const view = await openSignedOutView(baseURL, size)
+// Signed in through the form as a person would be, answering the code an enrolled member is asked.
+// A view that fails to sign in is closed here, since the caller never receives it to close.
+export async function signInView(app: AppUnderTest, email: string, password: string, size?: { width: number, height: number }): Promise<Bun.WebView> {
+  const { finishSignIn } = await import('./accounts')
+  const view = await openSignedOutView(app.baseURL, size)
   try {
-    await visit(view, `${baseURL}/sign-in`)
+    await visit(view, `${app.baseURL}/sign-in`)
     await fill(view, 'form input[type="email"]', email)
     await fill(view, 'form input[type="password"]', password)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, email)
     return view
   }
   catch (failure) {
@@ -318,7 +319,9 @@ export async function waitFor(view: Bun.WebView, expression: string, timeoutMs =
     if (await view.evaluate<boolean>(`Boolean(${expression})`)) return
     await Bun.sleep(100)
   }
-  throw new Error(`timed out waiting for ${expression}`)
+  // Where the page was and what it said, so a timeout on CI is read rather than rerun.
+  const seen = await view.evaluate<string>(`location.pathname + ': ' + (document.body?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 240)`).catch(() => 'unreadable')
+  throw new Error(`timed out waiting for ${expression} (at ${seen})`)
 }
 
 // A plain value assignment is invisible to v-model: Vue listens for the event, and the native

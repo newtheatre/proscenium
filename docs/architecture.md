@@ -365,10 +365,12 @@ A period (a term, a season, a year, any range the treasurer names) closes as a r
 never as a flag on the entries it covers: closing cannot mutate what it closes, the same rule
 that keeps the ledger itself append-only (0010). The enforcement is a single trigger,
 `ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`: a day is locked if
-the latest `period_locks` row covering it (ordered by `created_at`) is `CLOSED`, whatever its
-close and reopen history. `runLedgerBatch()` catches the trigger's refusal and turns it into a
-409; every one of the six modules that call `postEntry()` now goes through it, so a closed period
-is refused at the write for the whole estate, not for whichever caller remembered to check.
+the latest `period_locks` row covering it (ordered by `created_at`, then `rowid`, the order rows
+were written in: #1567, migration 0129) is `CLOSED`, whatever its close and reopen history.
+`isDayLocked()`, `isRangeClosed()` and `reopenPeriod()` read the latest row the same way.
+`runLedgerBatch()` catches the trigger's refusal and turns it into a 409; every one of the six
+modules that call `postEntry()` now goes through it, so a closed period is refused at the write
+for the whole estate, not for whichever caller remembered to check.
 
 Reopening (criterion 4, an administrator only, `finance.reopen`) inserts a new `REOPENED` row for
 the same range rather than editing the `CLOSED` one; re-closing after that is another new row.
@@ -546,7 +548,11 @@ Reading the table:
 - A conditional write's audit row rides the write's own batch and only what it changed (0049),
   through one of four shapes in `server/utils/audit.ts`. `auditedWrite(write, entry)` batches
   the write with `auditIfChanged(entry)`, an insert conditioned on `changes() = 1`, and answers
-  whether it applied; `auditIfChanged` goes directly after the write when the batch holds more.
+  whether it applied, read from the rows the write returns: it refuses, before anything runs, a
+  write that returns none (`db.run`, or a builder without `.returning()`), since that would read
+  as not applied after it had landed (#1562). `tests/helpers/d1.ts` binds `@nuxthub/db` to a test
+  database, so an integration test can call such a function end to end (`audited-write.test.ts`).
+  `auditIfChanged` goes directly after the write when the batch holds more.
   `auditWhere(entry, condition)` writes under any condition and answers with the row it wrote:
   first in a batch, under the batch's one guard, it says whether the whole batch applied (the
   ticket edit, whose writes are then gated on `entryLanded`, since its guard reads what they
@@ -879,9 +885,15 @@ accounts already due anonymisation, read with no side effect at all
 (`dueForAnonymisation()`, `server/utils/retention-candidates.ts`), and `PRIVILEGED_ROLES` counts
 every role holder signing in with a password and no confirmed authenticator
 (`roleHoldersWithoutFactorQuery()`, the directory's `privilegedWithoutFactor()` over every role),
-since a preview is read before the new list is known. `PRIVILEGED_ROLES` is also add-only above
-`PRIVILEGED_FLOOR`, 0009's money, personal data and safety roles: `configProblem()` refuses a list
-leaving one off and names it, so no confirmation gets below the floor (A-112 criterion 4). `GET
+ignoring the proposed list: the count is who any addition could reach. `AUTO_CLOSE_FROM_NIGHT` is
+the one preview that reads the proposed value: `autoCloseFromPreview()`
+(`server/utils/night-auto-close.ts`) counts what the next `nights:close` sweep would freeze from
+that night, through the sweep's own `unclosedCandidatesQuery()` and `pastTheirClose()` cut, so the
+two cannot disagree. The preview route takes the value as `?value=` (JSON) or `?revert=true` for
+the prior value, and a save or revert checks the echo against the value it is about to write.
+`PRIVILEGED_ROLES` is also add-only above `PRIVILEGED_FLOOR`, 0009's money, personal data and
+safety roles: `configProblem()` refuses a list leaving one off and names it, so no confirmation
+gets below the floor (A-112 criterion 4). `GET
 /api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
 `confirmation` field matching the key's own name or the previewed count
 (`confirmationMatches()`, `shared/utils/blast-radius.ts`, pure and shared with the client), 400ing
@@ -1481,7 +1493,13 @@ sale on a day with more than one performance names its house from the instant it
 against tonight's bar windows at the venue (F-126, 0078, `performanceForSale()` in
 `server/utils/sale.ts`), so each report's bar summary reads its own house, while the shared till
 session stays correct by design (criterion 5, `till_sessions` keyed to `venue_id` and `night`
-exactly as the criterion asks).
+exactly as the criterion asks). `reportBarSummary(performanceId, night)` counts the bar's revenue
+and items from `ledger_lines.performance_id` (`reportBarForPerformanceQuery()`), and beside them
+quotes `cardSalesQuery(night)`, till-close's own figure, as `nightCardSalesPence`, shown as "Drinks
+on card, whole night", the till close's own words: one reader serves every performance that night
+(#1572, F-118 criterion 4, E-127 criterion 4). `reportTakings()` scopes the bar's tenders, comps
+and discounts to the performance the same way; a tab settlement carries no `performance_id`, so it
+leaves the per-performance tenders and only the till close counts it.
 
 Criterion 3 (a wrong-performance scan refuses loudly, naming the correct one) waited on D-126
 building `/tonight/door` at all, corrected onto this story's own dependency line, which omitted
@@ -1523,8 +1541,14 @@ audience is one of that performance's two (`server/utils/night-message.ts`): its
 through `performanceTicketHoldersQuery()`, the announce composer's own resolver (0089), or its rota,
 `performanceRotaQuery()`, the claimed and confirmed slots on it. Every message goes at once as the
 transactional type (`nightMessageType()`), one `notify()` a recipient, each copy claimed first under
-`nightMessageClaim()`, the page's draft key and the person (0048), so a second press of the same
-draft reaches only those not yet reached. The send is `comms.announcement.sent` with the
+`nightMessageClaim()`, the page's draft key, the sender and the person (0048), so a second press of
+the same draft reaches only those not yet reached. A press first takes over the sender's own claims
+on that draft still `PENDING` 30 seconds after they were made, a send cut off between its claim and
+its `notify()`: `takeOverInterruptedQuery()` is one conditional `UPDATE` that moves each to
+`FAILED_FINAL` and renames its claim off the key, so the loop claims and sends that person afresh
+(0108). `created_at` is only read for the age: nothing updates it, and the takeover leaves it
+alone for the H-105 backoff and the retention prune. The answer is `{ count, alreadyOut, resent,
+stillSending }` (`draftClaimsQuery()`), and `saysNightMessageSent()` words it. The send is `comms.announcement.sent` with the
 performance, the audience, the count newly reached and `via`, never the words (0011), written in a
 `finally` so a press that fails part-way still records the copies it sent. The console composer at
 `/comms/announce` now offers **When it goes** in place of its safety tick: `sendTimingOptions()`
@@ -1913,7 +1937,7 @@ real SQL:
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
 | Milestones | `backstage_messages` | Venue and night, not performance: the board is E-120's own scope, so a matinee day's two reports read the same timeline and the reader judges which call belonged to which house from the clock. Closes the known-issues gap E-121 criterion 1 left open. |
 | Staffing | `shifts`, `audit_log` | One row per stamped slot, unfilled ones naming nobody. Beside it, `bypasses`: one line per `night.officer-bypass` row on the three targets `requireNightAuthority` writes for the venue's night (`night:{night}:{venueId}:{role}`), matched against this performance inside the bypass's own recorded `performanceIds`, naming the role, the officer and whether a confirmed shift of that role was on the performance (0098). And `covers`: the duty manager who covered the door, from the `night.door-cover` row for the venue's night whose `performanceIds` hold this performance (0095). |
-| Bar summary | `ledger_lines` | Revenue and items sold from this performance's `TILL`-sourced lines, alongside takings rather than instead of it. |
+| Bar summary | `ledger_lines` | Revenue and items sold from this performance's `TILL`-sourced lines, by `performance_id`, alongside takings rather than instead of it; and the night's till-close card figure, once, labelled as the whole night's (#1572). |
 | Access | `access_profiles`, `reservations`, `tickets` | A verified count only, never a need or an identity (criterion 3, D-127 criterion 3's own counts-only rule). |
 
 `GET /api/tonight/report` takes an optional `performanceId`; a venue running more than one

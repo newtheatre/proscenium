@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -24,7 +24,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   door = await registerMember(app, 'door-officer', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: door.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, door, 'FOH_MANAGER', admin.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -109,7 +109,7 @@ describe.skipIf(skip !== null)('scanning an unredeemed pass admits it on the spo
     expect((await send('POST', '/api/tonight/door/passes/scan', { reference, performanceId })).status).toBe(200)
     const again = await send('POST', '/api/tonight/door/passes/scan', { reference, performanceId })
     expect(again.status).toBe(409)
-    expect(await again.text()).toContain('already been admitted')
+    expect(await again.text()).toContain('already admitted')
   }, CASE_TIMEOUT_MS)
 })
 

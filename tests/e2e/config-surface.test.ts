@@ -188,7 +188,7 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
 
   // Arming would read as done while doing nothing: there is no sweep (J-105 criterion 4, K-111).
   test('retention cannot be armed while there is no sweep to arm', async () => {
-    const refused = await send('PUT', '/api/admin/config/RETENTION_ARMED', { value: true }, cookie)
+    const refused = await send('PUT', '/api/admin/config/RETENTION_ARMED', { value: true, confirmation: 'RETENTION_ARMED' }, cookie)
     expect(refused.status).toBe(409)
     expect((await settingFor('RETENTION_ARMED')).set).toBe(false)
   })

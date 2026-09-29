@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
+import { saysDay } from '#shared/utils/when'
 import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -27,8 +28,8 @@ beforeAll(async () => {
   treasurer = await registerMember(app, 'screens-treasurer', treasurerPassword)
   boxOffice = await registerMember(app, 'screens-box-office', generatePassword())
   committee = await registerMember(app, 'screens-committee', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, treasurer, 'TREASURER', admin.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 }, BOOT_TIMEOUT_MS)
 
@@ -43,9 +44,9 @@ function zReading(night: string, variancePence: number): void {
   const database = new Database(app.databaseFile)
   try {
     database.query(`
-      INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(`screens-z-${night}`, night, 1000 + variancePence, 1000, variancePence, treasurer.id)
+      INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(`screens-z-${night}`, night, 1000 + variancePence, 1000, variancePence, treasurer.id, variancePence === 0 ? null : 'The float was miscounted')
   }
   finally {
     database.close()
@@ -199,19 +200,21 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     await fill(view, 'form input[type="email"]', treasurer.email)
     await fill(view, 'form input[type="password"]', treasurerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, treasurer.email)
 
     await visit(view, `${app.baseURL}/money`, '[data-test="period-kind"]')
     await waitFor(view, `document.querySelector('[data-test="section-revenue"]')`)
     expect(await textOf(view, '[data-test="section-revenue"] thead')).toContain('Amount')
     expect(await textOf(view, '[data-test="section-revenue"] thead')).not.toContain('Pence')
 
-    await pickOption(view, '[data-test="period-kind"]', 'TERM')
+    await pickOption(view, '[data-test="period-kind"]', 'Term')
     await pickOption(view, '[data-test="period-term"]', 'Spring 2020')
-    await waitFor(view, `document.body.innerText.includes('2020-01-13 to 2020-03-27')`)
+    // The screens say a day in words, as everywhere else (the range, then the list of terms).
+    const range = `${saysDay('2020-01-13', { year: true })} to ${saysDay('2020-03-27', { year: true })}`
+    await waitFor(view, `document.body.innerText.includes(${JSON.stringify(range)})`)
 
     await visit(view, `${app.baseURL}/money/periods`, '[data-test="defined-terms"]')
-    expect(await textOf(view, '[data-test="defined-terms"]')).toContain('Spring 2020: 2020-01-13 to 2020-03-27')
+    expect(await textOf(view, '[data-test="defined-terms"]')).toContain(`Spring 2020: ${saysDay('2020-01-13')} to ${saysDay('2020-03-27')}`)
     view.close()
   }, 120_000)
 })

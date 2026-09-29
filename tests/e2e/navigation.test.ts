@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -35,7 +35,7 @@ beforeAll(async () => {
 
   // Granted through the route that records who did it, which is the only sanctioned path.
   trainer = await registerMember(app, 'trainer', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: trainer.id, role: 'TRAINING_MANAGER' }, officer.cookie)
+  await grantRole(app, trainer, 'TRAINING_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {

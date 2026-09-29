@@ -1223,18 +1223,19 @@ defined as a term.
 Indexed on `(from_day, to_day, created_at)`.
 
 **A close is a row appended, never a flag on the ledger it covers (I-107).** Whether a day is
-locked is read off the latest row (by `created_at`) whose range covers it: `CLOSED` refuses,
+locked is read off the latest row (by `created_at`, then `rowid`, the order rows were written in:
+#1567) whose range covers it: `CLOSED` refuses,
 `REOPENED` allows, and no row at all is open. Reopening inserts a new `REOPENED` row for the
 same range rather than editing the `CLOSED` one it reopens, and re-closing after that is another
 new row; nothing here supersedes by reference; the "latest row wins" rule already answers which
 one governs.
 
 **`ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`, is the actual
-enforcement.** It reads `period_locks` for `NEW.london_day` and raises where the answer is
-`CLOSED`; `server/utils/ledger.ts`'s `runLedgerBatch()` is what every `postEntry()` caller uses
-instead of `db.batch()`, and it is what turns that raise into a 409. A correction posts under
-today's date, in the open period, exactly as any other entry does; only `NEW.london_day` is
-judged, never what a correction names in `reverses_entry_id`.
+enforcement.** It reads the latest `period_locks` row for `NEW.london_day` the same way (migration
+0129) and raises where the answer is `CLOSED`; `server/utils/ledger.ts`'s `runLedgerBatch()` is
+what every `postEntry()` caller uses instead of `db.batch()`, and it is what turns that raise into
+a 409. A correction posts under today's date, in the open period, exactly as any other entry
+does; only `NEW.london_day` is judged, never what a correction names in `reverses_entry_id`.
 
 ### su_nominal_mappings
 `id` PK · `kind`, `source` (a `ledger_lines.kind` / `ledger_entries.source` pair) · `nominal_code`

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -29,7 +29,7 @@ beforeAll(async () => {
 
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -289,7 +289,7 @@ async function signInAsBoxOffice(): ReturnType<typeof openSignedOutView> {
   await fill(view, 'form input[type="email"]', boxOffice.email)
   await fill(view, 'form input[type="password"]', boxOfficePassword)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  await finishSignIn(app, view, boxOffice.email)
   return view
 }
 

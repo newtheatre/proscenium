@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -32,7 +32,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -181,7 +181,7 @@ describe.skipIf(skip !== null)('a show takes a poster and the public page draws 
     await fill(view, 'form input[type="email"]', boxOffice.email)
     await fill(view, 'form input[type="password"]', boxOfficePassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, boxOffice.email)
 
     await visit(view, `${app.baseURL}/box-office/shows/${show.id}`, '[data-test="poster-card"]')
     expect(await textOf(view, '[data-test="poster-card"]')).toContain('Show art is sovereign')

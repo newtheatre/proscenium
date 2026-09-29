@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
       pricePence: input.pricePence,
       effectiveFrom: input.effectiveFrom,
       createdBy: resolved.account.id,
-    }),
+    }).returning({ id: schema.categoryPrices.id }),
     auditEntry({
       actorId: resolved.account.id,
       action: 'bar.category.price.set',

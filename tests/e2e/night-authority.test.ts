@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -36,8 +36,8 @@ beforeAll(async () => {
   foh = await registerMember(app, 'foh', generatePassword())
   bar = await registerMember(app, 'bar', generatePassword())
   member = await registerMember(app, 'ordinary', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
 
   house = programme('house')
   studio = programme('studio')
@@ -120,7 +120,7 @@ describe.skipIf(skip !== null)('an officer opens a show-night screen with no shi
   // standing in, since it decrypts what the patron agreed to share (D-127, 0098).
   test('the hub\'s poll records nothing, and the glance\'s read of the access wording does', async () => {
     const officer = await registerMember(app, 'foh-glance', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: officer.id, role: 'FOH_MANAGER' }, admin.cookie)
+    await grantRole(app, officer, 'FOH_MANAGER', admin.cookie)
     const target = `night:${night}:${house.venueId}:DUTY_MANAGER`
 
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -158,7 +158,7 @@ describe.skipIf(skip !== null)('the roles are not interchangeable (E-111 criteri
   test('the front of house officer does not open the till', async () => {
     const response = await ask(`role=BAR&venueId=${house.venueId}`, foh.cookie)
     expect(response.status).toBe(403)
-    expect(await message(response)).toContain('bar manager')
+    expect(await message(response)).toContain('Bar Manager')
   })
 
   test('the bar manager opens neither the door nor the duty manager screens', async () => {
@@ -178,7 +178,7 @@ describe.skipIf(skip !== null)('the guard is the enforcement, not the navigation
     expect(response.status).toBe(403)
     const refusal = await message(response)
     expect(refusal).toContain('door shift')
-    expect(refusal).toContain('front of house')
+    expect(refusal).toContain('Front of House Manager')
   })
 
   test('a signed-out caller gets no further', async () => {
@@ -493,7 +493,7 @@ describe.skipIf(skip !== null)('the bar opens on a night with nothing running (F
     expect(response.status).toBe(403)
     const refusal = await message(response)
     expect(refusal).toContain('bar opening')
-    expect(refusal).toContain('bar manager')
+    expect(refusal).toContain('Bar Manager')
   })
 })
 
@@ -576,7 +576,7 @@ describe.skipIf(skip !== null)('any of tonight\'s roles: a shift before a bypass
 
   test('an officer on a confirmed door shift resolves through the shift, not the duty manager bypass', async () => {
     const officer = await registerMember(app, 'any-foh-shift', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: officer.id, role: 'FOH_MANAGER' }, admin.cookie)
+    await grantRole(app, officer, 'FOH_MANAGER', admin.cookie)
     shiftFor(house.performanceId, 'DOOR', officer.id)
 
     const response = await askAny(`venueId=${house.venueId}`, officer.cookie)

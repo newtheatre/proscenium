@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -25,7 +25,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -56,7 +56,7 @@ async function bookableShow(): Promise<{ title: string, performanceId: string, t
   const title = named('Hedda Gabler')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
   const showId = (await show.json() as { id: string }).id
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: now + 7 * 86_400 })
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: now + 7 * 86_400, durationMinutes: 120 })
   const performanceId = (await performance.json() as { id: string }).id
   const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
   const ticketTypeId = (await type.json() as { id: string }).id
@@ -70,7 +70,7 @@ async function signedInView(member: TestMember, password: string): Promise<Bun.W
   await fill(view, 'form input[type="email"]', member.email)
   await fill(view, 'form input[type="password"]', password)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+  await finishSignIn(app, view, member.email)
   return view
 }
 

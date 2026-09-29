@@ -43,8 +43,9 @@ export async function periodsList(): Promise<Period[]> {
 // term, the same append-only reasoning the rest of this module already keeps.
 export async function defineTerm(input: DefineTermInput, actorId: string): Promise<{ id: string, applied: boolean }> {
   const id = newId()
-  const statement = db.run(sql`
+  const statement = db.all<{ id: string }>(sql`
     INSERT INTO periods (id, label, from_day, to_day, created_by) VALUES (${id}, ${input.label}, ${input.fromDay}, ${input.toDay}, ${actorId})
+    RETURNING id
   `)
   const entry = auditEntry({
     actorId,
@@ -73,7 +74,7 @@ export function periodLocksHistoryQuery(): SQL {
            l.actor_id AS actorId, u.name AS actorName, l.created_at AS createdAt
     FROM period_locks l
     JOIN users u ON u.id = l.actor_id
-    ORDER BY l.created_at DESC
+    ORDER BY l.created_at DESC, l.rowid DESC
   `
 }
 
@@ -89,12 +90,12 @@ export async function periodLockById(id: string): Promise<{ fromDay: string, toD
 }
 
 // The row governing one day is the latest covering it, however many times that range has been
-// closed and reopened; a handful of ranges in a season's history, never a scan (0001).
+// closed and reopened. Latest is by second, then by rowid: an id is random (#1567).
 function currentActionForDayQuery(day: string): SQL {
   return sql`
     SELECT action FROM period_locks
     WHERE ${day} BETWEEN from_day AND to_day
-    ORDER BY created_at DESC, id DESC
+    ORDER BY created_at DESC, rowid DESC
     LIMIT 1
   `
 }
@@ -109,15 +110,15 @@ export async function isDayLocked(day: string): Promise<boolean> {
 export function rangeClosedQuery(fromDay: string, toDay: string): SQL {
   return sql`
     WITH cover AS (
-      SELECT id, action, created_at FROM period_locks
+      SELECT action, created_at, rowid AS seq FROM period_locks
       WHERE from_day <= ${fromDay} AND to_day >= ${toDay}
-      ORDER BY created_at DESC, id DESC
+      ORDER BY created_at DESC, rowid DESC
       LIMIT 1
     )
     SELECT cover.action AS action, EXISTS (
       SELECT 1 FROM period_locks later
       WHERE later.action = 'REOPENED' AND later.from_day <= ${toDay} AND later.to_day >= ${fromDay}
-        AND (later.created_at > cover.created_at OR (later.created_at = cover.created_at AND later.id > cover.id))
+        AND (later.created_at > cover.created_at OR (later.created_at = cover.created_at AND later.rowid > cover.seq))
     ) AS reopenedSince
     FROM cover
   `
@@ -140,9 +141,10 @@ export async function blockingConditionsFor(fromDay: string, toDay: string): Pro
 }
 
 function lockStatement(input: ClosePeriodInput, action: PeriodLockAction, actorId: string, id = newId()): BatchItem<'sqlite'> {
-  return db.run(sql`
+  return db.all<{ id: string }>(sql`
     INSERT INTO period_locks (id, from_day, to_day, label, action, actor_id)
     VALUES (${id}, ${input.fromDay}, ${input.toDay}, ${input.label ?? null}, ${action}, ${actorId})
+    RETURNING id
   `)
 }
 
@@ -168,7 +170,8 @@ export async function reopenPeriod(lockId: string, actorId: string): Promise<{ i
     WHERE l.id = ${lockId} AND l.action = 'CLOSED'
       AND NOT EXISTS (
         SELECT 1 FROM period_locks later
-        WHERE later.from_day = l.from_day AND later.to_day = l.to_day AND later.created_at > l.created_at
+        WHERE later.from_day = l.from_day AND later.to_day = l.to_day
+          AND (later.created_at > l.created_at OR (later.created_at = l.created_at AND later.rowid > l.rowid))
       )
   `)
   if (!lock) return null

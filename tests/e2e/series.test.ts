@@ -457,9 +457,12 @@ describe.skipIf(skip !== null)('the head follows what is left (C-111 criterion 3
 })
 
 describe.skipIf(skip !== null)('one message for a series, not one per week (C-111 criterion 5)', () => {
+  // A rooms message joins the member's next digest (H-104), so one owed is one sent or one held.
   function sentTo(userId: string, type: string): number {
-    return read<{ n: number }>(
-      'SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = ?', userId, type)?.n ?? 0
+    return read<{ n: number }>(`
+      SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = ?2)
+           + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = ?2) AS n
+    `, userId, type)?.n ?? 0
   }
 
   test('booking a term sends one', async () => {

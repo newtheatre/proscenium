@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openView, skipReason, startApp, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -28,7 +28,7 @@ beforeAll(async () => {
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   const officer = await registerMember(app, 'grantor', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   await request(app, 'POST', '/api/auth/register', { email: adminEmail, name: person.name, password: adminPassword })
@@ -52,17 +52,17 @@ async function hasNoHorizontalOverflow(view: Bun.WebView): Promise<boolean> {
 }
 
 async function signInAsBoxOffice(view: Bun.WebView): Promise<void> {
-  await view.navigate(`${app.baseURL}/sign-in`)
-  await waitFor(view, 'document.querySelector(\'form input[type="email"]\')')
+  // Hydrated before the address is typed: the form reveals the password only then (0103).
+  await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', boxOffice.email)
   await fill(view, 'form input[type="password"]', boxOfficePassword)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+  await finishSignIn(app, view, boxOffice.email)
 }
 
 async function signInAsAdmin(view: Bun.WebView): Promise<void> {
-  await view.navigate(`${app.baseURL}/sign-in`)
-  await waitFor(view, 'document.querySelector(\'form input[type="email"]\')')
+  // Hydrated before the address is typed: the form reveals the password only then (0103).
+  await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', adminEmail)
   await fill(view, 'form input[type="password"]', adminPassword)
   await click(view, 'form button[type="submit"]')

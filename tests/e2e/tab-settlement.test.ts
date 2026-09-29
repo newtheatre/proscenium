@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-109: a tab holder's account is itemised and live; settlement is bounded to exactly the
@@ -25,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'settle-bar-manager', barManagerPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
   barStaff = await registerMember(app, 'settle-bar-staff', barStaffPassword)
 }, BOOT_TIMEOUT_MS)
 
@@ -92,7 +93,7 @@ async function aSellableProduct(pricePence = 500): Promise<{ variantId: string, 
   const { id: variantId } = await variantAnswered.json() as { id: string }
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return { variantId, productId }
 }
 
@@ -302,7 +303,7 @@ describe.skipIf(skip !== null)('a void credits stock exactly once (criterion 5)'
     const { venueId, performanceId } = programme(`settle-void-stock-${crypto.randomUUID().slice(0, 6)}`)
     const categoryAnswered = await send('POST', '/api/admin/bar/categories', { name: named('Spirits') })
     const { id: categoryId } = await categoryAnswered.json() as { id: string }
-    const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700 })
+    const itemAnswered = await send('POST', '/api/admin/bar/items', { name: named('Gin'), unit: 'ML', containerMl: 700, ageRestricted: false })
     const { id: itemId } = await itemAnswered.json() as { id: string }
     await send('POST', '/api/admin/bar/movements', { itemId, qty: 700, kind: 'DELIVERY' })
     const productAnswered = await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId })
@@ -312,7 +313,7 @@ describe.skipIf(skip !== null)('a void credits stock exactly once (criterion 5)'
     await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 50 }] })
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
     await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 500, effectiveFrom: today })
-    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+    await putOnTheTill(send, productId)
 
     await openTill(venueId, performanceId)
     const member = await aMember()

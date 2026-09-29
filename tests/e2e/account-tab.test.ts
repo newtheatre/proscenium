@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-109 criterion 1: the holder's own account shows every charge itemised, with the live
@@ -23,7 +24,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'account-tab-manager', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -67,7 +68,7 @@ async function aSellableProduct(pricePence: number): Promise<{ variantId: string
   const variantAnswered = await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' })
   const { id: variantId } = await variantAnswered.json() as { id: string }
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return { variantId }
 }
 
@@ -90,7 +91,7 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await fill(view, 'form input[type="email"]', member.email)
     await fill(view, 'form input[type="password"]', password)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, member.email)
 
     await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
     expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£0.00')
@@ -114,7 +115,7 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await fill(view, 'form input[type="email"]', holder.email)
     await fill(view, 'form input[type="password"]', password)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, holder.email)
 
     await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
     expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£6.50')
@@ -142,7 +143,7 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await fill(view, 'form input[type="email"]', holder.email)
     await fill(view, 'form input[type="password"]', password)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, holder.email)
 
     await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
     expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£0.00')
@@ -170,7 +171,7 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await fill(view, 'form input[type="email"]', holder.email)
     await fill(view, 'form input[type="password"]', password)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, holder.email)
 
     await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
     expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£0.00')

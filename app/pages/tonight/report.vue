@@ -28,7 +28,8 @@ interface Report {
   staffing: { shiftId: string, role: ShiftRole, slot: number, status: ShiftStatus, name: string | null, officerBypass?: boolean }[]
   bypasses?: OfficerBypassLine[]
   covers?: { name: string | null }[]
-  bar: { revenuePence: number, itemsSold: number }
+  // Absent from a report frozen before the bar was read per performance.
+  bar: { revenuePence: number, itemsSold: number, nightCardSalesPence?: number }
   // Absent from a report frozen before late additions were read.
   lateAdditions?: LateAddition[]
   access: { verified: number }
@@ -156,6 +157,8 @@ const figures = computed(() => {
       { label: 'Comps given', value: saysMoney(desk.compsPence + bar.compsPence) },
       { label: 'Discounts given', value: saysMoney(desk.discountsPence + bar.discountsPence) },
       { label: 'Bar items sold', value: String(read.bar.itemsSold) },
+      // The reader serves the whole night, so its figure is labelled as the night's, not this show's.
+      ...(read.bar.nightCardSalesPence === undefined ? [] : [{ label: 'Drinks on card, whole night', value: saysMoney(read.bar.nightCardSalesPence) }]),
     ] },
   ]
 })

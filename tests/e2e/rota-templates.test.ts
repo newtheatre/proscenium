@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { adminSession, forgetSpentStep, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { daysAfter } from '#shared/utils/membership'
@@ -39,7 +39,7 @@ beforeAll(async () => {
 
   foh = await registerMember(app, 'foh', fohPassword)
   member = await registerMember(app, 'ordinary', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   house = programme('house')
 
@@ -49,7 +49,7 @@ beforeAll(async () => {
   const firstCookie = (first.headers.get('set-cookie') ?? '').split(';')[0]!
   adminBrowserSecret = (await (await request(app, 'POST', '/api/account/mfa/enrol', {}, firstCookie)).json() as { secret: string }).secret
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(adminBrowserSecret, stepFor(new Date())) }, firstCookie)
-  expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', adminBrowser.email, app.databaseFile]).exitCode).toBe(0)
+  expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', adminBrowser.email, app.databaseFile, '--additional']).exitCode).toBe(0)
 
   const department = `ROT${crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')}`
   await request(app, 'POST', '/api/admin/training/departments', { code: department, name: 'Rota gating' }, admin.cookie)
@@ -176,7 +176,7 @@ describe.skipIf(skip !== null)('a venue template is the front of house officer\'
 
     const entry = trail('shift-template.created', `venue:${house.venueId}`)
     expect(entry?.detail).toMatchObject({
-      changes: { slots: { from: '', to: 'DUTY_MANAGER:1, DOOR:2, BAR:1' } },
+      changes: { slots: { from: '', to: 'DUTY_MANAGER:1:default:default, DOOR:2:default:default, BAR:1:default:default' } },
     })
   })
 
@@ -186,7 +186,7 @@ describe.skipIf(skip !== null)('a venue template is the front of house officer\'
     }, foh.cookie)
 
     expect(trail('shift-template.updated', `venue:${house.venueId}`)?.detail).toMatchObject({
-      changes: { slots: { from: 'DUTY_MANAGER:1, DOOR:2, BAR:1', to: 'DUTY_MANAGER:1, DOOR:3, BAR:1' } },
+      changes: { slots: { from: 'DUTY_MANAGER:1:default:default, DOOR:2:default:default, BAR:1:default:default', to: 'DUTY_MANAGER:1:default:default, DOOR:3:default:default, BAR:1:default:default' } },
     })
 
     await send('PUT', `/api/admin/rota/templates/${house.venueId}`, { slots: HOUSE_SLOTS }, foh.cookie)
@@ -605,7 +605,7 @@ async function visitAsFoh(path: string): Promise<Bun.WebView> {
   await fill(view, 'form input[type="email"]', foh.email)
   await fill(view, 'form input[type="password"]', fohPassword)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+  await finishSignIn(app, view, foh.email)
   await visit(view, `${app.baseURL}${path}`, '[data-test="templates-table"]')
   return view
 }

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -24,7 +24,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'emergency-foh', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -277,7 +277,7 @@ describe.skipIf(skip !== null)('who to ring first (issue 1519)', () => {
       await fill(view, 'form input[type="email"]', reader.email)
       await fill(view, 'form input[type="password"]', password)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, reader.email)
 
       await visit(view, `${app.baseURL}/tonight/emergency`, '[data-test="emergency-call-01159518888"]')
       await click(view, '[data-test="emergency-call-01159518888"]')

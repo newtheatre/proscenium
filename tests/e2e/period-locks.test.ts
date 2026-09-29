@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { sqliteTarget } from '#tests/helpers/database'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -118,11 +118,17 @@ describe.skipIf(skip !== null)('a closed period refuses a new collection (criter
     const closed = await send('POST', '/api/admin/finance/periods', { fromDay: today, toDay: today, label: named('Term') })
     const { id: lockId } = await closed.json() as { id: string }
 
-    const wrong = await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: '2000-01-01', confirmToDay: today })
-    expect(wrong.status).toBe(409)
+    try {
+      const wrong = await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: '2000-01-01', confirmToDay: today })
+      expect(wrong.status).toBe(409)
 
-    const stillRefused = await collect(reservationId)
-    expect(stillRefused.status).toBe(409)
+      const stillRefused = await collect(reservationId)
+      expect(stillRefused.status).toBe(409)
+    }
+    finally {
+      // Today is left open again: the suite shares one database, and the next test collects today.
+      await send('POST', `/api/admin/finance/periods/${lockId}/reopen`, { confirmFromDay: today, confirmToDay: today })
+    }
   }, CASE_TIMEOUT_MS)
 
   test('a collection outside the closed range is unaffected', async () => {
@@ -145,7 +151,7 @@ describe.skipIf(skip !== null)('closing and reopening are treasurer and administ
 
   test('the treasurer role closes but cannot reopen', async () => {
     const treasurer = await registerMember(app, 'treasurer', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, officer.cookie)
+    await grantRole(app, treasurer, 'TREASURER', officer.cookie)
 
     const closed = await send('POST', '/api/admin/finance/periods', { fromDay: '2000-02-01', toDay: '2000-02-28' }, treasurer.cookie)
     expect(closed.status).toBe(200)

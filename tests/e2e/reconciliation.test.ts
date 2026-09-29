@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { saysMoney } from '#shared/utils/bar'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 import { Database } from 'bun:sqlite'
 import { currentShowNight } from '#shared/utils/show-night'
@@ -25,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   bar = await registerMember(app, 'reconcile-bar', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: bar.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, bar, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -80,7 +81,7 @@ async function aSellableProduct(pricePence: number): Promise<{ variantId: string
   const { id: variantId } = await variantAnswered.json() as { id: string }
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today }, officer.cookie)
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' }, officer.cookie)
+  await putOnTheTill((method, path, body) => send(method, path, body, officer.cookie), productId)
   return { variantId }
 }
 
@@ -219,7 +220,8 @@ describe.skipIf(skip !== null)('the close compares the reader with the whole nig
 })
 
 describe.skipIf(skip !== null)('the night report carries the same figure, never a retyped one (criterion 4)', () => {
-  test('the report\'s bar revenue equals the reconciliation\'s own card sales', async () => {
+  // The till-close figure is the night's, quoted on the report as the night's (#1572).
+  test('the report\'s night card figure equals the reconciliation\'s own card sales', async () => {
     const { venueId, performanceId } = programme(`reconcile-report-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct(725)
     const opened = await (await openTill(venueId, performanceId)).json() as { session: { id: string } }
@@ -230,8 +232,8 @@ describe.skipIf(skip !== null)('the night report carries the same figure, never 
 
     const reported = await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, officer.cookie)
     expect(reported.status).toBe(200)
-    const report = await reported.json() as { bar: { revenuePence: number, itemsSold: number } }
-    expect(report.bar.revenuePence).toBe(reconciliation.bar.cardSalesPence)
+    const report = await reported.json() as { bar: { revenuePence: number, itemsSold: number, nightCardSalesPence: number } }
+    expect(report.bar.nightCardSalesPence).toBe(reconciliation.bar.cardSalesPence)
     expect(report.bar.itemsSold).toBe(1)
   })
 })

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { defaultSendTiming, sendTimingOptions } from '#shared/utils/announcements'
-import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, nightMessageClaim, nightMessageForm, nightMessageType, saysNightMessageSent } from '#shared/utils/night-message'
+import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, nightMessageClaim, nightMessageDraftPrefix, nightMessageForm, nightMessageType, saysNightMessageSent } from '#shared/utils/night-message'
+import type { NightMessageOutcome } from '#shared/utils/night-message'
 import { showNightBounds } from '#shared/utils/show-night'
 
 // Issue 1327, decision 0101: tonight's duty manager messages tonight's audience from the show-night
@@ -34,14 +35,27 @@ describe('tonight\'s audience is one performance\'s ticket holders or its rota (
 // A draft is sent once to each person, however often the button is pressed after a dropped
 // connection: each recipient's copy is claimed under the draft's own key (0048).
 describe('tonight\'s message reaches each person once per draft (0101, 0048)', () => {
-  test('the claim names the draft and the person', () => {
-    expect(nightMessageClaim('draft-1', 'user-1')).toBe('night-message:draft-1:user-1')
+  // The sender is in the key, so a retry takes over only its own claims (0108).
+  test('the claim names the draft, the sender and the person', () => {
+    expect(nightMessageClaim('draft-1', 'sender-1', 'user-1')).toBe('night-message:draft-1:sender-1:user-1')
+    expect(nightMessageClaim('draft-1', 'sender-1', 'user-1').startsWith(nightMessageDraftPrefix('draft-1', 'sender-1'))).toBe(true)
+    expect(nightMessageClaim('draft-1', 'sender-2', 'user-1').startsWith(nightMessageDraftPrefix('draft-1', 'sender-1'))).toBe(false)
   })
 
+  const outcome = (count: number, more: Partial<NightMessageOutcome> = {}): NightMessageOutcome =>
+    ({ count, alreadyOut: 0, resent: 0, stillSending: 0, ...more })
+
   test('a second press says who it reached, and that everyone else already had it', () => {
-    expect(saysNightMessageSent(3)).toBe('Sent to 3 people')
-    expect(saysNightMessageSent(1)).toBe('Sent to 1 person')
-    expect(saysNightMessageSent(0)).toBe('Everyone in this audience already has it')
+    expect(saysNightMessageSent(outcome(3))).toBe('Sent to 3 people')
+    expect(saysNightMessageSent(outcome(1))).toBe('Sent to 1 person')
+    expect(saysNightMessageSent(outcome(0, { alreadyOut: 4 }))).toBe('Everyone in this audience already has it; 4 copies already out')
+  })
+
+  // 0108: a retry says what it resent, what was already out, and what is still in flight.
+  test('a retry says how many copies were already out, how many were resent, and how many are still going', () => {
+    expect(saysNightMessageSent(outcome(1, { resent: 1, alreadyOut: 2 }))).toBe('Sent to 1 person; 1 copy resent after an interrupted send; 2 copies already out')
+    expect(saysNightMessageSent(outcome(0, { alreadyOut: 2, stillSending: 3 }))).toBe('2 copies already out; 3 copies are still being sent; try again in a minute')
+    expect(saysNightMessageSent(outcome(0, { stillSending: 1 }))).toBe('1 copy is still being sent; try again in a minute')
   })
 
   test('the page sends its draft key, and a changed draft is a new one', async () => {
@@ -57,7 +71,9 @@ describe('tonight\'s message reaches each person once per draft (0101, 0048)', (
     expect(source).toMatch(/if \(!await claimNotification\(\{[^}]*key: claim[^}]*\}\)\) continue/)
     expect(source).toContain('notify(event, { type, userId, claim,')
     expect(source).toContain('recipientCount: reached')
-    expect(source).toContain('return { count: reached }')
+    expect(source).toContain('return { count: reached, alreadyOut: held?.alreadyOut ?? 0, resent, stillSending: held?.stillSending ?? 0 }')
+    // The takeover runs once, before the loop, so the loop's own claim is what resends (0108).
+    expect(source.indexOf('takeOverInterruptedQuery(input.draftKey, actorId, now)')).toBeLessThan(source.indexOf('for (const userId of ids)'))
   })
 
   test('a press that fails part-way still audits the copies it sent', async () => {

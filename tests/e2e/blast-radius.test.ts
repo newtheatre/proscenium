@@ -172,6 +172,28 @@ describe.skipIf(skip !== null)('reverting (criterion 3)', () => {
     }
   })
 
+  // The first self-closing night is flagged too: set too early, it freezes and mails imported
+  // performances. Nights in 2099, so no sweep in this run ever closes one.
+  test('the first self-closing night previews the proposed night, and a save or revert needs the echo', async () => {
+    try {
+      const preview = await send('GET', `/api/admin/config/AUTO_CLOSE_FROM_NIGHT/blast-radius?value=${encodeURIComponent(JSON.stringify('2099-01-01'))}`)
+      expect(preview.status).toBe(200)
+      expect(await preview.json()).toMatchObject({ count: 0, category: expect.stringContaining('night report') })
+
+      expect((await send('PUT', '/api/admin/config/AUTO_CLOSE_FROM_NIGHT', { value: '2099-01-01' })).status).toBe(400)
+      expect((await send('PUT', '/api/admin/config/AUTO_CLOSE_FROM_NIGHT', { value: '2099-01-01', confirmation: 'AUTO_CLOSE_FROM_NIGHT' })).status).toBe(200)
+      expect((await send('PUT', '/api/admin/config/AUTO_CLOSE_FROM_NIGHT', { value: '2099-01-02', confirmation: '0' })).status).toBe(200)
+
+      expect((await send('POST', '/api/admin/config/AUTO_CLOSE_FROM_NIGHT/revert')).status).toBe(400)
+      const reverted = await send('POST', '/api/admin/config/AUTO_CLOSE_FROM_NIGHT/revert', { confirmation: 'AUTO_CLOSE_FROM_NIGHT' })
+      expect(reverted.status).toBe(200)
+      expect((await reverted.json() as { value: string }).value).toBe('2099-01-01')
+    }
+    finally {
+      clearConfigOverride(app, 'AUTO_CLOSE_FROM_NIGHT')
+    }
+  })
+
   test('reverting needs config.write, the same as saving', async () => {
     const bystander = await registerMember(app, 'bystander', generatePassword())
     const answered = await send('POST', '/api/admin/config/HOLD_RELEASE_BATCH_CAP/revert', undefined, bystander.cookie)

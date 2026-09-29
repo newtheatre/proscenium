@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -23,7 +23,7 @@ beforeAll(async () => {
   admin = await adminSession(app)
   treasurer = await registerMember(app, 'export-treasurer', generatePassword())
   committee = await registerMember(app, 'export-committee', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, admin.cookie)
+  await grantRole(app, treasurer, 'TREASURER', admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
 
   const database = new Database(app.databaseFile)
@@ -78,7 +78,7 @@ describe.skipIf(skip !== null)('changing a mapping is audited with the from and 
     await send('POST', '/api/admin/finance/nominal-mappings', { kind: 'WALK_UP', source: 'DESK', nominalCode: '4200' }, treasurer.cookie)
 
     const row = read<{ actor_id: string, detail: string }>(
-      `SELECT actor_id, detail FROM audit_log WHERE action = 'finance.nominal-mapping.changed' ORDER BY created_at DESC LIMIT 1`)
+      `SELECT actor_id, detail FROM audit_log WHERE action = 'finance.nominal-mapping.changed' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
     expect(row?.actor_id).toBe(treasurer.id)
     expect(JSON.parse(row!.detail)).toMatchObject({ changes: { nominalCode: { from: '4100', to: '4200' } } })
   })
@@ -206,7 +206,7 @@ describe.skipIf(skip !== null)('exporting is audited (criterion 5)', () => {
     await send('GET', '/api/admin/finance/export?fromDay=2026-09-01&toDay=2026-09-30', undefined, treasurer.cookie)
 
     const row = read<{ actor_id: string, detail: string }>(
-      `SELECT actor_id, detail FROM audit_log WHERE action = 'finance.exported' ORDER BY created_at DESC LIMIT 1`)
+      `SELECT actor_id, detail FROM audit_log WHERE action = 'finance.exported' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
     expect(row?.actor_id).toBe(treasurer.id)
     expect(JSON.parse(row!.detail)).toMatchObject({ fromDay: '2026-09-01', toDay: '2026-09-30' })
   })

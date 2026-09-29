@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { showNightOf } from '#shared/utils/show-night'
@@ -29,7 +29,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'ordinary', generatePassword())
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, officer.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -726,7 +726,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', boxOffice.email)
     await fill(view, 'form input[type="password"]', boxOfficePassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, boxOffice.email)
     return view
   }
 
@@ -741,7 +741,8 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     const { show } = await detail(id)
     const view = await signedIn()
-    await visit(view, `${app.baseURL}/box-office/shows`, '[data-test="shows-table"]')
+    // Searched for by name: the suite's other shows fill more than a page by this point.
+    await visit(view, `${app.baseURL}/box-office/shows?search=${encodeURIComponent(title)}`, '[data-test="shows-table"]')
     await waitFor(view, `document.querySelector('[data-test="shows-table"]').textContent.includes(${JSON.stringify(title)})`)
 
     const rows = await textOf(view, '[data-test="shows-table"]')

@@ -2,6 +2,9 @@
 
 - Status: Accepted
 - Date: 2026-09-04
+- Amended: 28 September 2026 by 0108, under which a retry of "Message tonight's audience" by the
+  same sender takes over its own claims still `PENDING` after 30 seconds; everywhere else a stuck
+  `PENDING` row is still left alone.
 
 ## Context
 

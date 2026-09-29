@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { LAST_NIGHTS_BOARD } from '#shared/utils/backstage'
@@ -26,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'board-foh', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -387,7 +387,7 @@ describe.skipIf(skip !== null)('the current state fits the column it is given (i
       wings.close()
     }
 
-    const desk = await signInView(app.baseURL, manager.email, password, { width: 1280, height: 800 })
+    const desk = await signInView(app, manager.email, password, { width: 1280, height: 800 })
     try {
       await visit(desk, `${app.baseURL}/tonight/board`, '[data-test="board-current"]')
       await waitFor(desk, BOTH_CALLS, 30_000)

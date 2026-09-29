@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { ACCESS_FLAG_LABELS, ACCESS_FLAGS } from '#shared/utils/access-profiles'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
@@ -41,10 +41,10 @@ beforeAll(async () => {
   admin = await adminSession(app)
 
   accessOfficer = await registerMember(app, 'access', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: accessOfficer.id, role: 'ACCESSIBILITY_OFFICER' }, admin.cookie)
+  await grantRole(app, accessOfficer, 'ACCESSIBILITY_OFFICER', admin.cookie)
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
 
   patron = await registerMember(app, 'patron', patronPassword)
 }, BOOT_TIMEOUT_MS)
@@ -462,7 +462,7 @@ async function patronOnAccessPage(): Promise<Bun.WebView> {
   await fill(view, 'form input[type="email"]', patron.email)
   await fill(view, 'form input[type="password"]', patronPassword)
   await click(view, 'form button[type="submit"]')
-  await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+  await finishSignIn(app, view, patron.email)
   await visit(view, `${app.baseURL}/account/access`, '[data-test="access-form"]')
   return view
 }
