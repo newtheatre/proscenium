@@ -360,7 +360,7 @@ describe.skipIf(skip !== null)('a typed charge records nothing until the reader 
 describe.skipIf(skip !== null)('the screen', () => {
   // 0096: Charge shows the figure to key and records nothing; the answer at the reader decides.
   test('Charge asks for the reader\'s answer; Card declined brings the basket back; Reader took it records it', async () => {
-    const { variantId } = await aSellableProduct({ name: named('Screen typed') })
+    const { productId } = await aSellableProduct({ name: named('Screen typed') })
     const { venueId } = programme('charge-screen-typed')
     await openTill(venueId)
 
@@ -371,8 +371,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
 
     const before = ledgerCounts()
@@ -398,7 +398,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   }, 120_000)
 
   test('charging shows what to key into the reader, and starting the next sale clears the basket', async () => {
-    const { variantId } = await aSellableProduct({ name: named('Screen charge') })
+    const { productId } = await aSellableProduct({ name: named('Screen charge') })
     const { venueId } = programme('charge-screen')
     await openTill(venueId)
 
@@ -409,8 +409,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
 
     await click(view, `[aria-label="Charge £2.50"]`)
@@ -426,7 +426,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   }, 120_000)
 
   test('a refused charge shows both figures and leaves the basket to correct', async () => {
-    const { variantId } = await aSellableProduct({ name: named('Screen refusal') })
+    const { productId, variantId } = await aSellableProduct({ name: named('Screen refusal') })
     const { venueId } = programme('charge-screen-refusal')
     await openTill(venueId)
 
@@ -437,8 +437,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)
 
     // A correction lands after the screen last asked, so its remembered total is now wrong.

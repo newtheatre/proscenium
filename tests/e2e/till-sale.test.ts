@@ -86,6 +86,18 @@ const priceVariant = (variantId: string, pricePence: number): Promise<Response> 
 const anItem = async (over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 200, ageRestricted: false, ...over }))
 
+// The till answers allergens from the stock a size pours (issue 1348), so they are recorded there.
+async function aProductPouring(name: string, allergenNotes: string): Promise<{ productId: string }> {
+  const itemId = await anItem({ name: named(`${name} stock`), allergenState: 'RECORDED', allergenNotes })
+  expect((await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 5000, costPence: 5000 })).status).toBe(200)
+  const productId = await aProductIn(await aCategory(), { name: named(name) })
+  const variantId = await addVariant(productId)
+  await priceVariant(variantId, 250)
+  expect((await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })).status).toBe(200)
+  await activate(productId)
+  return { productId }
+}
+
 // A single, priced, on-the-till size: the shape every till test starts from.
 async function aSellableProduct(over: Record<string, unknown> = {}): Promise<{ productId: string, variantId: string, categoryId: string }> {
   const categoryId = await aCategory()
@@ -377,15 +389,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
   test('the allergen affordance shows the state without leaving the sale (F-107 criteria 1, 2, 3)', async () => {
     const { venueId } = programme('sale-allergen')
-    const categoryId = await aCategory()
-    const productId = await aProductIn(categoryId, {
-      name: named('Screen note'),
-      allergenState: 'RECORDED',
-      allergenNote: 'Contains nuts',
-    })
-    const variantId = await addVariant(productId)
-    await priceVariant(variantId, 250)
-    await activate(productId)
+    const { productId } = await aProductPouring('Screen note', 'Contains nuts')
     await openTill(venueId)
 
     const view = await openSignedOutView(app.baseURL)
@@ -412,15 +416,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // since the question usually comes after the round is rung up.
   test('the allergen affordance is also on the basket line', async () => {
     const { venueId } = programme('sale-allergen-line')
-    const categoryId = await aCategory()
-    const productId = await aProductIn(categoryId, {
-      name: named('Basket line note'),
-      allergenState: 'RECORDED',
-      allergenNote: 'Contains gluten',
-    })
-    const variantId = await addVariant(productId)
-    await priceVariant(variantId, 250)
-    await activate(productId)
+    const { productId } = await aProductPouring('Basket line note', 'Contains gluten')
     await openTill(venueId)
 
     const view = await openSignedOutView(app.baseURL)

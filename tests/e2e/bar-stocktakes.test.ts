@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -453,20 +453,23 @@ describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts 
   test('a role holder with no authenticator counts through tonight\'s bar shift', async () => {
     const item = await anItem()
     const opened = await open()
+    // Its own Front of House Manager: the suite's one holds an authenticator, as its other tests need.
+    const noFactor = await registerMember(app, 'fohmanager-no-factor', generatePassword())
+    await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'FOH_MANAGER' }, officer.cookie)
     overrideConfig(app, 'PRIVILEGED_ROLES', ['FOH_MANAGER'])
     try {
-      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], fohManager.cookie)).status).toBe(403)
-      aBarShift(fohManager.id, 'CONFIRMED')
-      const answered = await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], fohManager.cookie)
+      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], noFactor.cookie)).status).toBe(403)
+      aBarShift(noFactor.id, 'CONFIRMED')
+      const answered = await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], noFactor.cookie)
       expect(answered.status).toBe(200)
       const { lines } = await answered.json() as { lines: StocktakeLine[] }
       expect(lines.find(one => one.itemId === item.id)?.expectedQty).toBeNull()
-      expect((await send('GET', '/api/admin/bar/stocktakes/open', undefined, fohManager.cookie)).status).toBe(200)
+      expect((await send('GET', '/api/admin/bar/stocktakes/open', undefined, noFactor.cookie)).status).toBe(200)
       expect(await countedOf(opened.stocktake.id, item.id)).toBe(2)
     }
     finally {
       clearConfigOverride(app, 'PRIVILEGED_ROLES')
-      clearShifts(fohManager.id)
+      clearShifts(noFactor.id)
       await apply(opened.stocktake.id)
     }
   })
@@ -513,27 +516,35 @@ describe.skipIf(skip !== null)('the screen', () => {
     const uncountedAfter = opened.lines.length - 1
 
     const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', barManager.email)
-    await fill(view, 'form input[type="password"]', barPassword)
-    await click(view, 'form button[type="submit"]')
-    await finishSignIn(app, view, barManager.email)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
-    await fillNumber(view, `[data-test="counted-${item.id}"]`, '7')
-    await waitFor(view, `document.querySelector('[data-test="line-state-${item.id}"]')?.textContent.includes('Saved')`)
-    expect(await countedOf(opened.stocktake.id, item.id)).toBe(7)
+      await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await fillNumber(view, `[data-test="counted-${item.id}"]`, '7')
+      const state = `document.querySelector('[data-test="line-state-${item.id}"]')`
+      await waitFor(view, `${state} && !${state}.textContent.includes('Saving')`)
+      expect(await textOf(view, `[data-test="line-state-${item.id}"]`)).toContain('Saved')
+      expect(await countedOf(opened.stocktake.id, item.id)).toBe(7)
 
-    await click(view, '[data-test="open-apply"]')
-    await waitFor(view, `document.querySelector('[data-test="apply-summary"]')`)
-    expect(await textOf(view, '[data-test="apply-counted"]')).toContain('1')
-    expect(await textOf(view, '[data-test="apply-uncounted"]')).toContain(String(uncountedAfter))
-    // 7 counted against 10 expected, at 480 pence each: -3 * 480.
-    expect(await textOf(view, '[data-test="apply-net-variance"]')).toContain('14.40')
+      await click(view, '[data-test="open-apply"]')
+      await waitFor(view, `document.querySelector('[data-test="apply-summary"]')`)
+      expect(await textOf(view, '[data-test="apply-counted"]')).toContain('1')
+      expect(await textOf(view, '[data-test="apply-uncounted"]')).toContain(String(uncountedAfter))
+      // 7 counted against 10 expected, at 480 pence each: -3 * 480.
+      expect(await textOf(view, '[data-test="apply-net-variance"]')).toContain('14.40')
 
-    await click(view, '[data-test="confirm-apply"]')
-    await waitFor(view, `!document.querySelector('[data-test="open-apply"]')`)
-    view.close()
+      await click(view, '[data-test="confirm-apply"]')
+      await waitFor(view, `!document.querySelector('[data-test="open-apply"]')`)
+    }
+    finally {
+      view.close()
+      // One stocktake is open at a time, so one left open here would starve every later test.
+      await apply(opened.stocktake.id)
+    }
 
     const posted = movementsFor(item.id).filter(m => m.kind === 'STOCKTAKE')
     expect(posted).toHaveLength(1)
@@ -556,72 +567,80 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
     void third
 
     const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', barManager.email)
-    await fill(view, 'form input[type="password"]', barPassword)
-    await click(view, 'form button[type="submit"]')
-    await finishSignIn(app, view, barManager.email)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${first.id}"]`)
+      await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${first.id}"]`)
 
-    // A count of 750 or 1750 needs more than thirty pixels: no steppers, filling the cell.
-    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').getAttribute('placeholder') === 'Uncounted'`)
-    await waitFor(view, `document.querySelector('[data-test="count-fields-${first.id}"]').querySelectorAll('button').length === 0`)
-    expect(await textOf(view, `[data-test="uncounted-badge-${first.id}"]`)).toContain('Uncounted')
+      // A count of 750 or 1750 needs more than thirty pixels: no steppers, filling the cell.
+      await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]').getAttribute('placeholder') === 'Uncounted'`)
+      await waitFor(view, `document.querySelector('[data-test="count-fields-${first.id}"]').querySelectorAll('button').length === 0`)
+      expect(await textOf(view, `[data-test="uncounted-badge-${first.id}"]`)).toContain('Uncounted')
 
-    await fillNumber(view, `[data-test="counted-${first.id}"]`, '7')
-    await waitFor(view, `!document.querySelector('[data-test="uncounted-badge-${first.id}"]')`)
+      await fillNumber(view, `[data-test="counted-${first.id}"]`, '7')
+      await waitFor(view, `!document.querySelector('[data-test="uncounted-badge-${first.id}"]')`)
 
-    // The uncounted-only filter drops the line just counted and keeps the one still blank.
-    await click(view, '[data-test="uncounted-only-filter"]')
-    await waitFor(view, `!document.querySelector('[data-test="counted-${first.id}"]')`)
-    expect(await textOf(view, '[data-test="stocktake-lines"]')).toContain(second.name)
-    await click(view, '[data-test="uncounted-only-filter"]')
-    await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]')`)
+      // The uncounted-only filter drops the line just counted and keeps the one still blank.
+      await click(view, '[data-test="uncounted-only-filter"]')
+      await waitFor(view, `!document.querySelector('[data-test="counted-${first.id}"]')`)
+      expect(await textOf(view, '[data-test="stocktake-lines"]')).toContain(second.name)
+      await click(view, '[data-test="uncounted-only-filter"]')
+      await waitFor(view, `document.querySelector('[data-test="counted-${first.id}"]')`)
 
-    // Enter moves on to a different row. Which one depends on the random names' sort order, so
-    // that is read back rather than assumed; only a next row's existence is pinned, by the guard.
-    await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').focus()`)
-    await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
-    await waitFor(view, `document.activeElement?.getAttribute('data-test')?.startsWith('counted-') && document.activeElement.getAttribute('data-test') !== 'counted-${first.id}'`)
+      // Enter moves on to a different row. Which one depends on the random names' sort order, so
+      // that is read back rather than assumed; only a next row's existence is pinned, by the guard.
+      await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').focus()`)
+      await view.evaluate(`document.querySelector('[data-test="counted-${first.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+      await waitFor(view, `document.activeElement?.getAttribute('data-test')?.startsWith('counted-') && document.activeElement.getAttribute('data-test') !== 'counted-${first.id}'`)
 
-    // With the filter on, Enter on a row that is not first must not jump back to whatever the
-    // filter now puts first: typing drops that row out of the filtered list before Enter runs.
-    await click(view, '[data-test="uncounted-only-filter"]')
-    const beforeTyping = await view.evaluate(
-      `[...document.querySelectorAll('[data-test^="counted-"]:not([data-test^="counted-part-"])')].map(el => el.getAttribute('data-test'))`,
-    ) as string[]
-    expect(beforeTyping.length).toBeGreaterThanOrEqual(3)
-    const [, typedInto, expectedNext] = beforeTyping
+      // With the filter on, Enter on a row that is not first must not jump back to whatever the
+      // filter now puts first: typing drops that row out of the filtered list before Enter runs.
+      await click(view, '[data-test="uncounted-only-filter"]')
+      const beforeTyping = await view.evaluate(
+        `[...document.querySelectorAll('[data-test^="counted-"]:not([data-test^="counted-part-"])')].map(el => el.getAttribute('data-test'))`,
+      ) as string[]
+      expect(beforeTyping.length).toBeGreaterThanOrEqual(3)
+      const [, typedInto, expectedNext] = beforeTyping
 
-    await fillNumber(view, `[data-test="${typedInto}"]`, '3')
-    await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').focus()`)
-    await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
-    await waitFor(view, `document.activeElement?.getAttribute('data-test') === '${expectedNext}'`)
-
-    view.close()
-    await apply(opened.stocktake.id)
+      // Typed and entered without leaving the field: a blur would commit it and drop the row first.
+      await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').focus()`)
+      await fill(view, `[data-test="${typedInto}"]`, '3')
+      await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
+      await waitFor(view, `document.activeElement?.getAttribute('data-test') === '${expectedNext}'`)
+    }
+    finally {
+      view.close()
+      await apply(opened.stocktake.id)
+    }
   }, 120_000)
 
   test('filtering to only uncounted once every line is counted reads as done, not empty', async () => {
     const item = await anItem()
     await deliver(item.id, 10)
     const opened = await open()
-    await count(opened.stocktake.id, [{ itemId: item.id, counted: 10 }])
+    // Every line, not just this test's: the stocktake snapshots the whole catalogue.
+    await count(opened.stocktake.id, opened.lines.map(line => ({ itemId: line.itemId, counted: 10 })))
 
     const view = await openSignedOutView(app.baseURL)
-    await visit(view, `${app.baseURL}/sign-in`)
-    await fill(view, 'form input[type="email"]', barManager.email)
-    await fill(view, 'form input[type="password"]', barPassword)
-    await click(view, 'form button[type="submit"]')
-    await finishSignIn(app, view, barManager.email)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="password"]', barPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
-    await click(view, '[data-test="uncounted-only-filter"]')
-    await waitFor(view, `document.querySelector('[data-test="stocktake-lines"]').textContent.includes('Everything is counted')`)
-
-    view.close()
-    await apply(opened.stocktake.id)
+      await visit(view, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
+      await click(view, '[data-test="uncounted-only-filter"]')
+      await waitFor(view, `document.querySelector('[data-test="stocktake-lines"]').textContent.includes('Everything is counted')`)
+    }
+    finally {
+      view.close()
+      await apply(opened.stocktake.id)
+    }
   }, 120_000)
 })
 
@@ -644,8 +663,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('the expected figure stays hidden until the line is counted', async () => {
@@ -664,8 +683,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('a count typed and left is still there on the next visit', async () => {
@@ -684,8 +703,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('lines sit under their stock group, in 48 px rows, over a footer that stays in view', async () => {
@@ -713,8 +732,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   // F-115 criteria 2 and 6: a cleared line is uncounted again, never a counted nought.
@@ -738,8 +757,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('with only uncounted lines shown, a measured line stays until its open container is in', async () => {
@@ -762,8 +781,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   test('a count is whole millilitres, so a fraction of a bottle is not kept as one', async () => {
@@ -779,8 +798,8 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     }
     finally {
       screen.close()
+      await apply(opened.stocktake.id)
     }
-    await apply(opened.stocktake.id)
   }, 120_000)
 
   // F-115 criteria 3 and 4: Apply never confirms over a line the register does not hold.
