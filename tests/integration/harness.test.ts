@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { MAX_BOUND_PARAMETERS, applyMigration, applyMigrations, createTestDatabase, rows } from '#tests/helpers/database'
+import { migrationTag, withMigration } from '#tests/helpers/migrations'
 
 describe('the integration harness', () => {
   test('applies the compiled migrations and gives a usable database', async () => {
@@ -66,5 +67,23 @@ describe('the integration harness', () => {
       expect(() => raw.exec(`UPDATE audit_log SET action = 'test.again' WHERE id = 'a1'`)).toThrow()
     }
     finally { raw.close() }
+  })
+
+  test('a migration is found by its whole tag or by its name alone, and one not in the journal is refused', async () => {
+    expect(await migrationTag('0001_audit_log_append_only')).toBe('0001_audit_log_append_only')
+    expect(await migrationTag('_audit_log_append_only')).toBe('0001_audit_log_append_only')
+    await expect(migrationTag('_no_such_migration')).rejects.toThrow('no migration ending _no_such_migration')
+  })
+
+  test('withMigration seeds the shape before the migration, then applies it as many times as asked', async () => {
+    await withMigration('_audit_log_append_only', (raw) => {
+      expect((raw.query('PRAGMA foreign_keys').get() as { foreign_keys: number }).foreign_keys).toBe(1)
+      raw.exec(`INSERT INTO audit_log (id, action) VALUES ('a1', 'test.action')`)
+      expect(() => raw.exec(`UPDATE audit_log SET action = 'test.other' WHERE id = 'a1'`)).not.toThrow()
+    }, (raw) => {
+      expect(() => raw.exec(`UPDATE audit_log SET action = 'test.again' WHERE id = 'a1'`)).toThrow()
+    })
+    // Its triggers carry no IF NOT EXISTS, so only a second application can fail this way.
+    await expect(withMigration('_audit_log_append_only', () => {}, () => {}, { runs: 2 })).rejects.toThrow('already exists')
   })
 })

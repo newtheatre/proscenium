@@ -15,16 +15,25 @@ export async function migrationTags(): Promise<string[]> {
   return (parsed.entries ?? []).map(entry => entry.tag)
 }
 
-// One migration's own compiled SQL, applied in isolation: what a test seeding the schema as it
-// stood right before a specific rebuild uses to apply that rebuild alone (0052).
-export async function applyMigration(raw: Database, tag: string): Promise<void> {
+export async function migrationSql(tag: string): Promise<string> {
   const file = Bun.file(join(MIGRATIONS_DIR, `${tag}.sql`))
   if (!await file.exists()) throw new Error(`migration ${tag} is in the journal but has no .sql file`)
+  return file.text()
+}
+
+// Synchronous, so a test asserting that a migration throws is never satisfied by a failed read.
+export function execMigration(raw: Database, sql: string): void {
   // Drizzle separates statements with this marker; splitting on `;` breaks triggers.
-  for (const statement of (await file.text()).split('--> statement-breakpoint')) {
+  for (const statement of sql.split('--> statement-breakpoint')) {
     const trimmed = statement.trim()
     if (trimmed) raw.exec(trimmed)
   }
+}
+
+// One migration's own compiled SQL, applied in isolation: what a test seeding the schema as it
+// stood right before a specific rebuild uses to apply that rebuild alone (0052).
+export async function applyMigration(raw: Database, tag: string): Promise<void> {
+  execMigration(raw, await migrationSql(tag))
 }
 
 // Applies the compiled migrations in journal order, which is the order production applies them.

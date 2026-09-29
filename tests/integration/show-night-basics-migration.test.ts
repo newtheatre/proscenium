@@ -1,33 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { Database } from 'bun:sqlite'
-import { migrationTags } from '#migration/schema'
-import { applyMigration, applyMigrations } from '#tests/helpers/database'
+import type { Database } from 'bun:sqlite'
+import { withMigration } from '#tests/helpers/migrations'
 
 // Issue 1318's data migration against a scratch database at the shape it meets: system checks per
 // venue we run (E-114 criterion 3), four board calls (E-121 criterion 2). Found by name, not number.
 
 const NAME = '_the_show_night_basics_are_seeded'
-
-async function tagOf(): Promise<string> {
-  const tag = (await migrationTags()).find(one => one.endsWith(NAME))
-  if (!tag) throw new Error(`no migration ending ${NAME} is in the journal`)
-  return tag
-}
-
-async function withMigrated(seed: (raw: Database) => void, check: (raw: Database) => void, runs = 1): Promise<void> {
-  const raw = new Database(':memory:')
-  raw.exec('PRAGMA foreign_keys = ON;')
-  try {
-    const tag = await tagOf()
-    await applyMigrations(raw, tag)
-    seed(raw)
-    for (let run = 0; run < runs; run++) await applyMigration(raw, tag)
-    check(raw)
-  }
-  finally {
-    raw.close()
-  }
-}
 
 function venue(raw: Database, id: string, options: { external?: boolean, archived?: boolean } = {}): void {
   raw.query('INSERT INTO venues (id, name, is_external, archived) VALUES (?, ?, ?, ?)')
@@ -61,7 +39,7 @@ function audited(raw: Database, action: string): { target: string, detail: strin
 
 describe('every venue we run gains the two system-verified items (E-114 criterion 3)', () => {
   test('a venue we run gets both, post-show and required, made by no person', async () => {
-    await withMigrated(raw => venue(raw, 'house'), (raw) => {
+    await withMigration(NAME, raw => venue(raw, 'house'), (raw) => {
       expect(systemItems(raw, 'house')).toEqual([
         { phase: 'POST', label: 'Unpaid holds released', sort: 0, required: 1, systemCheck: 'NO_SHOW_HOLDS_RELEASED', active: 1, updatedBy: null },
         { phase: 'POST', label: 'Tonight\'s incidents reviewed', sort: 1, required: 1, systemCheck: 'INCIDENTS_REVIEWED', active: 1, updatedBy: null },
@@ -70,7 +48,7 @@ describe('every venue we run gains the two system-verified items (E-114 criterio
   })
 
   test('an external venue and a retired one gain nothing', async () => {
-    await withMigrated((raw) => {
+    await withMigration(NAME, (raw) => {
       venue(raw, 'hired', { external: true })
       venue(raw, 'gone', { archived: true })
     }, (raw) => {
@@ -80,7 +58,7 @@ describe('every venue we run gains the two system-verified items (E-114 criterio
   })
 
   test('a venue already carrying one keeps it and gains only the other, listed after its own items', async () => {
-    await withMigrated((raw) => {
+    await withMigration(NAME, (raw) => {
       venue(raw, 'house')
       item(raw, 'exits', 'house', 'PRE', 4, null)
       item(raw, 'holds', 'house', 'POST', 7, 'NO_SHOW_HOLDS_RELEASED')
@@ -93,7 +71,7 @@ describe('every venue we run gains the two system-verified items (E-114 criterio
   })
 
   test('a check the committee retired stays retired rather than coming back', async () => {
-    await withMigrated((raw) => {
+    await withMigration(NAME, (raw) => {
       venue(raw, 'house')
       item(raw, 'incidents', 'house', 'POST', 0, 'INCIDENTS_REVIEWED', false)
     }, (raw) => {
@@ -103,7 +81,7 @@ describe('every venue we run gains the two system-verified items (E-114 criterio
   })
 
   test('each addition is audited as the checklist screen audits one, naming no person (0011)', async () => {
-    await withMigrated(raw => venue(raw, 'house'), (raw) => {
+    await withMigration(NAME, raw => venue(raw, 'house'), (raw) => {
       const rows = audited(raw, 'checklist-item.created')
       expect(rows.map(row => [row.target, JSON.parse(row.detail), row.actorId])).toEqual([
         ['venue:house', { phase: 'POST', label: 'Tonight\'s incidents reviewed' }, null],
@@ -115,7 +93,7 @@ describe('every venue we run gains the two system-verified items (E-114 criterio
 
 describe('the board gains its four routine calls (E-121 criterion 2)', () => {
   test('an empty preset list gets Standby, Hold, Clear and Ambulance, in that order', async () => {
-    await withMigrated(() => {}, (raw) => {
+    await withMigration(NAME, () => {}, (raw) => {
       expect(presets(raw).map(row => [row.label, row.sort, row.active])).toEqual([
         ['Standby', 0, 1],
         ['Hold', 1, 1],
@@ -129,7 +107,7 @@ describe('the board gains its four routine calls (E-121 criterion 2)', () => {
   })
 
   test('a call the committee already has, whatever its case, is not added twice', async () => {
-    await withMigrated((raw) => {
+    await withMigration(NAME, (raw) => {
       raw.query('INSERT INTO backstage_presets (id, label, body, sort) VALUES (?, ?, ?, ?)').run('mine', 'hold', 'Hold please', 5)
     }, (raw) => {
       expect(presets(raw).map(row => [row.label, row.sort])).toEqual([
@@ -144,10 +122,10 @@ describe('the board gains its four routine calls (E-121 criterion 2)', () => {
 
 describe('running it again adds nothing', () => {
   test('a second run leaves the items, the presets and the audit trail as they were', async () => {
-    await withMigrated(raw => venue(raw, 'house'), (raw) => {
+    await withMigration(NAME, raw => venue(raw, 'house'), (raw) => {
       expect(systemItems(raw, 'house')).toHaveLength(2)
       expect(presets(raw)).toHaveLength(4)
       expect(audited(raw, 'checklist-item.created')).toHaveLength(2)
-    }, 2)
+    }, { runs: 2 })
   })
 })

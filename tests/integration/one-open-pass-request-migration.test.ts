@@ -1,33 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { Database } from 'bun:sqlite'
-import { migrationTags } from '#migration/schema'
-import { applyMigration, applyMigrations } from '#tests/helpers/database'
+import type { Database } from 'bun:sqlite'
+import { withMigration } from '#tests/helpers/migrations'
 
 // Issue 1331's data step against a scratch database at the shape it meets: a member who asked twice
 // asked once, so the oldest open request per member and type stays. Found by name, not number.
 
 const NAME = '_a_member_holds_one_open_pass_request_per_type'
-
-async function tagOf(): Promise<string> {
-  const tag = (await migrationTags()).find(one => one.endsWith(NAME))
-  if (!tag) throw new Error(`no migration ending ${NAME} is in the journal`)
-  return tag
-}
-
-async function withMigrated(seed: (raw: Database) => void, check: (raw: Database) => void): Promise<void> {
-  const raw = new Database(':memory:')
-  raw.exec('PRAGMA foreign_keys = ON;')
-  try {
-    const tag = await tagOf()
-    await applyMigrations(raw, tag)
-    seed(raw)
-    await applyMigration(raw, tag)
-    check(raw)
-  }
-  finally {
-    raw.close()
-  }
-}
 
 function people(raw: Database): void {
   for (const id of ['u-1', 'u-2']) {
@@ -51,7 +29,7 @@ const rows = (raw: Database): { id: string, status: string }[] =>
 
 describe('each member keeps one open request per pass type (issue 1331)', () => {
   test('the oldest open request stays, the newer duplicates go, and everything else is untouched', async () => {
-    await withMigrated((raw) => {
+    await withMigration(NAME, (raw) => {
       people(raw)
       request(raw, 'r-a-oldest', 'u-1', 'pt-1', 100)
       request(raw, 'r-b-newer', 'u-1', 'pt-1', 200)
@@ -72,7 +50,7 @@ describe('each member keeps one open request per pass type (issue 1331)', () => 
   })
 
   test('two open requests made in the same second keep the lower id', async () => {
-    await withMigrated((raw) => {
+    await withMigration(NAME, (raw) => {
       people(raw)
       request(raw, 'r-2', 'u-2', 'pt-2', 700)
       request(raw, 'r-1', 'u-2', 'pt-2', 700)
@@ -82,7 +60,7 @@ describe('each member keeps one open request per pass type (issue 1331)', () => 
   })
 
   test('the index is built: a second open request for a survivor is refused', async () => {
-    await withMigrated((raw) => {
+    await withMigration(NAME, (raw) => {
       people(raw)
       request(raw, 'r-1', 'u-1', 'pt-1', 100)
       request(raw, 'r-2', 'u-1', 'pt-1', 200)

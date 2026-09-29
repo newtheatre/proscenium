@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { Database } from 'bun:sqlite'
-import { join } from 'node:path'
 import { erasureStatements } from '#shared/utils/erasure'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { withMigration } from '#tests/helpers/migrations'
 import type { TestDatabase } from '#tests/helpers/database'
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {
@@ -98,32 +97,14 @@ describe('the student number is on the account (0031)', () => {
 // from its copying INSERT would take the rows with it.
 describe('the rebuild carries every row it found (0010)', () => {
   test('rows written under the old shape survive the migration that changes it', async () => {
-    const raw = new Database(':memory:')
-    raw.exec('PRAGMA foreign_keys = ON;')
-    const dir = 'server/db/migrations/sqlite'
-
-    async function apply(tag: string): Promise<void> {
-      for (const statement of (await Bun.file(join(dir, `${tag}.sql`)).text()).split('--> statement-breakpoint')) {
-        const trimmed = statement.trim()
-        if (trimmed) raw.exec(trimmed)
-      }
-    }
-
-    const journal = await Bun.file(join(dir, 'meta', '_journal.json')).json() as { entries: { tag: string }[] }
-    const tags = journal.entries.map(entry => entry.tag)
-
-    try {
-      // Everything up to and including the migration that adds the new columns.
-      for (const tag of tags.slice(0, tags.findIndex(tag => tag.startsWith('0010_')))) await apply(tag)
-
+    // Seeded in the shape just before the rebuild: the new columns already added, `year` not yet gone.
+    await withMigration('0010_charming_ego', (raw) => {
       raw.query('INSERT INTO users (id, email, name) VALUES (?, ?, ?)').run('u-1', 'member@example.invalid', 'A Member (test)')
       raw.query(`
         INSERT INTO memberships (id, user_id, year, starts_on, expires_on, source, evidence, confirmed_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `).run('m-1', 'u-1', 2026, '2026-09-14', '2027-09-13', 'MANUAL', 'SU-1234', 1780000000)
-
-      await apply(tags.find(tag => tag.startsWith('0010_'))!)
-
+    }, (raw) => {
       const held = raw.query('SELECT * FROM memberships WHERE id = ?').get('m-1') as Record<string, unknown>
       expect(held).toMatchObject({
         id: 'm-1',
@@ -136,9 +117,6 @@ describe('the rebuild carries every row it found (0010)', () => {
       })
       // The column the rebuild exists to remove is the only thing that went.
       expect(Object.keys(held)).not.toContain('year')
-    }
-    finally {
-      raw.close()
-    }
+    })
   })
 })
