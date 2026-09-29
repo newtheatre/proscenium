@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -74,7 +74,7 @@ async function signInAsAdmin(view: Bun.WebView): Promise<void> {
 
 describe.skipIf(skip !== null)('console list tables fit a phone width (922)', () => {
   test('box office shows has no horizontal overflow at 390px', async () => {
-    const view = await openView(PHONE)
+    const view = await openSignedOutView(app.baseURL, PHONE)
     try {
       await signInAsBoxOffice(view)
       await view.navigate(`${app.baseURL}/box-office/shows`)
@@ -87,7 +87,7 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
   }, CASE_TIMEOUT_MS)
 
   test('admin/audit and admin/backups fit 390px and show a card list, not the table', async () => {
-    const view = await openView(PHONE)
+    const view = await openSignedOutView(app.baseURL, PHONE)
     try {
       await signInAsAdmin(view)
 
@@ -117,7 +117,7 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
   }, CASE_TIMEOUT_MS)
 
   test('box office shows uses the full table at 1280px', async () => {
-    const view = await openView({ width: 1280, height: 800 })
+    const view = await openSignedOutView(app.baseURL, { width: 1280, height: 800 })
     try {
       await signInAsBoxOffice(view)
       await view.navigate(`${app.baseURL}/box-office/shows`)

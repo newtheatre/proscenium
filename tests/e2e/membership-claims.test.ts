@@ -315,7 +315,7 @@ describe.skipIf(skip !== null)('the screens (A-130 criterion 4)', () => {
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
       await visit(view, `${app.baseURL}/account/membership`, '[data-test="membership-state"]')
-      expect(await textOf(view, '[data-test="membership-state"]')).toContain('No membership')
+      expect(await textOf(view, '[data-test="membership-state"]')).toContain('You do not have a membership yet')
       expect(await textOf(view, '[data-test="claim-form"]')).toContain('The date on your SU receipt')
       expect(await readDate(view, '[data-test="claim-starts"]')).not.toMatch(/\d/)
 
@@ -416,7 +416,7 @@ describe.skipIf(skip !== null)('a full page load carries the session (issue 1005
       // A fresh navigation, not a client-side one: this is the request a bare $fetch inside
       // useAsyncData never carried a cookie on.
       await visit(view, `${app.baseURL}/account/membership`, '[data-test="membership-state"]')
-      expect(await textOf(view, '[data-test="membership-state"]')).not.toContain('No membership')
+      expect(await textOf(view, '[data-test="membership-state"]')).not.toContain('You do not have a membership yet')
       expect(await textOf(view, '[data-test="membership-state"]')).toContain('Current')
       expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="load-failed"]')`)).toBe(false)
     }

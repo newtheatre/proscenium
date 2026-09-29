@@ -356,6 +356,8 @@ describe.skipIf(skip !== null)('the directory screen', () => {
       await fill(view, '[data-test="invite-name"]', 'Added By Hand (test)')
       await fill(view, '[data-test="invite-email"]', invitee)
       await click(view, '[data-test="invite-submit"]')
+      // The form closes once the account is made; the shadow link can already be there from others.
+      await waitFor(view, 'document.querySelector(\'[data-test="invite-name"]\') === null')
       await waitFor(view, 'document.querySelector(\'[data-test="show-shadow"]\')')
       expect(read('SELECT id FROM users WHERE email = ?', invitee)).toBeDefined()
 

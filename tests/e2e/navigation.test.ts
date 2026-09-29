@@ -43,24 +43,28 @@ afterAll(async () => {
 }, 30_000)
 
 describe.skipIf(skip !== null)('the console sidebar shows what the caller holds (0040)', () => {
+  // A closed group renders no children (issue 896), and a group opens when the route lands in it,
+  // so each group's links are read from a page inside it.
   test('an administrator sees every group', async () => {
-    const { status, html } = await shell(officer.cookie)
-    expect(status).toBe(200)
-    for (const href of [...BOX_OFFICE, ...SPACES, ...PEOPLE, ...SYSTEM]) {
-      expect(html).toContain(`href="${href}"`)
+    for (const group of [BOX_OFFICE, SPACES, PEOPLE, SYSTEM]) {
+      const { status, html } = await shell(officer.cookie, group[0]!)
+      expect(status).toBe(200)
+      for (const href of group) expect(html).toContain(`href="${href}"`)
     }
   })
 
   // The one role whose sidebar is genuinely partial: it reads rooms but cannot decide a request,
   // reads accounts and the register but not the roll, and holds nothing in System.
   test('a training manager sees a partial sidebar', async () => {
-    const { status, html } = await shell(trainer.cookie)
-    expect(status).toBe(200)
-    for (const href of ['/rooms/manage', '/rooms/manage/closures', '/people/accounts', '/people/members']) {
-      expect(html).toContain(`href="${href}"`)
-    }
-    for (const href of ['/rooms/manage/requests', '/people/fellows', ...BOX_OFFICE, ...SYSTEM]) {
-      expect(html).not.toContain(`href="${href}"`)
+    const rooms = await shell(trainer.cookie, '/rooms/manage')
+    const people = await shell(trainer.cookie, '/people/accounts')
+    expect([rooms.status, people.status]).toEqual([200, 200])
+    for (const href of ['/rooms/manage', '/rooms/manage/closures']) expect(rooms.html).toContain(`href="${href}"`)
+    for (const href of ['/people/accounts', '/people/members']) expect(people.html).toContain(`href="${href}"`)
+    for (const html of [rooms.html, people.html]) {
+      for (const href of ['/rooms/manage/requests', '/people/fellows', ...BOX_OFFICE, ...SYSTEM]) {
+        expect(html).not.toContain(`href="${href}"`)
+      }
     }
   })
 
