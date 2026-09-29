@@ -6,8 +6,9 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
-import { click, fill, fillNumber, openSignedOutView, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
-import type { AppUnderTest } from '#tests/helpers/webview'
+import { NIGHT_TARGETS, click, fill, fillNumber, openSignedOutView, shortOfFloor, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX } from '#shared/utils/night-shell'
+import type { AppUnderTest, NightTarget } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
@@ -872,6 +873,50 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
       expect(line.figures.left).toBeGreaterThanOrEqual(line.fields.right)
       expect(line.fields.top).toBeLessThan(line.name.bottom)
       expect(line.figures.top).toBeLessThan(line.fields.bottom)
+    }
+    finally {
+      screen?.close()
+      await apply(opened.stocktake.id)
+    }
+  }, 120_000)
+
+  // The one show-night screen with a drawn choice. Its track keeps a switch's proportions, the floor
+  // check passes it by its row, and a tap the label's overlay alone can answer turns the filter on.
+  test('the Only uncounted switch on tonight\'s screen is drawn as a switch, and its whole row is the target', async () => {
+    const item = await anItem()
+    const opened = await open()
+    let screen: Bun.WebView | undefined
+    try {
+      screen = await signedIn(NIGHT_VIEWPORT_PX, 740)
+      await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${item.id}"]`)
+      const track = await screen.evaluate<{ width: number, height: number }>(`(() => {
+        const rect = document.querySelector('[data-test="uncounted-only-filter"]').getBoundingClientRect()
+        return { width: rect.width, height: rect.height }
+      })()`)
+      expect(track.height).toBeLessThan(NIGHT_TAP_TARGET_PX)
+      expect(track.width).toBeGreaterThanOrEqual(track.height * 1.5)
+
+      const controls = JSON.parse(await screen.evaluate<string>(NIGHT_TARGETS)) as NightTarget[]
+      expect(controls.map(one => one.what)).toContain('uncounted-only-filter')
+      expect(shortOfFloor(controls, NIGHT_TAP_TARGET_PX)).toEqual([])
+
+      // In the row, clear of both the label's box and the track's: above or below the track, or in
+      // the gap before the label. Without the overlay a tap there is lost.
+      const spot = await screen.evaluate<{ x: number, y: number } | null>(`(() => {
+        const control = document.querySelector('[data-test="uncounted-only-filter"]')
+        const row = control.parentElement.parentElement.getBoundingClientRect()
+        const label = control.labels[0].getBoundingClientRect()
+        const track = control.getBoundingClientRect()
+        const inside = (box, x, y) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
+        const middle = (track.left + track.right) / 2
+        const found = [[middle, (row.top + track.top) / 2], [middle, (track.bottom + row.bottom) / 2], [(track.right + label.left) / 2, (row.top + row.bottom) / 2]]
+          .find(([x, y]) => inside(row, x, y) && !inside(label, x, y) && !inside(track, x, y))
+        return found ? { x: found[0], y: found[1] } : null
+      })()`)
+      expect(spot).not.toBeNull()
+      expect(await screen.evaluate<string>(`document.querySelector('[data-test="uncounted-only-filter"]').getAttribute('aria-checked')`)).toBe('false')
+      await screen.evaluate(`document.elementFromPoint(${spot!.x}, ${spot!.y}).click()`)
+      await waitFor(screen, `document.querySelector('[data-test="uncounted-only-filter"]').getAttribute('aria-checked') === 'true'`)
     }
     finally {
       screen?.close()

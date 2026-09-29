@@ -31,6 +31,10 @@ Faithful to the document, deliberately:
   expiry, COST and PROD sign-off leads) are in each module's `Notes`, which only leads and
   administrators see.
 
+One note departs from the draft. `ADMN-103` said it was the training behind two proscenium roles,
+`FRONT_OF_HOUSE` and `BOX_OFFICE`, both since retired (0090, A-134). Its note now says what the
+module gates: claiming or being assigned a door shift (E-103), which opens the door on the night.
+
 The nine department codes and names live in `scripts/lib/catalogue.ts` rather than in the CSV: they
 are the `DEPT` half of the `DEPT-LCT` id scheme, and the spreadsheet names them by code alone.
 
