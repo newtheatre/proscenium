@@ -9,7 +9,7 @@ import type { AppUnderTest } from '#tests/helpers/webview'
 import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 import { Database } from 'bun:sqlite'
-import { currentShowNight } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 
 // F-118: reconciliation to the expected SumUp Z figure, at preview and at close, and the same
 // figure the night report's bar summary carries (criterion 4).
@@ -219,6 +219,23 @@ describe.skipIf(skip !== null)('the close compares the reader with the whole nig
   })
 })
 
+// Card sales on every till the session's night, as the ledger holds them (F-118 criterion 1).
+function nightCardSales(sessionId: string): number {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    const { night } = database.query('SELECT night FROM till_sessions WHERE id = ?').get(sessionId) as { night: string }
+    const { from, to } = showNightBounds(night)
+    return (database.query(`
+      SELECT coalesce(sum(l.amount_pence), 0) AS pence
+      FROM ledger_lines l JOIN ledger_entries e ON e.id = l.entry_id
+      WHERE e.source = 'TILL' AND e.tender = 'CARD' AND l.kind = 'BAR_ITEM' AND e.happened_at >= ? AND e.happened_at < ?
+    `).get(Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)) as { pence: number }).pence
+  }
+  finally {
+    database.close()
+  }
+}
+
 describe.skipIf(skip !== null)('the night report carries the same figure, never a retyped one (criterion 4)', () => {
   // The till-close figure is the night's, quoted on the report as the night's (#1572).
   test('the report\'s night card figure equals the reconciliation\'s own card sales', async () => {
@@ -233,7 +250,11 @@ describe.skipIf(skip !== null)('the night report carries the same figure, never 
     const reported = await send('GET', `/api/tonight/report?performanceId=${performanceId}`, undefined, officer.cookie)
     expect(reported.status).toBe(200)
     const report = await reported.json() as { bar: { revenuePence: number, itemsSold: number, nightCardSalesPence: number } }
-    expect(report.bar.nightCardSalesPence).toBe(reconciliation.bar.cardSalesPence)
+    // The preview is this till's; the report quotes the whole night's, every bar tonight, as the
+    // close's own Z does (0097). So it is this till's sale and every other bar's card sales too.
+    expect(reconciliation.bar.cardSalesPence).toBe(725)
+    expect(report.bar.nightCardSalesPence).toBe(nightCardSales(opened.session.id))
+    expect(report.bar.nightCardSalesPence).toBeGreaterThanOrEqual(725)
     expect(report.bar.itemsSold).toBe(1)
   })
 })

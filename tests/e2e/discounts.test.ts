@@ -83,7 +83,7 @@ const aCategory = async (): Promise<string> => {
   return (await answered.json() as { id: string }).id
 }
 
-async function aSellableProduct(): Promise<{ variantId: string }> {
+async function aSellableProduct(): Promise<{ productId: string, variantId: string }> {
   const categoryId = await aCategory()
   const productAnswered = await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId })
   const { id: productId } = await productAnswered.json() as { id: string }
@@ -91,7 +91,7 @@ async function aSellableProduct(): Promise<{ variantId: string }> {
   const { id: variantId } = await variantAnswered.json() as { id: string }
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 500, effectiveFrom: today() })
   await putOnTheTill(send, productId)
-  return { variantId }
+  return { productId, variantId }
 }
 
 const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, discountId: string | null, as = barManager.cookie): Promise<Response> =>
@@ -297,7 +297,7 @@ describe.skipIf(skip !== null)('the expected-total cross-check includes the disc
 describe.skipIf(skip !== null)('the screen', () => {
   test('picking a discount reduces the live total, and the confirmation names it', async () => {
     const { venueId } = programme(`discount-screen-${crypto.randomUUID().slice(0, 6)}`)
-    const { variantId } = await aSellableProduct()
+    const { productId } = await aSellableProduct()
     const { id: discountId, name } = await aDiscount(20)
     await openTill(venueId)
 
@@ -308,8 +308,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, 'form button[type="submit"]')
     await finishSignIn(app, view, barManager.email)
 
-    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
-    await click(view, `[data-test="variant-${variantId}"]`)
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="product-${productId}"]`)
+    await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="discount-${discountId}"]')`)
     await click(view, `[data-test="discount-${discountId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£4.00')`)
@@ -359,8 +359,10 @@ describe.skipIf(skip !== null)('the console screen (#1051)', () => {
     await waitFor(view, `!document.querySelector('[data-test="discount-form"]')`)
     expect(await textOf(view, `[data-test="edit-${id}"]`)).toBeTruthy()
 
-    // Retire, then put back: never deleted, and the table names the state either way.
+    // Retire, which confirms first (K-123 criterion 7), then put back: never deleted, and the
+    // table names the state either way.
     await click(view, `[data-test="status-${id}"]`)
+    await click(view, '[data-test="confirm-retire-discount-verb"]')
     await waitFor(view, `document.querySelector('[data-test="status-${id}"]') && document.querySelector('[data-test="status-${id}"]').textContent.trim() === 'Bring back'`)
     expect(await textOf(view, '[data-test="bar-discounts-table"]')).toContain('Retired')
 
@@ -390,19 +392,20 @@ describe.skipIf(skip !== null)('the console screen (#1051)', () => {
     view.close()
   }, 120_000)
 
-  // Retire and Bring back act straight from the table, with no modal open to carry the form's own
-  // alert: a code-review pass on this PR found the refusal had nowhere to show (issue #1051).
+  // Bring back acts straight from the table, with no modal open to carry a refusal (issue #1051);
+  // Retire confirms first (K-123 criterion 7), so its refusal is the confirmation's own.
   test('a status-change refusal shows on the page, not only inside a modal', async () => {
     const { id, name } = await aDiscount(10)
+    expect((await send('POST', `/api/admin/bar/discounts/${id}/status`, { status: 'RETIRED' })).status).toBe(200)
     const view = await signedInView()
     await visit(view, `${app.baseURL}/bar/discounts`, `[data-test="status-${id}"]`)
 
-    // Somebody else retires it first, racing the click about to happen from the table.
-    expect((await send('POST', `/api/admin/bar/discounts/${id}/status`, { status: 'RETIRED' })).status).toBe(200)
+    // Somebody else brings it back first, racing the click about to happen from the table.
+    expect((await send('POST', `/api/admin/bar/discounts/${id}/status`, { status: 'ACTIVE' })).status).toBe(200)
 
     await click(view, `[data-test="status-${id}"]`)
     await waitFor(view, `document.querySelector('[data-test="failure"]')`)
-    expect(await textOf(view, '[data-test="failure"]')).toContain(`${name} is already retired`)
+    expect(await textOf(view, '[data-test="failure"]')).toContain(`${name} is already active`)
     view.close()
   }, 120_000)
 })
