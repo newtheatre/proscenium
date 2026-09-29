@@ -44,7 +44,8 @@ beforeAll(async () => {
     .then(response => response.headers.get('set-cookie') ?? ''))!.split(';')[0]!
   officerSecret = (await (await send('POST', '/api/account/mfa/enrol', {}, officerFirst)).json() as { secret: string }).secret
   await send('POST', '/api/account/mfa/confirm', { code: await codeForStep(officerSecret, stepFor(new Date())) }, officerFirst)
-  Bun.spawnSync(['bun', 'scripts/grant-admin.ts', officer.email, app.databaseFile])
+  // An additional one: the admin session above is already the database's administrator.
+  expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', officer.email, app.databaseFile, '--additional']).exitCode).toBe(0)
 }, BOOT_TIMEOUT_MS)
 
 // One browser session per case: the challenge burns its step, so a fresh code every time.
