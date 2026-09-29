@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -41,7 +41,7 @@ beforeAll(async () => {
   foh = await registerMember(app, 'openings-foh', fohPassword)
   member = await registerMember(app, 'openings-member', generatePassword())
   other = await registerMember(app, 'openings-other', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -417,7 +417,7 @@ describe.skipIf(skip !== null)('a queued claim is confirmed or declined (E-130 c
       await fill(view, 'form input[type="email"]', foh.email)
       await fill(view, 'form input[type="password"]', fohPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, foh.email)
 
       await visit(view, `${app.baseURL}/rota/manage/openings`, `[data-test="confirm-${first.slotId}"]`)
       await click(view, `[data-test="confirm-${first.slotId}"]`)

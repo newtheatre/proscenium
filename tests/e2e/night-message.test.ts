@@ -97,7 +97,7 @@ describe.skipIf(skip !== null)('tonight\'s duty manager messages tonight\'s audi
 
     const sent = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS'), dm.cookie)
     expect(sent.status).toBe(200)
-    expect(await sent.json()).toEqual({ count: 2 })
+    expect(await sent.json()).toEqual({ count: 2, alreadyOut: 0, resent: 0, stillSending: 0 })
 
     const logged = read<{ user_id: string }>(`SELECT DISTINCT user_id FROM notification_log WHERE type = 'admin.ticket-holders.safety-notice' AND user_id IN (?, ?)`, holderOne.id, holderTwo.id)
     expect(logged.map(row => row.user_id).sort()).toEqual([holderOne.id, holderTwo.id].sort())
@@ -116,16 +116,16 @@ describe.skipIf(skip !== null)('tonight\'s duty manager messages tonight\'s audi
     const draftKey = crypto.randomUUID()
 
     const first = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS', draftKey), dm.cookie)
-    expect(await first.json()).toEqual({ count: 1 })
+    expect(await first.json()).toEqual({ count: 1, alreadyOut: 0, resent: 0, stillSending: 0 })
     const again = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS', draftKey), dm.cookie)
-    expect(await again.json()).toEqual({ count: 0 })
+    expect(await again.json()).toEqual({ count: 0, alreadyOut: 1, resent: 0, stillSending: 0 })
 
     expect(read(`SELECT id FROM notification_log WHERE type = 'admin.ticket-holders.safety-notice' AND user_id = ?`, holder.id)).toHaveLength(1)
     const audits = read<{ detail: string }>(`SELECT detail FROM audit_log WHERE action = 'comms.announcement.sent' AND actor_id = ? ORDER BY created_at`, dm.id)
     expect(audits.map(row => (JSON.parse(row.detail) as { recipientCount: number }).recipientCount)).toEqual([1, 0])
 
     const edited = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS'), dm.cookie)
-    expect(await edited.json()).toEqual({ count: 1 })
+    expect(await edited.json()).toEqual({ count: 1, alreadyOut: 0, resent: 0, stillSending: 0 })
   })
 
   test('the rota is that performance\'s team, told at once', async () => {
@@ -137,7 +137,7 @@ describe.skipIf(skip !== null)('tonight\'s duty manager messages tonight\'s audi
 
     const sent = await send('POST', '/api/tonight/message', message(performanceId, 'ROTA'), dm.cookie)
     expect(sent.status).toBe(200)
-    expect(await sent.json()).toEqual({ count: 2 })
+    expect(await sent.json()).toEqual({ count: 2, alreadyOut: 0, resent: 0, stillSending: 0 })
     expect(read(`SELECT id FROM notification_log WHERE type = 'admin.safety-notice' AND user_id = ?`, door.id).length).toBeGreaterThan(0)
   })
 
@@ -163,6 +163,37 @@ describe.skipIf(skip !== null)('tonight\'s duty manager messages tonight\'s audi
     expect(JSON.parse(audit!.detail)).toMatchObject({ audienceKind: 'PERFORMANCE_ROTA', performanceId, via: 'OFFICER' })
     const bypasses = read<{ target: string }>(`SELECT target FROM audit_log WHERE action = 'night.officer-bypass' AND actor_id = ?`, admin.id)
     expect(bypasses.some(row => row.target.endsWith(':DUTY_MANAGER'))).toBe(true)
+  })
+})
+
+// 0108: a copy whose send was cut off between its claim and its send is resent by a retry of the
+// same draft once its claim is 30 seconds old, and left alone before that.
+describe.skipIf(skip !== null)('a retry reaches anyone an interrupted send skipped (0108)', () => {
+  function stuckClaim(draftKey: string, senderId: string, userId: string, ageSeconds: number): void {
+    write(`INSERT INTO notification_log (id, user_id, type, channel, status, claim, created_at) VALUES (?, ?, 'admin.ticket-holders.safety-notice', 'EMAIL', 'PENDING', ?, unixepoch() - ?)`,
+      crypto.randomUUID().replaceAll('-', ''), userId, `night-message:${draftKey}:${senderId}:${userId}`, ageSeconds)
+  }
+
+  test('a claim stuck for over 30 seconds is resent, and one younger is reported as still sending', async () => {
+    const dm = await registerMember(app, 'message-stuck-dm', generatePassword())
+    const stuck = await registerMember(app, 'message-stuck-holder', generatePassword())
+    const young = await registerMember(app, 'message-young-holder', generatePassword())
+    const performanceId = house('message-stuck')
+    shift(performanceId, 'DUTY_MANAGER', dm.id)
+    holding(performanceId, stuck.id, 'MSGS01')
+    holding(performanceId, young.id, 'MSGS02')
+    const draftKey = crypto.randomUUID()
+    stuckClaim(draftKey, dm.id, stuck.id, 120)
+    stuckClaim(draftKey, dm.id, young.id, 2)
+
+    const retried = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS', draftKey), dm.cookie)
+    expect(retried.status).toBe(200)
+    expect(await retried.json()).toEqual({ count: 1, alreadyOut: 0, resent: 1, stillSending: 1 })
+
+    const rowsFor = (userId: string): { status: string }[] =>
+      read<{ status: string }>(`SELECT status FROM notification_log WHERE type = 'admin.ticket-holders.safety-notice' AND user_id = ? ORDER BY created_at, rowid`, userId)
+    expect(rowsFor(stuck.id).map(row => row.status)).toEqual(['FAILED_FINAL', 'SENT'])
+    expect(rowsFor(young.id).map(row => row.status)).toEqual(['PENDING'])
   })
 })
 

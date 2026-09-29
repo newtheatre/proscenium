@@ -349,7 +349,7 @@ export const PUBLIC_NAV: NavEntry[] = [
   { label: 'About us', icon: 'i-lucide-info', to: '/about', ability: anybody, group: 'About' },
   { label: 'Our history', icon: 'i-lucide-history', to: '/history', ability: anybody, group: 'About' },
   { label: 'Get involved', icon: 'i-lucide-heart-handshake', to: '/get-involved', ability: anybody, group: 'Join in' },
-  { label: 'Technical specification', icon: 'i-lucide-wrench', to: '/technical-specification', ability: anybody, group: 'About' },
+  { label: 'Technical information', icon: 'i-lucide-wrench', to: '/technical-specification', ability: anybody, group: 'About' },
 
   // Module G: training
 
@@ -367,7 +367,7 @@ export const PUBLIC_NAV: NavEntry[] = [
 
 // The few destinations a visitor arrives looking for, in the mockup's order; the rest of
 // PUBLIC_NAV stays in the footer. Derived, so a header link cannot disagree with the footer (0040).
-const HEADER_ORDER = ['/whats-on', '/get-involved', '/about']
+const HEADER_ORDER = ['/whats-on', '/get-involved', '/about', '/history']
 
 export const HEADER_NAV: NavEntry[] = HEADER_ORDER.flatMap(to => PUBLIC_NAV.filter(entry => entry.to === to))
 

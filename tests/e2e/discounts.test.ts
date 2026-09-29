@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillNumber, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-117: a discount is a capped percentage, editable in place, snapshotted onto every ledger
@@ -26,7 +27,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'discount-bar', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
   member = await registerMember(app, 'discount-ordinary', generatePassword())
   await setCap(20)
 }, BOOT_TIMEOUT_MS)
@@ -89,7 +90,7 @@ async function aSellableProduct(): Promise<{ variantId: string }> {
   const variantAnswered = await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' })
   const { id: variantId } = await variantAnswered.json() as { id: string }
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 500, effectiveFrom: today() })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return { variantId }
 }
 
@@ -305,7 +306,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, `[data-test="variant-${variantId}"]`)
     await click(view, `[data-test="variant-${variantId}"]`)
@@ -330,7 +331,7 @@ describe.skipIf(skip !== null)('the console screen (#1051)', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
     return view
   }
 

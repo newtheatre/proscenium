@@ -185,6 +185,25 @@ Three things a token can be, and all three are visible on the page rather than s
 A setting that holds personal data (`isSensitive`) can never appear on a policy page: CI refuses
 the token and the endpoint refuses the key, so neither a preview nor a deploy can publish it.
 
+### Committee tokens (0107)
+
+The committee is `content/committee.yml`, a Nuxt Content data collection (`committee` in
+`content.config.ts`): an `updatedOn` date and one entry per constitutional role, each with a `key`,
+a `title`, an optional role `email` and a list of `holders`. Any content page quotes it as
+`{{COMMITTEE_<KEY>_NAME}}` or `{{COMMITTEE_<KEY>_EMAIL}}`, and the about page draws the whole table
+with `::committee-table` (`app/components/content/CommitteeTable.vue`).
+
+| Piece | Where | Does |
+| --- | --- | --- |
+| The rules | `shared/utils/committee.ts` | The file's schema; a name as the holders joined with "and", or `[name goes here]` when there are none; an address as a mail link; `mayBeOutOfDate()`. Pure, shared by the schema, the check and the page. |
+| The build check | `scripts/check-content-tokens.ts` | Refuses a `COMMITTEE_` token whose role the file lacks, or whose field is neither `NAME` nor `EMAIL`. |
+| The rendering | `app/pages/[...slug].vue` | Reads the file for a page that quotes it, never through the settings endpoint, and merges its values with the policy values before resolving. |
+
+A role with no `email` is an unset address, so the paragraph quoting it goes whole (J-110
+criterion 6). From 1 September, a page quoting the file carries "This content may be out of date"
+when `updatedOn` is before that year's 1 August: the committee year turns on 31 July (0009) and
+August is the handover's grace month. Moving `updatedOn` is part of every edit to the file.
+
 ## The identity screens
 
 `/sign-in` and `/register` are the two entry points, and each carries its own steps rather than
@@ -860,9 +879,15 @@ accounts already due anonymisation, read with no side effect at all
 (`dueForAnonymisation()`, `server/utils/retention-candidates.ts`), and `PRIVILEGED_ROLES` counts
 every role holder signing in with a password and no confirmed authenticator
 (`roleHoldersWithoutFactorQuery()`, the directory's `privilegedWithoutFactor()` over every role),
-since a preview is read before the new list is known. `PRIVILEGED_ROLES` is also add-only above
-`PRIVILEGED_FLOOR`, 0009's money, personal data and safety roles: `configProblem()` refuses a list
-leaving one off and names it, so no confirmation gets below the floor (A-112 criterion 4). `GET
+ignoring the proposed list: the count is who any addition could reach. `AUTO_CLOSE_FROM_NIGHT` is
+the one preview that reads the proposed value: `autoCloseFromPreview()`
+(`server/utils/night-auto-close.ts`) counts what the next `nights:close` sweep would freeze from
+that night, through the sweep's own `unclosedCandidatesQuery()` and `pastTheirClose()` cut, so the
+two cannot disagree. The preview route takes the value as `?value=` (JSON) or `?revert=true` for
+the prior value, and a save or revert checks the echo against the value it is about to write.
+`PRIVILEGED_ROLES` is also add-only above `PRIVILEGED_FLOOR`, 0009's money, personal data and
+safety roles: `configProblem()` refuses a list leaving one off and names it, so no confirmation
+gets below the floor (A-112 criterion 4). `GET
 /api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
 `confirmation` field matching the key's own name or the previewed count
 (`confirmationMatches()`, `shared/utils/blast-radius.ts`, pure and shared with the client), 400ing
@@ -1485,8 +1510,14 @@ audience is one of that performance's two (`server/utils/night-message.ts`): its
 through `performanceTicketHoldersQuery()`, the announce composer's own resolver (0089), or its rota,
 `performanceRotaQuery()`, the claimed and confirmed slots on it. Every message goes at once as the
 transactional type (`nightMessageType()`), one `notify()` a recipient, each copy claimed first under
-`nightMessageClaim()`, the page's draft key and the person (0048), so a second press of the same
-draft reaches only those not yet reached. The send is `comms.announcement.sent` with the
+`nightMessageClaim()`, the page's draft key, the sender and the person (0048), so a second press of
+the same draft reaches only those not yet reached. A press first takes over the sender's own claims
+on that draft still `PENDING` 30 seconds after they were made, a send cut off between its claim and
+its `notify()`: `takeOverInterruptedQuery()` is one conditional `UPDATE` that moves each to
+`FAILED_FINAL` and renames its claim off the key, so the loop claims and sends that person afresh
+(0108). `created_at` is only read for the age: nothing updates it, and the takeover leaves it
+alone for the H-105 backoff and the retention prune. The answer is `{ count, alreadyOut, resent,
+stillSending }` (`draftClaimsQuery()`), and `saysNightMessageSent()` words it. The send is `comms.announcement.sent` with the
 performance, the audience, the count newly reached and `via`, never the words (0011), written in a
 `finally` so a press that fails part-way still records the copies it sent. The console composer at
 `/comms/announce` now offers **When it goes** in place of its safety tick: `sendTimingOptions()`

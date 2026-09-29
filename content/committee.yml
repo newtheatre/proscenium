@@ -1,0 +1,100 @@
+# The committee as section 4 of the constitution lists it, in its order (0107). Pages quote a
+# role as {{COMMITTEE_<KEY>_NAME}} or {{COMMITTEE_<KEY>_EMAIL}}; `bun run check` refuses a key
+# this file does not have. Holders stay empty until the committee supplies them, and a role with
+# no address of its own has no `email`. Move `updatedOn` to the day you edit, or from
+# 1 September the pages quoting this file say it may be out of date.
+updatedOn: '2026-09-28'
+roles:
+  - key: PRESIDENT
+    title: President
+    email: president@newtheatre.org.uk
+    holders:
+      - Abbie Foster
+  - key: SECRETARY
+    title: Secretary and Welfare Officer
+    email: secretary@newtheatre.org.uk
+    holders:
+      - Quinn Friedrich
+  - key: TREASURER
+    title: Treasurer
+    email: treasurer@newtheatre.org.uk
+    holders:
+      - Hazel Giles
+  - key: FOH_MANAGER
+    title: Front of House Manager
+    email: boxoffice@newtheatre.org.uk
+    holders:
+      - Harrison Martin
+  - key: IN_HOUSE_COORDINATOR
+    title: In-House Coordinator
+    email: inhouse@newtheatre.org.uk
+    holders:
+      - Sebastien Ramdeal
+  - key: STUDIO_COORDINATOR
+    title: Studio Coordinator
+    email: studio@newtheatre.org.uk
+    holders:
+      - Jess Yerby
+  - key: CREATIVES_COORDINATOR
+    title: Creatives Coordinator
+    email: creatives@newtheatre.org.uk
+    holders:
+      - Ronan Hensey
+  - key: EXTERNAL_RELATIONS_MANAGER
+    title: External Relations Manager
+    email: external@newtheatre.org.uk
+    holders:
+      - Maeve McAllister
+  - key: MARKETING_COORDINATOR
+    title: Marketing Coordinator
+    email: marketing@newtheatre.org.uk
+    holders:
+      - Gracie Cannon
+      - Izzy Barros
+  - key: SOCIAL_COORDINATOR
+    title: Social and Fundraising Coordinator
+    email: social@newtheatre.org.uk
+    holders:
+      - Will Laughey
+  - key: THEATRE_MANAGER
+    title: Theatre Manager
+    email: theatremanager@newtheatre.org.uk
+    holders:
+      - Lily Hagen
+  - key: COMPANY_STAGE_MANAGER
+    title: Company Stage Manager
+    email: csm@newtheatre.org.uk
+    holders:
+      - Zack Herbert
+      - Lorena Valle Alarcon
+  - key: COMPANY_TECHNICAL_DIRECTOR
+    title: Company Technical Director
+    email: ctd@newtheatre.org.uk
+    holders:
+      - Willow Tzing Que Darkins
+      - Megan Lepper
+  - key: TECHNICAL_MANAGER
+    title: Technical Manager
+    email: techmanager@newtheatre.org.uk
+    holders:
+      - Hope Somers
+  - key: WORKSHOP_MANAGER
+    title: Company Workshop Manager
+    email: cwm@newtheatre.org.uk
+    holders:
+      - Wincy Jeyaraj
+  - key: COSTUME_MANAGER
+    title: Costume, Props and Make-Up Manager
+    email: cpm@newtheatre.org.uk
+    holders:
+      - Theo Warren
+  - key: ARCHIVIST
+    title: Archivist
+    email: archive@newtheatre.org.uk
+    holders:
+      - Matt Adcock
+  - key: EVENTS_COORDINATOR
+    title: Events and Engagement Coordinator
+    email: engagement@newtheatre.org.uk
+    holders:
+      - George Day

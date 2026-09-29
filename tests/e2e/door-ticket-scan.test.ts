@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import { activePerformanceId } from '#shared/utils/tonight'
@@ -25,7 +25,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   door = await registerMember(app, 'door-ticket-officer', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: door.id, role: 'FOH_MANAGER' }, admin.cookie)
+  await grantRole(app, door, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {

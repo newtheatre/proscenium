@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { overrideConfig } from '#tests/helpers/config'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -29,7 +29,7 @@ beforeAll(async () => {
   overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
 
   accessOfficer = await registerMember(app, 'access', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: accessOfficer.id, role: 'ACCESSIBILITY_OFFICER' }, admin.cookie)
+  await grantRole(app, accessOfficer, 'ACCESSIBILITY_OFFICER', admin.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -175,7 +175,7 @@ describe.skipIf(skip !== null)('companion tickets price at zero (criterion 3)', 
     expect(tickets.find(t => t.ticketTypeId === companionTypeId)?.pricePaid).toBe(0)
 
     const boxOffice = await registerMember(app, 'collector', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
+    await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
     const searched = await send('GET', `/api/box-office/desk/search?performanceId=${performanceId}&q=${reference}`, undefined, boxOffice.cookie)
     const { items: results } = await searched.json() as { items: { id: string }[] }
     const collected = await send('POST', `/api/box-office/desk/reservations/${results[0]!.id}/collect`, { expectedTotalPence: totalPence, tender: 'CARD' }, boxOffice.cookie)
@@ -268,7 +268,7 @@ describe.skipIf(skip !== null)('the door sees the agreed wording, and nothing mo
     const { reference } = await booked.json() as { reference: string }
 
     const boxOffice = await registerMember(app, 'deskofficer', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
+    await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
 
     const searched = await send('GET', `/api/box-office/desk/search?performanceId=${performanceId}&q=${reference}`, undefined, boxOffice.cookie)
     const { items: results } = await searched.json() as { items: { id: string }[] }
@@ -288,7 +288,7 @@ describe.skipIf(skip !== null)('the door sees the agreed wording, and nothing mo
     const { reference } = await booked.json() as { reference: string }
 
     const boxOffice = await registerMember(app, 'deskofficer2', generatePassword())
-    await request(app, 'POST', '/api/admin/roles', { userId: boxOffice.id, role: 'FOH_MANAGER' }, admin.cookie)
+    await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
 
     const searched = await send('GET', `/api/box-office/desk/search?performanceId=${performanceId}&q=${reference}`, undefined, boxOffice.cookie)
     const { items: results } = await searched.json() as { items: { id: string }[] }

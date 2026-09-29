@@ -3,10 +3,12 @@ import { sql } from 'drizzle-orm'
 import { checklistFor } from './checklist'
 import { admittedSeatsSubquery, admittedWalkUpSeatsSubquery, heldSeatsSubquery, noShowSeatsSubquery } from './capacity'
 import { cardSalesQuery } from './reconciliation'
+import { lateAdditionsQuery } from './late-charge'
 import { DOOR_COVER_ACTION, NIGHT_ROLES, OFFICER_BYPASS_ACTION, doorCoverTarget, officerBypassTarget } from '#shared/utils/night-authority'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
+import type { LateAddition } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 
 // The night report compiler (E-123). Every figure derives from the ledger and the registers at
@@ -323,6 +325,8 @@ export interface NightReport {
   bypasses: OfficerBypassLine[]
   covers: ReportDoorCover[]
   bar: ReportBarSummary
+  // Card sales recorded after the till closed (question 15), each already inside `bar` above.
+  lateAdditions: LateAddition[]
   access: ReportAccess
   checklist: ChecklistEntry[]
 }
@@ -330,7 +334,7 @@ export interface NightReport {
 // The whole report, one call, every section its own query run together (criterion 4: a draft
 // before close and a frozen read after E-124 exists run this identically).
 export async function compileNightReport(performanceId: string, venueId: string, night: string): Promise<NightReport> {
-  const [attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, covers, bar, access, checklist] = await Promise.all([
+  const [attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, covers, bar, access, checklist, lateAdditions] = await Promise.all([
     reportAttendance(performanceId),
     reportTakings(performanceId, night),
     reportIncidents(performanceId),
@@ -344,6 +348,7 @@ export async function compileNightReport(performanceId: string, venueId: string,
     // Performance-scoped like every other section here (E-128); an exception's reason now
     // prints here, closing the gap E-114 criterion 5 left open.
     checklistFor(performanceId),
+    db.all<LateAddition>(lateAdditionsQuery(night)),
   ])
-  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, covers, bar, access, checklist }
+  return { performanceId, attendance, takings, incidents, ageChecks, milestones, staffing, bypasses, covers, bar, lateAdditions, access, checklist }
 }

@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-106 through the real route: a basket with an age-restricted line needs a Challenge 25
@@ -25,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'age-check-bar', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -70,7 +71,7 @@ const aProductIn = async (categoryId: string, over: Record<string, unknown> = {}
   created(await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId, ...over }))
 
 const activate = (productId: string): Promise<Response> =>
-  send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  putOnTheTill(send, productId)
 
 const addVariant = async (productId: string, over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single', ...over }))
@@ -433,7 +434,7 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
     await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, waitFor_)
     return view
   }

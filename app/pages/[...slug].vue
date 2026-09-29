@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { committeeValues, isCommitteeToken, mayBeOutOfDate, quotesCommittee } from '#shared/utils/committee'
 import { saysNoSuch } from '#shared/utils/no-such'
 import { resolvePolicyTree, tokensInTree } from '#shared/utils/policy-tokens'
+import { saysDayLong } from '#shared/utils/when'
+import { londonDate } from '#shared/utils/working-days'
 import type { PolicyValues } from '#shared/utils/policy-tokens'
 
 // The one route every editorial and policy page renders through (D-103, J-110): a markdown file
@@ -20,13 +23,35 @@ if (!page.value) {
 // with no content edit (0012, J-110 criterion 2).
 const { data: policy } = await useAsyncData(
   `policy:${route.path}`,
-  () => tokensInTree(page.value?.body).length === 0
+  () => tokensInTree(page.value?.body).every(isCommitteeToken)
     ? Promise.resolve({ values: {} as PolicyValues })
     : request<{ values: PolicyValues }, string>(`/api/policies/values?path=${encodeURIComponent(route.path)}`),
   { watch: [page] },
 )
 
-const body = computed(() => resolvePolicyTree(page.value?.body, policy.value?.values ?? {}))
+// The committee answers from its own data file, not the settings (0107). Today is read with it,
+// so the server and the browser agree on whether the list has gone stale.
+const { data: committee } = await useAsyncData(
+  `committee:${route.path}`,
+  async () => quotesCommittee(page.value?.body)
+    ? { committee: await queryCollection('committee').first(), today: londonDate(new Date()) }
+    : null,
+  { watch: [page] },
+)
+
+const values = computed<PolicyValues>(() => ({
+  ...policy.value?.values,
+  ...(committee.value?.committee ? committeeValues(tokensInTree(page.value?.body), committee.value.committee) : {}),
+}))
+
+const body = computed(() => resolvePolicyTree(page.value?.body, values.value))
+
+// D-103 criterion 11: from 1 September, a list not touched since before 1 August says so.
+const staleSince = computed(() => {
+  const current = committee.value
+  if (!current?.committee || !mayBeOutOfDate(current.committee.updatedOn, current.today)) return null
+  return saysDayLong(current.committee.updatedOn, { year: true })
+})
 
 // Two sections is a list, not a map. Below that the aside is an empty column beside the prose.
 const TOC_MINIMUM = 3
@@ -85,6 +110,17 @@ useSchemaOrg([
         icon="i-lucide-pencil"
         title="Awaiting committee copy"
         description="This page is a placeholder. It is not yet the committee's own words, and nothing on it should be read as fact."
+        class="mb-8"
+      />
+
+      <UAlert
+        v-if="staleSince"
+        data-test="content-stale"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-calendar-clock"
+        title="This content may be out of date"
+        :description="`The committee changes every August, and the names on this page were last updated on ${staleSince}.`"
         class="mb-8"
       />
 

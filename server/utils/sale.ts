@@ -24,6 +24,7 @@ import { qrTokenFor } from '#server/utils/qr-tokens'
 import { qrSvgBase64 } from '#server/utils/qr'
 import { sendWalkUpPaid } from '#server/utils/reservation-confirmation'
 import { recordPostedSaleStatement } from '#server/utils/sumup-queries'
+import { lateAddendumStatement, lateSaleAudit, lateSaleAuditStatement } from '#server/utils/late-charge'
 import { barWindowsTonight, shiftOffsetDefaults } from '#server/utils/rota'
 import { houseForSale } from '#shared/utils/rota-times'
 import { saleRefusal } from '#shared/utils/programme'
@@ -335,6 +336,10 @@ export interface SaleContext {
   baseURL?: string
   // Present on a live request, so a walk-up's confirmation goes out through the real transport.
   event?: H3Event
+  // A charge recorded after its night's till closed (question 15): dated when the reader took it,
+  // on its own night, and audited as late in the Treasurer's name (F-124 criterion 9).
+  at?: Date
+  lateRecorderId?: string
 }
 
 // The two things a basket may carry beyond drinks (F-122, F-123). Absent means a bar-only sale,
@@ -578,7 +583,7 @@ async function prepareSale(
   // showed, so a booking collected at the desk meanwhile refuses here (F-122, F-124 criterion 4).
   const performanceIds = context.performanceIds ?? (context.performanceId ? [context.performanceId] : [])
   const bookings = await resolveTickets(extras.tickets, performanceIds)
-  const walkUps = await resolveWalkUps(extras.walkUps, performanceIds, new Date())
+  const walkUps = await resolveWalkUps(extras.walkUps, performanceIds, context.at ?? new Date())
   const ticketsPence = bookings.reduce((sum, booking) => sum + booking.owedPence, 0)
   const walkUpsPence = walkUps.reduce((sum, walkUp) => sum + walkUp.amountPence, 0)
 
@@ -599,7 +604,7 @@ async function prepareSale(
   }
 
   return {
-    performanceId: await performanceForSale(context, Math.floor(Date.now() / 1000)),
+    performanceId: await performanceForSale(context, Math.floor((context.at?.getTime() ?? Date.now()) / 1000)),
     resolved, priced, discount, restricted, soldResolved, soldPriced, refusedPriced,
     bookings, walkUps, ticketsPence, walkUpsPence, soldTotalPence,
   }
@@ -714,7 +719,7 @@ export async function commitSale(
         // Without this a matinee sale is invisible to its own report (E-127 criterion 6).
         performanceId: performanceId,
       })), ...ticketLines],
-    }, new Date(), tab?.guard ?? undefined)
+    }, context.at ?? new Date(), tab?.guard ?? undefined)
     statements.push(...posted.statements)
     // Every movement cites the sale line that caused it (F-105 criterion 3), which is only known
     // once `postEntry` has assigned that line's id; a movement of zero never reaches the batch (0010).
@@ -775,6 +780,12 @@ export async function commitSale(
         WHERE ${posts} AND EXISTS (SELECT 1 FROM sumup_attempts WHERE id = ${context.attemptId} AND entry_id IS NULL)
       `))
       statements.push(db.run(recordPostedSaleStatement(context.attemptId, posted.id, Math.floor(Date.now() / 1000), posts)))
+      if (context.lateRecorderId && context.at) {
+        const chargedAt = Math.floor(context.at.getTime() / 1000)
+        const sale = { recorderId: context.lateRecorderId, entryId: posted.id, attemptId: context.attemptId, venueId: context.venueId, night: context.night, chargedAt }
+        statements.push(db.run(lateSaleAuditStatement(lateSaleAudit(sale), posted.id)))
+        statements.push(db.run(lateAddendumStatement({ id: newId(), night: context.night, entryId: posted.id, addedBy: context.lateRecorderId, totalPence: soldTotalPence, chargedAt })))
+      }
     }
     entryId = posted.id
   }

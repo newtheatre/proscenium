@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { actionLabels, chooseAction, click, fill, fillNumber, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -25,7 +25,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'ordinary', generatePassword())
 
   barManager = await registerMember(app, 'sizes', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -652,7 +652,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/products/${productId}`, '[data-test="add-variant"]')
     await click(view, '[data-test="add-variant"]')
@@ -688,7 +688,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="recipe-${variantId}"]`)
     await click(view, `[data-test="recipe-${variantId}"]`)
@@ -724,7 +724,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     // Attaching a choice sits in the row's overflow, behind `more-<id>` (K-123 criterion 10).
     await visit(view, `${app.baseURL}/bar/products/${productId}`, `[data-test="more-${variantId}"]`)

@@ -87,7 +87,7 @@ describe.skipIf(skip !== null)('a policy page quotes the live setting (criteria 
 
   test('the editorial pages still render, carrying no tokens of their own', async () => {
     const html = await pageHtml('/about')
-    expect(html).toContain('Awaiting committee copy')
+    expect(html).toContain('savennt.com')
     expect(html).not.toContain('policy-value')
   })
 })

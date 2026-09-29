@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
   if (!prior) {
     throw createError({ statusCode: 409, statusMessage: 'This setting has no prior value on the trail to revert to' })
   }
-  await requireBlastRadiusConfirmation(event, key, input?.confirmation)
+  await requireBlastRadiusConfirmation(event, key, input?.confirmation, prior.value)
 
   await writeConfigValue(event, resolved.account.id, key, prior.value)
   return { ok: true, key, value: prior.value }

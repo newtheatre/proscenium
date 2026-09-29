@@ -649,6 +649,17 @@ Open questions:
      basket it does not cover is refused with the sale's own stock wording; no attempt is written.
      The read is advisory: the trigger on the sale's write stays what holds (F-105 criterion 5),
      so a race lost between the hand-off and the answer still lands as criterion 4's mismatch.
+  9. Added 28 September 2026 (question 15 of the MVP flow review, option 1; issue 1316): a charge
+     left unanswered on a night whose till at that bar is closed is recorded by a `finance.write`
+     holder (the Treasurer, and ADMIN) from that night's Daily reconciliation, which the till's
+     earlier-night row leads to. It posts as the sale it was, through the one `commitSale`, in one
+     batch: dated when the reader took it, so it falls inside that show night (0014) and raises
+     that night's expected figure to meet the reader's Z; on the session it was rung up against;
+     its lines keyed to that night's performance. The write carries the total the screen showed,
+     and a mismatch refuses quoting both figures (0005). The trail marks it late
+     (`bar.till.sale.late`, naming who recorded it and when), Daily reconciliation lists it under
+     **Late additions**, and the night report shows it as a late addition, or as an addendum to
+     each report already signed off for that night (each froze the night-wide bar figure it moves).
 - Source: SumUp Payment Switch (developer.sumup.com/terminal-payments/payment-switch, and the
   sumup-android-url-scheme and sumup-ios-url-scheme references); decision 0069; Matt's
   direction, 13 September 2026; issue 1257 (a cancelled charge on Android returned in a new tab);

@@ -7,6 +7,7 @@ import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // E-127 criterion 6, end to end: a matinee and an evening at one venue produce two rotas, two
@@ -74,7 +75,7 @@ async function aSellableVariant(): Promise<string> {
   const productId = await created(await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId }))
   const variantId = await created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }))
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 250, effectiveFrom: today() })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return variantId
 }
 

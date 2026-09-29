@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { daysAfter, londonDay } from '#shared/utils/membership'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
-import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
+import { forgetSpentStep, grantRole, markVerified, registerMember } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -113,7 +113,7 @@ describe.skipIf(skip !== null)('reading the audit trail (J-103)', () => {
 
   test('a grant is findable by actor, by action, by module, by target and by date', async () => {
     const member = await registerMember(app, 'granted', password, { signIn: false })
-    expect((await send('POST', '/api/admin/roles', { userId: member.id, role: 'FOH_MANAGER' }, cookie)).status).toBe(200)
+    expect((await grantRole(app, member, 'FOH_MANAGER', cookie)).status).toBe(200)
 
     const target = `user:${member.id}`
     const carries = (listing: Listing): boolean =>
@@ -216,7 +216,7 @@ describe.skipIf(skip !== null)('recording something that happened outside the sy
     overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN', 'MANAGER', 'TRAINING_MANAGER'])
     try {
       const deputy = await registerMember(app, 'deputy', password)
-      expect((await send('POST', '/api/admin/roles', { userId: deputy.id, role: 'THEATRE_MANAGER' }, cookie)).status).toBe(200)
+      expect((await grantRole(app, deputy, 'THEATRE_MANAGER', cookie)).status).toBe(200)
 
       // The role works: the refusal that follows is about the signature and nothing else.
       expect((await send('GET', '/api/admin/audit', null, deputy.cookie)).status).toBe(200)

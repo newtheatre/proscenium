@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { answerCharge, sellOnTheTill, startTypedCharge } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-122, F-123 and F-124 through the real routes: ticket money rides the bar's own ledger entry,
@@ -30,7 +31,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'tickets-bar', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -96,7 +97,7 @@ async function aSellableProduct(): Promise<{ variantId: string }> {
   const productId = await created(await send('POST', '/api/admin/bar/products', { name: named('Lemonade'), categoryId }))
   const variantId = await created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single' }))
   expect((await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence: 250, effectiveFrom: today() })).status).toBe(200)
-  expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
+  expect((await putOnTheTill(send, productId)).status).toBe(200)
   return { variantId }
 }
 
@@ -533,7 +534,10 @@ describe.skipIf(skip !== null)('a charge from an earlier night is answered by th
       const { venueId } = programme('earlier-night-factor')
       const id = anEarlierCharge(venueId, 'factor')
 
-      const refused = await answerCharge(app, id, 'declined', barManager.cookie)
+      // Its own Bar Manager: the suite's one holds an authenticator, as every other test needs.
+      const noFactor = await registerMember(app, 'tickets-bar-no-factor', generatePassword())
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, officer.cookie)
+      const refused = await answerCharge(app, id, 'declined', noFactor.cookie)
       expect(refused.status).toBe(403)
       expect(await message(refused)).toMatch(/authenticator/i)
       expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', id)!.status).toBe('STARTED')

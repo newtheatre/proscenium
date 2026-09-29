@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
 import { click, fill, fillDate, menuOptions, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-119: sales, GP, variance, comp and discount reports, read live from the ledger, with a
@@ -27,10 +28,10 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'report-bar-manager', barManagerPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
   barStaff = await registerMember(app, 'report-bar-staff', generatePassword())
   treasurer = await registerMember(app, 'report-treasurer', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: treasurer.id, role: 'TREASURER' }, officer.cookie)
+  await grantRole(app, treasurer, 'TREASURER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -88,7 +89,7 @@ async function aStockedProduct(pricePence: number, bottlePence: number): Promise
   await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 50 }] })
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
   await send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today })
-  await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  await putOnTheTill(send, productId)
   return { variantId, itemId }
 }
 
@@ -242,7 +243,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barManagerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
     expect(await view.evaluate<boolean>('Boolean(document.querySelector(\'[data-test="refresh-report"]\'))')).toBe(false)
@@ -258,7 +259,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barManagerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
     expect(await menuOptions(view, '[data-test="period-kind"]')).toEqual(['Night', 'Week', 'Year', 'Custom range'])
@@ -289,7 +290,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barManagerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
     // Nothing this suite writes ever lands here; a changed date reads the report again itself.
@@ -315,7 +316,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barManagerPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/reports`, '[data-test="period-kind"]')
     await waitFor(view, `document.querySelector('[data-test="section-sales"]')`)

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can, recordLateCharges } from '#shared/utils/abilities'
 import { saysMoney } from '#shared/utils/bar'
 import { saysAttemptStatus, typedAndWaiting } from '#shared/utils/sumup'
 import { saysClock, saysDay } from '#shared/utils/when'
@@ -21,6 +22,8 @@ const emit = defineEmits<{
 }>()
 
 const notes = defineModel<Record<string, string>>('notes', { required: true })
+
+const mayRecordLate = computed(() => can(useViewer().value, recordLateCharges))
 </script>
 
 <template>
@@ -84,16 +87,32 @@ const notes = defineModel<Record<string, string>>('notes', { required: true })
         class="mt-2 w-full"
         :data-test="`earlier-note-${attempt.id}`"
       />
-      <!-- Recording the sale needs that night's till open, and how a late card charge lands in the
-           ledger is still to be decided, so a closed night's is the Treasurer's (issue 1316). -->
-      <p
+      <!-- A closed night's charge is the Treasurer's to record on its own night (question 15), so a
+           finance.write holder is led straight to it. -->
+      <div
         v-if="!attempt.sessionOpen"
-        class="mt-2 text-xs text-muted"
-        :data-test="`earlier-treasurer-${attempt.id}`"
+        class="mt-2 space-y-2"
       >
-        That night's till is closed, so the sale cannot be recorded here. If the reader took the money,
-        the Treasurer records it: say so in the note.
-      </p>
+        <p
+          class="text-xs text-muted"
+          :data-test="`earlier-treasurer-${attempt.id}`"
+        >
+          That night's till is closed, so the sale cannot be recorded here. If the reader took the money,
+          the Treasurer records it on that night's Daily reconciliation. Answer Payment did not only if it did not go through.
+        </p>
+        <UButton
+          v-if="mayRecordLate"
+          size="sm"
+          color="neutral"
+          variant="outline"
+          class="min-h-12"
+          icon="i-lucide-scale"
+          :to="`/money/reconciliation?night=${attempt.night}`"
+          :data-test="`earlier-record-late-${attempt.id}`"
+        >
+          Record it on {{ saysDay(attempt.night) }}
+        </UButton>
+      </div>
       <div class="mt-2 flex flex-wrap gap-2">
         <UButton
           v-if="attempt.sessionOpen"

@@ -143,8 +143,9 @@ describe('the settings that need a preview and a typed confirmation', () => {
     expect(ENFORCED_KEYS as readonly string[]).not.toContain('WIDE_BLAST_RADIUS_KEYS')
   })
 
-  test('refund policy, retention arming and the second-factor roles are flagged', () => {
-    expect([...WIDE_BLAST_RADIUS].sort()).toEqual(['PRIVILEGED_ROLES', 'REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED'])
+  test('refund policy, retention arming, the second-factor roles and the first self-closing night are flagged', () => {
+    expect([...WIDE_BLAST_RADIUS].sort()).toEqual(['AUTO_CLOSE_FROM_NIGHT', 'PRIVILEGED_ROLES', 'REFUND_PAID_REQUIRES_MANAGER', 'RETENTION_ARMED'])
+    expect(isWideBlastRadius('AUTO_CLOSE_FROM_NIGHT')).toBe(true)
     expect(isWideBlastRadius('PRIVILEGED_ROLES')).toBe(true)
     expect(isWideBlastRadius('PASSWORD_MIN_LENGTH')).toBe(false)
   })
