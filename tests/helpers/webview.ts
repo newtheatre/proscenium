@@ -321,7 +321,8 @@ export async function signInView(app: AppUnderTest, email: string, password: str
 export async function waitFor(view: Bun.WebView, expression: string, timeoutMs = SETTLE_TIMEOUT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (await view.evaluate<boolean>(`Boolean(${expression})`)) return
+    // Mid-navigation the document can be half gone, so a throw is a not-yet rather than an answer.
+    if (await view.evaluate<boolean>(`Boolean(${expression})`).catch(() => false)) return
     await Bun.sleep(100)
   }
   // Where the page was and what it said, so a timeout on CI is read rather than rerun.
