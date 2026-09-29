@@ -317,7 +317,10 @@ const FIELD = {
         label="Only uncounted"
         :ui="{ root: 'items-center', label: 'py-3.5' }"
       />
-      <div class="ml-auto flex gap-2">
+      <div
+        v-if="$slots.actions"
+        class="ml-auto flex gap-2"
+      >
         <slot name="actions" />
       </div>
     </div>

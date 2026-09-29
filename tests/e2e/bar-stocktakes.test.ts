@@ -899,6 +899,25 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
     }
   }, 120_000)
 
+  // Issue 1520: an empty element in the footer's wrapping row can take a line of its own at some
+  // progress widths; tonight's screen passes no actions, so the footer holds only what it shows.
+  test('tonight\'s stocktake footer holds nothing empty that could wrap onto a line of its own', async () => {
+    const item = await anItem()
+    const opened = await open()
+    let screen: Bun.WebView | undefined
+    try {
+      screen = await signedIn(NIGHT_VIEWPORT_PX, 740)
+      await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${item.id}"]`)
+      const empty = await screen.evaluate<number>(`[...document.querySelector('[data-test="stocktake-footer"]').children]
+        .filter(child => child.getBoundingClientRect().width === 0).length`)
+      expect(empty).toBe(0)
+    }
+    finally {
+      screen?.close()
+      await apply(opened.stocktake.id)
+    }
+  }, 120_000)
+
   // The one show-night screen with a drawn choice. Its track keeps a switch's proportions, the floor
   // check passes it by its row, and a tap the label's overlay alone can answer turns the filter on.
   test('the Only uncounted switch on tonight\'s screen is drawn as a switch, and its whole row is the target', async () => {
