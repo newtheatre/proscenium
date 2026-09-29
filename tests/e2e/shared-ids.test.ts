@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { adminSession } from '#tests/helpers/accounts'
+import { adminSession, request } from '#tests/helpers/accounts'
 import { click, fillDate, openView, pickOption, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -17,6 +17,8 @@ beforeAll(async () => {
   if (skip) return
   app = await startApp()
   officer = await adminSession(app)
+  // Add a module is offered only once a department exists to file the module under.
+  expect((await request(app, 'POST', '/api/admin/training/departments', { code: 'IDS', name: 'Department IDS' }, officer.cookie)).status).toBe(200)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {

@@ -976,7 +976,8 @@ describe.skipIf(skip !== null)('the screens', () => {
     await visit(view, `${app.baseURL}/docs/bar/products`, '[data-test="docs-body"]')
     expect(await textOf(view, '[data-test="docs-body"]')).toContain('A product nothing has ever been sold as can be deleted outright.')
 
-    await visit(view, `${app.baseURL}/bar/stock`, '[data-test="bar-items-table"]')
+    // Searched for: the register pages, and by now the suite has stocked more than a page of items.
+    await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, '[data-test="bar-items-table"]')
     const stock = await textOf(view, '[data-test="bar-items-table"]')
     expect(stock).toContain(itemName)
     expect(stock).toContain('4500 ml')

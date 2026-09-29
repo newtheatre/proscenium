@@ -96,7 +96,8 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
         ['/admin/backups', 'drills-table', 'drills-cards'],
       ] as const) {
         await view.navigate(`${app.baseURL}${path}`)
-        await waitFor(view, 'document.querySelector(\'main\')')
+        // The console shell renders no main of its own, so the list itself is what arrives.
+        await waitFor(view, `document.querySelector('[data-test="${tableTest}"], [data-test="${cardTest}"]')`)
         expect(await hasNoHorizontalOverflow(view)).toBe(true)
 
         const shape = await view.evaluate<{ table: string | null, cards: string | null }>(`(() => {

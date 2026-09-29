@@ -826,7 +826,8 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fillNumber(view, '[data-test="performance-duration"]', '135')
     await click(view, '[data-test="performance-submit"]')
 
-    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('4 Mar 2027')`)
+    // The table names a day the short London way, as every console list does, with no year.
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('Thu 4 Mar')`)
     expect(await textOf(view, '[data-test="performances-table"]')).toContain('20:15')
     expect((await detail(id)).performances.length).toBe(1)
     view.close()
@@ -894,7 +895,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await fillNumber(view, '[data-test="performance-duration"]', '140')
     await click(view, '[data-test="performance-submit"]')
 
-    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('5 Mar 2027')`)
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('Fri 5 Mar')`)
     const added = (await detail(id)).performances
     expect(added).toHaveLength(2)
 
@@ -903,7 +904,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="performance-form"]')`)
     await fillDate(view, '[data-test="performance-day"]', '2027-03-06')
     await click(view, '[data-test="performance-submit"]')
-    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('6 Mar 2027')`)
+    await waitFor(view, `document.querySelector('[data-test="performances-table"]').textContent.includes('Sat 6 Mar')`)
     const third = (await detail(id)).performances.find(one => !added.some(earlier => earlier.id === one.id))
     expect(third?.venueId).toBe(added[0]!.venueId)
     expect(third?.durationMinutes).toBe(140)

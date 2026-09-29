@@ -365,7 +365,8 @@ describe.skipIf(skip !== null)('the directory screen', () => {
       // where it is badged as a shadow account rather than an unverified one (0071).
       expect(await textOf(view, '[data-test="directory-total"]')).toContain('shadow account')
       await fill(view, 'input[data-test="toolbar-search"]', invitee)
-      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(invitee)})`)
+      // The table, not the page: the creation toast names the address before any search runs.
+      await waitFor(view, `document.querySelector('[data-test="directory-table"]')?.innerText.includes(${JSON.stringify(invitee)})`)
       const rowText = await textOf(view, '[data-test="directory-table"]')
       expect(rowText).toContain('Shadow')
       expect(rowText).not.toContain('Unverified')

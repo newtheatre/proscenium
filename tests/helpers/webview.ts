@@ -291,7 +291,9 @@ export async function openSignedOutView(baseURL: string, size?: { width: number,
   await waitFor(view, 'document.body')
   // The browser is shared, so a charge another suite left unanswered would come back on this till.
   await view.evaluate(`Object.keys(localStorage).filter(key => key.startsWith('nnt-till-sumup')).forEach(key => localStorage.removeItem(key))`)
-  await view.evaluate(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)
+  // Waited for: a sign-out answering after the case has signed in would clear the new session.
+  await view.evaluate(`(window.__signedOut = false, fetch('/api/auth/sign-out', { method: 'POST' }).finally(() => { window.__signedOut = true }), true)`)
+  await waitFor(view, 'window.__signedOut === true')
   return view
 }
 
@@ -319,7 +321,8 @@ export async function signInView(app: AppUnderTest, email: string, password: str
 export async function waitFor(view: Bun.WebView, expression: string, timeoutMs = SETTLE_TIMEOUT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (await view.evaluate<boolean>(`Boolean(${expression})`)) return
+    // Mid-navigation the document can be half gone, so a throw is a not-yet rather than an answer.
+    if (await view.evaluate<boolean>(`Boolean(${expression})`).catch(() => false)) return
     await Bun.sleep(100)
   }
   // Where the page was and what it said, so a timeout on CI is read rather than rerun.

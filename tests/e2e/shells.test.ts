@@ -17,6 +17,7 @@ let app: AppUnderTest
 let showSlug = ''
 let performanceId = ''
 let member: TestMember
+let officerCookie = ''
 let memberPassword = ''
 
 async function seedShow(cookie: string): Promise<void> {
@@ -57,7 +58,8 @@ async function seedShow(cookie: string): Promise<void> {
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
-  await seedShow((await adminSession(app)).cookie)
+  officerCookie = (await adminSession(app)).cookie
+  await seedShow(officerCookie)
   memberPassword = generatePassword()
   member = await registerMember(app, 'shells', memberPassword)
 }, BOOT_TIMEOUT_MS)
@@ -68,9 +70,10 @@ afterAll(async () => {
 
 // Signed out first: the browser is shared, so a session another suite left would otherwise
 // redirect a way in and change what a public page shows.
-async function inspect<T>(path: string, script: string): Promise<T> {
+async function inspect<T>(path: string, script: string, cookie?: string): Promise<T> {
   const view = await openSignedOutView(app.baseURL)
   try {
+    if (cookie) await view.evaluate(`document.cookie = ${JSON.stringify(cookie)}`)
     await view.navigate(`${app.baseURL}${path}`)
     return await view.evaluate<T>(script)
   }
@@ -153,10 +156,11 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
   // The one place every console screen agrees on was a bare span, so the sidebar had no way home
   // (0082). On /dev for the same reason the test above is.
   test('the console sidebar header is a link to the overview', async () => {
+    // As an officer: a signed-out view is given no sidebar to carry a header.
     const href = await inspect<string | null>('/dev', `(() => {
       const header = document.querySelector('aside a[href="/admin"], nav a[href="/admin"]')
       return header ? header.getAttribute('href') : null
-    })()`)
+    })()`, officerCookie)
     expect(href).toBe('/admin')
   })
 

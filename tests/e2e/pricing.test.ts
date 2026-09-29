@@ -323,11 +323,15 @@ describe.skipIf(skip !== null)('the screen shows why a price is what it is (D-12
   }, CASE_TIMEOUT_MS)
 })
 
+// Signed out first, and waited for: a script cannot overwrite the HttpOnly session another suite
+// left behind, and a sign-out answering late would clear the one planted here.
 async function openConsole(): Promise<Bun.WebView> {
   const { openView } = await import('#tests/helpers/webview')
   const view = await openView()
   await view.navigate(`${app.baseURL}/`)
   await waitFor(view, 'document.body')
+  await view.evaluate(`(window.__signedOut = false, fetch('/api/auth/sign-out', { method: 'POST' }).finally(() => { window.__signedOut = true }), true)`)
+  await waitFor(view, 'window.__signedOut === true')
   await view.evaluate(`document.cookie = ${JSON.stringify(officer.cookie)}`)
   return view
 }

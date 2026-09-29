@@ -553,7 +553,7 @@ describe.skipIf(skip !== null)('refunding a ticket confirms before anything move
 
     const ticket = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', id)!
     const refunds = (): unknown[] => queryAll(
-      'SELECT l.id FROM ledger_lines l WHERE l.kind = \'TICKET_REFUND\' AND l.ticket_id = ?', ticket.id,
+      'SELECT l.id FROM ledger_lines l WHERE l.kind = \'REFUND\' AND l.ticket_id = ?', ticket.id,
     )
 
     const view = await signInAsBoxOffice(app.baseURL)
@@ -581,7 +581,7 @@ describe.skipIf(skip !== null)('refunding a ticket confirms before anything move
       await waitFor(view, `document.querySelector('[data-test="desk-nothing-owing"]')`, 30_000)
 
       const refund = query<{ amountPence: number }>(
-        'SELECT amount_pence AS amountPence FROM ledger_lines WHERE kind = \'TICKET_REFUND\' AND ticket_id = ?', ticket.id,
+        'SELECT amount_pence AS amountPence FROM ledger_lines WHERE kind = \'REFUND\' AND ticket_id = ?', ticket.id,
       )
       expect(refund?.amountPence).toBe(-1250)
     }
@@ -632,14 +632,15 @@ describe.skipIf(skip !== null)('selling a walk-up from the desk screen (D-115 cr
       await click(view, '[data-test="desk-walk-up-sell"]')
       // Two seats sold at the desk are two walk-ups and two in (D-114 criterion 7, issue 1326).
       await waitFor(view, `document.querySelector('[data-test="desk-summary-walk-ups"]')?.innerText.includes('2')`, 30_000)
-      expect(await textOf(view, '[data-test="desk-summary-in"]')).toContain('2')
-      expect(await textOf(view, '[data-test="desk-summary-sold"]')).toContain('2')
 
+      // The booking first, since what it holds is what the tiles are counted from.
       const sold = queryAll<{ source: string, status: string }>(
         'SELECT source, status FROM reservations WHERE performance_id = ?', performanceId,
       )
       expect(sold).toHaveLength(1)
       expect(sold[0]).toEqual({ source: 'DOOR', status: 'DOOR' })
+      expect(await textOf(view, '[data-test="desk-summary-in"]')).toContain('2')
+      expect(await textOf(view, '[data-test="desk-summary-sold"]')).toContain('2')
     }
     finally {
       view.close()
