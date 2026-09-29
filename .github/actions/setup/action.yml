@@ -1,0 +1,21 @@
+name: Set up Bun and install
+description: Bun, the install cache restored from bun.lock, and a frozen install (0110).
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    # The download cache, not node_modules: postinstall still has to run on every runner.
+    - uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-
+
+    # postinstall runs `nuxt prepare`, which typecheck, lint and build all need.
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile

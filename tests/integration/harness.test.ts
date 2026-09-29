@@ -31,6 +31,7 @@ describe('the integration harness', () => {
     const first = await createTestDatabase()
     const second = await createTestDatabase()
     try {
+      migrated.exec('PRAGMA foreign_keys = ON;')
       await applyMigrations(migrated)
       const schema = 'SELECT type, name, sql FROM sqlite_master ORDER BY type, name'
       expect(first.raw.query(schema).all()).toEqual(migrated.query(schema).all())

@@ -47,6 +47,14 @@ function slice(files: string[]): string[] {
   return files.filter((_, position) => position % of === index - 1)
 }
 
+// `E2E_SUITES` narrows a run to the suites a pull request edits (0110); unset, every suite runs.
+function inScope(files: string[]): string[] {
+  const wanted = (process.env.E2E_SUITES ?? '').split(/\s+/).filter(Boolean)
+  const unknown = wanted.filter(path => !files.includes(path))
+  if (unknown.length) throw new Error(`E2E_SUITES names no such suite: ${unknown.join(', ')}`)
+  return wanted.length ? files.filter(file => wanted.includes(file)) : files
+}
+
 async function stream(shard: Shard, from: ReadableStream<Uint8Array>): Promise<void> {
   const decoder = new TextDecoder()
   const reader = from.getReader()
@@ -204,7 +212,9 @@ if (only.length) {
 }
 
 const began = Date.now()
-const passed = await e2e(slice(suites('tests/e2e')))
+const chosen = slice(inScope(suites('tests/e2e')))
+if (!chosen.length) console.log('end-to-end: no suite in scope falls to this slice')
+const passed = await e2e(chosen)
 
 console.log(`total ${elapsed(began)}`)
 process.exit(passed ? 0 : 1)

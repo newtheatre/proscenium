@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { scopeOf } from '../../scripts/lib/ci-scope'
+import type { Scope } from '../../scripts/lib/ci-scope'
 
-const EVERYTHING = { app: true, e2e: 'all', suites: [] }
+const EVERYTHING: Scope = { app: true, e2e: 'all', suites: [] }
 
 describe('a change to documentation alone reaches nothing that runs (0110)', () => {
   test('engineering documents and root Markdown skip the application gates and every suite', () => {
@@ -26,7 +27,7 @@ describe('a change the browser cannot see skips the end-to-end suites alone (011
     ['scripts/check.ts'],
     ['scripts/check-docs.ts'],
     ['.github/workflows/ci.yml'],
-    ['.github/pull_request_template.md'],
+    ['.github/CODEOWNERS'],
   ])('%s', (path) => {
     expect(scopeOf([path, 'docs/architecture.md'])).toEqual({ app: true, e2e: 'none', suites: [] })
   })
@@ -43,6 +44,7 @@ describe('a change to end-to-end suites alone runs those suites (0110)', () => {
     ['tests/e2e/fixtures/people.ts'],
     ['scripts/run-tests.ts'],
     ['.github/workflows/e2e.yml'],
+    ['.github/actions/setup/action.yml'],
     ['bun.lock'],
     ['package.json'],
     ['nuxt.config.ts'],
