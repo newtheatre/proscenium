@@ -35,8 +35,8 @@ Twelve steps, in `.github/workflows/ci.yml`. Run all of them before opening a pu
 6. `check migrations`: a generated migration that rebuilds an append-only table is refused, as is a
    hand-edited generated one, as is a journal that disagrees with the files on disk.
 7. `check content-tokens`: a policy token naming a key the schema does not have, or one that
-   holds personal data, and a unit word straight after a token that already renders with its
-   unit ("15 minutes minutes").
+   holds personal data; a committee token naming a role `content/committee.yml` lacks (0107);
+   and a unit word straight after a token that already renders with its unit ("15 minutes minutes").
 8. `check ledger`: a ledger line kind that the code does not enforce.
 9. `check notifications`: a notification type with no template, or a template nothing sends.
 10. `check audit`: a privileged route with no audit write, or an action written but never

@@ -796,6 +796,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   // Module I: finance
 
   { route: 'server/api/admin/finance/reconciliation/index.post.ts', actions: ['finance.z-reading.recorded'] },
+  {
+    route: 'server/api/admin/finance/late-charges/[id].post.ts',
+    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'bar.till.sale.late', 'age-check.logged', 'reservation.collected', 'account.created.guest'],
+    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/late-charge.ts', 'server/utils/reservations.ts'],
+  },
   { route: 'server/api/admin/finance/periods/index.get.ts', exempt: 'reads the close history, writing nothing' },
   {
     route: 'server/api/admin/finance/periods/preview.post.ts',

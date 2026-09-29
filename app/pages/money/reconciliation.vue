@@ -3,11 +3,13 @@ import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { penceFromPounds } from '#shared/utils/admin-forms'
 import { describeKind } from '#shared/utils/ledger'
-import { can, recordZReadings } from '#shared/utils/abilities'
+import { can, recordLateCharges, recordZReadings } from '#shared/utils/abilities'
 import { liveVariance, nightFromQuery } from '#shared/utils/night-reconciliation'
 import { currentShowNight } from '#shared/utils/show-night'
-import { saysDayLong } from '#shared/utils/when'
+import { saysAttemptStatus } from '#shared/utils/sumup'
+import { saysClock, saysDay, saysDayLong } from '#shared/utils/when'
 import type { NightExpected, ZReading } from '#shared/utils/night-reconciliation'
+import type { LateAddition, SumupAttemptView } from '#shared/utils/sumup'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Daily reconciliation', middleware: 'console', docs: '/docs/money/daily-reconciliation' })
@@ -39,7 +41,14 @@ watch(night, () => {
   writeOffNote.value = ''
 })
 
-interface ReconciliationResponse { night: string, expected: NightExpected, current: ZReading | null, history: ZReading[] }
+interface ReconciliationResponse {
+  night: string
+  expected: NightExpected
+  current: ZReading | null
+  history: ZReading[]
+  charges: SumupAttemptView[]
+  late: LateAddition[]
+}
 
 const { data, status, error, refresh } = await useAsyncData(
   'night-reconciliation',
@@ -50,6 +59,31 @@ const { data, status, error, refresh } = await useAsyncData(
 const reconciliationFailure = computed(() => (error.value ? refusalText(error.value, 'The reconciliation could not be read.') : null))
 
 const mayRecord = computed(() => can(useViewer().value, recordZReadings))
+const mayRecordLate = computed(() => can(useViewer().value, recordLateCharges))
+
+// "Payment went through" on a charge the night's closed till left: the sale lands on this night,
+// sent with the total the screen showed so a stale screen records nothing (question 15, 0005).
+const recordingLate = ref<string | null>(null)
+async function recordLate(charge: SumupAttemptView): Promise<void> {
+  if (recordingLate.value) return
+  recordingLate.value = charge.id
+  try {
+    const answer = await request<{ status: string, error: string | null }>(`/api/admin/finance/late-charges/${charge.id}`, {
+      method: 'POST',
+      body: { expectedTotalPence: charge.expectedTotalPence },
+    })
+    if (answer.error) toast.add({ title: answer.error, color: 'error' })
+    else toast.add({ title: `${saysMoney(charge.expectedTotalPence)} recorded on this night`, color: 'success' })
+    await Promise.all([refresh(), refreshNuxtData('nights-needing-you')])
+  }
+  catch (recordError) {
+    toast.add({ title: refusalText(recordError, 'That charge could not be recorded.'), color: 'error' })
+    await refresh()
+  }
+  finally {
+    recordingLate.value = null
+  }
+}
 
 // Said as the figure is typed, the same sign the recorded variance carries: reader less expected.
 const variance = computed(() => (data.value ? liveVariance(readerPence.value, data.value.expected.expectedPence) : null))
@@ -239,6 +273,70 @@ function writeOff(): Promise<void> {
             Against what we expect now, the variance is {{ saysMoney(varianceNow) }}.
           </p>
         </template>
+      </section>
+
+      <section
+        v-if="data.charges.length > 0"
+        class="space-y-2"
+        data-test="section-late-charges"
+      >
+        <h2 class="font-semibold">
+          Card charges left on a closed till
+        </h2>
+        <p class="text-sm text-muted">
+          Nobody said whether these went through before the till closed. If the reader's Z shows the
+          money, record it: it lands on this night as the sale it was, dated when the reader took it.
+          If it did not go through, the bar answers <strong>Payment did not</strong> from the till.
+        </p>
+        <div
+          v-for="charge in data.charges"
+          :key="charge.id"
+          class="flex flex-wrap items-center justify-between gap-2 border-b border-default py-2 last:border-b-0"
+          :data-test="`late-charge-${charge.id}`"
+        >
+          <p class="text-sm">
+            <span class="font-semibold">{{ saysMoney(charge.expectedTotalPence) }}</span>
+            · {{ charge.venueName }} {{ saysClock(charge.createdAt) }}<span v-if="charge.createdByName"> · {{ charge.createdByName }}</span>
+            · {{ saysAttemptStatus(charge.status, charge.kind) }}
+            <span
+              v-if="charge.error"
+              class="block text-xs text-muted"
+            >{{ charge.error }}</span>
+          </p>
+          <UButton
+            v-if="mayRecordLate"
+            size="sm"
+            class="min-h-12"
+            :loading="recordingLate === charge.id"
+            :disabled="recordingLate !== null && recordingLate !== charge.id"
+            :data-test="`late-charge-record-${charge.id}`"
+            @click="recordLate(charge)"
+          >
+            Payment went through: record it on this night
+          </UButton>
+        </div>
+      </section>
+
+      <section
+        v-if="data.late.length > 0"
+        class="space-y-2"
+        data-test="section-late-additions"
+      >
+        <h2 class="font-semibold">
+          Late additions
+        </h2>
+        <ul class="space-y-2 text-sm">
+          <li
+            v-for="late in data.late"
+            :key="late.entryId"
+            :data-test="`late-addition-${late.entryId}`"
+          >
+            <p>{{ saysMoney(late.totalPence) }} · {{ late.venueName }} {{ saysClock(late.chargedAt) }}, already in the expected figure above.</p>
+            <p class="text-xs text-muted">
+              Recorded by {{ late.recordedByName ?? 'someone since removed' }} on {{ saysDay(late.recordedAt) }} at {{ saysClock(late.recordedAt) }}
+            </p>
+          </li>
+        </ul>
       </section>
 
       <template v-if="mayRecord">

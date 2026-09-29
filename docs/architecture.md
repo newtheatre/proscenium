@@ -185,6 +185,25 @@ Three things a token can be, and all three are visible on the page rather than s
 A setting that holds personal data (`isSensitive`) can never appear on a policy page: CI refuses
 the token and the endpoint refuses the key, so neither a preview nor a deploy can publish it.
 
+### Committee tokens (0107)
+
+The committee is `content/committee.yml`, a Nuxt Content data collection (`committee` in
+`content.config.ts`): an `updatedOn` date and one entry per constitutional role, each with a `key`,
+a `title`, an optional role `email` and a list of `holders`. Any content page quotes it as
+`{{COMMITTEE_<KEY>_NAME}}` or `{{COMMITTEE_<KEY>_EMAIL}}`, and the about page draws the whole table
+with `::committee-table` (`app/components/content/CommitteeTable.vue`).
+
+| Piece | Where | Does |
+| --- | --- | --- |
+| The rules | `shared/utils/committee.ts` | The file's schema; a name as the holders joined with "and", or `[name goes here]` when there are none; an address as a mail link; `mayBeOutOfDate()`. Pure, shared by the schema, the check and the page. |
+| The build check | `scripts/check-content-tokens.ts` | Refuses a `COMMITTEE_` token whose role the file lacks, or whose field is neither `NAME` nor `EMAIL`. |
+| The rendering | `app/pages/[...slug].vue` | Reads the file for a page that quotes it, never through the settings endpoint, and merges its values with the policy values before resolving. |
+
+A role with no `email` is an unset address, so the paragraph quoting it goes whole (J-110
+criterion 6). From 1 September, a page quoting the file carries "This content may be out of date"
+when `updatedOn` is before that year's 1 August: the committee year turns on 31 July (0009) and
+August is the handover's grace month. Moving `updatedOn` is part of every edit to the file.
+
 ## The identity screens
 
 `/sign-in` and `/register` are the two entry points, and each carries its own steps rather than

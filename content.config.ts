@@ -1,5 +1,6 @@
 import { defineCollection, defineContentConfig } from '@nuxt/content'
 import { z } from 'zod'
+import { committeeSchema } from './shared/utils/committee'
 
 export default defineContentConfig({
   collections: {
@@ -47,6 +48,13 @@ export default defineContentConfig({
         // DOCS_AUDIENCES in shared/utils/docs-audience.ts; the tree reads it, access never does (0093).
         audience: z.enum(['member', 'committee']),
       }),
+    }),
+    // The constitution's roles, their holders and their addresses, quoted by token on any page
+    // (0107). One file, so one edit a year hands the committee over.
+    committee: defineCollection({
+      type: 'data',
+      source: 'committee.yml',
+      schema: committeeSchema,
     }),
     // Public help, read signed out: its own collection so its dump holds nothing but these pages.
     // Never a filter over `docs`, whose dump would then be anonymous too (0093).

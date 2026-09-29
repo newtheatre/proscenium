@@ -1,52 +1,110 @@
 import { describe, expect, test } from 'bun:test'
+import { HEADER_NAV, PUBLIC_NAV } from '#shared/utils/site-nav'
 
-// D-103, as Matt narrowed criterion 5 on 5 September 2026: nothing invented reaches the public
-// site, so every editorial page ships marked as awaiting the committee until real copy lands.
+// D-103: every editorial page is written now. About, history and the technical page carry the
+// committee's direction of 27 September 2026 (criteria 7 to 9).
 
-// Get involved is written: its hero, its tiles and its steps are the page, and the home page and
-// the error page both offer it. The other three are still the committee's to write.
-const PAGES = ['about', 'history', 'technical-specification']
+const PAGES = ['about', 'history', 'technical-specification', 'get-involved']
 
-describe('editorial pages are honest about being placeholders (D-103)', () => {
+const read = (slug: string): Promise<string> => Bun.file(`content/${slug}.md`).text()
+const frontOf = (source: string): string => source.slice(0, source.indexOf('\n---', 4))
+const bodyOf = (source: string): string => source.slice(source.indexOf('\n---', 4) + 4)
+
+describe('no editorial page still awaits the committee (D-103)', () => {
   for (const slug of PAGES) {
-    test(`content/${slug}.md declares itself a placeholder and names what belongs there`, async () => {
-      const source = await Bun.file(`content/${slug}.md`).text()
-      expect(source).toContain('placeholder: true')
-      expect(source).toContain('Awaiting committee copy')
+    test(`content/${slug}.md is not flagged and says nothing is missing`, async () => {
+      const source = await read(slug)
+      expect(frontOf(source)).not.toContain('placeholder: true')
+      expect(source).not.toContain('Awaiting committee copy')
     })
   }
+})
 
+describe('about says who we are, who runs it and where the building stands (D-103 criterion 7)', () => {
+  test('the short history points to the history project', async () => {
+    expect(await read('about')).toContain('](https://history.newtheatre.org.uk/)')
+  })
+
+  test('the closure points to the campaign', async () => {
+    expect(await read('about')).toContain('](https://savennt.com/)')
+  })
+
+  test('general enquiries go to the box office', async () => {
+    expect(await read('about')).toContain('](mailto:boxoffice@newtheatre.org.uk)')
+  })
+
+  // 0107: the table is drawn from content/committee.yml, never typed into the page.
+  test('the committee is drawn from the data file, not typed into the prose', async () => {
+    const body = bodyOf(await read('about'))
+    expect(body).toContain('::committee-table')
+    expect(body).not.toContain('| President')
+  })
+})
+
+describe('history carries the short history and points onward (D-103 criterion 7)', () => {
+  test('it links the history project and its address', async () => {
+    const source = await read('history')
+    expect(source).toContain('](https://history.newtheatre.org.uk/)')
+    expect(source).toContain('](mailto:history@newtheatre.org.uk)')
+  })
+})
+
+describe('the technical page describes the space and routes the detail (D-103 criterion 8)', () => {
+  test('it names the Studio, where it is, its capacity and its access', async () => {
+    const body = bodyOf(await read('technical-specification'))
+    expect(body).toContain('Portland Studio')
+    expect(body).toContain('62 seats')
+    expect(body).toMatch(/step-free/i)
+  })
+
+  test('a detailed specification is asked for by email, not published', async () => {
+    const body = bodyOf(await read('technical-specification'))
+    expect(body).toContain('](mailto:technical@newtheatre.org.uk)')
+    expect(body).not.toMatch(/^#+ .*(lighting|sound|rig|dimmer|desk)/im)
+  })
+
+  // D-103 criterion 10: the officer is named from the committee file, so the handover edits one file.
+  test('it names the technical officers by token rather than in prose', async () => {
+    const body = bodyOf(await read('technical-specification'))
+    expect(body).toContain('{{COMMITTEE_TECHNICAL_MANAGER_NAME}}')
+  })
+})
+
+describe('the editorial pages in the navigation (D-103 criterion 9)', () => {
+  test('about and history are header destinations', () => {
+    const header = HEADER_NAV.map(entry => entry.to)
+    expect(header).toContain('/about')
+    expect(header).toContain('/history')
+  })
+
+  test('the technical page keeps its address under its new label', () => {
+    expect(PUBLIC_NAV.find(entry => entry.to === '/technical-specification')?.label).toBe('Technical information')
+  })
+})
+
+describe('get-involved furniture (J-111)', () => {
   // D-103 criterion 6: an unwritten field is absent, never a stand-in sentence somebody could
   // mistake for a member's own words.
-  test('get-involved is not flagged, carries no stand-in quote and has no stand-in prose', async () => {
-    const source = await Bun.file('content/get-involved.md').text()
-    const front = source.slice(0, source.indexOf('\n---', 4))
-    expect(front).not.toContain('placeholder: true')
-    expect(front).not.toContain('quote:')
-    expect(source.slice(source.indexOf('\n---', 4) + 4).trim()).toBe('')
+  test('get-involved carries no stand-in quote and has no stand-in prose', async () => {
+    const source = await read('get-involved')
+    expect(frontOf(source)).not.toContain('quote:')
+    expect(bodyOf(source).trim()).toBe('')
   })
 
   // J-111: the landing page's tiles and steps are front matter, so a committee member changing a
   // department's wording never opens a Vue file.
   test('get-involved carries its landing furniture in front matter', async () => {
-    const source = await Bun.file('content/get-involved.md').text()
-    const front = source.slice(0, source.indexOf('\n---', 4))
+    const front = frontOf(await read('get-involved'))
     for (const field of ['headline:', 'flash:', 'departments:', 'steps:']) {
       expect(`${field} ${front.includes(field)}`).toBe(`${field} true`)
     }
   })
 
   test('the landing page names no figure, the membership fee included', async () => {
-    const source = await Bun.file('content/get-involved.md').text()
+    const source = await read('get-involved')
     // A price, a count of anything, or a bare number in the prose: all of them are the
     // configuration's to state, and none of them has a key yet (J-111 criterion 2).
     expect(source).not.toMatch(/£\s?\d/)
     expect(source).not.toMatch(/\b\d+\s*(pounds|members|shows|people|weeks|years)\b/i)
-  })
-
-  test('the technical specification invents no venue figures', async () => {
-    const source = await Bun.file('content/technical-specification.md').text()
-    // No dimension, capacity or measurement should appear until the committee supplies one.
-    expect(/\d+\s*(seats?|m\b|metres?|x\s*\d)/i.test(source)).toBe(false)
   })
 })
