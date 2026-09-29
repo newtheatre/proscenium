@@ -92,6 +92,7 @@ export async function savePreference(userId: string, input: PreferenceInput): Pr
       target: [schema.notificationPreferences.userId, schema.notificationPreferences.topic],
       set: { email: input.email, push: input.push },
     })
+    .returning({ userId: schema.notificationPreferences.userId })
 
   await auditedWrite(upsert, auditEntry({
     actorId: userId,

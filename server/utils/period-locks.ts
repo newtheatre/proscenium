@@ -43,8 +43,9 @@ export async function periodsList(): Promise<Period[]> {
 // term, the same append-only reasoning the rest of this module already keeps.
 export async function defineTerm(input: DefineTermInput, actorId: string): Promise<{ id: string, applied: boolean }> {
   const id = newId()
-  const statement = db.run(sql`
+  const statement = db.all<{ id: string }>(sql`
     INSERT INTO periods (id, label, from_day, to_day, created_by) VALUES (${id}, ${input.label}, ${input.fromDay}, ${input.toDay}, ${actorId})
+    RETURNING id
   `)
   const entry = auditEntry({
     actorId,
@@ -140,9 +141,10 @@ export async function blockingConditionsFor(fromDay: string, toDay: string): Pro
 }
 
 function lockStatement(input: ClosePeriodInput, action: PeriodLockAction, actorId: string, id = newId()): BatchItem<'sqlite'> {
-  return db.run(sql`
+  return db.all<{ id: string }>(sql`
     INSERT INTO period_locks (id, from_day, to_day, label, action, actor_id)
     VALUES (${id}, ${input.fromDay}, ${input.toDay}, ${input.label ?? null}, ${action}, ${actorId})
+    RETURNING id
   `)
 }
 

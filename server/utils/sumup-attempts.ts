@@ -177,7 +177,7 @@ export async function startAttempt(input: StartAttemptInput): Promise<string> {
     basket: input.basket,
     expectedTotalPence: input.expectedTotalPence,
     status: 'STARTED',
-  }), entry)
+  }).returning({ id: schema.sumupAttempts.id }), entry)
   return id
 }
 
