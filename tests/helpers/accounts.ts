@@ -121,7 +121,8 @@ export async function grantRole(app: AppUnderTest, member: TestMember, role: str
   const { CONFIG_KEYS } = await import('#shared/utils/config')
   const stored = query<{ value: string }>(app, `SELECT value FROM config WHERE key = 'PRIVILEGED_ROLES'`)
   const privileged = stored ? JSON.parse(stored.value) as string[] : CONFIG_KEYS.PRIVILEGED_ROLES.default as readonly string[]
-  if (privileged.includes(role)) await enrolAuthenticator(app, member)
+  // A member with no session never meets the guard in the test, and has none to enrol from.
+  if (privileged.includes(role) && member.cookie) await enrolAuthenticator(app, member)
   return request(app, 'POST', '/api/admin/roles', { userId: member.id, role }, as)
 }
 

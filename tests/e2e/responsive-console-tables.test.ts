@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openView, skipReason, startApp, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -52,8 +52,8 @@ async function hasNoHorizontalOverflow(view: Bun.WebView): Promise<boolean> {
 }
 
 async function signInAsBoxOffice(view: Bun.WebView): Promise<void> {
-  await view.navigate(`${app.baseURL}/sign-in`)
-  await waitFor(view, 'document.querySelector(\'form input[type="email"]\')')
+  // Hydrated before the address is typed: the form reveals the password only then (0103).
+  await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', boxOffice.email)
   await fill(view, 'form input[type="password"]', boxOfficePassword)
   await click(view, 'form button[type="submit"]')
@@ -61,8 +61,8 @@ async function signInAsBoxOffice(view: Bun.WebView): Promise<void> {
 }
 
 async function signInAsAdmin(view: Bun.WebView): Promise<void> {
-  await view.navigate(`${app.baseURL}/sign-in`)
-  await waitFor(view, 'document.querySelector(\'form input[type="email"]\')')
+  // Hydrated before the address is typed: the form reveals the password only then (0103).
+  await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', adminEmail)
   await fill(view, 'form input[type="password"]', adminPassword)
   await click(view, 'form button[type="submit"]')
