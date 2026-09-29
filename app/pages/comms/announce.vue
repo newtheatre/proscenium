@@ -80,13 +80,17 @@ const request = useRequestFetch()
 interface AudienceCount { count: number, digestMinutes: number }
 
 // Answered from the audience alone, so the count is on screen before a word is written
-// (criterion 7). Never cached: an audience is resolved from live data every time it is asked.
+// (criterion 7). Only the served answer is reused, on hydration; after that it is always asked.
 const { data: counted, status: countStatus } = await useAsyncData(
   () => `announce-audience-${JSON.stringify(audience.value)}`,
   () => (audienceReady.value
     ? request<AudienceCount>('/api/admin/comms/announcements/audience', { query: audience.value })
     : Promise.resolve(null)),
-  { watch: [audience], default: (): AudienceCount | null => null, getCachedData: () => undefined },
+  {
+    watch: [audience],
+    default: (): AudienceCount | null => null,
+    getCachedData: (key, nuxtApp) => (nuxtApp.isHydrating ? nuxtApp.payload.data[key] : undefined),
+  },
 )
 
 const timingItems = computed(() => sendTimingOptions(ticketHolders.value, counted.value?.digestMinutes ?? null))
