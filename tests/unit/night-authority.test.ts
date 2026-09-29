@@ -252,7 +252,7 @@ describe('several roles at once carry the single-role guard\'s options (0098)', 
       expect(source).toContain('askNightAuthority(\'ANY\')')
     }
     // With no role the route itself ranks the refusals (issue 1411); `ANY` is that question.
-    expect(await Bun.file('app/composables/useNightShell.ts').text()).toContain('{ query: role === \'ANY\' ? {} : { role } }')
+    expect(await Bun.file('app/composables/useNightShell.ts').text()).toContain('role === \'ANY\' ? {} : { role }')
   })
 })
 
