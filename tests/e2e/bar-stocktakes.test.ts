@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -452,20 +452,23 @@ describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts 
   test('a role holder with no authenticator counts through tonight\'s bar shift', async () => {
     const item = await anItem()
     const opened = await open()
+    // Its own Front of House Manager: the suite's one holds an authenticator, as its other tests need.
+    const noFactor = await registerMember(app, 'fohmanager-no-factor', generatePassword())
+    await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'FOH_MANAGER' }, officer.cookie)
     overrideConfig(app, 'PRIVILEGED_ROLES', ['FOH_MANAGER'])
     try {
-      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], fohManager.cookie)).status).toBe(403)
-      aBarShift(fohManager.id, 'CONFIRMED')
-      const answered = await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], fohManager.cookie)
+      expect((await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], noFactor.cookie)).status).toBe(403)
+      aBarShift(noFactor.id, 'CONFIRMED')
+      const answered = await count(opened.stocktake.id, [{ itemId: item.id, counted: 2 }], noFactor.cookie)
       expect(answered.status).toBe(200)
       const { lines } = await answered.json() as { lines: StocktakeLine[] }
       expect(lines.find(one => one.itemId === item.id)?.expectedQty).toBeNull()
-      expect((await send('GET', '/api/admin/bar/stocktakes/open', undefined, fohManager.cookie)).status).toBe(200)
+      expect((await send('GET', '/api/admin/bar/stocktakes/open', undefined, noFactor.cookie)).status).toBe(200)
       expect(await countedOf(opened.stocktake.id, item.id)).toBe(2)
     }
     finally {
       clearConfigOverride(app, 'PRIVILEGED_ROLES')
-      clearShifts(fohManager.id)
+      clearShifts(noFactor.id)
       await apply(opened.stocktake.id)
     }
   })
