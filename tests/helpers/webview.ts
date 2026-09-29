@@ -131,8 +131,11 @@ export async function startApp(): Promise<AppUnderTest> {
 
   // Adopted rather than replaced: `bun run test` boots the server before the suites and kills it
   // after, so what a suite usually finds here is one that is already up.
-  if (!portIsFree(port)) {
-    if (!await alreadyServing()) {
+  // Asked over HTTP too: a server on ::1 alone leaves 127.0.0.1 bindable, and booting past it wipes
+  // the directory it is serving from.
+  const serving = await alreadyServing()
+  if (serving || !portIsFree(port)) {
+    if (!serving) {
       throw new Error(`port ${port} is held by something that is not this app: stop it, or set E2E_BASE_URL`)
     }
     const adopted: AppUnderTest = {

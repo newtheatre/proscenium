@@ -2309,7 +2309,8 @@ the in-application `health:watch` task alerts if it stays unhealthy.
 CI gates, eleven of them: `build`, `typecheck`, `lint`, `typecheck:bun`, `test`, and the six
 checkers (comments, migrations, content tokens, ledger, notifications, audit). `typecheck` and
 `typecheck:bun` are separate compilers over separate projects, and passing one says nothing about
-the other. `test:e2e` is **not** a gate: it runs nightly and on demand (0029).
+the other. `test:e2e` runs on every pull request into `unified/main`, in ten slices
+(`E2E_SLICE`, `scripts/run-tests.ts`), but is not yet a required check (`docs/known-issues.md`).
 
 ## Testing (0016)
 
