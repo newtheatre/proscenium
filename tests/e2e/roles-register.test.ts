@@ -5,7 +5,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysDay, saysDayLong } from '#shared/utils/when'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // The role register, end to end (A-131). What it grants, what it refuses and what the page says
@@ -299,10 +299,10 @@ describe.skipIf(skip !== null)('a grant carries its expiry, its note and its his
   })
 })
 
-// One browser backs every view, so a console screen is reached by signing in through the real
-// form and its challenge, the way an officer does.
+// One browser backs every view, so each starts signed out of the last one's session, and signs in
+// through the real form and its challenge, the way an officer does.
 async function signedInView(): Promise<Bun.WebView> {
-  const view = await openView({ width: 1280, height: 800 })
+  const view = await openSignedOutView(app.baseURL, { width: 1280, height: 800 })
   // Hydrated before the address is typed: the form reveals the password only then (0103).
   await visit(view, `${app.baseURL}/sign-in`)
   await fill(view, 'form input[type="email"]', officer.email)
@@ -373,7 +373,7 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
     try {
       await view.navigate(`${app.baseURL}/people/accounts/${self}`)
       await waitFor(view, `document.querySelector('[data-test="grants"]')`)
-      expect(await textOf(view, '[data-test="grants"]')).toContain('ADMIN')
+      expect(await textOf(view, '[data-test="grants"]')).toContain('IT Manager')
       await waitFor(view, `document.querySelector('[data-test="open-register"]')`)
     }
     finally {
@@ -458,8 +458,8 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
       await waitFor(view, `document.querySelector('[data-test="grant-nobody-found"]')`, 20_000)
       await click(view, '[data-test="grant-nobody-found"]')
       await waitFor(view, `document.querySelector('[data-test="grant-by-email"]')`)
-      await fill(view, '[data-test="grant-email"] input', email)
-      await fill(view, '[data-test="grant-name"] input', 'Screen Incoming')
+      await fill(view, '[data-test="grant-email"]', email)
+      await fill(view, '[data-test="grant-name"]', 'Screen Incoming')
       await click(view, '[data-test="grant-submit"]')
       await waitFor(view, `document.querySelector('[data-test="pending-grants"]')?.innerText.includes('Screen Incoming')`)
       expect(read('SELECT id FROM users WHERE email = ?', email)).toBeDefined()

@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysRole } from '#shared/utils/roles'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, openSignedOutView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -338,7 +338,7 @@ describe.skipIf(skip !== null)('the account screen', () => {
       await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-role"]')
 
       await pickOption(view, '[data-test="grant-role"]', saysRole('TREASURER'))
-      await click(view, '[data-test="grant-permanent"]')
+      await pickOption(view, '[data-test="grant-until"]', 'Further notice')
       await click(view, '[data-test="grant-submit"]')
       await waitFor(view, 'document.body.innerText.includes(\'further notice\')')
 
@@ -386,9 +386,8 @@ describe.skipIf(skip !== null)('the account screen', () => {
     try {
       await visit(view, `${app.baseURL}/people/accounts/${loser.id}`, '[data-test="merge-winner"]')
 
-      await fill(view, '[data-test="merge-winner"] input', winner.email.slice(0, 6))
-      await waitFor(view, `document.body.innerText.includes('${winner.email}')`)
-      await click(view, `[data-test="merge-winner"] [role="option"]`)
+      // The options open in a listbox of their own, not inside the picker.
+      await pickPerson(view, '[data-test="merge-winner"]', winner.email.slice(0, 6), winner.email)
       await click(view, '[data-test="merge-preview"]')
       await waitFor(view, 'document.querySelector(\'[data-test="merge-preview-result"]\')')
       expect(await textOf(view, '[data-test="merge-preview-result"]')).toContain(winner.email)
