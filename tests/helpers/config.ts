@@ -6,6 +6,8 @@ import type { AppUnderTest } from './webview'
 export function overrideConfig(app: AppUnderTest, key: string, value: unknown): void {
   const database = new Database(app.databaseFile)
   try {
+    // The server writes to the same file: wait out its lock rather than fail the suite on it.
+    database.run('PRAGMA busy_timeout = 10000')
     database.query('INSERT OR REPLACE INTO config (key, value, updated_by, updated_at) VALUES (?, ?, NULL, ?)')
       .run(key, JSON.stringify(value), Math.floor(Date.now() / 1000))
   }
@@ -17,6 +19,7 @@ export function overrideConfig(app: AppUnderTest, key: string, value: unknown): 
 export function clearConfigOverride(app: AppUnderTest, key: string): void {
   const database = new Database(app.databaseFile)
   try {
+    database.run('PRAGMA busy_timeout = 10000')
     database.query('DELETE FROM config WHERE key = ?').run(key)
   }
   finally {
