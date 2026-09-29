@@ -200,7 +200,9 @@ async function askToConfirm(setting: Setting, value: unknown, isRevert: boolean)
   preview.value = null
   previewLoading.value = true
   try {
-    preview.value = await $fetch<BlastRadiusPreview>(`/api/admin/config/${setting.key}/blast-radius`)
+    // A preview can depend on the value itself, such as the first night that closes itself.
+    const query = isRevert ? { revert: 'true' } : { value: JSON.stringify(value) }
+    preview.value = await $fetch<BlastRadiusPreview>(`/api/admin/config/${setting.key}/blast-radius`, { query })
   }
   catch {
     preview.value = null

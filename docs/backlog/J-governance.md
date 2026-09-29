@@ -121,8 +121,11 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
   5. Trimmed 26 September 2026 (issue 1357): which settings are flagged wide-blast-radius is a
      list in the code (`WIDE_BLAST_RADIUS`, `shared/utils/config.ts`), changed by a reviewed pull
      request, and not a setting. As a setting, one plain save could empty it and take every
-     preview and typed confirmation with it. The list is refund policy, retention arming and the
-     roles that need a second factor.
+     preview and typed confirmation with it. The list is refund policy, retention arming, the
+     roles that need a second factor and, since 28 September 2026, `AUTO_CLOSE_FROM_NIGHT`: set
+     too early, it freezes and emails a night report for every imported performance after it.
+     Its preview counts the performances from the proposed night on with no report and already
+     past their 24-hour close.
   6. Added 27 September 2026 (the review of issue 1357): reverting a wide-blast-radius setting
      shows the same preview and asks for the same typed confirmation as saving it. A revert
      writes a value like a save does, so it can arm retention or add a second-factor role just

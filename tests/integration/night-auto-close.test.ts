@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { autoCloseFrom, unclosedCandidatesQuery } from '#server/utils/night-auto-close'
+import { autoCloseFrom, autoCloseFromPreview, pastTheirClose, unclosedCandidatesQuery } from '#server/utils/night-auto-close'
 import { signOffStatement } from '#server/utils/night-signoff'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { showNightBounds } from '#shared/utils/show-night'
+import type { UnclosedCandidateRow } from '#server/utils/night-auto-close'
 import type { NightReport } from '#server/utils/night-report'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -106,5 +107,57 @@ describe('unclosedCandidatesQuery (criterion 1)', () => {
       const candidates = run(database, unclosedCandidatesQuery(now, FROM)).map(row => row.performanceId)
       expect(candidates).not.toContain(performanceId)
     })
+  })
+})
+
+// J-105: saving the key previews what the next sweep would freeze and mail, through the sweep's
+// own query and cut, so the preview and the sweep cannot disagree.
+describe('the preview of saving AUTO_CLOSE_FROM_NIGHT', () => {
+  // The 2026-09-02 night's own close: it is due, the 2026-09-03 night has started but is not.
+  const AT = new Date(showNightBounds('2026-09-02').to.getTime() + 24 * 60 * 60 * 1000)
+
+  function previewCount(database: TestDatabase, proposed: string): number {
+    const now = Math.floor(AT.getTime() / 1000)
+    const candidates = run(database, unclosedCandidatesQuery(now, autoCloseFrom(proposed)!)) as unknown as UnclosedCandidateRow[]
+    return pastTheirClose(candidates, AT).length
+  }
+
+  function seed(database: TestDatabase): void {
+    tonightsPerformance(database, { night: '2026-08-31', suffix: 'preview-imported', curtainHoursAfterNightStart: 15 })
+    tonightsPerformance(database, { night: NIGHT, suffix: 'preview-first', curtainHoursAfterNightStart: 15 })
+    tonightsPerformance(database, { night: '2026-09-02', suffix: 'preview-second', curtainHoursAfterNightStart: 15 })
+    tonightsPerformance(database, { night: '2026-09-03', suffix: 'preview-open', curtainHoursAfterNightStart: 15 })
+    const signed = tonightsPerformance(database, { night: NIGHT, suffix: 'preview-signed', curtainHoursAfterNightStart: 15 })
+    run(database, signOffStatement({
+      id: 'report-preview-signed', performanceId: signed.performanceId, venueId: signed.venueId, night: NIGHT,
+      closingNote: 'Signed', report: { ...REPORT, performanceId: signed.performanceId }, signedBy: null, signedVia: 'SYSTEM',
+    }))
+  }
+
+  test('counts the unreported performances from the proposed night on that are past their close', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(previewCount(database, NIGHT)).toBe(2)
+    })
+  })
+
+  test('a night set a day too early counts the imported performance it would mail', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(previewCount(database, '2026-08-31')).toBe(3)
+    })
+  })
+
+  test('a night whose performances have not yet reached their close counts none', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      expect(previewCount(database, '2026-09-03')).toBe(0)
+    })
+  })
+
+  test('an unset or unreadable night previews nothing, reading no table', async () => {
+    expect(await autoCloseFromPreview(null, AT)).toBe(0)
+    expect(await autoCloseFromPreview(undefined, AT)).toBe(0)
+    expect(await autoCloseFromPreview('26 October', AT)).toBe(0)
   })
 })

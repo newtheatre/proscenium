@@ -879,9 +879,15 @@ accounts already due anonymisation, read with no side effect at all
 (`dueForAnonymisation()`, `server/utils/retention-candidates.ts`), and `PRIVILEGED_ROLES` counts
 every role holder signing in with a password and no confirmed authenticator
 (`roleHoldersWithoutFactorQuery()`, the directory's `privilegedWithoutFactor()` over every role),
-since a preview is read before the new list is known. `PRIVILEGED_ROLES` is also add-only above
-`PRIVILEGED_FLOOR`, 0009's money, personal data and safety roles: `configProblem()` refuses a list
-leaving one off and names it, so no confirmation gets below the floor (A-112 criterion 4). `GET
+ignoring the proposed list: the count is who any addition could reach. `AUTO_CLOSE_FROM_NIGHT` is
+the one preview that reads the proposed value: `autoCloseFromPreview()`
+(`server/utils/night-auto-close.ts`) counts what the next `nights:close` sweep would freeze from
+that night, through the sweep's own `unclosedCandidatesQuery()` and `pastTheirClose()` cut, so the
+two cannot disagree. The preview route takes the value as `?value=` (JSON) or `?revert=true` for
+the prior value, and a save or revert checks the echo against the value it is about to write.
+`PRIVILEGED_ROLES` is also add-only above `PRIVILEGED_FLOOR`, 0009's money, personal data and
+safety roles: `configProblem()` refuses a list leaving one off and names it, so no confirmation
+gets below the floor (A-112 criterion 4). `GET
 /api/admin/config/[key]/blast-radius` answers with the count and its category; `PUT` requires a
 `confirmation` field matching the key's own name or the previewed count
 (`confirmationMatches()`, `shared/utils/blast-radius.ts`, pure and shared with the client), 400ing
