@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-10
+- Amended: 29 September 2026 by #1567 and migration 0129: "latest" is by `created_at`, then by
+  `rowid`, the order rows were written in, so two rows in one second never resolve by a random id.
 
 ## Context
 

@@ -110,7 +110,7 @@ export async function isDayLocked(day: string): Promise<boolean> {
 export function rangeClosedQuery(fromDay: string, toDay: string): SQL {
   return sql`
     WITH cover AS (
-      SELECT id, action, created_at, rowid AS seq FROM period_locks
+      SELECT action, created_at, rowid AS seq FROM period_locks
       WHERE from_day <= ${fromDay} AND to_day >= ${toDay}
       ORDER BY created_at DESC, rowid DESC
       LIMIT 1
