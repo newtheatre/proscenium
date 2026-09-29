@@ -116,10 +116,12 @@ export async function finishSignIn(app: AppUnderTest, view: Bun.WebView, email: 
 }
 
 // A role on the second-factor list is refused on every screen until its holder has an
-// authenticator (A-112), so a privileged grant enrols one first, as a real officer must.
+// authenticator (A-112), so a privileged grant enrols one first; the live list, if overridden.
 export async function grantRole(app: AppUnderTest, member: TestMember, role: string, as: string): Promise<Response> {
   const { CONFIG_KEYS } = await import('#shared/utils/config')
-  if ((CONFIG_KEYS.PRIVILEGED_ROLES.default as readonly string[]).includes(role)) await enrolAuthenticator(app, member)
+  const stored = query<{ value: string }>(app, `SELECT value FROM config WHERE key = 'PRIVILEGED_ROLES'`)
+  const privileged = stored ? JSON.parse(stored.value) as string[] : CONFIG_KEYS.PRIVILEGED_ROLES.default as readonly string[]
+  if (privileged.includes(role)) await enrolAuthenticator(app, member)
   return request(app, 'POST', '/api/admin/roles', { userId: member.id, role }, as)
 }
 

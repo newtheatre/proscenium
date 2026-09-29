@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -534,7 +534,10 @@ describe.skipIf(skip !== null)('a charge from an earlier night is answered by th
       const { venueId } = programme('earlier-night-factor')
       const id = anEarlierCharge(venueId, 'factor')
 
-      const refused = await answerCharge(app, id, 'declined', barManager.cookie)
+      // Its own Bar Manager: the suite's one holds an authenticator, as every other test needs.
+      const noFactor = await registerMember(app, 'tickets-bar-no-factor', generatePassword())
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, officer.cookie)
+      const refused = await answerCharge(app, id, 'declined', noFactor.cookie)
       expect(refused.status).toBe(403)
       expect(await message(refused)).toMatch(/authenticator/i)
       expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', id)!.status).toBe('STARTED')
