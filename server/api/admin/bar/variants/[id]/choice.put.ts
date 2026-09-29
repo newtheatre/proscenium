@@ -1,7 +1,5 @@
-import { sql } from 'drizzle-orm'
 import { londonDayOf } from '#shared/utils/ledger'
 import { variantChoiceForm } from '#shared/utils/bar'
-import type { BatchItem } from 'drizzle-orm/batch'
 
 // Attach a choice group to a variant, or clear it. Its stocked-ingredient components (F-113
 // criterion 1) are untouched: that recipe surface is components.put.ts's.
@@ -27,29 +25,24 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar.variant.choice.changed',
+    target: `bar-variant:${id}`,
+    detail: { choiceGroupId: group?.id ?? null, includedInPrice: group ? includedInPrice : false, optional: group ? optional : false },
+  })
+
   // A variant offers at most one choice group, so attaching a new one replaces the last rather
   // than adding a second (0017).
-  const statements: BatchItem<'sqlite'>[] = [
-    db.delete(schema.variantComponents).where(sql`variant_id = ${id} AND choice_group_id IS NOT NULL`),
-    ...(group
-      ? [db.insert(schema.variantComponents).values({
-          id: newId(),
-          variantId: id,
-          choiceGroupId: group.id,
-          qty,
-          includedInPrice,
-          choiceOptional: optional,
-        })]
-      : []),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar.variant.choice.changed',
-      target: `bar-variant:${id}`,
-      detail: { choiceGroupId: group?.id ?? null, includedInPrice: group ? includedInPrice : false, optional: group ? optional : false },
-    })),
-  ]
+  const { logged, writes } = attachChoiceStatements(id, group ? { choiceGroupId: group.id, qty, includedInPrice, optional } : null, entry)
+  const [landed] = await db.batch([db.all<{ id: string }>(logged), ...writes.map(statement => db.run(statement))])
 
-  await db.batch(statements as unknown as Parameters<typeof db.batch>[0])
+  if ((landed as { id: string }[]).length === 0) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `${held.label} depletes no stocked item of its own, so served without its choice it would sell an empty glass: add one under What it depletes first`,
+    })
+  }
 
   return { ok: true, choiceGroupId: group?.id ?? null }
 })

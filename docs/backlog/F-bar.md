@@ -322,6 +322,11 @@ Open questions:
      at the option's stated quantity, in addition to the variant's own depletion. Amended
      27 September 2026 (issue 1314): the attachment may be optional, so the till offers "No mixer"
      (a spirit neat), which depletes the variant's own recipe and nothing from the group.
+     Amended 28 September 2026 (issue 1529): only a variant with a stocked item of its own may
+     take an optional choice, so "No mixer" never sells an empty glass. Marking the choice optional
+     on a variant whose only component is the choice is refused, naming the variant, and so is
+     taking the last stocked item off a variant whose choice is optional; both refusals ride the
+     write itself (0003).
   4. No container size is ever stored on the product itself; sizes live only on variants, which
      retires the old estate's damaged container semantics by construction.
   5. A variant that has sold cannot be deleted; retiring it hides it from the till without touching

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { VARIANT_REFERENCES, effectivePriceColumn, everPricedColumn, retiredIngredientsQuery, variantEverSoldQuery } from '#server/utils/bar'
+import { VARIANT_REFERENCES, attachChoiceStatements, effectivePriceColumn, everPricedColumn, recipeStatements, retiredIngredientsQuery, variantEverSoldQuery } from '#server/utils/bar'
+import type { AttachedChoice } from '#server/utils/bar'
+import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 
@@ -192,6 +194,185 @@ describe('a size is a row against one stocked thing (F-112 criteria 1 and 4)', (
       expect(() => insert(database, 'choice_group_items', { id: 'cgi-3', choice_group_id: 'cg-1', item_id: 'item-1', qty: 0 })).toThrow()
       // An option's stocked item cannot be dropped out from under it.
       expect(() => database.batch([['DELETE FROM bar_items WHERE id = \'item-2\'']])).toThrow()
+    })
+  })
+})
+
+// The routes' own statements, run as the batch they send: the first is the entry, and nothing
+// after it lands unless it did (0049).
+function attach(database: TestDatabase, choice: AttachedChoice | null): boolean {
+  const entry = auditEntry({ actorId: null, action: 'bar.variant.choice.changed', target: 'bar-variant:var-1' })
+  const { logged, writes } = attachChoiceStatements('var-1', choice, entry)
+  database.batch([logged, ...writes].map(statement => boundStatement(database, statement)))
+  return rows(database, 'SELECT id FROM audit_log WHERE id = ?', entry.id).length === 1
+}
+
+function recipe(database: TestDatabase, components: { itemId: string, qty: number }[]): boolean {
+  const entry = auditEntry({ actorId: null, action: 'bar.variant.recipe.changed', target: 'bar-variant:var-1' })
+  const { logged, writes } = recipeStatements('var-1', components, entry)
+  database.batch([logged, ...writes].map(statement => boundStatement(database, statement)))
+  return rows(database, 'SELECT id FROM audit_log WHERE id = ?', entry.id).length === 1
+}
+
+function componentsOf(database: TestDatabase): { item: string | null, group: string | null, optional: number | null }[] {
+  return rows(database, `
+    SELECT item_id AS item, choice_group_id AS "group", choice_optional AS optional
+    FROM variant_components WHERE variant_id = 'var-1' ORDER BY item_id IS NULL, item_id
+  `)
+}
+
+const neat: AttachedChoice = { choiceGroupId: 'cg-1', qty: 200, includedInPrice: false, optional: true }
+const required: AttachedChoice = { ...neat, optional: false }
+
+describe('an optional choice needs a recipe of its own, so "No mixer" never sells an empty glass (F-112 criterion 3, issue 1529)', () => {
+  function mixers(database: TestDatabase): void {
+    wine(database)
+    variant(database, { status: 'ACTIVE' })
+    insert(database, 'choice_groups', { id: 'cg-1', name: 'Mixers' })
+    insert(database, 'choice_group_items', { id: 'cgi-1', choice_group_id: 'cg-1', item_id: 'item-2', qty: 200 })
+  }
+
+  test('a size whose only component is its choice cannot take it as optional, and keeps what it had', async () => {
+    await withDatabase((database) => {
+      mixers(database)
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', choice_group_id: 'cg-1', qty: 200 })
+
+      expect(attach(database, neat)).toBe(false)
+      expect(componentsOf(database)).toEqual([{ item: null, group: 'cg-1', optional: null }])
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(0)
+    })
+  })
+
+  test('a size with nothing yet cannot take an optional choice either', async () => {
+    await withDatabase((database) => {
+      mixers(database)
+      expect(attach(database, neat)).toBe(false)
+      expect(componentsOf(database)).toEqual([])
+    })
+  })
+
+  test('a size with a stocked item of its own takes its choice as optional', async () => {
+    await withDatabase((database) => {
+      mixers(database)
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 25 })
+
+      expect(attach(database, neat)).toBe(true)
+      expect(componentsOf(database)).toEqual([
+        { item: 'item-1', group: null, optional: null },
+        { item: null, group: 'cg-1', optional: 1 },
+      ])
+    })
+  })
+
+  // A soft drink's glass: no choice makes no drink, so the choice alone may be its recipe.
+  test('a required choice and a cleared one need no recipe of their own', async () => {
+    await withDatabase((database) => {
+      mixers(database)
+      expect(attach(database, required)).toBe(true)
+      expect(componentsOf(database)).toEqual([{ item: null, group: 'cg-1', optional: 0 }])
+
+      expect(attach(database, null)).toBe(true)
+      expect(componentsOf(database)).toEqual([])
+    })
+  })
+
+  test('the last stocked item cannot come off a size whose choice is optional', async () => {
+    await withDatabase((database) => {
+      mixers(database)
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 25 })
+      expect(attach(database, neat)).toBe(true)
+
+      expect(recipe(database, [])).toBe(false)
+      expect(componentsOf(database)).toEqual([
+        { item: 'item-1', group: null, optional: null },
+        { item: null, group: 'cg-1', optional: 1 },
+      ])
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(1)
+    })
+  })
+
+  test('a size whose choice is optional may swap its recipe for another', async () => {
+    await withDatabase((database) => {
+      mixers(database)
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 25 })
+      expect(attach(database, neat)).toBe(true)
+
+      expect(recipe(database, [{ itemId: 'item-1', qty: 50 }])).toBe(true)
+      expect(rows(database, 'SELECT qty FROM variant_components WHERE item_id = \'item-1\'')).toEqual([{ qty: 50 }])
+    })
+  })
+
+  test('the last stocked item comes off a size whose choice is required', async () => {
+    await withDatabase((database) => {
+      mixers(database)
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 25 })
+      expect(attach(database, required)).toBe(true)
+
+      expect(recipe(database, [])).toBe(true)
+      expect(componentsOf(database)).toEqual([{ item: null, group: 'cg-1', optional: 0 }])
+    })
+  })
+
+  // Both requests read the size holding its recipe and a required choice. D1 runs one batch after
+  // the other, and the second reads what the first wrote, so the two never both land.
+  test('marking a choice optional and emptying the recipe, sent together, never both land', async () => {
+    for (const neatFirst of [true, false]) {
+      await withDatabase((database) => {
+        mixers(database)
+        insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 25 })
+        insert(database, 'variant_components', { id: 'c-2', variant_id: 'var-1', choice_group_id: 'cg-1', qty: 200 })
+
+        const outcomes = neatFirst
+          ? [attach(database, neat), recipe(database, [])]
+          : [recipe(database, []), attach(database, neat)]
+        expect(outcomes).toEqual([true, false])
+
+        const held = componentsOf(database)
+        const optional = held.some(component => component.optional === 1)
+        const ownRecipe = held.some(component => component.item !== null)
+        expect(optional && !ownRecipe).toBe(false)
+      })
+    }
+  })
+})
+
+describe('a size on the till keeps something to deplete, asked on the write (F-128 criterion 1)', () => {
+  test('the last stocked item cannot come off a size of an ACTIVE product with no choice', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 750 })
+      database.batch([['UPDATE bar_products SET status = \'ACTIVE\' WHERE id = \'prod-1\'']])
+
+      expect(recipe(database, [])).toBe(false)
+      expect(componentsOf(database)).toEqual([{ item: 'item-1', group: null, optional: null }])
+    })
+  })
+
+  // The product went on the till after the route read it as hidden: the write still refuses.
+  test('the guard reads the product as it is when the write runs, not as it was read', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 750 })
+      const entry = auditEntry({ actorId: null, action: 'bar.variant.recipe.changed', target: 'bar-variant:var-1' })
+      const { logged, writes } = recipeStatements('var-1', [], entry)
+
+      database.batch([['UPDATE bar_products SET status = \'ACTIVE\' WHERE id = \'prod-1\'']])
+      database.batch([logged, ...writes].map(statement => boundStatement(database, statement)))
+      expect(rows(database, 'SELECT id FROM audit_log')).toHaveLength(0)
+      expect(componentsOf(database)).toHaveLength(1)
+    })
+  })
+
+  test('a hidden product\'s size may be emptied', async () => {
+    await withDatabase((database) => {
+      wine(database)
+      variant(database, { status: 'ACTIVE' })
+      insert(database, 'variant_components', { id: 'c-1', variant_id: 'var-1', item_id: 'item-1', qty: 750 })
+
+      expect(recipe(database, [])).toBe(true)
+      expect(componentsOf(database)).toEqual([])
     })
   })
 })
