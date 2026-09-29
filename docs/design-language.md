@@ -188,10 +188,10 @@ Eleven rules follow:
    inside the shell does not, the screen saying Syncing and drawing nothing it may yet take away
    until it lands. So the served page draws no tile, control or badge that is then taken away, or
    added once it has painted (issue 1521, K-102 criterion 5). What belongs to the device is never
-   served: the till's basket, queued writes and card attempts arrive once mounted, and a night that
-   asks which bar, naming none, serves Syncing and nothing to press until the phone has read its
-   memory of the bar it opened. A page that only wears the shell, the SumUp return or a session
-   register, never waits on the roles. Polling stays on the client, and a
+   served: the till's basket and card attempts arrive once mounted, and a night that asks which
+   bar, naming none, serves Syncing and nothing to press until the phone has read its memory of the
+   bar it opened. A page that only wears the shell, the SumUp return or a session register, never
+   waits on the roles. Polling stays on the client, and a
    clock-dependent choice (the running house, doors open, the curtain) is judged by the read's own
    moment until the page has mounted (`useNightClock()`). The duty manager's comp requests wait on
    the hub too, as `NightCompQueue` under Waiting on you (issue 1304). Nothing that ends the night

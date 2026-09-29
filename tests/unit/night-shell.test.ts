@@ -438,13 +438,35 @@ describe('a show-night screen is served as the viewer will use it (issue 1521)',
     expect(await read('app/composables/useTillEarlier.ts')).not.toContain('onMounted(')
   })
 
-  test('the till\'s catalogue rides the served page, and the device keeps whichever copy is newer', async () => {
+  test('the served grid and the served emergency cards stand until the phone\'s own read answers, with no clock compared', async () => {
     const catalogue = await read('app/composables/useTillCatalogue.ts')
-    expect(catalogue).toContain('.adopt(')
-    expect(await read('app/composables/useNightCache.ts')).toContain('servedCopyWins(')
+    expect(catalogue).toContain('nightCopyShown(served.value?.data ?? null, catalogue.data.value, catalogue.fetched.value)')
+    expect(await read('app/pages/tonight/emergency.vue')).toContain('nightCopyShown<')
+    expect(await read('shared/utils/night-cache.ts')).not.toContain('servedCopyWins')
   })
 
-  test('the basket, queued writes and card attempts stay the device\'s, and are never served', async () => {
+  test('a watcher set up after the served read fills its source also runs once mounted, through one helper', async () => {
+    for (const path of ['app/composables/useTillCatalogue.ts', 'app/composables/useSumUpCharge.ts', 'app/composables/useTillTickets.ts']) {
+      expect(`${path}: ${(await read(path)).includes('watchSinceMount(')}`).toBe(`${path}: true`)
+    }
+  })
+
+  test('tonight\'s open card charges are read only once the attempt this phone left has settled', async () => {
+    const sumup = await read('app/composables/useSumUpCharge.ts')
+    expect(sumup).toContain('resumed = resume(')
+    expect(sumup).toContain('resumed.then(refreshOpenAttempts, refreshOpenAttempts)')
+  })
+
+  test('a slower walk-up answer for a house no longer chosen never replaces the options', async () => {
+    const tickets = await read('app/composables/useTillTickets.ts')
+    expect(tickets).toContain('if (mine === optionsAsked) walkUpOptions.value = answered.options')
+  })
+
+  test('the report clears its last failure and the switcher as a re-read starts', async () => {
+    expect(await read('app/pages/tonight/report.vue')).toMatch(/async function load\(\): Promise<void> \{\s+busy\.value = true\s+failure\.value = null\s+ambiguous\.value = false/)
+  })
+
+  test('the basket and card attempts stay the device\'s, and are never served', async () => {
     const till = await read('app/pages/tonight/till/index.vue')
     const served = till.slice(till.indexOf('useServedRead('), till.indexOf('\n})', till.indexOf('useServedRead(')))
     for (const device of ['useTillBasket', 'useSumUpCharge', 'useWriteQueue', 'sumup.', 'basket']) {

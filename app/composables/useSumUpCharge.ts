@@ -1,5 +1,6 @@
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { usePendingPoll } from './usePendingPoll'
+import { watchSinceMount } from '../utils/watch-since-mount'
 import { useSumUp } from './useSumUp'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
@@ -210,13 +211,15 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     pendingPoll.stop()
   }
 
+  // Settled once the attempt this phone left is answered, so tonight's open list is read after it and
+  // never lists that attempt as somebody else's to answer.
+  let resumed: Promise<void> = Promise.resolve()
+
   // Inside a component only: the unit test drives this with no instance, as useNightCache is.
   if (getCurrentInstance()) {
     onMounted(() => {
       document.addEventListener('visibilitychange', returnToTab)
-      void resume(deps.returnedAttemptId ?? null)
-      // A session the served page carried was there before the watcher below, which never saw it arrive.
-      if (session.value) void refreshOpenAttempts()
+      resumed = resume(deps.returnedAttemptId ?? null)
     })
     onBeforeUnmount(() => {
       document.removeEventListener('visibilitychange', returnToTab)
@@ -267,8 +270,8 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     }
     catch { /* the strip is a convenience; the till still sells */ }
   }
-  watch([session, sumupEnabled], () => {
-    if (session.value) void refreshOpenAttempts()
+  watchSinceMount([session, sumupEnabled], () => {
+    if (session.value) void resumed.then(refreshOpenAttempts, refreshOpenAttempts)
   })
 
   return {

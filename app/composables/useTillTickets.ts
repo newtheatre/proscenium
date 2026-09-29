@@ -1,4 +1,5 @@
-import { computed, getCurrentInstance, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { watchSinceMount } from '../utils/watch-since-mount'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
@@ -100,7 +101,10 @@ export function useTillTickets(venueId: Ref<string | null>) {
     if (!walkUpPerformanceId.value && performances.length === 1) walkUpPerformanceId.value = performances[0]!.id
   }, { immediate: true })
 
+  // Each read numbered, so a slower answer for a house no longer chosen never prices the walk-up.
+  let optionsAsked = 0
   async function loadWalkUpOptions(): Promise<void> {
+    const mine = ++optionsAsked
     const performanceId = walkUpPerformanceId.value
     walkUpOptions.value = []
     walkUpQty.value = {}
@@ -108,20 +112,13 @@ export function useTillTickets(venueId: Ref<string | null>) {
     if (!performanceId || !venueId.value) return
     try {
       const answered = await $fetch<{ options: WalkUpOption[] }>('/api/till/walk-up-options', { query: { venueId: venueId.value, performanceId } })
-      walkUpOptions.value = answered.options
+      if (mine === optionsAsked) walkUpOptions.value = answered.options
     }
     catch (refused) {
-      walkUpOptionsFailure.value = refusalText(refused)
+      if (mine === optionsAsked) walkUpOptionsFailure.value = refusalText(refused)
     }
   }
-  watch([walkUpPerformanceId, venueId], loadWalkUpOptions)
-  // On a served page the house and the bar are both known as this is set up, so the watcher never sees
-  // them change; outside a component there is nothing to mount.
-  if (getCurrentInstance()) {
-    onMounted(() => {
-      if (walkUpPerformanceId.value && venueId.value) void loadWalkUpOptions()
-    })
-  }
+  watchSinceMount([walkUpPerformanceId, venueId], loadWalkUpOptions)
 
   function bumpWalkUp(typeId: string, by: number): void {
     walkUpQty.value[typeId] = Math.max(0, Math.min(20, (walkUpQty.value[typeId] ?? 0) + by))

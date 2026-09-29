@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysWhenLong } from '#shared/utils/when'
-import { nightCacheKey, servedCopyWins } from '#shared/utils/night-cache'
+import { nightCacheKey, nightCopyShown } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 import { telHref } from '#shared/utils/tonight'
@@ -52,13 +52,9 @@ useServedRead('tonight-emergency', async () => import.meta.server ? await settle
   if (read?.kind === 'READ') served.value = { cards: read.value, at: read.at }
 })
 
-// Whichever copy is newer, the served one or the device's; its numbers are only its fetcher's.
-const shown = computed(() => {
-  const held = cache.data.value
-  const copy = served.value
-  if (copy && (!held || servedCopyWins(cache.cachedAt.value, copy.at))) return copy
-  return held ? { cards: held, at: cache.cachedAt.value } : null
-})
+// The served cards are this request's own, so they stand until the phone's refresh answers; the
+// device's copy is drawn only on a navigation, with nothing served. Its numbers are only its fetcher's.
+const shown = computed(() => nightCopyShown<{ cards: Cards, at: number | null }>(served.value, cache.data.value ? { cards: cache.data.value, at: cache.cachedAt.value } : null, cache.fetched.value))
 const cards = computed(() => emergencyCardsFor(shown.value?.cards ?? null, account.value.user?.id ?? null))
 const asOfAt = computed(() => shown.value?.at ?? null)
 

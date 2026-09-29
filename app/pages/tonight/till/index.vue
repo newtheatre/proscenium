@@ -582,7 +582,7 @@ const basketBindings = computed(() => ({
         : 'One till for the whole night. Everyone at this bar sells against it.'"
       :empty="settled && !session"
       :stale="session ? saleAt : syncedAt"
-      :busy="busy || syncing || !settled || catalogue.pending.value"
+      :busy="busy || syncing || !settled || (catalogue.pending.value && !sale)"
       :refused="failure && !needsVenue && !failure.enrolPath && failureStatus === 403 ? failure.message : null"
     >
       <TillEarlierNights

@@ -1,6 +1,7 @@
-import { nightCacheKey } from '#shared/utils/night-cache'
+import { nightCacheKey, nightCopyShown } from '#shared/utils/night-cache'
 import { currentShowNight } from '#shared/utils/show-night'
 import { useNightCache } from './useNightCache'
+import { watchSinceMount } from '../utils/watch-since-mount'
 import type { Ref } from 'vue'
 import type { Discount } from '#shared/utils/discounts'
 import type { SaleCatalogue, SaleProduct } from '#shared/utils/sale'
@@ -32,30 +33,18 @@ export function useTillCatalogue(session: Ref<TillSession | null>, venueId: Ref<
   const catalogueKey = computed(() => nightCacheKey({ screen: 'till-products', night: currentShowNight(), wholeNight: true }))
   const catalogue = useNightCache<SaleCatalogue>(catalogueKey, () => readSaleCatalogue(request, venueId.value), { immediate: false })
 
-  watch([session, venueId], () => {
-    if (session.value && venueId.value) void catalogue.refresh()
-  })
-
   // The grid's stock labels trail the shelf from the moment they load, so coming back to the till
   // (from the SumUp app, say) reads them again (F-128 criterion 8).
   function onReturn(): void {
     if (document.visibilityState === 'visible' && session.value && venueId.value) void catalogue.refresh()
   }
-  onMounted(() => {
-    document.addEventListener('visibilitychange', onReturn)
-    // A session the served page carried was there before the watchers above, which never saw it
-    // arrive; the served grid is as fresh as a refresh, so the device keeps it unless its own is newer.
-    if (!session.value || !venueId.value) return
-    if (served.value) catalogue.adopt(served.value.data, served.value.at)
-    else void catalogue.refresh()
-    void discounts.refresh()
-    void tabHolders.refresh()
-  })
+  onMounted(() => document.addEventListener('visibilitychange', onReturn))
   onBeforeUnmount(() => document.removeEventListener('visibilitychange', onReturn))
 
-  // The served copy until the device holds one, which after mount is the newer of the two.
-  const sale = computed(() => catalogue.data.value ?? served.value?.data ?? null)
-  const saleAt = computed(() => catalogue.data.value ? catalogue.cachedAt.value : (served.value?.at ?? null))
+  // The served grid is this request's own, so it stays on screen until the phone's refresh answers;
+  // the device's copy, perhaps another bar's stock, is drawn only on a navigation with nothing served.
+  const sale = computed(() => nightCopyShown(served.value?.data ?? null, catalogue.data.value, catalogue.fetched.value))
+  const saleAt = computed(() => nightCopyShown(served.value?.at ?? null, catalogue.cachedAt.value, catalogue.fetched.value))
   const categories = computed(() => sale.value?.categories ?? [])
   const products = computed(() => sale.value?.products ?? [])
   const productsIn = (categoryId: string): SaleProduct[] => products.value.filter(product => product.categoryId === categoryId)
@@ -66,10 +55,6 @@ export function useTillCatalogue(session: Ref<TillSession | null>, venueId: Ref<
   const discounts = useNightCache<{ discounts: Discount[] }>(discountsKey, () =>
     request<{ discounts: Discount[] }>('/api/till/discounts', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
 
-  watch([session, venueId], () => {
-    if (session.value && venueId.value) void discounts.refresh()
-  })
-
   const selectedDiscountId = ref<string | null>(null)
 
   // Who the till may charge a sale to instead of the reader (F-108). The allow-list is short by
@@ -78,11 +63,15 @@ export function useTillCatalogue(session: Ref<TillSession | null>, venueId: Ref<
   const tabHolders = useNightCache<{ holders: TabHolder[] }>(tabHoldersKey, () =>
     request<{ holders: TabHolder[] }>('/api/till/tab-holders', { query: { venueId: venueId.value ?? undefined } }), { immediate: false })
 
-  watch([session, venueId], () => {
-    if (session.value && venueId.value) void tabHolders.refresh()
-  })
-
   const selectedTabHolderId = ref<string | null>(null)
+
+  // Read afresh whenever the till has a session at a bar, a served one included.
+  watchSinceMount([session, venueId], () => {
+    if (!session.value || !venueId.value) return
+    void catalogue.refresh()
+    void discounts.refresh()
+    void tabHolders.refresh()
+  })
 
   return {
     catalogue,

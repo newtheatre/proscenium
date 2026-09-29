@@ -99,8 +99,11 @@ function applyDraft(asked: string | null, answered: SettledRead<Report>): void {
   syncedAt.value = answered.at
 }
 
+// The refusal card stays through a re-read, as before, so a refused viewer is never shown the work.
 async function load(): Promise<void> {
   busy.value = true
+  failure.value = null
+  ambiguous.value = false
   try {
     const asked = performanceId.value
     applyDraft(asked, await readDraft(asked))
