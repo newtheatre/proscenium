@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -19,6 +19,8 @@ let app: AppUnderTest
 let officer: TestMember
 let member: TestMember
 let venueId: string
+let boxOffice: TestMember
+const boxOfficePassword = generatePassword()
 
 beforeAll(async () => {
   if (skip) return
@@ -26,6 +28,8 @@ beforeAll(async () => {
   officer = await adminSession(app)
   member = await registerMember(app, 'ordinary', generatePassword())
   venueId = venue(40)
+  boxOffice = await registerMember(app, 'pricing-screen', boxOfficePassword)
+  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -323,15 +327,8 @@ describe.skipIf(skip !== null)('the screen shows why a price is what it is (D-12
   }, CASE_TIMEOUT_MS)
 })
 
-// Signed out first, and waited for: a script cannot overwrite the HttpOnly session another suite
-// left behind, and a sign-out answering late would clear the one planted here.
+// Signed in through the form: a script cannot plant a session over the HttpOnly one another
+// suite left in the shared browser, so a planted cookie was silently ignored.
 async function openConsole(): Promise<Bun.WebView> {
-  const { openView } = await import('#tests/helpers/webview')
-  const view = await openView()
-  await view.navigate(`${app.baseURL}/`)
-  await waitFor(view, 'document.body')
-  await view.evaluate(`(window.__signedOut = false, fetch('/api/auth/sign-out', { method: 'POST' }).finally(() => { window.__signedOut = true }), true)`)
-  await waitFor(view, 'window.__signedOut === true')
-  await view.evaluate(`document.cookie = ${JSON.stringify(officer.cookie)}`)
-  return view
+  return signInView(app, boxOffice.email, boxOfficePassword)
 }

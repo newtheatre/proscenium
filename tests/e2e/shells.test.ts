@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { testVenue } from '#tests/helpers/programme'
-import { click, fill, openSignedOutView, openView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, openView, signInView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -18,6 +18,8 @@ let showSlug = ''
 let performanceId = ''
 let member: TestMember
 let officerCookie = ''
+let deskOfficer: TestMember
+const deskOfficerPassword = generatePassword()
 let memberPassword = ''
 
 async function seedShow(cookie: string): Promise<void> {
@@ -62,6 +64,8 @@ beforeAll(async () => {
   await seedShow(officerCookie)
   memberPassword = generatePassword()
   member = await registerMember(app, 'shells', memberPassword)
+  deskOfficer = await registerMember(app, 'shells-desk', deskOfficerPassword)
+  await grantRole(app, deskOfficer, 'FOH_MANAGER', officerCookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -70,10 +74,9 @@ afterAll(async () => {
 
 // Signed out first: the browser is shared, so a session another suite left would otherwise
 // redirect a way in and change what a public page shows.
-async function inspect<T>(path: string, script: string, cookie?: string, size?: { width: number, height: number }): Promise<T> {
-  const view = await openSignedOutView(app.baseURL, size)
+async function inspect<T>(path: string, script: string): Promise<T> {
+  const view = await openSignedOutView(app.baseURL)
   try {
-    if (cookie) await view.evaluate(`document.cookie = ${JSON.stringify(cookie)}`)
     await view.navigate(`${app.baseURL}${path}`)
     return await view.evaluate<T>(script)
   }
@@ -156,12 +159,20 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
   // The one place every console screen agrees on was a bare span, so the sidebar had no way home
   // (0082). On /dev for the same reason the test above is.
   test('the console sidebar header is a link to the overview', async () => {
-    // As an officer at a desk: a signed-out view has no sidebar, and a narrow one folds it away.
-    const href = await inspect<string | null>('/dev', `(() => {
-      const header = document.querySelector('aside a[href="/admin"], nav a[href="/admin"]')
-      return header ? header.getAttribute('href') : null
-    })()`, officerCookie, { width: 1280, height: 800 })
-    expect(href).toBe('/admin')
+    // Signed in through the form at a desk: a signed-out view has no sidebar, a narrow one folds it
+    // away, and a session planted by script is refused over one another suite left behind.
+    const view = await signInView(app, deskOfficer.email, deskOfficerPassword, { width: 1280, height: 800 })
+    try {
+      await visit(view, `${app.baseURL}/dev`)
+      const href = await view.evaluate<string | null>(`(() => {
+        const header = document.querySelector('aside a[href="/admin"], nav a[href="/admin"]')
+        return header ? header.getAttribute('href') : null
+      })()`)
+      expect(href).toBe('/admin')
+    }
+    finally {
+      view.close()
+    }
   })
 
   // The member's own screens are calm, the same way the console is and for the same reason
