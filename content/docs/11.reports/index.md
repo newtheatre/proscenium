@@ -3,7 +3,7 @@ title: Reports
 description: Incident trends and each performance's attendance and staffing across any period, with a CSV export of each.
 module: Show night
 audience: committee
-updatedOn: 2026-09-27
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -12,8 +12,9 @@ navigation:
 
 **Night reports**, near the foot of the Manage sidebar, looks back over many show nights at once:
 which kinds of incident keep happening and where, and how each performance went for attendance
-and staffing. The Front of House Manager, the Safety Officer, the Committee and the IT Manager
-read it. It is its own entry in the sidebar, not part of Rota, Box office or Money, and holding
+and staffing. Every post reads it (the President, the Secretary and Welfare Officer, the
+Treasurer, the Front of House Manager and the Theatre Manager), and so do the Committee and the
+IT Manager. It is its own entry in the sidebar, not part of Rota, Box office or Money, and holding
 it opens nothing in those.
 
 ## If something goes wrong
@@ -22,6 +23,8 @@ it opens nothing in those.
   read."**: the figures did not come back, or your role no longer reads reports. Change the
   period and back to read it again; if it keeps happening, check your role under
   [roles and permissions](/docs/getting-started/roles-and-permissions).
+- **"The officers standing in with no performance could not be read."**: the performances came
+  back but the list under them did not. Change the period and back to read it again.
 - **"That season does not exist"**: the season chosen was removed while the screen was open.
   Reload the page and choose again.
 - **TERM or SEASON is not in the list**: nobody has defined a term yet, or no season exists.
@@ -66,6 +69,16 @@ One row for each performance in the period, earliest first. A cancelled performa
   the next day.
 
 On a phone, the last four columns are hidden; the export carries them all.
+
+### Officers standing in with no performance
+
+A bar opened on a night with no performance at that venue, such as a hire or a society social,
+has no night report, so an officer who opened its till without a bar shift would otherwise go
+unreported. Under the table, **Officers standing in with no performance** lists each one in the
+period, for example **Sat 17 Oct: Alex Morgan stood in at the bar by officer role: Society
+social, The Studio**. **with no bar opening planned** in place of a label means the bar was
+opened on a night the rota had no opening for. The list only appears when there is something on
+it, follows the period chosen, and is not in the export.
 
 Opening the performances tab puts `?tab=performances` on the address, so a link to it opens on
 that tab.

@@ -4,6 +4,9 @@
 - Date: 2026-09-26
 - Amends: 0090 (which permissions the Front of House Manager's role holds), and with it the refund
   line 0044 was amended to carry
+- Amended: 29 September 2026 by 0112, under which the consequence "the Manager still holds
+  `money.refund`" lapses: `MANAGER` retired, so `money.refund` is held by `FOH_MANAGER` and
+  `ADMIN` alone
 
 ## Context
 

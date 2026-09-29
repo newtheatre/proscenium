@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
-import { saysWhen } from '#shared/utils/when'
-import type { IncidentTrendRow, PerformanceReportRow } from '#shared/utils/season-reports'
+import { saysOpeningBypass } from '#shared/utils/season-reports'
+import { saysDay, saysWhen } from '#shared/utils/when'
+import type { IncidentTrendRow, OpeningBypassRow, PerformanceReportRow } from '#shared/utils/season-reports'
 import type { PeriodChoices } from '#shared/utils/season-dashboard'
 import { DEFAULT_PAGE_SIZE } from '#shared/utils/pagination'
 import type { Page } from '#shared/utils/pagination'
@@ -55,8 +56,16 @@ const { data: performances, status: performancesStatus, error: performancesError
   { watch: [query, performancesPage], default: empty<PerformanceReportRow> },
 )
 
+// No night report carries a bypass at a venue with nothing on, so this list does (E-130 criterion 6).
+const { data: openingBypasses, error: openingBypassesError } = await useAsyncData(
+  'reports-opening-bypasses',
+  () => request<OpeningBypassRow[]>('/api/admin/reports/opening-bypasses', { query: query.value }),
+  { watch: [query], default: (): OpeningBypassRow[] => [] },
+)
+
 const incidentsFailure = useListFailure(incidentsError, 'The incident report could not be read.')
 const performancesFailure = useListFailure(performancesError, 'The performance report could not be read.')
+const openingBypassesFailure = useListFailure(openingBypassesError, 'The officers standing in with no performance could not be read.')
 
 function exportUrl(report: Report): string {
   return `/api/admin/reports/${report}/export?${new URLSearchParams(query.value).toString()}`
@@ -219,6 +228,43 @@ const performanceColumns: TableColumn<PerformanceReportRow>[] = [
             :total="performances.total"
             :items-per-page="performances.pageSize"
           />
+
+          <UAlert
+            v-if="openingBypassesFailure && !performancesFailure"
+            data-test="opening-bypasses-failure"
+            color="error"
+            variant="subtle"
+            :description="openingBypassesFailure.message"
+          />
+
+          <div
+            v-else-if="openingBypasses.length > 0"
+            class="space-y-2"
+            data-test="opening-bypasses"
+          >
+            <h3 class="text-sm font-medium">
+              Officers standing in with no performance
+            </h3>
+            <p class="text-sm text-muted">
+              A bar opened on a night with no performance at that venue has no night report, so each
+              officer who stood in is listed here.
+            </p>
+            <ul class="space-y-1 text-sm">
+              <li
+                v-for="(bypass, index) in openingBypasses"
+                :key="`${bypass.night}-${bypass.venueId}-${bypass.role}-${index}`"
+              >
+                <UBadge
+                  color="warning"
+                  variant="subtle"
+                  size="sm"
+                  class="text-left whitespace-normal"
+                >
+                  {{ saysDay(bypass.night) }}: {{ saysOpeningBypass(bypass) }}
+                </UBadge>
+              </li>
+            </ul>
+          </div>
         </section>
       </template>
     </UTabs>

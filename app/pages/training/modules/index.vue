@@ -24,6 +24,7 @@ interface Module {
   expiryMode: ExpiryMode
   expiryMonths: number | null
   safetyCritical: boolean
+  committeeOnly: boolean
   held: boolean | null
   prerequisites: Prerequisite[]
   nextSession: NextSession | null

@@ -125,11 +125,11 @@ async function person(prefix: string): Promise<{ id: string, email: string, name
 describe.skipIf(skip !== null)('the role register answers who holds what (A-131 criteria 1 to 3)', () => {
   test('it counts live holders for every role in one answer, and pages the holders', async () => {
     const holder = await person('counted')
-    expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'BAR_MANAGER' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'PRESIDENT' }, cookie)).status).toBe(200)
 
-    const listing = await register('?role=is:BAR_MANAGER')
+    const listing = await register('?role=is:PRESIDENT')
     expect(listing.items.map(item => item.email)).toContain(holder.email)
-    expect(listing.counts.BAR_MANAGER).toBeGreaterThanOrEqual(1)
+    expect(listing.counts.PRESIDENT).toBeGreaterThanOrEqual(1)
     expect(listing.counts.ADMIN).toBeGreaterThanOrEqual(1)
     expect(listing).toMatchObject({ page: 1 })
     expect(Object.keys(listing.counts).every(role => (ROLES as readonly string[]).includes(role))).toBe(true)
@@ -145,18 +145,18 @@ describe.skipIf(skip !== null)('the role register answers who holds what (A-131 
 
   test('a lapsed grant is hidden, counted, and there when asked for', async () => {
     const holder = await person('lapsing')
-    expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'SAFETY_OFFICER' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'SECRETARY' }, cookie)).status).toBe(200)
     write('UPDATE role_grants SET expires_at = ? WHERE user_id = ?', Math.floor(Date.now() / 1000) - 60, holder.id)
 
-    const hidden = await register('?role=is:SAFETY_OFFICER')
+    const hidden = await register('?role=is:SECRETARY')
     expect(hidden.items.map(item => item.email)).not.toContain(holder.email)
     expect(hidden.lapsedHidden).toBeGreaterThanOrEqual(1)
-    expect(hidden.counts.SAFETY_OFFICER ?? 0).toBe(0)
+    expect(hidden.counts.SECRETARY ?? 0).toBe(0)
 
-    const asked = await register('?role=is:SAFETY_OFFICER&includeLapsed=true')
+    const asked = await register('?role=is:SECRETARY&includeLapsed=true')
     expect(asked.items.map(item => item.email)).toContain(holder.email)
     expect(asked.items.find(item => item.email === holder.email)?.live).toBe(false)
-    expect((await register('?role=is:SAFETY_OFFICER&lapsed=true')).lapsedHidden).toBe(0)
+    expect((await register('?role=is:SECRETARY&lapsed=true')).lapsedHidden).toBe(0)
   })
 
   test('permanent grants are a standing report, whatever role is being looked at (criterion 6)', async () => {
@@ -239,8 +239,8 @@ describe.skipIf(skip !== null)('a grant carries its expiry, its note and its his
     const holder = await person('audited')
     const first = Math.floor(Date.now() / 1000) + 10 * 24 * 60 * 60
     const second = Math.floor(Date.now() / 1000) + 20 * 24 * 60 * 60
-    await send('POST', '/api/admin/roles', { userId: holder.id, role: 'ACCESSIBILITY_OFFICER', expiresAt: first }, cookie)
-    await send('POST', '/api/admin/roles', { userId: holder.id, role: 'ACCESSIBILITY_OFFICER', expiresAt: second, note: 'Confirmed by the committee' }, cookie)
+    await send('POST', '/api/admin/roles', { userId: holder.id, role: 'SECRETARY', expiresAt: first }, cookie)
+    await send('POST', '/api/admin/roles', { userId: holder.id, role: 'SECRETARY', expiresAt: second, note: 'Confirmed by the committee' }, cookie)
 
     const entry = read<{ action: string, detail: string }>(
       'SELECT action, detail FROM audit_log WHERE target = ? AND action = ? ORDER BY created_at DESC',
@@ -450,7 +450,7 @@ describe.skipIf(skip !== null)('a role is granted by address when the picker fin
     const email = registrableAddress('screen-incoming')
     const view = await signedInView()
     try {
-      await visit(view, `${app.baseURL}/people/roles?role=is:BAR_MANAGER`, '[data-test="grant-form"]')
+      await visit(view, `${app.baseURL}/people/roles?role=is:SECRETARY`, '[data-test="grant-form"]')
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="grant-nobody-found"]'))`)).toBe(false)
 
       await typeSearch(view, '[data-test="grant-person"] input', email)

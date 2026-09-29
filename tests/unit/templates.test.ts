@@ -22,7 +22,7 @@ const EVERYTHING: TemplateContext = {
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
   securityUrl: 'https://newtheatre.org.uk/account/access',
-  accountUrl: 'https://newtheatre.org.uk/account',
+  accountUrl: 'https://newtheatre.org.uk/my',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
   accessUrl: ACCESS_URL,
   roomsUrl: ROOMS_URL,
@@ -216,6 +216,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     const { html } = render('role-expiring', EVERYTHING)
     expect(flat(html)).toContain('Committee roles run to the end of our year')
     expect(flat(html)).toContain(`ask the ${saysRole('ADMIN')} to renew`)
+    expect(flat(html)).toContain('Your roles are listed on <a href="https://newtheatre.org.uk/my">My NNT</a>.')
   })
 
   test('the unpaid hold calls it a booking and says the seats may be sold', () => {

@@ -1,6 +1,6 @@
 # Backlog index
 
-318 stories across 11 modules. Detailed stories carry testable acceptance criteria; Later
+319 stories across 11 modules. Detailed stories carry testable acceptance criteria; Later
 entries are epic stubs awaiting their own definition pass. Story ids are stable once merged:
 MVP stories number from x-101, V2 from x-201, Later from x-301. Cross-module dependencies are
 named by module (or by the specification's story ids) until all files' numbering is final; the
@@ -8,7 +8,7 @@ first tracker import resolves them.
 
 | File | Module | MVP | V2 | Later | Resolved | Total |
 | --- | --- | --- | --- | --- | --- | --- |
-| `A-identity.md` | Identity, membership and privacy | 33 | 4 | 2 | 2 | 41 |
+| `A-identity.md` | Identity, membership and privacy | 34 | 4 | 2 | 2 | 42 |
 | `B-productions.md` | Programming and productions (deferred) | 0 | 0 | 8 | 0 | 8 |
 | `C-spaces.md` | Spaces and equipment | 24 | 6 | 2 | 0 | 32 |
 | `D-ticketing.md` | Box office and ticketing | 32 | 7 | 2 | 1 | 42 |
@@ -19,7 +19,7 @@ first tracker import resolves them.
 | `I-finance.md` | Finance | 9 | 3 | 1 | 0 | 13 |
 | `J-governance.md` | Governance and handover | 10 | 6 | 0 | 1 | 17 |
 | `K-platform.md` | Platform foundations and migration | 30 | 1 | 0 | 5 | 36 |
-| **Total** | | **233** | **52** | **20** | **13** | **318** |
+| **Total** | | **234** | **52** | **20** | **13** | **319** |
 
 How the table counts: a story is a `## X-NNN:` heading in a module file, and its phase is the
 first word of the `- Phase:` line beneath it, MVP, V2 or Later. The phase line decides, not the

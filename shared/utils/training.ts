@@ -285,6 +285,8 @@ const moduleFields = z.object({
   grantsTrainer: z.boolean().default(false),
   grantsSupervisor: z.boolean().default(false),
   selfRegistrable: z.boolean().default(false),
+  // Any kind may be committee-only: it limits self sign-up and asks, never what a record means (0114).
+  committeeOnly: z.boolean().default(false),
   status: z.enum(MODULE_LIFECYCLE).default('DRAFT'),
   sort: z.number().int().nonnegative().max(9999).default(0),
   // Absent means leave the links alone. A default of none would let an edit that never mentions

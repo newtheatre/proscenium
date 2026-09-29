@@ -27,7 +27,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'tab-bar-manager', barManagerPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
   barStaff = await registerMember(app, 'tab-bar-staff', barStaffPassword)
 }, BOOT_TIMEOUT_MS)
 
@@ -292,7 +292,7 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     expect(answered.status).toBe(409)
   })
 
-  test('a bar manager may override, and the entry attributes to them', async () => {
+  test('a Front of House Manager may override, and the entry attributes to them', async () => {
     const { venueId, performanceId } = programme(`tabs-manager-override-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct(2000)
     await openTill(venueId, performanceId, barManager.cookie)

@@ -66,7 +66,7 @@ function seedDuplicate(database: TestDatabase): Seeded {
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-winner', winnerId, 'FOH_MANAGER', now + 1000],
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-loser', loserId, 'FOH_MANAGER', null],
     // A role only the loser holds moves across untouched.
-    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-loser-only', loserId, 'TRAINING_MANAGER', null],
+    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-loser-only', loserId, 'THEATRE_MANAGER', null],
   ])
 
   const venue = testVenue(database, { suffix: 'merge' })
@@ -164,8 +164,8 @@ describe('merging duplicate accounts (A-123)', () => {
       // The loser's never-expiring grant won: the winner's dated one is gone.
       expect(boxOffice[0]?.expiresAt).toBeNull()
 
-      const trainingManager = rows(database, 'SELECT id FROM role_grants WHERE user_id = ? AND role = ?', winnerId, 'TRAINING_MANAGER')
-      expect(trainingManager).toHaveLength(1)
+      const theatreManager = rows(database, 'SELECT id FROM role_grants WHERE user_id = ? AND role = ?', winnerId, 'THEATRE_MANAGER')
+      expect(theatreManager).toHaveLength(1)
 
       expect(rows(database, 'SELECT id FROM role_grants WHERE user_id = ?', loserId)).toHaveLength(0)
     })

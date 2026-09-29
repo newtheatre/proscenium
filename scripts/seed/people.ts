@@ -33,10 +33,10 @@ export interface SeedPerson {
 // Named so nobody mistakes one for a member, and spread across the states rather than clustered:
 // a screen that only ever sees a current member is a screen nobody has tested.
 export const PEOPLE: SeedPerson[] = [
-  { slug: 'rowan', name: 'Rowan Ellis (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'CURRENT' }] },
+  { slug: 'rowan', name: 'Rowan Ellis (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'FOH_MANAGER', when: 'CURRENT' }] },
   { slug: 'priya', name: 'Priya Nair (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'CURRENT' }] },
-  { slug: 'tomasz', name: 'Tomasz Zielinski (test)', pronouns: 'he/him', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'EXPIRING' }] },
-  { slug: 'aoife', name: 'Aoife Brennan (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'SAFETY_OFFICER', when: 'CURRENT' }] },
+  { slug: 'tomasz', name: 'Tomasz Zielinski (test)', pronouns: 'he/him', membership: 'CURRENT', roles: [{ role: 'TREASURER', when: 'EXPIRING' }] },
+  { slug: 'aoife', name: 'Aoife Brennan (test)', pronouns: 'she/her', membership: 'CURRENT', roles: [{ role: 'THEATRE_MANAGER', when: 'CURRENT' }] },
   { slug: 'sam', name: 'Sam Okonkwo (test)', pronouns: 'they/them', membership: 'CURRENT', roles: [{ role: 'THEATRE_MANAGER', when: 'LAPSED' }] },
   { slug: 'iris', name: 'Iris Fairweather (test)', membership: 'CURRENT', roles: [{ role: 'COMMITTEE', when: 'FOREVER' }] },
   { slug: 'devon', name: 'Devon Achebe (test)', pronouns: 'he/him', membership: 'CURRENT' },
@@ -44,8 +44,8 @@ export const PEOPLE: SeedPerson[] = [
   { slug: 'jonah', name: 'Jonah Whitlock (test)', pronouns: 'he/him', membership: 'CURRENT' },
   { slug: 'kavya', name: 'Kavya Raghunathan (test)', membership: 'CURRENT' },
   { slug: 'ellis', name: 'Ellis Trewin (test)', pronouns: 'they/them', membership: 'CURRENT' },
-  { slug: 'noor', name: 'Noor Haddad (test)', membership: 'CURRENT' },
-  { slug: 'bram', name: 'Bram Kowalczyk (test)', pronouns: 'he/him', membership: 'CURRENT' },
+  { slug: 'noor', name: 'Noor Haddad (test)', membership: 'CURRENT', roles: [{ role: 'PRESIDENT', when: 'CURRENT' }] },
+  { slug: 'bram', name: 'Bram Kowalczyk (test)', pronouns: 'he/him', membership: 'CURRENT', roles: [{ role: 'SECRETARY', when: 'CURRENT' }] },
 
   // The awkward ones, which is why they are here at all.
   { slug: 'lapsed', name: 'Lena Pastdue (test)', membership: 'LAPSED' },

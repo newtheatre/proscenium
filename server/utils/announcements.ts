@@ -10,6 +10,7 @@ import { auditEntry } from '#shared/utils/audit'
 import { londonDay } from '#shared/utils/membership'
 import { announcementType } from '#shared/utils/announcements'
 import { HOLDING_STATUSES } from '#shared/utils/capacity'
+import { withCommitteeStanding } from '#shared/utils/roles'
 import { messageType } from '#shared/utils/notifications'
 import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import type { AnnounceShowOption, AudienceDefinition, ComposeAnnouncementInput } from '#shared/utils/announcements'
@@ -38,13 +39,14 @@ export function allCurrentMembersQuery(today: string, graceDays: number): SQL {
   `
 }
 
-// A holder is a live grant on an account somebody uses: pending is not holding (0088).
+// A holder is a live grant on an account somebody uses: pending is not holding (0088). The
+// Committee is every post role, so a post holder is reached on their one grant (0112).
 export function roleHoldersQuery(role: string, nowEpoch: number): SQL {
   return sql`
     SELECT u.id AS id
     FROM users u
     WHERE u.anonymised_at IS NULL
-      AND ${holdsLiveGrant(sql`u.id`, [role], nowEpoch)}
+      AND ${holdsLiveGrant(sql`u.id`, withCommitteeStanding([role]), nowEpoch)}
   `
 }
 

@@ -13,7 +13,8 @@ function attemptRefund(database: TestDatabase, ticketId: string, reservationId: 
   // One transaction, claim first: `changes()` here is SQLite's own, reading the immediately
   // preceding statement, exactly as `postEntry`'s `guard` parameter does in production.
   database.batch([
-    ['UPDATE tickets SET refunded_at = ? WHERE id = ? AND reservation_id = ? AND refunded_at IS NULL', at, ticketId, reservationId],
+    [`UPDATE tickets SET refunded_at = ? WHERE id = ? AND reservation_id = ? AND refunded_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM reservations WHERE id = ? AND user_id = 'u-officer')`, at, ticketId, reservationId, reservationId],
     [`INSERT INTO ledger_entries (id, happened_at, london_day, source, tender, actor_id, total_pence)
       SELECT ?, ?, '2026-09-09', 'DESK', 'CARD', 'u-officer', -900
       WHERE changes() = 1`, entryId, at],
@@ -34,8 +35,9 @@ describe('the double refund: concurrent refunds of one ticket produce exactly on
       const seeded = tonightsPerformance(database)
       database.batch([
         ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-officer', 'officer@example.invalid', 'Officer'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-booker', 'booker@example.invalid', 'Booker'],
         ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
-          'r-1', 'ABCDEF', seeded.performanceId, 'u-officer', 'COLLECTED', 'WEB'],
+          'r-1', 'ABCDEF', seeded.performanceId, 'u-booker', 'COLLECTED', 'WEB'],
         ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
           't-1', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE'],
       ])

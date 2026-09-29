@@ -67,6 +67,18 @@ export function forgetSpentStep(app: AppUnderTest, email: string): void {
   }
 }
 
+// A duty manager shift needs a live committee role at claim and at use (0114). `COMMITTEE` asks for
+// no second factor (A-112), so a fixture holding one tests the shift rather than the grant.
+export function grantCommitteeRole(app: AppUnderTest, userId: string): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(`INSERT OR IGNORE INTO role_grants (id, user_id, role) VALUES (?, ?, 'COMMITTEE')`).run(`committee-${userId}`, userId)
+  }
+  finally {
+    database.close()
+  }
+}
+
 // The member's own authenticator, enrolled and confirmed through the routes, once: a second call
 // answers the secret already held, which only this helper's first call can know.
 const secrets = new Map<string, string>()

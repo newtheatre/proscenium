@@ -30,7 +30,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'charge-ordinary', generatePassword())
 
   barManager = await registerMember(app, 'charge-bar', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -191,7 +191,7 @@ describe.skipIf(skip !== null)('charging needs an open till session', () => {
 })
 
 describe.skipIf(skip !== null)('who may submit a sale', () => {
-  test('the bar manager may, an ordinary member may not, a signed-out caller gets no further', async () => {
+  test('the Front of House Manager may, an ordinary member may not, a signed-out caller gets no further', async () => {
     const { venueId } = programme('charge-permission')
     const { variantId } = await aSellableProduct()
     await openTill(venueId)

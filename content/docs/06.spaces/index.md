@@ -3,7 +3,7 @@ title: Spaces
 description: The rooms we control, the request queue, every booking, closures, the Students' Union rooms and the utilisation report.
 module: Spaces
 audience: committee
-updatedOn: 2026-09-27
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -14,10 +14,9 @@ Spaces is the console side of room booking. Members book from **Rooms** under My
 screens are where the list of rooms is kept true, requests are answered, a room is shut for a
 get-in, and the year's use is counted. They sit under **Manage, Spaces**.
 
-The Manager and the Theatre Manager read every screen here and change anything on it: adding
-or editing a room, answering a request, closing a room, listing a room we do not manage. The
-Training Manager reads only, so they see the rooms, the closures, the catalogue and the report
-without the buttons, and the request queue is not in their navigation at all.
+The Theatre Manager reads every screen here and changes anything on it: adding or editing a
+room, answering a request, closing a room, listing a room we do not manage. The IT Manager holds
+all of it too; no other role reaches these screens.
 
 ::card-group
   ::card{icon="i-lucide-door-open" title="Rooms" to="/docs/spaces/rooms"}

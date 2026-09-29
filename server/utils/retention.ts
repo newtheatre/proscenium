@@ -2,6 +2,7 @@ import {
   daysUntilRetentionThreshold,
   isRetentionGuest,
   isRetentionWarnable,
+  RETENTION_WARNING_LINK,
   retentionDigestClaimFor,
   retentionWarningClaimFor,
 } from '#shared/utils/retention'
@@ -33,7 +34,7 @@ async function warn(
     type: kind === 'final' ? 'retention.warning.final' : 'retention.warning.window',
     userId: row.id,
     claim: key,
-    context: { name: '', accountUrl: `${useRuntimeConfig(event).public.baseURL}/account` },
+    context: { name: '', accountUrl: `${useRuntimeConfig(event).public.baseURL}${RETENTION_WARNING_LINK}` },
   })
   return true
 }

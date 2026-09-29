@@ -1,7 +1,7 @@
 import { CONSOLE_WIDTH, PHONE_WIDTH } from './types'
 import type { Shot } from './types'
 
-const persona = 'dev-training@e2e.newtheatre.org.uk'
+const persona = 'dev-theatre@e2e.newtheatre.org.uk'
 
 // The seed lists sessions soonest first: a delivered one, a cancelled one, then the open one.
 const openSession = 'document.querySelectorAll(\'[data-test^="open-"]\')[2].click()'

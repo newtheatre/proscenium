@@ -1,4 +1,5 @@
 import { moduleRequestForm } from '#shared/utils/training'
+import { COMMITTEE_ONLY_WORDS } from '#shared/utils/training-action'
 
 // Ask for a module to be taught. It tells the department there is demand, and nothing more.
 export default defineEventHandler(async (event) => {
@@ -15,6 +16,11 @@ export default defineEventHandler(async (event) => {
       statusCode: 409,
       statusMessage: 'That module is not being taught at the moment, so there is nothing to ask for',
     })
+  }
+
+  // G-105 criterion 8: nobody off the committee puts themselves forward for its own training (0114).
+  if (module.committeeOnly && !(await hasCommitteeRole(account.id))) {
+    throw createError({ statusCode: 403, statusMessage: `${COMMITTEE_ONLY_WORDS}: asking for it needs a committee role` })
   }
 
   const id = newId()

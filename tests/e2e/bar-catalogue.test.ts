@@ -8,7 +8,7 @@ import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-111 and F-114 through the real routes and the real screens. The database guards are pinned in
-// the integration suites; this is what a bar manager can actually do with them.
+// the integration suites; this is what a Front of House Manager can actually do with them.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -26,7 +26,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'ordinary', generatePassword())
 
   barManager = await registerMember(app, 'barmanager', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -392,7 +392,7 @@ describe.skipIf(skip !== null)('every change is audited with a from and a to (F-
 })
 
 // Issue 1299 (F-106, F-111 criterion 6): a product pouring restricted stock sold with no Check ID,
-// so the list names every one for the Bar Manager and an edit cannot leave one that way.
+// so the list names every one for the Front of House Manager and an edit cannot leave one that way.
 describe.skipIf(skip !== null)('a product pouring restricted stock asks for Check ID (issue 1299)', () => {
   async function aWinePouredUnrestricted(): Promise<{ productId: string, itemId: string, itemName: string, name: string, categoryId: string }> {
     const categoryId = await addCategory()
@@ -884,7 +884,7 @@ describe.skipIf(skip !== null)('a correction supersedes, and stamps who made it 
 })
 
 describe.skipIf(skip !== null)('who may administer the bar (F-111 criterion 5)', () => {
-  test('the bar manager may, and it is their screen', async () => {
+  test('the Front of House Manager may, and it is their screen', async () => {
     const categoryId = await created(await send('POST', '/api/admin/bar/categories', { name: named('Theirs') }, barManager.cookie))
     expect((await products('', barManager.cookie)).length).toBeGreaterThanOrEqual(0)
     expect((await send('POST', '/api/admin/bar/products', { name: named('Theirs'), categoryId }, barManager.cookie)).status).toBe(200)
@@ -924,12 +924,12 @@ describe.skipIf(skip !== null)('a bar refusal held to a missing second factor na
   }
 
   test('the categories screen shows an enrolment link rather than a bare refusal', async () => {
-    // Narrowed for one request rather than widened: this bar manager carries no authenticator,
+    // Narrowed for one request rather than widened: this Front of House Manager carries no authenticator,
     // matching a real committee member who has never needed one before.
-    override('PRIVILEGED_ROLES', ['BAR_MANAGER'])
+    override('PRIVILEGED_ROLES', ['FOH_MANAGER'])
     try {
       const noFactor = await registerMember(app, 'barmanager-no-factor', barPassword)
-      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, officer.cookie)
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'FOH_MANAGER' }, officer.cookie)
       const view = await openSignedOutView(app.baseURL)
       await visit(view, `${app.baseURL}/sign-in`)
       await fill(view, 'form input[type="email"]', noFactor.email)
@@ -952,7 +952,7 @@ describe.skipIf(skip !== null)('a bar refusal held to a missing second factor na
 })
 
 describe.skipIf(skip !== null)('the screens', () => {
-  test('the bar manager sees the products and the stock they are made of', async () => {
+  test('the Front of House Manager sees the products and the stock they are made of', async () => {
     const categoryId = await addCategory({ name: named('On screen') })
     const productName = named('On screen red')
     await addProduct(categoryId, { name: productName })

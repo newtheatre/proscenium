@@ -72,12 +72,12 @@ describe('role holders (criterion 1)', () => {
       const anonymised = person(database, { anonymisedAt: 1_700_000_000 })
 
       database.batch([
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-1', live, 'BAR_MANAGER', null],
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-2', expired, 'BAR_MANAGER', 1_000],
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-3', anonymised, 'BAR_MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-1', live, 'FOH_MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-2', expired, 'FOH_MANAGER', 1_000],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-3', anonymised, 'FOH_MANAGER', null],
       ])
 
-      const ids = read<{ id: string }>(database, roleHoldersQuery('BAR_MANAGER', 1_700_000_000)).map(row => row.id)
+      const ids = read<{ id: string }>(database, roleHoldersQuery('FOH_MANAGER', 1_700_000_000)).map(row => row.id)
       expect(ids).toEqual([live])
     })
   })
@@ -88,11 +88,11 @@ describe('role holders (criterion 1)', () => {
       const pending = person(database, { pending: true })
 
       database.batch([
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-4', claimed, 'BAR_MANAGER', null],
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-5', pending, 'BAR_MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-4', claimed, 'FOH_MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-5', pending, 'FOH_MANAGER', null],
       ])
 
-      const ids = read<{ id: string }>(database, roleHoldersQuery('BAR_MANAGER', 1_700_000_000)).map(row => row.id)
+      const ids = read<{ id: string }>(database, roleHoldersQuery('FOH_MANAGER', 1_700_000_000)).map(row => row.id)
       expect(ids).toEqual([claimed])
     })
   })

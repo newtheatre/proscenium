@@ -26,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   bar = await registerMember(app, 'reconcile-bar', generatePassword())
-  await grantRole(app, bar, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, bar, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {

@@ -28,7 +28,7 @@ beforeAll(async () => {
   admin = await adminSession(app)
   bar = await registerMember(app, 'age-bar', generatePassword())
   door = await registerMember(app, 'age-door', generatePassword())
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'FOH_MANAGER', admin.cookie)
   await grantRole(app, door, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
@@ -62,7 +62,7 @@ const accepted = { performanceId: null, outcome: 'ACCEPTED', idType: 'PASSPORT',
 const refused = { performanceId: null, outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Short woman, red jacket', product: 'Strongbow', notes: null }
 
 describe.skipIf(skip !== null)('logging a Challenge 25 check (E-118 criteria 1, 2, 4)', () => {
-  test('the bar manager can log an accepted check', async () => {
+  test('the Front of House Manager can log an accepted check', async () => {
     const answered = await send('POST', '/api/tonight/age-checks', accepted, bar.cookie)
     expect(answered.status).toBe(200)
     const { id } = await answered.json() as { id: string }

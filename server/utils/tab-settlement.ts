@@ -9,6 +9,7 @@ import { postEntry, runLedgerBatch } from '#server/utils/ledger'
 import { noSuch } from '#server/utils/no-such'
 import { auditEntry } from '#shared/utils/audit'
 import { saysMoney } from '#shared/utils/bar'
+import { OWN_TAB_VOID } from '#shared/utils/self-dealing'
 import { MAX_SETTLEMENT_CHARGES } from '#shared/utils/tab-settlement'
 import type { MovementReason } from '#shared/utils/bar'
 import type { ItemisedTab, TabCharge } from '#shared/utils/tab-settlement'
@@ -44,14 +45,14 @@ export const OUTSTANDING_CHARGE = sql`
   AND NOT EXISTS (SELECT 1 FROM ledger_lines l WHERE l.settles_entry_id = e.id)
 `
 
-// The cap as a condition on the charge's own insert, re-summing at the moment it is written: a
-// read and a check cannot hold a cap two tills are charging against at once (F-108 criterion 3).
-export function tabCapGuard(holderId: string, chargePence: number, capPence: number): SQL {
+// The cap as a condition on the charge's own insert, re-summed as it is written (F-108 criterion
+// 3); an override lifts it only when someone other than the holder makes it (criterion 4, 0115).
+export function tabCapGuard(holderId: string, chargePence: number, capPence: number, overriddenBy: string | null = null): SQL {
   return sql`
-    (${chargePence} + (
+    ((${overriddenBy} IS NOT NULL AND ${overriddenBy} <> ${holderId}) OR (${chargePence} + (
       SELECT coalesce(sum(e.total_pence), 0) FROM ledger_entries e
       WHERE e.tab_debtor_id = ${holderId} AND ${OUTSTANDING_CHARGE}
-    )) <= ${capPence}
+    )) <= ${capPence})
   `
 }
 
@@ -230,6 +231,15 @@ export async function settleTab(
   return { entryId: posted.id, settledPence: owedPence }
 }
 
+// Still unsettled at the moment of insert, so a racing settlement refuses the void rather than
+// crediting stock for a charge just taken; never the voider's own tab (criterion 4, 0115).
+export function voidGuard(entryId: string, actorId: string): SQL {
+  return sql`
+    NOT EXISTS (SELECT 1 FROM ledger_lines WHERE settles_entry_id = ${entryId})
+    AND NOT EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${entryId} AND tab_debtor_id = ${actorId})
+  `
+}
+
 // A settled charge is corrected by refund policy, never a void (criterion 4). A credit names its
 // holder too, so the lookup says charge rather than "anything naming a debtor" (criterion 5).
 export async function voidTabCharge(
@@ -243,6 +253,7 @@ export async function voidTabCharge(
       AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
   `)
   if (!charge) throw noSuch('tab charge')
+  if (charge.tabDebtorId === actorId) throw createError({ statusCode: 403, statusMessage: OWN_TAB_VOID })
 
   const [settled] = await db.all<{ settled: number }>(sql`
     SELECT EXISTS (SELECT 1 FROM ledger_lines WHERE settles_entry_id = ${entryId}) AS settled
@@ -257,9 +268,7 @@ export async function voidTabCharge(
   `)
   const movements = await db.all<{ id: string, itemId: string, qty: number, locationVenueId: string | null }>(chargeMovementsQuery(entryId))
 
-  // Still unsettled at the moment of insert, not just at the read above: a settlement racing
-  // this refuses here rather than crediting stock for a charge that was just taken (criterion 4).
-  const guard = sql`NOT EXISTS (SELECT 1 FROM ledger_lines WHERE settles_entry_id = ${entryId})`
+  const guard = voidGuard(entryId, actorId)
   const posted = postEntry({
     source: 'TILL',
     tender: 'TAB',

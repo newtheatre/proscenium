@@ -223,6 +223,20 @@ describe('a rehearsal runs again without doubling the catalogue', () => {
       expect(rows<{ price: number }>(target, 'SELECT price FROM ticket_types WHERE id = ?', maps.ticketTypeIds.get('tt-adult'))[0]?.price).toBe(1100)
     })
   })
+
+  // The old estate has no such flag, so marking a module committee-only is a console edit (0114).
+  test('a module imports open to everybody, and a console edit to committee-only survives a re-run', async () => {
+    const estate = oldEstate()
+    await withTarget((target) => {
+      const maps = freshMaps()
+      transformCatalogue({ ...estate, ...maps, target: target.raw })
+      expect(rows<{ committee_only: number }>(target, 'SELECT committee_only FROM modules WHERE id = ?', 'NNT-001')[0]?.committee_only).toBe(0)
+
+      target.raw.exec('UPDATE modules SET committee_only = 1 WHERE id = \'NNT-001\'')
+      transformCatalogue({ ...estate, ...maps, target: target.raw })
+      expect(rows<{ committee_only: number }>(target, 'SELECT committee_only FROM modules WHERE id = ?', 'NNT-001')[0]?.committee_only).toBe(1)
+    })
+  })
 })
 
 describe('it reconciles', () => {

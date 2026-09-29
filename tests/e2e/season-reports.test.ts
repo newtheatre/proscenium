@@ -17,7 +17,7 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let admin: TestMember
 let foh: TestMember
-let bar: TestMember
+let committee: TestMember
 let performanceId: string
 const fohPassword = generatePassword()
 
@@ -26,9 +26,9 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'reports-foh', fohPassword)
-  bar = await registerMember(app, 'reports-bar', generatePassword())
+  committee = await registerMember(app, 'reports-committee', generatePassword())
   await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, committee, 'COMMITTEE', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -66,13 +66,13 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 const RANGE = 'kind=TERM&fromDay=2020-01-01&toDay=2030-01-01'
 
 describe.skipIf(skip !== null)('who may read the cross-season report (E-126 criterion 3)', () => {
-  test('the front of house officer can', async () => {
+  test('the Front of House Manager can', async () => {
     expect((await send('GET', `/api/admin/reports/incidents?${RANGE}`)).status).toBe(200)
     expect((await send('GET', `/api/admin/reports/performances?${RANGE}`)).status).toBe(200)
   })
 
-  test('the bar manager cannot: this is not a bar permission', async () => {
-    expect((await send('GET', `/api/admin/reports/incidents?${RANGE}`, undefined, bar.cookie)).status).toBe(403)
+  test('a Committee holder can too: the season aggregates are every post\'s (0112)', async () => {
+    expect((await send('GET', `/api/admin/reports/incidents?${RANGE}`, undefined, committee.cookie)).status).toBe(200)
   })
 
   test('an ordinary member cannot', async () => {
@@ -146,8 +146,8 @@ describe.skipIf(skip !== null)('the periods the screen offers (criterion 5)', ()
     expect(Array.isArray(body.seasons)).toBe(true)
   })
 
-  test('the bar manager cannot', async () => {
-    expect((await send('GET', '/api/admin/reports/periods', undefined, bar.cookie)).status).toBe(403)
+  test('a Committee holder can too', async () => {
+    expect((await send('GET', '/api/admin/reports/periods', undefined, committee.cookie)).status).toBe(200)
   })
 })
 

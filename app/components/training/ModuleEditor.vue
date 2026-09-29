@@ -54,6 +54,7 @@ interface FormState {
   grantsTrainer: boolean
   grantsSupervisor: boolean
   selfRegistrable: boolean
+  committeeOnly: boolean
   status: ModuleLifecycle
   sort: number
   materials: Material[]
@@ -81,6 +82,7 @@ function blank(): FormState {
     grantsTrainer: false,
     grantsSupervisor: false,
     selfRegistrable: false,
+    committeeOnly: false,
     status: 'DRAFT',
     sort: 0,
     materials: [],
@@ -110,6 +112,7 @@ watch(() => props.open, (isOpen) => {
         grantsTrainer: module.grantsTrainer,
         grantsSupervisor: module.grantsSupervisor,
         selfRegistrable: module.selfRegistrable,
+        committeeOnly: module.committeeOnly,
         status: module.status,
         sort: module.sort,
         materials: module.materials.map(material => ({ ...material })),
@@ -397,6 +400,12 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
             v-if="state.kind === 'BRIEF'"
             v-model="state.selfRegistrable"
             label="People can register themselves for it"
+          />
+          <USwitch
+            v-model="state.committeeOnly"
+            label="Committee only"
+            description="Only somebody holding a committee role can sign up to it or ask for it. Everybody else sees it, marked as only available to the committee; a trainer can still record it on the register."
+            data-test="module-committee-only"
           />
         </div>
 

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { changes } from '#shared/utils/audit'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
 import { CHOOSE_INSTEAD, PRE_LINKED, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
-import { PROTECTED_ROLE, ROLES } from '#shared/utils/roles'
+import { PROTECTED_ROLE, ROLES, SELF_GRANT } from '#shared/utils/roles'
 
 // Provenance on the grant, never in the audit trail's detail, which carries identifiers and never
 // prose about a person (A-118 criterion 2, 0011).
@@ -88,6 +88,10 @@ export default defineEventHandler(async (event) => {
   const subject = await findById(input.userId!)
   if (!subject || subject.anonymisedAt !== null) {
     throw noSuch('account')
+  }
+  // Committee standing is somebody else's decision; the IT Manager's own adds nothing it lacks (0113).
+  if (subject.id === resolved.account.id && input.role !== PROTECTED_ROLE) {
+    throw createError({ statusCode: 403, statusMessage: SELF_GRANT })
   }
 
   // A lapse is a revocation nobody acts on, so every IT Manager grant leaves one that cannot

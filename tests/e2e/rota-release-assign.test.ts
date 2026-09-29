@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { showNightOf } from '#shared/utils/show-night'
-import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -229,6 +229,7 @@ describe.skipIf(skip !== null)('the release notice window (E-107 criterion 2)', 
 
   test('a released duty manager shift always notifies immediately, however far out', async () => {
     const holder = await registerMember(app, 'release-dm', generatePassword())
+    grantCommitteeRole(app, holder.id)
     const house = performance(7, 'release-dm', 'DUTY_MANAGER')
     claim(house.shiftId, holder.id)
     const before = notificationCount(foh.id, 'shift.released')
@@ -297,6 +298,7 @@ describe.skipIf(skip !== null)('an officer assigning or reassigning a shift (E-1
     const outgoing = await registerMember(app, 'assign-dm-out', generatePassword())
     const incoming = await registerMember(app, 'assign-dm-in', generatePassword())
     await award(incoming.id, dutyManagerModule)
+    for (const holder of [outgoing, incoming]) grantCommitteeRole(app, holder.id)
     const house = performance(7, 'assign-dm', 'DUTY_MANAGER')
     claim(house.shiftId, outgoing.id)
 

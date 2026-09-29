@@ -3,7 +3,7 @@ title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
 audience: committee
-updatedOn: 2026-09-27
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -35,10 +35,10 @@ console; an officer whose only permissions are those three is shown no **Manage*
 Within the console each screen checks its own permission, so a person who can reach the
 overview may still be refused a screen the sidebar does not show them.
 
-- **Settings** are read by the IT Manager, the Manager and the Theatre Manager, and changed by
-  the IT Manager alone.
-- **The audit trail** is read by the IT Manager, the Manager and the Theatre Manager, and the
-  same three record an entry on it.
+- **Settings** are read by the IT Manager and the Theatre Manager, and changed by the IT
+  Manager alone.
+- **The audit trail** is read by the IT Manager and the President, and the same two record an
+  entry on it.
 - **Backups** are the IT Manager's alone.
 
 Every standing role expires at the end of the committee year, 31 July, so a permission held in
@@ -59,11 +59,12 @@ with nothing in it for you is not drawn at all.
    The numbers are the ones beside each screen in the sidebar, read once for both.
 3. **Tonight** lists what is on this show night, 04:00 to 04:00, with the venue and the curtain
    time, and opens tonight's screens. It is for whoever can open those screens without a shift:
-   the Front of House Manager, the Bar Manager and the IT Manager.
+   the Front of House Manager and the IT Manager.
 4. **Set-up still to do** lists what the theatre has not yet been given, each line opening the
    screen that finishes it. It disappears once everything in it is done.
 5. **Messages that did not arrive** lists every send that has not reached a person, newest first,
-   with why. It is for whoever reads the audit trail, and is not shown to anybody who does not:
+   with why. It is for whoever reads the audit trail (the President and the IT Manager), and is
+   not shown to anybody who does not:
    a trainer or a department lead reaches this screen on their standing alone, and an empty
    card would wrongly tell them nothing had failed.
 
@@ -71,10 +72,10 @@ with nothing in it for you is not drawn at all.
 
 | Line | For | Opens |
 | --- | --- | --- |
-| Membership claims to record | whoever records claims: the Manager and the IT Manager | [Members](/docs/people/members), on its claims queue |
-| Access declarations to verify | the Accessibility Officer | [Access profiles](/docs/box-office/access-profiles) |
-| Room requests to decide | the Manager and the Theatre Manager | [Room requests](/docs/spaces/room-requests) |
-| Training requests to answer | whoever reads the training catalogue, and a department lead for their own departments | [Requests](/docs/training/requests) |
+| Membership claims to record | whoever records claims: the IT Manager | [Members](/docs/people/members), on its claims queue |
+| Access declarations to verify | the Secretary and Welfare Officer | [Access profiles](/docs/box-office/access-profiles) |
+| Room requests to decide | the Theatre Manager | [Room requests](/docs/spaces/room-requests) |
+| Training requests to answer | the Theatre Manager, and a department lead for their own departments | [Requests](/docs/training/requests) |
 | Pass requests to fulfil, for a pass on sale | the Front of House Manager | [Pass desk](/docs/box-office/pass-desk) |
 
 The IT Manager holds every permission, so sees every line.

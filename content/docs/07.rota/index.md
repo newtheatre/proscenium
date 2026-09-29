@@ -3,7 +3,7 @@ title: Rota
 description: Setting a show night up from the console, from the venue's staffing to the wings device.
 module: Show night
 audience: committee
-updatedOn: 2026-09-26
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -13,13 +13,14 @@ navigation:
 These are the console screens under **Manage, Rota**. They are planned at a desk, days before
 a performance: how each venue is staffed, who is confirmed on which shift, what the duty manager
 must tick before the house opens and after it closes, what front of house reads in an emergency,
-and which incidents reach the Safety Officer. The screens used on the night itself, on a phone in
+and which incidents reach the Theatre Manager. The screens used on the night itself, on a phone in
 the foyer, are documented under [Show night](/docs/tonight/door).
 
-The **Front of house manager** role holds everything here except Safety: the rota, the checklists,
+The **Front of House Manager** role holds everything here except Safety: the rota, the checklists,
 the emergency cards, the Challenge 25 register export and the backstage board's configuration. The
-**Safety Officer** role holds Safety and nothing else. The IT Manager holds all of it. A shift never
-reaches these screens: a confirmed shift opens the night's tools, and a role opens the planning.
+**Theatre Manager** holds Safety and the emergency cards, and the **President** reads Safety
+without changing it. The IT Manager holds all of it. A shift never reaches these screens: a
+confirmed shift opens the night's tools, and a role opens the planning.
 
 ::card-group
   ::card{icon="i-lucide-clipboard-list" title="Shift templates" to="/docs/rota/shift-templates"}
@@ -38,7 +39,7 @@ reaches these screens: a confirmed shift opens the night's tools, and a role ope
   The card front of house reads in the dark: address, exits, assembly point, first aid.
   ::
   ::card{icon="i-lucide-shield-alert" title="Safety" to="/docs/rota/safety"}
-  Which incident severities reach the Safety Officer, and closing the follow-ups they open.
+  Which incident severities reach the Theatre Manager, and closing the follow-ups they open.
   ::
   ::card{icon="i-lucide-file-down" title="Challenge 25 register" to="/docs/rota/challenge-25-register"}
   Exporting the Challenge 25 register for a licensing inspection.

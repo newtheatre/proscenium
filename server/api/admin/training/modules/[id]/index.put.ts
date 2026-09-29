@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'module.updated',
       target: `module:${id}`,
-      detail: { department: input.department, status: input.status, expiryMode: input.expiryMode },
+      detail: { department: input.department, status: input.status, expiryMode: input.expiryMode, committeeOnly: input.committeeOnly },
     })),
   ])
 

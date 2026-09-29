@@ -16,7 +16,7 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let officer: TestMember
 let boxOffice: TestMember
-let manager: TestMember
+let theatre: TestMember
 let member: TestMember
 const boxOfficePassword = generatePassword()
 
@@ -24,7 +24,7 @@ beforeAll(async () => {
   if (skip) return
   app = await startApp()
   officer = await adminSession(app)
-  // The box office officer and the manager sign in with no authenticator and A-112 is not what this
+  // The box office officer and the Theatre Manager sign in with no authenticator and A-112 is not what this
   // file proves. The settings route refuses a list below its floor (issue 1357), so it is set here.
   overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
   member = await registerMember(app, 'ordinary', generatePassword())
@@ -32,9 +32,10 @@ beforeAll(async () => {
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
-  // MANAGER carries `ticketing.manage` and neither `ticketing.read` nor `ticketing.write` (0009).
-  manager = await registerMember(app, 'manager', generatePassword())
-  await grantRole(app, manager, 'MANAGER', officer.cookie)
+  // An officer holding no ticketing permission: `ticketing.manage` alone is held by no role but the
+  // IT Manager's, which holds everything (0112), so the narrow grant has no holder to test.
+  theatre = await registerMember(app, 'theatre', generatePassword())
+  await grantRole(app, theatre, 'THEATRE_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -268,13 +269,12 @@ describe.skipIf(skip !== null)('covered shows extend freely; a removal is what a
     expect((await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [] })).status).toBe(400)
   })
 
-  // MANAGER holds `ticketing.manage` and no `ticketing.write` (0009).
-  test('a manager reaches the route on `ticketing.manage` alone', async () => {
+  test('an officer holding neither ticketing permission is refused the route', async () => {
     const { id, showId } = await newPassType()
     const second = await newShow()
 
-    const answered = await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [showId, second] }, manager.cookie)
-    expect(answered.status).toBe(200)
+    const answered = await send('PUT', `/api/admin/pass-types/${id}/shows`, { showIds: [showId, second] }, theatre.cookie)
+    expect(answered.status).toBe(403)
   })
 })
 
@@ -339,10 +339,9 @@ describe.skipIf(skip !== null)('who may administer the passes', () => {
     expect((await addPassType(named('Sneaked'), 'no-such-show', {}, member.cookie)).status).toBe(403)
   })
 
-  // The narrow grant stays narrow: it opens the one route it names, not the whole console (0009).
-  test('a manager alone still cannot read the listing or create one', async () => {
-    expect((await send('GET', '/api/admin/pass-types', undefined, manager.cookie)).status).toBe(403)
-    expect((await addPassType(named('Overreach'), 'no-such-show', {}, manager.cookie)).status).toBe(403)
+  test('another officer role cannot read the listing or create one', async () => {
+    expect((await send('GET', '/api/admin/pass-types', undefined, theatre.cookie)).status).toBe(403)
+    expect((await addPassType(named('Overreach'), 'no-such-show', {}, theatre.cookie)).status).toBe(403)
   })
 
   test('a signed-out caller is refused', async () => {

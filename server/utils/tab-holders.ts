@@ -2,6 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { configValue } from '#server/utils/configuration'
 import { holdsLiveGrant } from '#server/utils/roles-register'
+import { withCommitteeStanding } from '#shared/utils/roles'
 import { tabBalanceQuery } from '#server/utils/tab-settlement'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
@@ -19,7 +20,7 @@ export function authorisedTabHoldersQuery(ids: readonly string[], roles: readonl
       ${only === undefined ? sql`` : sql`AND u.id = ${only}`}
       AND (
         u.id IN (SELECT value FROM json_each(${JSON.stringify(ids)}))
-        OR ${holdsLiveGrant(sql`u.id`, roles, now)}
+        OR ${holdsLiveGrant(sql`u.id`, withCommitteeStanding(roles), now)}
       )
     ORDER BY u.name COLLATE NOCASE
   `

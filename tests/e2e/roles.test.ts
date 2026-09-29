@@ -68,7 +68,7 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
 
   // Guards fail closed: an ordinary member holds nothing, so nothing is reachable.
   test('an account with no roles cannot grant one', async () => {
-    const response = await send('POST', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)
+    const response = await send('POST', '/api/admin/roles', { userId: subjectId, role: 'THEATRE_MANAGER' }, cookie)
     expect(response.status).toBe(403)
   })
 
@@ -78,7 +78,7 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
   })
 
   test('a signed-out caller is refused before permissions are even considered', async () => {
-    expect((await send('POST', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' })).status).toBe(401)
+    expect((await send('POST', '/api/admin/roles', { userId: subjectId, role: 'THEATRE_MANAGER' })).status).toBe(401)
   })
 
   // A privileged role needs a second factor, so an administrator enrols one before the role is
@@ -107,13 +107,13 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     cookie = await enrolAndReauthenticate()
 
     // The session was sealed before the grant existed, and permissions are read fresh.
-    const granted = await send('POST', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)
+    const granted = await send('POST', '/api/admin/roles', { userId: subjectId, role: 'THEATRE_MANAGER' }, cookie)
     expect(granted.status).toBe(200)
     const body = await granted.json()
     expect(body.expiresAt).toBe(defaultRoleExpiry(new Date()))
 
     const read = await fetch(`${app.baseURL}/api/admin/roles?userId=${subjectId}`, { headers: { cookie } })
-    expect(await read.json()).toMatchObject({ roles: [{ role: 'MANAGER' }] })
+    expect(await read.json()).toMatchObject({ roles: [{ role: 'THEATRE_MANAGER' }] })
   })
 
   // The third clause of the Phase 1 gate, asserted against a route rather than against the
@@ -127,7 +127,7 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
       `).get(`user:${subjectId}`) as { action: string, detail: string } | null
 
       expect(entry).not.toBeNull()
-      expect(JSON.parse(entry!.detail)).toMatchObject({ role: 'MANAGER' })
+      expect(JSON.parse(entry!.detail)).toMatchObject({ role: 'THEATRE_MANAGER' })
     }
     finally {
       database.close()
@@ -219,18 +219,18 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
   })
 
   test('an ordinary role can be revoked', async () => {
-    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'THEATRE_MANAGER' }, cookie)).status).toBe(200)
     const read = await fetch(`${app.baseURL}/api/admin/roles?userId=${subjectId}`, { headers: { cookie } })
     expect(await read.json()).toMatchObject({ roles: [] })
   })
 
   // 0049: the trail records a revocation when one happened, and only then.
   test('a revoke records itself once, and revoking a role nobody holds records nothing', async () => {
-    expect((await send('POST', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/roles', { userId: subjectId, role: 'THEATRE_MANAGER' }, cookie)).status).toBe(200)
     const before = await revocations(subjectId)
-    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'THEATRE_MANAGER' }, cookie)).status).toBe(200)
     expect(await revocations(subjectId)).toBe(before + 1)
-    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'MANAGER' }, cookie)).status).toBe(200)
+    expect((await send('DELETE', '/api/admin/roles', { userId: subjectId, role: 'THEATRE_MANAGER' }, cookie)).status).toBe(200)
     expect(await revocations(subjectId)).toBe(before + 1)
   })
 })

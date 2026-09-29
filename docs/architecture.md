@@ -506,8 +506,8 @@ outside every scope and counts only in the unscoped figure.
 | Pass sale | A pass is issued and paid for at the desk (D-124); or a Fellowship is awarded, which issues one at zero value in the same batch, nobody at a desk (D-130, 0023) | ticketing | `DESK`, `SYSTEM` | `CARD`, `NONE` | `PASS_SALE` |
 | Pass admission | A pass covers a seat, online or at the door (D-125, D-126); a Fellow's own entitlement rides the identical path (D-130) | ticketing | `SELF_SERVE`, `DESK` | `NONE` | `PASS_ADMISSION` |
 | Bar item | The sale, its lines and its stock movements commit together (F-105); a sale after midnight is the calendar day it happened on, not the night's; a discount, if any, is net into `amount_pence` and snapshotted alongside it (F-117) | bar | `TILL` | `CARD`, `COMP`, `TAB` | `BAR_ITEM` |
-| Tab charge | Credit extended, not money taken (F-108); the entry stamps the debtor and stays outstanding until settled, capped per holder unless a duty manager or bar manager overrides it | bar | `TILL` | `TAB` | `BAR_ITEM` |
-| Comp given | Requires a prior request with a reason, approved by tonight's duty manager or the bar manager, never the requester (F-110); the same policy D-117 states for a comp admission, that giving away value takes more than the operational access that lets you sell. `amount_pence` is zero and `unit_price_pence` stays the retail price, so the foregone value is queryable | bar | `TILL` | `COMP` | `BAR_ITEM` |
+| Tab charge | Credit extended, not money taken (F-108); the entry stamps the debtor and stays outstanding until settled, capped per holder unless a duty manager or the Front of House Manager's role overrides it | bar | `TILL` | `TAB` | `BAR_ITEM` |
+| Comp given | Requires a prior request with a reason, approved by tonight's duty manager or the Front of House Manager's role, never the requester (F-110); the same policy D-117 states for a comp admission, that giving away value takes more than the operational access that lets you sell. `amount_pence` is zero and `unit_price_pence` stays the retail price, so the foregone value is queryable | bar | `TILL` | `COMP` | `BAR_ITEM` |
 | Tab settlement | A tab is settled on the reader, bounded to the charges it covers (F-109); the settlement's own calendar day, not the charges' | bar | `TILL` | `CARD` | `TAB_SETTLEMENT` |
 | Void of a tab charge | An unsettled charge is voided with a reason (F-109); the calendar day of the void, not of the charge | bar | `TILL` | `TAB` | `BAR_ITEM` |
 | Ticket collection at the bar | A pending booking's money taken on the bar's reader, in the same entry and batch as the drinks beside it and the booking's move to `COLLECTED` (F-122); the door then reads PAID | bar | `TILL` | `CARD` | `TICKET_COLLECTION` |
@@ -954,7 +954,7 @@ enforcement (E-111 criterion 5, restated in 0040): the three abilities in
 
 | Piece | What it is |
 | --- | --- |
-| `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till, and neither does the front of house officer's role. |
+| `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till; the Front of House Manager's role opens all three as the officer bypass (0110). |
 | `NightScope` | `{ night?, venueId?, performanceId? }`. All optional: the common case is tonight, at the one venue running. |
 | The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId?, openingId? }`, where `via` is `SHIFT`, `OFFICER` or `COVER` (tonight's duty manager covering the door, 0095). |
 | A refusal | 403 naming both ways in, the shift and the officer role, or the hours the shift is worked. An administrator is never offered as the way out. |
@@ -991,9 +991,9 @@ A shift never needs the second-factor gate the officer branch carries, because a
 standing grant to begin with (0044); it also writes no audit row of its own, because the rota's own
 `shift.claimed` and `shift.confirmed` entries are already the record of how the account came to
 hold it. Only when no shift covers the request does the guard fall through to `OFFICER`, which
-stands on the permissions `night.door`, `night.till` and `night.manage`, held by `FOH_MANAGER`
-(door and manage) and `BAR_MANAGER` (till), the one named exception to standing permissions being
-administrative only (0009, 0044). `FOH_MANAGER` also holds the programme and the desk
+stands on the permissions `night.door`, `night.till` and `night.manage`, all three held by
+`FOH_MANAGER` since the bar joined the post (0110), the one named exception to standing
+permissions being administrative only (0009, 0044). `FOH_MANAGER` also holds the programme and the desk
 (`ticketing.*`, 0090) and `money.refund`, so it refunds a paid ticket on any day through its own
 permission, never through the bypass (0102). Planning the rota is not one of them: `rota.read` and
 `rota.write` are ordinary administrative permissions, held by `FOH_MANAGER` and `ADMIN`, and they
@@ -1400,7 +1400,7 @@ on the network. Every read on the screens served this way settles through `settl
 `shared/utils/night-hub.ts` (issue 1521); the night report, the till, the bar shift's stocktake,
 the emergency card and a refusal card's help line read the same way, a console list's failure
 through `settleReadWith()` with its enrol path. The till serves only what the server holds: its
-session and bar (`useTillSession()`), the Bar Manager's earlier nights, and the catalogue, read on
+session and bar (`useTillSession()`), the Front of House Manager's earlier nights, and the catalogue, read on
 the server alone (`useServedRead()`'s `serverOnly`, and `readServedCatalogue()` for the grid inside
 the till's read). A served copy is this request's own, so `useNightCache(..., { served })` shows it,
 with no Syncing, until the phone's own refresh answers, and does not read the device's copy beside
@@ -1444,8 +1444,16 @@ report's own seat counts (issue 1326), `unfilledSlots` from any `shifts` row sti
 signed_via` respectively. Both page in SQL (`shared/utils/pagination.ts`) and export to CSV
 through `toCsv()`, which already carries the formula-injection guard D-129 built.
 
-Criterion 3's "officers and administrators" is `reports.read`, held by `FOH_MANAGER`,
-`SAFETY_OFFICER` and `COMMITTEE`; `ADMIN` holds it automatically like every permission. Every
+A third read, `GET /api/admin/reports/opening-bypasses`, is the surface for an officer bypass
+at a venue with no performance that night, which no night report carries (E-130 criterion 6 as
+amended, issue 1537, 0110). `openingBypassesQuery` reads every `night.officer-bypass` row whose
+`performanceIds` is empty, by the show night the row names between the period's `fromDay` and
+`toDay` inclusive, joining `bar_openings` for the label where the row names one. It reads the
+rows rather than the openings, so a bar opened with no opening planned is listed too, and it is
+capped rather than paged, as such a night is rare. The Performances tab lists it under its table.
+
+Criterion 3's "officers and administrators" is `reports.read`, held by every post role and
+`COMMITTEE` (0112); `ADMIN` holds it automatically like every permission. Every
 figure reads live from the operational tables, never the frozen `night_reports.report` blob:
 `incidents`, `age_checks` and `shifts` are already performance-keyed and queryable directly,
 where the frozen report is one night's own snapshot rather than a queryable history. "Erased
@@ -1626,7 +1634,7 @@ the original entry's, if the correction does not change it).
 Two gaps neither criterion closes yet, both recorded in `docs/known-issues.md`: criterion 5
 asks that free text naming an erased person be scrubbed on erasure, and the mechanical erasure
 system only matches a single FK column against the erased id, not an arbitrary name appearing
-inside `body`; and no "safety officer" role exists in `shared/utils/roles.ts` to scope a
+inside `body`; and no safety role in `shared/utils/roles.ts` yet scopes a
 historical, cross-night read separate from tonight's own log, which is why the read endpoint
 here is tonight-only, the same scope E-118's register already carries.
 
@@ -1637,8 +1645,9 @@ migration with `requires_follow_up = false` on all four: nothing routes until a 
 member deliberately opts a severity in, deliberately not the generic `CONFIG_KEYS` system,
 which would 503 on every incident write until all four keys were configured by hand
 (criterion 1). `PUT /api/admin/safety/severities/[severity]` flips one, guarded by
-`safety.write` (a new standing permission on a new `SAFETY_OFFICER` role); the route is always
-an UPDATE, never a create, since every severity already exists.
+`safety.write` (the Theatre Manager's since 0111, which folded the `SAFETY_OFFICER` role into
+`THEATRE_MANAGER`); the route is always an UPDATE, never a create, since every severity already
+exists.
 
 `notifySafetyOfficersIfNeeded()` (`server/utils/incident-safety.ts`) is called once, after the
 write, from the three places an incident's severity can land or change:
@@ -1650,7 +1659,8 @@ territory or out of it; only the new entry's severity is ever checked). It reads
 `safety.write` (`safetyOfficers()`, mirroring `rotaOfficers()`'s established shape) as a
 transactional message with no incident free text in it, per 0011 (criterion 2).
 
-`GET /api/admin/safety/open-items` is the safety officer's list: every incident at a routed
+`GET /api/admin/safety/open-items` is the Theatre Manager's list (`safety.read`, which the
+President also holds, 0112): every incident at a routed
 severity with no closure yet, across every night, not scoped to tonight. `POST
 /api/admin/safety/incidents/[id]/close` requires a resolution note and writes
 `incident_followup_closures`, append-only and `UNIQUE(incident_id)`: a second closure attempt
@@ -1661,7 +1671,7 @@ waits on `night_reports` (E-123, `docs/known-issues.md`).
 ### The licensing export (E-119)
 
 `GET /api/admin/age-checks/export` is gated on `age-checks.export`, a new standing permission
-on `FOH_MANAGER` alone: an officer role, never a shift, per criterion 4; the bar manager who
+on `FOH_MANAGER` alone: an officer role, never a shift, per criterion 4; a bar shift that
 can log a check cannot export the register. `exportQuery()` (`server/utils/age-checks-export.ts`)
 takes a half-open `[from, to)` range in epoch seconds (`startOfLondonDay()` on each edge) and
 left-joins `performances`/`venues` so a bar-only check with no performance still appears, with
@@ -1777,7 +1787,8 @@ grouped a person and read against a current record of `FIRST_AID_MODULE` (read w
 `configValueIfSet`), and is null while that key is unset, which is the screen's cue to show the
 committee's own `firstAiders` line (`saysFirstAiders`). A GET records no bypass (0098). `PUT
 /api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
-`emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`.
+`emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`, and
+to `THEATRE_MANAGER` for fire training (0111).
 `GET /api/admin/venues/emergency`, the committee's overview, filters by venue name and by
 `filed` through `shared/utils/emergency-cards-list.ts` (K-129); the `venues` envelope it answers
 also carries paging, though a venue with no card yet still lists.
@@ -2099,7 +2110,7 @@ same unpaid figure for the status strip.
 
 Access profiles are declared at `/account/access` and verified at `/box-office/access-profiles`
 (D-127), the one screen `access.verify` gates rather than any of the box office's ordinary
-permissions: an accessibility officer, never general box office. The special-category payload is
+permissions: the Secretary and Welfare Officer (`SECRETARY`, 0112), never general box office. The special-category payload is
 one AES-256-GCM blob per row, `server/utils/access-profile-crypto.ts` the only place that touches
 the key (0050); `server/utils/access-profiles.ts` is where declaring, verifying, declining,
 withdrawing and the door's read all live. A save compares itself with what is stored
@@ -2258,14 +2269,16 @@ is the mechanism K-103 set the precedent for landing ahead of the screens that n
 ### The member's own summary (K-127)
 
 `GET /api/my/summary` is the one request `/my` makes. `shared/utils/my-summary.ts` declares
-`MySummary`, a column allow-list for the eight tiles; `server/utils/my-summary.ts` exports the
+`MySummary`, a column allow-list for the eight tiles and the **Your roles** list (A-119 criterion
+6); `server/utils/my-summary.ts` exports the
 pure `assembleMySummary()`, which shapes it from already-fetched facts, takes `onShiftTonight` from
 the same `onShiftTonight()` the session reads (0094), and derives the membership state word and a
 room booking's `cancellable` flag, and nothing
 in it reaches a database, which is what makes the allow-list provable in a unit test. The
 endpoint itself does the fetching, one bounded read per tile (`myShiftsQuery`, `longestTerm`,
 `ownClaim`, a new `nextRoomBooking`, `listModules`/`modulesHeldBy`/`whatsNextFor`,
-`sessionsForMember`, a new `activePasses`/`openPassRequest`, `recentInbox`, `publicListing`), run
+`sessionsForMember`, a new `activePasses`/`openPassRequest`, `recentInbox`, `publicListing`,
+`liveGrants`), run
 with `Promise.all` rather than in sequence.
 
 ## Environments

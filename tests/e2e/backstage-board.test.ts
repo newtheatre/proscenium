@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { LAST_NIGHTS_BOARD } from '#shared/utils/backstage'
@@ -381,6 +381,7 @@ describe.skipIf(skip !== null)('the current state fits the column it is given (i
     finally {
       database.close()
     }
+    grantCommitteeRole(app, manager.id)
     const composedAt = laterThanEveryCall()
     expect((await send('POST', '/api/tonight/board/messages', { body: FOH_CALL, composedAt }, foh.cookie)).status).toBe(200)
     const { deviceCookie } = await joinAs('Stage left desk')

@@ -58,7 +58,7 @@ export interface SignUpSession {
   opensAt: number | null
   status: string
   registerOpenedAt: number | null
-  modules: { id: string, name: string, safetyCritical: boolean }[]
+  modules: { id: string, name: string, safetyCritical: boolean, committeeOnly: boolean }[]
 }
 
 // Column allow-listed: `notes` is what the trainer wrote for themselves and never reaches a
@@ -82,6 +82,7 @@ export async function sessionForSignUp(sessionId: string): Promise<SignUpSession
     id: schema.trainingModules.id,
     name: schema.trainingModules.name,
     safetyCritical: schema.trainingModules.safetyCritical,
+    committeeOnly: schema.trainingModules.committeeOnly,
   })
     .from(schema.sessionModules)
     .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.sessionModules.moduleId))
@@ -145,7 +146,9 @@ export interface MemberSessionRow {
 }
 
 export interface MemberSession extends MemberSessionRow {
-  modules: { id: string, name: string, safetyCritical: boolean }[]
+  modules: { id: string, name: string, safetyCritical: boolean, committeeOnly: boolean }[]
+  // It teaches a committee-only module and this member holds no committee role (0114).
+  committeeOnly: boolean
   // Derived from the position, never read from a column.
   placed: boolean
   waitlistPosition: number | null
@@ -190,9 +193,9 @@ export async function sessionsForMember(
   `)
 
   // Scoped by repeating the predicate as a subquery, so nothing binds a parameter per session.
-  const taught = await db.all<{ sessionId: string, id: string, name: string, safetyCritical: number }>(sql`
+  const taught = await db.all<{ sessionId: string, id: string, name: string, safetyCritical: number, committeeOnly: number }>(sql`
     select sm.session_id as sessionId, m.id as id, m.name as name,
-      m.safety_critical as safetyCritical
+      m.safety_critical as safetyCritical, m.committee_only as committeeOnly
     from session_modules sm
     join modules m on m.id = sm.module_id
     where sm.session_id in (select s.id from training_sessions s where ${visible})
@@ -201,12 +204,15 @@ export async function sessionsForMember(
 
   const modulesOf = (sessionId: string) => taught
     .filter(row => row.sessionId === sessionId)
-    .map(row => ({ id: row.id, name: row.name, safetyCritical: row.safetyCritical === 1 }))
+    .map(row => ({ id: row.id, name: row.name, safetyCritical: row.safetyCritical === 1, committeeOnly: row.committeeOnly === 1 }))
 
   // Every module in view once, so the gaps are worked out for the member rather than per session.
   const everyModule = [...new Map(taught.map(row =>
     [row.id, { id: row.id, safetyCritical: row.safetyCritical === 1 }])).values()]
-  const gaps = await prerequisiteGapsFor(userId, everyModule, today)
+  const [gaps, committee] = await Promise.all([
+    prerequisiteGapsFor(userId, everyModule, today),
+    taught.some(row => row.committeeOnly === 1) ? hasCommitteeRole(userId) : true,
+  ])
 
   return rows.map((row) => {
     const modules = modulesOf(row.id)
@@ -215,6 +221,7 @@ export async function sessionsForMember(
     return {
       ...row,
       modules,
+      committeeOnly: !committee && modules.some(module => module.committeeOnly),
       placed,
       waitlistPosition: row.myPosition === null || placed ? null : row.myPosition - row.capacity,
       closure: signUpClosure(
@@ -237,7 +244,11 @@ export async function sessionsForMember(
 // The one action each module offers this member (issue 1335), from one read of the sessions they
 // can see and one of their asks (`asked`, if already read): never a query per module (0003).
 export async function trainingActionsFor(userId: string, today: string, closesHours: number, asked?: ReadonlySet<string>): Promise<(moduleId: string) => TrainingAction> {
-  const [sessions, requested] = await Promise.all([sessionsForMember(userId, today, closesHours), asked ?? openRequestsOf(userId)])
+  const [sessions, requested, barred] = await Promise.all([
+    sessionsForMember(userId, today, closesHours),
+    asked ?? openRequestsOf(userId),
+    committeeOnlyModulesFor(userId),
+  ])
 
   const byModule = new Map<string, ActionSession[]>()
   for (const session of sessions) {
@@ -247,14 +258,24 @@ export async function trainingActionsFor(userId: string, today: string, closesHo
       startsAt: session.startsAt,
       place: session.place,
       full: session.status === 'FULL' || session.signedUp >= session.capacity,
-      open: session.closure === null && session.blocked.length === 0,
+      open: session.closure === null && session.blocked.length === 0 && !session.committeeOnly,
       placed: session.myPosition === null ? null : session.placed,
       waitlistPosition: session.waitlistPosition,
     }
     for (const module of session.modules) byModule.set(module.id, [...(byModule.get(module.id) ?? []), offered])
   }
 
-  return moduleId => trainingAction(byModule.get(moduleId) ?? [], requested.has(moduleId))
+  return moduleId => trainingAction(byModule.get(moduleId) ?? [], requested.has(moduleId), barred.has(moduleId))
+}
+
+// The committee-only modules this member may not put themselves forward for: none if they hold a
+// live committee role, every flagged one if not (0114). The flagged set is a handful of rows.
+export async function committeeOnlyModulesFor(userId: string): Promise<ReadonlySet<string>> {
+  const flagged = await db.select({ id: schema.trainingModules.id })
+    .from(schema.trainingModules)
+    .where(eq(schema.trainingModules.committeeOnly, true))
+  if (flagged.length === 0 || await hasCommitteeRole(userId)) return new Set()
+  return new Set(flagged.map(row => row.id))
 }
 
 // What a promotion and a move back both say about the session they concern.

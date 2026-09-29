@@ -57,8 +57,8 @@ const BLANK_FLAGS = {
 }
 
 async function verifiedPatron(): Promise<TestMember> {
-  const officer = await registerMember(app, 'house-access-officer', generatePassword())
-  await grantRole(app, officer, 'ACCESSIBILITY_OFFICER', admin.cookie)
+  const officer = await registerMember(app, 'house-secretary', generatePassword())
+  await grantRole(app, officer, 'SECRETARY', admin.cookie)
   const holder = await registerMember(app, 'house-patron', generatePassword())
   expect((await send('PUT', '/api/account/access-profile', {
     flags: { ...BLANK_FLAGS, levelAccess: true },

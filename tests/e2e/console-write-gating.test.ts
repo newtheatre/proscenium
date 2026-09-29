@@ -51,9 +51,11 @@ afterAll(async () => {
   await app?.stop()
 }, 30_000)
 
+// No role holds rooms.read without rooms.write since the Theatre Manager took the rooms (0111), so
+// its holder is shown every control; a read-only holder is pinned by the two describes below.
 describe.skipIf(skip !== null)('the rooms console gates its write controls on rooms.write (#911)', () => {
-  test('a TRAINING_MANAGER (rooms.read only) sees no write control on any of the three screens', async () => {
-    const trainingManager = await officerWith('training-mgr', 'TRAINING_MANAGER')
+  test('the THEATRE_MANAGER (rooms.write) sees the write controls on all three screens', async () => {
+    const theatreManager = await officerWith('theatre-mgr-rooms', 'THEATRE_MANAGER')
     const room = await (await send('POST', '/api/admin/rooms', { name: `Gate ${crypto.randomUUID().slice(0, 6)}` })).json() as { id: string }
     await send('POST', '/api/admin/rooms/blackouts', {
       roomId: room.id,
@@ -63,19 +65,19 @@ describe.skipIf(skip !== null)('the rooms console gates its write controls on ro
     })
     await send('POST', '/api/admin/rooms/external-spaces', { name: `Other ${crypto.randomUUID().slice(0, 6)}` })
 
-    const view = await signedInView(trainingManager)
+    const view = await signedInView(theatreManager)
     try {
       await visit(view, `${app.baseURL}/rooms/manage`, '[data-test="rooms-table"]')
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="add-room"]\')')).toBe(false)
-      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="edit-room-${room.id}"]')`)).toBe(false)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="add-room"]\')')).toBe(true)
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="edit-room-${room.id}"]')`)).toBe(true)
 
       await visit(view, `${app.baseURL}/rooms/manage/closures`, '[data-test="blackouts-table"]')
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="close-room"]\')')).toBe(false)
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test^="reopen-"]\')')).toBe(false)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="close-room"]\')')).toBe(true)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test^="reopen-"]\')')).toBe(true)
 
       await visit(view, `${app.baseURL}/rooms/manage/other`, '[data-test="spaces-table"]')
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="add-space"]\')')).toBe(false)
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test^="edit-space-"]\')')).toBe(false)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="add-space"]\')')).toBe(true)
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test^="edit-space-"]\')')).toBe(true)
     }
     finally {
       view.close()
@@ -84,7 +86,8 @@ describe.skipIf(skip !== null)('the rooms console gates its write controls on ro
 })
 
 describe.skipIf(skip !== null)('the people console gates its write controls on fellowships.write and members.write (#911)', () => {
-  test('a THEATRE_MANAGER (read only on both rolls) sees no write control on either screen', async () => {
+  test('the SECRETARY (fellowships.read) and the THEATRE_MANAGER (members.read) see no write control on their roll', async () => {
+    const secretary = await officerWith('secretary', 'SECRETARY')
     const theatreManager = await officerWith('theatre-mgr', 'THEATRE_MANAGER')
     const fellow = await registerMember(app, 'fellow-subject', generatePassword())
     await send('POST', '/api/admin/fellowships', {
@@ -94,12 +97,18 @@ describe.skipIf(skip !== null)('the people console gates its write controls on f
       citation: 'For services to the gating test.',
     })
 
+    const fellows = await signedInView(secretary)
+    try {
+      await visit(fellows, `${app.baseURL}/people/fellows`, '[data-test="fellows-table"]')
+      expect(await fellows.evaluate<boolean>('!!document.querySelector(\'[data-test="award"]\')')).toBe(false)
+      expect(await fellows.evaluate<boolean>('!!document.querySelector(\'[data-test="revoke"]\')')).toBe(false)
+    }
+    finally {
+      fellows.close()
+    }
+
     const view = await signedInView(theatreManager)
     try {
-      await visit(view, `${app.baseURL}/people/fellows`, '[data-test="fellows-table"]')
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="award"]\')')).toBe(false)
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="revoke"]\')')).toBe(false)
-
       await visit(view, `${app.baseURL}/people/members`, '[data-test="members-table"]')
       expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="record-membership"]\')')).toBe(false)
       expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="confirm"]\')')).toBe(false)

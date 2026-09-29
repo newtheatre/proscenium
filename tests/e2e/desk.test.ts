@@ -33,12 +33,12 @@ beforeAll(async () => {
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
-  // Both roles, plus MFA: MANAGER is privileged (0037/A-112). ticketing.manage is now what
-  // decides a comp request rather than what collects one (D-117).
+  // Both roles, plus MFA: ADMIN is privileged (0037/A-112). ticketing.manage, the IT Manager's alone
+  // (0112), is what decides a comp request rather than what collects one (D-117).
   const managerPassword = generatePassword()
   manager = await registerMember(app, 'manager', managerPassword)
   await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'FOH_MANAGER' }, officer.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'MANAGER' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'ADMIN' }, officer.cookie)
 
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, manager.cookie)).json() as { secret: string }
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, manager.cookie)

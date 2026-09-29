@@ -7,6 +7,7 @@ import { configValueOrUnset } from './configuration'
 import { sendRaw } from './notify'
 import { holdsLiveGrant } from './roles-register'
 import { REVIEWED_AT_SIGN_OFF } from '#shared/utils/night-signoff'
+import { withCommitteeStanding } from '#shared/utils/roles'
 import type { NightReport } from './night-report'
 import type { AuditRow } from '#shared/utils/audit'
 import type { NightAuthorityVia } from '#shared/utils/night-authority'
@@ -148,7 +149,7 @@ function deliveryStatement(input: { id: string, reportId: string, addendumId: st
 export function reportRoleHoldersQuery(roles: readonly string[], now: number): SQL {
   return sql`
     SELECT u.email AS email FROM users u
-    WHERE ${holdsLiveGrant(sql`u.id`, roles, now)}
+    WHERE ${holdsLiveGrant(sql`u.id`, withCommitteeStanding(roles), now)}
     ORDER BY u.email
   `
 }

@@ -36,7 +36,7 @@ beforeAll(async () => {
   barShift = await registerMember(app, 'barshift', barShiftPassword)
 
   barManager = await registerMember(app, 'barmanager', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
 
   fohManager = await registerMember(app, 'fohmanager', generatePassword())
   await grantRole(app, fohManager, 'FOH_MANAGER', officer.cookie)
@@ -116,7 +116,7 @@ function movementsFor(itemId: string): { qty: number, kind: string, refTable: st
   }
 }
 
-// The Bar Manager, signed in on a screen of the given size.
+// The Front of House Manager, signed in on a screen of the given size.
 const signedIn = (width = 375, height = 812): Promise<Bun.WebView> =>
   signInView(app, barManager.email, barPassword, { width, height })
 
@@ -374,7 +374,7 @@ describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts 
     }
   })
 
-  test('the Bar Manager\'s own count is named too, so every line can be reviewed before Apply', async () => {
+  test('the Front of House Manager\'s own count is named too, so every line can be reviewed before Apply', async () => {
     const item = await anItem()
     const opened = await open()
     await count(opened.stocktake.id, [{ itemId: item.id, counted: 0 }])
@@ -402,9 +402,9 @@ describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts 
     }
   })
 
-  // The Front of House Manager takes the full count (0099): open, count and apply on any day, with
-  // no shift, and neither the catalogue, its prices and discounts, nor the rest of the register.
-  test('the Front of House Manager opens, counts and applies a stocktake, and nothing else of the bar', async () => {
+  // The Front of House Manager takes the full count (0099) on any day, with no shift, and holds the
+  // catalogue and the rest of the register beside it since the bar joined the post (0110).
+  test('the Front of House Manager opens, counts and applies a stocktake, and reads the rest of the bar too', async () => {
     const item = await anItem()
     await deliver(item.id, 10)
     const opened = await open(fohManager.cookie)
@@ -417,7 +417,7 @@ describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts 
     expect((await apply(opened.stocktake.id, fohManager.cookie)).status).toBe(200)
 
     for (const path of ['/api/admin/bar/products', '/api/admin/bar/items', '/api/admin/bar/discounts', '/api/admin/bar/movements', '/api/admin/bar/categories']) {
-      expect(`${path} ${(await send('GET', path, undefined, fohManager.cookie)).status}`).toBe(`${path} 403`)
+      expect(`${path} ${(await send('GET', path, undefined, fohManager.cookie)).status}`).toBe(`${path} 200`)
     }
   })
 

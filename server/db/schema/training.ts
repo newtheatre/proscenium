@@ -58,6 +58,8 @@ export const trainingModules = sqliteTable('modules', {
   grantsTrainer: integer('grants_trainer', { mode: 'boolean' }).notNull().default(false),
   grantsSupervisor: integer('grants_supervisor', { mode: 'boolean' }).notNull().default(false),
   selfRegistrable: integer('self_registrable', { mode: 'boolean' }).notNull().default(false),
+  // Self sign-up and asks need a live committee role; the register ignores it (0114, G-105 c8).
+  committeeOnly: integer('committee_only', { mode: 'boolean' }).notNull().default(false),
   status: text('status').notNull().default('DRAFT'),
   sort: integer('sort').notNull().default(0),
   createdAt: integer('created_at').notNull().default(now),

@@ -199,7 +199,7 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
     const barPassword = generatePassword()
     const bar = await registerMember(app, 'a11y-till-bar', barPassword)
     const officer = await adminSession(app)
-    await grantRole(app, bar, 'BAR_MANAGER', officer.cookie)
+    await grantRole(app, bar, 'FOH_MANAGER', officer.cookie)
 
     const database = new Database(app.databaseFile)
     let venueId: string

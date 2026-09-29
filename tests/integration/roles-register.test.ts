@@ -48,8 +48,8 @@ function seed(database: TestDatabase): void {
     ['INSERT INTO users (id, email, name, verified, password) VALUES (?, ?, ?, ?, ?)', 'cal', 'cal@example.test', 'Cal Committee', 1, 'hash'],
     ['INSERT INTO users (id, email, name, verified, anonymised_at) VALUES (?, ?, ?, ?, ?)', 'gone', 'gone@example.test', 'Erased', 1, NOW - 60],
     ['INSERT INTO role_grants (id, user_id, role, expires_at, granted_by, granted_at) VALUES (?, ?, ?, ?, ?, ?)', 'g-ada', 'ada', 'ADMIN', null, 'ada', NOW - YEAR],
-    ['INSERT INTO role_grants (id, user_id, role, expires_at, granted_by, granted_at) VALUES (?, ?, ?, ?, ?, ?)', 'g-bea', 'bea', 'BAR_MANAGER', NOW + YEAR, 'ada', NOW - 60],
-    ['INSERT INTO role_grants (id, user_id, role, expires_at, granted_by, granted_at) VALUES (?, ?, ?, ?, ?, ?)', 'g-cal', 'cal', 'BAR_MANAGER', NOW - 60, 'ada', NOW - 2 * YEAR],
+    ['INSERT INTO role_grants (id, user_id, role, expires_at, granted_by, granted_at) VALUES (?, ?, ?, ?, ?, ?)', 'g-bea', 'bea', 'FOH_MANAGER', NOW + YEAR, 'ada', NOW - 60],
+    ['INSERT INTO role_grants (id, user_id, role, expires_at, granted_by, granted_at) VALUES (?, ?, ?, ?, ?, ?)', 'g-cal', 'cal', 'FOH_MANAGER', NOW - 60, 'ada', NOW - 2 * YEAR],
     ['INSERT INTO role_grants (id, user_id, role, expires_at, granted_by, granted_at) VALUES (?, ?, ?, ?, ?, ?)', 'g-gone', 'gone', 'COMMITTEE', null, 'ada', NOW - YEAR],
   ])
 }
@@ -58,9 +58,9 @@ describe('a role is what the register is read by (criterion 2)', () => {
   test('one role, not that role, and any of several', async () => {
     await withDatabase((database) => {
       seed(database)
-      expect(ids(database, { role: 'is:BAR_MANAGER' })).toEqual(['g-bea'])
+      expect(ids(database, { role: 'is:FOH_MANAGER' })).toEqual(['g-bea'])
       expect(ids(database, { role: 'is:ADMIN' })).toEqual(['g-ada'])
-      expect(ids(database, { role: 'any:ADMIN,BAR_MANAGER' })).toEqual(['g-ada', 'g-bea'])
+      expect(ids(database, { role: 'any:ADMIN,FOH_MANAGER' })).toEqual(['g-ada', 'g-bea'])
       expect(ids(database, { role: 'not:ADMIN' })).toEqual(['g-bea'])
     })
   })
@@ -77,7 +77,7 @@ describe('a role is what the register is read by (criterion 2)', () => {
   test('it sorts by the holder by default, and by expiry when asked', async () => {
     await withDatabase((database) => {
       seed(database)
-      expect(ids(database, { role: 'any:ADMIN,BAR_MANAGER' })).toEqual(['g-ada', 'g-bea'])
+      expect(ids(database, { role: 'any:ADMIN,FOH_MANAGER' })).toEqual(['g-ada', 'g-bea'])
       // A permanent grant has no expiry at all, so it sorts ahead of every dated one.
       expect(ids(database, { sort: 'expiresAt', direction: 'asc', lapsed: 'true' })).toEqual(['g-cal'])
     })
@@ -88,17 +88,17 @@ describe('a lapsed grant is hidden until it is asked for (criterion 3)', () => {
   test('the default register is live grants only', async () => {
     await withDatabase((database) => {
       seed(database)
-      expect(ids(database, { role: 'is:BAR_MANAGER' })).toEqual(['g-bea'])
-      expect(ids(database, { role: 'is:BAR_MANAGER' }, true)).toEqual(['g-bea', 'g-cal'])
-      expect(ids(database, { role: 'is:BAR_MANAGER', lapsed: 'true' })).toEqual(['g-cal'])
-      expect(ids(database, { role: 'is:BAR_MANAGER', lapsed: 'false' })).toEqual(['g-bea'])
+      expect(ids(database, { role: 'is:FOH_MANAGER' })).toEqual(['g-bea'])
+      expect(ids(database, { role: 'is:FOH_MANAGER' }, true)).toEqual(['g-bea', 'g-cal'])
+      expect(ids(database, { role: 'is:FOH_MANAGER', lapsed: 'true' })).toEqual(['g-cal'])
+      expect(ids(database, { role: 'is:FOH_MANAGER', lapsed: 'false' })).toEqual(['g-bea'])
     })
   })
 
   test('what the hiding took out is counted, so hidden never means lost', async () => {
     await withDatabase((database) => {
       seed(database)
-      const hidden = grantsClause(query({ role: 'is:BAR_MANAGER' }), NOW).hiddenLapsed
+      const hidden = grantsClause(query({ role: 'is:FOH_MANAGER' }), NOW).hiddenLapsed
       expect(hidden).toBeDefined()
       const statement = sql`SELECT count(*) AS n FROM role_grants
         JOIN users ON users.id = role_grants.user_id WHERE ${hidden!}`
@@ -106,7 +106,7 @@ describe('a lapsed grant is hidden until it is asked for (criterion 3)', () => {
       expect(rows<{ n: number }>(database, text, ...parameters)[0]!.n).toBe(1)
 
       // Asked for, nothing is being hidden, so there is nothing to count.
-      expect(grantsClause(query({ role: 'is:BAR_MANAGER' }, true), NOW).hiddenLapsed).toBeUndefined()
+      expect(grantsClause(query({ role: 'is:FOH_MANAGER' }, true), NOW).hiddenLapsed).toBeUndefined()
       expect(grantsClause(query({ lapsed: 'true' }), NOW).hiddenLapsed).toBeUndefined()
     })
   })
@@ -141,7 +141,7 @@ describe('every role is counted in one statement, never a query each (criterion 
       const byRole = Object.fromEntries(counted.map(row => [row.role, Number(row.holders)]))
 
       expect(byRole.ADMIN).toBe(1)
-      expect(byRole.BAR_MANAGER).toBe(1)
+      expect(byRole.FOH_MANAGER).toBe(1)
       expect(byRole.COMMITTEE).toBeUndefined()
     })
   })

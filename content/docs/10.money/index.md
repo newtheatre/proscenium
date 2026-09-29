@@ -3,7 +3,7 @@ title: Money
 description: The money dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
 audience: committee
-updatedOn: 2026-09-27
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -21,15 +21,16 @@ the Students' Union at the end of a period.
 - **"The dashboard could not be read."**: the ledger query failed or you no longer hold a
   finance permission. Change the period and back to read it again; if it persists, check your
   role under [roles and the committee year](/docs/people/roles).
-- **The Entries buttons are missing**: you are on the Committee rather than the Treasurer. The
-  committee sees the totals, not the entries behind them.
+- **The Entries buttons are missing**: you hold a post other than the Treasurer's. Every other
+  post sees the totals, not the entries behind them.
 
 ## Who reaches what
 
 - **The Treasurer** opens every screen in the group and every figure down to one ledger entry,
   records a reader reading, closes a period, changes an SU nominal code and takes the SU export.
 - **The Committee** opens the money dashboard only, with its totals but without the **Entries**
-  buttons that drill into who rang what in.
+  buttons that drill into who rang what in. So does every other post: the President, the
+  Secretary and Welfare Officer, the Front of House Manager and the Theatre Manager.
 - **The IT Manager** reopens a closed period, which nobody else does, and holds everything the
   Treasurer holds.
 
@@ -46,7 +47,7 @@ The dashboard at `/money` is the first item in the group. It answers "how are we
 period: a day, a week, a month, a term, a season or a year. The year runs from {{ YEAR_START }}
 to {{ YEAR_END }} (month and day, London), the same year the committee's roles run to. A season
 is one of the theatre's seasons, Autumn, Spring, StuFF or the Fringe, and runs on the days the
-Box Office Manager gave it on the [seasons](/docs/box-office/seasons) screen.
+Front of House Manager gave it on the [seasons](/docs/box-office/seasons) screen.
 
 ![The money dashboard with the period kind (1), the period's own controls (2), revenue by source (3) and the other figures (4)](/images/docs/money/dashboard.png)
 

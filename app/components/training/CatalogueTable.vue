@@ -28,6 +28,7 @@ export interface CatalogueModule {
   grantsTrainer: boolean
   grantsSupervisor: boolean
   selfRegistrable: boolean
+  committeeOnly: boolean
   status: ModuleLifecycle
   sort: number
   materials: Material[]

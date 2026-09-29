@@ -213,10 +213,10 @@ describe.skipIf(skip !== null)('recording something that happened outside the sy
   // Signing is a property of the entry, not of the role: A-112 already stops a privileged role
   // working without a factor, so this proves the guard that holds when the setting does not.
   test('a signer without an authenticator is refused even where the role would not require one', async () => {
-    overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN', 'MANAGER', 'TRAINING_MANAGER'])
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN', 'THEATRE_MANAGER'])
     try {
       const deputy = await registerMember(app, 'deputy', password)
-      expect((await grantRole(app, deputy, 'THEATRE_MANAGER', cookie)).status).toBe(200)
+      expect((await grantRole(app, deputy, 'PRESIDENT', cookie)).status).toBe(200)
 
       // The role works: the refusal that follows is about the signature and nothing else.
       expect((await send('GET', '/api/admin/audit', null, deputy.cookie)).status).toBe(200)

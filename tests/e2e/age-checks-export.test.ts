@@ -26,7 +26,7 @@ beforeAll(async () => {
   admin = await adminSession(app)
   bar = await registerMember(app, 'export-bar', generatePassword())
   foh = await registerMember(app, 'export-foh', generatePassword())
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'FOH_MANAGER', admin.cookie)
   await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
@@ -71,13 +71,15 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 const RANGE = 'from=2020-01-01&to=2030-01-01'
 
 describe.skipIf(skip !== null)('who may export the register (E-119 criterion 3)', () => {
-  test('the front of house officer can export', async () => {
+  test('the Front of House Manager can export', async () => {
     const answered = await send('GET', `/api/admin/age-checks/export?${RANGE}&format=csv`, undefined, foh.cookie)
     expect(answered.status).toBe(200)
   })
 
-  test('the bar manager cannot: the export is a front of house licensing duty', async () => {
-    const answered = await send('GET', `/api/admin/age-checks/export?${RANGE}&format=csv`, undefined, bar.cookie)
+  test('the Theatre Manager cannot: the export is a front of house licensing duty', async () => {
+    const theatre = await registerMember(app, 'export-theatre', generatePassword())
+    await grantRole(app, theatre, 'THEATRE_MANAGER', admin.cookie)
+    const answered = await send('GET', `/api/admin/age-checks/export?${RANGE}&format=csv`, undefined, theatre.cookie)
     expect(answered.status).toBe(403)
   })
 

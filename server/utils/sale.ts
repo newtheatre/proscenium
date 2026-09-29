@@ -15,6 +15,7 @@ import { authorisedTabHolder, outstandingTabBalance } from '#server/utils/tab-ho
 import { tabCapGuard } from '#server/utils/tab-settlement'
 import { claimCompRequestForSale, compRequestById, compRequestLines, releaseCompRequestClaim } from '#server/utils/comps'
 import { priceRef, saysMoney } from '#shared/utils/bar'
+import { ownTabCapOverride } from '#shared/utils/self-dealing'
 import { deskTicketsQuery } from '#server/utils/desk'
 import { tillBookingById } from '#server/utils/till-bookings'
 import { bookableTicketTypes, guestAccount, holdReleaseMinutesFor, writeReservation } from '#server/utils/reservations'
@@ -502,6 +503,9 @@ async function resolveTab(
   let capOverridden = false
 
   if (outstandingPence + chargePence > cap) {
+    if (holder.id === actorId) {
+      throw createError({ statusCode: 403, statusMessage: ownTabCapOverride(holder.name, outstandingPence, chargePence, cap) })
+    }
     const overrideEnabled = await configValue(undefined, 'BAR_TAB_CAP_MANAGER_OVERRIDE')
     if (!overrideEnabled || !await isDutyOrBarManager(actorId, night)) {
       throw createError({
@@ -513,9 +517,9 @@ async function resolveTab(
     capOverridden = true
   }
 
-  // The refusal above is for the reader; this is what actually holds the cap. An overridden
-  // charge carries no guard: a manager waved this one past deliberately (criterion 4).
-  const guard = capOverridden ? null : tabCapGuard(holder.id, chargePence, cap)
+  // The refusals above are for the reader; this is what holds the cap. It lifts for an override,
+  // and only one made by someone other than the holder (criteria 3 and 4, 0115).
+  const guard = tabCapGuard(holder.id, chargePence, cap, capOverridden ? actorId : null)
   return { holderId: holder.id, holderName: holder.name, outstandingPence, capOverridden, guard }
 }
 

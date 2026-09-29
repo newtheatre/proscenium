@@ -1,5 +1,6 @@
 import { and, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { londonParts } from '#shared/utils/london'
+import { PERMISSION_MAP, ROLES } from '#shared/utils/roles'
 import { claimFor, digestClaimFor, nagClaimFor, nagWeek } from '#shared/utils/training-expiry'
 import type { WarningKind } from '#shared/utils/training-expiry'
 import type { H3Event } from 'h3'
@@ -164,16 +165,17 @@ async function sendDigests(event: H3Event | undefined, at: Date, armed: boolean)
 
 export interface DigestRecipient {
   userId: string
-  // True for an administrator or the training officer, who read the whole estate rather than
-  // the departments they happen to lead.
+  // True for a holder of the catalogue (`training.revoke`), who reads the whole estate rather
+  // than the departments they happen to lead (0111).
   everything: boolean
 }
 
 async function digestRecipients(): Promise<DigestRecipient[]> {
   const live = or(isNull(schema.roleGrants.expiresAt), sql`${schema.roleGrants.expiresAt} > unixepoch()`)
+  const owners = ROLES.filter(role => PERMISSION_MAP[role].includes('training.revoke'))
   const everything = await db.select({ userId: schema.roleGrants.userId })
     .from(schema.roleGrants)
-    .where(and(inArray(schema.roleGrants.role, ['ADMIN', 'TRAINING_MANAGER']), live))
+    .where(and(inArray(schema.roleGrants.role, owners), live))
 
   const leads = await db.select({ userId: schema.departmentLeads.userId })
     .from(schema.departmentLeads)

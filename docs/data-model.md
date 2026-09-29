@@ -119,7 +119,7 @@ officer-reference column does, and are named as a known gap rather than silently
 
 ### emergency_contacts
 `user_id` PK → users cascade · `name` (scrub) · `phone` (scrub) · `relation` (scrub) ·
-`updated_at`. Readable only by tonight's duty manager and safety officers while the person
+`updated_at`. Readable only by tonight's duty manager and the Theatre Manager while the person
 holds a shift or production role (A-3). Neither a shift nor a production role exists yet, so
 until they do it is readable by its owner and nobody else: the audience opens when there is
 something to evaluate it against, never wider than the story allows (A-114).
@@ -242,6 +242,13 @@ The retired `BOX_OFFICE` role was folded into `FOH_MANAGER` in place by migratio
 expiry winning for a holder of both, each moved grant audited as `role.merged` (0090, A-133).
 The retired `FRONT_OF_HOUSE` role granted nothing, so migration 0127 deleted its grants rather than
 folding them anywhere, each deletion audited first as `role.retired` (A-134).
+Migration 0130 folded `BAR_MANAGER` into `FOH_MANAGER`, `SAFETY_OFFICER` and `TRAINING_MANAGER`
+into `THEATRE_MANAGER`, and `ACCESSIBILITY_OFFICER` into `SECRETARY`, where the holder held the
+post role (later expiry winning, permanent beating any date), renamed a lone accessibility grant
+to `SECRETARY`, dropped every other live retired grant (`MANAGER` among them) into a covering
+`ADMIN` grant, removed a `COMMITTEE` grant its post grant outlasts, and rewrote the three
+role-keyed settings to the successors; it refuses, writing nothing, if a grant would land on no
+covering role (0112, A-135).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·
@@ -856,8 +863,8 @@ like a paid one (criterion 4, `heldSeatsSubquery`), and I-103's own `foregoneQue
 **Refunds and cancelling a paid booking (D-116).** `POST
 /api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund` hands money back one ticket at
 a time, under the same expected-total cross-check collection uses. Approval (criterion 2) is the
-refunder's own `money.refund`, held with the desk by `FOH_MANAGER` and `ADMIN` (`MANAGER` holds
-it without the desk, so cannot reach the route), on any day and for any performance, gated by the
+refunder's own `money.refund`, held with the desk by `FOH_MANAGER` and `ADMIN` alone since
+`MANAGER` retired (0112), on any day and for any performance, gated by the
 `REFUND_PAID_REQUIRES_MANAGER` configuration key (default true, registered ahead of this story);
 the refunder is the actor on the ledger entry and the audit row. The general desk permission
 (`ticketing.write`) is needed to reach the route at all, and no shift gives it, so a duty manager
@@ -1025,7 +1032,7 @@ two that read and `ticketing.write` for the rest:
 | `POST /api/admin/pass-types` | Adds one, always DRAFT, with its price points and covered shows in one batch. |
 | `GET /api/admin/pass-types/[id]` | One pass product and every show it may be extended to cover. |
 | `PUT /api/admin/pass-types/[id]` | Changes name, address, description, windows, price points and status. It does not take covered shows. Price points are kept by label and a changed price is updated in place, since an issued pass holds its price point by id (`pass_type_price_id` RESTRICT, D-124) and keeps its own `price_paid`. A price point the edit leaves out is removed, and the whole edit is refused with a 409 naming it if an issued pass holds it: the predicate rides the `UPDATE` (`updatePassTypeStatement()`), and the price points follow behind its audit row (`priceUpsertStatements()`). |
-| `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Reachable by `ticketing.write` or `ticketing.manage`, since MANAGER carries the second and not the first (0009); dropping a show with a live pass against it needs `ticketing.manage` specifically, whichever door was used to reach the route. |
+| `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Reachable by `ticketing.write` or `ticketing.manage`, a pair since the retired MANAGER carried the second and not the first (0009, 0112); dropping a show with a live pass against it needs `ticketing.manage` specifically, whichever door was used to reach the route. |
 | `DELETE /api/admin/pass-types/[id]` | Deletes one nothing has ever been issued under. An issued one is a 409 naming closing as the way. |
 
 **"Ever issued" and "live coverage" are queries over rows, never columns.** `PASS_TYPE_REFERENCES`
@@ -1581,7 +1588,7 @@ for each listing (the stocktakes list also to `bar.stocktake`, 0099):
 | Route | What it does |
 | --- | --- |
 | `GET /api/admin/bar/categories` | The paged envelope, each row carrying its product count. Filtered by its declaration (`shared/utils/bar-categories-list.ts`, K-129): no field yet, only `search` over the name and `sort` by till order or name. |
-| `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold, `allergens` (the answer the till gives, derived from what its live sizes pour with the product's own note as the bar's addition, `deriveAllergens`, issue 1348) and `restrictedPours`, the names of the age-restricted stocked items its live sizes pour. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId`, `retired` and `poursRestrictedSwitchedOff` (a product left unrestricted that pours restricted stock, hidden and retired included, the Bar Manager's tidy-up list, issue 1299), with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
+| `GET /api/admin/bar/products` | The paged envelope, every status included, each row carrying whether it has ever sold, `allergens` (the answer the till gives, derived from what its live sizes pour with the product's own note as the bar's addition, `deriveAllergens`, issue 1348) and `restrictedPours`, the names of the age-restricted stocked items its live sizes pour. Filtered by its declaration (`shared/utils/bar-products-list.ts`, K-129): `categoryId`, `retired` and `poursRestrictedSwitchedOff` (a product left unrestricted that pours restricted stock, hidden and retired included, the Front of House Manager's tidy-up list, issue 1299), with `search` over the name and `sort` by category, category name, till order within the category, or product name. |
 | `GET /api/admin/bar/items` | The paged envelope, each row carrying what is on hand: the sum of its movements, and `pourSizes`, the quantities the live sizes of products on the till pour from it (once each, choices included, the same products as Poured by, `pourSizesColumn`), which a write-off offers as chips (issue 1350), and `allergenState`, the item's answer as `itemAllergenState` reads it. Filtered by its declaration (`shared/utils/bar-items-list.ts`, K-129): `retired` and `allergenState` (issue 1348), with `search` over the name and `sort` by status, name, or allergens with the unanswered first. |
 | `GET /api/admin/bar/movements` | The paged envelope, newest first. Filtered by its declaration (`shared/utils/bar-movements-list.ts`, K-129): `itemId` and `kind`, with `search` over the stocked item's name and `sort` by when or `recordedOrder`, the row's own insertion order, which breaks a tie within the same second. |
 | `GET /api/admin/bar/stocktakes` | The paged envelope, newest opened first. Filtered by its declaration (`shared/utils/stocktakes-list.ts`, K-129): `status`, which is also the only column the `search` box runs over. |
@@ -1753,7 +1760,7 @@ second session for the same night, which `requireNightAuthority` refuses to open
 has passed. The close still runs, since its own predicate reads
 `closed_at IS NULL`, and no other write path updates the table at all.
 A session left open past its night is F-102's own query (`earlierOpenSessionsQuery`), read by the
-Bar Manager's list on the till (`GET /api/till/earlier`, with the unresolved `sumup_attempts` of
+Front of House Manager's list on the till (`GET /api/till/earlier`, with the unresolved `sumup_attempts` of
 ended nights). The close-night checklist reads `tillLeftOpenQuery` as a derived line, **The till
 is closed**: its own venue's till tonight, and earlier nights' open tills and unresolved charges at
 every bar, since a house not running tonight has no checklist of its own and every bar shares the
@@ -1888,8 +1895,7 @@ the account that entered the count now standing and cleared with it, bare (a ref
 rebuild the table) and registered as personal data kept on erasure (0099). UNIQUE
 (`stocktake_id`, `item_id`).
 
-Counts are entered by a holder of `bar.stocktake` on any day (the Bar Manager and the Front of
-House Manager), or by tonight's confirmed bar shift inside its window while the stocktake is open
+Counts are entered by a holder of `bar.stocktake` on any day (the Front of House Manager, 0110), or by tonight's confirmed bar shift inside its window while the stocktake is open
 (`requireStocktakeCounter`, `server/utils/stocktake-authority.ts`, resolving the till's night
 authority, 0099); opening and applying stay with `bar.stocktake`. `GET
 /api/admin/bar/stocktakes/open` and `GET /api/admin/bar/stocktakes/[id]` read for a holder of
@@ -2436,7 +2442,8 @@ free text, and it names nobody but its subject.
 `NONE|MONTHS|ACADEMIC_YEAR` · `expiry_months` · `allows_external` bool ·
 `external_evidence` · `safety_critical` bool · `signoff_required` bool · `grants_trainer` /
 `grants_supervisor` bool (frozen while unrevoked records exist) · `self_registrable` bool
-(BRIEF only, G-208) · `status` CHECK `DRAFT|ACTIVE|RETIRED` · `sort` · timestamps.
+(BRIEF only, G-208) · `committee_only` bool · `status` CHECK `DRAFT|ACTIVE|RETIRED` · `sort` ·
+timestamps.
 
 Six further CHECKs carry rules the form also states, because a rule stated only in a form holds
 only until somebody writes a second writer: safety-critical is never `SELF_DIRECTED`; a `MONTHS`
@@ -2464,6 +2471,15 @@ free-text note saying what paper that department wants to see, shown to whoever 
 guidance and never a validation rule (G-121 criterion 1). The catalogue screen offers it only once
 `allows_external` is on, and clears it when that goes off, so the note never outlives the opt-in it
 describes.
+
+`committee_only` (migration 0131, decision 0114) limits self sign-up to somebody holding a live
+committee role (any of `COMMITTEE_ROLES`, never `ADMIN` alone). It is read at the write path of a
+session sign-up and a module request, and derived into the member's action as "Only available to
+the committee"; the module stays listed everywhere. It carries no CHECK, since any kind may be
+committee-only, and it is not frozen: it governs who may put themselves forward, never what a record
+certified, so the register, walk-ins and logged deliveries ignore it. The old estate's import never
+writes it (0075), so a console edit survives a re-run; the catalogue CSV's `Committee Only` column
+sets it in a development seed.
 
 **A field the form hides is a field the form clears.** The screen shows what a module's kind admits
 and nothing else: a brief is offered no expiry, no grants and no external opt-in, because the write
@@ -2774,7 +2790,7 @@ inserts are chunked at `DELIVERY_RECORDS_PER_STATEMENT` rows so no statement's b
 count grows with the number of people taught (0003). Every attendee gets one
 `record.delivery-logged` audit entry in the same batch, naming the modules and the day.
 
-Revocation is `training.revoke`, held by the administrator and the training officer (question 8).
+Revocation is `training.revoke`, held by the administrator and the Theatre Manager (question 8, 0111).
 It is idempotent by predicate rather than by a read, so two officers racing produce one stamp and
 one audit entry rather than one refusal; the entry is written first in the batch, because the
 update would otherwise falsify the guard the entry rides on. The reason never reaches audit

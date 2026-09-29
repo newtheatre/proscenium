@@ -81,9 +81,9 @@ describe('pruning lapsed grants audits exactly the rows it deletes (A-119 criter
   test('each pruned grant has its trail row, and a grant still in date or permanent has neither', async () => {
     await withDatabase((database) => {
       for (const id of ['u-1', 'u-2', 'u-3']) insert(database, 'users', { id, email: `${id}@example.invalid`, name: id })
-      insert(database, 'role_grants', { id: 'g-old', user_id: 'u-1', role: 'BAR_MANAGER', expires_at: 1000 })
+      insert(database, 'role_grants', { id: 'g-old', user_id: 'u-1', role: 'THEATRE_MANAGER', expires_at: 1000 })
       insert(database, 'role_grants', { id: 'g-older', user_id: 'u-2', role: 'FOH_MANAGER', expires_at: 500 })
-      insert(database, 'role_grants', { id: 'g-recent', user_id: 'u-3', role: 'BAR_MANAGER', expires_at: 5000 })
+      insert(database, 'role_grants', { id: 'g-recent', user_id: 'u-3', role: 'THEATRE_MANAGER', expires_at: 5000 })
       insert(database, 'role_grants', { id: 'g-permanent', user_id: 'u-3', role: 'ADMIN', expires_at: null })
 
       const { audit, prune } = pruneLapsedStatements(2000)
@@ -92,7 +92,7 @@ describe('pruning lapsed grants audits exactly the rows it deletes (A-119 criter
       expect(rows<{ id: string }>(database, 'SELECT id FROM role_grants ORDER BY id').map(row => row.id)).toEqual(['g-permanent', 'g-recent'])
       const pruned = trail(database, 'role.pruned')
       expect(pruned.map(row => row.target)).toEqual(['user:u-1', 'user:u-2'])
-      expect(pruned.map(row => JSON.parse(row.detail!))).toEqual([{ role: 'BAR_MANAGER', expiresAt: 1000 }, { role: 'FOH_MANAGER', expiresAt: 500 }])
+      expect(pruned.map(row => JSON.parse(row.detail!))).toEqual([{ role: 'THEATRE_MANAGER', expiresAt: 1000 }, { role: 'FOH_MANAGER', expiresAt: 500 }])
 
       // Nothing left to prune: neither the delete nor the trail finds a row.
       database.batch([boundStatement(database, audit), boundStatement(database, prune)])

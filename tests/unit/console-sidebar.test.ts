@@ -38,20 +38,19 @@ describe('a group with one visible entry is drawn as that entry (0105)', () => {
     expect(reports?.kind === 'entry' && reports.entry.to).toBe('/reports')
   })
 
-  test('the Accessibility Officer\'s Box office, narrowed to one by abilities, is Access profiles', () => {
-    expect(drawn('ACCESSIBILITY_OFFICER')).toEqual(['entry /box-office/access-profiles'])
+  test('the Secretary\'s Box office, narrowed to one by abilities, is Access profiles', () => {
+    expect(drawn('SECRETARY')).toEqual(['entry /box-office/access-profiles', 'entry /people/fellows', 'entry /money', 'entry /reports'])
   })
 
-  test('the Safety Officer and the Committee see links only, and the Treasurer one group beside a link', () => {
-    expect(drawn('SAFETY_OFFICER')).toEqual(['entry /rota/manage/safety', 'entry /reports'])
+  test('the Committee sees links only, and the Treasurer and the President one group beside links', () => {
     expect(drawn('COMMITTEE')).toEqual(['entry /money', 'entry /reports'])
-    expect(drawn('TREASURER')).toEqual(['entry /bar/reports', 'group money'])
+    expect(drawn('TREASURER')).toEqual(['entry /bar/reports', 'group money', 'entry /reports'])
+    expect(drawn('PRESIDENT')).toEqual(['entry /rota/manage/safety', 'group people', 'entry /money', 'entry /reports', 'entry /admin/audit'])
   })
 
-  // The Front of House Manager takes the full count and nothing else of the bar (0099).
-  test('the Front of House Manager\'s Bar is Stocktakes alone', () => {
-    expect(drawn('FOH_MANAGER')).toContain('entry /bar/stock/stocktakes')
-    expect(drawn('FOH_MANAGER').filter(part => part.includes('/bar') || part === 'group bar')).toEqual(['entry /bar/stock/stocktakes'])
+  // The bar joined the Front of House Manager's post whole, the catalogue with the count (0110).
+  test('the Front of House Manager\'s Bar is the whole group', () => {
+    expect(drawn('FOH_MANAGER')).toContain('group bar')
   })
 
   test('a group holding two or more stays a group, with every entry in it', () => {

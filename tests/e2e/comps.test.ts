@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { answerCharge, startTypedCharge } from '#tests/helpers/till'
@@ -12,7 +12,7 @@ import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-110: a comp sale requires a prior request with a reason; approval belongs to tonight's duty
-// manager or the bar manager, never the requester, claimed atomically; it lapses on a timer.
+// manager or the Front of House Manager, never the requester, claimed atomically; it lapses on a timer.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -29,7 +29,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'comp-bar-manager', barManagerPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
   barStaff = await registerMember(app, 'comp-bar-staff', barStaffPassword)
 }, BOOT_TIMEOUT_MS)
 
@@ -72,6 +72,7 @@ function confirmShift(performanceId: string, role: 'BAR' | 'DUTY_MANAGER', userI
   finally {
     database.close()
   }
+  if (role === 'DUTY_MANAGER') grantCommitteeRole(app, userId)
 }
 
 function openTill(venueId: string, performanceId: string, as: string = barStaff.cookie): Promise<Response> {
@@ -179,7 +180,7 @@ describe.skipIf(skip !== null)('a comp sale requires a prior request with a reas
     expect(answered.status).toBe(400)
   })
 
-  test('a duty manager or the bar manager decides; ordinary bar staff may not', async () => {
+  test('a duty manager or the Front of House Manager decides; ordinary bar staff may not', async () => {
     const { venueId, performanceId } = programme(`comps-authority-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct()
     await openTill(venueId, performanceId)

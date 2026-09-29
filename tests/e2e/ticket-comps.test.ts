@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, forgetSpentStep, grantRole, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, forgetSpentStep, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -30,12 +30,12 @@ beforeAll(async () => {
   boxOffice = await registerMember(app, 'comp-desk', generatePassword())
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
-  // MANAGER is privileged (0037/A-112): requirePermission needs a confirmed second factor
-  // before ticketing.write is honoured at all, not only ticketing.manage.
+  // ticketing.manage is the IT Manager's alone (0112), and privileged (0037/A-112): requirePermission
+  // needs a confirmed second factor before ticketing.write is honoured at all, not only ticketing.manage.
   const managerPassword = generatePassword()
   ticketingManager = await registerMember(app, 'comp-manager', managerPassword)
   await request(app, 'POST', '/api/admin/roles', { userId: ticketingManager.id, role: 'FOH_MANAGER' }, officer.cookie)
-  await request(app, 'POST', '/api/admin/roles', { userId: ticketingManager.id, role: 'MANAGER' }, officer.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: ticketingManager.id, role: 'ADMIN' }, officer.cookie)
 
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, ticketingManager.cookie)).json() as { secret: string }
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, ticketingManager.cookie)
@@ -92,6 +92,7 @@ function confirmDutyManagerShift(performanceId: string, userId: string): void {
   finally {
     database.close()
   }
+  grantCommitteeRole(app, userId)
 }
 
 const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice(0, 8)}`
@@ -153,7 +154,7 @@ describe.skipIf(skip !== null)('asking for a comp (criterion 1)', () => {
     expect(id2).toBeTruthy()
   })
 
-  test('a duty manager or a ticketing manager decides; ordinary desk access may not', async () => {
+  test('a duty manager or the IT Manager decides; desk access alone may not', async () => {
     const { performanceId, ticketTypeId } = await bookableShow()
     const { id } = await bookedReservation(performanceId, ticketTypeId)
     const requestId = await requestedComp(id)

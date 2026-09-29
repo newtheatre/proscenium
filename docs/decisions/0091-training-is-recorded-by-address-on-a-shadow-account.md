@@ -2,6 +2,8 @@
 
 - Status: Accepted, 24 September 2026 (IT Manager)
 - Date: 2026-09-24
+- Amended: 29 September 2026 by 0111, under which `training.by-address` is the Theatre Manager's
+  and the IT Manager's; a lead of the module's department still derives it
 
 ## Context
 

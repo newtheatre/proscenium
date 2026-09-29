@@ -27,7 +27,7 @@ describe('what the register can be asked', () => {
   const parse = (raw: Record<string, string>) => schema.safeParse(raw)
 
   test('a role, a lapsed grant and a permanent one are all questions it takes', () => {
-    expect(parse({ role: 'is:BAR_MANAGER' }).success).toBe(true)
+    expect(parse({ role: 'is:FOH_MANAGER' }).success).toBe(true)
     expect(parse({ lapsed: 'true' }).success).toBe(true)
     expect(parse({ permanent: 'true' }).success).toBe(true)
   })

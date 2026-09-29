@@ -17,8 +17,8 @@ export type NightAuthorityVia = 'SHIFT' | 'OFFICER' | 'COVER'
 
 export const OFFICER_BYPASS_ACTION = 'night.officer-bypass'
 
-// The bypass permission each role stands on. A door shift does not open the till and neither does
-// the front of house officer's role, so no two roles share one (E-111 criterion 1).
+// The bypass permission each shift role stands on. A door shift does not open the till, so no two
+// shift roles share one (E-111 criterion 1); the one officer role holds all three (0110).
 export const NIGHT_ROLE_PERMISSION: Record<NightRole, Permission> = {
   DUTY_MANAGER: 'night.manage',
   DOOR: 'night.door',
@@ -38,7 +38,7 @@ export const NIGHT_ROLE_WORDS: Record<NightRole, string> = {
 export const NIGHT_ROLE_OFFICER: Record<NightRole, { role: Role, words: string }> = {
   DUTY_MANAGER: { role: 'FOH_MANAGER', words: 'the Front of House Manager\'s role' },
   DOOR: { role: 'FOH_MANAGER', words: 'the Front of House Manager\'s role' },
-  BAR: { role: 'BAR_MANAGER', words: 'the Bar Manager\'s role' },
+  BAR: { role: 'FOH_MANAGER', words: 'the Front of House Manager\'s role' },
 }
 
 // What the caller says it is working on. Every field is optional because the common case is
@@ -111,6 +111,15 @@ export function claimedShiftRefusal(role: NightRole): { statusCode: 403, statusM
   }
 }
 
+// A confirmed duty manager shift whose holder holds no live committee role opens nothing, and
+// says what is missing rather than that there is no shift (0114, E-111 criterion 1).
+export function committeeShiftRefusal(): { statusCode: 403, statusMessage: string } {
+  return {
+    statusCode: 403,
+    statusMessage: 'Your duty manager shift tonight opens nothing: a duty manager shift is for committee members, and you do not hold a committee role',
+  }
+}
+
 // Somebody holding tonight's shift outside the hours they work it is not somebody without one, so
 // the refusal quotes the window in London wall clock rather than the ways in (0078, E-131).
 export function outsideWindowRefusal(window: string): { statusCode: 403, statusMessage: string } {
@@ -146,9 +155,9 @@ export function saysOfficerBypass(line: OfficerBypassLine): string {
   return `${words.charAt(0).toUpperCase()}${words.slice(1)}: ${who} stood in by officer role, ${beside}`
 }
 
-// Why one role refused a caller, most specific first: the hours of a shift they hold, then the
-// request or an officer's own standing, then a claim waiting, then no shift at all (E-111).
-export const NIGHT_REFUSAL_KINDS = ['OUTSIDE_WINDOW', 'ASKED', 'CLAIMED', 'NO_SHIFT'] as const
+// Why one role refused a caller, most specific first: a shift's hours, the request or an officer's
+// standing, a shift its holder's standing cannot use (0114), a claim waiting, no shift (E-111).
+export const NIGHT_REFUSAL_KINDS = ['OUTSIDE_WINDOW', 'ASKED', 'NO_STANDING', 'CLAIMED', 'NO_SHIFT'] as const
 export type NightRefusalKind = (typeof NIGHT_REFUSAL_KINDS)[number]
 
 // The refusal a screen more than one role reaches shows: the most specific, and among equals the

@@ -20,7 +20,7 @@ const reads: string[] = []
 Object.assign(globalThis, {
   liveGrants: async (id: string) => {
     reads.push(id)
-    return id === 'u-committee' ? [{ role: 'BAR_MANAGER', expiresAt: null }] : []
+    return id === 'u-committee' ? [{ role: 'FOH_MANAGER', expiresAt: null }] : []
   },
   longestTerm: async () => null,
   configValue: async () => 14,

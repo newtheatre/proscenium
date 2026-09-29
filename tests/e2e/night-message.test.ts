@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -65,6 +65,7 @@ function house(suffix: string): string {
 function shift(performanceId: string, role: string, userId: string, slot = 1): void {
   write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)',
     `${performanceId}-${role}-${slot}`, performanceId, role, slot, userId, 'CONFIRMED')
+  if (role === 'DUTY_MANAGER') grantCommitteeRole(app, userId)
 }
 
 function holding(performanceId: string, userId: string, reference: string): void {

@@ -10,7 +10,7 @@ import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // E-116's routes: the committee's routing config, the open-items list, closing a follow-up,
-// and the wiring into E-115's incident routes that actually notifies the safety officer.
+// and the wiring into E-115's incident routes that actually notifies the Theatre Manager.
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
@@ -27,9 +27,9 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   const safetyPassword = generatePassword()
-  safety = await registerMember(app, 'safety-officer', safetyPassword)
+  safety = await registerMember(app, 'theatre-manager', safetyPassword)
   bar = await registerMember(app, 'safety-bar', generatePassword())
-  await request(app, 'POST', '/api/admin/roles', { userId: safety.id, role: 'SAFETY_OFFICER' }, admin.cookie)
+  await request(app, 'POST', '/api/admin/roles', { userId: safety.id, role: 'THEATRE_MANAGER' }, admin.cookie)
 
   // The role holds safety records, so it is privileged and needs a confirmed factor (A-112, #1211).
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, safety.cookie)).json() as { secret: string }
@@ -38,7 +38,7 @@ beforeAll(async () => {
   const { attemptId } = await (await request(app, 'POST', '/api/auth/sign-in', { email: safety.email, password: safetyPassword })).json() as { attemptId: string }
   const answered = await request(app, 'POST', '/api/auth/mfa/challenge', { attemptId, code: await codeForStep(secret, stepFor(new Date())) })
   safety = { ...safety, cookie: (answered.headers.get('set-cookie') ?? '').split(';')[0]! }
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -78,7 +78,7 @@ describe.skipIf(skip !== null)('severity routing (E-116 criterion 1)', () => {
     expect(severities.every(row => row.requiresFollowUp === false)).toBe(true)
   })
 
-  test('the safety officer can opt a severity in', async () => {
+  test('the Theatre Manager can opt a severity in', async () => {
     const updated = await send('PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: true }, safety.cookie)
     expect(updated.status).toBe(200)
 
@@ -154,7 +154,7 @@ describe.skipIf(skip !== null)('the open-items list and closing a follow-up (E-1
   })
 })
 
-describe.skipIf(skip !== null)('logging at a routed severity notifies the safety officer (E-116 criterion 2)', () => {
+describe.skipIf(skip !== null)('logging at a routed severity notifies the Theatre Manager (E-116 criterion 2)', () => {
   test('logging an incident at a routed severity sends one, unrouted sends none', async () => {
     await send('PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: true }, safety.cookie)
     await send('PUT', '/api/admin/safety/severities/NOTE', { requiresFollowUp: false }, safety.cookie)

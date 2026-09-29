@@ -3,7 +3,7 @@ title: Training
 description: The catalogue of modules, the departments that own them, what people hold, what they are asking for, and the sessions that teach it.
 module: Training
 audience: member
-updatedOn: 2026-09-22
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -41,9 +41,9 @@ the sessions they can sign up for and the public catalogue, is described in
 
 Three kinds of standing open these screens, and only the first is a role.
 
-- **The Training Manager** role holds the whole of it: the catalogue, every department, every
-  record, appointing leads and revoking. The Manager reads and writes the catalogue too. Signing
-  a module off as never expiring is the IT Manager's alone, and no screen offers it.
+- **The Theatre Manager** role holds the whole of it: the catalogue, every department, every
+  record, appointing leads, revoking, and recording training for an address with no account yet.
+  Signing a module off as never expiring is the IT Manager's alone, and no screen offers it.
 - **A department lead** is a person named against a department on the
   [Departments](/docs/training/departments) screen. They reach Catalogue, Departments, Records
   and Requests for their own departments without holding any role. The assignment lapses at the

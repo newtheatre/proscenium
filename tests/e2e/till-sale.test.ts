@@ -28,7 +28,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'sale-ordinary', generatePassword())
 
   barManager = await registerMember(app, 'sale-bar', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -201,7 +201,7 @@ describe.skipIf(skip !== null)('what the till may sell right now (F-103 criterio
     expect(choice?.options.map(option => option.itemName)).toContain(itemName)
   })
 
-  test('who may read it: the bar manager, not an ordinary member, not signed out', async () => {
+  test('who may read it: the Front of House Manager, not an ordinary member, not signed out', async () => {
     const { venueId } = programme('sale-permission')
     await aSellableProduct()
 
@@ -456,7 +456,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
   // Issue 1297: before the bar's first count, a drink pouring stock with nothing on hand is refused
   // at the charge, so the till tells whoever can count it how many drinks that is (0080).
-  test('before the first count, the Bar Manager is told how many drinks the till would refuse', async () => {
+  test('before the first count, the Front of House Manager is told how many drinks the till would refuse', async () => {
     const { venueId } = programme('sale-uncounted')
     const { productId, variantId } = await aSellableProduct({ name: named('Uncounted gin') })
     const itemId = await anItem({ name: named('Uncounted base') })

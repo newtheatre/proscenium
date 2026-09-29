@@ -699,7 +699,7 @@ ledger, so re-running the sweep, or two of them racing, sends nothing twice. Bri
 entirely: a brief never expires, and warning about one would be inventing an obligation.
 
 Digests go on the first of the month to every department lead for their departments, and to
-administrators and the training officer for everything. **They send even when there is nothing in
+administrators and the Theatre Manager for everything. **They send even when there is nothing in
 them**, because a month with no digest means the clockwork stopped, and that is the thing worth
 noticing. Somebody who is both an officer and a lead gets the wider scope, not two emails.
 
@@ -850,7 +850,7 @@ record and granting it again.
 
 Teaching that happened without a scheduled session still ends in records.
 `/training/manage/sessions` is where a trainer logs it, under **Log a session**, and it needs a
-current trainer certification rather than a role (the training officer may use it on a trainer's
+current trainer certification rather than a role (the Theatre Manager may use it on a trainer's
 behalf). Scheduling a session and logging one that already happened are the same job at two ends of
 the same day, so they share one screen.
 
@@ -959,6 +959,62 @@ beside their own. The first Google sign-in with it joins that account, keeps the
 address, marks it verified and clears the link; the trail records it as **Google sign-in linked
 by a set Workspace address**. Setting and clearing are trailed with who did it and never the
 address (0011). Clearing asks first, since it puts the second-account problem back.
+
+## Granting the committee's roles (A-135, 0112)
+
+A committee post holds one grant (0112). Five posts with standing work in the console hold a role
+named after them. Every other post holds `COMMITTEE`, with the post named in the grant's note
+(A-118 criterion 2). A post role already carries the Committee's standing, so nobody needs
+`COMMITTEE` beside it. `ADMIN` is the Archivist's IT function (constitution 4.17.1). It carries no
+committee standing, so the Archivist also holds `COMMITTEE` for the post. Nobody grants a role to
+their own account except `ADMIN` (0113).
+
+**Now (issue #1534, before booking opens on 12 October).** The IT Manager grants `TREASURER` to
+the elected Treasurer, `THEATRE_MANAGER` to the Theatre Manager and `SECRETARY` to the Secretary
+and Welfare Officer. Each grant is dated 31 July 2027 and has the post in the note. From then on
+the Treasurer, not the IT Managers, records the Z readings and writes off variances (I-104,
+constitution 4.3.2). The Theatre Manager follows up safety incidents and the Secretary verifies
+access declarations.
+
+**The handover on 1 August.** The IT Manager delegate holds the permanent `ADMIN` grant, so a
+usable permanent IT Manager exists throughout (A-120).
+
+1. **In July**, the outgoing Archivist, with the incoming one, sets up the incoming Committee's
+   Workspace addresses with 2-Step Verification enforced (constitution 4.17.2). The incoming
+   Committee should minute its IT delegate at its first meeting (4.2.2). If the delegate changes,
+   grant the new delegate `ADMIN` permanently before revoking the old one.
+2. **Outgoing grants lapse on their own** at the end of 31 July, London time (0009). Nothing needs
+   revoking except the permanent grants on the standing report.
+3. **On 1 August, not before,** the delegate makes the grants. A grant made in July defaults to
+   31 July of the same year. Each grant takes the default expiry and names the post in the note.
+   An address nobody has signed into yet is granted by address (0088, A-132).
+
+   | Post | Grant |
+   | --- | --- |
+   | President | `PRESIDENT` |
+   | Secretary and Welfare Officer | `SECRETARY` |
+   | Treasurer | `TREASURER` |
+   | Front of House Manager | `FOH_MANAGER` |
+   | Theatre Manager | `THEATRE_MANAGER` |
+   | Archivist | `COMMITTEE` and `ADMIN` |
+   | Every other post | `COMMITTEE` |
+
+4. **Before each grant**, check that the holder is a Full Member (constitution 3.2.1, 7.4). The
+   console does not record Full or Associate membership, so this check is done by hand.
+5. **In the first week**, the Theatre Manager assigns department leads on the training console
+   (0037, G-110):
+   - Front of House Manager: ADMN
+   - Company Technical Directors and the Technical Manager: TECH
+   - Company Workshop Manager: STGE
+   - Costume, Props and Make-Up Manager: COST
+   - Company Stage Managers: MGMT
+   - In-House and Studio Season Coordinators: PROD
+   - Theatre Manager: SFTY, NNT and LEAD
+6. **In the first week**, the President reviews the role register and the permanent grants report.
+7. **During the year**, acting cover is a dated grant of the post's role with the clause in the
+   note (constitution 4.1.5, 4.2.5, 7.8.2, 7.8.3). A resignation is revoked on the day. Tab credit
+   by role and the night report's recipients name roles, so they need no editing at handover.
+   People named in `BAR_AUTHORISED_TAB_HOLDERS` do not lapse, so review that list.
 
 ## Secrets
 

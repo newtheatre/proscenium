@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, registerMember, request } from '#tests/helpers/accounts'
 import { curtainDown, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { saysBlockedClose } from '#shared/utils/checklist'
@@ -68,6 +68,7 @@ function withBatch<T>(fn: (runner: { batch: (statements: [string, ...unknown[]][
 function shift(performanceId: string, role: string, userId: string, status = 'CONFIRMED'): void {
   write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
     `${performanceId}-${role}`, performanceId, role, userId, status)
+  if (role === 'DUTY_MANAGER') grantCommitteeRole(app, userId)
 }
 
 // Sign off and close opens once the curtain is down, on the server too (issue 1315).

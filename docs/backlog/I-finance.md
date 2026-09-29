@@ -22,7 +22,9 @@ Stories: 13 (9 MVP, 3 V2, 1 Later).
 4. SU nominal codes: who supplies the category vocabulary for export mappings, and is the SU
    return format stable year to year?
 5. Variance policy: what variance size demands investigation rather than write-off, and which role
-   may write one off?
+   may write one off? The role half answered 29 September 2026 by decision 0112: writing off a
+   variance is the Treasurer's (constitution 4.3.2, "cash discrepancies"), never the Front of
+   House Manager's, who takes the money. What size of variance needs investigating stays open.
 
 ## I-101: The append-only ledger
 

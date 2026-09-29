@@ -26,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'settle-bar-manager', barManagerPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
   barStaff = await registerMember(app, 'settle-bar-staff', barStaffPassword)
 }, BOOT_TIMEOUT_MS)
 
@@ -249,7 +249,7 @@ describe.skipIf(skip !== null)('settlement is bounded to the charges it covers (
   })
 })
 
-describe.skipIf(skip !== null)('only an unsettled charge may be voided, by the bar manager, with a reason (criterion 4)', () => {
+describe.skipIf(skip !== null)('only an unsettled charge may be voided, by the Front of House Manager, with a reason (criterion 4)', () => {
   test('ordinary bar staff cannot void', async () => {
     const { venueId, performanceId } = programme(`settle-void-authority-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct(500)

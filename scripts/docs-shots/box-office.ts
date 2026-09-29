@@ -149,7 +149,7 @@ export const boxOffice: Shot[] = [
   },
   {
     name: 'box-office/access-profiles',
-    persona: 'dev-access@e2e.newtheatre.org.uk',
+    persona: 'dev-secretary@e2e.newtheatre.org.uk',
     url: '/box-office/access-profiles',
     marker: '[data-test="access-profiles-table"]',
     width: CONSOLE_WIDTH,

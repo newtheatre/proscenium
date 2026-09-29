@@ -67,6 +67,18 @@ async function signUp(): Promise<void> {
     >
       {{ saysTrainingAction(action) }}
     </UBadge>
+    <!-- Shown, not hidden: the committee's own training stays visible, with why it is not offered (0114). -->
+    <UButton
+      v-else-if="action.kind === 'COMMITTEE_ONLY'"
+      color="neutral"
+      variant="subtle"
+      :size="large ? 'lg' : 'sm'"
+      :class="large ? 'min-h-12' : undefined"
+      disabled
+      :data-test="`module-committee-only-${moduleId}`"
+    >
+      {{ saysTrainingAction(action) }}
+    </UButton>
     <TrainingRequestModule
       v-else
       :module-id="moduleId"

@@ -10,7 +10,7 @@ password; there is one unified app, so the old cross-app session contract does n
 passkeys enrolled against the old relying-party id cannot cross to the new one (SP-4 found one
 affected account, so no re-enrolment flow is built).
 
-**Counts: 33 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
+**Counts: 34 MVP, 4 V2, 2 Later, 2 resolved won't-build.**
 
 Open questions for the committee:
 
@@ -235,7 +235,7 @@ Open questions for the committee:
 - Depends on: A-101
 - Acceptance criteria:
   1. Profile fields: name, pronouns (optional, free text, never inferred and never required), contact details, emergency contact. Every field states who can see it before the member fills it in.
-  2. The emergency contact is visible only to duty managers and safety officers, and only while the member holds a current shift or production role; it appears in no export except the member's own.
+  2. The emergency contact is visible only to duty managers and the Theatre Manager, and only while the member holds a current shift or production role; it appears in no export except the member's own. Amended 29 September 2026 by decision 0111: the safety officer's role folded into the Theatre Manager's.
   3. Dietary and access needs are not profile fields: they are separate consents with separate audiences, owned by module D (D-6).
   4. Each person controls their credit name per production for programmes and the public archive; the default is the profile name.
   5. A name change propagates everywhere immediately, because every module references the same record (principle P1).
@@ -303,7 +303,8 @@ Open questions for the committee:
   4. A role removal or expiry takes effect on privileged surfaces within one minute.
   5. Every grant change is audited as a from/to diff.
   6. Old-estate grants and their provenance import via a written role-vocabulary mapping table agreed in Phase 0.
-- Source: Prompt Book A-4, module 0 principle P3; audit SD-9; Get-In part 2 (roles row: carry).
+  7. Added 29 September 2026 (decision 0113): a grant to the granter's own account is refused for every role but the IT Manager's, whose holder already holds every permission; renewing one's own IT Manager grant (to make it permanent, A-120) stays allowed.
+- Source: Prompt Book A-4, module 0 principle P3; audit SD-9; Get-In part 2 (roles row: carry); criterion 7 from the role audit on issue #1211, 26 September 2026 (R4).
 
 ## A-119: Warn holders before roles lapse
 
@@ -317,6 +318,7 @@ Open questions for the committee:
   3. The standing report of permanent grants is included in the digest cycle, so exceptions stay visible.
   4. Grants expired more than 90 days ago are pruned as housekeeping; enforcement was already read-time, so pruning changes no behaviour.
   5. Every automated action is attributed to system in the audit trail.
+  6. A holder sees their own live roles on My NNT: each by its title and the day it lapses, or "until further notice" for a permanent grant, shown only while they hold at least one. The warning links there, to a live page and never to an address the old-site redirect map answers (issue 1400).
 - Source: Prompt Book A-4, module 0 principle P6; audit SD-13.
 
 ## A-120: Guard the last administrator
@@ -745,6 +747,47 @@ Open questions for the committee:
   0090 retired `BOX_OFFICE`. The audit's points 5 and 6 belong to the role-vocabulary workshop and
   are not part of this story.
 
+## A-135: One role per committee post
+
+- Role: Administrator
+- Phase: MVP
+- Story: As the IT Manager, I want every committee post to hold one grant, named after the post
+  where it has standing work, so that a handover is one grant per post and the register reads as
+  the constitution does.
+- Depends on: A-118, A-131, A-133, A-134
+- Acceptance criteria:
+  1. The vocabulary is seven roles: `ADMIN` (the IT Manager), `PRESIDENT`, `SECRETARY` (the
+     Secretary and Welfare Officer), `TREASURER`, `FOH_MANAGER`, `THEATRE_MANAGER` and `COMMITTEE`.
+     Each post with standing work holds its own role and no second grant; every other post holds
+     `COMMITTEE` with the post named in the grant's note (A-118 criterion 2). `MANAGER`,
+     `BAR_MANAGER`, `SAFETY_OFFICER`, `TRAINING_MANAGER` and `ACCESSIBILITY_OFFICER` are not roles:
+     granting one is refused as an unknown role, none is offered on `/people/roles` or an account's
+     page, a stored grant naming one grants nothing, and an audit entry written before still reads
+     its old title.
+  2. "The Committee" means any post role (`COMMITTEE_ROLES`: the five post roles and `COMMITTEE`,
+     never `ADMIN`). A stored list naming `COMMITTEE` reaches every post holder: the roles given tab
+     credit, an announcement's audience, the night report's recipients and the directory's role
+     filter.
+  3. One migration folds each live grant of a retired role into the holder's live post role
+     (`BAR_MANAGER` into `FOH_MANAGER`, `SAFETY_OFFICER` and `TRAINING_MANAGER` into
+     `THEATRE_MANAGER`, `ACCESSIBILITY_OFFICER` into `SECRETARY`): the later expiry wins, a permanent
+     grant beats any date, and the lapse warning is re-armed. A lone `ACCESSIBILITY_OFFICER` grant is
+     renamed `SECRETARY` with its expiry, granter and note. Every other live retired grant is dropped
+     into an `ADMIN` grant that covers it, a lapsed one is removed, and a `COMMITTEE` grant that the
+     holder's post grant outlasts is removed.
+  4. The migration refuses, writing nothing, when a live retired grant's holder holds neither the
+     live post role nor an `ADMIN` grant lasting at least as long; a `MANAGER` grant always needs
+     `ADMIN`. Such a grant is decided by hand and the migration runs again (0070).
+  5. Every moved grant writes a `role.merged` audit entry first (`role.retired` for a lapsed one),
+     with no actor and no free text (0011). The three role-keyed settings (the roles given tab
+     credit, the night report's recipients and the second-factor list) are rewritten to each
+     retired role's successor, never silently dropped, the second-factor list keeping its whole
+     floor, and each rewrite is audited as a settings change with no actor.
+- Source: The role audit on issue #1211 (26 September 2026, R1 to R3) against the 2026/27
+  constitution, decided by the IT Manager (0110, 0111, 0112); migration 0130 folds the grants.
+  The IT Manager's role keeps every permission (0113), so the audit's narrowing of it (R4) is not
+  part of this story.
+
 ## A-201: Import an SU membership list by hand
 
 - Role: Administrator
@@ -807,7 +850,7 @@ Open questions for the committee:
 
 - Role: Administrator
 - Phase: V2
-- Story: As the Training Manager, I want roles that require a current training record so that authority and competence cannot drift apart.
+- Story: As the Theatre Manager, I want roles that require a current training record so that authority and competence cannot drift apart. Amended 29 September 2026 by decision 0111: the training catalogue is the Theatre Manager's, so the story is theirs rather than a Training Manager's.
 - Depends on: A-118
 - Acceptance criteria:
   1. A role definition may require a current training record (module G); granting it to someone without the record is refused, naming the missing module.

@@ -2,7 +2,7 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { admittedSeatsSubquery, heldSeatsSubquery, noShowSeatsSubquery } from './capacity'
 import { OFFICER_BYPASS_ACTION } from '#shared/utils/night-authority'
-import type { IncidentTrendFilter, IncidentTrendRow, PerformanceReportFilter, PerformanceReportRow } from '#shared/utils/season-reports'
+import type { IncidentTrendFilter, IncidentTrendRow, OpeningBypassRow, PerformanceReportFilter, PerformanceReportRow } from '#shared/utils/season-reports'
 import type { SQL } from 'drizzle-orm'
 
 // E-126: every query scoped by a resolved range, never one bound parameter per row it covers
@@ -111,6 +111,28 @@ export async function performanceReports(fromAt: number, toAt: number, filter: P
     db.all<{ total: number }>(performanceReportsCountQuery(fromAt, toAt, filter)),
   ])
   return { items: rows.map(readBooleans), total: totalRow?.total ?? 0 }
+}
+
+// Every bypass whose row names no performance, by the show night it names, both days inclusive:
+// no night report carries these (E-130 criterion 6, issue 1537). Capped, not paged: they are rare.
+export function openingBypassesQuery(fromDay: string, toDay: string, filter: PerformanceReportFilter): SQL {
+  return sql`
+    SELECT json_extract(a.detail, '$.night') AS night, json_extract(a.detail, '$.role') AS role,
+      v.id AS venueId, v.name AS venueName, o.label AS openingLabel, u.name AS officerName
+    FROM audit_log a
+    JOIN venues v ON v.id = json_extract(a.detail, '$.venueId')
+    LEFT JOIN bar_openings o ON o.id = json_extract(a.detail, '$.openingId')
+    LEFT JOIN users u ON u.id = a.actor_id
+    WHERE a.action = ${OFFICER_BYPASS_ACTION}
+      AND json_array_length(a.detail, '$.performanceIds') = 0
+      AND json_extract(a.detail, '$.night') >= ${fromDay} AND json_extract(a.detail, '$.night') <= ${toDay}${filter.venueId ? sql` AND v.id = ${filter.venueId}` : sql``}
+    ORDER BY night, v.name, u.name
+    LIMIT ${EXPORT_LIMIT}
+  `
+}
+
+export async function openingBypasses(fromDay: string, toDay: string, filter: PerformanceReportFilter): Promise<OpeningBypassRow[]> {
+  return db.all<OpeningBypassRow>(openingBypassesQuery(fromDay, toDay, filter))
 }
 
 export function performanceReportsExportQuery(fromAt: number, toAt: number, filter: PerformanceReportFilter): SQL {

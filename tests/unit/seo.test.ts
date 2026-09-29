@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 import { matchPathToRule } from '@nuxtjs/robots/util'
 import { OLD_SITE_REDIRECTS, oldShowRedirect } from '#shared/utils/redirects'
+import { RETENTION_WARNING_LINK } from '#shared/utils/retention'
+import { ROLE_EXPIRY_LINK } from '#shared/utils/role-expiry'
 import {
   DEFAULT_OG_IMAGE,
   PRODUCTION_SITE_URL,
@@ -218,6 +220,22 @@ describe('the old-site redirect map (K-125 criterion 5)', () => {
       .map(from => from.slice(0, -3))
       .filter(bare => bare in OLD_SITE_REDIRECTS && OLD_SITE_REDIRECTS[bare] === OLD_SITE_REDIRECTS[`${bare}/**`])
     expect(redundant).toEqual([])
+  })
+
+  // Issue 1400: an email outlives the redirect map, so it names the live page, never an old address.
+  test('the role-expiring and retention emails link a live page, never an old address (A-119, A-126)', async () => {
+    const old = (path: string): boolean => path in OLD_SITE_REDIRECTS || Object.keys(OLD_SITE_REDIRECTS)
+      .some(from => from.endsWith('/**') && (path === from.slice(0, -3) || path.startsWith(from.slice(0, -2))))
+    for (const link of [ROLE_EXPIRY_LINK, RETENTION_WARNING_LINK]) {
+      const path = link.replace(/#.*$/, '')
+      expect(old(path)).toBe(false)
+      expect(resolves(path)).toBe(true)
+    }
+    for (const [file, name] of [['server/utils/role-expiry.ts', 'ROLE_EXPIRY_LINK'], ['server/utils/retention.ts', 'RETENTION_WARNING_LINK']] as const) {
+      const source = await Bun.file(file).text()
+      expect(source).toContain(`baseURL}\${${name}}`)
+      expect(source).not.toContain('baseURL}/account')
+    }
   })
 
   test('the old account addresses land on My NNT and the bar tab (K-127 criterion 4, issue 1341)', () => {

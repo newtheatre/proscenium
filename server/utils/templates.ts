@@ -1497,8 +1497,8 @@ end of our year, so this is the ordinary handover rather than anything having go
 <p>If you are carrying on, ask the ${saysRole('ADMIN')} to renew ${one ? 'it' : 'them'}. If you are
 handing over, this is the notice to plan it.</p>
 <p>This is about your standing role and nothing else. A shift you are confirmed for still opens the
-screens it always did, and your account, bookings and training records are untouched. Your roles are
-listed on <a href="${String(context.accountUrl)}">your account</a>.</p>`),
+screens it always did, and your account, bookings and training records are untouched.</p>
+<p>Your roles are listed on <a href="${String(context.accountUrl)}">My NNT</a>.</p>`),
       text: `Hello ${context.name},
 
 ${one ? 'A role you hold lapses soon.' : 'Roles you hold lapse soon.'} Committee roles run to the end
@@ -1512,7 +1512,7 @@ handing over, this is the notice to plan it.
 This is about your standing role and nothing else. A shift you are confirmed for still opens the
 screens it always did, and your account, bookings and training records are untouched.
 
-Your roles:
+Your roles are listed on My NNT:
 ${String(context.accountUrl)}
 
 The Nottingham New Theatre`,

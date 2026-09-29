@@ -30,10 +30,10 @@ interface ConfigKeyDefinition {
   plannedFor?: { story: string, issue: number }
 }
 
-// Every role touching money, personal data or safety records (0009). PRIVILEGED_ROLES ships as
-// this and a save can add to it, never take one of these off (A-112 criterion 4, issue 1357).
+// Every role touching money, personal data or safety records (0009): every post role, and never
+// `COMMITTEE`. A save can add to it, never take one of these off (A-112 criterion 4, 0112).
 export const PRIVILEGED_FLOOR = [
-  'ADMIN', 'MANAGER', 'THEATRE_MANAGER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER', 'TREASURER', 'BAR_MANAGER', 'FOH_MANAGER', 'SAFETY_OFFICER',
+  'ADMIN', 'PRESIDENT', 'SECRETARY', 'TREASURER', 'FOH_MANAGER', 'THEATRE_MANAGER',
 ] as const satisfies readonly Role[]
 
 export const CONFIG_KEYS = {
@@ -176,7 +176,7 @@ export const CONFIG_KEYS = {
     schema: z.array(z.enum(ROLES)),
     default: [],
     workshop: 'money-and-box-office',
-    describes: 'Roles whose holders may charge purchases to a tab while their grant lasts, checked live on every charge. Naming a role extends credit up to the tab cap to everybody who holds it, including anyone granted it later in the year.',
+    describes: 'Roles whose holders may charge purchases to a tab while their grant lasts, checked live on every charge. Naming a role extends credit up to the tab cap to everybody who holds it, including anyone granted it later in the year. Naming the Committee includes every post role.',
   },
 
   // Module I: finance
@@ -692,7 +692,7 @@ export const CONFIG_KEYS = {
   NIGHT_REPORT_ROLES: {
     schema: z.array(z.enum(ROLES)),
     workshop: 'people-and-communications',
-    describes: 'Roles whose holders are emailed every end-of-night report, alongside whoever closed the night. Read when the report goes, so a grant that has lapsed receives nothing. The roles are confirmed in the workshop.',
+    describes: 'Roles whose holders are emailed every end-of-night report, alongside whoever closed the night. Read when the report goes, so a grant that has lapsed receives nothing. Naming the Committee includes every post role. The roles are confirmed in the workshop.',
   },
 
   // Which training module gates each shift role, as the committee named them (issue 1318). Null

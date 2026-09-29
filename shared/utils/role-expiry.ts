@@ -1,6 +1,10 @@
 // The idempotency keys the notification ledger holds for A-119, and the two windows the sweep
 // binds. Pure, so a test can assert the exact string a claim takes rather than infer it.
 
+// My NNT's own list of the holder's roles, never an old-site address the redirect map happens to
+// answer (criterion 6, issue 1400).
+export const ROLE_EXPIRY_LINK = '/my#roles'
+
 // The expiry rides the key (0048): moving a grant's date changes the claim, so the new date is
 // warned about rather than finding one already spent (criterion 1).
 export function roleExpiryClaimFor(grantId: string, expiresAt: number): string {

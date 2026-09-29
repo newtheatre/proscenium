@@ -52,6 +52,7 @@ const MODULE_COLUMNS = {
   grantsTrainer: schema.trainingModules.grantsTrainer,
   grantsSupervisor: schema.trainingModules.grantsSupervisor,
   selfRegistrable: schema.trainingModules.selfRegistrable,
+  committeeOnly: schema.trainingModules.committeeOnly,
   status: schema.trainingModules.status,
   sort: schema.trainingModules.sort,
 }
@@ -408,6 +409,7 @@ export interface ModuleRow {
   grantsTrainer: boolean
   grantsSupervisor: boolean
   selfRegistrable: boolean
+  committeeOnly: boolean
   status: string
   sort: number
   materials: { label: string, url: string }[]
@@ -508,7 +510,7 @@ export interface ModuleHeader {
 
 // The policy a sign-off stamps from, with the lifecycle and kind its refusals turn on.
 export async function modulePolicy(id: string): Promise<
-  (ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean }) | undefined
+  (ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean, committeeOnly: boolean }) | undefined
 > {
   const [row] = await db.select({
     expiryMode: schema.trainingModules.expiryMode,
@@ -516,8 +518,9 @@ export async function modulePolicy(id: string): Promise<
     kind: schema.trainingModules.kind,
     status: schema.trainingModules.status,
     allowsExternal: schema.trainingModules.allowsExternal,
+    committeeOnly: schema.trainingModules.committeeOnly,
   }).from(schema.trainingModules).where(eq(schema.trainingModules.id, id)).limit(1)
-  return row as (ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean }) | undefined
+  return row as (ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean, committeeOnly: boolean }) | undefined
 }
 
 export async function moduleById(id: string): Promise<ModuleHeader | undefined> {
@@ -771,6 +774,7 @@ export function moduleValues(input: ModuleInput) {
     grantsTrainer: input.grantsTrainer,
     grantsSupervisor: input.grantsSupervisor,
     selfRegistrable: input.selfRegistrable,
+    committeeOnly: input.committeeOnly,
     status: input.status,
     sort: input.sort,
   }

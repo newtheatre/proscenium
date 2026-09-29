@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MY_THINGS_TO_DO, saysMembershipSentence, splitMyTiles } from '#shared/utils/my-summary'
+import { MY_THINGS_TO_DO, saysMembershipSentence, saysRoleLapse, splitMyTiles } from '#shared/utils/my-summary'
 import type { MySummary } from '#shared/utils/my-summary'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
@@ -18,6 +18,7 @@ const EMPTY: MySummary = {
   ticket: null,
   notifications: [],
   nextShow: null,
+  roles: [],
 }
 
 const { data: summary, error, refresh } = await useAsyncData(
@@ -119,6 +120,26 @@ const greeting = computed(() => {
               <span class="text-default">{{ thing.says }}</span>
               <span class="font-medium text-primary">{{ thing.label }}</span>
             </ULink>
+          </li>
+        </ul>
+      </UPageCard>
+
+      <!-- The role-expiring email links here, so the anchor is a contract (A-119 criterion 6). -->
+      <UPageCard
+        v-if="summary.roles.length"
+        id="roles"
+        title="Your roles"
+        class="sm:col-span-2 lg:col-span-3"
+        data-test="my-roles"
+      >
+        <ul class="divide-y divide-default">
+          <li
+            v-for="held in summary.roles"
+            :key="held.role"
+            class="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2 text-sm"
+          >
+            <span class="font-medium text-default">{{ held.role }}</span>
+            <span class="text-muted">{{ saysRoleLapse(held.lapsesOn) }}</span>
           </li>
         </ul>
       </UPageCard>

@@ -54,6 +54,7 @@ export async function seedTraining(target: SeedTarget, people: People, now: numb
       expiry_mode: module.expiryMode,
       expiry_months: module.expiryMonths,
       safety_critical: Number(module.safetyCritical),
+      committee_only: Number(module.committeeOnly),
       signoff_required: Number(module.signoffRequired),
       grants_trainer: Number(module.grantsTrainer),
       grants_supervisor: Number(module.grantsSupervisor),
@@ -62,7 +63,8 @@ export async function seedTraining(target: SeedTarget, people: People, now: numb
     }, `(id) DO UPDATE SET
         name = excluded.name, description = excluded.description, notes = excluded.notes,
         expiry_mode = excluded.expiry_mode, expiry_months = excluded.expiry_months,
-        safety_critical = excluded.safety_critical, status = excluded.status, sort = excluded.sort`))
+        safety_critical = excluded.safety_critical, committee_only = excluded.committee_only,
+        status = excluded.status, sort = excluded.sort`))
 
     if (module.materialsUrl) {
       statements.push(insert('module_materials', {

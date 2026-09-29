@@ -13,19 +13,16 @@ export default defineEventHandler(async (event) => {
   if (performance.status === 'CANCELLED') throw createError({ statusCode: 409, statusMessage: 'This performance has been cancelled' })
 
   const today = londonToday()
-  const refusedTraining = createError({
-    statusCode: 403,
-    statusMessage: `That member does not currently qualify for a ${saysShiftRole(input.role).toLowerCase()} shift`,
-  })
   let subject = null
   if (input.userId) {
     subject = await findById(input.userId)
     if (!subject || subject.anonymisedAt !== null) throw noSuch('member')
     if (subject.disabled) throw createError({ statusCode: 403, statusMessage: 'That account is disabled and cannot be assigned a shift' })
-    if (!(await shiftEligibilities(event, input.userId, today))[input.role].eligible) throw refusedTraining
+    const eligibility = (await shiftEligibilities(event, input.userId, today))[input.role]
+    if (!eligibility.eligible) throw ineligibleRefusal(input.role, eligibility, subject.name)
   }
-  // The same gate rides the insert, so a record lapsing after this check confirms nobody (#1302).
-  const gate = { moduleId: (await shiftRoleRules(event))[input.role], today }
+  // The same gate rides the insert, so a record or a role lapsing after this check confirms nobody (#1302).
+  const gate = shiftGate(input.role, (await shiftRoleRules(event))[input.role], today, Math.floor(Date.now() / 1000))
 
   const shiftId = newId()
   const entry = auditEntry({
@@ -38,7 +35,9 @@ export default defineEventHandler(async (event) => {
   const offsets = await shiftOffsetDefaults(event)
   const added = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(addShiftStatement(shiftId, input, resolved.account.id, offsets, gate)), entry))
   if (!added) {
-    if (input.userId) throw refusedTraining
+    if (input.userId && subject) {
+      throw ineligibleRefusal(input.role, (await shiftEligibilities(event, input.userId, today))[input.role], subject.name)
+    }
     throw noSuch('performance')
   }
 

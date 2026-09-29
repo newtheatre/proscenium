@@ -1,7 +1,7 @@
 import { CONSOLE_WIDTH } from './types'
 import type { Shot } from './types'
 
-const persona = 'dev-bar@e2e.newtheatre.org.uk'
+const persona = 'dev-foh@e2e.newtheatre.org.uk'
 
 // A detail screen is reached from its list: the first row's own link is followed before capture.
 const openFirst = (prefix: string): string =>

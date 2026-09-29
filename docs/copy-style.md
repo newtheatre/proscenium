@@ -81,7 +81,7 @@ One word for each thing, checked against `docs/data-model.md` and 0043.
 | Certification | Record, module as a loose word | Not a separate object: a module of kind `CERTIFICATION`. A finished course is always a "record". |
 | Pass | Ticket | A `pass_types` entitlement, bought once, admitted against many performances. |
 | Officer | Committee, crew | A person holding a standing role with a permission, expiring each committee year (0009). |
-| Role titles | Title Case: the IT Manager, the Bar Manager, the Safety Officer | A role is a proper title, capitalised wherever it is read, sentence-initial or not. The wording comes from `ROLE_WORDING` in `shared/utils/roles.ts`, never hand-typed. |
+| Role titles | Title Case: the IT Manager, the Front of House Manager, the Secretary and Welfare Officer | A role is a proper title, capitalised wherever it is read, sentence-initial or not. The wording comes from `ROLE_WORDING` in `shared/utils/roles.ts`, never hand-typed. |
 | Committee | Officer, crew | The collective body: "committee direction", "the committee's own words" (0051). |
 | Crew | Officer | Backstage participants who join a show night with a short code, no account (`tonight/board.vue`). |
 | The SU | SU, the union | The Students' Union, abbreviated only after the first full mention on a page. |
@@ -167,7 +167,7 @@ several ways each, and put each of them in one place.
 | A membership a member needs | "Tell us about your membership" | The refusal links to `/account/membership`, which is where telling us happens. Never "Sort out your membership". |
 | What we send | "Notification" | The inbox is "Notifications" and the My NNT tile says it too. The page that chooses what is emailed is "Email settings", because in-app always arrives. Never "message". |
 | Room bookings | "My bookings", only as the link on Rooms | `rooms/index.vue`. "Bookings" on its own is the reader's word for tickets (section 4), so it is never a nav label; on Rooms the page around it says which. The notification topic keeps "Bookings". |
-| The officer who decides | The role in Title Case where one role decides ("the Theatre Manager", "the Accessibility Officer", "the department lead"); "an officer" where the permission decides and no one role holds it | Never "somebody". A room request has no approver role: whoever holds `rooms.write` may decide it, so "an officer" is the true word there. |
+| The officer who decides | The role in Title Case where one role decides ("the Theatre Manager", "the Secretary and Welfare Officer", "the department lead"); "an officer" where the permission decides and no one role holds it | Never "somebody". A room request has no approver role: whoever holds `rooms.write` may decide it, so "an officer" is the true word there. |
 | A declined training request | "Declined" | `saysRequestStatus()` in `shared/utils/training.ts`. "Answered" hid a refusal behind a softer word. |
 | The people working the door | "the people on the door", "anybody working the door" | Never "the door" as a shorthand for them: a member choosing what is shown is choosing who sees it. |
 
@@ -185,7 +185,7 @@ sweep; a screen that writes its own again fails `tests/unit/admin-conventions.te
 
 A read that was refused is not a read that failed. It shows the refusal the route gave, which
 names who can change it, and never "could not be read": a trainer opening somebody else's register
-is told the Training Manager can make them its trainer, not that the register is unreadable
+is told the Theatre Manager can make them its trainer, not that the register is unreadable
 (issue 1336). "Could not be read" is kept for a read that did not finish.
 
 ## 7. The shape of an empty state

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MY_THINGS_TO_DO, MY_TILES, orderMyTiles, saysMembershipSentence, splitMyTiles } from '#shared/utils/my-summary'
+import { MY_THINGS_TO_DO, MY_TILES, orderMyTiles, saysMembershipSentence, saysRoleLapse, splitMyTiles } from '#shared/utils/my-summary'
 import type { MySummary } from '#shared/utils/my-summary'
 
 // The overview leads with what is soonest, then the standing tiles (K-127 criterion 6), and a
@@ -16,6 +16,7 @@ const BASE: MySummary = {
   ticket: null,
   notifications: [],
   nextShow: null,
+  roles: [],
 }
 
 // 2026-10-14, 19:30 London, in epoch seconds.
@@ -181,5 +182,12 @@ describe('a failed read is a failure, not an empty estate (K-127 criterion 7, is
   // Issue 1332 revives the tile issue 1153 removed, now that the summary answers it.
   test('the tickets tile reads the summary it is given', async () => {
     expect(await Bun.file('app/components/my/tiles/Tickets.vue').text()).toContain('summary.ticket')
+  })
+})
+
+describe('a held role says when it lapses (A-119 criterion 6, issue 1400)', () => {
+  test('a dated grant names the day with its year, and a permanent one says so', () => {
+    expect(saysRoleLapse('2027-07-31')).toBe('Lapses on Sat 31 Jul 2027')
+    expect(saysRoleLapse(null)).toBe('Until further notice')
   })
 })

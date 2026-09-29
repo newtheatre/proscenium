@@ -21,6 +21,7 @@ import {
 } from '#shared/utils/access-profiles'
 import { accessProfilesList } from '#shared/utils/access-profiles-list'
 import { conditionsOf } from '#shared/utils/list-filters'
+import { OWN_ACCESS_DECISION } from '#shared/utils/self-dealing'
 import type { H3Event } from 'h3'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
@@ -252,14 +253,15 @@ async function clearCardNumber(row: AccessProfileRow, userId: string): Promise<A
 }
 
 // A fresh or lapsed declaration, as the officer read it, matched again at the write (D-127 criterion
-// 5, 0003); a member's save since the read changes the IV and refuses the decision (issue 1383).
-export const decisionPredicate = (now: number, version: string | null) =>
-  sql`(status = 'PENDING' OR (status = 'VERIFIED' AND expires_at IS NOT NULL AND expires_at <= ${now})) AND encryption_iv IS ${version}`
+// 5, 0003; issue 1383), and never the officer's own (criterion 2, 0115).
+export const decisionPredicate = (now: number, version: string | null, officerId: string) =>
+  sql`(status = 'PENDING' OR (status = 'VERIFIED' AND expires_at IS NOT NULL AND expires_at <= ${now})) AND encryption_iv IS ${version} AND user_id <> ${officerId}`
 
 // Also the declaration the officer read: a member's save since then leaves this decision about
 // words that are no longer theirs, so it is refused rather than written over them (issue 1383).
-function requireDecidable(row: AccessProfileRow | undefined, now: number, version: string | null): AccessProfileRow {
+function requireDecidable(row: AccessProfileRow | undefined, now: number, version: string | null, officerId: string): AccessProfileRow {
   if (!row) throw noSuch('access profile')
+  if (row.userId === officerId) throw createError({ statusCode: 403, statusMessage: OWN_ACCESS_DECISION })
   const status = effectiveStatus({ status: asAccessProfileStatus(row.status), expiresAt: row.expiresAt }, now)
   if (status !== 'PENDING' && status !== 'EXPIRED') {
     throw createError({ statusCode: 409, statusMessage: `This declaration is already ${status.toLowerCase()}` })
@@ -272,7 +274,7 @@ function requireDecidable(row: AccessProfileRow | undefined, now: number, versio
 
 export async function verifyAccessProfile(event: H3Event, userId: string, officerId: string, fohNote: string, version: string | null): Promise<void> {
   const now = Math.floor(Date.now() / 1000)
-  const existing = requireDecidable(await rowFor(userId), now, version)
+  const existing = requireDecidable(await rowFor(userId), now, version, officerId)
   const months = await configValue(event, 'ACCESS_PROFILE_VALIDITY_MONTHS')
 
   const payload = await clearCardNumber(existing, userId)
@@ -289,19 +291,19 @@ export async function verifyAccessProfile(event: H3Event, userId: string, office
       UPDATE access_profiles
       SET status = 'VERIFIED', encrypted_payload = ${encrypted.ciphertext}, encryption_iv = ${encrypted.iv},
           verified_by = ${officerId}, verified_at = ${now}, expires_at = ${expiresAt}, updated_at = ${now}
-      WHERE user_id = ${userId} AND ${decisionPredicate(now, version)}
+      WHERE user_id = ${userId} AND ${decisionPredicate(now, version, officerId)}
       RETURNING user_id AS userId
     `),
     entry,
   )
 
-  if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000), version)
+  if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000), version, officerId)
 }
 
 // The reason goes into the encrypted payload for the owner to read, never into the trail (0011, 0050).
 export async function declineAccessProfile(event: H3Event, userId: string, officerId: string, reason: string, version: string | null): Promise<void> {
   const now = Math.floor(Date.now() / 1000)
-  const existing = requireDecidable(await rowFor(userId), now, version)
+  const existing = requireDecidable(await rowFor(userId), now, version, officerId)
 
   const payload = await clearCardNumber(existing, userId)
   payload.declineReason = reason
@@ -312,13 +314,13 @@ export async function declineAccessProfile(event: H3Event, userId: string, offic
     db.all<{ userId: string }>(sql`
       UPDATE access_profiles
       SET status = 'DECLINED', encrypted_payload = ${encrypted.ciphertext}, encryption_iv = ${encrypted.iv}, updated_at = ${now}
-      WHERE user_id = ${userId} AND ${decisionPredicate(now, version)}
+      WHERE user_id = ${userId} AND ${decisionPredicate(now, version, officerId)}
       RETURNING user_id AS userId
     `),
     entry,
   )
 
-  if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000), version)
+  if (!applied) requireDecidable(await rowFor(userId), Math.floor(Date.now() / 1000), version, officerId)
 }
 
 // A tombstone past its days, matched again on the DELETE itself: a profile declared again since

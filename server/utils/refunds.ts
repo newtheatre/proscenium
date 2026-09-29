@@ -5,15 +5,16 @@ import { auditedWrite } from './audit'
 import { configValue } from './configuration'
 import { postEntry, runLedgerBatch } from './ledger'
 import { auditEntry } from '#shared/utils/audit'
-import type { Authority } from './authorise'
+import { OWN_BOOKING_REFUND } from '#shared/utils/self-dealing'
+import type { Permission } from '#shared/utils/roles'
 import type { H3Event } from 'h3'
 
 // D-116: refunding a ticket and, once nothing is left owed, cancelling the booking it belonged
 // to. Kept apart from server/utils/desk.ts's reads, matching D-114's own collect/desk split.
 
-// Criterion 2, gated by REFUND_PAID_REQUIRES_MANAGER: a `money.refund` holder approves their own
-// refund on any day and is the approver recorded. No shift reaches the desk, so none approves (0102).
-export async function requireRefundApproval(event: H3Event, resolved: Authority): Promise<void> {
+// Criterion 2, gated by REFUND_PAID_REQUIRES_MANAGER: a `money.refund` holder approves the refunds
+// they make, on any day, and is the approver recorded. No shift reaches the desk, so none approves (0102).
+export async function requireRefundApproval(event: H3Event, resolved: { permissions: ReadonlySet<Permission> }): Promise<void> {
   if (!await configValue(event, 'REFUND_PAID_REQUIRES_MANAGER')) return
   if (resolved.permissions.has('money.refund')) return
   throw createError({
@@ -35,12 +36,17 @@ export interface RefundTicketResult {
   entryId?: string
 }
 
+// Nobody refunds a booking in their own name (criterion 7, 0115): a clause on the claim itself.
+const notTheirOwnBooking = (reservationId: string, actorId: string) =>
+  sql`NOT EXISTS (SELECT 1 FROM reservations WHERE id = ${reservationId} AND user_id = ${actorId})`
+
 // Race-safe (criterion 4): the ticket's own claim is the arbiter, and `postEntry`'s guard rides
 // its `changes()`, so a losing claim posts no ledger entry either (0001).
 export async function refundTicket(input: RefundTicketWriteInput, at = new Date()): Promise<RefundTicketResult> {
   const claim = sql`
     UPDATE tickets SET refunded_at = ${Math.floor(at.getTime() / 1000)}
     WHERE id = ${input.ticketId} AND reservation_id = ${input.reservationId} AND refunded_at IS NULL
+      AND ${notTheirOwnBooking(input.reservationId, input.actorId)}
     RETURNING id
   `
 
@@ -79,6 +85,13 @@ export async function refundTicket(input: RefundTicketWriteInput, at = new Date(
   ])
 
   const applied = Array.isArray(claimed) && claimed.length > 0
+  if (!applied) {
+    // Read only for the words: the claim above already refused it.
+    const [own] = await db.all<{ own: number }>(sql`
+      SELECT EXISTS (SELECT 1 FROM reservations WHERE id = ${input.reservationId} AND user_id = ${input.actorId}) AS own
+    `)
+    if (own?.own) throw createError({ statusCode: 403, statusMessage: OWN_BOOKING_REFUND })
+  }
   return { applied, entryId: applied ? posted.id : undefined }
 }
 

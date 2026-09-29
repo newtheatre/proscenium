@@ -69,6 +69,7 @@ const pendingComps = computed(() => [
 const deciding = ref<string | null>(null)
 const approving = ref<{ queue: 'TICKET' | 'BAR', id: string, line: string } | null>(null)
 const approveFailure = ref<string | null>(null)
+const reauthenticating = ref(false)
 const declining = ref<{ queue: 'TICKET' | 'BAR', id: string } | null>(null)
 const declineReason = ref('')
 const declineFailure = ref<string | null>(null)
@@ -102,7 +103,10 @@ async function approveComp(): Promise<void> {
     await refresh()
   }
   catch (refused) {
-    approveFailure.value = refusalText(refused)
+    // A desk comp gives a seat away, so a stale session re-asserts first, then the approval is
+    // retried (D-117 criterion 6, 0115).
+    if (needsReauthentication(refused)) reauthenticating.value = true
+    else approveFailure.value = refusalText(refused)
   }
   finally {
     deciding.value = null
@@ -278,5 +282,10 @@ watch(() => props.performanceId, refresh)
         </UFormField>
       </form>
     </NightSheet>
+
+    <ReauthenticateModal
+      v-model:open="reauthenticating"
+      @reauthenticated="approveComp()"
+    />
   </div>
 </template>
