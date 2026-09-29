@@ -553,7 +553,8 @@ Manager's role opens, counts and applies the stocktake itself (`bar.stocktake`, 
 the catalogue, its prices or discounts. A second full count follows at
 cutover (26 to 31 October), and the latest applied one is the balance (0080). Until the first is
 applied, the till tells anyone who can reach the stocktake screen how many drinks on it pour stock
-with nothing on hand, with a link to the stocktakes.
+with nothing on hand, with a link to the stocktakes. A drink whose mixer is optional is not counted
+for an empty mixer while its own stock can still be poured neat (issue 1530).
 
 The count goes into the stocktake screen bar already has (`/bar/stock/stocktakes`, F-115) and is
 applied there. That count **is** the opening balance: F-115's

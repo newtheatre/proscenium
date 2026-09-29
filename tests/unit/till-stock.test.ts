@@ -138,6 +138,28 @@ describe('the drinks the till would refuse until the first count', () => {
     expect(uncountedProducts({ stockCounted: false, products: [aProduct([oneLeft])] })).toBe(1)
   })
 
+  // Issue 1530: an optional choice's none pours only the size's own recipe (F-112 criterion 3).
+  test('a size whose choice is optional does not count for an empty option while it still sells neat', () => {
+    const mixers = { id: 'g', name: 'Mixer', optional: true, options: [{ id: 'o1', itemName: 'Tonic', stock: empty }, { id: 'o2', itemName: 'Soda', stock: some }] }
+    const allGone = { ...mixers, options: mixers.options.map(option => ({ ...option, stock: empty })) }
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([{ ...aVariant('f', some), choice: mixers }])] })).toBe(0)
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([{ ...aVariant('g', some), choice: allGone }])] })).toBe(0)
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([{ ...aVariant('h', null), choice: allGone }])] })).toBe(0)
+  })
+
+  test('a size whose choice is optional still counts when its own recipe has nothing on hand', () => {
+    const mixers = { id: 'g', name: 'Mixer', optional: true, options: [{ id: 'o1', itemName: 'Tonic', stock: some }] }
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([{ ...aVariant('i', empty), choice: mixers }])] })).toBe(1)
+  })
+
+  test('a required choice counts for an empty option exactly as before, whether said or left unsaid', () => {
+    const options = [{ id: 'o1', itemName: 'Tonic', stock: empty }, { id: 'o2', itemName: 'Soda', stock: some }]
+    const said = { ...aVariant('j', some), choice: { id: 'g', name: 'Mixer', optional: false, options } }
+    const unsaid = { ...aVariant('k', some), choice: { id: 'g', name: 'Mixer', options } }
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([said])] })).toBe(1)
+    expect(uncountedProducts({ stockCounted: false, products: [aProduct([unsaid])] })).toBe(1)
+  })
+
   test('once a count is applied the till greys those out itself, so there is nothing to say', () => {
     expect(uncountedProducts({ stockCounted: true, products: [aProduct([aVariant('a', variantStock(0, true))])] })).toBe(0)
   })
