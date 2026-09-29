@@ -341,7 +341,8 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
       await click(view, `[data-test="revoke-${holder.id}-FOH_MANAGER"]`)
       await waitFor(view, `document.querySelector('[data-test="confirm-revoke-role-verb"]')`)
       await click(view, '[data-test="confirm-revoke-role-verb"]')
-      await waitFor(view, `!document.body.innerText.includes(${JSON.stringify(holder.name)})`)
+      // The table, not the page: the revoked toast names the person while it shows.
+      await waitFor(view, `!document.querySelector('[data-test="holders-table"]')?.innerText.includes(${JSON.stringify(holder.name)})`)
       expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)).toBeUndefined()
     }
     finally {
