@@ -64,35 +64,28 @@ export async function reportAttendance(performanceId: string): Promise<ReportAtt
 
 export interface TenderTotal { tender: string, totalPence: number }
 
-// A performance's own lines, the desk's and the bar's alike: a bar sale carries its performance (#1572).
-type TakingsScope = { performanceId: string }
-
-function scopeWindow(scope: TakingsScope): SQL {
-  return sql`ll.performance_id = ${scope.performanceId}`
-}
-
 // One row per tender actually used; a tender nobody took tonight is simply absent; the caller
 // fills zeroes for display rather than this carrying every possible value (criterion 1).
-export function reportTakingsQuery(scope: TakingsScope, source: 'DESK' | 'TILL'): SQL {
+export function reportTakingsQuery(performanceId: string, source: 'DESK' | 'TILL'): SQL {
   return sql`
     SELECT le.tender AS tender, sum(ll.amount_pence) AS totalPence
     FROM ledger_entries le
     JOIN ledger_lines ll ON ll.entry_id = le.id
-    WHERE le.source = ${source} AND ${scopeWindow(scope)}
+    WHERE le.source = ${source} AND ll.performance_id = ${performanceId}
     GROUP BY le.tender
   `
 }
 
 // Foregone revenue, never a silent gap (criterion 2): a comp line's own amount is always zero
 // (I-102 criterion 4), so what was given away is unit_price_pence, never amount_pence (I-103).
-export function reportForegoneQuery(scope: TakingsScope, source: 'DESK' | 'TILL'): SQL {
+export function reportForegoneQuery(performanceId: string, source: 'DESK' | 'TILL'): SQL {
   return sql`
     SELECT
       coalesce(sum(CASE WHEN le.tender = 'COMP' THEN ll.unit_price_pence * ll.qty ELSE 0 END), 0) AS compsPence,
       coalesce(sum(ll.discount_pence), 0) AS discountsPence
     FROM ledger_entries le
     JOIN ledger_lines ll ON ll.entry_id = le.id
-    WHERE le.source = ${source} AND ${scopeWindow(scope)}
+    WHERE le.source = ${source} AND ll.performance_id = ${performanceId}
   `
 }
 
@@ -101,16 +94,17 @@ export interface ReportTakings {
   bar: { tenders: TenderTotal[], compsPence: number, discountsPence: number }
 }
 
-async function takingsFor(scope: TakingsScope, source: 'DESK' | 'TILL'): Promise<ReportTakings['desk']> {
+// A performance's own lines, the desk's and the bar's alike: a bar sale carries its performance (#1572).
+async function takingsFor(performanceId: string, source: 'DESK' | 'TILL'): Promise<ReportTakings['desk']> {
   const [tenders, [foregone]] = await Promise.all([
-    db.all<TenderTotal>(reportTakingsQuery(scope, source)),
-    db.all<{ compsPence: number, discountsPence: number }>(reportForegoneQuery(scope, source)),
+    db.all<TenderTotal>(reportTakingsQuery(performanceId, source)),
+    db.all<{ compsPence: number, discountsPence: number }>(reportForegoneQuery(performanceId, source)),
   ])
   return { tenders, compsPence: foregone?.compsPence ?? 0, discountsPence: foregone?.discountsPence ?? 0 }
 }
 
 export async function reportTakings(performanceId: string): Promise<ReportTakings> {
-  const [desk, bar] = await Promise.all([takingsFor({ performanceId }, 'DESK'), takingsFor({ performanceId }, 'TILL')])
+  const [desk, bar] = await Promise.all([takingsFor(performanceId, 'DESK'), takingsFor(performanceId, 'TILL')])
   return { desk, bar }
 }
 

@@ -197,8 +197,8 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-till-card', 'TILL', 'CARD')
       line(database, 'l-till-card', 'e-till-card', tonight.performanceId, 500)
 
-      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ performanceId: tonight.performanceId }, 'DESK'))
-      const bar = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ performanceId: tonight.performanceId }, 'TILL'))
+      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(tonight.performanceId, 'DESK'))
+      const bar = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(tonight.performanceId, 'TILL'))
       expect(desk).toEqual([{ tender: 'CARD', totalPence: 1000 }])
       expect(bar).toEqual([{ tender: 'CARD', totalPence: 500 }])
     })
@@ -214,8 +214,8 @@ describe('takings (criteria 1, 2)', () => {
       database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id) VALUES (?, ?, ?, ?, ?)',
         'l-till-card', 'e-till-card', 'BAR_ITEM', 500, matinee.performanceId]])
 
-      const onMatinee = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ performanceId: matinee.performanceId }, 'TILL'))
-      const onEvening = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ performanceId: evening.performanceId }, 'TILL'))
+      const onMatinee = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(matinee.performanceId, 'TILL'))
+      const onEvening = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(evening.performanceId, 'TILL'))
       expect(onMatinee).toEqual([{ tender: 'CARD', totalPence: 500 }])
       expect(onEvening).toEqual([])
     })
@@ -231,7 +231,7 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-discount', 'DESK', 'CARD')
       line(database, 'l-discount', 'e-discount', tonight.performanceId, 800, 100)
 
-      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery({ performanceId: tonight.performanceId }, 'DESK'))
+      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery(tonight.performanceId, 'DESK'))
       expect(row).toMatchObject({ compsPence: 900, discountsPence: 100 })
     })
   })
@@ -246,7 +246,7 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-bar-discount', 'TILL', 'CARD')
       line(database, 'l-bar-discount', 'e-bar-discount', tonight.performanceId, 380, 20)
 
-      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery({ performanceId: tonight.performanceId }, 'TILL'))
+      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery(tonight.performanceId, 'TILL'))
       expect(row).toMatchObject({ compsPence: 450, discountsPence: 20 })
     })
   })
@@ -259,7 +259,7 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-reversal', 'DESK', 'CARD')
       line(database, 'l-reversal', 'e-reversal', tonight.performanceId, -1000)
 
-      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ performanceId: tonight.performanceId }, 'DESK'))
+      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(tonight.performanceId, 'DESK'))
       expect(desk).toEqual([{ tender: 'CARD', totalPence: 0 }])
     })
   })
