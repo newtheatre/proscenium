@@ -90,7 +90,7 @@ async function coveredPerformance(capacity: number | null = 120): Promise<{ perf
   const { id: passTypeId } = await created.json() as { id: string }
   await send('PUT', `/api/admin/pass-types/${passTypeId}`, {
     name, slug: slugged(name), validFrom: now, validUntil: now + 180 * 86_400,
-    prices: [{ label: 'Standard', price: 4500 }], status: 'ON_SALE', showIds: [showId],
+    prices: [{ label: 'Standard', price: 4500 }], status: 'ON_SALE',
   })
   const detail = await send('GET', `/api/admin/pass-types/${passTypeId}`)
   const { passType } = await detail.json() as { passType: { prices: { id: string }[] } }

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { poursRestrictedSwitchedOff } from '#shared/utils/bar'
 import { chooseAction, click, fill, fillNumber, menuOptions, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -26,7 +26,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'ordinary', generatePassword())
 
   barManager = await registerMember(app, 'barmanager', barPassword)
-  await request(app, 'POST', '/api/admin/roles', { userId: barManager.id, role: 'BAR_MANAGER' }, officer.cookie)
+  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -913,16 +913,18 @@ describe.skipIf(skip !== null)('a bar refusal held to a missing second factor na
   }
 
   test('the categories screen shows an enrolment link rather than a bare refusal', async () => {
-    // Narrowed for one request rather than widened: the bar manager account carries no
-    // authenticator, matching a real committee member who has never needed one before.
+    // Narrowed for one request rather than widened: this bar manager carries no authenticator,
+    // matching a real committee member who has never needed one before.
     override('PRIVILEGED_ROLES', ['BAR_MANAGER'])
     try {
+      const noFactor = await registerMember(app, 'barmanager-no-factor', barPassword)
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, officer.cookie)
       const view = await openSignedOutView(app.baseURL)
       await visit(view, `${app.baseURL}/sign-in`)
-      await fill(view, 'form input[type="email"]', barManager.email)
+      await fill(view, 'form input[type="email"]', noFactor.email)
       await fill(view, 'form input[type="password"]', barPassword)
       await click(view, 'form button[type="submit"]')
-      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+      await finishSignIn(app, view, noFactor.email)
 
       await visit(view, `${app.baseURL}/bar/categories`, 'body')
       await waitFor(view, `document.querySelector('[data-test="listing-failure"]')`)
@@ -952,7 +954,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     // The console shell renders no <main>, so each screen names an element of its own.
     await visit(view, `${app.baseURL}/bar/products`, '[data-test="bar-products-table"]')
@@ -986,7 +988,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="deliver-${itemId}"]`)
     await click(view, `[data-test="deliver-${itemId}"]`)
@@ -1017,7 +1019,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="write-off-${itemId}"]`)
     await click(view, `[data-test="write-off-${itemId}"]`)
@@ -1048,7 +1050,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock/movements?itemId=${itemId}`, `[data-test="reverse-${delivered}"]`)
     expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="reverse-${sold}"]'))`)).toBe(false)
@@ -1066,7 +1068,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="deliver-${itemId}"]`)
     await click(view, `[data-test="deliver-${itemId}"]`)
@@ -1098,7 +1100,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="deliver-${itemId}"]`)
     await click(view, `[data-test="deliver-${itemId}"]`)
@@ -1120,7 +1122,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock/allergens`, `[data-test="allergen-row-${itemId}"]`)
     await click(view, `[data-test="allergen-${itemId}-NONE"]`)
@@ -1140,7 +1142,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await fill(view, 'form input[type="email"]', barManager.email)
     await fill(view, 'form input[type="password"]', barPassword)
     await click(view, 'form button[type="submit"]')
-    await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
+    await finishSignIn(app, view, barManager.email)
 
     await visit(view, `${app.baseURL}/bar/stock?search=${encodeURIComponent(itemName)}`, `[data-test="write-off-${itemId}"]`)
     await click(view, `[data-test="write-off-${itemId}"]`)

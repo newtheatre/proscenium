@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { showNightOf } from '#shared/utils/show-night'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -26,7 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'foh-release', generatePassword())
-  await send('POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' })
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   const department = `REL${suffix()}`
   expect((await send('POST', '/api/admin/training/departments', { code: department, name: 'Release and reassignment' })).status).toBe(200)

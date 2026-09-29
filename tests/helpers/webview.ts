@@ -293,8 +293,8 @@ export async function openSignedOutView(baseURL: string, size?: { width: number,
   return view
 }
 
-// Signed in through the form as a person would be, answering the authenticator challenge an
-// enrolled officer meets. A view that fails to sign in is closed here, as the caller never has it.
+// Signed in through the form as a person would be, answering the code an enrolled member is asked.
+// A view that fails to sign in is closed here, since the caller never receives it to close.
 export async function signInView(app: AppUnderTest, email: string, password: string, size?: { width: number, height: number }): Promise<Bun.WebView> {
   const { finishSignIn } = await import('./accounts')
   const view = await openSignedOutView(app.baseURL, size)

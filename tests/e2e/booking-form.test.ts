@@ -83,7 +83,7 @@ async function guidedShow(): Promise<{ performanceId: string, ticketTypeId: stri
     warnings: [{ warningId, level: null }],
   })).status).toBe(200)
 
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek() })
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek(), durationMinutes: 120 })
   const performanceId = (await performance.json() as { id: string }).id
   const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
   const ticketTypeId = (await type.json() as { id: string }).id

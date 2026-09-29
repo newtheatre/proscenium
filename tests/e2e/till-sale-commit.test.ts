@@ -7,6 +7,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { putOnTheTill } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-105 through the real route: a matched total writes the ledger entry, one line per basket
@@ -70,7 +71,7 @@ const aProductIn = async (categoryId: string, over: Record<string, unknown> = {}
   created(await send('POST', '/api/admin/bar/products', { name: named('Gin'), categoryId, ...over }))
 
 const activate = (productId: string): Promise<Response> =>
-  send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+  putOnTheTill(send, productId)
 
 const addVariant = async (productId: string, over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/variants', { productId, servingKind: 'single', label: 'Single', ...over }))
@@ -79,7 +80,7 @@ const priceVariant = (variantId: string, pricePence: number): Promise<Response> 
   send('POST', `/api/admin/bar/variants/${variantId}/prices`, { pricePence, effectiveFrom: today() })
 
 const anItem = async (over: Record<string, unknown> = {}): Promise<string> =>
-  created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 1000, ...over }))
+  created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 1000, ageRestricted: false, ...over }))
 
 const deliver = (itemId: string, qty: number): Promise<Response> =>
   send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty, costPence: 100 })

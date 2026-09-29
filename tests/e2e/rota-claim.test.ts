@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { londonParts } from '#shared/utils/london'
 import { showNightOf } from '#shared/utils/show-night'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
@@ -29,7 +29,7 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
   foh = await registerMember(app, 'foh-approver', generatePassword())
-  await send('POST', '/api/admin/roles', { userId: foh.id, role: 'FOH_MANAGER' })
+  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
 
   member = await registerMember(app, 'claimant', generatePassword())
   other = await registerMember(app, 'other-claimant', generatePassword())
