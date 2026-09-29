@@ -36,11 +36,6 @@ class Statement {
     return this.execute()
   }
 
-  async first(column?: string): Promise<unknown> {
-    const [row] = this.execute().results as Record<string, unknown>[]
-    return column ? row?.[column] : row ?? null
-  }
-
   async raw(): Promise<unknown[][]> {
     return open().prepare(this.query).values(...this.params as never[])
   }
@@ -50,10 +45,6 @@ class Statement {
 const binding = {
   prepare: (query: string) => new Statement(query),
   batch: async (statements: Statement[]) => open().transaction(() => statements.map(statement => statement.execute()))(),
-  exec: async (query: string) => {
-    open().exec(query)
-    return { count: 1, duration: 0 }
-  },
 }
 
 export function bindD1(database: TestDatabase): void {

@@ -65,7 +65,7 @@ describe('auditedWrite refuses a statement that returns no rows', () => {
   test('a run is refused, and neither it nor its audit entry lands', async () => {
     const entry = auditEntry({ actorId: TREASURER, action: 'finance.period.defined', target: 'period:guard', detail: {} })
     const write = db.run(sql`INSERT INTO periods (id, label, from_day, to_day, created_by) VALUES ('guard', 'Guard', '2026-01-01', '2026-01-02', ${TREASURER})`)
-    expect(auditedWrite(write, entry)).rejects.toThrow('RETURNING')
+    await expect(auditedWrite(write, entry)).rejects.toThrow('RETURNING')
     expect(rows(database, 'SELECT id FROM periods WHERE id = ?', 'guard')).toHaveLength(0)
     expect(trail('finance.period.defined')).toHaveLength(0)
   })
