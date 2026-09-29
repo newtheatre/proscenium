@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, finishSignIn, forgetSpentStep, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillNumber, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { showNightOf } from '#shared/utils/show-night'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -100,7 +100,7 @@ const weekOffsetSeconds = 7 * 86_400
 
 // The offset is a parameter because the desk screen opens on tonight and nothing else: a case
 // driving the screen needs a performance inside the night in progress, not one a week out.
-async function bookableShow(price = 900, offsetSeconds = weekOffsetSeconds): Promise<{ performanceId: string, ticketTypeId: string, startsAt: number, night: string }> {
+async function bookableShow(price = 900, offsetSeconds = weekOffsetSeconds): Promise<{ performanceId: string, ticketTypeId: string, startsAt: number, night: string, title: string }> {
   const title = named('The Seagull')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, officer.cookie)
   const showId = (await show.json() as { id: string }).id
@@ -114,7 +114,7 @@ async function bookableShow(price = 900, offsetSeconds = weekOffsetSeconds): Pro
 
   expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true }, officer.cookie)).status).toBe(200)
 
-  return { performanceId, ticketTypeId, startsAt, night: showNightOf(new Date(startsAt * 1000)) }
+  return { performanceId, ticketTypeId, startsAt, night: showNightOf(new Date(startsAt * 1000)), title }
 }
 
 async function bookedReservation(performanceId: string, ticketTypeId: string, quantity = 1): Promise<{ reference: string, id: string, qrToken: string, totalPence: number }> {
@@ -444,11 +444,20 @@ async function signInAsBoxOffice(baseURL: string): ReturnType<typeof openSignedO
   return view
 }
 
+// Tonight holds every screen case's performance, so a case chooses its own rather than taking
+// whichever the desk opened on.
+async function atTheDesk(view: Bun.WebView, title: string): Promise<void> {
+  await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+  await waitFor(view, `document.querySelector('[data-test="desk-performance"]')`, 30_000)
+  await pickOption(view, '[data-test="desk-performance"]', title)
+}
+
 // #899: the SSR fetch on a full page load carries no cookie unless it goes through
 // useRequestFetch, and the failed nightly no longer resolves silently as an empty screen.
 describe.skipIf(skip !== null)('opening the desk by a full page load (#899, #940)', () => {
   test('a bookmark or a refresh still shows tonight\'s night, the picker and its bookings', async () => {
-    const { performanceId, ticketTypeId } = await bookableShow()
+    // The first case with a performance tonight, so the desk's own choice of the first is this one.
+    const { performanceId, ticketTypeId } = await bookableShow(900, twoHoursSeconds)
     const { reference } = await bookedReservation(performanceId, ticketTypeId)
 
     const view = await signInAsBoxOffice(app.baseURL)
@@ -472,12 +481,12 @@ describe.skipIf(skip !== null)('opening the desk by a full page load (#899, #940
 // further click; a URadioGroup replaces the nested select that caused it.
 describe.skipIf(skip !== null)('raising a comp from the desk with real pointer events (#939)', () => {
   test('choosing COMP still lets the reason be typed and the request sent', async () => {
-    const { performanceId, ticketTypeId } = await bookableShow(900)
+    const { performanceId, ticketTypeId, title } = await bookableShow(900, twoHoursSeconds)
     const { reference, id } = await bookedReservation(performanceId, ticketTypeId)
 
     const view = await signInAsBoxOffice(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await atTheDesk(view, title)
       await waitFor(view, `document.querySelector('[data-test="desk-results"]')?.innerText.includes(${JSON.stringify(reference)})`, 30_000)
 
       await click(view, `[data-test="desk-open-${id}"]`)
@@ -511,13 +520,12 @@ describe.skipIf(skip !== null)('raising a comp from the desk with real pointer e
 // typed field takes the decoded value the way tests/e2e/door-camera-scan.test.ts feeds it.
 describe.skipIf(skip !== null)('scanning with the camera, with no camera to open (criterion 8)', () => {
   test('the desk names the failure, then opens the collect modal for a decoded value typed in', async () => {
-    const { performanceId, ticketTypeId } = await bookableShow()
+    const { performanceId, ticketTypeId, title } = await bookableShow(900, twoHoursSeconds)
     const { reference } = await bookedReservation(performanceId, ticketTypeId)
 
     const view = await signInAsBoxOffice(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
-      await waitFor(view, `document.querySelector('[data-test="desk-performance"]')`, 30_000)
+      await atTheDesk(view, title)
 
       await click(view, '[data-test="desk-scan-camera"]')
       await waitFor(view, `document.querySelector('[data-test="desk-scan-camera-note"]')`, 15_000)
@@ -539,7 +547,7 @@ describe.skipIf(skip !== null)('scanning with the camera, with no camera to open
 // verb carries the amount going back. Back refunds nothing.
 describe.skipIf(skip !== null)('refunding a ticket confirms before anything moves (K-123)', () => {
   test('Back refunds nothing, and the named verb refunds the ticket', async () => {
-    const { performanceId, ticketTypeId } = await bookableShow(1250)
+    const { performanceId, ticketTypeId, title } = await bookableShow(1250, twoHoursSeconds)
     const { reference, id } = await bookedReservation(performanceId, ticketTypeId)
     expect((await send('POST', `/api/box-office/desk/reservations/${id}/collect`, { expectedTotalPence: 1250, tender: 'CARD' })).status).toBe(200)
 
@@ -550,7 +558,7 @@ describe.skipIf(skip !== null)('refunding a ticket confirms before anything move
 
     const view = await signInAsBoxOffice(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await atTheDesk(view, title)
       await waitFor(view, `document.querySelector('[data-test="desk-results"]')?.innerText.includes(${JSON.stringify(reference)})`, 30_000)
 
       await click(view, `[data-test="desk-open-${id}"]`)
@@ -568,6 +576,8 @@ describe.skipIf(skip !== null)('refunding a ticket confirms before anything move
       await click(view, `[data-test="desk-refund-${ticket.id}"]`)
       await waitFor(view, `document.querySelector('[data-test="confirm-desk-refund-verb"]')`, 15_000)
       await click(view, '[data-test="confirm-desk-refund-verb"]')
+      // The confirmation closes once the refund is written; nothing owing was true before it too.
+      await waitFor(view, `!document.querySelector('[data-test="confirm-desk-refund-verb"]')`, 30_000)
       await waitFor(view, `document.querySelector('[data-test="desk-nothing-owing"]')`, 30_000)
 
       const refund = query<{ amountPence: number }>(
@@ -604,17 +614,17 @@ describe.skipIf(skip !== null)('what a walk-up may be sold as at the desk (D-115
 
 describe.skipIf(skip !== null)('selling a walk-up from the desk screen (D-115 criterion 7)', () => {
   test('the total is read out, the sale lands as a door booking and the tiles move', async () => {
-    const { performanceId, ticketTypeId } = await bookableShow(1100, twoHoursSeconds)
+    const { performanceId, ticketTypeId, title } = await bookableShow(1100, twoHoursSeconds)
 
     const view = await signInAsBoxOffice(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await atTheDesk(view, title)
       await waitFor(view, `document.querySelector('[data-test="desk-walk-up"]')`, 30_000)
 
       // Nothing chosen: the sale names what it still needs rather than sitting dead.
       expect(await textOf(view, '[data-test="desk-walk-up-blocked"]')).toContain('ticket')
 
-      await fill(view, `[data-test="desk-walk-up-quantity-${ticketTypeId}"]`, '2')
+      await fillNumber(view, `[data-test="desk-walk-up-quantity-${ticketTypeId}"]`, '2')
       await fill(view, '[data-test="desk-walk-up-name"]', 'Walk Up')
       await fill(view, '[data-test="desk-walk-up-email"]', registrableAddress('walkup'))
       await waitFor(view, `document.querySelector('[data-test="desk-walk-up-total"]')?.innerText.includes('£22.00')`, 15_000)
@@ -641,11 +651,11 @@ describe.skipIf(skip !== null)('selling a walk-up from the desk screen (D-115 cr
 // "No results yet" about a search that had already run.
 describe.skipIf(skip !== null)('an empty results card says which kind of empty it is (D-114 criterion 9)', () => {
   test('a house with no bookings reads differently from a search that matched nothing', async () => {
-    await bookableShow(900, twoHoursSeconds)
+    const { title } = await bookableShow(900, twoHoursSeconds)
 
     const view = await signInAsBoxOffice(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/box-office/desk`, '[data-test="desk-page"]')
+      await atTheDesk(view, title)
       await waitFor(view, `document.querySelector('[data-test="desk-empty"]')`, 30_000)
       expect(await textOf(view, '[data-test="desk-empty"]')).toContain('No bookings on this performance')
 
