@@ -3,7 +3,7 @@ import {
   reportAccessQuery,
   reportAgeChecksQuery,
   reportAttendanceQuery,
-  reportBarItemsSoldQuery,
+  reportBarForPerformanceQuery,
   reportForegoneQuery,
   reportIncidentsQuery,
   reportMilestonesQuery,
@@ -197,27 +197,27 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-till-card', 'TILL', 'CARD')
       line(database, 'l-till-card', 'e-till-card', tonight.performanceId, 500)
 
-      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ performanceId: tonight.performanceId }, 'DESK'))
-      const bar = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ night: tonight.night }, 'TILL'))
+      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(tonight.performanceId, 'DESK'))
+      const bar = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(tonight.performanceId, 'TILL'))
       expect(desk).toEqual([{ tender: 'CARD', totalPence: 1000 }])
       expect(bar).toEqual([{ tender: 'CARD', totalPence: 500 }])
     })
   })
 
-  // A bar sale never carries a performance_id (F-105): a basket sells for the whole night, not
-  // one house, so the till side must scope by the night's own window, never by that column (F-118).
-  test('bar takings are scoped to the night, not to any performance the line never names', async () => {
+  // A bar sale carries the performance it was made against (F-126), so a matinee's sale is the
+  // matinee's takings and never the evening's (#1572, E-127 criterion 4).
+  test('bar takings are the performance\'s own, never another house\'s that night', async () => {
     await withDatabase(async (database) => {
-      const tonight = tonightsPerformance(database)
-      const elsewhere = tonightsPerformance(database, { suffix: 'b', night: '2026-01-05' })
+      const matinee = tonightsPerformance(database, { suffix: 'takings-matinee', curtainHoursAfterNightStart: 10 })
+      const evening = tonightsPerformance(database, { suffix: 'takings-evening', venueId: matinee.venueId, curtainHoursAfterNightStart: 15.5 })
       entry(database, 'e-till-card', 'TILL', 'CARD')
-      database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence) VALUES (?, ?, ?, ?)',
-        'l-till-card', 'e-till-card', 'BAR_ITEM', 500]])
+      database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id) VALUES (?, ?, ?, ?, ?)',
+        'l-till-card', 'e-till-card', 'BAR_ITEM', 500, matinee.performanceId]])
 
-      const barA = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ night: tonight.night }, 'TILL'))
-      const barB = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ night: elsewhere.night }, 'TILL'))
-      expect(barA).toEqual([{ tender: 'CARD', totalPence: 500 }])
-      expect(barB).toEqual([])
+      const onMatinee = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(matinee.performanceId, 'TILL'))
+      const onEvening = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(evening.performanceId, 'TILL'))
+      expect(onMatinee).toEqual([{ tender: 'CARD', totalPence: 500 }])
+      expect(onEvening).toEqual([])
     })
   })
 
@@ -231,7 +231,7 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-discount', 'DESK', 'CARD')
       line(database, 'l-discount', 'e-discount', tonight.performanceId, 800, 100)
 
-      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery({ performanceId: tonight.performanceId }, 'DESK'))
+      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery(tonight.performanceId, 'DESK'))
       expect(row).toMatchObject({ compsPence: 900, discountsPence: 100 })
     })
   })
@@ -246,7 +246,7 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-bar-discount', 'TILL', 'CARD')
       line(database, 'l-bar-discount', 'e-bar-discount', tonight.performanceId, 380, 20)
 
-      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery({ night: tonight.night }, 'TILL'))
+      const [row] = read<{ compsPence: number, discountsPence: number }>(database, reportForegoneQuery(tonight.performanceId, 'TILL'))
       expect(row).toMatchObject({ compsPence: 450, discountsPence: 20 })
     })
   })
@@ -259,7 +259,7 @@ describe('takings (criteria 1, 2)', () => {
       entry(database, 'e-reversal', 'DESK', 'CARD')
       line(database, 'l-reversal', 'e-reversal', tonight.performanceId, -1000)
 
-      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery({ performanceId: tonight.performanceId }, 'DESK'))
+      const desk = read<{ tender: string, totalPence: number }>(database, reportTakingsQuery(tonight.performanceId, 'DESK'))
       expect(desk).toEqual([{ tender: 'CARD', totalPence: 0 }])
     })
   })
@@ -459,18 +459,21 @@ describe('officer bypasses (criterion 1, 0098)', () => {
   })
 })
 
-describe('the bar summary (criterion 1)', () => {
-  test('sums revenue and items from tonight\'s till lines, the same query till-close reconciles against (F-118 criterion 4)', async () => {
+// #1572: each performance's report counts its own bar sales, read by the sale's performance; the
+// till-close figure is the whole night's, the same query till-close reconciles against (F-118 c4).
+describe('the bar summary (criterion 1, #1572)', () => {
+  test('a performance counts its own bar sales, and the night figure is till-close\'s own', async () => {
     await withDatabase(async (database) => {
-      const tonight = tonightsPerformance(database)
+      const matinee = tonightsPerformance(database, { suffix: 'bar-matinee', curtainHoursAfterNightStart: 10 })
+      const evening = tonightsPerformance(database, { suffix: 'bar-evening', venueId: matinee.venueId, curtainHoursAfterNightStart: 15.5 })
       entry(database, 'e-till', 'TILL', 'CARD')
-      database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty) VALUES (?, ?, ?, ?, ?)',
-        'l-till', 'e-till', 'BAR_ITEM', 450, 2]])
+      database.batch([['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, qty, performance_id) VALUES (?, ?, ?, ?, ?, ?)',
+        'l-till', 'e-till', 'BAR_ITEM', 450, 2, matinee.performanceId]])
 
-      const [revenue] = read<{ cardSalesPence: number }>(database, cardSalesQuery(tonight.night))
-      const [items] = read<{ itemsSold: number }>(database, reportBarItemsSoldQuery(tonight.night))
-      expect(revenue).toMatchObject({ cardSalesPence: 450 })
-      expect(items).toMatchObject({ itemsSold: 2 })
+      const [night] = read<{ cardSalesPence: number }>(database, cardSalesQuery(matinee.night))
+      expect(night).toMatchObject({ cardSalesPence: 450 })
+      expect(read(database, reportBarForPerformanceQuery(matinee.performanceId))[0]).toMatchObject({ revenuePence: 450, itemsSold: 2 })
+      expect(read(database, reportBarForPerformanceQuery(evening.performanceId))[0]).toMatchObject({ revenuePence: 0, itemsSold: 0 })
     })
   })
 })
