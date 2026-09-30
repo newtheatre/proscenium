@@ -137,7 +137,7 @@ export function restrictedPoursColumn(alias: string): SQL {
 
 export const readRestrictedPours = (value: string | null): string[] => readJsonArray(value)
 
-// The Bar Manager's tidy-up list: any product left unrestricted that pours restricted stock.
+// The Front of House Manager's tidy-up list: any product left unrestricted that pours restricted stock.
 // Hidden and retired count, since either goes back on the till with one press.
 export function poursRestrictedSwitchedOffPredicate(alias: string): SQL {
   return sql`(${sql.raw(alias)}.age_restricted = 0 AND EXISTS (${restrictedPoured(sql.raw(`${alias}.id`))}))`

@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
 
   if (!session) throw noSuch('session', 'Open the sessions list and choose it again')
 
-  // The trainer running it, or the training officer. Somebody else's register is not yours to open.
+  // The trainer running it, or the Theatre Manager. Somebody else's register is not yours to open.
   const mine = session.trainerId === resolved.account.id
   if (!mine && !resolved.permissions.has('training.write')) {
     throw createError({ statusCode: 403, statusMessage: 'Only the trainer running this session may open its register' })

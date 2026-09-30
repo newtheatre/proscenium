@@ -7,7 +7,7 @@ import type { ResolveOutcome } from '#shared/utils/sumup'
 import type { EarlierTillLeftOpen } from '#shared/utils/till'
 import type { ListFailure } from '~/composables/useListFailure'
 
-// What ended nights left open, above tonight's till for the Bar Manager (F-102 criterion 5, issue
+// What ended nights left open, above tonight's till for the Front of House Manager (F-102 criterion 5, issue
 // 1316): each till closes on its own night's figures, and each charge takes the answers tonight's do.
 
 defineProps<{
@@ -27,7 +27,7 @@ const mayRecordLate = computed(() => can(useViewer().value, recordLateCharges))
 </script>
 
 <template>
-  <!-- A refused read shows too: a Bar Manager with no authenticator otherwise sees nothing at all. -->
+  <!-- A refused read shows too: the Front of House Manager with no authenticator otherwise sees nothing at all. -->
   <NightBlock
     v-if="failure || left.sessions.length || left.attempts.length"
     title="Left open from an earlier night"

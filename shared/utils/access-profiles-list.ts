@@ -1,7 +1,7 @@
 import { ACCESS_PROFILE_STATUSES, saysAccessProfileStatus } from './access-profiles'
 import type { ListSpec } from './list-filters'
 
-// The accessibility officer's queue declaration (K-129, D-127). Pending is the hidden default the
+// The Secretary's queue declaration (K-129, D-127). Pending is the hidden default the
 // register gives "current": not a database value, so "everyone" is its own choice, "ALL".
 export const accessProfilesList = {
   key: 'access-profiles',

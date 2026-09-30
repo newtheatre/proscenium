@@ -485,7 +485,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/admin/safety/severities/index.get.ts', exempt: 'reads the fixed four-severity routing table' },
   { route: 'server/api/admin/safety/severities/[severity]/index.put.ts', actions: ['incident-severity.routing-changed'] },
-  { route: 'server/api/admin/safety/open-items.get.ts', exempt: 'reads the open-items list, gated by the safety officer\'s own permission' },
+  { route: 'server/api/admin/safety/open-items.get.ts', exempt: 'reads the open-items list, gated by the Theatre Manager\'s own permission' },
   { route: 'server/api/admin/safety/incidents/[id]/close.post.ts', actions: ['incident-followup.closed'] },
   { route: 'server/api/admin/age-checks/export.get.ts', actions: ['age-checks.exported'] },
   { route: 'server/api/admin/reports/incidents/export.get.ts', actions: ['reports.exported'] },

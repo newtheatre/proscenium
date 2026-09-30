@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   for (const showId of removed) {
     const [row] = await db.all<{ live: number }>(liveCoverageQuery(id, showId))
     if ((row?.live ?? 0) > 0 && !resolved.permissions.has('ticketing.manage')) {
-      throw createError({ statusCode: 403, statusMessage: 'A manager must remove a show with a live pass against it' })
+      throw createError({ statusCode: 403, statusMessage: 'Only the IT Manager removes a show with a live pass against it' })
     }
   }
 

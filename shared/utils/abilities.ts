@@ -66,7 +66,7 @@ export const recordTrainingByAddress = defineAbility((viewer: Viewer) => holds(v
 // Running a session derives from a current trainer certification (requireTrainer, G-111).
 export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewer, 'training.write') || viewer.isTrainer)
 
-// Naming somebody else to teach a session: the training officer only, never a trainer (G-112, issue 1336).
+// Naming somebody else to teach a session: the Theatre Manager only, never a trainer (G-112, issue 1336).
 export const nameTrainers = defineAbility((viewer: Viewer) => holds(viewer, 'training.write'))
 
 // A membership is a dated fact, not a grant (0009, 0031). Grace counts for what these guard;
@@ -101,7 +101,7 @@ export const viewBarStock = defineAbility((viewer: Viewer) => holds(viewer, 'bar
 // The Front of House Manager takes the full count without reading the rest of the register (0099).
 export const takeStocktakes = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read') || holds(viewer, 'bar.stocktake'))
 
-// F-119 criterion 5 names the bar manager, the treasurer and administrators: the treasurer holds
+// F-119 criterion 5 names the Front of House Manager, the treasurer and administrators: the treasurer holds
 // no bar.read, so reports admit finance.read too, without opening the catalogue or stock (#906).
 export const viewBarReports = defineAbility((viewer: Viewer) => holds(viewer, 'bar.read') || holds(viewer, 'finance.read'))
 
@@ -146,7 +146,7 @@ export const manageChecklist = defineAbility((viewer: Viewer) => holds(viewer, '
 export const viewEmergencyCard = defineAbility((viewer: Viewer) => holds(viewer, 'emergency-card.read'))
 export const manageEmergencyCard = defineAbility((viewer: Viewer) => holds(viewer, 'emergency-card.write'))
 
-// Severity routing and the open-items list, held by the safety officer (0009, E-116).
+// Severity routing and the open-items list, held by the Theatre Manager (0009, E-116).
 export const viewSafety = defineAbility((viewer: Viewer) => holds(viewer, 'safety.read'))
 export const manageSafety = defineAbility((viewer: Viewer) => holds(viewer, 'safety.write'))
 

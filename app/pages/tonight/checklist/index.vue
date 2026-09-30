@@ -159,7 +159,7 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
           v-if="phaseItems.length === 0"
           class="text-sm text-muted"
         >
-          Nothing on this list yet. Ask the Safety Officer to add the items.
+          Nothing on this list yet. Ask the Front of House Manager to add the items.
         </p>
         <NightChecklistItems
           :items="phaseItems"

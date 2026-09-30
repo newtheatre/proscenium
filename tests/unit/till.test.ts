@@ -187,10 +187,10 @@ describe('the checklist line for the till', () => {
     expect(saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0 })).toContain('Tonight\'s till is still open')
   })
 
-  test('an earlier night\'s till or charge is the Bar Manager\'s', () => {
+  test('an earlier night\'s till or charge is the Front of House Manager\'s', () => {
     const said = saysTillLeftOpen({ tonight: 0, earlier: 2, unanswered: 1 })!
     expect(said).toContain('2 tills from an earlier night')
     expect(said).toContain('1 card charge from an earlier night')
-    expect(said).toContain('Bar Manager')
+    expect(said).toContain('Front of House Manager')
   })
 })

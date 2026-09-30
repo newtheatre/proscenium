@@ -25,7 +25,7 @@ export const barCategories = sqliteTable('bar_categories', {
   check('bar_categories_colour_hex', sql`${table.colour} IS NULL OR lower(${table.colour}) GLOB '#[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'`),
 ])
 
-// A percentage a bar manager may apply to a sale, capped by configuration (0012). Editable in
+// A percentage the Front of House Manager may apply to a sale, capped by configuration (0012). Editable in
 // place: a past sale's own ledger lines snapshot what it charged, so an edit here never restates it.
 export const discounts = sqliteTable('discounts', {
   id: id(),
@@ -43,7 +43,7 @@ export const discounts = sqliteTable('discounts', {
   check('discounts_status_values', sql`${table.status} IN ('ACTIVE', 'RETIRED')`),
 ])
 
-// A request to give a basket away, decided once by tonight's duty manager or the bar manager,
+// A request to give a basket away, decided once by tonight's duty manager or the Front of House Manager,
 // never the requester (F-110 criterion 1). `lines` is read exactly, never resubmitted.
 export const compRequests = sqliteTable('comp_requests', {
   id: id(),

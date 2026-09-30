@@ -3,7 +3,7 @@ import { inlineAgeCheckForm } from './age-checks'
 import { basketLineForm } from './sale'
 
 // Comps by request and approval, before the sale (F-110). Deciding one is restricted to tonight's
-// duty manager or the bar manager, and never the requester (criterion 1).
+// duty manager or the Front of House Manager, and never the requester (criterion 1).
 
 export const COMP_REASON_LIMIT = 200
 export const COMP_DECLINE_REASON_LIMIT = 200

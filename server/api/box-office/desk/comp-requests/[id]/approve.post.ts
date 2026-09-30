@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   const account = await requireAccount(event)
   if (!await isDutyManagerOrTicketingManager(account.id, night)) {
-    throw createError({ statusCode: 403, statusMessage: 'A duty manager or a Manager decides a comp request' })
+    throw createError({ statusCode: 403, statusMessage: 'A duty manager or the IT Manager decides a comp request' })
   }
   // Gives a seat away, so the approver proves it is still them (D-117 criterion 6, 0116, A-128).
   await requireFreshSession(event)

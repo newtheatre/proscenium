@@ -6,7 +6,7 @@ import { accessProfilesClause } from '#server/utils/access-profiles'
 
 const query = filterQuerySchema(accessProfilesList)
 
-// Every access profile declaration, without the encrypted payload: the accessibility officer
+// Every access profile declaration, without the encrypted payload: the Secretary
 // opens one to read it (D-127 criterion 2), filtered and ordered by its own declaration (K-129).
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'access.verify')

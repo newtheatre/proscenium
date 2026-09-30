@@ -1,4 +1,4 @@
-// Approve a comp request: tonight's duty manager or the bar manager, never the requester
+// Approve a comp request: tonight's duty manager or the Front of House Manager, never the requester
 // (F-110 criterion 1), claimed atomically so a race between two approvers settles to one.
 export default defineEventHandler(async (event) => {
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')

@@ -9,7 +9,7 @@ import type { NavCount } from './site-nav'
 // is on tonight, each offered only to somebody who could act on it.
 
 // The permission that decides each queue. A live department lead answers training requests for
-// their own departments without the training officer's grant (G-110).
+// their own departments without the Theatre Manager's grant (G-110).
 const DECIDES: Record<NavCount, Permission> = {
   'membership-claims': 'members.write',
   'access-profiles': 'access.verify',

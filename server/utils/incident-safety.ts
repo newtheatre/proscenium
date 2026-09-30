@@ -45,7 +45,7 @@ export interface OpenFollowUp {
   happenedAt: number
 }
 
-// Every incident at a routed severity with no closure yet: the safety officer's open-items list
+// Every incident at a routed severity with no closure yet: the Theatre Manager's open-items list
 // (criterion 2). A superseded entry is judged on its own severity, the same as any other row.
 export function openFollowUpsQuery(): SQL {
   return sql`
@@ -64,7 +64,7 @@ export async function openFollowUps(): Promise<OpenFollowUp[]> {
 }
 
 // Predicated on no closure existing yet, decided from RETURNING via auditedWrite() (0049): two
-// safety officers closing the same item at once settle to one winner between them.
+// officers closing the same item at once settle to one winner between them.
 export function closeFollowUpStatement(incidentId: string, resolutionNote: string, closedBy: string, id: string): SQL {
   return sql`
     INSERT INTO incident_followup_closures (id, incident_id, resolution_note, closed_by)
@@ -75,7 +75,7 @@ export function closeFollowUpStatement(incidentId: string, resolutionNote: strin
   `
 }
 
-// Whoever holds the safety officer's own standing permission, the same shape `rotaOfficers()`
+// Whoever holds the Theatre Manager's own standing permission, the same shape `rotaOfficers()`
 // uses for the FOH officer's (E-107, E-108).
 export async function safetyOfficers(): Promise<{ id: string }[]> {
   const roles = ROLES.filter(role => PERMISSION_MAP[role].includes('safety.write'))

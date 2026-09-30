@@ -51,10 +51,10 @@ async function save(event: FormSubmitEvent<DeclareAccessProfileInput>): Promise<
     toast.add({
       title: repended ? 'Access profile saved' : 'Nothing has changed',
       description: repended
-        ? 'The Accessibility Officer verifies it before it reaches anybody working the door.'
+        ? 'The Secretary and Welfare Officer verifies it before it reaches anybody working the door.'
         : profile.value?.status === 'VERIFIED'
           ? 'Your requirements are as they were, so they stay verified.'
-          : 'Your requirements are as they were, and still with the Accessibility Officer.',
+          : 'Your requirements are as they were, and still with the Secretary and Welfare Officer.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -140,7 +140,7 @@ useSeoMeta({ title: 'Access requirements' })
 <template>
   <AccountSettings
     title="Access requirements"
-    description="Tell us what you need once, and choose exactly what the people on the door are shown. The Accessibility Officer verifies it in person before it reaches any other screen."
+    description="Tell us what you need once, and choose exactly what the people on the door are shown. The Secretary and Welfare Officer verifies it in person before it reaches any other screen."
   >
     <UPageCard>
       <div
@@ -197,7 +197,7 @@ useSeoMeta({ title: 'Access requirements' })
             class="text-sm"
             data-test="access-decline-reason"
           >
-            The Accessibility Officer could not verify this.
+            The Secretary and Welfare Officer could not verify this.
             <template v-if="profile.declineReason">
               Why: {{ profile.declineReason }}
             </template>
@@ -207,7 +207,7 @@ useSeoMeta({ title: 'Access requirements' })
             v-else-if="profile.status === 'PENDING'"
             class="text-sm text-muted"
           >
-            With the Accessibility Officer, who checks it in person before the door is shown anything.
+            With the Secretary and Welfare Officer, who checks it in person before the door is shown anything.
           </p>
         </div>
 
@@ -264,7 +264,7 @@ useSeoMeta({ title: 'Access requirements' })
           <UFormField
             label="Anything else, in your own words"
             name="requesterNote"
-            hint="Optional. Shown to nobody but the Accessibility Officer verifying this."
+            hint="Optional. Shown to nobody but the Secretary and Welfare Officer verifying this."
           >
             <UTextarea
               v-model="state.requesterNote"

@@ -1,7 +1,7 @@
 import { SEVERITIES } from '#shared/utils/incidents'
 import { severityConfigForm } from '#shared/utils/incident-safety'
 
-// Flip whether one severity routes to the safety officer. Every severity is seeded by
+// Flip whether one severity routes to the Theatre Manager. Every severity is seeded by
 // migration, so this is always an UPDATE, never a create (criterion 1).
 export default defineEventHandler(async (event) => {
   const severity = getRouterParam(event, 'severity') ?? ''

@@ -1754,9 +1754,9 @@ The Nottingham New Theatre`,
     }
   },
   'access-profile-verified': (context: TemplateContext): Rendered => accessAnswer(context, 'Your access requirements are verified',
-    'The Accessibility Officer has verified your access requirements. What the people on the door are shown, and the date the verification runs to, are on your account.'),
+    'The Secretary and Welfare Officer has verified your access requirements. What the people on the door are shown, and the date the verification runs to, are on your account.'),
   'access-profile-declined': (context: TemplateContext): Rendered => accessAnswer(context, 'We could not verify your access requirements',
-    'The Accessibility Officer could not verify your access requirements. Why, and what you can do next, is on your account.'),
+    'The Secretary and Welfare Officer could not verify your access requirements. Why, and what you can do next, is on your account.'),
   'health-alert': (context: TemplateContext): Rendered => {
     const since = String(context.since)
     return {

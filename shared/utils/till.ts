@@ -44,7 +44,7 @@ export interface TillVenueOption {
 // it against, so its form lives with that computation in `shared/utils/reconciliation.ts` (F-118).
 
 // What ended nights left open, each with its bar: no shift reaches back into a night, so the till
-// lists these for the Bar Manager alone to close and answer (F-102 criterion 5, issue 1316).
+// lists these for the Front of House Manager alone to close and answer (F-102 criterion 5, issue 1316).
 export interface EarlierTillLeftOpen {
   sessions: (TillSession & { venueName: string })[]
   // `sessionOpen`: that night's till is still open at that bar, which recording the sale needs.
@@ -67,7 +67,7 @@ export function saysTillLeftOpen(left: TillLeftOpen): string | null {
     left.earlier > 0 ? `${plural(left.earlier, 'till')} from an earlier night left open` : null,
     left.unanswered > 0 ? `${plural(left.unanswered, 'card charge')} from an earlier night left unanswered` : null,
   ].filter(part => part !== null)
-  if (earlier.length > 0) said.push(`${earlier.join(', and ')}. Tell the Bar Manager, whose role alone reaches an earlier night from the till.`)
+  if (earlier.length > 0) said.push(`${earlier.join(', and ')}. Tell the Front of House Manager, whose role alone reaches an earlier night from the till.`)
   return said.length > 0 ? said.join(' ') : null
 }
 

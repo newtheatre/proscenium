@@ -172,7 +172,7 @@ export async function currentTrainers(today: string): Promise<{ id: string, name
 export async function requireTrainer(event: H3Event): Promise<Authority> {
   const resolved = await authority(event)
 
-  // The training officer runs the catalogue and may act without holding a certification.
+  // The Theatre Manager runs the catalogue and may act without holding a certification.
   if (!resolved.permissions.has('training.write')) {
     const standing = await trainerStandingOf(resolved.account.id, londonToday())
     if (!standing.trainer) {
@@ -602,7 +602,7 @@ export async function requireCatalogueAuthority(event: H3Event): Promise<Catalog
   return { ...resolved, leads }
 }
 
-// Editing a department's catalogue is the training officer's, or that department's live leads'.
+// Editing a department's catalogue is the Theatre Manager's, or that department's live leads'.
 // Standing is read at the request and cached nowhere (G-110 criteria 2 and 4).
 export function assertStewards(resolved: CatalogueAuthority, department: string): void {
   if (resolved.permissions.has('training.write')) return
@@ -673,11 +673,11 @@ export interface TeachableModule {
 }
 
 // The trainer a scheduler named, or undefined when it is the scheduler (G-112 as amended, issue 1336).
-// A trainer schedules their own sessions; only the training officer names somebody else.
+// A trainer schedules their own sessions; only the Theatre Manager names somebody else.
 export async function namedTeacher(resolved: Authority, trainerId: string | null, today: string): Promise<{ id: string, name: string } | undefined> {
   if (trainerId === null || trainerId === resolved.account.id) return undefined
   if (!resolved.permissions.has('training.write')) {
-    throw createError({ statusCode: 403, statusMessage: `A trainer schedules their own sessions; the ${saysRole('TRAINING_MANAGER')} names somebody else` })
+    throw createError({ statusCode: 403, statusMessage: `A trainer schedules their own sessions; the ${saysRole('THEATRE_MANAGER')} names somebody else` })
   }
 
   const [person] = await db.select({ id: schema.users.id, name: schema.users.name })
@@ -727,7 +727,7 @@ export async function assertTeachable(
   }
 
   // Question 4's answer: a trainer teaches what they hold, scoped by competence not department. A
-  // trainer the Training Manager named is held to it too, whoever scheduled the session (G-112).
+  // trainer the Theatre Manager named is held to it too, whoever scheduled the session (G-112).
   const teacherId = teacher?.id ?? (resolved.permissions.has('training.write') ? null : resolved.account.id)
   if (teacherId !== null) {
     const held = await modulesHeldBy(teacherId, today)
