@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
     notifications,
     listing,
     bookings,
+    grants,
   ] = await Promise.all([
     db.all<MyShiftRow>(myShiftsQuery(account.id, nowSeconds)),
     longestTerm(account.id),
@@ -45,6 +46,7 @@ export default defineEventHandler(async (event) => {
     recentInbox(account.id, 3),
     publicListing(rules, 1, 1, now),
     ownBookings(account.id, ownBookingsFrom(now), 1),
+    liveGrants(account.id, now),
   ])
   const booking = bookings[0]
 
@@ -94,5 +96,6 @@ export default defineEventHandler(async (event) => {
           performances: listedShow.performances.map(performance => ({ startsAt: performance.startsAt, availability: performance.availability })),
         }
       : null,
+    grants,
   })
 })

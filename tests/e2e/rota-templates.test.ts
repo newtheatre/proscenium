@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { adminSession, finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, forgetSpentStep, grantCommitteeRole, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride } from '#tests/helpers/config'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { daysAfter } from '#shared/utils/membership'
@@ -128,6 +128,7 @@ function shiftsOn(performanceId: string): { role: string, slot: number, status: 
 
 // A confirmed shift, which is the state E-104 will reach through the claim path in wave 2.
 function claim(performanceId: string, userId: string): void {
+  grantCommitteeRole(app, userId)
   assign(performanceId, 'DUTY_MANAGER', userId, 'CONFIRMED')
 }
 

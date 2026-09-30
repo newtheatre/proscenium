@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -20,7 +20,7 @@ const BOOT_TIMEOUT_MS = 180_000
 let app: AppUnderTest
 let admin: TestMember
 let foh: TestMember
-let bar: TestMember
+let theatre: TestMember
 let member: TestMember
 let house: { venueId: string, performanceId: string }
 let studio: { venueId: string, performanceId: string }
@@ -34,10 +34,10 @@ beforeAll(async () => {
   admin = await adminSession(app)
 
   foh = await registerMember(app, 'foh', generatePassword())
-  bar = await registerMember(app, 'bar', generatePassword())
+  theatre = await registerMember(app, 'theatre', generatePassword())
   member = await registerMember(app, 'ordinary', generatePassword())
   await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, theatre, 'THEATRE_MANAGER', admin.cookie)
 
   house = programme('house')
   studio = programme('studio')
@@ -101,8 +101,8 @@ describe.skipIf(skip !== null)('an officer opens a show-night screen with no shi
     expect(resolved.performanceIds).toEqual([house.performanceId])
   })
 
-  test('the bar manager resolves the till at a venue', async () => {
-    const resolved = await (await ask(`role=BAR&venueId=${house.venueId}`, bar.cookie)).json() as Resolved
+  test('the Front of House Manager resolves the till at a venue', async () => {
+    const resolved = await (await ask(`role=BAR&venueId=${house.venueId}`, foh.cookie)).json() as Resolved
     expect(resolved.via).toBe('OFFICER')
     expect(resolved.performanceIds).toEqual([house.performanceId])
   })
@@ -155,20 +155,20 @@ describe.skipIf(skip !== null)('an officer opens a show-night screen with no shi
 })
 
 describe.skipIf(skip !== null)('the roles are not interchangeable (E-111 criterion 1, F-101 criterion 2)', () => {
-  test('the front of house officer does not open the till', async () => {
-    const response = await ask(`role=BAR&venueId=${house.venueId}`, foh.cookie)
-    expect(response.status).toBe(403)
-    expect(await message(response)).toContain('Bar Manager')
-  })
-
-  test('the bar manager opens neither the door nor the duty manager screens', async () => {
-    for (const role of ['DOOR', 'DUTY_MANAGER']) {
-      expect((await ask(`role=${role}&venueId=${house.venueId}`, bar.cookie)).status).toBe(403)
+  test('the Theatre Manager opens none of the door, the till or the duty manager screens', async () => {
+    for (const role of ['DOOR', 'DUTY_MANAGER', 'BAR']) {
+      expect((await ask(`role=${role}&venueId=${house.venueId}`, theatre.cookie)).status).toBe(403)
     }
   })
 
+  test('the till refuses the Theatre Manager in the Front of House Manager\'s name (0111)', async () => {
+    const response = await ask(`role=BAR&venueId=${house.venueId}`, theatre.cookie)
+    expect(response.status).toBe(403)
+    expect(await message(response)).toContain('Front of House Manager')
+  })
+
   test('a refused officer is not recorded as having bypassed anything', async () => {
-    expect(bypasses(bar.id).filter(row => row.target.endsWith(':DOOR'))).toEqual([])
+    expect(bypasses(theatre.id)).toEqual([])
   })
 })
 
@@ -250,6 +250,7 @@ describe.skipIf(skip !== null)('authority keys to a performance, never to a day 
 let nextSlot = 100
 
 function shiftFor(performanceId: string, role: string, userId: string, status = 'CONFIRMED'): string {
+  if (role === 'DUTY_MANAGER') grantCommitteeRole(app, userId)
   const database = new Database(app.databaseFile)
   try {
     const id = `${performanceId}-${role}-${(nextSlot += 1)}`
@@ -453,26 +454,26 @@ describe.skipIf(skip !== null)('the bar opens on a night with nothing running (F
     expect((await ask(`role=BAR&venueId=${venueId}`, stoodDown.cookie)).status).toBe(403)
   })
 
-  // The bar manager's own way in on a hire the rota never covered: the venue is what stands in
-  // for the performance, and the bypass records that there was none.
-  test('the bar manager opens the till at a named venue with nothing running, and acting there is recorded', async () => {
+  // The Front of House Manager's own way in on a hire the rota never covered: the venue is what
+  // stands in for the performance, and the bypass records that there was none.
+  test('the Front of House Manager opens the till at a named venue with nothing running, and acting there is recorded', async () => {
     const venueId = hireVenue()
-    const response = await ask(`role=BAR&venueId=${venueId}`, bar.cookie)
+    const response = await ask(`role=BAR&venueId=${venueId}`, foh.cookie)
     expect(response.status).toBe(200)
     const resolved = await response.json() as Resolved
     expect(resolved).toMatchObject({ venueId, via: 'OFFICER' })
     expect(resolved.performanceIds).toEqual([])
-    expect(bypasses(bar.id).filter(row => row.target.endsWith(`:${venueId}:BAR`))).toEqual([])
+    expect(bypasses(foh.id).filter(row => row.target.endsWith(`:${venueId}:BAR`))).toEqual([])
 
     // Pricing a basket is the till acting, whether or not a session is open to sell into (0098).
-    await request(app, 'POST', '/api/till/price', { venueId, lines: [{ variantId: 'no-such-variant', qty: 1 }] }, bar.cookie)
-    const written = bypasses(bar.id).filter(row => row.target.endsWith(`:${venueId}:BAR`))
+    await request(app, 'POST', '/api/till/price', { venueId, lines: [{ variantId: 'no-such-variant', qty: 1 }] }, foh.cookie)
+    const written = bypasses(foh.id).filter(row => row.target.endsWith(`:${venueId}:BAR`))
     expect(written.length).toBe(1)
     expect(JSON.parse(written[0]!.detail)).toMatchObject({ role: 'BAR', night, venueId, performanceIds: [] })
   })
 
-  test('the bar manager naming no venue at all is asked for one rather than refused', async () => {
-    const response = await ask('role=BAR', bar.cookie)
+  test('the Front of House Manager naming no venue at all is asked for one rather than refused', async () => {
+    const response = await ask('role=BAR', foh.cookie)
     expect(response.status).toBe(400)
     expect(await message(response)).toContain('venue')
   })
@@ -493,7 +494,7 @@ describe.skipIf(skip !== null)('the bar opens on a night with nothing running (F
     expect(response.status).toBe(403)
     const refusal = await message(response)
     expect(refusal).toContain('bar opening')
-    expect(refusal).toContain('Bar Manager')
+    expect(refusal).toContain('Front of House Manager')
   })
 })
 
@@ -585,9 +586,11 @@ describe.skipIf(skip !== null)('any of tonight\'s roles: a shift before a bypass
   })
 
   test('an officer with no shift still resolves through the first role their bypass opens', async () => {
-    const response = await askAny(`venueId=${house.venueId}`, bar.cookie)
+    const officer = await registerMember(app, 'any-foh-bypass', generatePassword())
+    await grantRole(app, officer, 'FOH_MANAGER', admin.cookie)
+    const response = await askAny(`venueId=${house.venueId}`, officer.cookie)
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ role: 'BAR', via: 'OFFICER' })
+    expect(await response.json()).toMatchObject({ role: 'DUTY_MANAGER', via: 'OFFICER' })
   })
 
   test('a door claimant is told about the claim, not the bar\'s generic refusal', async () => {
@@ -646,7 +649,6 @@ describe.skipIf(skip !== null)('the session says who can work tonight (0094, iss
   })
 
   test('an officer with a night permission can work tonight without being on shift', async () => {
-    expect(await facts(bar.cookie)).toEqual({ onShiftTonight: false, canWorkTonight: true })
     expect(await facts(foh.cookie)).toEqual({ onShiftTonight: false, canWorkTonight: true })
   })
 

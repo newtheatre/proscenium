@@ -226,7 +226,7 @@ describe('the Treasurer alone records it, against the total the screen showed (0
     expect(ABILITY_PERMISSIONS.recordLateCharges).toBe('finance.write')
     expect(holds('TREASURER')).toBe(true)
     expect(holds('ADMIN')).toBe(true)
-    for (const role of ['BAR_MANAGER', 'FOH_MANAGER', 'COMMITTEE', 'THEATRE_MANAGER'] as Role[]) expect(holds(role)).toBe(false)
+    for (const role of ['PRESIDENT', 'SECRETARY', 'FOH_MANAGER', 'THEATRE_MANAGER', 'COMMITTEE'] as Role[]) expect(holds(role)).toBe(false)
 
     const route = readFileSync('server/api/admin/finance/late-charges/[id].post.ts', 'utf8')
     expect(route).toContain('requirePermission(event, \'finance.write\')')

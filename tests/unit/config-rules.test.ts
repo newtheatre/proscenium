@@ -46,9 +46,9 @@ describe('what a setting will accept (J-104 criterion 3)', () => {
     const without = (...roles: string[]): string[] => PRIVILEGED_FLOOR.filter(role => !roles.includes(role))
 
     expect(configProblem('PRIVILEGED_ROLES', without('TREASURER'), shipped)).toContain('Treasurer')
-    const two = configProblem('PRIVILEGED_ROLES', without('TREASURER', 'SAFETY_OFFICER'), shipped)
+    const two = configProblem('PRIVILEGED_ROLES', without('TREASURER', 'THEATRE_MANAGER'), shipped)
     expect(two).toContain('Treasurer')
-    expect(two).toContain('Safety Officer')
+    expect(two).toContain('Theatre Manager')
     expect(configProblem('PRIVILEGED_ROLES', [], shipped)).toContain('second factor')
   })
 

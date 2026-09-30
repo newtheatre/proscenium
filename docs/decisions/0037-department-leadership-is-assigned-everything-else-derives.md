@@ -2,6 +2,8 @@
 
 - Status: Accepted
 - Date: 2026-09-01
+- Amended: 29 September 2026 by 0112, under which `training.write`, `training.leads`,
+  `training.revoke` and `training.by-address` are the Theatre Manager's and the IT Manager's
 
 ## Context
 

@@ -19,6 +19,7 @@ const props = defineProps<{
   expiryMode: ExpiryMode
   expiryMonths: number | null
   safetyCritical: boolean
+  committeeOnly: boolean
   held: boolean | null
   prerequisites: Prerequisite[]
   nextSession: NextSession | null
@@ -60,6 +61,14 @@ const nextSessionLine = computed(() => {
           size="sm"
         >
           Safety critical
+        </UBadge>
+        <UBadge
+          v-if="committeeOnly"
+          color="neutral"
+          variant="subtle"
+          size="sm"
+        >
+          Committee only
         </UBadge>
         <UBadge
           v-if="held"

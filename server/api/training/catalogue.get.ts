@@ -43,6 +43,7 @@ export default defineEventHandler(async (event) => {
       expiryMode: module.expiryMode,
       expiryMonths: module.expiryMonths,
       safetyCritical: module.safetyCritical,
+      committeeOnly: module.committeeOnly,
       prerequisites: (prerequisites.get(module.id) ?? []).map(edge => ({
         moduleId: edge.requiresId,
         name: edge.requiresName,

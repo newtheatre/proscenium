@@ -22,7 +22,7 @@ const BOOT_TIMEOUT_MS = 180_000
 
 let app: AppUnderTest
 let admin: TestMember
-let foh: TestMember
+let theatre: TestMember
 let bar: TestMember
 let bar2: TestMember
 let member: TestMember
@@ -36,13 +36,13 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
 
-  foh = await registerMember(app, 'till-foh', generatePassword())
+  theatre = await registerMember(app, 'till-theatre', generatePassword())
   bar = await registerMember(app, 'till-bar', generatePassword())
   bar2 = await registerMember(app, 'till-bar2', generatePassword())
   member = await registerMember(app, 'till-ordinary', generatePassword())
-  await grantRole(app, foh, 'FOH_MANAGER', admin.cookie)
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
-  await grantRole(app, bar2, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, theatre, 'THEATRE_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'FOH_MANAGER', admin.cookie)
+  await grantRole(app, bar2, 'FOH_MANAGER', admin.cookie)
 
   house = programme('till-house')
   studio = programme('till-studio')
@@ -160,7 +160,7 @@ function shiftFor(performanceId: string, role: string, userId: string, status = 
 }
 
 describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority (F-101 criteria 1, 2, 5)', () => {
-  test('the bar manager opens the till', async () => {
+  test('the Front of House Manager opens the till', async () => {
     const response = await openTill(house.venueId, bar.cookie)
     expect(response.status).toBe(200)
     const body = await response.json() as { ok: boolean, opened: boolean, session: TillSessionBody }
@@ -170,7 +170,7 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
 
   // The rota, not a standing grant: a confirmed bar shift opens the till with no officer role held
   // at all, and resolves via the shift branch rather than recording an officer bypass (0044).
-  test('a confirmed bar shift opens the till, with no bar manager role at all', async () => {
+  test('a confirmed bar shift opens the till, with no officer role at all', async () => {
     const shiftVenue = programme('till-shift-bar')
     const holder = await registerMember(app, 'till-shift-bar', generatePassword())
     shiftFor(shiftVenue.performanceId, 'BAR', holder.id)
@@ -194,13 +194,13 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
     expect(response.status).toBe(403)
     const refusal = await message(response)
     expect(refusal).toContain('a confirmed bar shift')
-    expect(refusal).toContain('Bar Manager\'s role')
+    expect(refusal).toContain('Front of House Manager\'s role')
   })
 
-  test('the front of house officer does not open the till', async () => {
-    const response = await openTill(studio.venueId, foh.cookie)
+  test('the Theatre Manager does not open the till: no other officer role holds the bar (0111)', async () => {
+    const response = await openTill(studio.venueId, theatre.cookie)
     expect(response.status).toBe(403)
-    expect(await message(response)).toContain('Bar Manager\'s role')
+    expect(await message(response)).toContain('Front of House Manager\'s role')
   })
 
   test('an ordinary member is refused, and told what would unlock it', async () => {
@@ -208,7 +208,7 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
     expect(response.status).toBe(403)
     const refusal = await message(response)
     expect(refusal).toContain('a confirmed bar shift')
-    expect(refusal).toContain('Bar Manager\'s role')
+    expect(refusal).toContain('Front of House Manager\'s role')
   })
 
   test('a signed-out caller gets no further', async () => {
@@ -217,14 +217,14 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
 })
 
 describe.skipIf(skip !== null)('authority is checked on every request, not cached (F-101 criterion 3)', () => {
-  test('revoking the bar manager role refuses the very next request', async () => {
+  test('revoking the Front of House Manager role refuses the very next request', async () => {
     const volunteer = await registerMember(app, 'till-revoked', generatePassword())
-    await grantRole(app, volunteer, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, volunteer, 'FOH_MANAGER', admin.cookie)
 
     expect((await openTill(studio.venueId, volunteer.cookie)).status).toBe(200)
 
     // A revoke names its grant in the query: a DELETE body hangs the Workers runtime (0068).
-    expect((await request(app, 'DELETE', `/api/admin/roles?userId=${volunteer.id}&role=BAR_MANAGER`, undefined, admin.cookie)).status).toBe(200)
+    expect((await request(app, 'DELETE', `/api/admin/roles?userId=${volunteer.id}&role=FOH_MANAGER`, undefined, admin.cookie)).status).toBe(200)
 
     const refused = await tillStatus(studio.venueId, volunteer.cookie)
     expect(refused.status).toBe(403)
@@ -238,7 +238,7 @@ describe.skipIf(skip !== null)('one session per venue per night, however many as
     expect(status.session).toBeNull()
   })
 
-  test('two bar managers racing the same venue and night resolve to one session', async () => {
+  test('two Front of House Managers racing the same venue and night resolve to one session', async () => {
     const raced = programme('till-race')
 
     const [first, second] = await Promise.all([
@@ -270,7 +270,7 @@ describe.skipIf(skip !== null)('one session per venue per night, however many as
 })
 
 describe.skipIf(skip !== null)('closing a session (F-102 criterion 4)', () => {
-  test('the bar manager closes tonight\'s session, stamped with who and when', async () => {
+  test('the Front of House Manager closes tonight\'s session, stamped with who and when', async () => {
     const closing = programme('till-closing')
     const opened = await (await openTill(closing.venueId, bar.cookie)).json() as { session: TillSessionBody }
 
@@ -348,7 +348,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test.skip('Close till is reached from the overflow menu, not the pinned actions, and still closes the session', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-close', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const closing = programme('till-screen-close')
     await openTill(closing.venueId, screenBar.cookie)
 
@@ -381,7 +381,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test.skip('Confirm close is disabled while a variance has no note, and enables once one is typed', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-variance', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const closing = programme('till-screen-variance')
     await openTill(closing.venueId, screenBar.cookie)
 
@@ -418,7 +418,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test('correcting the Z figure clears a note written for the old one', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-correct', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const closing = programme('till-screen-correct')
     await openTill(closing.venueId, screenBar.cookie)
 
@@ -453,7 +453,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   test.skip('a sale landing after the modal opens is caught by the refusal, and the note field catches up', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-refresh', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const closing = programme('till-screen-refresh')
     await openTill(closing.venueId, screenBar.cookie)
     const { variantId } = await aSellableProduct(250)
@@ -491,8 +491,8 @@ describe.skipIf(skip !== null)('the screen', () => {
   }, 120_000)
 })
 
-describe.skipIf(skip !== null)('a stale session waits for the bar manager, not tonight\'s shift (F-102 criterion 5)', () => {
-  test('the bar manager closes a session left over from an earlier night', async () => {
+describe.skipIf(skip !== null)('a stale session waits for the Front of House Manager, not tonight\'s shift (F-102 criterion 5)', () => {
+  test('the Front of House Manager closes a session left over from an earlier night', async () => {
     const stale = programme('till-stale')
     const id = insertStaleSession(stale.venueId, '2020-01-01', bar.id)
 
@@ -502,17 +502,17 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     expect(closed.session.closedBy).toBe(bar.id)
   })
 
-  test('the front of house officer cannot reach back for it: it is the bar manager\'s role, not tonight\'s coverage', async () => {
-    const stale = programme('till-stale-foh')
+  test('the Theatre Manager cannot reach back for it: it is the Front of House Manager\'s role, not tonight\'s coverage', async () => {
+    const stale = programme('till-stale-theatre')
     const id = insertStaleSession(stale.venueId, '2020-01-01', bar.id)
 
-    const response = await closeTill(id, foh.cookie)
+    const response = await closeTill(id, theatre.cookie)
     expect(response.status).toBe(403)
-    expect(await message(response)).toContain('Bar Manager\'s role')
+    expect(await message(response)).toContain('Front of House Manager\'s role')
   })
 
   // Issue 1316: the till lists what an earlier night left open, for the one role that can act on it.
-  test('the bar manager\'s till lists an earlier night\'s open session and unanswered charge; nobody else\'s does', async () => {
+  test('the Front of House Manager\'s till lists an earlier night\'s open session and unanswered charge; nobody else\'s does', async () => {
     const stale = programme('till-stale-listed')
     const id = insertStaleSession(stale.venueId, '2020-01-02', bar.id)
     const database = new Database(app.databaseFile)
@@ -531,7 +531,7 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
     expect(body.sessions.find(session => session.id === id)?.venueName).toBeTruthy()
     expect(body.attempts.map(attempt => attempt.id)).toContain(`earlier-${id}`)
 
-    expect((await request(app, 'GET', '/api/till/earlier', undefined, foh.cookie)).status).toBe(403)
+    expect((await request(app, 'GET', '/api/till/earlier', undefined, theatre.cookie)).status).toBe(403)
     // No shift reaches back into an ended night, tonight's confirmed bar shift included.
     const onShift = await registerMember(app, 'till-earlier-shift', generatePassword())
     shiftFor(stale.performanceId, 'BAR', onShift.id)
@@ -540,10 +540,10 @@ describe.skipIf(skip !== null)('a stale session waits for the bar manager, not t
 
   // A closed night's charge is not offered as recorded at the till: the Treasurer records it on
   // that night's Daily reconciliation (question 15, F-124 criterion 9).
-  test('the bar manager closes last night\'s till from tonight\'s, then answers its charge the Treasurer now records', async () => {
+  test('the Front of House Manager closes last night\'s till from tonight\'s, then answers its charge the Treasurer now records', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-earlier', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const tonight = programme('till-screen-earlier')
     await openTill(tonight.venueId, screenBar.cookie)
     const id = insertStaleSession(tonight.venueId, '2020-01-03', screenBar.id)
@@ -659,14 +659,14 @@ describe.skipIf(skip !== null)('the Treasurer records a card charge left on a cl
 // console list.
 describe.skipIf(skip !== null)('a till refusal held to a missing second factor', () => {
   test('the till shows an enrolment link rather than a bare refusal', async () => {
-    // Narrowed for one request rather than widened: the bar manager account carries no
+    // Narrowed for one request rather than widened: the Front of House Manager account carries no
     // authenticator, matching a real committee member who has never needed one before.
-    overrideConfig(app, 'PRIVILEGED_ROLES', ['BAR_MANAGER'])
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['FOH_MANAGER'])
     try {
       const enrolling = programme('till-enrol')
       const password = generatePassword()
       const noFactor = await registerMember(app, 'till-enrol-bar', password)
-      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, admin.cookie)
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'FOH_MANAGER' }, admin.cookie)
 
       const view = await openSignedOutView(app.baseURL)
       await visit(view, `${app.baseURL}/sign-in`)
@@ -690,13 +690,13 @@ describe.skipIf(skip !== null)('a till refusal held to a missing second factor',
 
   // Tonight's shift opens the till with no second factor; the earlier nights' list is the role's
   // alone, so its refusal shows rather than an empty screen (issue 1316).
-  test('a Bar Manager on tonight\'s shift without an authenticator is told why earlier nights are not listed', async () => {
-    overrideConfig(app, 'PRIVILEGED_ROLES', ['BAR_MANAGER'])
+  test('a Front of House Manager on tonight\'s shift without an authenticator is told why earlier nights are not listed', async () => {
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['FOH_MANAGER'])
     try {
       const working = programme('till-enrol-shift')
       const password = generatePassword()
       const noFactor = await registerMember(app, 'till-enrol-shift-bar', password)
-      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, admin.cookie)
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'FOH_MANAGER' }, admin.cookie)
       shiftFor(working.performanceId, 'BAR', noFactor.id)
 
       const view = await openSignedOutView(app.baseURL)
@@ -723,7 +723,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
   test('a bar-only basket can be asked, waited on and given once approved', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-comp-ask', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const comping = programme('till-comp')
     await openTill(comping.venueId, screenBar.cookie)
     const { productId } = await aSellableProduct(300)
@@ -779,7 +779,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
   test('a declined request says why, rather than leaving the till waiting forever', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-comp-decline', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const comping = programme('till-comp-decline')
     await openTill(comping.venueId, screenBar.cookie)
     const { productId } = await aSellableProduct(200)
@@ -816,7 +816,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
   test('a restricted line still needs a Challenge 25 outcome, and the prompt closes once given', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-comp-restricted', screenPassword)
-    await grantRole(app, screenBar, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
     const comping = programme('till-comp-restricted')
     await openTill(comping.venueId, screenBar.cookie)
     const { productId } = await aSellableProduct(400, true)
@@ -861,7 +861,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   async function atTheTill(secondCategory = false, size?: { width: number, height: number }): Promise<{ view: Bun.WebView, productId: string }> {
     const password = generatePassword()
     const staff = await registerMember(app, `till-layout-${crypto.randomUUID().slice(0, 6)}`, password)
-    await grantRole(app, staff, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, staff, 'FOH_MANAGER', admin.cookie)
     const where = programme(`till-layout-${crypto.randomUUID().slice(0, 6)}`)
     await openTill(where.venueId, staff.cookie)
     // The catalogue is every active product, so earlier tests' products leave the till first.

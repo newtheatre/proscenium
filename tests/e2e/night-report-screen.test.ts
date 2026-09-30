@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { registerMember } from '#tests/helpers/accounts'
+import { grantCommitteeRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { showNightOf, showNightOpensAt } from '#shared/utils/show-night'
@@ -56,6 +56,7 @@ function curtainAlreadyDown(): number {
 async function dutyManagerOn(suffix: string, curtains: (number | undefined)[]): Promise<{ id: string, password: string, email: string, venueId: string, performanceIds: string[] }> {
   const password = generatePassword()
   const member = await registerMember(app, `report-screen-${suffix}`, password)
+  grantCommitteeRole(app, member.id)
   const database = new Database(app.databaseFile)
   const performanceIds: string[] = []
   let venueId: string

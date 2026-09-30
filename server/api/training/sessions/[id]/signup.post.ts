@@ -8,6 +8,7 @@ import {
   signUpStatement,
   warningGaps,
 } from '#shared/utils/training-signup'
+import { COMMITTEE_ONLY_WORDS } from '#shared/utils/training-action'
 
 // Sign up to a session. It never refuses for fullness: past capacity you join the order and are
 // told where in it you are (G-105 criteria 1 and 4).
@@ -22,6 +23,15 @@ export default defineEventHandler(async (event) => {
   const closesHours = await configValue(event, 'SESSION_SIGNUP_CLOSES_HOURS')
   const closure = signUpClosure(windowOf(session), closesHours, new Date())
   if (closure) throw createError({ statusCode: 409, statusMessage: saysClosure(closure) })
+
+  // Criterion 8: self sign-up only, so a trainer's register never reads this (0115).
+  const reserved = session.modules.filter(module => module.committeeOnly)
+  if (reserved.length > 0 && !(await hasCommitteeRole(account.id))) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: `${COMMITTEE_ONLY_WORDS}: this session teaches ${reserved.map(module => module.name).join(' and ')}, which needs a committee role`,
+    })
+  }
 
   // Criteria 3 and 6. Expiring counts as held, because `modulesHeldBy` is the one definition of
   // held and the warning window cancels out in it.

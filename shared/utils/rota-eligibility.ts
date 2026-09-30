@@ -33,3 +33,25 @@ export function noLongerQualifies(role: ShiftRole, claimantName: string, moduleN
     declineReason: `You no longer hold ${moduleName}, which a ${lower} shift needs. Renew it and claim again.`,
   }
 }
+
+// Roles that also need a live committee role, at claim and at use: a grant that narrows who may
+// take the shift and never opens anything by itself (0115, 0009).
+const COMMITTEE_SHIFT_ROLES: readonly ShiftRole[] = ['DUTY_MANAGER']
+
+export function needsCommitteeRole(role: ShiftRole): boolean {
+  return COMMITTEE_SHIFT_ROLES.includes(role)
+}
+
+// `who` is "you do not" for the member themselves, or "<name> does not" for an officer.
+export function forCommitteeMembers(role: ShiftRole, who: string): string {
+  return `A ${saysShiftRole(role).toLowerCase()} shift is for committee members, and ${who} hold a committee role`
+}
+
+// The E-105 criterion 3 pair for a claimant who has left the committee since claiming (0115).
+export function noLongerOnCommittee(role: ShiftRole, claimantName: string): LapsedClaim {
+  const lower = saysShiftRole(role).toLowerCase()
+  return {
+    statusMessage: `No longer qualifies: ${claimantName} no longer holds a committee role, which a ${lower} shift needs`,
+    declineReason: `A ${lower} shift is for committee members, and you no longer hold a committee role.`,
+  }
+}

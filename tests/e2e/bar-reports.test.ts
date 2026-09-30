@@ -28,7 +28,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'report-bar-manager', barManagerPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
   barStaff = await registerMember(app, 'report-bar-staff', generatePassword())
   treasurer = await registerMember(app, 'report-treasurer', generatePassword())
   await grantRole(app, treasurer, 'TREASURER', officer.cookie)
@@ -208,13 +208,13 @@ describe.skipIf(skip !== null)('CSV export is guarded and formatted at display, 
   })
 })
 
-describe.skipIf(skip !== null)('access is limited to the bar manager, the treasurer and administrators (criterion 5, #906)', () => {
+describe.skipIf(skip !== null)('access is limited to the Front of House Manager, the treasurer and administrators (criterion 5, #906)', () => {
   test('ordinary bar staff cannot read the report', async () => {
     const answered = await runReport(barStaff.cookie)
     expect(answered.status).toBe(403)
   })
 
-  test('the bar manager can', async () => {
+  test('the Front of House Manager can', async () => {
     const answered = await runReport(barManager.cookie)
     expect(answered.status).toBe(200)
   })

@@ -18,7 +18,7 @@ const BOOT_TIMEOUT_MS = 180_000
 
 let app: AppUnderTest
 let admin: TestMember
-let accessOfficer: TestMember
+let secretary: TestMember
 let boxOffice: TestMember
 let patron: TestMember
 const patronPassword = generatePassword()
@@ -40,8 +40,8 @@ beforeAll(async () => {
   app = await startApp()
   admin = await adminSession(app)
 
-  accessOfficer = await registerMember(app, 'access', generatePassword())
-  await grantRole(app, accessOfficer, 'ACCESSIBILITY_OFFICER', admin.cookie)
+  secretary = await registerMember(app, 'secretary', generatePassword())
+  await grantRole(app, secretary, 'SECRETARY', admin.cookie)
 
   boxOffice = await registerMember(app, 'boxoffice', generatePassword())
   await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
@@ -75,13 +75,13 @@ function row<T>(sql: string, ...parameters: unknown[]): T | undefined {
 // The officer decides on the declaration they read, so a decision sends back the version it saw
 // (issue 1383, 0003).
 async function versionOf(userId: string): Promise<string | null> {
-  const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${userId}`, undefined, accessOfficer.cookie))
+  const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${userId}`, undefined, secretary.cookie))
   return (await answered.json() as { profile: { version: string | null } }).profile.version
 }
 
 async function decide(userId: string, decision: 'verify' | 'decline', body: Record<string, unknown>): Promise<Response> {
   const version = await versionOf(userId)
-  return withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${userId}/${decision}`, { ...body, version }, accessOfficer.cookie))
+  return withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${userId}/${decision}`, { ...body, version }, secretary.cookie))
 }
 
 const BLANK_FLAGS = {
@@ -130,7 +130,7 @@ describe.skipIf(skip !== null)('a patron declares their own profile (criterion 1
   })
 })
 
-describe.skipIf(skip !== null)('only a named accessibility officer verifies (criterion 2)', () => {
+describe.skipIf(skip !== null)('only the Secretary and Welfare Officer verifies (criterion 2, 0113)', () => {
   test('general box office cannot reach the review screen', async () => {
     expect((await send('GET', '/api/admin/access-profiles', undefined, boxOffice.cookie)).status).toBe(403)
     expect((await send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote: 'Aisle seat' }, boxOffice.cookie)).status).toBe(403)
@@ -140,8 +140,8 @@ describe.skipIf(skip !== null)('only a named accessibility officer verifies (cri
     expect((await send('GET', '/api/admin/access-profiles', undefined, patron.cookie)).status).toBe(403)
   })
 
-  test('the accessibility officer reads the full declaration', async () => {
-    const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${patron.id}`, undefined, accessOfficer.cookie))
+  test('the Secretary reads the full declaration', async () => {
+    const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${patron.id}`, undefined, secretary.cookie))
     expect(answered.status).toBe(200)
     const { profile } = await answered.json() as { profile: { flags: Record<string, boolean>, requesterNote: string | null, accessCardNumber: string | null } }
     expect(profile.flags.levelAccess).toBe(true)
@@ -256,7 +256,7 @@ describe.skipIf(skip !== null)('the owner is told, and told nothing declared or 
     declined = await registerMember(app, 'declined', generatePassword())
     expect((await declare(declined)).status).toBe(200)
 
-    const bare = await withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${declined.id}/decline`, {}, accessOfficer.cookie))
+    const bare = await withoutSecondFactor(() => send('POST', `/api/admin/access-profiles/${declined.id}/decline`, {}, secretary.cookie))
     expect(bare.status).toBe(400)
     const answered = await decide(declined.id, 'decline', { reason })
     expect(answered.status).toBe(200)
@@ -275,7 +275,7 @@ describe.skipIf(skip !== null)('the owner is told, and told nothing declared or 
   })
 
   test('the officer reading the declined profile is not shown the reason (criterion 8)', async () => {
-    const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${declined.id}`, undefined, accessOfficer.cookie))
+    const answered = await withoutSecondFactor(() => send('GET', `/api/admin/access-profiles/${declined.id}`, undefined, secretary.cookie))
     expect(answered.status).toBe(200)
     const { profile } = await answered.json() as { profile: Record<string, unknown> }
     expect(profile).not.toHaveProperty('declineReason')
@@ -302,13 +302,13 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
   )
 
   const verifyAs = (userId: string, version: string | null): Promise<Response> => withoutSecondFactor(() =>
-    send('POST', `/api/admin/access-profiles/${userId}/verify`, { fohNote: 'Aisle seat', version }, accessOfficer.cookie))
+    send('POST', `/api/admin/access-profiles/${userId}/verify`, { fohNote: 'Aisle seat', version }, secretary.cookie))
 
   test('the officer reads a version, and a decision without one is refused', async () => {
     const member = await declared('versioned')
     expect(typeof await versionOf(member.id)).toBe('string')
     const unversioned = await withoutSecondFactor(() =>
-      send('POST', `/api/admin/access-profiles/${member.id}/verify`, { fohNote: 'Aisle seat' }, accessOfficer.cookie))
+      send('POST', `/api/admin/access-profiles/${member.id}/verify`, { fohNote: 'Aisle seat' }, secretary.cookie))
     expect(unversioned.status).toBe(400)
   })
 
@@ -331,7 +331,7 @@ describe.skipIf(skip !== null)('a decision holds only for the declaration the of
     expect((await declare(member, { companions: 0 })).status).toBe(200)
 
     const stale = await withoutSecondFactor(() =>
-      send('POST', `/api/admin/access-profiles/${member.id}/decline`, { reason: 'Could not check the card', version: seen }, accessOfficer.cookie))
+      send('POST', `/api/admin/access-profiles/${member.id}/decline`, { reason: 'Could not check the card', version: seen }, secretary.cookie))
     expect(stale.status).toBe(409)
     expect(await own(member)).toMatchObject({ status: 'PENDING', companions: 0, declineReason: null })
     expect(count(`SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = 'access-profile.declined'`, member.id)).toBe(0)

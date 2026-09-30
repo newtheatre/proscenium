@@ -12,7 +12,7 @@ const BOOT_TIMEOUT_MS = 180_000
 
 let app: AppUnderTest
 let officer: TestMember
-let trainer: TestMember
+let theatre: TestMember
 let member: TestMember
 
 // Asserted on hrefs rather than labels: a word like System appears in a stylesheet too, and a
@@ -34,8 +34,8 @@ beforeAll(async () => {
   member = await registerMember(app, 'ordinary', generatePassword())
 
   // Granted through the route that records who did it, which is the only sanctioned path.
-  trainer = await registerMember(app, 'trainer', generatePassword())
-  await grantRole(app, trainer, 'TRAINING_MANAGER', officer.cookie)
+  theatre = await registerMember(app, 'theatre', generatePassword())
+  await grantRole(app, theatre, 'THEATRE_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -53,24 +53,24 @@ describe.skipIf(skip !== null)('the console sidebar shows what the caller holds 
     }
   })
 
-  // The one role whose sidebar is genuinely partial: it reads rooms but cannot decide a request,
-  // reads accounts and the register but not the roll, and holds nothing in System.
-  test('a training manager sees a partial sidebar', async () => {
-    const rooms = await shell(trainer.cookie, '/rooms/manage')
-    const people = await shell(trainer.cookie, '/people/accounts')
+  // A partial sidebar: every room screen, accounts and the register but not the roll of Fellows,
+  // and the settings without the trail (0112, 0113).
+  test('a Theatre Manager sees a partial sidebar', async () => {
+    const rooms = await shell(theatre.cookie, '/rooms/manage')
+    const people = await shell(theatre.cookie, '/people/accounts')
     expect([rooms.status, people.status]).toEqual([200, 200])
-    for (const href of ['/rooms/manage', '/rooms/manage/closures']) expect(rooms.html).toContain(`href="${href}"`)
+    for (const href of SPACES) expect(rooms.html).toContain(`href="${href}"`)
     for (const href of ['/people/accounts', '/people/members']) expect(people.html).toContain(`href="${href}"`)
     for (const html of [rooms.html, people.html]) {
-      for (const href of ['/rooms/manage/requests', '/people/fellows', ...BOX_OFFICE, ...SYSTEM]) {
+      for (const href of ['/people/fellows', '/admin/audit', ...BOX_OFFICE]) {
         expect(html).not.toContain(`href="${href}"`)
       }
     }
   })
 
   test('a group with nothing visible in it does not render', async () => {
-    const { html } = await shell(trainer.cookie)
-    // System holds nothing for this role, and the modules that have not landed hold nothing yet.
+    const { html } = await shell(theatre.cookie)
+    // Box office and Communications hold nothing for this role.
     expect(html).not.toContain('Box office')
     expect(html).not.toContain('Communications')
   })
@@ -88,14 +88,15 @@ describe.skipIf(skip !== null)('the console sidebar shows what the caller holds 
 
 describe.skipIf(skip !== null)('a deep link is guarded by the same declaration as the sidebar', () => {
   test('a screen the caller cannot see refuses when typed into the bar', async () => {
-    expect((await shell(trainer.cookie, '/rooms/manage/requests')).status).toBe(403)
-    expect((await shell(trainer.cookie, '/people/fellows')).status).toBe(403)
-    expect((await shell(trainer.cookie, '/admin/settings')).status).toBe(403)
+    expect((await shell(theatre.cookie, '/box-office/shows')).status).toBe(403)
+    expect((await shell(theatre.cookie, '/people/fellows')).status).toBe(403)
+    expect((await shell(theatre.cookie, '/admin/audit')).status).toBe(403)
   })
 
   test('a screen the caller can see opens', async () => {
-    expect((await shell(trainer.cookie, '/people/accounts')).status).toBe(200)
-    expect((await shell(trainer.cookie, '/rooms/manage')).status).toBe(200)
+    expect((await shell(theatre.cookie, '/people/accounts')).status).toBe(200)
+    expect((await shell(theatre.cookie, '/rooms/manage')).status).toBe(200)
+    expect((await shell(theatre.cookie, '/rooms/manage/requests')).status).toBe(200)
   })
 })
 
@@ -152,13 +153,13 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
     return { status: answer.status, body: await answer.json() as T }
   }
 
-  test('an administrator is counted every queue, a training manager only the requests they answer', async () => {
+  test('an administrator is counted every queue, a Theatre Manager only the requests they answer', async () => {
     const everything = await read<{ counts: Record<string, number> }>(officer.cookie, '/api/admin/waiting')
     expect(everything.status).toBe(200)
     expect(Object.keys(everything.body.counts).sort()).toEqual(['access-profiles', 'membership-claims', 'pass-requests', 'room-requests', 'training-requests'])
     for (const count of Object.values(everything.body.counts)) expect(Number.isInteger(count)).toBe(true)
 
-    expect((await read<{ counts: Record<string, number> }>(trainer.cookie, '/api/admin/waiting')).body.counts).toEqual({ 'training-requests': expect.any(Number) })
+    expect((await read<{ counts: Record<string, number> }>(theatre.cookie, '/api/admin/waiting')).body.counts).toEqual({ 'room-requests': expect.any(Number), 'training-requests': expect.any(Number) })
     expect((await read<{ counts: Record<string, number> }>(member.cookie, '/api/admin/waiting')).body.counts).toEqual({})
   })
 
@@ -168,7 +169,7 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
     expect(Array.isArray(officerView.body.tonight)).toBe(true)
     expect(Array.isArray(officerView.body.setUp)).toBe(true)
 
-    const trainerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(trainer.cookie, '/api/admin/overview')
+    const trainerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
     expect(trainerView.body.tonight).toBeNull()
     expect(trainerView.body.setUp).toEqual([])
   })

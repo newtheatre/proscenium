@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -66,6 +66,7 @@ function performance(suffix: string): { performanceId: string, showId: string } 
 function shift(performanceId: string, role: string, userId: string, status = 'CONFIRMED'): void {
   write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
     `${performanceId}-${role}`, performanceId, role, userId, status)
+  if (role === 'DUTY_MANAGER') grantCommitteeRole(app, userId)
 }
 
 describe.skipIf(skip !== null)('the duty manager\'s tonight screen (E-112 criteria 1 and 2)', () => {

@@ -392,8 +392,7 @@ describe.skipIf(skip !== null)('a department lead stewards their own catalogue (
       .toBe(theirs)
   })
 
-  // Skipped until #1583: a lead's listing names the modules table behind its alias, and fails.
-  test.skip('a lead reads the catalogue they may write, and sees only their own departments', async () => {
+  test('a lead reads the catalogue they may write, and sees only their own departments', async () => {
     const lead = await adminSession(app, { roles: [] })
     const theirs = await addDepartment()
     const somebody = await addDepartment()

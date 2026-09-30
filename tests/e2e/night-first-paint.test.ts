@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, registerMember, request } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -26,6 +26,7 @@ beforeAll(async () => {
   app = await startApp()
   door = await registerMember(app, 'first-paint-door', generatePassword())
   dutyManager = await registerMember(app, 'first-paint-dm', generatePassword())
+  grantCommitteeRole(app, dutyManager.id)
   bar = await registerMember(app, 'first-paint-bar', generatePassword())
   nobody = await registerMember(app, 'first-paint-nobody', generatePassword())
 

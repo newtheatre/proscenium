@@ -208,10 +208,25 @@ async function throughShift(
   }
 }
 
+// A confirmed shift the lookup refused only for the committee role it needs, so the refusal names
+// that rather than no shift at all (0115, E-111 criterion 1).
+async function shiftWithoutStanding(accountId: string, role: NightRole, night: string, scope: NightScope): Promise<boolean> {
+  if (!needsCommitteeRole(role)) return false
+  const { from, to } = showNightBounds(night)
+  const rows = await confirmedShiftsTonight(
+    accountId, role, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000),
+    { venueId: scope.venueId, performanceId: scope.performanceId, anyStanding: true },
+  )
+  return rows.length > 0
+}
+
 // Somebody holding tonight's shift at the wrong hour is told the hours, and a claim still waiting
 // is named with who confirms it, rather than either being refused as no shift at all (issue 1303).
 async function shiftRefusal({ resolved, tonight }: Caller, role: NightRole, scope: NightScope, held: ShiftBranch): Promise<Refusal> {
   if (held.outsideWindow) return { kind: 'OUTSIDE_WINDOW', error: createError(outsideWindowRefusal(held.outsideWindow)) }
+  if (await shiftWithoutStanding(resolved.account.id, role, tonight, scope)) {
+    return { kind: 'NO_STANDING', error: createError(committeeShiftRefusal()) }
+  }
   if (await claimedShiftTonight(resolved.account.id, role, tonight, scope)) {
     return { kind: 'CLAIMED', error: createError(claimedShiftRefusal(role)) }
   }

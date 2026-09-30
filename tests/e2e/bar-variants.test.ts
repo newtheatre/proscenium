@@ -25,7 +25,7 @@ beforeAll(async () => {
   member = await registerMember(app, 'ordinary', generatePassword())
 
   barManager = await registerMember(app, 'sizes', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -665,7 +665,7 @@ describe.skipIf(skip !== null)('a product cannot go active while its recipe call
 })
 
 describe.skipIf(skip !== null)('who may administer the sizes', () => {
-  test('the bar manager may, and an ordinary member may not', async () => {
+  test('the Front of House Manager may, and an ordinary member may not', async () => {
     const productId = await aProduct()
     expect((await send('GET', `/api/admin/bar/products/${productId}/variants`, undefined, barManager.cookie)).status).toBe(200)
     expect((await send('GET', `/api/admin/bar/products/${productId}/variants`, undefined, member.cookie)).status).toBe(403)

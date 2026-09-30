@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { registerMember } from '#tests/helpers/accounts'
+import { grantCommitteeRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
@@ -25,6 +25,7 @@ beforeAll(async () => {
   app = await startApp()
   dutyManagerPassword = generatePassword()
   dutyManager = await registerMember(app, 'hub-tiles-dm', dutyManagerPassword)
+  grantCommitteeRole(app, dutyManager.id)
 
   const database = new Database(app.databaseFile)
   try {

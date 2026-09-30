@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { eligibilityRefusal } from '#shared/utils/rota-eligibility'
+import { eligibilityRefusal, needsCommitteeRole } from '#shared/utils/rota-eligibility'
 import { SHIFT_ROLES } from '#shared/utils/rota'
 
 const query = z.object({ search: z.string().trim().min(1).max(200), role: z.enum(SHIFT_ROLES) })
@@ -27,8 +27,8 @@ export default defineEventHandler(async (event) => {
   const rules = await shiftRoleRules(event)
   const today = londonToday()
   const items: AddShiftCandidate[] = await Promise.all(matched.map(async (row) => {
-    const heldModules = await modulesHeldBy(row.id, today)
-    return { ...row, eligible: eligibilityRefusal(rules[role], heldModules) === null }
+    const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), needsCommitteeRole(role) ? hasCommitteeRole(row.id) : true])
+    return { ...row, eligible: committee && eligibilityRefusal(rules[role], heldModules) === null }
   }))
 
   return { items }

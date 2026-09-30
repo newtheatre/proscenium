@@ -133,6 +133,8 @@ export function transformCatalogue(input: CatalogueInput): { summary: CatalogueS
       grants_trainer = excluded.grants_trainer, grants_supervisor = excluded.grants_supervisor,
       status = excluded.status, sort = excluded.sort, updated_at = excluded.updated_at
   `)
+  // `committee_only` is absent from the old estate and from both lists above, so it takes the
+  // column's default on insert and a re-run leaves a console edit to it standing (0115).
   for (const module of training.query('SELECT * FROM modules ORDER BY sort, id').all() as OldModule[]) {
     // The unified CHECKs: a months policy carries a number and nothing else does, and a brief
     // never expires. A row breaking either is written with the policy it can hold, and named.

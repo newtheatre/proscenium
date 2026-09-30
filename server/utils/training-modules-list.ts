@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm'
+import { and, asc, inArray, isNull, sql } from 'drizzle-orm'
 import { db, schema } from '@nuxthub/db'
 import { londonParts } from '#shared/utils/london'
 import { expiryFor } from '#shared/utils/training'
@@ -21,17 +21,11 @@ export function trainingModulesClause(query: ListQuery): ListClause {
   })
 }
 
-// The same "live lead" predicate training.ts's ledBy answers, repeated rather than imported: an
-// import here would pull that file's ambient-reliant code into the Bun typecheck graph.
+// The same "live lead" predicate training.ts's ledBy answers, written against the `m` alias: a
+// drizzle column renders as "modules"."department", which the alias hides from SQLite (#1583).
 function ledBy(leadOf: string, now: Date): SQL {
-  return inArray(
-    schema.trainingModules.department,
-    db.select({ department: schema.departmentLeads.department }).from(schema.departmentLeads)
-      .where(and(
-        eq(schema.departmentLeads.userId, leadOf),
-        or(isNull(schema.departmentLeads.expiresAt), gt(schema.departmentLeads.expiresAt, Math.floor(now.getTime() / 1000))),
-      )),
-  )
+  return sql`m.department IN (SELECT l.department FROM department_leads l WHERE l.user_id = ${leadOf}
+    AND (l.expires_at IS NULL OR l.expires_at > ${Math.floor(now.getTime() / 1000)}))`
 }
 
 export function scopedClause(clause: ListClause, leadOf?: string, now = new Date()): ListClause {
@@ -57,6 +51,7 @@ const MODULE_LIST_COLUMNS = sql`
   m.grants_trainer AS grantsTrainer,
   m.grants_supervisor AS grantsSupervisor,
   m.self_registrable AS selfRegistrable,
+  m.committee_only AS committeeOnly,
   m.status AS status,
   m.sort AS sort
 `
@@ -78,13 +73,14 @@ interface AdminModuleRow {
   grantsTrainer: number
   grantsSupervisor: number
   selfRegistrable: number
+  committeeOnly: number
   status: string
   sort: number
 }
 
 export interface AdminModule extends Omit<
   AdminModuleRow,
-  'allowsExternal' | 'safetyCritical' | 'signoffRequired' | 'grantsTrainer' | 'grantsSupervisor' | 'selfRegistrable'
+  'allowsExternal' | 'safetyCritical' | 'signoffRequired' | 'grantsTrainer' | 'grantsSupervisor' | 'selfRegistrable' | 'committeeOnly'
 > {
   allowsExternal: boolean
   safetyCritical: boolean
@@ -92,6 +88,7 @@ export interface AdminModule extends Omit<
   grantsTrainer: boolean
   grantsSupervisor: boolean
   selfRegistrable: boolean
+  committeeOnly: boolean
   materials: { label: string, url: string }[]
   expiresIfAwardedToday: string | null
   frozen: boolean
@@ -142,6 +139,7 @@ export async function listAdminModules(
     grantsTrainer: row.grantsTrainer === 1,
     grantsSupervisor: row.grantsSupervisor === 1,
     selfRegistrable: row.selfRegistrable === 1,
+    committeeOnly: row.committeeOnly === 1,
     materials: materials.filter(material => material.moduleId === row.id).map(({ label, url }) => ({ label, url })),
     expiresIfAwardedToday: expiryFor(row as ExpiryPolicy, today, year),
     frozen: frozen.has(row.id),

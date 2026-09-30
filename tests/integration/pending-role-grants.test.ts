@@ -32,7 +32,7 @@ function seed(database: TestDatabase): void {
   ])
 }
 
-function attemptGrant(database: TestDatabase, index: number, email = 'incoming@example.test', role = 'BAR_MANAGER', expiresAt: number | null = NOW + YEAR): { status: number } {
+function attemptGrant(database: TestDatabase, index: number, email = 'incoming@example.test', role = 'THEATRE_MANAGER', expiresAt: number | null = NOW + YEAR): { status: number } {
   const userId = `pending-${index}`
   try {
     database.batch(pendingGrantStatements({
@@ -100,7 +100,7 @@ describe('granting by address makes one shadow account holding the grant (criter
       const [account] = rows<Record<string, unknown>>(database, `SELECT * FROM users WHERE id = 'pending-0'`)
       expect(account).toMatchObject({ email: 'incoming@example.test', password: null, google_sub: null, last_login_at: null })
       const [grant] = rows<Record<string, unknown>>(database, `SELECT * FROM role_grants WHERE user_id = 'pending-0'`)
-      expect(grant).toMatchObject({ role: 'BAR_MANAGER', expires_at: NOW + YEAR, granted_by: 'ada', note: 'Elected at the AGM' })
+      expect(grant).toMatchObject({ role: 'THEATRE_MANAGER', expires_at: NOW + YEAR, granted_by: 'ada', note: 'Elected at the AGM' })
     })
   })
 
@@ -122,7 +122,7 @@ describe('granting by address makes one shadow account holding the grant (criter
       expect(answers.map(answer => answer.status).sort()).toEqual([200, 409])
 
       expect(rows(database, `SELECT id FROM users WHERE email = 'incoming@example.test'`)).toHaveLength(1)
-      expect(rows(database, `SELECT id FROM role_grants WHERE role = 'BAR_MANAGER'`)).toHaveLength(1)
+      expect(rows(database, `SELECT id FROM role_grants WHERE role = 'THEATRE_MANAGER'`)).toHaveLength(1)
       expect(rows(database, `SELECT id FROM audit_log WHERE action = 'role.granted'`)).toHaveLength(1)
       expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.created.console'`)).toHaveLength(1)
     })
@@ -171,7 +171,7 @@ describe('the trail says pending and never who (criterion 6, 0011)', () => {
       seed(database)
       attemptGrant(database, 0)
       const [granted] = rows<{ detail: string }>(database, `SELECT detail FROM audit_log WHERE action = 'role.granted'`)
-      expect(JSON.parse(granted!.detail)).toEqual({ role: 'BAR_MANAGER', expiresAt: NOW + YEAR, permanent: false, noted: true, pending: true })
+      expect(JSON.parse(granted!.detail)).toEqual({ role: 'THEATRE_MANAGER', expiresAt: NOW + YEAR, permanent: false, noted: true, pending: true })
       expect(granted!.detail).not.toContain('incoming')
       expect(granted!.detail).not.toContain('Incoming Officer')
     })
@@ -184,9 +184,9 @@ describe('pending is not holding (criterion 3)', () => {
       seed(database)
       attemptGrant(database, 0)
       expect(registerIds(database)).toEqual(['g-ada'])
-      expect(registerIds(database, { role: 'is:BAR_MANAGER' })).toEqual([])
+      expect(registerIds(database, { role: 'is:THEATRE_MANAGER' })).toEqual([])
       expect(pendingIds(database)).toEqual(['g-pending-0'])
-      expect(counts(database).BAR_MANAGER).toBeUndefined()
+      expect(counts(database).THEATRE_MANAGER).toBeUndefined()
     })
   })
 
@@ -201,7 +201,7 @@ describe('pending is not holding (criterion 3)', () => {
   test('a permanent grant made by address is pending, not in the permanent report (A-131 criterion 6)', async () => {
     await withDatabase((database) => {
       seed(database)
-      expect(attemptGrant(database, 0, 'incoming@example.test', 'BAR_MANAGER', null).status).toBe(200)
+      expect(attemptGrant(database, 0, 'incoming@example.test', 'THEATRE_MANAGER', null).status).toBe(200)
       expect(pendingIds(database)).toEqual(['g-pending-0'])
       expect(permanentIds(database)).toEqual(['g-ada'])
 
@@ -226,8 +226,8 @@ describe('A-116\'s claim is what makes it held (criterion 1)', () => {
         attemptGrant(database, 0)
         database.batch([[claim]])
         expect(pendingIds(database)).toEqual([])
-        expect(registerIds(database, { role: 'is:BAR_MANAGER' })).toEqual(['g-pending-0'])
-        expect(counts(database).BAR_MANAGER).toBe(1)
+        expect(registerIds(database, { role: 'is:THEATRE_MANAGER' })).toEqual(['g-pending-0'])
+        expect(counts(database).THEATRE_MANAGER).toBe(1)
       })
     })
   }
@@ -247,7 +247,7 @@ describe('revoking a pending grant (criterion 4)', () => {
     await withDatabase((database) => {
       seed(database)
       attemptGrant(database, 0)
-      database.batch([[`DELETE FROM role_grants WHERE user_id = 'pending-0' AND role = 'BAR_MANAGER'`]])
+      database.batch([[`DELETE FROM role_grants WHERE user_id = 'pending-0' AND role = 'THEATRE_MANAGER'`]])
       expect(pendingIds(database)).toEqual([])
     })
   })

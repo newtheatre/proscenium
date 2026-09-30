@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
@@ -118,6 +118,7 @@ function confirmDutyManagerTonight(userId: string, performanceId: string): void 
     'INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)',
     crypto.randomUUID(), performanceId, 'DUTY_MANAGER', 1, userId, 'CONFIRMED',
   )
+  grantCommitteeRole(app, userId)
 }
 
 describe.skipIf(skip !== null)('a refund is money handed back in person, one ticket at a time (criteria 1, 3)', () => {

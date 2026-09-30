@@ -1,0 +1,1 @@
+ALTER TABLE `modules` ADD `committee_only` integer DEFAULT false NOT NULL;

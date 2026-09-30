@@ -30,7 +30,7 @@ function people(database: TestDatabase): void {
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-live', 'u-committee', 'COMMITTEE', NOW + 30 * DAY],
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-lapsed', 'u-lapsed', 'COMMITTEE', NOW - DAY],
     ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, NULL)', 'g-permanent', 'u-permanent', 'COMMITTEE'],
-    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-other', 'u-other-role', 'SAFETY_OFFICER', NOW + 30 * DAY],
+    ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g-other', 'u-other-role', 'ADMIN', NOW + 30 * DAY],
   ])
 }
 
@@ -57,7 +57,7 @@ describe('who a charge to a tab is refused for (F-108 criterion 1, issue 1264)',
     expect(holders(database, [], ['COMMITTEE'], 'u-lapsed')).toEqual([])
   }))
 
-  test('a grant of a role that is not named authorises nobody', () => withDatabase((database) => {
+  test('a grant of a role that is not named, and carries no committee standing, authorises nobody', () => withDatabase((database) => {
     people(database)
     expect(holders(database, [], ['COMMITTEE'], 'u-other-role')).toEqual([])
   }))

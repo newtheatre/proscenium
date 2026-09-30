@@ -19,6 +19,7 @@ interface Module {
   expiryMode: ExpiryMode
   expiryMonths: number | null
   safetyCritical: boolean
+  committeeOnly: boolean
   materials: { label: string, url: string }[]
   prerequisites: Prerequisite[]
   nextSession: NextSession | null
@@ -151,6 +152,14 @@ useSeoMeta({
             data-test="module-safety"
           >
             Safety critical
+          </UBadge>
+          <UBadge
+            v-if="module.committeeOnly"
+            color="neutral"
+            variant="subtle"
+            data-test="module-committee-only"
+          >
+            Committee only
           </UBadge>
           <UBadge
             v-if="module.held"

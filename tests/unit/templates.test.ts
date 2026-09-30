@@ -22,7 +22,7 @@ const EVERYTHING: TemplateContext = {
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
   securityUrl: 'https://newtheatre.org.uk/account/access',
-  accountUrl: 'https://newtheatre.org.uk/account',
+  accountUrl: 'https://newtheatre.org.uk/my',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
   accessUrl: ACCESS_URL,
   roomsUrl: ROOMS_URL,
@@ -216,6 +216,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     const { html } = render('role-expiring', EVERYTHING)
     expect(flat(html)).toContain('Committee roles run to the end of our year')
     expect(flat(html)).toContain(`ask the ${saysRole('ADMIN')} to renew`)
+    expect(flat(html)).toContain('Your roles are listed on <a href="https://newtheatre.org.uk/my">My NNT</a>.')
   })
 
   test('the unpaid hold calls it a booking and says the seats may be sold', () => {
@@ -538,9 +539,9 @@ describe('the shared labels (item 8)', () => {
 
   test('every role name is a Title Case proper title', () => {
     for (const role of ROLES) {
-      // "of" is the one word a title leaves lower case; everything else is capitalised.
+      // "of" and "and" are the words a title leaves lower case; everything else is capitalised.
       const lower = saysRole(role).split(' ').filter(word => !/^[A-Z]/.test(word))
-      expect(lower.filter(word => word !== 'of')).toEqual([])
+      expect(lower.filter(word => word !== 'of' && word !== 'and')).toEqual([])
     }
     expect(saysRole('ADMIN')).toBe('IT Manager')
     expect(saysRole('FOH_MANAGER')).toBe('Front of House Manager')

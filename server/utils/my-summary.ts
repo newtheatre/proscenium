@@ -2,10 +2,12 @@ import { db, schema } from '@nuxthub/db'
 import { and, asc, desc, eq, gte } from 'drizzle-orm'
 import { refusalToCancel } from '#shared/utils/bookings'
 import { londonDay, membershipState } from '#shared/utils/membership'
+import { isGrantLive, ROLES, saysRole } from '#shared/utils/roles'
 import { showNightOf } from '#shared/utils/show-night'
 import type { MembershipState } from '#shared/utils/membership'
 import type { MySummary } from '#shared/utils/my-summary'
 import type { Availability } from '#shared/utils/programme'
+import type { Grant } from '#shared/utils/roles'
 
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun (CONTRIBUTING). Bun-safe only: the endpoint fetches training data itself and hands it in.
@@ -104,6 +106,7 @@ export interface MySummaryInputs {
   ticket: { id: string, reference: string, showTitle: string, venueName: string, startsAt: number, url: string } | null
   notifications: { id: string, title: string, link: string | null, createdAt: number }[]
   nextShow: { slug: string, title: string, performances: { startsAt: number, availability: Availability }[] } | null
+  grants: Grant[]
 }
 
 function untilOf(state: MembershipState): string | null {
@@ -179,5 +182,12 @@ export function assembleMySummary(input: MySummaryInputs): MySummary {
         },
     notifications: input.notifications.slice(0, 3).map(item => ({ id: item.id, title: item.title, link: item.link, createdAt: item.createdAt })),
     nextShow,
+    roles: input.grants
+      .filter(grant => isGrantLive(grant, input.now))
+      .sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role))
+      .map(grant => ({
+        role: saysRole(grant.role),
+        lapsesOn: grant.expiresAt === null ? null : londonDay(new Date(grant.expiresAt * 1000)),
+      })),
   }
 }

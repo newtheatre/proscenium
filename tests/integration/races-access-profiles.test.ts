@@ -11,6 +11,8 @@ import type { SQL } from 'drizzle-orm'
 // conditional on the row they read, on the statement itself, so a write landing in between refuses it.
 
 const NOW = 1_800_000_000
+// Somebody other than every declarant here: deciding one's own is its own suite (0116).
+const OFFICER = 'u-officer'
 
 function run(database: TestDatabase, statement: SQL): unknown[] {
   const [query, ...parameters] = boundStatement(database, statement)
@@ -31,7 +33,7 @@ function verify(database: TestDatabase, userId: string, version: string | null):
   const written = run(database, sql`
     UPDATE access_profiles
     SET status = 'VERIFIED', encrypted_payload = 'c-decided', encryption_iv = 'iv-decided', updated_at = ${NOW}
-    WHERE user_id = ${userId} AND ${decisionPredicate(NOW, version)}
+    WHERE user_id = ${userId} AND ${decisionPredicate(NOW, version, OFFICER)}
     RETURNING user_id AS userId
   `)
   run(database, auditIfChanged(auditEntry({ actorId: null, action: 'access-profile.verified', target: `user:${userId}` })))
@@ -87,7 +89,7 @@ describe('a decision lands only on the declaration the officer read (issue 1383)
     try {
       declared(database, 'u-bare', null, null)
       const touch = (version: string | null): unknown[] => run(database, sql`
-        UPDATE access_profiles SET updated_at = ${NOW} WHERE user_id = ${'u-bare'} AND ${decisionPredicate(NOW, version)}
+        UPDATE access_profiles SET updated_at = ${NOW} WHERE user_id = ${'u-bare'} AND ${decisionPredicate(NOW, version, OFFICER)}
         RETURNING user_id AS userId
       `)
       expect(touch('x')).toEqual([])

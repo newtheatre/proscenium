@@ -2,8 +2,9 @@ import { CONSOLE_WIDTH } from './types'
 import type { Shot } from './types'
 
 const foh = 'dev-foh@e2e.newtheatre.org.uk'
-// The readiness card's module fields need config.write, and Safety has no seeded SAFETY_OFFICER persona.
+// The readiness card's module fields need config.write, which the IT Manager alone holds.
 const admin = 'dev-admin@e2e.newtheatre.org.uk'
+const theatre = 'dev-theatre@e2e.newtheatre.org.uk'
 
 // The runner waits after this, so a click is enough to have the dialog open for the capture.
 const openFirst = (selector: string): string => `document.querySelector('${selector}').click()`
@@ -132,7 +133,7 @@ export const rota: Shot[] = [
   },
   {
     name: 'rota/safety',
-    persona: admin,
+    persona: theatre,
     url: '/rota/manage/safety',
     marker: '[data-test="severity-config"]',
     width: CONSOLE_WIDTH,

@@ -31,7 +31,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'tickets-bar', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -458,8 +458,8 @@ describe.skipIf(skip !== null)('a booking in a typed charge is collected only on
 })
 
 // F-102 criterion 5, issue 1308: an ended night has no shift left to answer for it, so a charge
-// from one waits for the Bar Manager's standing role, exactly as its till session does.
-describe.skipIf(skip !== null)('a charge from an earlier night is answered by the Bar Manager, not tonight\'s shift', () => {
+// from one waits for the Front of House Manager's standing role, exactly as its till session does.
+describe.skipIf(skip !== null)('a charge from an earlier night is answered by the Front of House Manager, not tonight\'s shift', () => {
   const EARLIER = '2020-01-01'
 
   // Started by somebody else, so the answer's actor is plainly whoever answered it.
@@ -504,7 +504,7 @@ describe.skipIf(skip !== null)('a charge from an earlier night is answered by th
     expect(query<{ status: string }>('SELECT status FROM sumup_attempts WHERE id = ?', id)!.status).toBe('STARTED')
   })
 
-  test('the Bar Manager answers it', async () => {
+  test('the Front of House Manager answers it', async () => {
     const { venueId } = programme('earlier-night-manager')
     const id = anEarlierCharge(venueId, 'manager')
 
@@ -528,15 +528,15 @@ describe.skipIf(skip !== null)('a charge from an earlier night is answered by th
   })
 
   // A privileged role answers only with its second factor, as it closes the session (A-112).
-  test('the Bar Manager without an authenticator is sent to set one up, and nothing moves', async () => {
-    overrideConfig(app, 'PRIVILEGED_ROLES', ['BAR_MANAGER'])
+  test('the Front of House Manager without an authenticator is sent to set one up, and nothing moves', async () => {
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['FOH_MANAGER'])
     try {
       const { venueId } = programme('earlier-night-factor')
       const id = anEarlierCharge(venueId, 'factor')
 
-      // Its own Bar Manager: the suite's one holds an authenticator, as every other test needs.
+      // Its own Front of House Manager: the suite's one holds an authenticator, as every other test needs.
       const noFactor = await registerMember(app, 'tickets-bar-no-factor', generatePassword())
-      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'BAR_MANAGER' }, officer.cookie)
+      await request(app, 'POST', '/api/admin/roles', { userId: noFactor.id, role: 'FOH_MANAGER' }, officer.cookie)
       const refused = await answerCharge(app, id, 'declined', noFactor.cookie)
       expect(refused.status).toBe(403)
       expect(await message(refused)).toMatch(/authenticator/i)

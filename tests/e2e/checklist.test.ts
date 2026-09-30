@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { curtainDown, testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { NIGHT_TAP_TARGET_PX } from '#shared/utils/night-shell'
@@ -279,6 +279,7 @@ function write(statement: string, ...parameters: unknown[]): void {
 function shift(performanceId: string, role: string, userId: string): void {
   write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)',
     `${performanceId}-${role}`, performanceId, role, userId, 'CONFIRMED')
+  if (role === 'DUTY_MANAGER') grantCommitteeRole(app, userId)
 }
 
 // Issue 1296: a paid no-show never holds the night open, and an unpaid hold takes an exception.
@@ -459,7 +460,7 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
     const dmPassword = generatePassword()
     const dm = await registerMember(app, 'checklist-till-dm', dmPassword)
     const barManager = await registerMember(app, 'checklist-till-bar', generatePassword())
-    await grantRole(app, barManager, 'BAR_MANAGER', admin.cookie)
+    await grantRole(app, barManager, 'FOH_MANAGER', admin.cookie)
     const { venueId, performanceId } = (() => {
       const database = new Database(app.databaseFile)
       try {

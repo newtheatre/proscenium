@@ -5,6 +5,7 @@ import { londonParts } from '#shared/utils/london'
 import {
   lapseNoticeCutoff,
   lapsedBefore,
+  ROLE_EXPIRY_LINK,
   roleDigestClaimFor,
   roleExpiryClaimFor,
 } from '#shared/utils/role-expiry'
@@ -119,7 +120,7 @@ async function warnHolders(
           role: saysRole(grant.role),
           lapsesOn: londonDay(new Date(grant.expiresAt * 1000)),
         })),
-        accountUrl: `${useRuntimeConfig(event).public.baseURL}/account`,
+        accountUrl: `${useRuntimeConfig(event).public.baseURL}${ROLE_EXPIRY_LINK}`,
       },
     })
 

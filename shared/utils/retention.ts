@@ -3,6 +3,10 @@
 
 export type RetentionWarningKind = 'window' | 'final'
 
+// Where a warning sends the reader: a live page, never an old-site address that works only while
+// the redirect map lasts (issue 1400). Signing in is all it asks.
+export const RETENTION_WARNING_LINK = '/my'
+
 // The last sign-in rides the key (0048): a fresh one changes lastLoginAt, so the old claim
 // stops matching and the next dormant spell warns again rather than finding one already spent.
 export function retentionWarningClaimFor(kind: RetentionWarningKind, userId: string, lastLoginAt: number): string {

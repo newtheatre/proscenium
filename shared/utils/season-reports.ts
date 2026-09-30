@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { CATEGORIES, SEVERITIES } from './incidents'
 import type { Category, Severity } from './incidents'
+import type { NightRole } from './night-authority'
 
 // Cross-season report queries (E-126): every range comes from `resolvePeriodBounds`
 // (season-dashboard.ts), reused as-is rather than a second resolver of a period's start.
@@ -40,3 +41,22 @@ export const performanceReportFilter = z.object({
 })
 
 export type PerformanceReportFilter = z.output<typeof performanceReportFilter>
+
+export interface OpeningBypassRow {
+  night: string
+  role: NightRole
+  venueId: string
+  venueName: string
+  openingLabel: string | null
+  officerName: string | null
+}
+
+const STOOD_IN_AS: Record<NightRole, string> = { DUTY_MANAGER: 'as duty manager', DOOR: 'on the door', BAR: 'at the bar' }
+
+// A bypass at a venue with nothing on has no night report, so this line is its only surface
+// (E-130 criterion 6, issue 1537); a bar opened with none planned says so rather than go unsaid.
+export function saysOpeningBypass(row: OpeningBypassRow): string {
+  const who = row.officerName ?? 'An officer'
+  const where = row.openingLabel ? `${row.openingLabel}, ${row.venueName}` : `${row.venueName}, with no bar opening planned`
+  return `${who} stood in ${STOOD_IN_AS[row.role]} by officer role: ${where}`
+}

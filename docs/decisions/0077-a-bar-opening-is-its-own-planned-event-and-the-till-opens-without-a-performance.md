@@ -2,6 +2,9 @@
 
 - Status: Accepted
 - Date: 2026-09-15
+- Amended: 29 September 2026 by 0111, under which the Front of House Manager's role holds the till
+  bypass, and a bypass at a venue with no performance, which no night report carries, is listed on
+  the Night reports screen rather than a night report's staffing section (E-130 criterion 6).
 
 ## Context
 

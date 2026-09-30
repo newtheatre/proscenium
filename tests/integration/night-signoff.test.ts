@@ -298,10 +298,10 @@ describe('reportRoleHoldersQuery', () => {
   test('reaches every live holder of a named role, and nobody holding another', async () => {
     await withDatabase((database) => {
       grant(database, holder(database, 'foh'), 'FOH_MANAGER')
-      grant(database, holder(database, 'safety'), 'SAFETY_OFFICER')
-      grant(database, holder(database, 'bar'), 'BAR_MANAGER')
-      expect(addresses(database, ['FOH_MANAGER', 'SAFETY_OFFICER']))
-        .toEqual(['foh@e2e.newtheatre.org.uk', 'safety@e2e.newtheatre.org.uk'])
+      grant(database, holder(database, 'theatre'), 'THEATRE_MANAGER')
+      grant(database, holder(database, 'treasurer'), 'TREASURER')
+      expect(addresses(database, ['FOH_MANAGER', 'THEATRE_MANAGER']))
+        .toEqual(['foh@e2e.newtheatre.org.uk', 'theatre@e2e.newtheatre.org.uk'])
     })
   })
 
@@ -315,22 +315,22 @@ describe('reportRoleHoldersQuery', () => {
 
   test('an erased or disabled holder is not written to', async () => {
     await withDatabase((database) => {
-      grant(database, holder(database, 'erased'), 'SAFETY_OFFICER')
-      grant(database, holder(database, 'disabled'), 'SAFETY_OFFICER')
+      grant(database, holder(database, 'erased'), 'THEATRE_MANAGER')
+      grant(database, holder(database, 'disabled'), 'THEATRE_MANAGER')
       database.batch([
         ['UPDATE users SET anonymised_at = ? WHERE id = ?', NOW, 'erased'],
         ['UPDATE users SET disabled = 1 WHERE id = ?', 'disabled'],
       ])
-      expect(addresses(database, ['SAFETY_OFFICER'])).toEqual([])
+      expect(addresses(database, ['THEATRE_MANAGER'])).toEqual([])
     })
   })
 
   // A grant made to a typed address before anybody claimed it must not mail the report there.
   test('a holder nobody has signed into yet is not written to', async () => {
     await withDatabase((database) => {
-      grant(database, person(database, 'pending'), 'SAFETY_OFFICER')
-      grant(database, holder(database, 'claimed'), 'SAFETY_OFFICER')
-      expect(addresses(database, ['SAFETY_OFFICER'])).toEqual(['claimed@e2e.newtheatre.org.uk'])
+      grant(database, person(database, 'pending'), 'THEATRE_MANAGER')
+      grant(database, holder(database, 'claimed'), 'THEATRE_MANAGER')
+      expect(addresses(database, ['THEATRE_MANAGER'])).toEqual(['claimed@e2e.newtheatre.org.uk'])
     })
   })
 
@@ -338,8 +338,8 @@ describe('reportRoleHoldersQuery', () => {
     await withDatabase((database) => {
       const both = holder(database, 'both')
       grant(database, both, 'FOH_MANAGER')
-      grant(database, both, 'SAFETY_OFFICER')
-      expect(addresses(database, ['FOH_MANAGER', 'SAFETY_OFFICER'])).toEqual(['both@e2e.newtheatre.org.uk'])
+      grant(database, both, 'THEATRE_MANAGER')
+      expect(addresses(database, ['FOH_MANAGER', 'THEATRE_MANAGER'])).toEqual(['both@e2e.newtheatre.org.uk'])
       expect(addresses(database, [])).toEqual([])
     })
   })

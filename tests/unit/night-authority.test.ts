@@ -54,21 +54,24 @@ describe('the night roles are the three the rota staffs (E-111 criterion 1)', ()
     }
   })
 
-  // F-101 criterion 2: the roles are not interchangeable, and the desk work each also does
-  // (the bar's catalogue, the rota) is not a bypass, so it is not counted here.
-  test('the front of house officer does not open the till, and the bar manager does not open the door', () => {
-    const bypass = (role: 'FOH_MANAGER' | 'BAR_MANAGER'): string[] =>
-      PERMISSION_MAP[role].filter(permission => OPERATIONAL_PERMISSIONS.includes(permission))
-    expect(bypass('FOH_MANAGER')).toEqual(['night.door', 'night.manage'])
-    expect(bypass('BAR_MANAGER')).toEqual(['night.till'])
+  // A shift opens only its own screen (E-111 criterion 1, F-101 criterion 2); the one officer role
+  // holds all three, because the constitution gives the post the bar as well as the house (0111).
+  test('the Front of House Manager\'s role holds all three bypasses', () => {
+    expect(PERMISSION_MAP.FOH_MANAGER.filter(permission => OPERATIONAL_PERMISSIONS.includes(permission)).sort())
+      .toEqual(['night.door', 'night.manage', 'night.till'])
+    for (const role of NIGHT_ROLES) expect(NIGHT_ROLE_OFFICER[role].role).toBe('FOH_MANAGER')
   })
 
-  // A volunteer's night comes from a shift, never a role, so only the officers hold a bypass (0009, A-134).
-  test('no role but the two officers and the IT Manager holds a bypass', () => {
+  test('no two shift roles stand on one permission, so a door shift does not open the till', () => {
+    expect(new Set(NIGHT_ROLES.map(role => NIGHT_ROLE_PERMISSION[role])).size).toBe(NIGHT_ROLES.length)
+  })
+
+  // A volunteer's night comes from a shift, never a role, so only the officer holds a bypass (0009, A-134).
+  test('no role but the Front of House Manager and the IT Manager holds a bypass', () => {
     const holders = Object.entries(PERMISSION_MAP)
       .filter(([, held]) => held.some(permission => OPERATIONAL_PERMISSIONS.includes(permission)))
       .map(([role]) => role)
-    expect(holders.sort()).toEqual(['ADMIN', 'BAR_MANAGER', 'FOH_MANAGER'])
+    expect(holders.sort()).toEqual(['ADMIN', 'FOH_MANAGER'])
   })
 })
 

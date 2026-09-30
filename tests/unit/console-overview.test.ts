@@ -15,13 +15,13 @@ const read = (path: string): Promise<string> => Bun.file(path).text()
 
 describe('a queue is offered to whoever decides it', () => {
   test('each officer is given the queues their role works, and nobody else\'s', () => {
-    expect(queuesFor(holding('MANAGER'), false)).toEqual(['membership-claims', 'room-requests', 'training-requests'])
-    expect(queuesFor(holding('ACCESSIBILITY_OFFICER'), false)).toEqual(['access-profiles'])
+    expect(queuesFor(holding('SECRETARY'), false)).toEqual(['access-profiles'])
+    expect(queuesFor(holding('PRESIDENT', 'TREASURER', 'COMMITTEE'), false)).toEqual([])
     expect(queuesFor(holding('FOH_MANAGER'), false)).toEqual(['pass-requests'])
     expect(queuesFor(holding('ADMIN'), false)).toEqual(['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests'])
   })
 
-  test('a department lead answers training requests without the training officer\'s grant', () => {
+  test('a department lead answers training requests without the Theatre Manager\'s grant', () => {
     expect(queuesFor(new Set(), true)).toEqual(['training-requests'])
     expect(queuesFor(new Set(), false)).toEqual([])
   })

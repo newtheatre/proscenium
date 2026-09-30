@@ -35,7 +35,7 @@ beforeAll(async () => {
   bar = await registerMember(app, 'till-venues-bar', generatePassword())
   member = await registerMember(app, 'till-venues-member', generatePassword())
   claimant = await registerMember(app, 'till-venues-claimant', generatePassword())
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
   try {
@@ -104,7 +104,7 @@ describe.skipIf(skip !== null)('the till names the venues a caller may open one 
     expect(JSON.stringify(offered)).not.toContain('A Test Show')
   })
 
-  // A venue with nothing on and nobody rostered is still somewhere the bar manager may open a
+  // A venue with nothing on and nobody rostered is still somewhere the Front of House Manager may open a
   // till: the hire the rota never covered is exactly the case 0077 exists for.
   test('a dark venue is offered to a night.till holder and to nobody else', async () => {
     expect((await venuesFor(bar.cookie)).map(venue => venue.venueId)).toContain(DARK)

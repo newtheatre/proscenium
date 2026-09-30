@@ -1,10 +1,9 @@
 import { PHONE_WIDTH } from './types'
 import type { Shot } from './types'
 
-// The front of house manager opens the door and the duty manager screens with no shift (0044);
-// the bar manager opens the till. The seed runs two performances at the house tonight.
+// The front of house manager opens the door, the till and the duty manager screens with no shift
+// (0044, 0111). The seed runs two performances at the house tonight.
 const foh = 'dev-foh@e2e.newtheatre.org.uk'
-const bar = 'dev-bar@e2e.newtheatre.org.uk'
 
 export const showNight: Shot[] = [
   {
@@ -70,7 +69,7 @@ export const showNight: Shot[] = [
   },
   {
     name: 'show-night/till',
-    persona: bar,
+    persona: foh,
     url: '/tonight/till',
     marker: '[data-test="till-panes"]',
     width: PHONE_WIDTH,
@@ -85,7 +84,7 @@ export const showNight: Shot[] = [
   },
   {
     name: 'show-night/till-basket',
-    persona: bar,
+    persona: foh,
     url: '/tonight/till',
     marker: '[data-test="till-panes"]',
     width: PHONE_WIDTH,
@@ -102,7 +101,7 @@ export const showNight: Shot[] = [
   },
   {
     name: 'show-night/till-comp',
-    persona: bar,
+    persona: foh,
     url: '/tonight/till',
     marker: '[data-test="till-panes"]',
     width: PHONE_WIDTH,

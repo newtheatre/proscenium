@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysGaps } from '#shared/utils/training'
 import { saysClosure, saysPlace, saysPlaceNote } from '#shared/utils/training-signup'
+import { COMMITTEE_ONLY_WORDS } from '#shared/utils/training-action'
 import { saysDay } from '#shared/utils/when'
 import type { PrerequisiteGap } from '#shared/utils/training'
 import type { ClosureReason } from '#shared/utils/training-signup'
@@ -23,7 +24,9 @@ interface Session {
   placed: boolean
   waitlistPosition: number | null
   closure: ClosureReason | null
-  modules: { id: string, name: string, safetyCritical: boolean }[]
+  modules: { id: string, name: string, safetyCritical: boolean, committeeOnly: boolean }[]
+  // It teaches a committee-only module and this member holds no committee role (G-105 criterion 8).
+  committeeOnly: boolean
   blocked: PrerequisiteGap[]
   warnings: PrerequisiteGap[]
 }
@@ -326,7 +329,17 @@ const sessionDay = (session: Session): string =>
             </div>
 
             <UButton
-              v-if="session.blocked.length === 0 && !session.closure"
+              v-if="session.committeeOnly"
+              size="xs"
+              color="neutral"
+              variant="subtle"
+              disabled
+              :data-test="`committee-only-${session.id}`"
+            >
+              {{ COMMITTEE_ONLY_WORDS }}
+            </UButton>
+            <UButton
+              v-else-if="session.blocked.length === 0 && !session.closure"
               size="xs"
               :loading="working === session.id"
               :data-test="`signup-${session.id}`"

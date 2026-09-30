@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
 
   // Whom a member asks about a role nobody can claim yet (issue 1318); the claimable list holds
   // no such role, and My rota reads them from the roles endpoint.
-  const officers = !claimable && Object.values(eligibilities).some(one => !one.eligible && one.unlockedBy === null)
+  const officers = !claimable && Object.values(eligibilities).some(one => !one.eligible && one.unlockedBy === null && !one.needsCommittee)
     ? await fohManagerNames()
     : []
 

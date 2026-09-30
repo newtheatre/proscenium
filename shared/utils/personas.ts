@@ -22,8 +22,9 @@ export const PERSONAS: Persona[] = [
   // Module A: identity
 
   { email: 'dev-admin@e2e.newtheatre.org.uk', name: 'Ada Admin (dev)', role: 'ADMIN', shape: 'full', describes: 'Everything, including the settings and the roll of Fellows.' },
-  { email: 'dev-manager@e2e.newtheatre.org.uk', name: 'Mo Manager (dev)', role: 'MANAGER', shape: 'full', describes: 'The trail, the register and the accounts, but not the roles.' },
-  { email: 'dev-theatre@e2e.newtheatre.org.uk', name: 'Tam Theatre (dev)', role: 'THEATRE_MANAGER', shape: 'full', describes: 'Reads the roll and the register; records neither.' },
+  { email: 'dev-president@e2e.newtheatre.org.uk', name: 'Pru President (dev)', role: 'PRESIDENT', shape: 'full', describes: 'Reads the audit trail, the open safety items and the season figures; writes no money and grants no role (0113).' },
+  { email: 'dev-secretary@e2e.newtheatre.org.uk', name: 'Sol Secretary (dev)', role: 'SECRETARY', shape: 'full', describes: 'The welfare officer: verifies access profile declarations and reads the roll of Fellows. Not general box office (D-127).' },
+  { email: 'dev-committee@e2e.newtheatre.org.uk', name: 'Cal Committee (dev)', role: 'COMMITTEE', shape: 'full', describes: 'A post with no standing work of its own yet: the season figures and reports, nothing else.' },
   { email: 'dev-member@e2e.newtheatre.org.uk', name: 'Mel Member (dev)', role: null, shape: 'full', describes: 'An ordinary account: no roles, nothing in the admin screens.' },
   { email: 'dev-guest@e2e.newtheatre.org.uk', name: 'Gus Guest (dev)', role: null, shape: 'guest', describes: 'No password and no way in, the way guest checkout leaves one (A-116).' },
   { email: 'dev-erased@e2e.newtheatre.org.uk', name: 'Term Tombstone (dev)', role: null, shape: 'tombstone', membership: 'CURRENT', describes: 'Anonymised, so every screen has to keep working around it (0011). Its current term is kept for the statistics and left off the register, which says so.' },
@@ -32,20 +33,13 @@ export const PERSONAS: Persona[] = [
 
   { email: 'dev-booker@e2e.newtheatre.org.uk', name: 'Bea Booker (dev)', role: null, shape: 'full', membership: 'CURRENT', describes: 'An ordinary member holding a current membership, so the room forms open rather than refuse (issue 1338).' },
 
-  // Module D: ticketing
-
-  { email: 'dev-access@e2e.newtheatre.org.uk', name: 'Ash Access (dev)', role: 'ACCESSIBILITY_OFFICER', shape: 'full', describes: 'Sights evidence and verifies access profile declarations. Nothing else: not general box office (D-127).' },
-
   // Module E: show night
 
-  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Sets up the programme and its prices, works the desk, takes the stocktake, and opens the door and the duty manager screens with no shift, audited for it (0044, 0090, 0099).' },
-  { email: 'dev-bar@e2e.newtheatre.org.uk', name: 'Bex Bar (dev)', role: 'BAR_MANAGER', shape: 'full', describes: 'Opens the till with no bar shift. Opens nothing else: the roles are not interchangeable.' },
+  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Sets up the programme and its prices, works the desk, runs the bar and its stock, and opens the door, the till and the duty manager screens with no shift, audited for it (0044, 0090, 0111).' },
 
-  // Module F: bar
+  // Module G: training, and safety
 
-  // Module G: training
-
-  { email: 'dev-training@e2e.newtheatre.org.uk', name: 'Tri Training (dev)', role: 'TRAINING_MANAGER', shape: 'full', describes: 'Reads accounts, the register and the rooms: the one role whose sidebar is partial.' },
+  { email: 'dev-theatre@e2e.newtheatre.org.uk', name: 'Tam Theatre (dev)', role: 'THEATRE_MANAGER', shape: 'full', describes: 'The rooms, the training catalogue and its leads, and the open safety items (0112).' },
 
   // Module I: finance
 

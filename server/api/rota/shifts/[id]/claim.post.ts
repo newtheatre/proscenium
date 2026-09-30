@@ -1,5 +1,4 @@
 import { changes } from '#shared/utils/audit'
-import { saysShiftRole } from '#shared/utils/rota'
 import { shiftClaimForm } from '#shared/utils/tonight'
 
 // Claim an open shift in one tap. Eligibility is re-checked live and availability rides the
@@ -13,14 +12,11 @@ export default defineEventHandler(async (event) => {
   if (!held) throw noSuch('shift')
 
   const today = londonToday()
-  const refusedTraining = createError({
-    statusCode: 403,
-    statusMessage: `You do not currently qualify for a ${saysShiftRole(held.role).toLowerCase()} shift`,
-  })
-  const eligibilities = await shiftEligibilities(event, account.id, today)
-  if (!eligibilities[held.role].eligible) throw refusedTraining
-  // The same gate rides the write, so a record lapsing after this check admits nobody (#1302).
-  const gate = { moduleId: (await shiftRoleRules(event))[held.role], today }
+  const eligibility = (await shiftEligibilities(event, account.id, today))[held.role]
+  if (!eligibility.eligible) throw ineligibleRefusal(held.role, eligibility)
+  // The same gate rides the write, so a record or a committee role lapsing after this check admits
+  // nobody (#1302, 0115).
+  const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000))
 
   const autoConfirm = await configValue(event, 'SHIFT_CLAIM_AUTO_CONFIRM')
   const status = autoConfirm ? 'CONFIRMED' : 'CLAIMED'
@@ -44,7 +40,8 @@ export default defineEventHandler(async (event) => {
     const now = await shiftDetail(id)
     if (!now) throw noSuch('shift')
     if (now.status !== 'OPEN') throw createError({ statusCode: 409, statusMessage: 'That shift has already been taken' })
-    if (!(await shiftEligibilities(event, account.id, today))[held.role].eligible) throw refusedTraining
+    const again = (await shiftEligibilities(event, account.id, today))[held.role]
+    if (!again.eligible) throw ineligibleRefusal(held.role, again)
     throw createError({ statusCode: 409, statusMessage: 'You already hold a shift on this performance' })
   }
 

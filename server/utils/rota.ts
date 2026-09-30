@@ -3,11 +3,13 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
+import { holdsCommitteeRole } from './committee-standing'
 import { configValue } from './configuration'
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import { onShiftAt } from '#shared/utils/night-authority'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
+import { needsCommitteeRole } from '#shared/utils/rota-eligibility'
 import { currentShowNight, showNightBounds, showNightOf, showNightOpensAt, showNightStartOf } from '#shared/utils/show-night'
 import { unfilledShiftsList } from '#shared/utils/unfilled-shifts-list'
 import type { ListClause } from './list-filters'
@@ -543,19 +545,26 @@ export interface ClaimScope { table: string, event: string }
 
 export const SHIFT_CLAIM_SCOPE: ClaimScope = { table: 'shifts', event: 'performance_id' }
 
-// The role's gating module and London's today, as the live check read them (E-104 criterion 1).
-export interface TrainingGate { moduleId: string | null, today: string }
+// The role's gating module and London's today, as the live check read them (E-104 criterion 1);
+// `committeeAt` is the instant a duty manager shift's committee role is read at (0115).
+export interface TrainingGate { moduleId: string | null, today: string, committeeAt?: number }
+
+// Every write that confirms somebody on a shift builds its gate here, so none can forget the role.
+export function shiftGate(role: ShiftRole, moduleId: string | null, today: string, now: number): TrainingGate {
+  return needsCommitteeRole(role) ? { moduleId, today, committeeAt: now } : { moduleId, today }
+}
 
 // `heldNow` repeated, not imported: training.ts leans on ambient imports Bun cannot typecheck, so
 // change both together. An unset rule holds for nobody, as it lets nobody claim (E-103 criterion 4).
 export function holdsGate(gate: TrainingGate, userId: string | SQL): SQL {
   if (gate.moduleId === null) return sql`0`
+  const standing = gate.committeeAt === undefined ? sql`` : sql` AND ${holdsCommitteeRole(userId, gate.committeeAt)}`
   return sql`EXISTS (
     SELECT 1 FROM training_records gate_record
     WHERE gate_record.user_id = ${userId} AND gate_record.module_id = ${gate.moduleId}
       AND gate_record.revoked_at IS NULL
       AND (gate_record.expires_on IS NULL OR gate_record.expires_on > ${gate.today})
-  )`
+  )${standing}`
 }
 
 // Availability, one-slot-per-event and the training gate all ride the UPDATE, so two claims resolve
@@ -828,16 +837,19 @@ export interface ConfirmedShiftTonight {
 export interface ConfirmedShiftScope {
   venueId?: string
   performanceId?: string
+  // Only for wording a refusal: whether the shift is there and only the committee role is not (0115).
+  anyStanding?: boolean
 }
 
-// A confirmed shift of this role, held by this current account, on a performance inside the
-// night's own bounds (E-102 criterion 4); disabled and anonymised are re-checked, not trusted.
+// A confirmed shift of this role, held by this current account, on tonight's performance (E-102 c4);
+// disabled and anonymised are re-checked, and a duty manager's needs a live committee role (0115).
 export function confirmedShiftsTonightQuery(
   userId: string,
   role: ShiftRole,
   from: number,
   to: number,
   scope: ConfirmedShiftScope,
+  at = Math.floor(Date.now() / 1000),
 ): SQL {
   const terms: SQL[] = [
     sql`s.user_id = ${userId}`,
@@ -850,6 +862,7 @@ export function confirmedShiftsTonightQuery(
   ]
   if (scope.venueId) terms.push(sql`p.venue_id = ${scope.venueId}`)
   if (scope.performanceId) terms.push(sql`p.id = ${scope.performanceId}`)
+  if (needsCommitteeRole(role) && !scope.anyStanding) terms.push(holdsCommitteeRole(sql`u.id`, at))
 
   return sql`
     SELECT s.id AS shiftId, s.performance_id AS performanceId, p.venue_id AS venueId,

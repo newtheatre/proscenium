@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { londonParts } from '#shared/utils/london'
 import { showNightOf } from '#shared/utils/show-night'
-import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
@@ -192,6 +192,7 @@ describe.skipIf(skip !== null)('a duty manager\'s answer about their number', ()
 
   test('a claim carrying the answer records it, and a lost claim records nothing', async () => {
     expect((await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE', { value: moduleId })).status).toBe(200)
+    for (const claimant of [member, other]) grantCommitteeRole(app, claimant.id)
     await setAutoConfirm(true)
     const house = programme('claim-share')
     const shiftId = openShift(house.performanceId, 'DUTY_MANAGER', 1)

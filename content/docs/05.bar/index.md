@@ -3,7 +3,7 @@ title: Bar
 description: The catalogue the till sells from, the stock register behind it, and the reports read from the ledger.
 module: Bar
 audience: committee
-updatedOn: 2026-09-26
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -16,8 +16,8 @@ Union's SumUp reader, is a show-night screen and has its own page at
 [Till](/docs/tonight/till). What is set up here is what the till draws its buttons
 from, what a sale depletes, and what the Treasurer reads at the end of a period.
 
-The screens are under **Manage, Bar** in the account menu. The Bar Manager reads them and
-changes them, and the IT Manager holds everything. Reports are the one exception: the Treasurer
+The screens are under **Manage, Bar** in the account menu. The Front of House Manager reads them
+and changes them, and the IT Manager holds everything. Reports are the one exception: the Treasurer
 reads them too, without seeing the catalogue or the stock. Nobody reaches any of this
 from a shift: a bar shift opens the till, not these screens.
 

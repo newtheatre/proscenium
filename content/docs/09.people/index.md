@@ -3,7 +3,7 @@ title: People
 description: Every account the theatre holds, the membership register, the roll of Fellows and the roles that run out each committee year.
 module: Identity
 audience: committee
-updatedOn: 2026-09-22
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -16,11 +16,11 @@ entered on the roll of Fellows. Everything here is about who somebody is to the 
 what they are doing tonight: the door, the till and the rota derive their authority from a
 shift or a training record, never from anything on these screens.
 
-The IT Manager, the Manager and the Theatre Manager read these screens, and the Training
-Manager reads the accounts and the register too. Changing anything is narrower: granting roles, disabling, merging and
-erasing accounts belong to the IT Manager alone; recording memberships and fellowships is the
-IT Manager's and the Manager's. Every role that reaches these screens needs an authenticator
-app enrolled before it works.
+The IT Manager reads every screen here. The Theatre Manager reads the accounts and the
+membership register, the President reads the accounts, and the Secretary and Welfare Officer
+reads the roll of Fellows. Changing anything is the IT Manager's alone: granting roles,
+disabling, merging and erasing accounts, and recording memberships and fellowships. Every role
+that reaches these screens needs an authenticator app enrolled before it works.
 
 ::card-group
   ::card{icon="i-lucide-users" title="Accounts" to="/docs/people/accounts"}

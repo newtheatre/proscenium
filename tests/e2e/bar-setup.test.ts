@@ -29,7 +29,7 @@ beforeAll(async () => {
   officer = await adminSession(app)
 
   barManager = await registerMember(app, 'setup-bar', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
 
   const database = new Database(app.databaseFile)
   try {

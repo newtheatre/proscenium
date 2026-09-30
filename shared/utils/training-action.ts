@@ -23,17 +23,22 @@ export type TrainingAction
     | { kind: 'JOIN_WAITING_LIST', session: SessionRef }
     | { kind: 'ASKED' }
     | { kind: 'ASK' }
+    | { kind: 'COMMITTEE_ONLY' }
+
+// The words a committee-only module shows and refuses in, wherever it is met (G-105 criterion 8).
+export const COMMITTEE_ONLY_WORDS = 'Only available to the committee'
 
 const refOf = (session: ActionSession): SessionRef =>
   ({ id: session.id, heldOn: session.heldOn, startsAt: session.startsAt, place: session.place })
 
-// `sessions` are those teaching the module, soonest first. A held place wins over a waiting one on
-// an earlier session, then the soonest session open to them, then the ask.
-export function trainingAction(sessions: readonly ActionSession[], requested: boolean): TrainingAction {
+// `sessions` teach the module, soonest first: a held place, then a waiting one, then nothing to do
+// for somebody off the committee (`committeeOnly`, 0115), then the soonest open session, then the ask.
+export function trainingAction(sessions: readonly ActionSession[], requested: boolean, committeeOnly = false): TrainingAction {
   const placed = sessions.find(session => session.placed === true)
   if (placed) return { kind: 'PLACED', session: refOf(placed) }
   const waiting = sessions.find(session => session.placed === false)
   if (waiting) return { kind: 'WAITING', session: refOf(waiting), position: waiting.waitlistPosition ?? 0 }
+  if (committeeOnly) return { kind: 'COMMITTEE_ONLY' }
   const open = sessions.find(session => session.open)
   if (open) return { kind: open.full ? 'JOIN_WAITING_LIST' : 'SIGN_UP', session: refOf(open) }
   return requested ? { kind: 'ASKED' } : { kind: 'ASK' }
@@ -47,6 +52,7 @@ export function saysTrainingAction(action: TrainingAction): string {
     case 'JOIN_WAITING_LIST': return 'Join the waiting list'
     case 'ASKED': return 'Asked for'
     case 'ASK': return 'Ask for this module'
+    case 'COMMITTEE_ONLY': return COMMITTEE_ONLY_WORDS
     default: return action satisfies never
   }
 }

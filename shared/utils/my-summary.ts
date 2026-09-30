@@ -25,6 +25,8 @@ export interface MySummary {
   ticket: { reference: string, showTitle: string, venueName: string, startsAt: number, url: string } | null
   notifications: { id: string, title: string, link: string | null, createdAt: number }[]
   nextShow: { slug: string, title: string, firstAt: number, lastAt: number, availability: Availability } | null
+  // Live grants by title and London lapse day, null when permanent (A-119 criterion 6).
+  roles: { role: string, lapsesOn: string | null }[]
 }
 
 // The tiles, in the order they stand when nothing is coming up (K-127 criterion 6).
@@ -90,6 +92,11 @@ export const MY_THINGS_TO_DO: Record<MyThingName, { says: string, label: string,
   passes: { says: 'You hold no pass.', label: 'See passes', to: '/account/passes' },
   notifications: { says: 'Nothing new has come in.', label: 'Choose what we email you about', to: '/account/notifications' },
   show: { says: 'Nothing is on sale yet.', label: 'See what\'s on', to: '/whats-on' },
+}
+
+// A-119 criterion 6: the day a role lapses, with its year since a grant can outrun this one.
+export function saysRoleLapse(lapsesOn: string | null): string {
+  return lapsesOn === null ? 'Until further notice' : `Lapses on ${saysDay(lapsesOn, { year: true })}`
 }
 
 // What the overview says about the reader's membership: a sentence, not a fragment hung off their

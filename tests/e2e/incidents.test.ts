@@ -28,7 +28,7 @@ beforeAll(async () => {
   admin = await adminSession(app)
   bar = await registerMember(app, 'incident-bar', generatePassword())
   door = await registerMember(app, 'incident-door', generatePassword())
-  await grantRole(app, bar, 'BAR_MANAGER', admin.cookie)
+  await grantRole(app, bar, 'FOH_MANAGER', admin.cookie)
   await grantRole(app, door, 'FOH_MANAGER', admin.cookie)
 
   const database = new Database(app.databaseFile)
@@ -61,7 +61,7 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 const entry = { performanceId: null as string | null, category: 'SAFETY', severity: 'INCIDENT', body: 'A trip hazard on the stairs was flagged and taped off.' }
 
 describe.skipIf(skip !== null)('logging an incident (E-115 criteria 1, 2, 4)', () => {
-  test('the bar manager can log an incident', async () => {
+  test('the Front of House Manager can log an incident', async () => {
     const answered = await send('POST', '/api/tonight/incidents', { ...entry, performanceId: house.performanceId }, bar.cookie)
     expect(answered.status).toBe(200)
     const { id } = await answered.json() as { id: string }

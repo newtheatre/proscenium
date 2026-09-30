@@ -17,7 +17,7 @@ const CASE_TIMEOUT_MS = 120_000
 
 let app: AppUnderTest
 let admin: TestMember
-let accessOfficer: TestMember
+let secretary: TestMember
 let venueId: string
 
 beforeAll(async () => {
@@ -28,8 +28,8 @@ beforeAll(async () => {
   // settings route refuses a list below its floor (issue 1357), so it is narrowed in the database.
   overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
 
-  accessOfficer = await registerMember(app, 'access', generatePassword())
-  await grantRole(app, accessOfficer, 'ACCESSIBILITY_OFFICER', admin.cookie)
+  secretary = await registerMember(app, 'secretary', generatePassword())
+  await grantRole(app, secretary, 'SECRETARY', admin.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -80,9 +80,9 @@ async function verifiedPatron(companions: number, fohNote = 'Aisle seat, assista
   }, patron.cookie)).status).toBe(200)
 
   // A decision sends back the version of the declaration it read (issue 1383).
-  const read = await send('GET', `/api/admin/access-profiles/${patron.id}`, undefined, accessOfficer.cookie)
+  const read = await send('GET', `/api/admin/access-profiles/${patron.id}`, undefined, secretary.cookie)
   const { version } = (await read.json() as { profile: { version: string | null } }).profile
-  const verified = await send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote, version }, accessOfficer.cookie)
+  const verified = await send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote, version }, secretary.cookie)
   expect(verified.status).toBe(200)
   return patron
 }

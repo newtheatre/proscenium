@@ -27,7 +27,7 @@ beforeAll(async () => {
   app = await startApp()
   officer = await adminSession(app)
   barManager = await registerMember(app, 'discount-bar', barPassword)
-  await grantRole(app, barManager, 'BAR_MANAGER', officer.cookie)
+  await grantRole(app, barManager, 'FOH_MANAGER', officer.cookie)
   member = await registerMember(app, 'discount-ordinary', generatePassword())
   await setCap(20)
 }, BOOT_TIMEOUT_MS)
@@ -151,7 +151,7 @@ describe.skipIf(skip !== null)('a discount is a percentage above zero, capped by
   })
 })
 
-describe.skipIf(skip !== null)('creation and edits are bar-manager-only and audited (criterion 5)', () => {
+describe.skipIf(skip !== null)('creation and edits are the Front of House Manager\'s, and audited (criterion 5)', () => {
   test('an ordinary member may not create or edit a discount', async () => {
     expect((await createDiscount(named('Blocked'), 10, member.cookie)).status).toBe(403)
     const { id } = await aDiscount()

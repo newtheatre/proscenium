@@ -135,9 +135,9 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
   test('the night report goes to roles, taking no address, audited with the roles', async () => {
     try {
       expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_ROLES', { value: ['duty@newtheatre.org.uk'] }, cookie)).status).toBe(400)
-      expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_ROLES', { value: ['FOH_MANAGER', 'SAFETY_OFFICER'] }, cookie)).status).toBe(200)
+      expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_ROLES', { value: ['FOH_MANAGER', 'THEATRE_MANAGER'] }, cookie)).status).toBe(200)
       expect(JSON.parse(auditFor('NIGHT_REPORT_ROLES')!.detail))
-        .toMatchObject({ changes: { value: { to: ['FOH_MANAGER', 'SAFETY_OFFICER'] } } })
+        .toMatchObject({ changes: { value: { to: ['FOH_MANAGER', 'THEATRE_MANAGER'] } } })
       expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_RECIPIENTS', { value: [] }, cookie)).status).toBe(404)
     }
     finally {

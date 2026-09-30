@@ -19,13 +19,9 @@ export default defineEventHandler(async (event) => {
   // The same live gate self-claiming rides: an officer's assignment does not admit somebody a
   // training gap would otherwise refuse (E-107 criterion 3).
   const today = londonToday()
-  const refusedTraining = createError({
-    statusCode: 403,
-    statusMessage: `That member does not currently qualify for a ${saysShiftRole(held.role).toLowerCase()} shift`,
-  })
-  const eligibilities = await shiftEligibilities(event, userId, today)
-  if (!eligibilities[held.role].eligible) throw refusedTraining
-  const gate = { moduleId: (await shiftRoleRules(event))[held.role], today }
+  const eligibility = (await shiftEligibilities(event, userId, today))[held.role]
+  if (!eligibility.eligible) throw ineligibleRefusal(held.role, eligibility, subject.name)
+  const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000))
 
   const entry = auditEntry({
     actorId: resolved.account.id,
@@ -40,8 +36,9 @@ export default defineEventHandler(async (event) => {
 
   if (!applied) {
     const now = await shiftDetail(id)
-    // The gate on the write refused a record that lapsed after the check above (#1302).
-    if (now && now.status !== 'CANCELLED' && !(await shiftEligibilities(event, userId, today))[held.role].eligible) throw refusedTraining
+    // The gate on the write refused a record or a role that lapsed after the check above (#1302).
+    const again = now && now.status !== 'CANCELLED' ? (await shiftEligibilities(event, userId, today))[held.role] : null
+    if (again && !again.eligible) throw ineligibleRefusal(held.role, again, subject.name)
     throw createError({ statusCode: 409, statusMessage: reassignRefusal(now?.status ?? held.status) })
   }
 

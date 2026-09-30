@@ -398,11 +398,11 @@ describe('the waiting claims notice (issue 1005)', () => {
         ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 0)', 'unverified', 'unverified@example.invalid', 'Unverified'],
         ['INSERT INTO users (id, email, name, verified, disabled) VALUES (?, ?, ?, 1, 1)', 'disabled', 'disabled@example.invalid', 'Disabled'],
         ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'reader', 'reader@example.invalid', 'Reader'],
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g1', 'officer', 'MANAGER', now + 86_400],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g1', 'officer', 'FOH_MANAGER', now + 86_400],
         ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g2', 'officer', 'ADMIN', null],
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g3', 'lapsed', 'MANAGER', now - 1],
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g4', 'unverified', 'MANAGER', null],
-        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g5', 'disabled', 'MANAGER', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g3', 'lapsed', 'ADMIN', now - 1],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g4', 'unverified', 'ADMIN', null],
+        ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g5', 'disabled', 'ADMIN', null],
         ['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'g6', 'reader', 'THEATRE_MANAGER', null],
       ])
 

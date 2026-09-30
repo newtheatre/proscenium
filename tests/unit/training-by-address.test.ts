@@ -10,18 +10,18 @@ import type { Permission } from '#shared/utils/roles'
 const now = new Date('2026-09-24T12:00:00Z')
 
 describe('who may make the account (criterion 4)', () => {
-  test('the Training Manager holds the narrow permission and not accounts.create', () => {
-    expect(PERMISSION_MAP.TRAINING_MANAGER).toContain('training.by-address')
-    expect(PERMISSION_MAP.TRAINING_MANAGER).not.toContain('accounts.create')
+  test('the Theatre Manager holds the narrow permission and not accounts.create', () => {
+    expect(PERMISSION_MAP.THEATRE_MANAGER).toContain('training.by-address')
+    expect(PERMISSION_MAP.THEATRE_MANAGER).not.toContain('accounts.create')
     expect(PERMISSION_MAP[PROTECTED_ROLE]).toContain('training.by-address')
   })
 
-  test('the permission is held by the IT Manager and the Training Manager alone', () => {
+  test('the permission is held by the IT Manager and the Theatre Manager alone', () => {
     const holders = Object.entries(PERMISSION_MAP)
       .filter(([, permissions]) => permissions.includes('training.by-address'))
       .map(([role]) => role)
       .sort()
-    expect(holders).toEqual(['ADMIN', 'TRAINING_MANAGER'])
+    expect(holders).toEqual(['ADMIN', 'THEATRE_MANAGER'])
   })
 
   const officer = new Set<Permission>(['training.write', 'training.by-address'])

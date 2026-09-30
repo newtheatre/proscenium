@@ -6,6 +6,7 @@ import { tableColumns, whereFrom, yes, yesNo } from './list-filters'
 import { accountsList } from '#shared/utils/accounts-list'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { londonDay } from '#shared/utils/membership'
+import { withCommitteeStanding } from '#shared/utils/roles'
 import type { ListClause } from './list-filters'
 import type { FilterCondition, ListQuery } from '#shared/utils/list-filters'
 import type { SQL } from 'drizzle-orm'
@@ -19,10 +20,9 @@ const live = (now: number): SQL => or(
 )!
 
 // Exported for the retention sweep (K-111): a live role, any role, is a role-holder exemption.
-export const holdsLiveRole = (now: number, role?: string): SQL => sql`exists (
+export const holdsLiveRole = (now: number): SQL => sql`exists (
   select 1 from ${schema.roleGrants}
   where ${schema.roleGrants.userId} = ${schema.users.id}
-    and ${role ? sql`${schema.roleGrants.role} = ${role}` : sql`1 = 1`}
     and ${live(now)}
 )`
 
@@ -104,12 +104,13 @@ export interface AccountsClause extends ListClause {
   hiddenShadow: SQL | undefined
 }
 
+// Filtering on the Committee finds every post holder, not only the grants named `COMMITTEE` (0113).
 function roleCondition(condition: FilterCondition, now: number): SQL {
-  const [role] = condition.values
+  const roles = withCommitteeStanding(condition.values)
   switch (condition.operator) {
-    case 'is': return holdsLiveRole(now, role)
-    case 'not': return sql`not ${holdsLiveRole(now, role)}`
-    default: return holdsAnyLiveRole(now, condition.values)
+    case 'is': return holdsAnyLiveRole(now, roles)
+    case 'not': return sql`not ${holdsAnyLiveRole(now, roles)}`
+    default: return holdsAnyLiveRole(now, roles)
   }
 }
 

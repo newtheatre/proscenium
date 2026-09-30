@@ -3,7 +3,7 @@ title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
 audience: member
-updatedOn: 2026-09-27
+updatedOn: 2026-09-29
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -15,24 +15,22 @@ foyer: a dark screen, big buttons, the actions under your thumb, no sidebar. The
 navigation; every other screen has a back arrow to it. While you are on shift (a confirmed shift
 inside its own hours), **Tonight** is the first entry in the account menu, a bar under the header
 of every public and member page says **You are on shift tonight** with **Open Tonight**, signing
-in lands here, and the **Next shift** tile on My NNT points here. The Front of House Manager, the
-Bar Manager and the IT Manager see the menu entry all night without the bar. The address also
+in lands here, and the **Next shift** tile on My NNT points here. The Front of House Manager and
+the IT Manager see the menu entry all night without the bar. The address also
 works typed into any phone.
 
 ::callout{icon="i-lucide-info" color="info"}
 **A shift tonight is what opens these screens, not a standing role.** A confirmed door, bar or
 duty manager shift on one of tonight's performances is the ordinary way in, and it stops working
-at 04:00 with nothing to revoke. Two roles open the screens anyway when the rota is wrong at
-19:20: the Front of House Manager opens the door and the duty manager's screens, and the Bar
-Manager opens the till. Every act they take there is recorded and flagged on the night report,
+at 04:00 with nothing to revoke. One role opens the screens anyway when the rota is wrong at
+19:20: the Front of House Manager opens the door, the till and the duty manager's screens. Every act they take there is recorded and flagged on the night report,
 which is how the committee sees a rota that is not being kept; looking at a screen is not.
 ::
 
 ## If something goes wrong
 
-- **"This needs a confirmed door shift on one of tonight's performances, or the front of house
-  manager's role"** (or the same for a bar shift and the Bar Manager, or for a duty manager
-  shift): nothing tonight gives you this screen. It shows as one card in place of the screen,
+- **"This needs a confirmed door shift on one of tonight's performances, or the Front of House
+  Manager's role"** (or the same for a bar shift, or for a duty manager shift): nothing tonight gives you this screen. It shows as one card in place of the screen,
   naming tonight's duty manager to ask, with **Back to tonight**; none of the screen's own buttons is
   left to press. Find the person named, or ask the officer to assign you the shift on the rota. The
   IT Manager is never offered as the answer to a rota that is wrong. At the door the refusal also
@@ -64,14 +62,14 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 
 | Screen | A shift of | Or the role |
 | --- | --- | --- |
-| The door | Door, or the duty manager's own shift on that performance | Front of house manager |
-| Checklist, Night report, Backstage, Message tonight's audience, and the glance's comp requests, rota and backstage code | Duty manager | Front of house manager |
-| The till | Bar | Bar manager |
-| Tonight at a glance and the hub's house numbers (access wording for the door and duty manager only), Contacts and incidents, Challenge 25 | Any of the three | Either |
+| The door | Door, or the duty manager's own shift on that performance | Front of House Manager |
+| Checklist, Night report, Backstage, Message tonight's audience, and the glance's comp requests, rota and backstage code | Duty manager | Front of House Manager |
+| The till | Bar | Front of House Manager |
+| Tonight at a glance and the hub's house numbers (access wording for the door and duty manager only), Contacts and incidents, Challenge 25 | Any of the three | Front of House Manager |
 | Emergency (the duty manager's number only for tonight's team at that venue) | None: anyone signed in | None |
 
-A door shift does not open the till, and the Front of house manager's role does not either; the
-roles are not interchangeable. The one crossing is the duty manager covering the door: their
+A door shift does not open the till, and a bar shift does not open the door; the shifts are not
+interchangeable. The one crossing is the duty manager covering the door: their
 confirmed shift opens the door and pass admission for their own performance, inside their own
 hours, and nothing more. The show night runs from 04:00 to 04:00, so a performance that
 finishes at 01:00 is still tonight, and a screen left open past 04:00 is refused rather than
@@ -95,8 +93,8 @@ desk, on any day: take the person's booking reference and pass it to the Front o
    They refresh on their own every 20 seconds; a dropped connection leaves the last numbers on
    screen with a warning rather than a spinner, and the **Last synced** line at the top of every
    screen says how old what you are looking at is. Any of tonight's shifts sees them.
-4. **Your own job**, first and in gold. For the Front of House Manager, who holds the door and the
-   duty manager's screens, it is **Tonight at a glance**; on a door shift it is **Door**, which
+4. **Your own job**, first and in gold. For the Front of House Manager, who holds the door, the till
+   and the duty manager's screens, it is **Tonight at a glance**; on a door shift it is **Door**, which
    opens [the door](/docs/tonight/door) for tickets and passes alike.
 5. **Emergency** opens [the emergency card](/docs/tonight/emergency), which is cached on
    the phone the moment any show-night screen opens.

@@ -179,13 +179,13 @@ describe.skipIf(skip !== null)('auto-close within 24 hours (criteria 1, 2, 4)', 
     await fetch(`${app.baseURL}/api/admin/roles`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'cookie': admin.cookie },
-      body: JSON.stringify({ userId: standing.id, role: 'SAFETY_OFFICER' }),
+      body: JSON.stringify({ userId: standing.id, role: 'THEATRE_MANAGER' }),
     })
     const recipient = standing.email
     const stored = await fetch(`${app.baseURL}/api/admin/config/NIGHT_REPORT_ROLES`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'cookie': admin.cookie },
-      body: JSON.stringify({ value: ['SAFETY_OFFICER'] }),
+      body: JSON.stringify({ value: ['THEATRE_MANAGER'] }),
     })
     expect(stored.status).toBe(200)
 

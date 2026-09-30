@@ -1,9 +1,10 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { sql } from 'drizzle-orm'
 import { capOf, fieldOf, filterQuerySchema, operatorsOf } from '#shared/utils/list-filters'
 import { trainingModulesList } from '#shared/utils/training-modules-list'
-import { trainingModulesClause } from '#server/utils/training-modules-list'
+import { countAdminModules, listAdminModules, scopedClause, trainingModulesClause } from '#server/utils/training-modules-list'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { bindD1 } from '#tests/helpers/d1'
 import type { FilterField } from '#shared/utils/list-filters'
 import type { TestDatabase } from '#tests/helpers/database'
 
@@ -131,5 +132,60 @@ describe('the training catalogue filters by its declaration (K-129)', () => {
         }
       }
     })
+  })
+})
+
+// #1583: a lead holding no training.read is scoped by their own leads, and the statement that
+// scope builds must name the `m` alias, or SQLite answers "no such column" (G-110).
+describe('a department lead lists their own catalogue (G-110, #1583)', () => {
+  const LEAD = 'lead-1'
+  const OTHER = 'lead-2'
+  const NOW = new Date('2026-09-29T12:00:00Z')
+  const SECONDS = Math.floor(NOW.getTime() / 1000)
+  const YEAR = { boundary: '07-31', carryOverDays: 0 }
+  let database: TestDatabase
+
+  beforeEach(async () => {
+    database = await createTestDatabase()
+    database.batch([
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', LEAD, 'lead-1@e2e.newtheatre.org.uk', 'A lead'],
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', OTHER, 'lead-2@e2e.newtheatre.org.uk', 'Another lead'],
+    ])
+    for (const code of ['TECH', 'FOH', 'STAGE', 'WARDROBE']) department(database, code)
+    addModule(database, { id: 'TECH-1', department: 'TECH' })
+    addModule(database, { id: 'FOH-1', department: 'FOH' })
+    addModule(database, { id: 'STAGE-1', department: 'STAGE' })
+    addModule(database, { id: 'WARDROBE-1', department: 'WARDROBE' })
+    database.batch([
+      ['INSERT INTO department_leads (id, department, user_id, expires_at) VALUES (?, ?, ?, ?)', 'l-1', 'TECH', LEAD, null],
+      ['INSERT INTO department_leads (id, department, user_id, expires_at) VALUES (?, ?, ?, ?)', 'l-2', 'FOH', LEAD, SECONDS + 86_400],
+      ['INSERT INTO department_leads (id, department, user_id, expires_at) VALUES (?, ?, ?, ?)', 'l-3', 'STAGE', LEAD, SECONDS - 1],
+      ['INSERT INTO department_leads (id, department, user_id, expires_at) VALUES (?, ?, ?, ?)', 'l-4', 'WARDROBE', OTHER, null],
+    ])
+    bindD1(database)
+  })
+
+  afterEach(() => {
+    database.close()
+  })
+
+  test('the count and the page run, and hold only the departments the lead leads today', async () => {
+    const clause = scopedClause(trainingModulesClause(parsed({})), LEAD, NOW)
+
+    expect(await countAdminModules(clause)).toBe(2)
+    expect((await listAdminModules(clause, 25, 0, YEAR, NOW)).map(one => one.id).sort()).toEqual(['FOH-1', 'TECH-1'])
+  })
+
+  test('the scope is ANDed onto a filter, never widening it', async () => {
+    const clause = scopedClause(trainingModulesClause(parsed({ department: 'any:TECH,WARDROBE' })), LEAD, NOW)
+
+    expect(await countAdminModules(clause)).toBe(1)
+    expect((await listAdminModules(clause, 25, 0, YEAR, NOW)).map(one => one.id)).toEqual(['TECH-1'])
+  })
+
+  test('a reader with no lead scope sees every department', async () => {
+    const clause = scopedClause(trainingModulesClause(parsed({})), undefined, NOW)
+
+    expect(await countAdminModules(clause)).toBe(4)
   })
 })

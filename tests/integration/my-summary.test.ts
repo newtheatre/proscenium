@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { assembleMySummary } from '#server/utils/my-summary'
+import { saysRole } from '#shared/utils/roles'
 import type { MySummaryInputs } from '#server/utils/my-summary'
 
 // The tile grid's one allow-list (K-127 criterion 1, A-129 criterion 2): every field named here
@@ -23,7 +24,33 @@ const BASE: MySummaryInputs = {
   ticket: null,
   notifications: [],
   nextShow: null,
+  grants: [],
 }
+
+// 2027-07-31 23:59:59 London, the committee year end a default grant lapses at (0009, 0014).
+const YEAR_END = Math.floor(Date.UTC(2027, 6, 31, 22, 59, 59) / 1000)
+
+describe('a holder sees their own live roles (A-119 criterion 6, issue 1400)', () => {
+  test('each live role is named by its title and the London day it lapses, in the role order', () => {
+    const summary = assembleMySummary({
+      ...BASE,
+      grants: [
+        { role: 'THEATRE_MANAGER', expiresAt: YEAR_END },
+        { role: 'PRESIDENT', expiresAt: null },
+      ],
+    })
+    expect(summary.roles).toEqual([
+      { role: saysRole('PRESIDENT'), lapsesOn: null },
+      { role: saysRole('THEATRE_MANAGER'), lapsesOn: '2027-07-31' },
+    ])
+  })
+
+  test('a grant that has already lapsed is not listed, and a member with none has an empty list', () => {
+    const lapsed = Math.floor(BASE.now.getTime() / 1000) - 1
+    expect(assembleMySummary({ ...BASE, grants: [{ role: 'TREASURER', expiresAt: lapsed }] }).roles).toEqual([])
+    expect(assembleMySummary(BASE).roles).toEqual([])
+  })
+})
 
 describe('assembleMySummary (K-127 criterion 1)', () => {
   test('a lapsed member is given every tile, not fewer', () => {

@@ -134,7 +134,7 @@ describe.skipIf(skip !== null)('a holder is warned before a grant lapses (criter
   test('four grants lapsing together are one message naming all four', async () => {
     const userId = await holder()
     const at = now() + 9 * DAY
-    for (const role of ['FOH_MANAGER', 'BAR_MANAGER', 'SAFETY_OFFICER', 'COMMITTEE']) grant(userId, role, at)
+    for (const role of ['FOH_MANAGER', 'THEATRE_MANAGER', 'TREASURER', 'COMMITTEE']) grant(userId, role, at)
 
     await runSweep()
     const claims = claimsFor(userId).filter(row => row.type === 'role.expiring')
@@ -251,7 +251,7 @@ describe.skipIf(skip !== null)('the digest (criteria 2, 3)', () => {
     grant(userId, 'COMMITTEE', null)
 
     const before = (await runSweep()).standing.permanent
-    grant(await holder(), 'MANAGER', null)
+    grant(await holder(), 'PRESIDENT', null)
     expect((await runSweep()).standing.permanent).toBe(before + 1)
   })
 

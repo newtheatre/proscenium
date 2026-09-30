@@ -15,9 +15,10 @@ async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>
   }
 }
 
-// Any split the map could produce; FOH_MANAGER stands in for a desk role without money.refund.
+// Any split the map could produce: FOH_MANAGER stands in for a desk role without money.refund, and
+// THEATRE_MANAGER for an approving role beside ADMIN.
 function count(database: TestDatabase): number {
-  const [query, ...parameters] = boundStatement(database, officersWithoutRefundApprovalQuery(['FOH_MANAGER'], ['ADMIN', 'MANAGER']))
+  const [query, ...parameters] = boundStatement(database, officersWithoutRefundApprovalQuery(['FOH_MANAGER'], ['ADMIN', 'THEATRE_MANAGER']))
   const [row] = rows<{ count: number }>(database, query, ...parameters)
   return row?.count ?? 0
 }
@@ -34,8 +35,8 @@ function grant(database: TestDatabase, userId: string, role: string, expiresAt: 
 
 // Read from the permission map, so a role gaining or losing the desk moves the count (0090).
 describe('the roles the preview reads', () => {
-  test('no role holds the desk without refund approval, and the front of house officer approves', () => {
-    expect(refundPreviewRoles()).toEqual({ officers: [], approving: ['ADMIN', 'MANAGER', 'FOH_MANAGER'] })
+  test('no role holds the desk without refund approval, and the Front of House Manager approves', () => {
+    expect(refundPreviewRoles()).toEqual({ officers: [], approving: ['ADMIN', 'FOH_MANAGER'] })
   })
 })
 
@@ -48,16 +49,16 @@ describe('officersWithoutRefundApprovalQuery counts who self-approves without th
     })
   })
 
-  test('a box office officer who also holds MANAGER is not counted, already approving', async () => {
+  test('a box office officer who also holds THEATRE_MANAGER is not counted, already approving', async () => {
     await withDatabase((database) => {
       person(database, 'officer-1')
       grant(database, 'officer-1', 'FOH_MANAGER')
-      grant(database, 'officer-1', 'MANAGER')
+      grant(database, 'officer-1', 'THEATRE_MANAGER')
       expect(count(database)).toBe(0)
     })
   })
 
-  test('ADMIN is an approving role too, the same as MANAGER', async () => {
+  test('ADMIN is an approving role too, the same as THEATRE_MANAGER', async () => {
     await withDatabase((database) => {
       person(database, 'officer-1')
       grant(database, 'officer-1', 'FOH_MANAGER')
@@ -74,11 +75,11 @@ describe('officersWithoutRefundApprovalQuery counts who self-approves without th
     })
   })
 
-  test('a lapsed MANAGER grant does not exempt a still-live FOH_MANAGER one', async () => {
+  test('a lapsed THEATRE_MANAGER grant does not exempt a still-live FOH_MANAGER one', async () => {
     await withDatabase((database) => {
       person(database, 'officer-1')
       grant(database, 'officer-1', 'FOH_MANAGER')
-      grant(database, 'officer-1', 'MANAGER', Math.floor(Date.now() / 1000) - 3600)
+      grant(database, 'officer-1', 'THEATRE_MANAGER', Math.floor(Date.now() / 1000) - 3600)
       expect(count(database)).toBe(1)
     })
   })
@@ -97,7 +98,7 @@ describe('officersWithoutRefundApprovalQuery counts who self-approves without th
         person(database, id)
         grant(database, id, 'FOH_MANAGER')
       }
-      grant(database, 'officer-3', 'MANAGER')
+      grant(database, 'officer-3', 'THEATRE_MANAGER')
       expect(count(database)).toBe(2)
     })
   })
@@ -167,7 +168,7 @@ describe('roleHoldersWithoutFactorQuery counts who a role added to the list woul
     await withDatabase((database) => {
       signsIn(database, 'both', 'hash')
       grant(database, 'both', 'COMMITTEE')
-      grant(database, 'both', 'BAR_MANAGER')
+      grant(database, 'both', 'FOH_MANAGER')
       expect(holders(database)).toBe(1)
     })
   })

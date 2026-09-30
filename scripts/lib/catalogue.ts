@@ -12,6 +12,8 @@ export interface ParsedModule {
   expiryMode: 'NONE' | 'MONTHS' | 'ACADEMIC_YEAR'
   expiryMonths: number | null
   safetyCritical: boolean
+  // Self sign-up and asks need a live committee role (0115).
+  committeeOnly: boolean
   signoffRequired: boolean
   grantsSupervisor: boolean
   grantsTrainer: boolean
@@ -217,6 +219,11 @@ export function parseCatalogue(text: string, source = 'catalogue.csv'): ParsedMo
       throw new CatalogueParseError(source, line, id, 'Safety Critical', `unrecognised value "${safetyRaw}" (expected yes or no)`)
     }
 
+    const committeeRaw = cell(row, 'Committee Only').toLowerCase()
+    if (committeeRaw !== '' && !/^(yes|no|true|false|y|n|1|0)$/.test(committeeRaw)) {
+      throw new CatalogueParseError(source, line, id, 'Committee Only', `unrecognised value "${committeeRaw}" (expected yes or no)`)
+    }
+
     const kind = isCertification ? 'CERTIFICATION' : expiry.isBrief ? 'BRIEF' : 'MODULE'
     if (kind !== 'CERTIFICATION' && (grantsSupervisor || grantsTrainer)) {
       throw new CatalogueParseError(source, line, id, 'Grants', 'only a certification confers standing')
@@ -235,6 +242,7 @@ export function parseCatalogue(text: string, source = 'catalogue.csv'): ParsedMo
       expiryMode: brief ? 'NONE' : expiry.expiryMode,
       expiryMonths: brief ? null : expiry.expiryMonths,
       safetyCritical: /^(yes|true|y|1)$/.test(safetyRaw),
+      committeeOnly: /^(yes|true|y|1)$/.test(committeeRaw),
       signoffRequired: isCertification,
       grantsSupervisor: isCertification && grantsSupervisor,
       grantsTrainer: isCertification && grantsTrainer,

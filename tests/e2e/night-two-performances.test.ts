@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, grantCommitteeRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { sellOnTheTill } from '#tests/helpers/till'
@@ -59,6 +59,7 @@ function withBatch<T>(fn: (runner: { batch: (statements: [string, ...unknown[]][
 function shift(performanceId: string, role: string, userId: string, slot = 1): void {
   write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)',
     `${performanceId}-${role}-${slot}`, performanceId, role, slot, userId, 'CONFIRMED')
+  if (role === 'DUTY_MANAGER') grantCommitteeRole(app, userId)
 }
 
 const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice(0, 8)}`

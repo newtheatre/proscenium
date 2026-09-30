@@ -121,10 +121,10 @@ describe('configuration surface (0012, 0019)', () => {
     expect(PRIVILEGED_FLOOR.filter(role => !isRole(role))).toEqual([])
   })
 
-  // Named as well as derived: the safety officer holds safety records, so a stolen password alone
-  // must not reach the open-items list (A-112, #1211).
-  test('the safety officer needs a second factor', () => {
-    expect(PRIVILEGED_FLOOR).toContain('SAFETY_OFFICER')
+  // Named as well as derived: the Theatre Manager holds safety records, so a stolen password alone
+  // must not reach the open-items list (A-112, #1211, 0112).
+  test('the Theatre Manager needs a second factor', () => {
+    expect(PRIVILEGED_FLOOR).toContain('THEATRE_MANAGER')
   })
 
   // Chosen from the roles, never typed as a code, so a misspelt role cannot be saved (issue 1357).
@@ -250,7 +250,7 @@ describe('who the night report goes to', () => {
   test('the standing list is roles, not addresses', () => {
     expect(isConfigKey('NIGHT_REPORT_RECIPIENTS')).toBe(false)
     const schema = CONFIG_KEYS.NIGHT_REPORT_ROLES.schema
-    expect(schema.safeParse(['FOH_MANAGER', 'SAFETY_OFFICER']).success).toBe(true)
+    expect(schema.safeParse(['FOH_MANAGER', 'THEATRE_MANAGER']).success).toBe(true)
     expect(schema.safeParse(['duty@newtheatre.org.uk']).success).toBe(false)
   })
 
