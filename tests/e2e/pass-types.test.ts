@@ -33,7 +33,7 @@ beforeAll(async () => {
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   // An officer holding no ticketing permission: `ticketing.manage` alone is held by no role but the
-  // IT Manager's, which holds everything (0112), so the narrow grant has no holder to test.
+  // IT Manager's, which holds everything (0113), so the narrow grant has no holder to test.
   theatre = await registerMember(app, 'theatre', generatePassword())
   await grantRole(app, theatre, 'THEATRE_MANAGER', officer.cookie)
 }, BOOT_TIMEOUT_MS)

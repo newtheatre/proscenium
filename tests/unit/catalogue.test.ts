@@ -79,7 +79,7 @@ describe('a row becomes a module', () => {
       .toThrow(CatalogueParseError)
   })
 
-  // Decision 0114: a column the subcommittee's older sheets do not have reads as open to everybody.
+  // Decision 0115: a column the subcommittee's older sheets do not have reads as open to everybody.
   test('the committee-only column reads yes and no, and its absence as no', () => {
     const withColumn = `${HEADER},Committee Only\n`
       + 'ADMN,ADMN-201,Committee Operations,,,,Academic year,,,,ACTIVE,,yes\n'
@@ -100,7 +100,7 @@ describe('a row becomes a module', () => {
   })
 })
 
-// The 26 September training decisions as the file carries them (0114, issues 1532 and 1544).
+// The 26 September training decisions as the file carries them (0115, issues 1532 and 1544).
 describe('the draft catalogue itself', () => {
   test('front of house management comes before the door, the bar and the duty manager', async () => {
     const byId = new Map((await readCatalogue()).map(module => [module.id, module]))

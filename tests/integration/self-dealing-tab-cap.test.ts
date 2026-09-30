@@ -4,7 +4,7 @@ import { ownTabCapOverride } from '#shared/utils/self-dealing'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// F-108 criterion 4, 0115: an override lifts the cap only when someone other than the holder makes
+// F-108 criterion 4, 0116: an override lifts the cap only when someone other than the holder makes
 // it. The guard rides the charge's own insert, so the till's refusal is for the reader alone.
 
 const CAP = 2000
@@ -37,7 +37,7 @@ function charge(id: string, holderId: string, actorId: string, overriddenBy: str
   `, id, actorId, holderId, ...parameters).length
 }
 
-describe('nobody overrides the cap on their own tab (F-108 criterion 4, 0115)', () => {
+describe('nobody overrides the cap on their own tab (F-108 criterion 4, 0116)', () => {
   test('a manager\'s override past the cap on their own tab writes nothing', () => {
     expect(charge('own-override', 'u-manager', 'u-manager', 'u-manager')).toBe(0)
     expect(rows(database, 'SELECT id FROM ledger_entries WHERE id = ?', 'own-override')).toEqual([])

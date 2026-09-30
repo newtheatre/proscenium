@@ -1,4 +1,4 @@
--- A committee post holds one role (0112, A-135): the bar folds into front of house, safety and
+-- A committee post holds one role (0113, A-135): the bar folds into front of house, safety and
 -- training into the Theatre Manager, accessibility becomes the Secretary's, and MANAGER retires.
 -- role_grants is not append-only, so this updates in place; D1 runs the file as one transaction.
 -- Guard first: a live retired grant whose holder holds neither the live post role nor an IT Manager
@@ -137,7 +137,7 @@ DELETE FROM role_grants
 WHERE role IN ('MANAGER', 'BAR_MANAGER', 'SAFETY_OFFICER', 'TRAINING_MANAGER', 'ACCESSIBILITY_OFFICER');
 --> statement-breakpoint
 -- A post role carries the Committee's standing, so a Committee grant it outlasts is removed. One
--- beside the IT Manager's alone stays: the function is not a post (0112).
+-- beside the IT Manager's alone stays: the function is not a post (0113).
 INSERT INTO audit_log (id, actor_id, action, target, detail)
 SELECT
   lower(hex(randomblob(16))),

@@ -34,7 +34,7 @@ beforeAll(async () => {
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   // Both roles, plus MFA: ADMIN is privileged (0037/A-112). ticketing.manage, the IT Manager's alone
-  // (0112), is what decides a comp request rather than what collects one (D-117).
+  // (0113), is what decides a comp request rather than what collects one (D-117).
   const managerPassword = generatePassword()
   manager = await registerMember(app, 'manager', managerPassword)
   await request(app, 'POST', '/api/admin/roles', { userId: manager.id, role: 'FOH_MANAGER' }, officer.cookie)

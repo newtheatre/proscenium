@@ -10,7 +10,7 @@ import { skipReason, startApp } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
-// Decision 0114 through the real routes, each refusal naming the committee role; what each writing
+// Decision 0115 through the real routes, each refusal naming the committee role; what each writing
 // statement refuses is pinned in `tests/integration/duty-manager-committee.test.ts`.
 
 const skip = skipReason()

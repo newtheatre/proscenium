@@ -197,7 +197,7 @@ describe.skipIf(skip !== null)('the till opens only to tonight\'s bar authority 
     expect(refusal).toContain('Front of House Manager\'s role')
   })
 
-  test('the Theatre Manager does not open the till: no other officer role holds the bar (0110)', async () => {
+  test('the Theatre Manager does not open the till: no other officer role holds the bar (0111)', async () => {
     const response = await openTill(studio.venueId, theatre.cookie)
     expect(response.status).toBe(403)
     expect(await message(response)).toContain('Front of House Manager\'s role')

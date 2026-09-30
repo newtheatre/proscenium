@@ -1,7 +1,7 @@
 import { saysMoney } from './bar'
 
 // The words for an act refused because it is the officer's own, each naming who does it instead.
-// The rule itself rides the write (0115); these only say why that write changed nothing.
+// The rule itself rides the write (0116); these only say why that write changed nothing.
 
 export const OWN_TAB_VOID = 'Nobody voids a charge on their own tab: someone else holding the Front of House Manager\'s or the IT Manager\'s role voids it'
 

@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   const closure = signUpClosure(windowOf(session), closesHours, new Date())
   if (closure) throw createError({ statusCode: 409, statusMessage: saysClosure(closure) })
 
-  // Criterion 8: self sign-up only, so a trainer's register never reads this (0114).
+  // Criterion 8: self sign-up only, so a trainer's register never reads this (0115).
   const reserved = session.modules.filter(module => module.committeeOnly)
   if (reserved.length > 0 && !(await hasCommitteeRole(account.id))) {
     throw createError({

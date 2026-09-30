@@ -18,7 +18,7 @@ export type NightAuthorityVia = 'SHIFT' | 'OFFICER' | 'COVER'
 export const OFFICER_BYPASS_ACTION = 'night.officer-bypass'
 
 // The bypass permission each shift role stands on. A door shift does not open the till, so no two
-// shift roles share one (E-111 criterion 1); the one officer role holds all three (0110).
+// shift roles share one (E-111 criterion 1); the one officer role holds all three (0111).
 export const NIGHT_ROLE_PERMISSION: Record<NightRole, Permission> = {
   DUTY_MANAGER: 'night.manage',
   DOOR: 'night.door',
@@ -112,7 +112,7 @@ export function claimedShiftRefusal(role: NightRole): { statusCode: 403, statusM
 }
 
 // A confirmed duty manager shift whose holder holds no live committee role opens nothing, and
-// says what is missing rather than that there is no shift (0114, E-111 criterion 1).
+// says what is missing rather than that there is no shift (0115, E-111 criterion 1).
 export function committeeShiftRefusal(): { statusCode: 403, statusMessage: string } {
   return {
     statusCode: 403,
@@ -156,7 +156,7 @@ export function saysOfficerBypass(line: OfficerBypassLine): string {
 }
 
 // Why one role refused a caller, most specific first: a shift's hours, the request or an officer's
-// standing, a shift its holder's standing cannot use (0114), a claim waiting, no shift (E-111).
+// standing, a shift its holder's standing cannot use (0115), a claim waiting, no shift (E-111).
 export const NIGHT_REFUSAL_KINDS = ['OUTSIDE_WINDOW', 'ASKED', 'NO_STANDING', 'CLAIMED', 'NO_SHIFT'] as const
 export type NightRefusalKind = (typeof NIGHT_REFUSAL_KINDS)[number]
 

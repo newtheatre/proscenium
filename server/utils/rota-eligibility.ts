@@ -11,12 +11,12 @@ export interface ShiftEligibility {
   // What would unlock it, for a role the member does not qualify for. Null when eligible, and
   // when nothing a member can act on is named: no module, or one that is not published (issue 1318).
   unlockedBy: { moduleId: string, moduleName: string } | null
-  // The role needs a live committee role the member does not hold, which no training opens (0114).
+  // The role needs a live committee role the member does not hold, which no training opens (0115).
   needsCommittee: boolean
 }
 
 // The 403 a claim or an officer's assignment raises on the live check: a missing committee role is
-// named as that, never as a training gap. `memberName` is set when an officer is told (0114).
+// named as that, never as a training gap. `memberName` is set when an officer is told (0115).
 export function ineligibleRefusal(role: ShiftRole, eligibility: ShiftEligibility, memberName?: string): H3Error {
   if (eligibility.needsCommittee) {
     return createError({ statusCode: 403, statusMessage: forCommitteeMembers(role, memberName ? `${memberName} does not` : 'you do not') })
@@ -53,7 +53,7 @@ export async function shiftEligibilities(
 
   const result = {} as Record<ShiftRole, ShiftEligibility>
   for (const line of lines) {
-    // Checked first: a grant narrows who may take the shift and training never widens it (0114).
+    // Checked first: a grant narrows who may take the shift and training never widens it (0115).
     if (needsCommitteeRole(line.role) && !committee) {
       result[line.role] = { eligible: false, unlockedBy: null, needsCommittee: true }
       continue

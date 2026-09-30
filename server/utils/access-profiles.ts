@@ -253,7 +253,7 @@ async function clearCardNumber(row: AccessProfileRow, userId: string): Promise<A
 }
 
 // A fresh or lapsed declaration, as the officer read it, matched again at the write (D-127 criterion
-// 5, 0003; issue 1383), and never the officer's own (criterion 2, 0115).
+// 5, 0003; issue 1383), and never the officer's own (criterion 2, 0116).
 export const decisionPredicate = (now: number, version: string | null, officerId: string) =>
   sql`(status = 'PENDING' OR (status = 'VERIFIED' AND expires_at IS NOT NULL AND expires_at <= ${now})) AND encryption_iv IS ${version} AND user_id <> ${officerId}`
 

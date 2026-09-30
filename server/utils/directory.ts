@@ -104,7 +104,7 @@ export interface AccountsClause extends ListClause {
   hiddenShadow: SQL | undefined
 }
 
-// Filtering on the Committee finds every post holder, not only the grants named `COMMITTEE` (0112).
+// Filtering on the Committee finds every post holder, not only the grants named `COMMITTEE` (0113).
 function roleCondition(condition: FilterCondition, now: number): SQL {
   const roles = withCommitteeStanding(condition.values)
   switch (condition.operator) {

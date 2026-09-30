@@ -67,7 +67,7 @@ async function signUp(): Promise<void> {
     >
       {{ saysTrainingAction(action) }}
     </UBadge>
-    <!-- Shown, not hidden: the committee's own training stays visible, with why it is not offered (0114). -->
+    <!-- Shown, not hidden: the committee's own training stays visible, with why it is not offered (0115). -->
     <UButton
       v-else-if="action.kind === 'COMMITTEE_ONLY'"
       color="neutral"

@@ -8,8 +8,8 @@
   the Front of House Manager now holds the programme's configuration
 - Amended: 26 September 2026 by 0094, under which Tonight is offered by one fact, a confirmed shift
   in its window or a night permission, first in the account menu, with an on-shift bar and landing
-- Amended: 29 September 2026 by 0112, which retires the Training Manager role named below; the
-  Theatre Manager now holds the training catalogue (0111)
+- Amended: 29 September 2026 by 0113, which retires the Training Manager role named below; the
+  Theatre Manager now holds the training catalogue (0112)
 
 ## Context
 

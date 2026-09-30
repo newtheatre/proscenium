@@ -1,4 +1,4 @@
-# 0113: The IT Manager's role holds every permission, and nobody grants themselves a role
+# 0114: The IT Manager's role holds every permission, and nobody grants themselves a role
 
 - Status: Accepted (IT Manager, 29 September 2026)
 - Date: 2026-09-29
@@ -18,15 +18,15 @@ Committee fills the post.
 
 The same recommendation also refused a grant to the granter's own account. Only `ADMIN` holds
 `roles.grant`, so the refusal is about committee standing, not permissions: an IT Manager who grants
-themselves `COMMITTEE` or a post role would take the Committee's standing (0112), which reaches tab
-credit, committee notices and duty manager eligibility (0114), without anybody else deciding it.
+themselves `COMMITTEE` or a post role would take the Committee's standing (0113), which reaches tab
+credit, committee notices and duty manager eligibility (0115), without anybody else deciding it.
 
 ## Decision
 
 **`ADMIN` holds every permission.** `PERMISSION_MAP.ADMIN` stays `PERMISSIONS`, with no exceptions.
 R4's narrowing is not adopted. `PROTECTED_ROLE` keeps its meaning: `ADMIN` alone holds `roles.*`,
 `accounts.create`, `accounts.disable`, `accounts.merge`, `config.write`, `backups.*`,
-`training.override`, `comms.*`, `finance.reopen`, and, since `MANAGER` retired (0112),
+`training.override`, `comms.*`, `finance.reopen`, and, since `MANAGER` retired (0113),
 `fellowships.write`, `members.write` and `ticketing.manage`.
 
 **Nobody grants themselves a role.** A grant whose holder is the granter's own account is refused
@@ -37,7 +37,7 @@ with that person as the actor.
 ## Consequences
 
 - A-118 gains a criterion for the self-grant refusal.
-- The money separation pinned by 0112's unit test excepts `ADMIN` permanently rather than until
+- The money separation pinned by 0113's unit test excepts `ADMIN` permanently rather than until
   R4. What answers the concentration is who holds `ADMIN`: the Archivist and one delegate, with the
   President reviewing their grants and settings changes, and every act audited.
 - An IT Manager who also holds a post (the Archivist, whose post is `COMMITTEE`) receives that

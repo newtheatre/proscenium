@@ -1,4 +1,4 @@
-# 0110: The Front of House Manager holds the bar
+# 0111: The Front of House Manager holds the bar
 
 - Status: Accepted (IT Manager, 29 September 2026)
 - Date: 2026-09-29
@@ -27,7 +27,7 @@ role". The role audit against the constitution (26 September, on issue #1211) re
 **`FOH_MANAGER` holds the bar.** It gains `bar.read`, `bar.write` and `night.till`, alongside the
 `bar.stocktake`, `night.door` and `night.manage` it already held. `NIGHT_ROLE_OFFICER.BAR` names the
 Front of House Manager, so every till refusal points at a post that exists. `BAR_MANAGER` leaves
-`ROLES` and its grants fold into the holder's `FOH_MANAGER` grant (0112, migration 0130).
+`ROLES` and its grants fold into the holder's `FOH_MANAGER` grant (0113, migration 0130).
 
 **One officer role holds all three bypasses.** A shift still opens only its own screen: a door
 shift does not open the till (E-111 criterion 1). The officer's bypass is still 0044's: tonight
@@ -50,14 +50,14 @@ House Manager and the IT Managers reach, and are approved by tonight's duty mana
 Manager; the route refuses the requester. Bar comps and cap overrides are requested by volunteers
 on a bar shift and approved by tonight's duty manager or the Front of House Manager; F-110 criterion
 1 refuses a requester's own comp. Self-dealing on voids, cap overrides, refunds and access
-verification is refused where the write happens (0115).
+verification is refused where the write happens (0116).
 
 ## Consequences
 
 - One grant sets prices, works the desk, refunds on any day, adjusts stock, applies a stocktake,
   voids tab charges and opens all three show-night screens without a shift. The live holder already
   held all of it through two grants, so nobody's exposure changes on the day this lands.
-- The controls that answer the concentration ship with it: 0115's self-dealing refusals, the
+- The controls that answer the concentration ship with it: 0116's self-dealing refusals, the
   night report's per-role bypass flags (0098, E-123), and the Treasurer's review of the Z variance
   and any write-off (I-104), which 0097's till-close reader total feeds.
 - 0044's clause "and neither does the front of house officer's role" no longer holds; "a door

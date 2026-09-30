@@ -1,7 +1,7 @@
 import { nextCommitteeYearEnd } from './london'
 
 // One role per committee post with standing work, `COMMITTEE` for every other post, and `ADMIN`
-// for the Archivist's IT function (0112); migration/role-map.json maps the old estate onto these.
+// for the Archivist's IT function (0113); migration/role-map.json maps the old estate onto these.
 export const ROLES = [
   'ADMIN',
   'PRESIDENT',
@@ -15,11 +15,11 @@ export const ROLES = [
 export type Role = (typeof ROLES)[number]
 
 // What "the Committee" means wherever a rule names it: any post role. `ADMIN` is a function its
-// delegate may hold without a post, so it carries no committee standing (0112).
+// delegate may hold without a post, so it carries no committee standing (0113).
 export const COMMITTEE_ROLES: readonly Role[] = ['PRESIDENT', 'SECRETARY', 'TREASURER', 'FOH_MANAGER', 'THEATRE_MANAGER', 'COMMITTEE']
 
 // A stored list naming `COMMITTEE` means every post role, so a setting or an audience written as
-// "the Committee" reaches a post holder who holds one grant, not two (0112).
+// "the Committee" reaches a post holder who holds one grant, not two (0113).
 export function withCommitteeStanding(roles: readonly string[]): string[] {
   return roles.includes('COMMITTEE') ? [...new Set([...roles, ...COMMITTEE_ROLES])] : [...roles]
 }
@@ -48,9 +48,9 @@ export const PERMISSIONS = [
   'rooms.write',
   'training.read',
   'training.write',
-  // Appointing a department's stewards: the Theatre Manager's, as owner of the catalogue (G-110, 0111).
+  // Appointing a department's stewards: the Theatre Manager's, as owner of the catalogue (G-110, 0112).
   'training.leads',
-  // Taking a record away is the Theatre Manager's (G-122 criterion 1, 0111); signing one off as
+  // Taking a record away is the Theatre Manager's (G-122 criterion 1, 0112); signing one off as
   // never expiring is the IT Manager's break-glass, absent from every screen (G-120 criterion 5).
   'training.revoke',
   'training.override',
@@ -71,14 +71,14 @@ export const PERMISSIONS = [
   // never derived from a shift (0102).
   'money.refund',
   // Deciding an access profile declaration: sighting evidence, agreeing the door's wording. The
-  // Secretary and Welfare Officer's, never general box office's (D-127 criterion 2, 0112).
+  // Secretary and Welfare Officer's, never general box office's (D-127 criterion 2, 0113).
   'access.verify',
   // The bar's catalogue and its stock register: the Front of House Manager's sit-down work
-  // (0110). Selling over the bar is operational and derives from tonight (0009, F-111).
+  // (0111). Selling over the bar is operational and derives from tonight (0009, F-111).
   'bar.read',
   'bar.write',
   // Opening, counting and applying a stocktake, without the catalogue or the rest of the register
-  // (0099). The Front of House Manager holds it beside `bar.write` since the bar joined the post (0110).
+  // (0099). The Front of House Manager holds it beside `bar.write` since the bar joined the post (0111).
   'bar.stocktake',
   // The rota is planned days ahead at a desk, so administering it is a standing permission like
   // the programme's. Working tonight is not, and derives from a shift (0009, 0046).
@@ -93,7 +93,7 @@ export const PERMISSIONS = [
   'emergency-card.read',
   'emergency-card.write',
   // The Theatre Manager's safety work: which severities route to them, reading and closing the
-  // open-items list, which the President also reads (0111, 0112). Never from a shift (E-116).
+  // open-items list, which the President also reads (0112, 0113). Never from a shift (E-116).
   'safety.read',
   'safety.write',
   // Exporting the licensing register's history. A shift alone reads tonight's entries; taking a
@@ -142,25 +142,25 @@ export const OPERATIONAL_PERMISSIONS: readonly Permission[] = ['night.door', 'ni
 // Deliberately sparse: a role earns a permission when the thing it unlocks exists. Guessing
 // now would grant authority over features nobody has reviewed.
 export const PERMISSION_MAP: Record<Role, readonly Permission[]> = {
-  // Every permission, deliberately: the IT Manager is the recovery route for every other post (0113).
+  // Every permission, deliberately: the IT Manager is the recovery route for every other post (0114).
   ADMIN: PERMISSIONS,
   // Oversight of committee members reads the trail (4.1.2), and safety is shared with the Theatre
-  // Manager (4.1.1), so it reads incident text: a named widening of health data (0112).
+  // Manager (4.1.1), so it reads incident text: a named widening of health data (0113).
   PRESIDENT: ['accounts.read', 'audit.read', 'audit.write', 'safety.read', 'reports.read', 'finance.summary'],
   // The official welfare officer verifies access declarations, never the box office (D-127
-  // criterion 2), and runs the fellowship meeting (4.2.1, 3.7.1, 0112).
+  // criterion 2), and runs the fellowship meeting (4.2.1, 3.7.1, 0113).
   SECRETARY: ['access.verify', 'fellowships.read', 'reports.read', 'finance.summary'],
   // Keeps the record and resolves discrepancies, and never takes the money (4.3, 7.2). Reopening a
   // period stays the IT Manager's (I-107 criterion 4).
   TREASURER: ['finance.read', 'finance.write', 'finance.export', 'finance.summary', 'reports.read'],
   // Sales and the bar, the reader, the rota and show nights (4.4.1 to 4.4.3): all three night
-  // permissions in one grant (0044, 0090, 0102, 0110). Never `finance.write` or `access.verify`.
+  // permissions in one grant (0044, 0090, 0102, 0111). Never `finance.write` or `access.verify`.
   FOH_MANAGER: ['ticketing.read', 'ticketing.write', 'ticketing.export', 'money.refund', 'bar.read', 'bar.write', 'bar.stocktake', 'night.door', 'night.till', 'night.manage', 'rota.read', 'rota.write', 'checklist.read', 'checklist.write', 'emergency-card.read', 'emergency-card.write', 'age-checks.export', 'board.read', 'board.write', 'reports.read', 'finance.summary'],
   // Spaces, health and safety, and the training catalogue with its leads (4.11.4, 4.11.6, 6.5,
-  // 9.6, 0111). `training.override` stays the IT Manager's break-glass (G-120 criterion 5).
+  // 9.6, 0112). `training.override` stays the IT Manager's break-glass (G-120 criterion 5).
   THEATRE_MANAGER: ['accounts.read', 'members.read', 'config.read', 'rooms.read', 'rooms.write', 'safety.read', 'safety.write', 'training.read', 'training.write', 'training.leads', 'training.revoke', 'training.by-address', 'emergency-card.read', 'emergency-card.write', 'reports.read', 'finance.summary'],
   // Season aggregates only (E-126, I-105 criterion 5). Every post role carries these too, so a
-  // post holder never needs this grant beside their own (0112).
+  // post holder never needs this grant beside their own (0113).
   COMMITTEE: ['finance.summary', 'reports.read'],
 }
 
@@ -210,7 +210,7 @@ const ROLE_WORDING: Record<Role, string> = {
   COMMITTEE: 'Committee',
 }
 
-// Grantable no longer, but named by audit entries written before they were retired (0090, 0112).
+// Grantable no longer, but named by audit entries written before they were retired (0090, 0113).
 const RETIRED_ROLE_WORDING: Record<string, string> = {
   BOX_OFFICE: 'Box Office Manager',
   FRONT_OF_HOUSE: 'Front of House',

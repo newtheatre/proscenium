@@ -122,7 +122,7 @@ describe('configuration surface (0012, 0019)', () => {
   })
 
   // Named as well as derived: the Theatre Manager holds safety records, so a stolen password alone
-  // must not reach the open-items list (A-112, #1211, 0111).
+  // must not reach the open-items list (A-112, #1211, 0112).
   test('the Theatre Manager needs a second factor', () => {
     expect(PRIVILEGED_FLOOR).toContain('THEATRE_MANAGER')
   })

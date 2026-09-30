@@ -28,7 +28,7 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 
 - Role: Administrator
 - Phase: MVP
-- Story: As the President, I want every privileged action in one append-only audit trail so that accountability survives the people involved. Amended 29 September 2026 by decision 0112: the trail's reader is the President (constitution 4.1.2), as J-103 records.
+- Story: As the President, I want every privileged action in one append-only audit trail so that accountability survives the people involved. Amended 29 September 2026 by decision 0113: the trail's reader is the President (constitution 4.1.2), as J-103 records.
 - Depends on: none
 - Acceptance criteria:
   1. Every privileged mutation writes an audit entry recording actor, action, target, timestamp and a structured before/after diff, in the same transaction as the mutation itself.
@@ -56,7 +56,7 @@ Stories: 17 (10 MVP, 6 V2, 1 resolved: J-108 superseded by 0030).
 
 - Role: President
 - Phase: MVP
-- Story: As the President, I want to search the trail and record actions taken outside the system so that the record of what happened is complete and findable. Amended 29 September 2026 by decision 0112: the trail (`audit.read`, `audit.write`) is the President's, for the oversight and accountability of committee members (constitution 4.1.2), and the IT Manager's; the Theatre Manager no longer holds it.
+- Story: As the President, I want to search the trail and record actions taken outside the system so that the record of what happened is complete and findable. Amended 29 September 2026 by decision 0113: the trail (`audit.read`, `audit.write`) is the President's, for the oversight and accountability of committee members (constitution 4.1.2), and the IT Manager's; the Theatre Manager no longer holds it.
 - Depends on: J-101
 - Acceptance criteria:
   1. The trail is filterable by actor, action, target, source module and date range; results page in SQL and return a pagination envelope, never a bare array.

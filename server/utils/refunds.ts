@@ -36,7 +36,7 @@ export interface RefundTicketResult {
   entryId?: string
 }
 
-// Nobody refunds a booking in their own name (criterion 7, 0115): a clause on the claim itself.
+// Nobody refunds a booking in their own name (criterion 7, 0116): a clause on the claim itself.
 const notTheirOwnBooking = (reservationId: string, actorId: string) =>
   sql`NOT EXISTS (SELECT 1 FROM reservations WHERE id = ${reservationId} AND user_id = ${actorId})`
 

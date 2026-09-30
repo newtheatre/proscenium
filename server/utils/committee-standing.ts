@@ -7,7 +7,7 @@ import { COMMITTEE_ROLES } from '#shared/utils/roles'
 import type { SQL } from 'drizzle-orm'
 
 // A live grant of any post role or `COMMITTEE` on a usable account, never `ADMIN` alone: what "for
-// committee members" means where a duty manager shift or a committee-only module is written (0114).
+// committee members" means where a duty manager shift or a committee-only module is written (0115).
 export function holdsCommitteeRole(userId: string | SQL, now: number): SQL {
   return holdsLiveGrant(typeof userId === 'string' ? sql`${userId}` : userId, COMMITTEE_ROLES, now)
 }

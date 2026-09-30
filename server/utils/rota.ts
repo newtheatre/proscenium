@@ -546,7 +546,7 @@ export interface ClaimScope { table: string, event: string }
 export const SHIFT_CLAIM_SCOPE: ClaimScope = { table: 'shifts', event: 'performance_id' }
 
 // The role's gating module and London's today, as the live check read them (E-104 criterion 1);
-// `committeeAt` is the instant a duty manager shift's committee role is read at (0114).
+// `committeeAt` is the instant a duty manager shift's committee role is read at (0115).
 export interface TrainingGate { moduleId: string | null, today: string, committeeAt?: number }
 
 // Every write that confirms somebody on a shift builds its gate here, so none can forget the role.
@@ -837,12 +837,12 @@ export interface ConfirmedShiftTonight {
 export interface ConfirmedShiftScope {
   venueId?: string
   performanceId?: string
-  // Only for wording a refusal: whether the shift is there and only the committee role is not (0114).
+  // Only for wording a refusal: whether the shift is there and only the committee role is not (0115).
   anyStanding?: boolean
 }
 
 // A confirmed shift of this role, held by this current account, on tonight's performance (E-102 c4);
-// disabled and anonymised are re-checked, and a duty manager's needs a live committee role (0114).
+// disabled and anonymised are re-checked, and a duty manager's needs a live committee role (0115).
 export function confirmedShiftsTonightQuery(
   userId: string,
   role: ShiftRole,

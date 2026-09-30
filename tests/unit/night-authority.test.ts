@@ -55,7 +55,7 @@ describe('the night roles are the three the rota staffs (E-111 criterion 1)', ()
   })
 
   // A shift opens only its own screen (E-111 criterion 1, F-101 criterion 2); the one officer role
-  // holds all three, because the constitution gives the post the bar as well as the house (0110).
+  // holds all three, because the constitution gives the post the bar as well as the house (0111).
   test('the Front of House Manager\'s role holds all three bypasses', () => {
     expect(PERMISSION_MAP.FOH_MANAGER.filter(permission => OPERATIONAL_PERMISSIONS.includes(permission)).sort())
       .toEqual(['night.door', 'night.manage', 'night.till'])

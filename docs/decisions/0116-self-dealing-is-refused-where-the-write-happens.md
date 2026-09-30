@@ -1,4 +1,4 @@
-# 0115: Self-dealing is refused where the write happens
+# 0116: Self-dealing is refused where the write happens
 
 - Status: Accepted (IT Manager, 29 September 2026)
 - Date: 2026-09-29
@@ -7,13 +7,13 @@
 ## Context
 
 The role audit of September 2026 (issue 1211, section 4 and R1) put the whole bar in the Front of
-House Manager's grant (0110). One grant now sells, sets prices, runs the desk, refunds paid tickets
+House Manager's grant (0111). One grant now sells, sets prices, runs the desk, refunds paid tickets
 on any day (0102), voids tab charges and overrides the tab cap. Comps already need a second person:
 F-110 criterion 1 and D-117 refuse the requester's own approval, on the claim itself. Four other acts
 had no such check. An officer could void a charge on their own tab, wave a charge to their own tab
 past the cap, refund a ticket on their own booking, and, holding `access.verify`, verify their own
 access declaration, which carries up to two companion seats priced at zero (D-127 criterion 1,
-D-128 criterion 3). The IT Manager holds every permission (0113), so the same was true of them.
+D-128 criterion 3). The IT Manager holds every permission (0114), so the same was true of them.
 
 Approving a desk comp gives a seat away on any day. It is decided by tonight's duty manager or an IT
 Manager, and asked nothing more of them than the session they signed in with, however long ago

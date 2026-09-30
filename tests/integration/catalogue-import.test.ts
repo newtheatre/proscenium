@@ -224,7 +224,7 @@ describe('a rehearsal runs again without doubling the catalogue', () => {
     })
   })
 
-  // The old estate has no such flag, so marking a module committee-only is a console edit (0114).
+  // The old estate has no such flag, so marking a module committee-only is a console edit (0115).
   test('a module imports open to everybody, and a console edit to committee-only survives a re-run', async () => {
     const estate = oldEstate()
     await withTarget((target) => {

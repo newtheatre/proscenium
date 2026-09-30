@@ -499,7 +499,7 @@ Open questions:
   7. Nobody refunds a ticket on a booking in their own name, whatever their role and whatever
      `REFUND_PAID_REQUIRES_MANAGER` says: the ticket's claim refuses it, and the refusal names the
      Front of House Manager or an IT Manager. Taking the money for somebody else's booking is not
-     refused (0115).
+     refused (0116).
 - Source: Prompt Book D-4, P2, P4; audit PR-6; Get-In part 2 (refunds: carry), part 5 (double
   refund as named regression case)
 
@@ -513,7 +513,7 @@ Open questions:
 - Acceptance criteria:
   1. A comp is requested with a mandatory reason; approval authority is tonight's confirmed duty
      manager shift or a manager role, never general box office. Amended 29 September 2026 by
-     decision 0112: the manager role is the IT Manager's (`ticketing.manage`), the Manager role
+     decision 0113: the manager role is the IT Manager's (`ticketing.manage`), the Manager role
      having retired; the substance is unchanged.
   2. A pending comp request expires after 10 minutes, with expiry derived at read time so a slow
      sweep cannot extend it; approval claims the decision atomically before any ticket or ledger
@@ -525,7 +525,7 @@ Open questions:
   5. A declined request records the decision and decliner; the requester sees the outcome.
   6. The requester never decides their own request, and approving one needs a credential
      re-asserted within `REAUTH_WINDOW_MINUTES` (A-128): a stale session opens the
-     re-authentication step and nothing is approved until it is answered (0115).
+     re-authentication step and nothing is approved until it is answered (0116).
 - Source: Prompt Book D-5, P3, P4, I-1; audit PR-5, PR-10
 
 ## D-118: Reinstatement with capacity re-check
@@ -654,7 +654,7 @@ Open questions:
      products resolve for every held pass and report.
   4. Covered shows can be extended during the season (additive); removing a covered show from a
      product with live passes requires a manager role and is audited. Amended 29 September 2026 by
-     decision 0112: the manager role is the IT Manager's (`ticketing.manage`), the Manager role
+     decision 0113: the manager role is the IT Manager's (`ticketing.manage`), the Manager role
      having retired; the substance is unchanged. Amended 26 September 2026
      (issue 1323): the cover is also chosen where the show is put on sale. The show's publish sheet
      lists each pass on sale whose validity holds one of the show's performances, with an Include
@@ -763,7 +763,7 @@ Open questions:
      front-of-house consent given, and not expired; verification is performed by the
      Secretary and Welfare Officer's role, never by general box office. Nobody verifies or
      declines their own declaration: the `UPDATE` that decides it carries the refusal, not a read
-     before it (0115). Amended 29 September 2026 by decision 0112: the accessibility officer's
+     before it (0116). Amended 29 September 2026 by decision 0113: the accessibility officer's
      role gave way to the official welfare officer's (constitution 4.2.1).
   3. The door sees agreed operational wording only (for example "aisle seat, assistance dog"),
      never need flags, diagnosis or the applicant's own note; night reports carry counts only.

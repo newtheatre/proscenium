@@ -1,4 +1,4 @@
-# 0111: The Theatre Manager holds safety and the training catalogue
+# 0112: The Theatre Manager holds safety and the training catalogue
 
 - Status: Accepted (IT Manager, 29 September 2026)
 - Date: 2026-09-29
@@ -29,7 +29,7 @@ and Safety documentation, the Training Policy among it, with the President (9.5,
 which it shares with the Front of House Manager because fire training (4.11.6) and the FoH speech
 (4.4.2) both rest on it. It keeps the rooms (4.11.4), `accounts.read`, `members.read` and
 `config.read`. `SAFETY_OFFICER` and `TRAINING_MANAGER` leave `ROLES`, and their grants fold into the
-holder's `THEATRE_MANAGER` grant or, for an IT Manager, into `ADMIN` (0112, migration 0130).
+holder's `THEATRE_MANAGER` grant or, for an IT Manager, into `ADMIN` (0113, migration 0130).
 
 **`training.override` stays the IT Manager's** break-glass (G-120 criterion 5).
 
@@ -38,7 +38,7 @@ the training expiry digest now reads the roles holding `training.revoke` instead
 `['ADMIN', 'TRAINING_MANAGER']`.
 
 **The Theatre Manager gives up the audit trail and the fellowship roll.** `audit.*` moves to the
-President (4.1.2, 0112); the roll is the Archivist's (3.7.3) through `ADMIN`, read by the Secretary
+President (4.1.2, 0113); the roll is the Archivist's (3.7.3) through `ADMIN`, read by the Secretary
 who runs the fellowship meeting (3.7.1).
 
 ## Consequences
@@ -63,4 +63,4 @@ who runs the fellowship meeting (3.7.1).
 - **Give training to `ADMIN`.** It widens a system function further, and the catalogue is
   committee business, not IT.
 - **Give safety to the President.** 4.1.1 shares keeping the Theatre safe, but 4.11.6 names the
-  Theatre Manager's work; the President reads the open items (0112) and closes none.
+  Theatre Manager's work; the President reads the open items (0113) and closes none.

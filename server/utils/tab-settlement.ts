@@ -46,7 +46,7 @@ export const OUTSTANDING_CHARGE = sql`
 `
 
 // The cap as a condition on the charge's own insert, re-summed as it is written (F-108 criterion
-// 3); an override lifts it only when someone other than the holder makes it (criterion 4, 0115).
+// 3); an override lifts it only when someone other than the holder makes it (criterion 4, 0116).
 export function tabCapGuard(holderId: string, chargePence: number, capPence: number, overriddenBy: string | null = null): SQL {
   return sql`
     ((${overriddenBy} IS NOT NULL AND ${overriddenBy} <> ${holderId}) OR (${chargePence} + (
@@ -232,7 +232,7 @@ export async function settleTab(
 }
 
 // Still unsettled at the moment of insert, so a racing settlement refuses the void rather than
-// crediting stock for a charge just taken; never the voider's own tab (criterion 4, 0115).
+// crediting stock for a charge just taken; never the voider's own tab (criterion 4, 0116).
 export function voidGuard(entryId: string, actorId: string): SQL {
   return sql`
     NOT EXISTS (SELECT 1 FROM ledger_lines WHERE settles_entry_id = ${entryId})

@@ -235,7 +235,7 @@ Open questions for the committee:
 - Depends on: A-101
 - Acceptance criteria:
   1. Profile fields: name, pronouns (optional, free text, never inferred and never required), contact details, emergency contact. Every field states who can see it before the member fills it in.
-  2. The emergency contact is visible only to duty managers and the Theatre Manager, and only while the member holds a current shift or production role; it appears in no export except the member's own. Amended 29 September 2026 by decision 0111: the safety officer's role folded into the Theatre Manager's.
+  2. The emergency contact is visible only to duty managers and the Theatre Manager, and only while the member holds a current shift or production role; it appears in no export except the member's own. Amended 29 September 2026 by decision 0112: the safety officer's role folded into the Theatre Manager's.
   3. Dietary and access needs are not profile fields: they are separate consents with separate audiences, owned by module D (D-6).
   4. Each person controls their credit name per production for programmes and the public archive; the default is the profile name.
   5. A name change propagates everywhere immediately, because every module references the same record (principle P1).
@@ -303,7 +303,7 @@ Open questions for the committee:
   4. A role removal or expiry takes effect on privileged surfaces within one minute.
   5. Every grant change is audited as a from/to diff.
   6. Old-estate grants and their provenance import via a written role-vocabulary mapping table agreed in Phase 0.
-  7. Added 29 September 2026 (decision 0113): a grant to the granter's own account is refused for every role but the IT Manager's, whose holder already holds every permission; renewing one's own IT Manager grant (to make it permanent, A-120) stays allowed.
+  7. Added 29 September 2026 (decision 0114): a grant to the granter's own account is refused for every role but the IT Manager's, whose holder already holds every permission; renewing one's own IT Manager grant (to make it permanent, A-120) stays allowed.
 - Source: Prompt Book A-4, module 0 principle P3; audit SD-9; Get-In part 2 (roles row: carry); criterion 7 from the role audit on issue #1211, 26 September 2026 (R4).
 
 ## A-119: Warn holders before roles lapse
@@ -784,8 +784,8 @@ Open questions for the committee:
      retired role's successor, never silently dropped, the second-factor list keeping its whole
      floor, and each rewrite is audited as a settings change with no actor.
 - Source: The role audit on issue #1211 (26 September 2026, R1 to R3) against the 2026/27
-  constitution, decided by the IT Manager (0110, 0111, 0112); migration 0130 folds the grants.
-  The IT Manager's role keeps every permission (0113), so the audit's narrowing of it (R4) is not
+  constitution, decided by the IT Manager (0111, 0112, 0113); migration 0130 folds the grants.
+  The IT Manager's role keeps every permission (0114), so the audit's narrowing of it (R4) is not
   part of this story.
 
 ## A-201: Import an SU membership list by hand
@@ -850,7 +850,7 @@ Open questions for the committee:
 
 - Role: Administrator
 - Phase: V2
-- Story: As the Theatre Manager, I want roles that require a current training record so that authority and competence cannot drift apart. Amended 29 September 2026 by decision 0111: the training catalogue is the Theatre Manager's, so the story is theirs rather than a Training Manager's.
+- Story: As the Theatre Manager, I want roles that require a current training record so that authority and competence cannot drift apart. Amended 29 September 2026 by decision 0112: the training catalogue is the Theatre Manager's, so the story is theirs rather than a Training Manager's.
 - Depends on: A-118
 - Acceptance criteria:
   1. A role definition may require a current training record (module G); granting it to someone without the record is refused, naming the missing module.

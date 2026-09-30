@@ -209,7 +209,7 @@ async function throughShift(
 }
 
 // A confirmed shift the lookup refused only for the committee role it needs, so the refusal names
-// that rather than no shift at all (0114, E-111 criterion 1).
+// that rather than no shift at all (0115, E-111 criterion 1).
 async function shiftWithoutStanding(accountId: string, role: NightRole, night: string, scope: NightScope): Promise<boolean> {
   if (!needsCommitteeRole(role)) return false
   const { from, to } = showNightBounds(night)

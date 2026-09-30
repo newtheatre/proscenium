@@ -5,7 +5,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
-// A-118 criterion 7 (0113): nobody grants themselves a role but the IT Manager's own, which adds
+// A-118 criterion 7 (0114): nobody grants themselves a role but the IT Manager's own, which adds
 // nothing its holder lacks. Another IT Manager grants it, and is the actor on the trail.
 
 const skip = skipReason()
@@ -21,7 +21,7 @@ afterAll(async () => {
   await app?.stop()
 }, 30_000)
 
-describe.skipIf(skip !== null)('nobody grants themselves a role (A-118 criterion 7, 0113)', () => {
+describe.skipIf(skip !== null)('nobody grants themselves a role (A-118 criterion 7, 0114)', () => {
   test('an IT Manager granting themselves the Committee is refused, and nothing is written', async () => {
     const itm = await adminSession(app)
     const response = await request(app, 'POST', '/api/admin/roles', { userId: itm.id, role: 'COMMITTEE' }, itm.cookie)

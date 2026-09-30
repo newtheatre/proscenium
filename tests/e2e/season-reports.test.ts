@@ -71,7 +71,7 @@ describe.skipIf(skip !== null)('who may read the cross-season report (E-126 crit
     expect((await send('GET', `/api/admin/reports/performances?${RANGE}`)).status).toBe(200)
   })
 
-  test('a Committee holder can too: the season aggregates are every post\'s (0112)', async () => {
+  test('a Committee holder can too: the season aggregates are every post\'s (0113)', async () => {
     expect((await send('GET', `/api/admin/reports/incidents?${RANGE}`, undefined, committee.cookie)).status).toBe(200)
   })
 

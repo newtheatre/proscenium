@@ -37,7 +37,7 @@ Open questions:
 - Answered 15 September 2026: on a night with no performance (an external hire with the bar open),
   a bar opening is planned like a rota and a confirmed shift on it opens the till; the Front of
   House Manager's role still opens it by naming the venue, recorded as any bypass is. Comp
-  approval widens the same way. Decision 0077, and 0110 for the role; stories F-125 and E-130.
+  approval widens the same way. Decision 0077, and 0111 for the role; stories F-125 and E-130.
 
 ## F-101: Till access scoped to tonight's bar shift
 
@@ -49,7 +49,7 @@ Open questions:
 - Acceptance criteria:
   1. The till opens only to a person holding a confirmed bar shift for a performance tonight
      (the show night runs 04:00 to 04:00 Europe/London), or to the Front of House Manager's role.
-     Amended 29 September 2026 by decision 0110: the bar manager's officer role folded into the
+     Amended 29 September 2026 by decision 0111: the bar manager's officer role folded into the
      Front of House Manager's, which now holds all three night permissions.
   2. A confirmed door or duty-manager shift does not open the till; the roles are not
      interchangeable.
@@ -58,7 +58,7 @@ Open questions:
   4. After the 04:00 boundary the shift no longer opens the till, even with a live login session.
   5. A refusal names exactly what would unlock access (a confirmed bar shift tonight, or the Front
      of House Manager's role), so a volunteer knows what to fix. Amended 29 September 2026 by
-     decision 0110.
+     decision 0111.
 - Source: Prompt Book F-1, P3; audit PR-12.
 
 ## F-102: One open till session per venue per night
@@ -79,7 +79,7 @@ Open questions:
      session's expected reconciliation figure (F-118).
   5. An unclosed session from a previous night surfaces on the duty manager's close-night checklist
      and remains closable by the Front of House Manager's role later, dated to its own night.
-     Amended 29 September 2026 by decision 0110: closing an earlier night's session is that role's
+     Amended 29 September 2026 by decision 0111: closing an earlier night's session is that role's
      standing act, audited as a till close rather than as a bypass.
 - Source: Prompt Book F-1; audit PR-12 (partial unique index per venue per night).
 
@@ -234,10 +234,10 @@ Open questions:
   3. A configurable hard cap applies per holder; a charge that would take the outstanding balance
      past the cap is refused quoting the balance, the charge and the cap.
   4. The duty manager or the Front of House Manager's role may override a cap refusal; the override
-     records the approver on the charge itself. Amended 29 September 2026 by decision 0110: the bar
+     records the approver on the charge itself. Amended 29 September 2026 by decision 0111: the bar
      manager's role folded into the Front of House Manager's. Nobody overrides the cap on their own
      tab: the till refuses it naming who can, and the cap's guard on the charge's own insert lifts
-     only for an override by someone other than the holder (0115).
+     only for an override by someone other than the holder (0116).
   5. A tab charge writes lines and stock movements atomically per F-105, with a ledger entry marked
      as credit extended, not money taken.
 - Source: Prompt Book F-1; audit PR-12 (the old £20 cap was a nag, not a block).
@@ -258,8 +258,8 @@ Open questions:
      than being silently absorbed into the total.
   4. Only an unsettled charge may be voided (the Front of House Manager's role, mandatory reason); a
      settled charge is corrected by refund policy, never by void. Amended 29 September 2026 by
-     decision 0110: the bar manager's role folded into the Front of House Manager's. A void is never
-     made on the voider's own tab, refused by the void entry's own guard rather than a read (0115).
+     decision 0111: the bar manager's role folded into the Front of House Manager's. A void is never
+     made on the voider's own tab, refused by the void entry's own guard rather than a read (0116).
   5. A void credits each of the charge's stock movements exactly once and is refused on repeat: the
      double-void that double-credited stock in the old estate is a named regression case.
   6. Unsettled tabs at year end appear on the treasurer's closing checklist with holder and
@@ -276,9 +276,9 @@ Open questions:
 - Acceptance criteria:
   1. A comp sale requires a prior request with a reason; approval belongs to tonight's confirmed
      duty manager or the Front of House Manager's role, and a requester can never approve their own
-     request. Amended 29 September 2026 by decision 0110: the bar manager's role folded into the
+     request. Amended 29 September 2026 by decision 0111: the bar manager's role folded into the
      Front of House Manager's. The same rule holds a tab-cap override and a tab void to someone
-     other than the holder (F-108 criterion 4, F-109 criterion 4, 0115).
+     other than the holder (F-108 criterion 4, F-109 criterion 4, 0116).
   2. Approval is claimed atomically: two racing approvals resolve to a single decision, and only
      then may the sale proceed.
   3. Requests expire on a configurable timer (default 10 minutes); an expired request cannot
@@ -305,7 +305,7 @@ Open questions:
      reference; retired products vanish from the till and remain in reports.
   4. Category and ordering changes appear on the till immediately, without a deploy.
   5. The surface is restricted to the Front of House Manager's role and administrators, and every
-     change is audited with a from/to diff. Amended 29 September 2026 by decision 0110: the bar
+     change is audited with a from/to diff. Amended 29 September 2026 by decision 0111: the bar
      manager's role folded into the Front of House Manager's.
   6. One way to create a product, not two side by side. A new product's age-restricted flag and a
      new stocked item's each start from one stated default, read by every screen that offers
@@ -423,7 +423,7 @@ Open questions:
      confirmed bar shift may enter and change counts inside its window, each line recording who
      entered it, so every line is reviewed before Apply. Opening, counting and applying are the
      Front of House Manager's, who takes the full count (`bar.stocktake`). Amended 29 September
-     2026 by decision 0110: the bar manager's role folded into the Front of House Manager's, and
+     2026 by decision 0111: the bar manager's role folded into the Front of House Manager's, and
      the Front of House Manager reviews every line before Apply.
 - Source: Prompt Book F-2; audit PR-12 (stocktake blanks recorded as zero).
 
@@ -445,7 +445,7 @@ Open questions:
      restates a past sale.
   5. Future-dated rows are permitted and take effect on their date; the full price history per
      variant is visible to the Front of House Manager's role. Amended 29 September 2026 by
-     decision 0110: the bar manager's role folded into the Front of House Manager's.
+     decision 0111: the bar manager's role folded into the Front of House Manager's.
 - Source: Prompt Book F-2; audit PR-12 (one row per product per day, latest wins).
 
 ## F-117: Discounts, percent-capped and snapshotted
@@ -508,7 +508,7 @@ Open questions:
   4. Reports are queries over the ledger and movement history, never stored aggregates, so a
      correcting entry is reflected immediately.
   5. Access is limited to the Front of House Manager's role, the treasurer and administrators.
-     Amended 29 September 2026 by decision 0110: the bar manager's role folded into the Front of
+     Amended 29 September 2026 by decision 0111: the bar manager's role folded into the Front of
      House Manager's.
 - Source: Prompt Book F-2, P4; audit PR-12, PR-7 (CSV injection guard).
 
@@ -715,7 +715,7 @@ Open questions:
      night.
   6. A refusal names both ways in: a confirmed bar shift on tonight's performances or on tonight's
      bar opening at this venue, or the Front of House Manager's role. Amended 29 September 2026 by
-     decision 0110, for this criterion and criterion 2: the bar manager's officer role folded into
+     decision 0111, for this criterion and criterion 2: the bar manager's officer role folded into
      the Front of House Manager's.
 - Source: Module F open question 5 (till and comp authority on a night with no performance),
   answered by Matt on 15 September 2026; decision 0077.
@@ -899,7 +899,7 @@ Open questions:
      variance trends across the season.
   3. Configurable thresholds flag anomalies (an item's variance exceeding a percentage across
      consecutive stocktakes) to the Front of House Manager; the system notices, a human decides.
-     Amended 29 September 2026 by decision 0110: the bar belongs to the Front of House Manager.
+     Amended 29 September 2026 by decision 0111: the bar belongs to the Front of House Manager.
   4. All analytics derive from the existing movement ledger; no new write path is introduced.
 - Source: Prompt Book F-2, P6; audit PR-12.
 

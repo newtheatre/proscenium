@@ -89,7 +89,7 @@ export default defineEventHandler(async (event) => {
   if (!subject || subject.anonymisedAt !== null) {
     throw noSuch('account')
   }
-  // Committee standing is somebody else's decision; the IT Manager's own adds nothing it lacks (0113).
+  // Committee standing is somebody else's decision; the IT Manager's own adds nothing it lacks (0114).
   if (subject.id === resolved.account.id && input.role !== PROTECTED_ROLE) {
     throw createError({ statusCode: 403, statusMessage: SELF_GRANT })
   }

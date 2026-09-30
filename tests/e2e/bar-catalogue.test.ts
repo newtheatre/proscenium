@@ -381,7 +381,7 @@ describe.skipIf(skip !== null)('every change is audited with a from and a to (F-
   test('a status change records the state it moved between', async () => {
     const id = await addProduct(await addCategory())
     await addPouringVariant(id)
-    await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'ACTIVE' })
+    expect((await send('POST', `/api/admin/bar/products/${id}/status`, { status: 'ACTIVE' })).status).toBe(200)
 
     const entry = trail<{ detail: { changes: { status: { from: string, to: string } } } }>(
       'bar.product.status.changed',

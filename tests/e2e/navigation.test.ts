@@ -54,7 +54,7 @@ describe.skipIf(skip !== null)('the console sidebar shows what the caller holds 
   })
 
   // A partial sidebar: every room screen, accounts and the register but not the roll of Fellows,
-  // and the settings without the trail (0111, 0112).
+  // and the settings without the trail (0112, 0113).
   test('a Theatre Manager sees a partial sidebar', async () => {
     const rooms = await shell(theatre.cookie, '/rooms/manage')
     const people = await shell(theatre.cookie, '/people/accounts')

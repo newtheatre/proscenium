@@ -51,7 +51,7 @@ afterAll(async () => {
   await app?.stop()
 }, 30_000)
 
-// No role holds rooms.read without rooms.write since the Theatre Manager took the rooms (0111), so
+// No role holds rooms.read without rooms.write since the Theatre Manager took the rooms (0112), so
 // its holder is shown every control; a read-only holder is pinned by the two describes below.
 describe.skipIf(skip !== null)('the rooms console gates its write controls on rooms.write (#911)', () => {
   test('the THEATRE_MANAGER (rooms.write) sees the write controls on all three screens', async () => {

@@ -130,7 +130,7 @@ describe.skipIf(skip !== null)('a patron declares their own profile (criterion 1
   })
 })
 
-describe.skipIf(skip !== null)('only the Secretary and Welfare Officer verifies (criterion 2, 0112)', () => {
+describe.skipIf(skip !== null)('only the Secretary and Welfare Officer verifies (criterion 2, 0113)', () => {
   test('general box office cannot reach the review screen', async () => {
     expect((await send('GET', '/api/admin/access-profiles', undefined, boxOffice.cookie)).status).toBe(403)
     expect((await send('POST', `/api/admin/access-profiles/${patron.id}/verify`, { fohNote: 'Aisle seat' }, boxOffice.cookie)).status).toBe(403)

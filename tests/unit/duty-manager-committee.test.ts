@@ -4,7 +4,7 @@ import { forCommitteeMembers, needsCommitteeRole, noLongerOnCommittee } from '#s
 import { saysTrainingAction, trainingAction } from '#shared/utils/training-action'
 import type { ActionSession } from '#shared/utils/training-action'
 
-// Decision 0114's words: every refusal names what is missing, a committee role, and never reads
+// Decision 0115's words: every refusal names what is missing, a committee role, and never reads
 // as a training gap the member could close by booking a session.
 
 describe('which shift roles need a committee role', () => {

@@ -11,7 +11,7 @@ import type { SQL } from 'drizzle-orm'
 // conditional on the row they read, on the statement itself, so a write landing in between refuses it.
 
 const NOW = 1_800_000_000
-// Somebody other than every declarant here: deciding one's own is its own suite (0115).
+// Somebody other than every declarant here: deciding one's own is its own suite (0116).
 const OFFICER = 'u-officer'
 
 function run(database: TestDatabase, statement: SQL): unknown[] {

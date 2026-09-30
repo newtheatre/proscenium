@@ -161,7 +161,7 @@ describe.skipIf(skip !== null)('the roles are not interchangeable (E-111 criteri
     }
   })
 
-  test('the till refuses the Theatre Manager in the Front of House Manager\'s name (0110)', async () => {
+  test('the till refuses the Theatre Manager in the Front of House Manager\'s name (0111)', async () => {
     const response = await ask(`role=BAR&venueId=${house.venueId}`, theatre.cookie)
     expect(response.status).toBe(403)
     expect(await message(response)).toContain('Front of House Manager')

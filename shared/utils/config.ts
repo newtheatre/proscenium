@@ -31,7 +31,7 @@ interface ConfigKeyDefinition {
 }
 
 // Every role touching money, personal data or safety records (0009): every post role, and never
-// `COMMITTEE`. A save can add to it, never take one of these off (A-112 criterion 4, 0112).
+// `COMMITTEE`. A save can add to it, never take one of these off (A-112 criterion 4, 0113).
 export const PRIVILEGED_FLOOR = [
   'ADMIN', 'PRESIDENT', 'SECRETARY', 'TREASURER', 'FOH_MANAGER', 'THEATRE_MANAGER',
 ] as const satisfies readonly Role[]

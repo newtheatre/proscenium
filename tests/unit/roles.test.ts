@@ -50,14 +50,14 @@ describe('the role vocabulary', () => {
     // The posts the old estate never modelled are granted by hand: no president or secretary, no
     // access profiles (D-127) and no treasurer (I-103).
     expect([...ROLES].filter(role => !targets.has(role))).toEqual(['PRESIDENT', 'SECRETARY', 'TREASURER'])
-    // Retired and marker roles are decided by hand or skipped, never suggested (A-134 c4, 0112).
+    // Retired and marker roles are decided by hand or skipped, never suggested (A-134 c4, 0113).
     expect(map['proscenium:FRONT_OF_HOUSE']).toBeUndefined()
     expect(map['proscenium:MANAGER']).toBeUndefined()
     expect(map['ticketing:MANAGER']).toBeUndefined()
     expect(map['training:ADMIN']).toBe('THEATRE_MANAGER')
   })
 
-  // Questions 7 and 8, answered 2 September, and 0111. Pinned because a role widening is a
+  // Questions 7 and 8, answered 2 September, and 0112. Pinned because a role widening is a
   // governance decision, and the map is one line a later edit could undo unnoticed.
   test('the Theatre Manager appoints leads and revokes, but never stamps never-expiring', () => {
     const officer = PERMISSION_MAP.THEATRE_MANAGER
@@ -125,7 +125,7 @@ describe('permissions come from live grants only', () => {
   })
 
   // The one named exception, and it stays one: the one officer role opens tonight's screens and
-  // every use of it is audited (0044, 0110). Administering the bar sitting down is not a bypass.
+  // every use of it is audited (0044, 0111). Administering the bar sitting down is not a bypass.
   test('the Front of House Manager carries all three night bypasses, and no other post role any', () => {
     const bypass = (role: Role): string[] =>
       [...permissionsFor([{ role, expiresAt: null }], now)].filter(held => OPERATIONAL_PERMISSIONS.includes(held)).sort()
@@ -152,8 +152,8 @@ describe('permissions come from live grants only', () => {
 })
 
 // The final vocabulary, whole: one role per post with standing work, the Committee for every other
-// post, and the IT Manager's function (0110 to 0113). A change here is a governance decision.
-describe('one role per committee post (A-135 criterion 1, 0112)', () => {
+// post, and the IT Manager's function (0111 to 0114). A change here is a governance decision.
+describe('one role per committee post (A-135 criterion 1, 0113)', () => {
   const now = fromLondonWallClock(2026, 10, 15, 19, 0)
   const holds = (role: Role): string[] => [...permissionsFor([{ role, expiresAt: null }], now)].sort()
 
@@ -161,7 +161,7 @@ describe('one role per committee post (A-135 criterion 1, 0112)', () => {
     expect([...ROLES]).toEqual(['ADMIN', 'PRESIDENT', 'SECRETARY', 'TREASURER', 'FOH_MANAGER', 'THEATRE_MANAGER', 'COMMITTEE'])
   })
 
-  test('the IT Manager holds every permission (0113)', () => {
+  test('the IT Manager holds every permission (0114)', () => {
     expect(holds('ADMIN')).toEqual([...PERMISSIONS].sort())
   })
 
@@ -177,7 +177,7 @@ describe('one role per committee post (A-135 criterion 1, 0112)', () => {
     expect(holds('TREASURER')).toEqual(['finance.export', 'finance.read', 'finance.summary', 'finance.write', 'reports.read'])
   })
 
-  test('the Front of House Manager holds sales, the bar and the night (4.4, 0090, 0102, 0110)', () => {
+  test('the Front of House Manager holds sales, the bar and the night (4.4, 0090, 0102, 0111)', () => {
     expect(holds('FOH_MANAGER')).toEqual([
       'age-checks.export', 'bar.read', 'bar.stocktake', 'bar.write', 'board.read', 'board.write', 'checklist.read', 'checklist.write',
       'emergency-card.read', 'emergency-card.write', 'finance.summary', 'money.refund', 'night.door', 'night.manage', 'night.till',
@@ -185,7 +185,7 @@ describe('one role per committee post (A-135 criterion 1, 0112)', () => {
     ])
   })
 
-  test('the Theatre Manager holds the rooms, safety and the training catalogue (4.11, 0111)', () => {
+  test('the Theatre Manager holds the rooms, safety and the training catalogue (4.11, 0112)', () => {
     expect(holds('THEATRE_MANAGER')).toEqual([
       'accounts.read', 'config.read', 'emergency-card.read', 'emergency-card.write', 'finance.summary', 'members.read', 'reports.read',
       'rooms.read', 'rooms.write', 'safety.read', 'safety.write', 'training.by-address', 'training.leads', 'training.read', 'training.revoke', 'training.write',
@@ -224,7 +224,7 @@ describe('one role per committee post (A-135 criterion 1, 0112)', () => {
 })
 
 // The separations the constitution draws, pinned so a later widening is a decision and not a
-// slip (0112, 0115). The IT Manager is excepted: it holds everything by decision (0113).
+// slip (0113, 0116). The IT Manager is excepted: it holds everything by decision (0114).
 describe('separations that stand', () => {
   const others = ROLES.filter(role => role !== PROTECTED_ROLE)
 

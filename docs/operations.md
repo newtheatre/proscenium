@@ -960,14 +960,14 @@ address, marks it verified and clears the link; the trail records it as **Google
 by a set Workspace address**. Setting and clearing are trailed with who did it and never the
 address (0011). Clearing asks first, since it puts the second-account problem back.
 
-## Granting the committee's roles (A-135, 0112)
+## Granting the committee's roles (A-135, 0113)
 
-A committee post holds one grant (0112). Five posts with standing work in the console hold a role
+A committee post holds one grant (0113). Five posts with standing work in the console hold a role
 named after them. Every other post holds `COMMITTEE`, with the post named in the grant's note
 (A-118 criterion 2). A post role already carries the Committee's standing, so nobody needs
 `COMMITTEE` beside it. `ADMIN` is the Archivist's IT function (constitution 4.17.1). It carries no
 committee standing, so the Archivist also holds `COMMITTEE` for the post. Nobody grants a role to
-their own account except `ADMIN` (0113).
+their own account except `ADMIN` (0114).
 
 **Now (issue #1534, before booking opens on 12 October).** The IT Manager grants `TREASURER` to
 the elected Treasurer, `THEATRE_MANAGER` to the Theatre Manager and `SECRETARY` to the Secretary

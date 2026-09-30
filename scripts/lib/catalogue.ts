@@ -12,7 +12,7 @@ export interface ParsedModule {
   expiryMode: 'NONE' | 'MONTHS' | 'ACADEMIC_YEAR'
   expiryMonths: number | null
   safetyCritical: boolean
-  // Self sign-up and asks need a live committee role (0114).
+  // Self sign-up and asks need a live committee role (0115).
   committeeOnly: boolean
   signoffRequired: boolean
   grantsSupervisor: boolean

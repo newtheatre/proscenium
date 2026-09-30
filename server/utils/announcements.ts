@@ -40,7 +40,7 @@ export function allCurrentMembersQuery(today: string, graceDays: number): SQL {
 }
 
 // A holder is a live grant on an account somebody uses: pending is not holding (0088). The
-// Committee is every post role, so a post holder is reached on their one grant (0112).
+// Committee is every post role, so a post holder is reached on their one grant (0113).
 export function roleHoldersQuery(role: string, nowEpoch: number): SQL {
   return sql`
     SELECT u.id AS id

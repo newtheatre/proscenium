@@ -35,7 +35,7 @@ One note departs from the draft. `ADMN-103` said it was the training behind two 
 `FRONT_OF_HOUSE` and `BOX_OFFICE`, both since retired (0090, A-134). Its note now says what the
 module gates: claiming or being assigned a door shift (E-103), which opens the door on the night.
 
-Three rows carry the IT Manager's training decisions of 26 and 29 September 2026 (decision 0114):
+Three rows carry the IT Manager's training decisions of 26 and 29 September 2026 (decision 0115):
 `ADMN-101` is a prerequisite of `ADMN-102`, `ADMN-103` and `ADMN-201`, so the door, the bar and the
 duty manager share one foundation, and `ADMN-201` is the one committee-only module. Selling alcohol
 (`ADMN-102`) is not committee-only.
@@ -61,7 +61,7 @@ One row per module or certification, with a leading `Department` column.
 | `Grants` | | `supervisor`, `trainer`, or both. Certifications only. |
 | `Status` | | `DRAFT` (default), `ACTIVE`, `RETIRED`. |
 | `Notes` | | Lead and administrator visible only. |
-| `Committee Only` | | `yes` or `no`, blank being no. Only somebody holding a committee role may sign up to it or ask for it; everybody else sees it marked as only available to the committee (0114). |
+| `Committee Only` | | `yes` or `no`, blank being no. Only somebody holding a committee role may sign up to it or ask for it; everybody else sees it marked as only available to the committee (0115). |
 
 Unknown columns are ignored, so the subcommittee can keep their own working columns.
 **An unparseable cell is a hard failure naming the cell**: nothing is skipped silently.

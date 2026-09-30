@@ -104,7 +104,7 @@ async function approveComp(): Promise<void> {
   }
   catch (refused) {
     // A desk comp gives a seat away, so a stale session re-asserts first, then the approval is
-    // retried (D-117 criterion 6, 0115).
+    // retried (D-117 criterion 6, 0116).
     if (needsReauthentication(refused)) reauthenticating.value = true
     else approveFailure.value = refusalText(refused)
   }

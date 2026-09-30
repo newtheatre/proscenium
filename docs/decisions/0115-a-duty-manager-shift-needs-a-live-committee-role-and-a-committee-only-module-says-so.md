@@ -1,9 +1,9 @@
-# 0114: A duty manager shift needs a live committee role, and a committee-only module says so
+# 0115: A duty manager shift needs a live committee role, and a committee-only module says so
 
 - Status: Accepted (IT Manager, 29 September 2026)
 - Date: 2026-09-29
 - Amends: E-103 (who a duty manager shift is offered to) and E-111 criterion 1 (what a confirmed
-  duty manager shift opens); extends 0009, 0037 and 0075, and reads "the Committee" as 0112 defines it
+  duty manager shift opens); extends 0009, 0037 and 0075, and reads "the Committee" as 0113 defines it
 
 ## Context
 
@@ -25,7 +25,7 @@ disabled as only available to the committee.
 
 **A duty manager shift needs a live committee role as well as its training, at claim and at use.**
 A committee role is a live grant of any role in `COMMITTEE_ROLES` (the five post roles and
-`COMMITTEE`) on a usable account, read the way every other "the Committee" is (0112). `ADMIN` alone
+`COMMITTEE`) on a usable account, read the way every other "the Committee" is (0113). `ADMIN` alone
 is not one: it is a function its delegate may hold without a post.
 
 - *At claim.* The self-claim, an officer's assignment, an officer's ad hoc shift naming somebody,
@@ -46,7 +46,7 @@ the confirmed shift and a current training record (0009); the committee role is 
 shift must stand on, not a grant that opens anything by itself.
 
 **A training module may be marked committee-only.** `modules.committee_only` is a flag the
-catalogue editor sets (0111), read by the catalogue import from a `Committee Only` column. For a
+catalogue editor sets (0112), read by the catalogue import from a `Committee Only` column. For a
 member without a live committee role, a committee-only module is still listed in the catalogue,
 on the sessions list and in what's next, so the committee's work stays visible, but its one
 action is disabled and reads "Only available to the committee". Signing up to a session that

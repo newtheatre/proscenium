@@ -3,7 +3,7 @@ import type { Database } from 'bun:sqlite'
 import { isAuditAction } from '#shared/utils/audit-actions'
 import { databaseBefore, execMigration, migrationSql, withMigration } from '#tests/helpers/migrations'
 
-// A-135 criteria 3 to 5 against a scratch database at the shape the fold meets (0112): the grants a
+// A-135 criteria 3 to 5 against a scratch database at the shape the fold meets (0113): the grants a
 // real committee holds, then the one migration, then what each holder and each setting is left with.
 
 const FOLD = 'the_retired_roles_fold_into_the_post_roles'

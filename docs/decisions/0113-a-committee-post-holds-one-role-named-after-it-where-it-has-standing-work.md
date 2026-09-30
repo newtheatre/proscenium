@@ -1,4 +1,4 @@
-# 0112: A committee post holds one role, named after it where it has standing work
+# 0113: A committee post holds one role, named after it where it has standing work
 
 - Status: Accepted (IT Manager, 29 September 2026)
 - Date: 2026-09-29
@@ -27,8 +27,8 @@ declarations or read the audit trail. The role audit against the constitution, p
 | `PRESIDENT` | President | The President (4.1) |
 | `SECRETARY` | Secretary and Welfare Officer | The Secretary (4.2) |
 | `TREASURER` | Treasurer | The Treasurer (4.3) |
-| `FOH_MANAGER` | Front of House Manager | The Front of House Manager (4.4), with the bar (0110) |
-| `THEATRE_MANAGER` | Theatre Manager | The Theatre Manager (4.11), with safety and training (0111) |
+| `FOH_MANAGER` | Front of House Manager | The Front of House Manager (4.4), with the bar (0111) |
+| `THEATRE_MANAGER` | Theatre Manager | The Theatre Manager (4.11), with safety and training (0112) |
 | `COMMITTEE` | Committee | Every other post, with the post named in the grant's note (A-118 criterion 2) |
 
 **Every post role carries the Committee's standing.** Each holds `finance.summary` and
@@ -55,7 +55,7 @@ meeting (3.7.1, 4.2.3).
 
 **`MANAGER` retires.** It matched only the old estate's `proscenium:MANAGER` and
 `ticketing:MANAGER` and held no live grant. Its `money.refund` is the Front of House Manager's
-(0102), its rooms and training the Theatre Manager's (0111), `audit.*` the President's, and
+(0102), its rooms and training the Theatre Manager's (0112), `audit.*` the President's, and
 `fellowships.write`, `members.write` and `ticketing.manage` the IT Manager's alone. Deciding
 membership claims is the IT Managers' until the queue's volume after cutover is known.
 
@@ -113,7 +113,7 @@ in the note.
   `dev-access`, `dev-bar` and `dev-training` go.
 - Three separations stand. The Front of House Manager takes the money and the Treasurer keeps the
   record (4.3 against 4.4, 7.2): a unit test pins that no role holding `ticketing.write`,
-  `bar.write` or `night.till` holds `finance.write`, except `ADMIN` (0113). Access verification
+  `bar.write` or `night.till` holds `finance.write`, except `ADMIN` (0114). Access verification
   stays away from the box office (D-127 criterion 2, 0050). Approving a comp on any day and
   narrowing a pass with live passes stay the IT Manager's (D-117 criterion 1, D-123 criterion 4).
 - The next posts to earn a role of their own are the External Relations Manager when external hires

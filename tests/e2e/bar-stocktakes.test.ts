@@ -403,7 +403,7 @@ describe.skipIf(skip !== null)('tonight\'s confirmed bar shift may enter counts 
   })
 
   // The Front of House Manager takes the full count (0099) on any day, with no shift, and holds the
-  // catalogue and the rest of the register beside it since the bar joined the post (0110).
+  // catalogue and the rest of the register beside it since the bar joined the post (0111).
   test('the Front of House Manager opens, counts and applies a stocktake, and reads the rest of the bar too', async () => {
     const item = await anItem()
     await deliver(item.id, 10)
@@ -892,6 +892,25 @@ describe.skipIf(skip !== null)('a line keeps its shape in whatever width it is g
       expect(line.figures.left).toBeGreaterThanOrEqual(line.fields.right)
       expect(line.fields.top).toBeLessThan(line.name.bottom)
       expect(line.figures.top).toBeLessThan(line.fields.bottom)
+    }
+    finally {
+      screen?.close()
+      await apply(opened.stocktake.id)
+    }
+  }, 120_000)
+
+  // Issue 1520: an empty element in the footer's wrapping row can take a line of its own at some
+  // progress widths; tonight's screen passes no actions, so the footer holds only what it shows.
+  test('tonight\'s stocktake footer holds nothing empty that could wrap onto a line of its own', async () => {
+    const item = await anItem()
+    const opened = await open()
+    let screen: Bun.WebView | undefined
+    try {
+      screen = await signedIn(NIGHT_VIEWPORT_PX, 740)
+      await visit(screen, `${app.baseURL}/tonight/stocktake`, `[data-test="counted-${item.id}"]`)
+      const empty = await screen.evaluate<number>(`[...document.querySelector('[data-test="stocktake-footer"]').children]
+        .filter(child => child.getBoundingClientRect().width === 0).length`)
+      expect(empty).toBe(0)
     }
     finally {
       screen?.close()

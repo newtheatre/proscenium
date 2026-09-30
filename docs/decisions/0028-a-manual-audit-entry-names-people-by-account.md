@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-29
-- Amended: 29 September 2026 by 0112, under which `audit.read` and `audit.write` are the
+- Amended: 29 September 2026 by 0113, under which `audit.read` and `audit.write` are the
   President's (and the IT Manager's), so J-103 is the President's story
 
 ## Context

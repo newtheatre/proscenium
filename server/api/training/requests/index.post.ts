@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // G-105 criterion 8: nobody off the committee puts themselves forward for its own training (0114).
+  // G-105 criterion 8: nobody off the committee puts themselves forward for its own training (0115).
   if (module.committeeOnly && !(await hasCommitteeRole(account.id))) {
     throw createError({ statusCode: 403, statusMessage: `${COMMITTEE_ONLY_WORDS}: asking for it needs a committee role` })
   }

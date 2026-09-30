@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Database } from 'bun:sqlite'
 import { withMigration } from '#tests/helpers/migrations'
 
-// Decision 0114's column against the shape it meets: every module already in the catalogue stays
+// Decision 0115's column against the shape it meets: every module already in the catalogue stays
 // open to self sign-up, and a new one is too unless somebody marks it. Found by name, not number.
 
 const NAME = '_a_committee_only_module_says_so'
@@ -12,7 +12,7 @@ function catalogue(raw: Database): void {
   raw.query('INSERT INTO modules (id, department, kind, name, status) VALUES (?, ?, ?, ?, ?)').run('ADMN-201', 'ADMN', 'MODULE', 'Committee Operations and Governance', 'ACTIVE')
 }
 
-describe('modules gain a committee-only flag (0114)', () => {
+describe('modules gain a committee-only flag (0115)', () => {
   test('a module already in the catalogue is not committee-only', async () => {
     await withMigration(NAME, catalogue, (raw) => {
       expect(raw.query('SELECT committee_only FROM modules WHERE id = ?').get('ADMN-201')).toEqual({ committee_only: 0 })

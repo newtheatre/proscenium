@@ -248,7 +248,7 @@ post role (later expiry winning, permanent beating any date), renamed a lone acc
 to `SECRETARY`, dropped every other live retired grant (`MANAGER` among them) into a covering
 `ADMIN` grant, removed a `COMMITTEE` grant its post grant outlasts, and rewrote the three
 role-keyed settings to the successors; it refuses, writing nothing, if a grant would land on no
-covering role (0112, A-135).
+covering role (0113, A-135).
 
 ### totp_secrets
 `user_id` PK → users cascade · `secret` · `confirmed_at` NULL until proven ·
@@ -864,7 +864,7 @@ like a paid one (criterion 4, `heldSeatsSubquery`), and I-103's own `foregoneQue
 /api/box-office/desk/reservations/[id]/tickets/[ticketId]/refund` hands money back one ticket at
 a time, under the same expected-total cross-check collection uses. Approval (criterion 2) is the
 refunder's own `money.refund`, held with the desk by `FOH_MANAGER` and `ADMIN` alone since
-`MANAGER` retired (0112), on any day and for any performance, gated by the
+`MANAGER` retired (0113), on any day and for any performance, gated by the
 `REFUND_PAID_REQUIRES_MANAGER` configuration key (default true, registered ahead of this story);
 the refunder is the actor on the ledger entry and the audit row. The general desk permission
 (`ticketing.write`) is needed to reach the route at all, and no shift gives it, so a duty manager
@@ -1032,7 +1032,7 @@ two that read and `ticketing.write` for the rest:
 | `POST /api/admin/pass-types` | Adds one, always DRAFT, with its price points and covered shows in one batch. |
 | `GET /api/admin/pass-types/[id]` | One pass product and every show it may be extended to cover. |
 | `PUT /api/admin/pass-types/[id]` | Changes name, address, description, windows, price points and status. It does not take covered shows. Price points are kept by label and a changed price is updated in place, since an issued pass holds its price point by id (`pass_type_price_id` RESTRICT, D-124) and keeps its own `price_paid`. A price point the edit leaves out is removed, and the whole edit is refused with a 409 naming it if an issued pass holds it: the predicate rides the `UPDATE` (`updatePassTypeStatement()`), and the price points follow behind its audit row (`priceUpsertStatements()`). |
-| `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Reachable by `ticketing.write` or `ticketing.manage`, a pair since the retired MANAGER carried the second and not the first (0009, 0112); dropping a show with a live pass against it needs `ticketing.manage` specifically, whichever door was used to reach the route. |
+| `PUT /api/admin/pass-types/[id]/shows` | Replaces the covered set. Reachable by `ticketing.write` or `ticketing.manage`, a pair since the retired MANAGER carried the second and not the first (0009, 0113); dropping a show with a live pass against it needs `ticketing.manage` specifically, whichever door was used to reach the route. |
 | `DELETE /api/admin/pass-types/[id]` | Deletes one nothing has ever been issued under. An issued one is a 409 naming closing as the way. |
 
 **"Ever issued" and "live coverage" are queries over rows, never columns.** `PASS_TYPE_REFERENCES`
@@ -1895,7 +1895,7 @@ the account that entered the count now standing and cleared with it, bare (a ref
 rebuild the table) and registered as personal data kept on erasure (0099). UNIQUE
 (`stocktake_id`, `item_id`).
 
-Counts are entered by a holder of `bar.stocktake` on any day (the Front of House Manager, 0110), or by tonight's confirmed bar shift inside its window while the stocktake is open
+Counts are entered by a holder of `bar.stocktake` on any day (the Front of House Manager, 0111), or by tonight's confirmed bar shift inside its window while the stocktake is open
 (`requireStocktakeCounter`, `server/utils/stocktake-authority.ts`, resolving the till's night
 authority, 0099); opening and applying stay with `bar.stocktake`. `GET
 /api/admin/bar/stocktakes/open` and `GET /api/admin/bar/stocktakes/[id]` read for a holder of
@@ -2472,7 +2472,7 @@ guidance and never a validation rule (G-121 criterion 1). The catalogue screen o
 `allows_external` is on, and clears it when that goes off, so the note never outlives the opt-in it
 describes.
 
-`committee_only` (migration 0131, decision 0114) limits self sign-up to somebody holding a live
+`committee_only` (migration 0131, decision 0115) limits self sign-up to somebody holding a live
 committee role (any of `COMMITTEE_ROLES`, never `ADMIN` alone). It is read at the write path of a
 session sign-up and a module request, and derived into the member's action as "Only available to
 the committee"; the module stays listed everywhere. It carries no CHECK, since any kind may be
@@ -2790,7 +2790,7 @@ inserts are chunked at `DELIVERY_RECORDS_PER_STATEMENT` rows so no statement's b
 count grows with the number of people taught (0003). Every attendee gets one
 `record.delivery-logged` audit entry in the same batch, naming the modules and the day.
 
-Revocation is `training.revoke`, held by the administrator and the Theatre Manager (question 8, 0111).
+Revocation is `training.revoke`, held by the administrator and the Theatre Manager (question 8, 0112).
 It is idempotent by predicate rather than by a read, so two officers racing produce one stamp and
 one audit entry rather than one refusal; the entry is written first in the batch, because the
 update would otherwise falsify the guard the entry rides on. The reason never reaches audit

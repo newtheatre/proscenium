@@ -14,8 +14,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # What the change can reach (0110): nothing, the suites it edits, or every suite.
+  scope:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      e2e: ${{ steps.scope.outputs.e2e }}
+      suites: ${{ steps.scope.outputs.suites }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - id: scope
+        name: What this change can reach
+        run: bun scripts/ci-scope.ts
+
   e2e:
     name: e2e (${{ matrix.slice }}/10)
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -25,18 +47,22 @@ jobs:
       fail-fast: false
       matrix:
         slice: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # Skipped by step, never by job: a matrix job skipped whole reports an unexpanded name, and
+    # the required `e2e (i/10)` checks would wait for ever (0110).
     steps:
+      - name: Out of scope
+        if: needs.scope.outputs.e2e == 'none'
+        run: echo "Nothing this change touches reaches the end-to-end suites (0110)."
+
       - uses: actions/checkout@v4
+        if: needs.scope.outputs.e2e != 'none'
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup
+        if: needs.scope.outputs.e2e != 'none'
 
       # Keys made for this run alone and thrown away with the runner: nothing stored, nothing shared.
       - name: Generate this run's keys
+        if: needs.scope.outputs.e2e != 'none'
         run: |
           for key in NUXT_SESSION_PASSWORD NUXT_ACCESS_PROFILE_ENCRYPTION_KEY NUXT_QR_TOKEN_SECRET NUXT_BACKSTAGE_BOARD_SECRET NUXT_WAITING_LIST_TOKEN_SECRET; do
             value="$(openssl rand -base64 32)"
@@ -45,9 +71,11 @@ jobs:
           done
 
       - name: End-to-end suites
+        if: needs.scope.outputs.e2e != 'none'
         run: bun run test:e2e
         env:
           E2E_SLICE: ${{ matrix.slice }}/10
+          E2E_SUITES: ${{ needs.scope.outputs.suites }}
 
       # The suites report a 500 without its cause; the server's own log has it.
       - name: Server log

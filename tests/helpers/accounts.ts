@@ -67,7 +67,7 @@ export function forgetSpentStep(app: AppUnderTest, email: string): void {
   }
 }
 
-// A duty manager shift needs a live committee role at claim and at use (0114). `COMMITTEE` asks for
+// A duty manager shift needs a live committee role at claim and at use (0115). `COMMITTEE` asks for
 // no second factor (A-112), so a fixture holding one tests the shift rather than the grant.
 export function grantCommitteeRole(app: AppUnderTest, userId: string): void {
   const database = new Database(app.databaseFile)

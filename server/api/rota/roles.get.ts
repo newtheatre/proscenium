@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const now = Math.floor(Date.now() / 1000)
 
   const eligibilities = await shiftEligibilities(event, account.id, today)
-  // A role no training opens for this member is not one they could take (0114).
+  // A role no training opens for this member is not one they could take (0115).
   const locked = SHIFT_ROLES.filter(role => !eligibilities[role].eligible && !eligibilities[role].needsCommittee)
   if (locked.length === 0) return { roles: [] as RoleCard[], officers: [] as string[] }
 

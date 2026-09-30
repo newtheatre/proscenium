@@ -32,7 +32,7 @@ const refOf = (session: ActionSession): SessionRef =>
   ({ id: session.id, heldOn: session.heldOn, startsAt: session.startsAt, place: session.place })
 
 // `sessions` teach the module, soonest first: a held place, then a waiting one, then nothing to do
-// for somebody off the committee (`committeeOnly`, 0114), then the soonest open session, then the ask.
+// for somebody off the committee (`committeeOnly`, 0115), then the soonest open session, then the ask.
 export function trainingAction(sessions: readonly ActionSession[], requested: boolean, committeeOnly = false): TrainingAction {
   const placed = sessions.find(session => session.placed === true)
   if (placed) return { kind: 'PLACED', session: refOf(placed) }

@@ -7,7 +7,7 @@ import { skipReason, startApp } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
-// G-105 criterion 8 and decision 0114: a committee-only module stays listed for somebody off the
+// G-105 criterion 8 and decision 0115: a committee-only module stays listed for somebody off the
 // committee, with its action disabled, and self sign-up and asking are refused at the write.
 
 const skip = skipReason()
@@ -127,7 +127,7 @@ describe.skipIf(skip !== null)('somebody without a committee role (G-105 criteri
     expect(await refusal(answered)).toContain(WORDS)
   })
 
-  // Only the IT Manager's role is not a committee role: it is a function held without a post (0112).
+  // Only the IT Manager's role is not a committee role: it is a function held without a post (0113).
   test('holding the IT Manager\'s role alone does not count', async () => {
     const moduleId = await addModule(true)
     expect((await catalogueItem(moduleId, admin.cookie))?.action).toEqual({ kind: 'COMMITTEE_ONLY' })

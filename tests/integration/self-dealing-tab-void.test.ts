@@ -5,7 +5,7 @@ import { boundStatement, createTestDatabase, rows } from '#tests/helpers/databas
 import { bindD1 } from '#tests/helpers/d1'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// F-109 criterion 4, 0115: nobody voids a charge on their own tab. The void entry's own guard
+// F-109 criterion 4, 0116: nobody voids a charge on their own tab. The void entry's own guard
 // refuses it, so the rule holds for any caller of the write, not only the route that reads first.
 
 let database: TestDatabase
@@ -42,7 +42,7 @@ const voidsOf = (entryId: string): unknown[] =>
 const voidAudits = (entryId: string): unknown[] =>
   rows(database, `SELECT id FROM audit_log WHERE action = 'bar.tab-charge.voided' AND target = ?`, `ledger-entry:${entryId}`)
 
-describe('a void is never made on the voider\'s own tab (F-109 criterion 4, 0115)', () => {
+describe('a void is never made on the voider\'s own tab (F-109 criterion 4, 0116)', () => {
   test('voiding a charge on one\'s own tab is refused, naming who can, and posts nothing', async () => {
     const own = charge('u-officer')
 

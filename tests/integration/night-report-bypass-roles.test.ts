@@ -7,7 +7,7 @@ import type { NightRole } from '#shared/utils/night-authority'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Issue 1537 (E-123 criterion 1 as amended, 0110): one officer role holds all three bypasses, so
+// Issue 1537 (E-123 criterion 1 as amended, 0111): one officer role holds all three bypasses, so
 // the report flags each by the role it stood in for, whatever the rota stamped.
 
 async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>): Promise<void> {

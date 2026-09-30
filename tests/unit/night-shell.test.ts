@@ -156,6 +156,12 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(source).toMatch(/@3xl:grid-cols-/)
   })
 
+  // Issue 1520: tonight's screen passes no actions, and an empty box in a wrapping row can take a
+  // line of its own, a gap under the switch; whether the footer holds nothing empty is in the browser.
+  test('the stocktake footer draws its actions box only for a page that passes actions', async () => {
+    expect(await read(STOCKTAKE_COUNTS)).toMatch(/v-if="\$slots\.actions"[^>]*>\s*<slot name="actions"/)
+  })
+
   // The hub is the exception, and only the hub: it is the navigation rather than a screen with
   // work on it, so it spends the whole viewport on its six tiles (E-112 criterion 1).
   const THE_HUB = 'index.vue'

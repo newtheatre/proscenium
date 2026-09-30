@@ -22,7 +22,7 @@ export const PERSONAS: Persona[] = [
   // Module A: identity
 
   { email: 'dev-admin@e2e.newtheatre.org.uk', name: 'Ada Admin (dev)', role: 'ADMIN', shape: 'full', describes: 'Everything, including the settings and the roll of Fellows.' },
-  { email: 'dev-president@e2e.newtheatre.org.uk', name: 'Pru President (dev)', role: 'PRESIDENT', shape: 'full', describes: 'Reads the audit trail, the open safety items and the season figures; writes no money and grants no role (0112).' },
+  { email: 'dev-president@e2e.newtheatre.org.uk', name: 'Pru President (dev)', role: 'PRESIDENT', shape: 'full', describes: 'Reads the audit trail, the open safety items and the season figures; writes no money and grants no role (0113).' },
   { email: 'dev-secretary@e2e.newtheatre.org.uk', name: 'Sol Secretary (dev)', role: 'SECRETARY', shape: 'full', describes: 'The welfare officer: verifies access profile declarations and reads the roll of Fellows. Not general box office (D-127).' },
   { email: 'dev-committee@e2e.newtheatre.org.uk', name: 'Cal Committee (dev)', role: 'COMMITTEE', shape: 'full', describes: 'A post with no standing work of its own yet: the season figures and reports, nothing else.' },
   { email: 'dev-member@e2e.newtheatre.org.uk', name: 'Mel Member (dev)', role: null, shape: 'full', describes: 'An ordinary account: no roles, nothing in the admin screens.' },
@@ -35,11 +35,11 @@ export const PERSONAS: Persona[] = [
 
   // Module E: show night
 
-  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Sets up the programme and its prices, works the desk, runs the bar and its stock, and opens the door, the till and the duty manager screens with no shift, audited for it (0044, 0090, 0110).' },
+  { email: 'dev-foh@e2e.newtheatre.org.uk', name: 'Fen Foh (dev)', role: 'FOH_MANAGER', shape: 'full', describes: 'Sets up the programme and its prices, works the desk, runs the bar and its stock, and opens the door, the till and the duty manager screens with no shift, audited for it (0044, 0090, 0111).' },
 
   // Module G: training, and safety
 
-  { email: 'dev-theatre@e2e.newtheatre.org.uk', name: 'Tam Theatre (dev)', role: 'THEATRE_MANAGER', shape: 'full', describes: 'The rooms, the training catalogue and its leads, and the open safety items (0111).' },
+  { email: 'dev-theatre@e2e.newtheatre.org.uk', name: 'Tam Theatre (dev)', role: 'THEATRE_MANAGER', shape: 'full', describes: 'The rooms, the training catalogue and its leads, and the open safety items (0112).' },
 
   // Module I: finance
 

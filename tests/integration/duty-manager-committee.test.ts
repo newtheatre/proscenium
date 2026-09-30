@@ -13,7 +13,7 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Decision 0114 against the real migrations: a duty manager shift needs a live committee role
+// Decision 0115 against the real migrations: a duty manager shift needs a live committee role
 // beside its training, as a predicate on every write that confirms one and on the night's read.
 
 const NOW = Math.floor(Date.now() / 1000)
@@ -74,7 +74,7 @@ const STANDINGS = [
   ['a Committee role that has lapsed', { role: 'COMMITTEE', expiresAt: NOW - DAY }, 0],
 ] as const
 
-describe('the gate a duty manager shift carries (0114)', () => {
+describe('the gate a duty manager shift carries (0115)', () => {
   test('a duty manager shift carries the committee role, and the door and the bar do not', () => {
     expect(dutyManagerGate.committeeAt).toBe(NOW)
     expect(shiftGate('DOOR', 'ADMN-103', TODAY, NOW).committeeAt).toBeUndefined()

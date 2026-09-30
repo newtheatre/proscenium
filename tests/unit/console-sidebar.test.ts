@@ -48,7 +48,7 @@ describe('a group with one visible entry is drawn as that entry (0105)', () => {
     expect(drawn('PRESIDENT')).toEqual(['entry /rota/manage/safety', 'group people', 'entry /money', 'entry /reports', 'entry /admin/audit'])
   })
 
-  // The bar joined the Front of House Manager's post whole, the catalogue with the count (0110).
+  // The bar joined the Front of House Manager's post whole, the catalogue with the count (0111).
   test('the Front of House Manager\'s Bar is the whole group', () => {
     expect(drawn('FOH_MANAGER')).toContain('group bar')
   })

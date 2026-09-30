@@ -4,8 +4,8 @@
 - Date: 2026-09-23
 - Amended: 26 September 2026 by 0102, under which `FOH_MANAGER` also holds `money.refund` and
   approves a paid refund on any day, no longer through the night bypass
-- Amended: 29 September 2026 by 0112, under which the other pairings the #1211 audit raised are
-  decided: one role per committee post, and the bar is the Front of House Manager's (0110)
+- Amended: 29 September 2026 by 0113, under which the other pairings the #1211 audit raised are
+  decided: one role per committee post, and the bar is the Front of House Manager's (0111)
 
 ## Context
 

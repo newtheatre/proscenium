@@ -230,7 +230,7 @@ describe.skipIf(skip !== null)('one stocked thing sells at many sizes (F-112 cri
     const id = await addVariant(productId)
     const itemId = await anItem()
     await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [{ itemId, qty: 175 }] })
-    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+    expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
 
     const refused = await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [] })
     expect(refused.status).toBe(409)
@@ -255,7 +255,7 @@ describe.skipIf(skip !== null)('one stocked thing sells at many sizes (F-112 cri
     const groupItem = await anItem({ name: named('Tonic') })
     const groupId = await addChoiceGroup([{ itemId: groupItem, qty: 200 }])
     await send('PUT', `/api/admin/bar/variants/${id}/choice`, { choiceGroupId: groupId })
-    await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })
+    expect((await send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' })).status).toBe(200)
 
     expect((await send('PUT', `/api/admin/bar/variants/${id}/components`, { components: [] })).status).toBe(200)
   })

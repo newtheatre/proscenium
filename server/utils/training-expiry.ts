@@ -166,7 +166,7 @@ async function sendDigests(event: H3Event | undefined, at: Date, armed: boolean)
 export interface DigestRecipient {
   userId: string
   // True for a holder of the catalogue (`training.revoke`), who reads the whole estate rather
-  // than the departments they happen to lead (0111).
+  // than the departments they happen to lead (0112).
   everything: boolean
 }
 

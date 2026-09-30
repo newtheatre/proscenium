@@ -7,7 +7,7 @@ import type { NightRole } from '#shared/utils/night-authority'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Issue 1537 (E-130 criterion 6 as amended, 0110): a bypass at a venue with no performance has no
+// Issue 1537 (E-130 criterion 6 as amended, 0111): a bypass at a venue with no performance has no
 // night report, so the Night reports screen is where it surfaces, read from the rows themselves.
 
 const NIGHT = '2026-10-17'

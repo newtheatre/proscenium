@@ -518,7 +518,7 @@ async function resolveTab(
   }
 
   // The refusals above are for the reader; this is what holds the cap. It lifts for an override,
-  // and only one made by someone other than the holder (criteria 3 and 4, 0115).
+  // and only one made by someone other than the holder (criteria 3 and 4, 0116).
   const guard = tabCapGuard(holder.id, chargePence, cap, capOverridden ? actorId : null)
   return { holderId: holder.id, holderName: holder.name, outstandingPence, capOverridden, guard }
 }

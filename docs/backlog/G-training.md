@@ -12,8 +12,8 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
 4. Answered 2 September: session running is scoped, but by competence rather than by department. Trainer standing is one cross-department certification (LEAD-CERT), and a trainer may teach only a module they currently hold a record for. A trainer may never sign off a certification, and a certification is not normally attached to a session at all, because it is issued on experience gained outside training; G-112 criterion 3's refusal of sign-off-only modules already covers that.
 5. Quiz governance for V2: who authors and reviews quiz content, and does editing a quiz after people have passed it invalidate or merely date-stamp their attempts?
 6. Answered 2 September: the session's own trainer may release the freeze, and only while the register carries no marks. Waiting on an officer at 18:50 is the friction that answer removes. Two consequences for G-115 and G-116: the release is a conditional write predicated on zero marks existing rather than a read followed by a write, and G-116's marking race has to assume the module list can change under it until the first mark lands.
-7. Answered 2 September: TRAINING_MANAGER holds `training.leads`. The training officer is who knows which people are stepping up, so appointing stewards belongs with running the module rather than with the administrator alone. Amended 29 September 2026 by decision 0111: the training catalogue is the Theatre Manager's (constitution 6.5, 9.5, 9.6), so `THEATRE_MANAGER` holds `training.leads` beside the IT Manager, and `TRAINING_MANAGER` is retired.
-8. Answered 2 September: TRAINING_MANAGER holds `training.revoke`; `training.override` stays ADMIN alone. Amended 29 September 2026 by decision 0111: `THEATRE_MANAGER` holds `training.revoke` in its place; `training.override` still stays ADMIN alone. Revocation is a safety act that sometimes has to happen tonight, and waiting for an administrator is the friction. Stamping a record as never expiring is the rarer break-glass and stays where G-120 criterion 5 put it.
+7. Answered 2 September: TRAINING_MANAGER holds `training.leads`. The training officer is who knows which people are stepping up, so appointing stewards belongs with running the module rather than with the administrator alone. Amended 29 September 2026 by decision 0112: the training catalogue is the Theatre Manager's (constitution 6.5, 9.5, 9.6), so `THEATRE_MANAGER` holds `training.leads` beside the IT Manager, and `TRAINING_MANAGER` is retired.
+8. Answered 2 September: TRAINING_MANAGER holds `training.revoke`; `training.override` stays ADMIN alone. Amended 29 September 2026 by decision 0112: `THEATRE_MANAGER` holds `training.revoke` in its place; `training.override` still stays ADMIN alone. Revocation is a safety act that sometimes has to happen tonight, and waiting for an administrator is the friction. Stamping a record as never expiring is the rarer break-glass and stays where G-120 criterion 5 put it.
 
 ## G-101: My training dashboard with derived validity
 
@@ -103,7 +103,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   7. Withdrawing asks first, in the shared confirmation: it says that a place passes to whoever
      is next on the waiting list, or that a waiting member leaves the list, and that signing up
      again joins at the back; nothing is withdrawn until the member confirms.
-  8. Added 29 September 2026 by decision 0114: a module may be marked committee-only in the
+  8. Added 29 September 2026 by decision 0115: a module may be marked committee-only in the
      module editor and the catalogue import. For a member without a live committee role (any of
      `COMMITTEE_ROLES`, never `ADMIN` alone), the catalogue, the module page, what's next and the
      sessions list still show it, but its one action is disabled and reads "Only available to the
@@ -142,7 +142,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   3. Lifecycle is draft, active, retired: drafts are invisible to members (G-103), and retiring a module blocks new sessions, sign-offs and requests while leaving existing records readable.
   4. Briefs cannot carry an expiry policy, cannot be prerequisites and cannot grant trainer or supervisor standing; the write path refuses each.
   5. Material links are owned by the module's department and editable by its leads as well as administrators.
-  6. Added 29 September 2026 (decision 0111): the catalogue (`training.write`) is the Theatre Manager's role and the IT Manager's; the training officer this story named is the Theatre Manager.
+  6. Added 29 September 2026 (decision 0112): the catalogue (`training.write`) is the Theatre Manager's role and the IT Manager's; the training officer this story named is the Theatre Manager.
 - Source: Prompt Book G-3, G-4; audit TR-7; Get-In constraint 6
 
 ## G-108: Prerequisites as direct edges with cycle detection
@@ -185,7 +185,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   3. Lead assignments follow the committee year: they default to expiry at handover (31 July, Europe/London) in line with the platform role model, and an expired assignment confers nothing.
   4. Removing a lead takes effect on their next request; nothing is cached beyond the session staleness window.
   5. Lead assignment and removal are audited with actor and target.
-  6. Added 29 September 2026 (decision 0111): assigning and removing leads (`training.leads`) is the Theatre Manager's role and the IT Manager's, at the start of each committee year.
+  6. Added 29 September 2026 (decision 0112): assigning and removing leads (`training.leads`) is the Theatre Manager's role and the IT Manager's, at the start of each committee year.
 - Source: Prompt Book module 0 (P3), G-3; audit TR roles table
 
 ## G-111: Trainer standing derived live
@@ -217,7 +217,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
   6. The session's own page changes its places while it is planned, open or full and its register
      is unopened, and says how many members the change promoted or moved back to the waiting list.
   7. Added 26 September 2026 (issue 1336): the scheduler names the trainer. A trainer always
-     teaches what they schedule; the Theatre Manager (`training.write`, 0111) may name anybody with
+     teaches what they schedule; the Theatre Manager (`training.write`, 0112) may name anybody with
      trainer standing today who holds every module the session teaches, and that person, not
      the scheduler, is the session's trainer: it is theirs on My training, under "Sessions you
      teach", and its register is theirs to open. Left unnamed, the scheduler teaches it.
@@ -379,7 +379,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
 - Story: As an administrator, I want revocation with a mandatory reason so that the only way to take a record away is deliberate, attributed and repeatable.
 - Depends on: G-101
 - Acceptance criteria:
-  1. Revocation is the Theatre Manager's and the IT Managers' (`training.revoke`); trainers and leads cannot revoke. Amended 29 September 2026 by decision 0111: this read "administrator-only", which open question 8 had already widened.
+  1. Revocation is the Theatre Manager's and the IT Managers' (`training.revoke`); trainers and leads cannot revoke. Amended 29 September 2026 by decision 0112: this read "administrator-only", which open question 8 had already widened.
   2. A reason is mandatory; revocation without one is refused.
   3. Revocation is idempotent: revoking an already-revoked record succeeds without a second audit entry or a changed outcome.
   4. A revoked record immediately stops counting at every gate, and derived standings (trainer, supervisor) fall with it (G-111).
@@ -422,7 +422,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
 - Depends on: G-123
 - Acceptance criteria:
   1. A daily sweep emails each member a grouped warning when a record enters the 60-day window, and again at 14 days before expiry; each warning sends once per record and window, held by the notification ledger.
-  2. Monthly digests go to each department's leads (their departments) and to administrators and the Theatre Manager (everything), on the first days of the month. Amended 29 September 2026 by decision 0111: the safety officer's role folded into the Theatre Manager's.
+  2. Monthly digests go to each department's leads (their departments) and to administrators and the Theatre Manager (everything), on the first days of the month. Amended 29 September 2026 by decision 0112: the safety officer's role folded into the Theatre Manager's.
   3. Digests are sent even when empty, because the digest's absence is itself the alert.
   4. The sweep ships in dry-run mode: it computes and reports what it would send until the mode is deliberately armed, and the arming is audited.
   5. Nothing in the sweep ever changes a record: expiry happens because the calendar moved, and the sweep merely notices.
@@ -513,7 +513,7 @@ Counts: 27 MVP stories (G-101 to G-123, G-125, G-128 to G-130), 12 V2 stories (G
      (which a new account holds none of), expiry and evidence.
   4. Making the account needs `training.by-address`, held by the Theatre Manager and the IT
      Manager, or a live lead of the module's own department, derived at the request (0037);
-     `accounts.create` is not required and not granted. Amended 29 September 2026 by decision 0111: the Training Manager's
+     `accounts.create` is not required and not granted. Amended 29 September 2026 by decision 0112: the Training Manager's
      role folded into the Theatre Manager's.
   5. Nothing is sent to the address. The record is the person's when they claim the account by
      A-116's own mechanism; a Workspace address is claimed by Google alone (0008).

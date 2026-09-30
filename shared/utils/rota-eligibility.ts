@@ -35,7 +35,7 @@ export function noLongerQualifies(role: ShiftRole, claimantName: string, moduleN
 }
 
 // Roles that also need a live committee role, at claim and at use: a grant that narrows who may
-// take the shift and never opens anything by itself (0114, 0009).
+// take the shift and never opens anything by itself (0115, 0009).
 const COMMITTEE_SHIFT_ROLES: readonly ShiftRole[] = ['DUTY_MANAGER']
 
 export function needsCommitteeRole(role: ShiftRole): boolean {
@@ -47,7 +47,7 @@ export function forCommitteeMembers(role: ShiftRole, who: string): string {
   return `A ${saysShiftRole(role).toLowerCase()} shift is for committee members, and ${who} hold a committee role`
 }
 
-// The E-105 criterion 3 pair for a claimant who has left the committee since claiming (0114).
+// The E-105 criterion 3 pair for a claimant who has left the committee since claiming (0115).
 export function noLongerOnCommittee(role: ShiftRole, claimantName: string): LapsedClaim {
   const lower = saysShiftRole(role).toLowerCase()
   return {

@@ -147,7 +147,7 @@ export interface MemberSessionRow {
 
 export interface MemberSession extends MemberSessionRow {
   modules: { id: string, name: string, safetyCritical: boolean, committeeOnly: boolean }[]
-  // It teaches a committee-only module and this member holds no committee role (0114).
+  // It teaches a committee-only module and this member holds no committee role (0115).
   committeeOnly: boolean
   // Derived from the position, never read from a column.
   placed: boolean
@@ -269,7 +269,7 @@ export async function trainingActionsFor(userId: string, today: string, closesHo
 }
 
 // The committee-only modules this member may not put themselves forward for: none if they hold a
-// live committee role, every flagged one if not (0114). The flagged set is a handful of rows.
+// live committee role, every flagged one if not (0115). The flagged set is a handful of rows.
 export async function committeeOnlyModulesFor(userId: string): Promise<ReadonlySet<string>> {
   const flagged = await db.select({ id: schema.trainingModules.id })
     .from(schema.trainingModules)

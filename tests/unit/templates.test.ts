@@ -539,9 +539,9 @@ describe('the shared labels (item 8)', () => {
 
   test('every role name is a Title Case proper title', () => {
     for (const role of ROLES) {
-      // "of" is the one word a title leaves lower case; everything else is capitalised.
+      // "of" and "and" are the words a title leaves lower case; everything else is capitalised.
       const lower = saysRole(role).split(' ').filter(word => !/^[A-Z]/.test(word))
-      expect(lower.filter(word => word !== 'of')).toEqual([])
+      expect(lower.filter(word => word !== 'of' && word !== 'and')).toEqual([])
     }
     expect(saysRole('ADMIN')).toBe('IT Manager')
     expect(saysRole('FOH_MANAGER')).toBe('Front of House Manager')

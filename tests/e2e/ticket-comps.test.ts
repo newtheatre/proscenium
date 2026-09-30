@@ -30,7 +30,7 @@ beforeAll(async () => {
   boxOffice = await registerMember(app, 'comp-desk', generatePassword())
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
-  // ticketing.manage is the IT Manager's alone (0112), and privileged (0037/A-112): requirePermission
+  // ticketing.manage is the IT Manager's alone (0113), and privileged (0037/A-112): requirePermission
   // needs a confirmed second factor before ticketing.write is honoured at all, not only ticketing.manage.
   const managerPassword = generatePassword()
   ticketingManager = await registerMember(app, 'comp-manager', managerPassword)

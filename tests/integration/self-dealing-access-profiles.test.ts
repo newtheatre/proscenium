@@ -7,7 +7,7 @@ import { boundStatement, createTestDatabase, rows } from '#tests/helpers/databas
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// D-127 criterion 2, 0115: nobody verifies or declines their own declaration. The refusal is on
+// D-127 criterion 2, 0116: nobody verifies or declines their own declaration. The refusal is on
 // the UPDATE that decides it (0003), so no read before it can be skipped around.
 
 const NOW = 1_800_000_000
@@ -53,7 +53,7 @@ const profile = (): { status: string, verifiedBy: string | null } | undefined =>
 const decisions = (): unknown[] =>
   rows(database, `SELECT id FROM audit_log WHERE action IN ('access-profile.verified', 'access-profile.declined') AND target = ?`, 'user:u-secretary')
 
-describe('an officer never decides their own declaration (D-127 criterion 2, 0115)', () => {
+describe('an officer never decides their own declaration (D-127 criterion 2, 0116)', () => {
   test('verifying one\'s own declaration changes nothing and records nothing', () => {
     expect(decide('VERIFIED', 'u-secretary')).toEqual([])
     expect(profile()).toEqual({ status: 'PENDING', verifiedBy: null })

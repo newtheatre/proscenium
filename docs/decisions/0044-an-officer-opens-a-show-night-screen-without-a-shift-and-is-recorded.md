@@ -10,7 +10,7 @@
   when a screen looks, and the night report lists every role an officer stood in for
 - Amended: 26 September 2026 by 0095, under which tonight's confirmed duty manager also opens the
   door for their own performance and window, as cover recorded once, never the till
-- Amended: 29 September 2026 by 0110, under which `FOH_MANAGER` holds all three night permissions,
+- Amended: 29 September 2026 by 0111, under which `FOH_MANAGER` holds all three night permissions,
   so "and neither does the front of house officer's role" no longer holds; a door shift still
   does not open the till
 

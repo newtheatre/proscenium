@@ -2,7 +2,7 @@ import { PHONE_WIDTH } from './types'
 import type { Shot } from './types'
 
 // The front of house manager opens the door, the till and the duty manager screens with no shift
-// (0044, 0110). The seed runs two performances at the house tonight.
+// (0044, 0111). The seed runs two performances at the house tonight.
 const foh = 'dev-foh@e2e.newtheatre.org.uk'
 
 export const showNight: Shot[] = [

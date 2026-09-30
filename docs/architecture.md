@@ -954,7 +954,7 @@ enforcement (E-111 criterion 5, restated in 0040): the three abilities in
 
 | Piece | What it is |
 | --- | --- |
-| `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till; the Front of House Manager's role opens all three as the officer bypass (0110). |
+| `NightRole` | `DUTY_MANAGER`, `DOOR` or `BAR`. A door shift does not open the till; the Front of House Manager's role opens all three as the officer bypass (0111). |
 | `NightScope` | `{ night?, venueId?, performanceId? }`. All optional: the common case is tonight, at the one venue running. |
 | The resolution | `{ account, night, role, venueId, performanceIds, via, shiftId?, openingId? }`, where `via` is `SHIFT`, `OFFICER` or `COVER` (tonight's duty manager covering the door, 0095). |
 | A refusal | 403 naming both ways in, the shift and the officer role, or the hours the shift is worked. An administrator is never offered as the way out. |
@@ -992,7 +992,7 @@ standing grant to begin with (0044); it also writes no audit row of its own, bec
 `shift.claimed` and `shift.confirmed` entries are already the record of how the account came to
 hold it. Only when no shift covers the request does the guard fall through to `OFFICER`, which
 stands on the permissions `night.door`, `night.till` and `night.manage`, all three held by
-`FOH_MANAGER` since the bar joined the post (0110), the one named exception to standing
+`FOH_MANAGER` since the bar joined the post (0111), the one named exception to standing
 permissions being administrative only (0009, 0044). `FOH_MANAGER` also holds the programme and the desk
 (`ticketing.*`, 0090) and `money.refund`, so it refunds a paid ticket on any day through its own
 permission, never through the bypass (0102). Planning the rota is not one of them: `rota.read` and
@@ -1446,14 +1446,14 @@ through `toCsv()`, which already carries the formula-injection guard D-129 built
 
 A third read, `GET /api/admin/reports/opening-bypasses`, is the surface for an officer bypass
 at a venue with no performance that night, which no night report carries (E-130 criterion 6 as
-amended, issue 1537, 0110). `openingBypassesQuery` reads every `night.officer-bypass` row whose
+amended, issue 1537, 0111). `openingBypassesQuery` reads every `night.officer-bypass` row whose
 `performanceIds` is empty, by the show night the row names between the period's `fromDay` and
 `toDay` inclusive, joining `bar_openings` for the label where the row names one. It reads the
 rows rather than the openings, so a bar opened with no opening planned is listed too, and it is
 capped rather than paged, as such a night is rare. The Performances tab lists it under its table.
 
 Criterion 3's "officers and administrators" is `reports.read`, held by every post role and
-`COMMITTEE` (0112); `ADMIN` holds it automatically like every permission. Every
+`COMMITTEE` (0113); `ADMIN` holds it automatically like every permission. Every
 figure reads live from the operational tables, never the frozen `night_reports.report` blob:
 `incidents`, `age_checks` and `shifts` are already performance-keyed and queryable directly,
 where the frozen report is one night's own snapshot rather than a queryable history. "Erased
@@ -1645,7 +1645,7 @@ migration with `requires_follow_up = false` on all four: nothing routes until a 
 member deliberately opts a severity in, deliberately not the generic `CONFIG_KEYS` system,
 which would 503 on every incident write until all four keys were configured by hand
 (criterion 1). `PUT /api/admin/safety/severities/[severity]` flips one, guarded by
-`safety.write` (the Theatre Manager's since 0111, which folded the `SAFETY_OFFICER` role into
+`safety.write` (the Theatre Manager's since 0112, which folded the `SAFETY_OFFICER` role into
 `THEATRE_MANAGER`); the route is always an UPDATE, never a create, since every severity already
 exists.
 
@@ -1660,7 +1660,7 @@ territory or out of it; only the new entry's severity is ever checked). It reads
 transactional message with no incident free text in it, per 0011 (criterion 2).
 
 `GET /api/admin/safety/open-items` is the Theatre Manager's list (`safety.read`, which the
-President also holds, 0112): every incident at a routed
+President also holds, 0113): every incident at a routed
 severity with no closure yet, across every night, not scoped to tonight. `POST
 /api/admin/safety/incidents/[id]/close` requires a resolution note and writes
 `incident_followup_closures`, append-only and `UNIQUE(incident_id)`: a second closure attempt
@@ -1788,7 +1788,7 @@ grouped a person and read against a current record of `FIRST_AID_MODULE` (read w
 committee's own `firstAiders` line (`saysFirstAiders`). A GET records no bypass (0098). `PUT
 /api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
 `emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`, and
-to `THEATRE_MANAGER` for fire training (0111).
+to `THEATRE_MANAGER` for fire training (0112).
 `GET /api/admin/venues/emergency`, the committee's overview, filters by venue name and by
 `filed` through `shared/utils/emergency-cards-list.ts` (K-129); the `venues` envelope it answers
 also carries paging, though a venue with no card yet still lists.
@@ -2110,7 +2110,7 @@ same unpaid figure for the status strip.
 
 Access profiles are declared at `/account/access` and verified at `/box-office/access-profiles`
 (D-127), the one screen `access.verify` gates rather than any of the box office's ordinary
-permissions: the Secretary and Welfare Officer (`SECRETARY`, 0112), never general box office. The special-category payload is
+permissions: the Secretary and Welfare Officer (`SECRETARY`, 0113), never general box office. The special-category payload is
 one AES-256-GCM blob per row, `server/utils/access-profile-crypto.ts` the only place that touches
 the key (0050); `server/utils/access-profiles.ts` is where declaring, verifying, declining,
 withdrawing and the door's read all live. A save compares itself with what is stored
@@ -2322,8 +2322,12 @@ the in-application `health:watch` task alerts if it stays unhealthy.
 CI gates, eleven of them: `build`, `typecheck`, `lint`, `typecheck:bun`, `test`, and the six
 checkers (comments, migrations, content tokens, ledger, notifications, audit). `typecheck` and
 `typecheck:bun` are separate compilers over separate projects, and passing one says nothing about
-the other. `test:e2e` runs on every pull request into `unified/main`, in ten slices
-(`E2E_SLICE`, `scripts/run-tests.ts`), and each slice is a required check on `unified/main` (0109).
+the other. They run as parallel jobs behind one required check, `ci` (0110). `test:e2e` runs on every
+pull request into `unified/main`, in ten slices (`E2E_SLICE`, `scripts/run-tests.ts`), and each
+slice is a required check on `unified/main` (0109). A scope step (`scripts/lib/ci-scope.ts`) reads
+the pull request's diff: documentation alone skips build, typecheck, lint and the browser suites,
+a change reaching no browser journey skips the suites, and a change to suites alone runs just those
+(`E2E_SUITES`). Anything its allowlist does not name runs everything.
 
 ## Testing (0016)
 

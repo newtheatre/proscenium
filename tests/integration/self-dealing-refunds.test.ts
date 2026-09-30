@@ -6,7 +6,7 @@ import { bindD1 } from '#tests/helpers/d1'
 import { ticketTypeFixture, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 
-// D-116 criterion 7, 0115: nobody refunds a ticket on a booking in their own name. The ticket's
+// D-116 criterion 7, 0116: nobody refunds a ticket on a booking in their own name. The ticket's
 // claim carries the refusal, so no ledger entry or audit row follows a refused refund either.
 
 let database: TestDatabase
@@ -55,7 +55,7 @@ const refundLines = (ticketId: string): unknown[] =>
 const refundAudits = (reservationId: string): unknown[] =>
   rows(database, `SELECT id FROM audit_log WHERE action = 'ticket.refunded' AND target = ?`, `reservation:${reservationId}`)
 
-describe('a refunder never refunds their own booking (D-116 criterion 7, 0115)', () => {
+describe('a refunder never refunds their own booking (D-116 criterion 7, 0116)', () => {
   test('a ticket on a booking in the refunder\'s own name is refused, naming who can, and nothing is written', async () => {
     const ticketId = collected('own-1', 'u-officer')
 

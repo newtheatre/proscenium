@@ -35,7 +35,7 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
 5. ~~Who may record a no-show (any admin, or only the Theatre Manager), and does the consequence
    ladder reset at the committee-year boundary?~~ **Answered on both halves, and built.** Anyone
    holding `rooms.write` may record one and withdraw one; it is not narrowed to the Theatre
-   Manager. Since 29 September 2026 (0111, 0112) `rooms.write` is held by the Theatre Manager and
+   Manager. Since 29 September 2026 (0112, 0113) `rooms.write` is held by the Theatre Manager and
    the IT Managers alone, the retired Manager role's share having gone to the Theatre Manager.
    The ladder looks back over a rolling window **and** clears at the committee year end,
    whichever is the shorter reach, so a member does not carry a first-term no-show into the
