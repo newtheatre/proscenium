@@ -173,7 +173,7 @@ describe('a months policy is the only one carrying months (G-123 criterion 1)', 
         'id', 'department', 'kind', 'name', 'description', 'notes', 'delivery_mode', 'expiry_mode',
         'expiry_months', 'allows_external', 'external_evidence', 'safety_critical',
         'signoff_required', 'grants_trainer', 'grants_supervisor', 'self_registrable', 'status',
-        'sort', 'created_at', 'updated_at',
+        'sort', 'created_at', 'updated_at', 'committee_only',
       ])
     })
   })

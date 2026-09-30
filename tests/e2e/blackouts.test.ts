@@ -270,15 +270,16 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
   test('a closure over several days cancels each day, and tells the member once', async () => {
     const room = await makeRoom()
     await send('PUT', '/api/admin/config/ROOM_ACTIVE_BOOKINGS_PER_MEMBER', { value: 500 }, officer)
-    for (const day of [80, 81, 82, 83, 84]) expect((await book(room, span(day))).status).toBe(200)
+    // Well inside ROOM_BOOKING_HORIZON_WEEKS whatever hour the run starts, or the last day asks.
+    for (const day of [70, 71, 72, 73, 74]) expect((await book(room, span(day))).status).toBe(200)
 
     const before = read<{ n: number }>(
       `SELECT (SELECT count(*) FROM notification_log WHERE user_id = ?1 AND type = 'room.blackout.cancelled') + (SELECT count(*) FROM notification_digest_entries WHERE user_id = ?1 AND type = 'room.blackout.cancelled') AS n`,
       member.id)?.n ?? 0
 
     const answered = await closeRoom(room, {
-      startsAt: span(80, 0).startsAt,
-      endsAt: span(84, 23).endsAt,
+      startsAt: span(70, 0).startsAt,
+      endsAt: span(74, 23).endsAt,
     }, 'Get-in for the autumn show')
     const body = await answered.json() as { cancelled: number, told: number }
 

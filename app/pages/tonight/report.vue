@@ -379,13 +379,13 @@ async function signOff(): Promise<void> {
             {{ saysDoorCover(cover.name) }}
           </li>
         </ul>
-        <!-- The flags above read the audit rows, not the slots, so they stand with none stamped (E-123). -->
+        <!-- The flags above read the audit rows, not the slots, so they stand with no shift on the rota (E-123). -->
         <p
           v-if="report.staffing.length === 0"
           class="text-sm text-muted"
           data-test="staffing-none-stamped"
         >
-          No shifts were stamped for this performance.
+          No shifts were on the rota for this performance.
         </p>
         <ul
           v-else

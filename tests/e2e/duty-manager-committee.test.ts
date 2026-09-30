@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
 import { londonParts } from '#shared/utils/london'
 import { showNightOf } from '#shared/utils/show-night'
+import { committeeShiftRefusal } from '#shared/utils/night-authority'
 import { adminSession, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
@@ -175,7 +176,7 @@ describe.skipIf(skip !== null)('a confirmed duty manager shift on the night (E-1
 
     const answered = await send('GET', '/api/tonight/duty-manager', undefined, member.cookie)
     expect(answered.status).toBe(403)
-    expect((await refusal(answered)).statusMessage).toContain(FOR_COMMITTEE)
+    expect((await refusal(answered)).statusMessage).toBe(committeeShiftRefusal().statusMessage)
   })
 
   test('opens the duty manager\'s screen once the holder holds the Committee role', async () => {
