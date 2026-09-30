@@ -1690,3 +1690,32 @@ describe('the unstaffed digest leaves out an external night with no shifts (issu
     })
   })
 })
+
+// A confirmed duty manager the shift opens nothing for leaves the night without one, so the digest
+// still flags the slot (E-108 criterion 2, 0115).
+describe('the unstaffed digest counts only a duty manager holding a committee role (0115)', () => {
+  const NOW = Math.floor(Date.now() / 1000)
+  const STANDINGS = [
+    ['no role at all', undefined, 1],
+    ['the Front of House Manager\'s role', { role: 'FOH_MANAGER', expiresAt: NOW + 30 * 86_400 }, 0],
+    ['the Committee role', { role: 'COMMITTEE', expiresAt: NOW + 30 * 86_400 }, 0],
+    ['a permanent Committee role', { role: 'COMMITTEE', expiresAt: null }, 0],
+    ['the IT Manager\'s role alone', { role: 'ADMIN', expiresAt: NOW + 30 * 86_400 }, 1],
+    ['a Committee role that has lapsed', { role: 'COMMITTEE', expiresAt: NOW - 86_400 }, 1],
+  ] as const
+
+  test.each(STANDINGS)('a confirmed duty manager holding %s', async (_, grant, gap) => {
+    await withDatabase(async (database) => {
+      testVenue(database, { suffix: 'a' })
+      const soon = tonightsPerformance(database, { suffix: 'soon', night: daysAfter(currentShowNight(), 3), venueId: 'venue-a' })
+      const holder = person(database, 'holder')
+      database.batch([['UPDATE users SET last_login_at = ? WHERE id = ?', NOW - 86_400, holder]])
+      if (grant) database.batch([['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', 'grant-holder', holder, grant.role, grant.expiresAt]])
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, ?, ?, ?)',
+        'dm', soon.performanceId, 'DUTY_MANAGER', 1, holder, 'CONFIRMED']])
+
+      const chased = run(database, unstaffedPerformancesQuery(NOW, NOW + 7 * 86_400)) as { performanceId: string, dutyManagerGap: number }[]
+      expect(chased.map(row => [row.performanceId, row.dutyManagerGap])).toEqual(gap ? [[soon.performanceId, 1]] : [])
+    })
+  })
+})
