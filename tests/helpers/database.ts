@@ -25,11 +25,28 @@ export interface TestDatabase {
 // seeding the schema as it stood before one rebuild keeps its import (0052).
 export { applyMigration, applyMigrations } from '../../migration/schema'
 
+let migratedImage: Promise<Uint8Array> | undefined
+
+// Replaying the journal for every test was most of the suite's time; a copy of one migrated
+// image is still a database of its own (0110).
+function migrated(): Promise<Uint8Array> {
+  migratedImage ??= (async () => {
+    const scratch = new Database(':memory:')
+    try {
+      scratch.exec('PRAGMA foreign_keys = ON;')
+      await applyMigrations(scratch)
+      return scratch.serialize()
+    }
+    finally { scratch.close() }
+  })()
+  return migratedImage
+}
+
 // An in-memory database per suite: nothing to clean up, and no test can reach another's rows.
 export async function createTestDatabase(): Promise<TestDatabase> {
-  const raw = new Database(':memory:')
+  const raw = Database.deserialize(await migrated())
+  // Per connection, not part of the image.
   raw.exec('PRAGMA foreign_keys = ON;')
-  await applyMigrations(raw)
   const db = drizzle(raw)
   // D1 has no interactive transaction: atomicity is batch only (0001, 0003). The sink mirrors
   // its all-or-nothing semantics so a test exercises the shape production runs.

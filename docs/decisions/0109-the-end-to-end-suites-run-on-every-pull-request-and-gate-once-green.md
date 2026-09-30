@@ -3,6 +3,8 @@
 - Status: Accepted (IT Manager, 29 September 2026)
 - Date: 2026-09-29
 - Amends: 0029 ("the second runs nightly and on demand")
+- Amended: by 0110, under which a pull request runs only the suites its change can reach, and
+  none for a change to documentation alone.
 
 ## Context
 

@@ -5,43 +5,103 @@ on:
   push:
     branches: [main, unified/main]
 
+# A newer push to a pull request makes the older run's answer moot; a branch push always finishes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+# Each gate on its own runner, behind the one `ci` job branch protection names (0110).
 jobs:
-  ci:
+  # A change to documentation alone skips build, typecheck and lint (`scripts/lib/ci-scope.ts`).
+  scope:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    outputs:
+      app: ${{ steps.scope.outputs.app }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      # postinstall runs `nuxt prepare`, which typecheck, lint and build all need.
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
+      - id: scope
+        name: What this change can reach
+        run: bun scripts/ci-scope.ts
+
+  build:
+    needs: scope
+    if: needs.scope.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
 
       # The production build is the hard gate: a red build means a broken deploy.
       # Its heap is raised in package.json's build script: the Nuxt build outgrew the smaller one.
       - name: Build
         run: bun run build
 
+  typecheck:
+    needs: scope
+    if: needs.scope.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
       - name: Typecheck
         run: bun run typecheck
-
-      - name: Lint
-        run: bun run lint
 
       # tests/, scripts/ and migration/ run under Bun, so Nuxt's typecheck does not see them.
       - name: Typecheck (Bun projects)
         run: bun run typecheck:bun
 
-      # Unit and integration only, in under a second. The end-to-end suites need a dev server and
-      # a browser, and run in their own workflow (0029, 0109).
+  lint:
+    needs: scope
+    if: needs.scope.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Lint
+        run: bun run lint
+
+  # Always, whatever the scope: unit tests read docs/ (the access matrix, the backlog).
+  # The end-to-end suites need a dev server and a browser, and run in their own workflow (0109).
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
       - name: Tests
         run: bun run test
 
-      # The six invariant checkers. One step rather than six, because the runner runs all of
-      # them and names each failure as a GitHub annotation (`scripts/check.ts`).
+  # One step for every checker: the runner runs them all and names each failure as a GitHub
+  # annotation (`scripts/check.ts`). Always, since `check docs` guards docs/.
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
       - name: Checks
         run: bun run check
+
+  # The required check. A gate skipped as out of scope passes; a failed or cancelled one fails it.
+  ci:
+    if: always()
+    needs: [scope, build, typecheck, lint, test, checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every gate passed or was out of scope
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "A gate failed or was cancelled: ${{ join(needs.*.result, ', ') }}"
+          exit 1

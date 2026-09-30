@@ -66,11 +66,12 @@ bun run test:e2e
 bun run build
 ```
 
-`bun run test` is the unit and integration suites, and finishes in under a second. `bun run
+`bun run test` is the unit and integration suites, and finishes in seconds: each test database is
+a copy of one migrated image rather than a fresh migration (0110). `bun run
 test:e2e` is the slow half: it drives a real browser against a single dev server it boots and owns,
 emptying the database between suites, and names each suite as it starts so a slow run says which
 suite is slow (0029). CI gates on both; the second runs on every pull request into `unified/main`,
-in ten slices.
+in ten slices, on the suites that pull request can reach (0110).
 `bun test <file>` still runs one suite on its own.
 
 ### Example data
