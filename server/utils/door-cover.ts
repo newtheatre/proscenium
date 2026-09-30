@@ -1,5 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
+import { holdsCommitteeRole } from './committee-standing'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { showNightBounds } from '#shared/utils/show-night'
 import type { AuditRow } from '#shared/utils/audit'
@@ -34,9 +35,15 @@ function inScope(alias: string, scope: NightScope): SQL {
   return sql`${atVenue}${atPerformance}`
 }
 
-// Tonight's confirmed duty manager for the request's scope, and whether the asker holds a confirmed
-// shift there too: only tonight's own team is told the name. Fixed parameters (0006).
-export function dutyManagerTonightQuery(askerId: string, from: number, to: number, scope: NightScope): SQL {
+// Tonight's confirmed duty manager holding a committee role, so one who could open the door (0115),
+// and whether the asker works there too: only tonight's own team is told the name (0006).
+export function dutyManagerTonightQuery(
+  askerId: string,
+  from: number,
+  to: number,
+  scope: NightScope,
+  at = Math.floor(Date.now() / 1000),
+): SQL {
   return sql`
     SELECT u.name AS name, EXISTS (
       SELECT 1 FROM shifts mine
@@ -49,7 +56,7 @@ export function dutyManagerTonightQuery(askerId: string, from: number, to: numbe
     JOIN users u ON u.id = s.user_id
     WHERE s.role = 'DUTY_MANAGER' AND s.status = 'CONFIRMED' AND p.status <> 'CANCELLED'
       AND p.starts_at >= ${from} AND p.starts_at < ${to}
-      AND u.disabled = 0 AND u.anonymised_at IS NULL${inScope('p', scope)}
+      AND u.disabled = 0 AND u.anonymised_at IS NULL AND ${holdsCommitteeRole(sql`u.id`, at)}${inScope('p', scope)}
     ORDER BY p.starts_at
     LIMIT 1
   `

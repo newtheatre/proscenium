@@ -2,7 +2,7 @@
 export default defineTask({
   meta: {
     name: 'shifts:escalate',
-    description: 'Chase any performance inside seven days with an open shift or an unconfirmed duty manager',
+    description: 'Chase any performance inside seven days with an open shift or no confirmed duty manager on the committee',
   },
   async run() {
     return { result: await escalateUnstaffedRota(undefined) }

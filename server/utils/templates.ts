@@ -470,20 +470,20 @@ The Nottingham New Theatre`,
       const roles = row.noTemplate
         ? 'The venue has no template, so nothing is staffed at all.'
         : (row.missingRoles ? `Missing: ${row.missingRoles}.` : '')
-      const gap = row.dutyManagerGap ? ' No confirmed duty manager: the night cannot run without one.' : ''
+      const gap = row.dutyManagerGap ? ' No confirmed duty manager holding a committee role: the night cannot run without one.' : ''
       return `${row.show} at ${row.venue}, ${row.when}. ${roles}${gap}`.trim()
     }
 
     return {
       subject: `${plural(performances.length, 'performance')} unstaffed inside seven days`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>These performances inside the next seven days still have an open shift or an unconfirmed
-duty manager:</p>
+<p>These performances inside the next seven days still have an open shift or no confirmed
+duty manager holding a committee role:</p>
 <ul>${performances.map(row => `<li>${say(row)}</li>`).join('')}</ul>`),
       text: `Hello ${context.name},
 
-These performances inside the next seven days still have an open shift or an unconfirmed
-duty manager:
+These performances inside the next seven days still have an open shift or no confirmed
+duty manager holding a committee role:
 
 ${performances.map(row => `- ${say(row)}`).join('\n')}
 
