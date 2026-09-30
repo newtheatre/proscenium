@@ -1,6 +1,6 @@
 import { voidTabChargeForm } from '#shared/utils/tab-settlement'
 
-// Void an unsettled tab charge, with a mandatory reason: the bar manager's own call, never the
+// Void an unsettled tab charge, with a mandatory reason: the Front of House Manager's own call, never the
 // till's (F-109 criterion 4).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')

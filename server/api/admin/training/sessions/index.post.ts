@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // G-112 as amended (issue 1336): the scheduler names who teaches. A trainer schedules their own
-  // sessions; only the training officer names somebody else, who must hold trainer standing.
+  // sessions; only the Theatre Manager names somebody else, who must hold trainer standing.
   const teacher = await namedTeacher(resolved, input.trainerId, today)
 
   // Criteria 3 and 4, and question 4's answer. Shared with the retrospective log, which refuses

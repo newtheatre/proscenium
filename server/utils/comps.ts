@@ -118,7 +118,7 @@ export async function requestedCompRequest(id: string | undefined, expiryMinutes
 // the caller has already established they hold tonight's authority at all.
 export async function requireCompDecider(deciderId: string, request: CompRequest): Promise<void> {
   if (!await isDutyOrBarManager(deciderId, request.night)) {
-    throw createError({ statusCode: 403, statusMessage: 'A duty manager or bar manager decides a comp request' })
+    throw createError({ statusCode: 403, statusMessage: 'Tonight\'s duty manager or the Front of House Manager decides a comp request' })
   }
 }
 

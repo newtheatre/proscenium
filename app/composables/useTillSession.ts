@@ -184,7 +184,7 @@ export function useTillSession() {
   }
 
   // The expected figure before anyone commits to closing (F-102 criterion 4, F-118 criterion 3).
-  // Tonight's session, or one an ended night left open that the Bar Manager chose (issue 1316).
+  // Tonight's session, or one an ended night left open that the Front of House Manager chose (issue 1316).
   const closing = ref<{ id: string, venueName: string, night: string } | null>(null)
   const closeModalOpen = ref(false)
   const reconciliation = ref<NightReconciliation | null>(null)

@@ -63,7 +63,7 @@ const cardIcon: Record<DoorVerdict['state'], string> = {
       >
         {{ party }}
       </UBadge>
-      <!-- The wording the Accessibility Officer agreed, and nothing behind it (D-127 criterion 3). -->
+      <!-- The wording the Secretary agreed, and nothing behind it (D-127 criterion 3). -->
       <p
         v-if="access"
         class="flex items-center gap-2 rounded-lg bg-default px-3 py-2 text-base font-semibold text-default"

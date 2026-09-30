@@ -67,7 +67,7 @@ export function sessionByIdQuery(id: string): SQL {
   return sql`SELECT ${SESSION_COLUMNS} FROM till_sessions WHERE id = ${id}`
 }
 
-// Every session an ended night left open, at any bar, for the Bar Manager's list on the till
+// Every session an ended night left open, at any bar, for the Front of House Manager's list on the till
 // (F-102 criterion 5, issue 1316).
 export function earlierOpenSessionsQuery(tonight: string): SQL {
   return sql`

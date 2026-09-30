@@ -49,7 +49,7 @@ const {
   settle: settleTill,
 } = useTillSession()
 
-// What ended nights left open, for the Bar Manager alone; a till closed from it leaves the list.
+// What ended nights left open, for the Front of House Manager alone; a till closed from it leaves the list.
 const {
   left: earlierLeft,
   failure: earlierFailure,

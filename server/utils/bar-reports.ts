@@ -144,7 +144,7 @@ export async function stocktakeVarianceReport(fromAt: number, toAt: number, pagi
   return envelope(items, counted?.total ?? 0, paging.page, paging.pageSize)
 }
 
-// `source = 'TILL'`: module D's ticket comps post comp entries too, and this is the bar manager's
+// `source = 'TILL'`: module D's ticket comps post comp entries too, and this is the Front of House Manager's
 // section, not the box office's.
 const compsScope = (fromAt: number, toAt: number): SQL => sql`
   FROM ledger_entries e

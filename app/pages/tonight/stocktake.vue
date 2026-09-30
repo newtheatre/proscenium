@@ -74,7 +74,7 @@ function saved(line: StocktakeLine): void {
       class="text-sm text-muted"
       data-test="no-stocktake"
     >
-      No stocktake is open. The Bar Manager or the Front of House Manager opens one from the
+      No stocktake is open. The Front of House Manager opens one from the
       console, and it appears here for tonight's bar shift to count into.
     </p>
   </NightScreen>

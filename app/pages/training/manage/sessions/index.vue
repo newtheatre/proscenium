@@ -89,7 +89,7 @@ const teachableOptions = computed(() => plannerModuleOptions(catalogue.value.ite
 const teachable = computed(() => teachableOptions.value.filter(option => !option.disabled))
 const drafts = computed(() => teachableOptions.value.length - teachable.value.length)
 
-// The training officer names who teaches; a trainer always teaches what they schedule, so they are
+// The Theatre Manager names who teaches; a trainer always teaches what they schedule, so they are
 // not offered the choice (G-112 as amended, issue 1336).
 const namesTrainer = computed(() => can(useViewer().value, nameTrainers))
 const { data: trainers } = await useAsyncData(

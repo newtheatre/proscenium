@@ -262,7 +262,7 @@ export const checklistCloses = sqliteTable('checklist_closes', {
   unique('checklist_closes_performance').on(table.performanceId),
 ])
 
-// Which severities route to the safety officer (E-116 criterion 1). One row per severity,
+// Which severities route to the Theatre Manager (E-116 criterion 1). One row per severity,
 // defaulting closed: a severity nobody has opted in notifies nobody, never guessed open.
 export const incidentSeverityConfig = sqliteTable('incident_severity_config', {
   severity: text('severity').primaryKey(),

@@ -27,7 +27,7 @@ const SINCE_THE_ANSWER = sql`coalesce(a.callback_at, a.created_at)`
 export const UNRESOLVED = sql`a.status IN (${sql.join(UNRESOLVED_ATTEMPT_STATUSES.map(status => sql`${status}`), sql`, `)})`
 
 // A charge an ended night left waiting, or taken and not recorded: no shift reaches it now, so it
-// is the Bar Manager's to answer from the till (F-102 criterion 5, issue 1316).
+// is the Front of House Manager's to answer from the till (F-102 criterion 5, issue 1316).
 export const unresolvedBefore = (tonight: string): SQL => sql`a.night < ${tonight} AND ${UNRESOLVED}`
 
 // `sessionOpen` because recording the sale needs that night's till still open at that bar.

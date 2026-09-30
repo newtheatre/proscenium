@@ -482,7 +482,7 @@ export const sessionForm = z.object({
   description: text(2000),
   notes: text(2000),
   moduleIds: z.array(z.string().trim().min(1, 'Say which module you mean').max(32)).min(1, 'Choose at least one module').max(10),
-  // Who teaches it; absent is whoever schedules it. Only the Training Manager names somebody else (G-112).
+  // Who teaches it; absent is whoever schedules it. Only the Theatre Manager names somebody else (G-112).
   trainerId: z.string().trim().min(1).max(64).nullish().transform(value => value ?? null),
 }).refine(session => session.endsAt > session.startsAt, {
   path: ['endsAt'],
@@ -493,7 +493,7 @@ export type SessionInput = z.output<typeof sessionForm>
 
 // A trainer who opens somebody else's session is told who can change that, never a bare
 // "permission" or a read that "could not" happen (issue 1336, docs/copy-style.md section 6).
-export const NOT_YOUR_SESSION = `This session is taught by somebody else. The ${saysRole('TRAINING_MANAGER')} can make you its trainer.`
+export const NOT_YOUR_SESSION = `This session is taught by somebody else. The ${saysRole('THEATRE_MANAGER')} can make you its trainer.`
 
 export function saysSessionStatus(status: string): string {
   if (status === 'OPEN') return 'Open for sign-up'

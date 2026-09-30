@@ -21,7 +21,7 @@ export const PROFILE_FIELDS: ProfileField[] = [
   { name: 'name', label: 'Name', audience: 'officers', optional: false },
   { name: 'pronouns', label: 'Pronouns', audience: 'officers', optional: true },
   { name: 'phone', label: 'Phone number', audience: 'officers', optional: true },
-  // The story's audience is duty managers and safety officers while a shift or production role is
+  // The story's audience is duty managers and the Theatre Manager while a shift or production role is
   // held. Neither exists yet, so it denies everyone rather than opening wider than that (A-114).
   { name: 'emergencyName', label: 'Emergency contact', audience: 'you', optional: true },
   { name: 'emergencyPhone', label: 'Their phone number', audience: 'you', optional: true },

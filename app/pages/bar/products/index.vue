@@ -38,7 +38,7 @@ const filterOptions = computed<Record<string, FilterOption[]>>(() => ({ category
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barProductsList, { options: filterOptions })
 
 // The tidy-up list's size whatever the page shows: a product pouring restricted stock with its
-// switch off is the Bar Manager's to correct, though the till asks anyway (F-106, issue 1299).
+// switch off is the Front of House Manager's to correct, though the till asks anyway (F-106, issue 1299).
 const SWITCHED_OFF: FilterCondition = { key: 'poursRestrictedSwitchedOff', operator: 'is', values: ['true'] }
 
 const [{ data, status, error, refresh }, { data: switchedOff, refresh: recount }] = await Promise.all([

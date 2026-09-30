@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const resolved = await authority(event)
   const night = currentShowNight()
 
-  // A `night.till` holder may open a session anywhere, which is what lets the bar manager open a
+  // A `night.till` holder may open a session anywhere, which is what lets the Front of House Manager open a
   // hire night the rota never covered; everybody else sees only where they are working.
   const officer = resolved.permissions.has('night.till')
   // The same gate the bypass itself carries: a standing grant being used needs the second factor,

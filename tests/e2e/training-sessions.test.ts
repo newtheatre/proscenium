@@ -610,7 +610,7 @@ describe.skipIf(skip !== null)('the scheduler names the trainer (G-112)', () => 
     return person
   }
 
-  test('the Training Manager schedules a session taught by somebody else, who is then its trainer', async () => {
+  test('the Theatre Manager schedules a session taught by somebody else, who is then its trainer', async () => {
     const module = await addModule()
     const teacher = await aTrainerHolding(module)
 
@@ -654,7 +654,7 @@ describe.skipIf(skip !== null)('the scheduler names the trainer (G-112)', () => 
     expect((await schedule({ moduleIds: [module], trainerId: colleague.id }, teacher.cookie)).status).toBe(403)
   })
 
-  test('somebody else\'s register refuses a trainer, naming the Training Manager rather than a bare permission', async () => {
+  test('somebody else\'s register refuses a trainer, naming the Theatre Manager rather than a bare permission', async () => {
     const module = await addModule()
     const teacher = await aTrainerHolding(module)
     const colleague = await aTrainerHolding(module)
@@ -662,7 +662,7 @@ describe.skipIf(skip !== null)('the scheduler names the trainer (G-112)', () => 
 
     const refused = await send('GET', `/api/admin/training/sessions/${id}/register`, undefined, colleague.cookie)
     expect(refused.status).toBe(403)
-    expect(await said(refused)).toContain('Training Manager')
+    expect(await said(refused)).toContain('Theatre Manager')
   })
 })
 
@@ -707,7 +707,7 @@ describe.skipIf(skip !== null)('who may be named, and who is told what', () => {
     expect((await schedule({ moduleIds: [module], trainerId: gone.id })).status).toBe(404)
   })
 
-  test('a colleague opening the session itself is told the Training Manager can change who teaches it', async () => {
+  test('a colleague opening the session itself is told the Theatre Manager can change who teaches it', async () => {
     const module = await addModule()
     const teacher = await adminSession(app, { roles: [] })
     award(teacher.id, trainerCert)
@@ -718,7 +718,7 @@ describe.skipIf(skip !== null)('who may be named, and who is told what', () => {
 
     const refused = await send('GET', `/api/admin/training/sessions/${id}`, undefined, colleague.cookie)
     expect(refused.status).toBe(403)
-    expect(await said(refused)).toContain('Training Manager')
+    expect(await said(refused)).toContain('Theatre Manager')
   })
 })
 

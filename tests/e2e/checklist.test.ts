@@ -495,7 +495,7 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
       await visit(view, `${app.baseURL}/tonight/checklist?performanceId=${performanceId}`, '[data-test="checklist-till"]')
       const said = await view.evaluate<string>(`document.querySelector('[data-test="checklist-till"]').innerText`)
       expect(said).toContain('Tonight\'s till is still open')
-      expect(said).toContain('Bar Manager')
+      expect(said).toContain('Front of House Manager')
     }
     finally {
       view.close()

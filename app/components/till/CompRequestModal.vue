@@ -30,7 +30,7 @@ const reason = defineModel<string>('reason', { required: true })
   <UModal
     v-model:open="open"
     title="Ask for a comp"
-    description="Free, once a duty manager or the bar manager agrees."
+    description="Free, once a duty manager or the Front of House Manager agrees."
   >
     <template #body>
       <div class="space-y-4">
@@ -162,7 +162,7 @@ const reason = defineModel<string>('reason', { required: true })
             data-test="comp-waiting"
             class="space-y-2 py-4 text-center text-sm text-muted"
           >
-            <p>Waiting on a duty manager or the bar manager&hellip;</p>
+            <p>Waiting on a duty manager or the Front of House Manager&hellip;</p>
             <UAlert
               v-if="pollFailure"
               data-test="comp-poll-failure"

@@ -511,7 +511,7 @@ async function resolveTab(
       throw createError({
         statusCode: 409,
         statusMessage: `${holder.name}'s tab is at ${saysMoney(outstandingPence)}; this charge of ${saysMoney(chargePence)} `
-          + `would take it past the ${saysMoney(cap)} cap. Nothing has been charged: a duty manager or bar manager can override.`,
+          + `would take it past the ${saysMoney(cap)} cap. Nothing has been charged: a duty manager or the Front of House Manager can override.`,
       })
     }
     capOverridden = true
@@ -827,7 +827,7 @@ export async function commitSale(
     throw createError({
       statusCode: 409,
       statusMessage: `${tab.holderName}'s tab reached the cap while this was being charged. `
-        + 'Nothing has been charged: read the tab and try again, or ask a duty manager or bar manager to override.',
+        + 'Nothing has been charged: read the tab and try again, or ask a duty manager or the Front of House Manager to override.',
     })
   }
 

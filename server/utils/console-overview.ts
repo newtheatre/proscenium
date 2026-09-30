@@ -49,7 +49,7 @@ export function waitingCountsQuery(queues: readonly NavCount[], leadOf: string |
   return sql`SELECT ${sql.join(queues.map(count => sql`${COUNTS[count](leadOf)} AS ${sql.identifier(count)}`), sql`, `)}`
 }
 
-// `leadOf` is the demand board's own scope (scopeToLeadOf): undefined for a training officer.
+// `leadOf` is the demand board's own scope (scopeToLeadOf): undefined for the Theatre Manager.
 export async function waitingCounts(permissions: ReadonlySet<Permission>, leadOf: string | undefined, leadsDepartment: boolean): Promise<Partial<Record<NavCount, number>>> {
   const queues = queuesFor(permissions, leadsDepartment)
   if (queues.length === 0) return {}

@@ -887,7 +887,7 @@ export function says(value: string | null): string {
 }
 
 // A movement made by another record names that record in words: the table it sits in is the
-// estate's own vocabulary and means nothing to a bar manager (K-128, issue 1151 item 8).
+// estate's own vocabulary and means nothing to the Front of House Manager (K-128, issue 1151 item 8).
 export const MOVEMENT_SOURCE_TABLES = ['ledger_lines', 'stocktake_lines'] as const
 
 const MOVEMENT_SOURCE_WORDING: Record<string, string> = {
