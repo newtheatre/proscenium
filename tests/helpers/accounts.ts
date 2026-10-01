@@ -188,6 +188,8 @@ export async function registerMember(
 export interface AdminOptions {
   // Empty grants nothing, for checking that a guard refuses somebody ordinary.
   roles?: 'ADMIN'[]
+  // The bootstrap refuses a second IT Manager unless told this one is meant (K-122 criterion 4).
+  additional?: boolean
 }
 
 // A privileged session is four steps, not one: a role carrying a permission needs a second factor
@@ -195,7 +197,7 @@ export interface AdminOptions {
 export async function adminSession(app: AppUnderTest, options: AdminOptions = {}): Promise<TestMember> {
   const { codeForStep, stepFor } = await import('#shared/utils/totp')
   const { generatePassword } = await import('./seed')
-  const { roles = ['ADMIN'] } = options
+  const { roles = ['ADMIN'], additional = false } = options
 
   const password = generatePassword()
   const member = await registerMember(app, roles.length ? 'officer' : 'stranger', password)
@@ -204,7 +206,7 @@ export async function adminSession(app: AppUnderTest, options: AdminOptions = {}
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, member.cookie)).json() as { secret: string }
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, member.cookie)
 
-  Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile])
+  Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile, ...(additional ? ['--additional'] : [])])
   forgetSpentStep(app, member.email)
 
   const { attemptId } = await (await request(app, 'POST', '/api/auth/sign-in', { email: member.email, password })).json() as { attemptId: string }

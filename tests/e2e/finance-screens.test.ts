@@ -19,6 +19,7 @@ let admin: TestMember
 let treasurer: TestMember
 let boxOffice: TestMember
 let committee: TestMember
+let member: TestMember
 const treasurerPassword = generatePassword()
 
 beforeAll(async () => {
@@ -28,6 +29,7 @@ beforeAll(async () => {
   treasurer = await registerMember(app, 'screens-treasurer', treasurerPassword)
   boxOffice = await registerMember(app, 'screens-box-office', generatePassword())
   committee = await registerMember(app, 'screens-committee', generatePassword())
+  member = await registerMember(app, 'screens-member', generatePassword())
   await grantRole(app, treasurer, 'TREASURER', admin.cookie)
   await grantRole(app, boxOffice, 'FOH_MANAGER', admin.cookie)
   await request(app, 'POST', '/api/admin/roles', { userId: committee.id, role: 'COMMITTEE' }, admin.cookie)
@@ -64,13 +66,14 @@ function seasonRow(id: string, name: string, startsOn: string, endsOn: string): 
 }
 
 describe.skipIf(skip !== null)('/money: the dashboard over one of the theatre\'s seasons (0087)', () => {
-  test('the finance roles list the seasons, box office reads them only from its own screens', async () => {
+  // Every post role carries `finance.summary` (0113), so the refusal is a member holding no role.
+  test('the committee lists the seasons, a member without a committee role may not', async () => {
     seasonRow('screens-season-autumn', 'Autumn 2018 (screens)', '2018-09-24', '2018-12-14')
     const listed = await send('GET', '/api/admin/finance/seasons', undefined, committee.cookie)
     expect(listed.status).toBe(200)
     const { seasons } = await listed.json() as { seasons: { id: string, name: string, fromDay: string, toDay: string }[] }
     expect(seasons).toContainEqual({ id: 'screens-season-autumn', name: 'Autumn 2018 (screens)', fromDay: '2018-09-24', toDay: '2018-12-14' })
-    expect((await send('GET', '/api/admin/finance/seasons', undefined, boxOffice.cookie)).status).toBe(403)
+    expect((await send('GET', '/api/admin/finance/seasons', undefined, member.cookie)).status).toBe(403)
   })
 
   test('the summary answers a season as the days its row carries', async () => {
@@ -172,9 +175,9 @@ describe.skipIf(skip !== null)('/money/exports: editing a mapping before the CSV
 })
 
 describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105 criterion 4)', () => {
-  test('the committee may list the terms the picker offers, box office may not', async () => {
+  test('the committee may list the terms the picker offers, a member without a committee role may not', async () => {
     expect((await send('GET', '/api/admin/finance/terms', undefined, committee.cookie)).status).toBe(200)
-    expect((await send('GET', '/api/admin/finance/terms', undefined, boxOffice.cookie)).status).toBe(403)
+    expect((await send('GET', '/api/admin/finance/terms', undefined, member.cookie)).status).toBe(403)
   })
 
   test('the whole year is asked for as a year, and a season named by a year is refused (0087)', async () => {

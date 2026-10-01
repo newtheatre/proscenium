@@ -127,7 +127,7 @@ describe.skipIf(skip !== null)('exporting is audited (E-119 criterion 3)', () =>
     await send('GET', `/api/admin/age-checks/export?${RANGE}&format=csv`, undefined, foh.cookie)
 
     const row = read<{ action: string, actor_id: string, detail: string }>(
-      `SELECT action, actor_id, detail FROM audit_log WHERE action = 'age-checks.exported' ORDER BY created_at DESC LIMIT 1`)
+      `SELECT action, actor_id, detail FROM audit_log WHERE action = 'age-checks.exported' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
     expect(row?.action).toBe('age-checks.exported')
     expect(row?.actor_id).toBe(foh.id)
     expect(JSON.parse(row!.detail)).toMatchObject({ from: '2020-01-01', to: '2030-01-01', format: 'csv' })

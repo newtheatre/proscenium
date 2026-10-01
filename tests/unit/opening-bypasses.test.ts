@@ -3,7 +3,7 @@ import { saysOpeningBypass } from '#shared/utils/season-reports'
 import type { OpeningBypassRow } from '#shared/utils/season-reports'
 
 // Issue 1537: a bypass with no performance is said where the committee reads staffing gaps
-// (E-130 criterion 6 as amended), and a report with no shifts stamped says so (E-123 criterion 1).
+// (E-130 criterion 6 as amended), and a report with no shifts on the rota says so (E-123 criterion 1).
 
 const REPORTS = 'app/pages/reports/index.vue'
 const NIGHT_REPORT = 'app/pages/tonight/report.vue'
@@ -41,9 +41,9 @@ describe('the screens carry it (issue 1537)', () => {
     expect(source).toContain('saysOpeningBypass(')
   })
 
-  test('a night report with no shifts stamped says so beside its flags', async () => {
+  test('a night report with no shifts on the rota says so beside its flags', async () => {
     const source = await Bun.file(NIGHT_REPORT).text()
     expect(source).toContain('data-test="staffing-none-stamped"')
-    expect(source).toContain('No shifts were stamped for this performance.')
+    expect(source).toContain('No shifts were on the rota for this performance.')
   })
 })
