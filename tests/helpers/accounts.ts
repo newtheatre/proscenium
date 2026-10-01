@@ -206,7 +206,9 @@ export async function adminSession(app: AppUnderTest, options: AdminOptions = {}
   const { secret } = await (await request(app, 'POST', '/api/account/mfa/enrol', {}, member.cookie)).json() as { secret: string }
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, member.cookie)
 
-  Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile, ...(additional ? ['--additional'] : [])])
+  const granted = Bun.spawnSync(['bun', 'scripts/grant-admin.ts', member.email, app.databaseFile, ...(additional ? ['--additional'] : [])])
+  // A refused bootstrap hands back a member with no ADMIN, and every guard then refuses quietly.
+  if (granted.exitCode !== 0) throw new Error(`grant-admin.ts refused ${member.email}: ${granted.stderr.toString().trim()}`)
   forgetSpentStep(app, member.email)
 
   const { attemptId } = await (await request(app, 'POST', '/api/auth/sign-in', { email: member.email, password })).json() as { attemptId: string }

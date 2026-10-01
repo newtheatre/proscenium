@@ -198,7 +198,8 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
   test.skip('the till has none either, mid-sale and in the close dialogue', async () => {
     const barPassword = generatePassword()
     const bar = await registerMember(app, 'a11y-till-bar', barPassword)
-    const officer = await adminSession(app)
+    // The console case above bootstrapped this app's first IT Manager.
+    const officer = await adminSession(app, { additional: true })
     await grantRole(app, bar, 'FOH_MANAGER', officer.cookie)
 
     const database = new Database(app.databaseFile)
