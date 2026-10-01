@@ -52,7 +52,12 @@ sql('UPDATE users SET verified = 1 WHERE email = ?', email)
 const first = ((await send('POST', '/api/auth/sign-in', { email, password })).headers.get('set-cookie') ?? '').split(';')[0]!
 const { secret } = await (await send('POST', '/api/account/mfa/enrol', {}, first)).json() as { secret: string }
 await send('POST', '/api/account/mfa/confirm', { code: await codeForStep(secret, stepFor(new Date())) }, first)
-Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile])
+const granted = Bun.spawnSync(['bun', 'scripts/grant-admin.ts', email, app.databaseFile])
+// Without the role every screen is a refusal, and a folder of those looks like a finished run.
+if (granted.exitCode !== 0) {
+  await app.stop()
+  throw new Error(`grant-admin.ts refused ${email}: ${granted.stderr.toString().trim()}`)
+}
 
 // A code is single use, so a second sign-in in the same 30 second step needs the last one forgotten.
 function forgetStep(): void {
