@@ -128,14 +128,26 @@ describe.skipIf(skip !== null)('the seven-day unstaffed digest (E-108)', () => {
     expect(after.performances).toBe(before.performances)
   })
 
+  // The Front of House Manager holds a committee role, so their duty manager shift covers the night (0115).
   test('a fully confirmed performance sends nothing about itself (criterion 3)', async () => {
     const before = await escalate()
     const house = performanceInDays(4, 'fully-staffed')
-    stampShift(house.performanceId, 'DUTY_MANAGER', 1, 'CONFIRMED', admin.id)
+    stampShift(house.performanceId, 'DUTY_MANAGER', 1, 'CONFIRMED', foh.id)
     stampShift(house.performanceId, 'DOOR', 1, 'CONFIRMED', admin.id)
 
     const after = await escalate()
     expect(after.performances).toBe(before.performances)
+  })
+
+  // `ADMIN` alone is no committee role, so the shift opens nothing and the night still has no duty manager.
+  test('a confirmed duty manager holding no committee role is flagged (criterion 2, 0115)', async () => {
+    const before = await escalate()
+    const house = performanceInDays(4, 'dm-off-committee')
+    stampShift(house.performanceId, 'DUTY_MANAGER', 1, 'CONFIRMED', admin.id)
+    stampShift(house.performanceId, 'DOOR', 1, 'CONFIRMED', admin.id)
+
+    const after = await escalate()
+    expect(after.performances).toBe(before.performances + 1)
   })
 
   test('a claimed, unconfirmed duty manager is flagged even with every other slot filled (criterion 2)', async () => {

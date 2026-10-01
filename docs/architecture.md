@@ -684,7 +684,7 @@ without naming it), and `nights:close` from E-125.
 | `*/10 * * * *` | `waiting-list:sweep` | Lapses waiting-list offers past `WAITING_LIST_OFFER_WINDOW_MINUTES`, then re-offers each seat a lapse gives back to the next entry in join order (D-113 criterion 3). Every other freeing event (a hold release, a self-cancel, a refund, a raised capacity) offers inline at the point that frees the seat; this is the one with no such point of its own. |
 | `*/10 * * * *` | `training:open-sessions` | Opens every training session whose chosen sign-up instant has passed, a conditional `UPDATE` whose predicate is the whole scope rather than an id list (0003), and resolves the module requests each newly open session answers, one email per requester through the usual claim (G-104 criterion 4, G-112 criterion 2). The only thing that moves a session out of `PLANNED`; a session opened as it is scheduled resolves inline instead. |
 | `0 6 * * *` | `training:expiry-sweep` | Expiry warnings and digests (dry-run gated). |
-| `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or an unconfirmed duty manager, the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
+| `0 7 * * *` | `shifts:escalate` | Emails whoever holds `rota.write` one digest of every performance inside seven days with an open shift or no confirmed duty manager holding a committee role (0115), the second flagged distinctly on its own line; sends nothing when the week is fully staffed (E-108). |
 | `0 8 * * *` | `rooms:sweep` | Tells the approvers about room requests that have been waiting, once each, and lapses the ones that waited too long (C-108). Union requests are chased the same way but never lapse: expiry frees a held slot, and a union request holds none (0036). |
 | `0 9 * * *` | `sessions:sweep` | Session reminders and unmarked-register nags (G-119, not yet built). |
 | `0 10 * * *` | `shifts:remind` | Tomorrow's confirmed shift holders, one message per shift with a calendar attachment carrying the call time (E-109). Idempotent per shift, read from `notification_log`'s claim column rather than a column on `shifts`. |
@@ -1033,8 +1033,9 @@ already written" predicate rides the insert), its detail naming every performanc
 manager holds a confirmed shift on at that venue that night, so a two-house day's second report
 reads it too; a read records nothing, as a bypass does under 0098. A door refusal with nothing
 else to say points to tonight's confirmed duty manager for the request's performance or venue
-(`dutyManagerTonight`, which leaves out a disabled or erased account): by first name to somebody
-holding a confirmed shift there, and as "tonight's duty manager" to anybody else.
+(`dutyManagerTonight`, which leaves out a disabled or erased account and, as the shift itself
+does, a holder with no live committee role, who could open nothing (0115)): by first name to
+somebody holding a confirmed shift there, and as "tonight's duty manager" to anybody else.
 
 `requireAnyNightAuthority` and `nightAuthorityIfAny` share one `firstAuthority` step (every role's
 shift, then door cover, then any bypass). The guard, short of authority, works out the most
@@ -1144,7 +1145,7 @@ shift per slot on a performance. `shift_templates` and `shifts` are in `docs/dat
 | `stampPerformanceStatement(performanceId)` | The stamp for one performance, batched with the INSERT that creates it, so a performance can never exist staffed by nothing (E-102 criterion 1). |
 | `backfillVenueStatement(venueId, from)` | The same stamp over every performance at a venue from a given instant. `ON CONFLICT DO NOTHING` against the slot uniqueness makes a second run a no-op (E-102 criterion 2). |
 | `stampUnstampedStatement(venueId, from)` | The same stamp over only the performances at a venue from a given instant that hold no live (uncancelled) shift, batched with a template save, so a venue's first template reaches the diary already there and a rota already stamped is untouched (E-101 criterion 3, issue 1319). |
-| `unstaffedPerformancesQuery(from, to)` | The seven-day digest's rows: an open or declined shift, an unconfirmed duty manager, or no shifts at a venue we run. An external night with no shifts is left out, since it is staffed by hand (E-108, issue 1319). |
+| `unstaffedPerformancesQuery(from, to)` | The seven-day digest's rows: an open or declined shift, a duty manager unconfirmed or holding no live committee role at `from` (0115), or no shifts at a venue we run. An external night with no shifts is left out, since it is staffed by hand (E-108, issue 1319). |
 | `cancelShiftsStatement(performanceId)` | Cancels a performance's shifts, batched with the cancellation itself (E-102 criterion 4). |
 | `cancelOrphanedShiftsStatement(performanceId, newVenueId)` | On a venue move, cancels only the held shifts whose role the new venue's template does not staff at all; a role it staffs with fewer slots than before still carries over (E-101, E-102, committee direction 4 September 2026). |
 | `activeShifts(performanceId)` | Every shift not already cancelled, open or held: what a cancellation or a move has to notify or count, in one query (E-102 criterion 4). |
@@ -1328,7 +1329,8 @@ each listing's clause).
 performance inside seven days of a run with an open shift, no shifts at all at a venue we run, or a
 `DUTY_MANAGER` shift that is not `CONFIRMED`, the second
 counted whether or not it is also `CLAIMED`, because only a confirmed one satisfies the legal
-requirement (E-108 criteria 1 and 2). `rotaOfficers()` reads the same permission `rota.write`
+requirement (E-108 criteria 1 and 2). A confirmed one whose holder holds no live committee role at
+the run's instant is a gap too, since that shift opens nothing on the night (0115, `holdsCommitteeRole`). `rotaOfficers()` reads the same permission `rota.write`
 templates are administered under, rather than a named role, so an administrator is chased
 alongside the FOH officer. One digest per officer per London day, read from `notification_log`
 rather than a column, the same idempotency `remindTomorrow` uses for room bookings (E-108

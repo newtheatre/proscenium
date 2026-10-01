@@ -27,10 +27,22 @@ function run(database: TestDatabase, statement: SQL): unknown[] {
   return database.raw.prepare(query).all(...parameters as never[]) as unknown[]
 }
 
+const NOW = Math.floor(Date.now() / 1000)
+const DAY = 86_400
+
+// Signed in, so a grant given below is held rather than pending (A-132).
 function person(database: TestDatabase, id: string, name = `Someone ${id}`): string {
-  database.batch([['INSERT OR IGNORE INTO users (id, name, email, verified) VALUES (?, ?, ?, 1)', id, name, `${id}@e2e.newtheatre.org.uk`]])
+  database.batch([['INSERT OR IGNORE INTO users (id, name, email, verified, last_login_at) VALUES (?, ?, ?, 1, ?)', id, name, `${id}@e2e.newtheatre.org.uk`, NOW - DAY]])
   return id
 }
+
+function granted(database: TestDatabase, id: string, role = 'COMMITTEE', expiresAt: number | null = NOW + 30 * DAY): string {
+  database.batch([['INSERT INTO role_grants (id, user_id, role, expires_at) VALUES (?, ?, ?, ?)', `grant-${id}-${role}`, id, role, expiresAt]])
+  return id
+}
+
+// Tonight's duty manager, who holds the committee role a duty manager shift needs (0115).
+const onCommittee = (database: TestDatabase, id: string, name?: string): string => granted(database, person(database, id, name))
 
 const covers = (database: TestDatabase): { target: string }[] =>
   rows(database, 'SELECT target FROM audit_log WHERE action = ? ORDER BY target', DOOR_COVER_ACTION)
@@ -104,7 +116,7 @@ describe('tonight\'s duty manager for a door refusal', () => {
   test('the confirmed duty manager on this performance, and whether the asker works it', async () => {
     await withDatabase((database) => {
       const house = tonightsPerformance(database)
-      const rowan = person(database, 'rowan', 'Rowan Ellis')
+      const rowan = onCommittee(database, 'rowan', 'Rowan Ellis')
       const barkeep = person(database, 'barkeep')
       const stranger = person(database, 'stranger')
       shift(database, 'dm', house.performanceId, 'DUTY_MANAGER', rowan)
@@ -124,11 +136,11 @@ describe('tonight\'s duty manager for a door refusal', () => {
       const early = tonightsPerformance(database, { suffix: 'early', venueId: house.venueId })
       database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', dark.performanceId]])
       const asker = person(database, 'asker')
-      shift(database, 'claimed', house.performanceId, 'DUTY_MANAGER', person(database, 'claimant'), 'CLAIMED')
-      shift(database, 'elsewhere', studio.performanceId, 'DUTY_MANAGER', person(database, 'elsewhere'))
-      shift(database, 'cancelled', dark.performanceId, 'DUTY_MANAGER', person(database, 'dark'))
-      shift(database, 'disabled', late.performanceId, 'DUTY_MANAGER', person(database, 'disabled'))
-      shift(database, 'erased', early.performanceId, 'DUTY_MANAGER', person(database, 'erased'))
+      shift(database, 'claimed', house.performanceId, 'DUTY_MANAGER', onCommittee(database, 'claimant'), 'CLAIMED')
+      shift(database, 'elsewhere', studio.performanceId, 'DUTY_MANAGER', onCommittee(database, 'elsewhere'))
+      shift(database, 'cancelled', dark.performanceId, 'DUTY_MANAGER', onCommittee(database, 'dark'))
+      shift(database, 'disabled', late.performanceId, 'DUTY_MANAGER', onCommittee(database, 'disabled'))
+      shift(database, 'erased', early.performanceId, 'DUTY_MANAGER', onCommittee(database, 'erased'))
       database.batch([
         ['UPDATE users SET disabled = 1 WHERE id = ?', 'disabled'],
         ['UPDATE users SET anonymised_at = unixepoch() WHERE id = ?', 'erased'],
@@ -137,6 +149,40 @@ describe('tonight\'s duty manager for a door refusal', () => {
       expect(asked(database, asker, house.night, { performanceId: house.performanceId })).toEqual([])
       expect(asked(database, asker, house.night, { venueId: house.venueId })).toEqual([])
       expect(asked(database, asker, dark.night, { performanceId: dark.performanceId })).toEqual([])
+    })
+  })
+
+  // Only a holder the shift actually opens for is named: nobody else can open the door (0115).
+  const STANDINGS = [
+    ['no role at all', undefined, false],
+    ['the Front of House Manager\'s role', { role: 'FOH_MANAGER' }, true],
+    ['the Committee role', { role: 'COMMITTEE' }, true],
+    ['a permanent Committee role', { role: 'COMMITTEE', expiresAt: null }, true],
+    ['the IT Manager\'s role alone', { role: 'ADMIN' }, false],
+    ['a Committee role that has lapsed', { role: 'COMMITTEE', expiresAt: NOW - DAY }, false],
+  ] as const
+
+  test.each(STANDINGS)('a confirmed duty manager holding %s', async (_, grant, named) => {
+    await withDatabase((database) => {
+      const house = tonightsPerformance(database)
+      const rowan = person(database, 'rowan', 'Rowan Ellis')
+      if (grant) granted(database, rowan, grant.role, 'expiresAt' in grant ? grant.expiresAt : undefined)
+      shift(database, 'dm', house.performanceId, 'DUTY_MANAGER', rowan)
+
+      expect(asked(database, person(database, 'asker'), house.night, { performanceId: house.performanceId }))
+        .toEqual(named ? [{ name: 'Rowan Ellis', onTeam: 0 }] : [])
+    })
+  })
+
+  test('a duty manager without the role does not hide one with it at the same venue', async () => {
+    await withDatabase((database) => {
+      const matinee = tonightsPerformance(database, { suffix: 'matinee', curtainHoursAfterNightStart: 10 })
+      const evening = tonightsPerformance(database, { suffix: 'evening', venueId: matinee.venueId, curtainHoursAfterNightStart: 15 })
+      shift(database, 'dm-matinee', matinee.performanceId, 'DUTY_MANAGER', person(database, 'former', 'Former Member'))
+      shift(database, 'dm-evening', evening.performanceId, 'DUTY_MANAGER', onCommittee(database, 'rowan', 'Rowan Ellis'))
+
+      expect(asked(database, person(database, 'asker'), matinee.night, { venueId: matinee.venueId }))
+        .toEqual([{ name: 'Rowan Ellis', onTeam: 0 }])
     })
   })
 })

@@ -277,13 +277,14 @@ export function backfillVenueStatement(venueId: string, from: number, defaults: 
   return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}`, defaults)
 }
 
-// The seven-day digest's rows (E-108): an open or declined shift, an unconfirmed duty manager, or no
-// shifts at a venue we run. An external night nobody rostered is staffed ad hoc (issue 1319).
+// The seven-day digest's rows (E-108) at the run's instant `from`: an open or declined shift, a duty
+// manager unconfirmed or without a committee role (0115), or no shifts at a venue we run (issue 1319).
 export function unstaffedPerformancesQuery(from: number, to: number): SQL {
   return sql`
     SELECT p.id AS performanceId, s.title AS showTitle, v.name AS venueName, p.starts_at AS startsAt,
            group_concat(DISTINCT CASE WHEN sh.status IN ('OPEN', 'DECLINED') THEN sh.role END) AS openRoles,
-           max(CASE WHEN sh.role = 'DUTY_MANAGER' AND sh.status NOT IN ('CONFIRMED', 'CANCELLED')
+           max(CASE WHEN sh.role = 'DUTY_MANAGER' AND (sh.status <> 'CONFIRMED'
+                      OR NOT ${holdsCommitteeRole(sql`sh.user_id`, from)})
                     THEN 1 ELSE 0 END) AS dutyManagerGap,
            count(sh.id) AS shiftCount
     FROM performances p
