@@ -23,7 +23,9 @@ describe.skipIf(skip !== null)('a signed-out visitor to a show-night screen', ()
     test(`${path} sends them to sign in and back`, async () => {
       const answer = await fetch(`${app.baseURL}${path}`, { redirect: 'manual' })
       expect([302, 303, 307]).toContain(answer.status)
-      expect(answer.headers.get('location')).toContain(`/sign-in?next=${encodeURIComponent(path)}`)
+      const location = new URL(answer.headers.get('location') ?? '', app.baseURL)
+      expect(location.pathname).toBe('/sign-in')
+      expect(location.searchParams.get('next')).toBe(path)
     })
   }
 })
