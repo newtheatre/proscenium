@@ -5,7 +5,7 @@ import { openingHouseId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
 import type { DoorAdmission, DoorPassCard, DoorTicketFound, DoorVerdict, LookUpHalf, ScannerFailure } from '#shared/utils/door'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/door' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/door' })
 useSeoMeta({ title: 'Door' })
 
 interface CoveredPerformance { id: string, showTitle: string, startsAt: number, venueName: string, active: boolean }
