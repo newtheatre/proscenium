@@ -1,5 +1,6 @@
 import { saysMoney } from './bar'
 import { saleForm } from './sale'
+import { plural } from './text'
 import { z } from 'zod'
 
 // The hand-off of a basket to the SumUp app and what comes back (F-124, 0069). Pure: the URL the
@@ -185,6 +186,19 @@ export interface SumupAttemptView {
   error: string | null
   entryId: string | null
   resolution: SumupResolution | null
+  basketSays: string | null
+}
+
+export interface AttemptBasketCounts { basketLines: string | null, basketBookings: number, basketWalkUps: number }
+
+// Abandoned charges of one total pile up alike, so each says what it was for.
+export function saysAttemptBasket(counts: AttemptBasketCounts): string | null {
+  const parts = [
+    counts.basketLines,
+    counts.basketBookings > 0 ? plural(counts.basketBookings, 'booking') : null,
+    counts.basketWalkUps > 0 ? plural(counts.basketWalkUps, 'walk-up ticket') : null,
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join(', ') : null
 }
 
 // A typed charge still waiting is answered as the reader answered it (0096).

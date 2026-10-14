@@ -12,7 +12,13 @@ export const ATTEMPT_COLUMNS = sql`
   a.smp_tx_code AS smpTxCode, a.smp_message AS smpMessage, a.smp_failure_cause AS smpFailureCause,
   a.resolution AS resolution, a.resolved_by AS resolvedBy, a.resolved_at AS resolvedAt,
   a.resolution_note AS resolutionNote, a.callback_at AS callbackAt, a.entry_id AS entryId, a.error AS error,
-  coalesce(a.kind, 'SUMUP') AS kind, (SELECT name FROM venues WHERE id = a.venue_id) AS venueName
+  coalesce(a.kind, 'SUMUP') AS kind, (SELECT name FROM venues WHERE id = a.venue_id) AS venueName,
+  (SELECT group_concat(json_extract(j.value, '$.qty') || '× ' || v.label || ' ' || p.name, ', ')
+    FROM json_each(a.basket, '$.sale.lines') j
+    JOIN product_variants v ON v.id = json_extract(j.value, '$.variantId')
+    JOIN bar_products p ON p.id = v.product_id) AS basketLines,
+  coalesce(json_array_length(a.basket, '$.sale.tickets'), 0) AS basketBookings,
+  (SELECT coalesce(sum(json_extract(w.value, '$.quantity')), 0) FROM json_each(a.basket, '$.sale.walkUps') w) AS basketWalkUps
 `
 
 // Any bar's hand-off whose money may still reach the one reader (F-124.6, issue 1308).

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -27,8 +28,6 @@ beforeAll(async () => {
   app = await startApp()
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  const officer = await registerMember(app, 'grantor', generatePassword())
-  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   await request(app, 'POST', '/api/auth/register', { email: adminEmail, name: person.name, password: adminPassword })
@@ -39,6 +38,10 @@ beforeAll(async () => {
   adminSecret = enrolled.secret
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(adminSecret, stepFor(new Date())) }, cookie)
   expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', adminEmail, app.databaseFile]).exitCode).toBe(0)
+
+  // Only an IT Manager can grant: a plain member's grant is refused and the stock screen with it.
+  const officer = await adminSession(app, { additional: true })
+  expect((await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)).ok).toBe(true)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -78,7 +81,8 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
     try {
       await signInAsBoxOffice(view)
       await view.navigate(`${app.baseURL}/box-office/shows`)
-      await waitFor(view, 'document.querySelector(\'main\')')
+      // The console shell renders no main of its own, so the list itself is what arrives.
+      await waitFor(view, 'document.querySelector(\'[data-test="shows-table"]\')')
       expect(await hasNoHorizontalOverflow(view)).toBe(true)
     }
     finally {
@@ -117,12 +121,40 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
     }
   }, CASE_TIMEOUT_MS)
 
+  test('the stock register keeps every row action on screen at 390px', async () => {
+    const itemId = `bi-${crypto.randomUUID().slice(0, 8)}`
+    const database = new Database(app.databaseFile)
+    try {
+      database.run('INSERT INTO bar_items (id, name, unit, container_ml) VALUES (?, ?, ?, ?)', [itemId, 'House gin with a long name', 'ML', 700])
+    }
+    finally {
+      database.close()
+    }
+    const view = await openSignedOutView(app.baseURL, PHONE)
+    try {
+      await signInAsBoxOffice(view)
+      await view.navigate(`${app.baseURL}/bar/stock`)
+      await waitFor(view, `document.querySelector('[data-test="edit-${itemId}"]')`)
+      const offscreen = await view.evaluate<string[]>(`(() => {
+        const row = document.querySelector('[data-test="edit-${itemId}"]').closest('tr')
+        return [...row.querySelectorAll('button')]
+          .filter(button => button.getBoundingClientRect().right > document.documentElement.clientWidth)
+          .map(button => button.textContent.trim() || button.getAttribute('aria-label'))
+      })()`)
+      expect(offscreen).toEqual([])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('box office shows uses the full table at 1280px', async () => {
     const view = await openSignedOutView(app.baseURL, { width: 1280, height: 800 })
     try {
       await signInAsBoxOffice(view)
       await view.navigate(`${app.baseURL}/box-office/shows`)
-      await waitFor(view, 'document.querySelector(\'main\')')
+      // The console shell renders no main of its own, so the list itself is what arrives.
+      await waitFor(view, 'document.querySelector(\'[data-test="shows-table"]\')')
       const display = await view.evaluate<string | null>(
         '(() => { const t = document.querySelector(\'[data-test="shows-table"]\'); return t ? getComputedStyle(t).display : null })()',
       )

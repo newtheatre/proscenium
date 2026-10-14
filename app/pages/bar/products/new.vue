@@ -5,17 +5,18 @@ import {
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   DELIVERY_COST_QUESTION,
   STOCK_UNITS,
-  asPence,
-  asPounds,
   deliveryCostBasis,
   defaultItemName,
+  firstUnreadable,
   measurePreset,
   openingQuantity,
+  packagedKindFor,
   presetForCategory,
   restrictedStockOf,
   says,
   saysRestricted,
   saysSetupFinish,
+  stockItemAgeRestrictedFor,
   suggestedShape,
 } from '#shared/utils/bar'
 import type {
@@ -107,7 +108,7 @@ const existingItemId = ref('')
 const newItem = reactive({
   name: '',
   unit: 'ITEM' as StockUnit,
-  containerMl: null as number | null,
+  containerMl: undefined as number | undefined,
   ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   allergenState: 'UNKNOWN' as AllergenState,
   allergenNotes: '',
@@ -120,19 +121,18 @@ watch(() => newItem.allergenState, (state) => {
 interface SizeRow {
   servingKind: ServingKind
   label: string
-  qty: number
-  // Pounds, because that is what the field takes; the request carries pence, converted once in
-  // `body()` and nowhere else (0004).
-  pricePounds: number | null
+  qty?: number
+  // Pence, NaN while the field holds text that is not a sum of money (0127).
+  pricePence?: number
   chosen: boolean
 }
 
 const preset = ref<MeasurePresetId | null>(null)
 const sizes = ref<SizeRow[]>([])
-const components = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 25 }])
-const choice = reactive({ offered: false, name: '', includedInPrice: false, optional: false, qty: 1 })
-const choiceOptions = ref<{ itemId: string, qty: number }[]>([{ itemId: '', qty: 1 }])
-const opening = reactive({ offered: false, qty: 1, costPounds: null as number | null })
+const components = ref<{ itemId: string, qty?: number }[]>([{ itemId: '', qty: 25 }])
+const choice = reactive({ offered: false, name: '', includedInPrice: false, optional: false, qty: 1 as number | undefined })
+const choiceOptions = ref<{ itemId: string, qty?: number }[]>([{ itemId: '', qty: 1 }])
+const opening = reactive({ offered: false, qty: 1 as number | undefined, costPence: undefined as number | undefined })
 
 // What the opening delivery comes out of: its cost is asked the way it is bought (0100), and its
 // quantity the way it stands on the shelf, in whole containers (issue 1349).
@@ -204,20 +204,20 @@ function fillFrom(id: MeasurePresetId | null): void {
   touched.value = false
   preset.value = id
   if (shape.value === 'RECIPE') {
-    sizes.value = [{ servingKind: 'item', label: says('item'), qty: 0, pricePounds: asPounds(defaults.value.get('item')), chosen: true }]
+    sizes.value = [{ servingKind: 'item', label: says('item'), qty: 0, pricePence: defaults.value.get('item'), chosen: true }]
   }
   else {
     const chosen = id ? measurePreset(id) : null
-    sizes.value = (chosen?.sizes ?? []).map((size, index) => ({
+    sizes.value = (chosen?.sizes ?? []).map(size => ({
       servingKind: size.servingKind,
       label: says(size.servingKind),
       qty: size.qty,
-      pricePounds: asPounds(defaults.value.get(size.servingKind)),
-      chosen: shape.value !== 'SIMPLE' || index === 0,
+      pricePence: defaults.value.get(size.servingKind),
+      chosen: shape.value !== 'SIMPLE' || size.servingKind === packagedKind.value,
     }))
     if (chosen && itemMode.value === 'NEW' && !itemNamedByHand.value) {
       newItem.unit = shape.value === 'SIMPLE' ? 'ITEM' : chosen.unit
-      newItem.containerMl = shape.value === 'SIMPLE' ? null : chosen.containerMl
+      newItem.containerMl = shape.value === 'SIMPLE' ? undefined : chosen.containerMl ?? undefined
     }
   }
   void nextTick(() => {
@@ -227,6 +227,12 @@ function fillFrom(id: MeasurePresetId | null): void {
 
 // The category comes first, and the shape its drinks are usually sold in is marked (issue 1349).
 const chosenCategory = computed(() => categories.value.items.find(item => item.id === product.categoryId) ?? null)
+// A crisp packet is sold each and asks for no ID; a can of cider is a can and does (F-111 c6).
+const packagedKind = computed(() => (chosenCategory.value ? packagedKindFor(chosenCategory.value.name) : 'can'))
+const ageRestrictedByHand = ref(false)
+watch(chosenCategory, (category) => {
+  if (category && !ageRestrictedByHand.value) newItem.ageRestricted = stockItemAgeRestrictedFor(category.name)
+})
 const suggested = computed(() => (chosenCategory.value ? suggestedShape(chosenCategory.value.name) : null))
 const suggestedPreset = computed(() => (chosenCategory.value ? presetForCategory(chosenCategory.value.name) : null))
 
@@ -236,7 +242,7 @@ const itemNamedByHand = ref(false)
 const suggestedItemName = computed(() => defaultItemName({
   productName: product.name,
   shape: shape.value,
-  containerMl: newItem.unit === 'ML' ? newItem.containerMl : null,
+  containerMl: newItem.unit === 'ML' ? newItem.containerMl ?? null : null,
   servingKind: shape.value === 'SIMPLE' ? sizes.value.find(size => size.chosen)?.servingKind ?? null : null,
 }))
 watch([suggestedItemName, itemMode], ([next, mode]) => {
@@ -261,8 +267,10 @@ function start(chosen: ProductShape): void {
   shape.value = chosen
   failure.value = null
   if (chosen === 'SIMPLE') {
+    // Sold sealed, so nothing is added at the bar: its allergens are the stocked item's alone.
+    Object.assign(product, { allergenState: 'UNKNOWN', allergenNote: '' })
     // Whole items only: the shape is about a thing that leaves the shelf, not a measure of one.
-    Object.assign(newItem, { unit: 'ITEM', containerMl: null })
+    Object.assign(newItem, { unit: 'ITEM', containerMl: undefined })
     existingItemId.value = ''
     fillFrom('PACKAGED')
   }
@@ -279,7 +287,7 @@ const chosenSizes = computed(() => (shape.value === 'MEASURED'
 const simpleSize = computed(() => chosenSizes.value[0] ?? null)
 
 const unpriced = computed(() => chosenSizes.value
-  .filter(size => size.pricePounds === null && !defaults.value.has(size.servingKind))
+  .filter(size => size.pricePence === undefined && !defaults.value.has(size.servingKind))
   .map(size => says(size.servingKind)))
 
 // The kind is what a category default resolves on, so changing it takes the new kind's default
@@ -287,7 +295,7 @@ const unpriced = computed(() => chosenSizes.value
 function soldAs(size: SizeRow, kind: ServingKind): void {
   size.servingKind = kind
   size.label = says(kind)
-  size.pricePounds = asPounds(defaults.value.get(kind))
+  size.pricePence = defaults.value.get(kind)
 }
 
 // What the screen can say before the route would: an empty measure set, an empty recipe and a
@@ -303,6 +311,20 @@ const blocked = computed<string | null>(() => {
   }
   if (shape.value !== 'RECIPE' && itemMode.value === 'EXISTING' && !existingItemId.value) {
     return 'Say which stocked item it comes out of.'
+  }
+  const unreadable = firstUnreadable({
+    prices: chosenSizes.value.map(size => ({ label: `The price of ${size.label || says(size.servingKind)}`, pence: size.pricePence })),
+    quantities: [
+      ...(shape.value === 'MEASURED' ? chosenSizes.value.map(size => ({ label: `How much ${size.label || says(size.servingKind)} pours`, qty: size.qty })) : []),
+      ...(shape.value === 'RECIPE' ? components.value.filter(component => component.itemId).map(component => ({ label: 'An ingredient\'s quantity', qty: component.qty })) : []),
+      ...(shape.value === 'RECIPE' && choice.offered ? choiceOptions.value.filter(option => option.itemId).map(option => ({ label: 'An option\'s quantity', qty: option.qty })) : []),
+      ...(shape.value !== 'RECIPE' && itemMode.value === 'NEW' && newItem.unit === 'ML' && newItem.containerMl !== undefined ? [{ label: 'The container size', qty: newItem.containerMl }] : []),
+      ...(opening.offered && shape.value !== 'RECIPE' ? [{ label: openingAsked.value.label, qty: opening.qty }] : []),
+    ],
+  })
+  if (unreadable) return unreadable
+  if (opening.offered && opening.costPence !== undefined && Number.isNaN(opening.costPence)) {
+    return `${openingCost.value.label}: Type pounds and pence with a full stop, such as 6.50.`
   }
   if (shape.value === 'RECIPE') {
     if (components.value.filter(component => component.itemId).length === 0) {
@@ -331,7 +353,7 @@ function itemPayload(): Record<string, unknown> {
     item: {
       name: newItem.name.trim(),
       unit: newItem.unit,
-      containerMl: newItem.unit === 'ML' ? newItem.containerMl : null,
+      containerMl: newItem.unit === 'ML' ? newItem.containerMl ?? null : null,
       ageRestricted: newItem.ageRestricted,
       allergenState: newItem.allergenState,
       allergenNotes: newItem.allergenNotes.trim() || null,
@@ -353,7 +375,7 @@ function productPayload(): Record<string, unknown> {
 
 function body(): Record<string, unknown> {
   const openingPayload = opening.offered
-    ? { qty: openingQuantity(opening.qty, openingItem.value), costPence: asPence(opening.costPounds) }
+    ? { qty: openingQuantity(opening.qty ?? 0, openingItem.value), costPence: opening.costPence ?? null }
     : null
 
   if (shape.value === 'SIMPLE') {
@@ -363,7 +385,7 @@ function body(): Record<string, unknown> {
       product: productPayload(),
       item: itemPayload(),
       serving: size
-        ? { servingKind: size.servingKind, label: size.label.trim(), qty: size.qty, pricePence: asPence(size.pricePounds) }
+        ? { servingKind: size.servingKind, label: size.label.trim(), qty: size.qty, pricePence: size.pricePence ?? null }
         : undefined,
       opening: openingPayload,
     }
@@ -378,7 +400,7 @@ function body(): Record<string, unknown> {
         servingKind: size.servingKind,
         label: size.label.trim(),
         qty: size.qty,
-        pricePence: asPence(size.pricePounds),
+        pricePence: size.pricePence ?? null,
       })),
       opening: openingPayload,
     }
@@ -391,7 +413,7 @@ function body(): Record<string, unknown> {
     serving: {
       servingKind: size?.servingKind ?? 'item',
       label: size?.label.trim() || 'Each',
-      pricePence: asPence(size?.pricePounds),
+      pricePence: size?.pricePence ?? null,
     },
     components: components.value.filter(component => component.itemId),
     choice: choice.offered
@@ -635,6 +657,7 @@ function moveFocus(step: number): void {
           </UFormField>
 
           <UFormField
+            v-if="shape !== 'SIMPLE'"
             label="Added at the bar"
             description="Only what this product adds to the stock it pours, such as a garnish. Its answer at the till is read from that stock too."
           >
@@ -647,7 +670,7 @@ function moveFocus(step: number): void {
           </UFormField>
 
           <UFormField
-            v-if="product.allergenState !== 'UNKNOWN'"
+            v-if="shape !== 'SIMPLE' && product.allergenState !== 'UNKNOWN'"
             label="Allergen note"
             :required="product.allergenState === 'RECORDED'"
             description="What staff read out at the bar."
@@ -724,9 +747,8 @@ function moveFocus(step: number): void {
               label="Container size in millilitres"
               description="What one bottle, keg or cask holds. A serving cannot pour more than this."
             >
-              <UInputNumber
+              <WholeField
                 v-model="newItem.containerMl"
-                :min="1"
                 class="w-full"
                 data-test="setup-container"
               />
@@ -735,8 +757,9 @@ function moveFocus(step: number): void {
             <USwitch
               v-model="newItem.ageRestricted"
               label="The stocked item is age restricted"
-              description="A new stocked item starts restricted, since most of the shelf is alcohol. Switch it off for a soft drink or a snack."
+              description="Set from the product category: on for alcohol, off for a soft drink or a snack. Check it before you set the product up."
               data-test="setup-item-age-restricted"
+              @update:model-value="ageRestrictedByHand = true"
             />
 
             <UFormField
@@ -796,9 +819,8 @@ function moveFocus(step: number): void {
               :label="openingAsked.label"
               :description="openingAsked.description"
             >
-              <UInputNumber
+              <WholeField
                 v-model="opening.qty"
-                :min="1"
                 class="w-full"
                 data-test="setup-opening-qty"
               />
@@ -807,10 +829,8 @@ function moveFocus(step: number): void {
               :label="openingCost.label"
               :description="openingCost.description"
             >
-              <UInputNumber
-                v-model="opening.costPounds"
-                :min="0"
-                :step="0.01"
+              <PoundsField
+                v-model="opening.costPence"
                 class="w-full"
                 data-test="setup-opening-cost"
               />
@@ -857,9 +877,8 @@ function moveFocus(step: number): void {
               />
             </UFormField>
             <UFormField label="Pours">
-              <UInputNumber
+              <WholeField
                 v-model="size.qty"
-                :min="1"
                 class="w-full"
                 :data-test="`size-qty-${size.servingKind}`"
               />
@@ -868,10 +887,8 @@ function moveFocus(step: number): void {
               label="Price in pounds"
               :description="defaults.has(size.servingKind) ? 'The category default is filled in.' : undefined"
             >
-              <UInputNumber
-                v-model="size.pricePounds"
-                :min="0"
-                :step="0.01"
+              <PoundsField
+                v-model="size.pricePence"
                 class="w-full"
                 :data-test="`size-price-${size.servingKind}`"
               />
@@ -910,10 +927,8 @@ function moveFocus(step: number): void {
               label="Price in pounds"
               :description="defaults.has(simpleSize.servingKind) ? 'The category default is filled in.' : undefined"
             >
-              <UInputNumber
-                v-model="simpleSize.pricePounds"
-                :min="0"
-                :step="0.01"
+              <PoundsField
+                v-model="simpleSize.pricePence"
                 class="w-full"
                 data-test="setup-price"
               />
@@ -946,9 +961,8 @@ function moveFocus(step: number): void {
               />
             </UFormField>
             <UFormField label="Quantity">
-              <UInputNumber
+              <WholeField
                 v-model="component.qty"
-                :min="1"
                 class="w-full"
                 :data-test="`component-qty-${index}`"
               />
@@ -978,11 +992,9 @@ function moveFocus(step: number): void {
             label="Price in pounds"
             :description="defaults.has('item') ? 'The category default is filled in.' : undefined"
           >
-            <UInputNumber
+            <PoundsField
               v-if="simpleSize"
-              v-model="simpleSize.pricePounds"
-              :min="0"
-              :step="0.01"
+              v-model="simpleSize.pricePence"
               class="w-full sm:w-64"
               data-test="setup-recipe-price"
             />
@@ -1028,9 +1040,8 @@ function moveFocus(step: number): void {
                 />
               </UFormField>
               <UFormField label="Quantity">
-                <UInputNumber
+                <WholeField
                   v-model="option.qty"
-                  :min="1"
                   class="w-full"
                   :data-test="`choice-qty-${index}`"
                 />

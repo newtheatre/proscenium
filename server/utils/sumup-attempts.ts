@@ -13,7 +13,7 @@ import { ATTEMPT_COLUMNS, UNRESOLVED, earlierUnresolvedAttemptsQuery, openAttemp
 import { LATE_RECORD_INTERRUPTED, lateAdditionsQuery, lateChargesQuery, lateClaimStatement, lateSaleTiming } from './late-charge'
 import { auditEntry } from '#shared/utils/audit'
 import { londonDayOf } from '#shared/utils/ledger'
-import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, attemptMayMove, isTerminalAttempt, lateChargeTotalRefusal, sumupLaunchUrl } from '#shared/utils/sumup'
+import { ATTEMPT_KEY_DOMAIN, SUMUP_RETURN_PATH, SUMUP_STUCK_COMPLETING_MINUTES, attemptMayMove, isTerminalAttempt, lateChargeTotalRefusal, saysAttemptBasket, sumupLaunchUrl } from '#shared/utils/sumup'
 import type { SQL } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SaleInput, SaleReceipt } from '#shared/utils/sale'
@@ -75,6 +75,9 @@ interface AttemptRow {
   entryId: string | null
   error: string | null
   venueName: string
+  basketLines: string | null
+  basketBookings: number
+  basketWalkUps: number
 }
 
 export function attemptByIdQuery(id: string): SQL {
@@ -107,6 +110,7 @@ export function view(row: AttemptRow): SumupAttemptView {
     error: row.error,
     entryId: row.entryId,
     resolution: row.resolution,
+    basketSays: saysAttemptBasket(row),
   }
 }
 

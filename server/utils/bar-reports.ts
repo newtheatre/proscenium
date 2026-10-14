@@ -9,7 +9,7 @@ import { envelope, offsetFor } from '#shared/utils/pagination'
 import type { SQL } from 'drizzle-orm'
 import type { Page } from '#shared/utils/pagination'
 import { WASTAGE_REASONS } from '#shared/utils/bar-reports'
-import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInput, SalesRow, VarianceRow, WastageRow } from '#shared/utils/bar-reports'
+import type { BarReport, CompRow, DiscountRow, GpReport, GpRow, ReportPeriodInput, SalesRow, VarianceRow, VarianceSection, WastageRow } from '#shared/utils/bar-reports'
 
 // Every figure is a query over the ledger and the movement history, run fresh for the period
 // asked for; nothing here is a stored aggregate (F-119 criterion 4).
@@ -108,12 +108,39 @@ export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
   `
 }
 
+// Products sold in the period whose lines poured nothing, so their cost is missing from the
+// figure rather than nought; the screen names them instead of overstating profit in silence.
+export function gpUnpouredQuery(fromAt: number, toAt: number): SQL {
+  return sql`
+    SELECT DISTINCT p.name AS productName
+    FROM ledger_lines l
+    JOIN ledger_entries e ON e.id = l.entry_id
+    JOIN product_variants v ON v.id = l.product_variant_id
+    JOIN bar_products p ON p.id = v.product_id
+    WHERE l.kind = 'BAR_ITEM' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND NOT EXISTS (SELECT 1 FROM stock_movements m WHERE m.ref_table = 'ledger_lines' AND m.ref_id = l.id)
+    ORDER BY p.name COLLATE NOCASE
+  `
+}
+
+// Items poured in the period with no delivery that names a cost, so they count at nothing.
+export function gpUncostedQuery(fromAt: number, toAt: number): SQL {
+  return sql`
+    SELECT i.name AS itemName FROM (${gpDepletionQuery(fromAt, toAt)}) g
+    JOIN bar_items i ON i.name = g.itemName
+    WHERE ${unitCostPence} IS NULL
+    ORDER BY i.name COLLATE NOCASE
+  `
+}
+
 export async function grossProfitReport(fromAt: number, toAt: number): Promise<GpReport> {
   const [revenue] = await db.all<{ revenuePence: number }>(gpRevenueQuery(fromAt, toAt))
   const byItem = await db.all<GpRow>(gpDepletionQuery(fromAt, toAt))
+  const unpoured = (await db.all<{ productName: string }>(gpUnpouredQuery(fromAt, toAt))).map(row => row.productName)
+  const uncosted = (await db.all<{ itemName: string }>(gpUncostedQuery(fromAt, toAt))).map(row => row.itemName)
   const revenuePence = revenue?.revenuePence ?? 0
   const costPence = byItem.reduce((sum, row) => sum + row.costPence, 0)
-  return { revenuePence, costPence, grossProfitPence: revenuePence - costPence, byItem }
+  return { revenuePence, costPence, grossProfitPence: revenuePence - costPence, byItem, unpoured, uncosted }
 }
 
 const varianceScope = (fromAt: number, toAt: number): SQL => sql`
@@ -126,7 +153,7 @@ const varianceScope = (fromAt: number, toAt: number): SQL => sql`
 
 export function varianceQuery(fromAt: number, toAt: number, limit: number, offset: number): SQL {
   return sql`
-    SELECT st.id AS stocktakeId, i.name AS itemName, st.applied_at AS appliedAt,
+    SELECT st.id AS stocktakeId, i.name AS itemName, i.unit AS unit, st.opened_at AS openedAt, st.applied_at AS appliedAt,
            m.qty AS qtyVariance, round(m.qty * coalesce(${unitCostPence}, 0)) AS valuePence
     ${varianceScope(fromAt, toAt)}
     ORDER BY st.applied_at, i.name COLLATE NOCASE, m.id
@@ -138,10 +165,16 @@ export function varianceCountQuery(fromAt: number, toAt: number): SQL {
   return sql`SELECT count(*) AS total ${varianceScope(fromAt, toAt)}`
 }
 
-export async function stocktakeVarianceReport(fromAt: number, toAt: number, paging: ReportPaging): Promise<Page<VarianceRow>> {
+// Money sums across items where quantities cannot, since a millilitre and a can are not one unit.
+export function varianceTotalQuery(fromAt: number, toAt: number): SQL {
+  return sql`SELECT coalesce(sum(round(m.qty * coalesce(${unitCostPence}, 0))), 0) AS totalValuePence ${varianceScope(fromAt, toAt)}`
+}
+
+export async function stocktakeVarianceReport(fromAt: number, toAt: number, paging: ReportPaging): Promise<VarianceSection> {
   const [counted] = await db.all<{ total: number }>(varianceCountQuery(fromAt, toAt))
+  const [summed] = await db.all<{ totalValuePence: number }>(varianceTotalQuery(fromAt, toAt))
   const items = await db.all<VarianceRow>(varianceQuery(fromAt, toAt, paging.pageSize, offsetFor(paging.page, paging.pageSize)))
-  return envelope(items, counted?.total ?? 0, paging.page, paging.pageSize)
+  return { ...envelope(items, counted?.total ?? 0, paging.page, paging.pageSize), totalValuePence: summed?.totalValuePence ?? 0 }
 }
 
 // `source = 'TILL'`: module D's ticket comps post comp entries too, and this is the Front of House Manager's
@@ -203,7 +236,7 @@ export function discountsReportQuery(fromAt: number, toAt: number): SQL {
   return sql`
     SELECT l.discount_id AS discountId, max(l.discount_percent) AS percent,
            coalesce(d.name, '(deleted discount)') AS discountName,
-           count(*) AS timesApplied, sum(l.discount_pence) AS discountedPence
+           count(DISTINCT l.entry_id) AS timesApplied, sum(l.discount_pence) AS discountedPence
     FROM ledger_lines l
     JOIN ledger_entries e ON e.id = l.entry_id
     LEFT JOIN discounts d ON d.id = l.discount_id

@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   if (held.everSold) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${held.name} has been sold, so it can only be retired: every line sold under it still has to resolve`,
+      statusMessage: `${held.name} has been sold, so it can only be retired. Its sales stay in the reports under its name.`,
     })
   }
 
@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
   if (blocked) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${held.name} has a serving size with ${blocked.everSold ? 'sales' : 'a price history'} against it, so it can only be retired: every line still has to resolve`,
+      statusMessage: `${held.name} has a serving size with ${blocked.everSold ? 'sales' : 'a price history'} against it, so it can only be retired. Its history stays readable.`,
     })
   }
 

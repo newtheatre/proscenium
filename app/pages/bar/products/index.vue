@@ -297,7 +297,7 @@ const columns: TableColumn<BarProduct>[] = [
                 retiring.value = row.original
               },
             }]),
-        ...(row.original.everSold
+        ...(row.original.everSold || row.original.everPriced
           ? []
           : [{
               label: 'Delete',
@@ -550,7 +550,7 @@ const columns: TableColumn<BarProduct>[] = [
     <UModal
       :open="removing !== null"
       :title="removing ? `Delete ${removing.name}` : ''"
-      description="Nothing has ever been sold as this product, so there is no history to keep."
+      description="Nothing has ever been sold as this product or priced, so there is no history to keep."
       @update:open="removing = null; failure = null"
     >
       <template #body>

@@ -191,8 +191,16 @@ describe.skipIf(skip !== null)('CSV export is guarded and formatted at display, 
     expect(answered.status).toBe(200)
     expect(answered.headers.get('content-type')).toContain('text/csv')
     const csv = await answered.text()
-    expect(csv).toContain('£5.00')
-    expect(csv.startsWith('"category","product","variant","qty","revenue"')).toBe(true)
+    // A plain decimal under a pounds heading, so a spreadsheet sums the column (0128).
+    expect(csv).toContain('"5.00"')
+    expect(csv).not.toContain('£5.00')
+    expect(csv.startsWith('"Category","Product","Size","Quantity","Revenue (£)"')).toBe(true)
+    expect(answered.headers.get('content-disposition')).toMatch(/filename="bar-sales-\d{4}-\d{2}-\d{2}-to-\d{4}-\d{2}-\d{2}\.csv"/)
+  })
+
+  test('a section with nothing in the period still exports its heading, not an empty file', async () => {
+    const csv = await (await send('GET', '/api/admin/bar/reports/export?kind=CUSTOM&from=2001-01-01&to=2001-01-02&section=comps')).text()
+    expect(csv).toBe('"When","Reason","Approved by","Forgone (£)"\r\n')
   })
 
   test('a discount named like a formula is exported inert', async () => {
