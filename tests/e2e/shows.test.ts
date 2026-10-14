@@ -967,7 +967,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="publish-night-${performance}"]')`)
     const night = await textOf(view, `[data-test="publish-night-${performance}"]`)
     expect(night).toContain('The Test House')
-    expect(night).toContain('2h 15')
+    expect(night).toContain('2 hours 15 minutes')
     expect(night).toContain('No shifts')
     expect(await textOf(view, '[data-test="publish-warnings"]')).toContain('Not yet assessed')
     expect(await textOf(view, '[data-test="publish-poster"]')).toContain('No poster')

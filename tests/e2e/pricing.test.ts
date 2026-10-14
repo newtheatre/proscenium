@@ -247,13 +247,13 @@ describe.skipIf(skip !== null)('an override change is audited and reaches only n
 // D-105 criterion 4. Nothing has been sold yet anywhere, so the refusal cannot be shown against a
 // real ticket; what is proved here is that the path is open and the guard is on the statement.
 describe.skipIf(skip !== null)('capacity moves by its own action (D-105 criterion 4)', () => {
-  test('raising capacity is always allowed, which is how a deliberate oversell is done', async () => {
+  test('raising capacity above the venue is allowed once confirmed, which is how a deliberate oversell is done', async () => {
     const show = await newShow()
     const performance = await addPerformance(show.id, { capacityOverride: 10 })
+    const raise = { venueId, startsAt: nextWeek(), durationMinutes: 120, capacityOverride: 500 }
 
-    const answered = await send('PUT', `/api/admin/performances/${performance}`, {
-      venueId, startsAt: nextWeek(), durationMinutes: 120, capacityOverride: 500,
-    })
+    expect((await send('PUT', `/api/admin/performances/${performance}`, raise)).status).toBe(400)
+    const answered = await send('PUT', `/api/admin/performances/${performance}`, { ...raise, aboveVenueCapacity: true })
     expect(answered.status).toBe(200)
   })
 

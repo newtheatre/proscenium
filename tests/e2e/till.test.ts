@@ -835,6 +835,7 @@ describe.skipIf(skip !== null)('asking for and giving a comp from the till (F-11
     await waitFor(view, `document.querySelector('[data-test="comp-reason"]')`)
     await fill(view, '[data-test="comp-reason"]', 'Cast member, age checked at the door')
     await click(view, '[data-test="comp-send"]')
+    await waitFor(view, `document.querySelector('[data-test="comp-waiting"]')`)
 
     const listed = await request(app, 'GET', `/api/till/comp-requests?venueId=${comping.venueId}`, undefined, bar2.cookie)
     const { requests } = await listed.json() as { requests: { request: { id: string } }[] }
