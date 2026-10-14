@@ -22,7 +22,7 @@ afterAll(async () => {
 
 interface Tools {
   session: { factor: boolean } | null
-  personas: { email: string, account: { id: string } | null }[]
+  personas: { email: string, shape: string, factor: boolean, account: { id: string } | null }[]
 }
 
 describe('a seeded persona already carries a second factor', () => {
@@ -51,7 +51,7 @@ describe('a seeded persona already carries a second factor', () => {
   // route listed eleven (review of 13 October 2026): it now serves both, and says per persona.
   test.skipIf(Boolean(skip))('the page serves every persona, whether each has the factor, and the code to scan', async () => {
     await request(app, 'POST', '/api/dev/seed')
-    const tools = await (await request(app, 'GET', '/api/dev')).json() as Tools & { personas: { shape: string, factor: boolean }[], totp: { qr: string } }
+    const tools = await (await request(app, 'GET', '/api/dev')).json() as Tools & { totp: { qr: string } }
     for (const persona of tools.personas.filter(one => one.shape === 'full')) expect(persona.factor).toBe(true)
     expect(tools.totp.qr).toStartWith('data:image/svg+xml;base64,')
 
