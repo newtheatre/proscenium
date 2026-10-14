@@ -66,16 +66,22 @@ export function barSetUpQuery(): SQL {
 
 interface BarSetUp { anythingOnHand: number, anyStocktake: number, allergensUnknown: number }
 
+// Every severity ships routing nowhere (E-116 criterion 1), so until one is opted in nobody is told.
+export function safetyRoutingQuery(): SQL {
+  return sql`SELECT EXISTS (SELECT 1 FROM incident_severity_config WHERE requires_follow_up = 1) AS anySeverityRoutes`
+}
+
 // Each part is read only for a reader who could finish it: the rota's owner, the bar's, or whoever counts.
 export async function consoleOverview(event: H3Event, permissions: ReadonlySet<Permission>): Promise<ConsoleOverview> {
   const holds = (permission: Permission): boolean => permissions.has(permission)
   const bar = holds('bar.read')
   const stocktakes = bar || holds('bar.stocktake')
 
-  const [eligibility, facts, tonight] = await Promise.all([
+  const [eligibility, facts, tonight, routing] = await Promise.all([
     holds('rota.read') ? roleEligibilities(event) : undefined,
     stocktakes ? db.all<BarSetUp>(barSetUpQuery()).then(([row]) => row) : undefined,
     OPERATIONAL_PERMISSIONS.some(holds) ? performancesOnNight(currentShowNight()) : null,
+    holds('safety.write') ? db.all<{ anySeverityRoutes: number }>(safetyRoutingQuery()).then(([row]) => Boolean(row?.anySeverityRoutes)) : undefined,
   ])
 
   return {
@@ -84,6 +90,7 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
       anythingOnHand: bar && facts ? Boolean(facts.anythingOnHand) : undefined,
       anyStocktake: stocktakes && facts ? Boolean(facts.anyStocktake) : undefined,
       allergensUnknown: bar && facts ? Number(facts.allergensUnknown) : undefined,
+      anySeverityRoutes: routing,
     }),
     tonight: tonight === null ? null : tonightLines(tonight),
   }
