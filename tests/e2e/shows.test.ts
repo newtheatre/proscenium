@@ -962,7 +962,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect((await send('POST', '/api/admin/ticket-types', { name: access, price: 900, accessKind: 'ACCESS' })).status).toBe(200)
 
     const view = await signedIn()
-    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="publish"]')
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, `[data-test="sale-${performance}"]`)
     await click(view, '[data-test="publish"]')
     await waitFor(view, `document.querySelector('[data-test="publish-night-${performance}"]')`)
     const night = await textOf(view, `[data-test="publish-night-${performance}"]`)
@@ -981,6 +981,8 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     await click(view, '[data-test="confirm-publish"]')
     await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)
+    // The rows below follow the publish without a reload.
+    await waitFor(view, `document.querySelector('[data-test="sale-${performance}"]')?.textContent.includes('Off sale')`)
     view.close()
   }, 120_000)
 
