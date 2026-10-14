@@ -556,9 +556,8 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
   return movements
 }
 
-// One applied, so the stock screens have a count behind them, and one open, because a stocktake
-// half done is the state somebody walks back into. Seeded after the ledger's bar sales, so a line
-// expects what the movements had left on hand when it was opened.
+// One applied and one half done; seeded after the ledger's bar sales, so a line expects what the
+// movements had left on hand when it was opened.
 export function seedStocktakes(target: SeedTarget, items: Map<string, string>, people: People, now: number): number {
   const keeper = personIn(people, 'devon').id
   const counted = ['gin', 'vodka', 'house-red', 'lager', 'crisps']
