@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
+import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
+import { saysDay } from '#shared/utils/when'
 import { closedOn, dateStrip } from '#shared/utils/rooms'
 import { addDays } from '#shared/utils/series'
 import { SU_ROOM_ASK } from '#shared/utils/external-requests'
@@ -91,7 +92,7 @@ const roomOptions = computed(() => [
 ])
 
 function labelFor(day: string): string {
-  return formatLondon(noonOn(day), { weekday: 'short', day: 'numeric', month: 'short' })
+  return saysDay(noonOn(day), { year: false })
 }
 
 // The four shapes, from two questions. Across every room, the columns are rooms and the question

@@ -429,8 +429,6 @@ const BUILDS_ITS_OWN = /formatLondon\(/
 // and the shared helpers. The list may shrink and may not grow.
 const BUILDS_ITS_OWN_ALLOWED = [
   'app/components/box-office/show/Performances.vue',
-  'app/pages/rooms/index.vue',
-  'app/pages/rooms/mine.vue',
   'shared/utils/blackouts.ts',
   'shared/utils/list-filters.ts',
   'shared/utils/programme.ts',

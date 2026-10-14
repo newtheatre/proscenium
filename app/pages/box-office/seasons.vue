@@ -2,7 +2,7 @@
 import { h, resolveComponent } from 'vue'
 import { saysOverlaps, seasonForm } from '#shared/utils/seasons'
 import { seasonsList } from '#shared/utils/seasons-list'
-import { saysDay } from '#shared/utils/when'
+import { saysDayRange } from '#shared/utils/when'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminSeason } from '#shared/utils/seasons'
 
@@ -141,14 +141,14 @@ const columns: TableColumn<AdminSeason>[] = [
       ]),
       // Below sm the run and whether anything uses it are hidden: shown here instead, so a phone
       // keeps the row actions in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysDay(row.original.startsOn)} to ${saysDay(row.original.endsOn)}, ${row.original.inUse ? 'a show belongs to it' : 'nothing yet'}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysDayRange(row.original.startsOn, row.original.endsOn)}, ${row.original.inUse ? 'a show belongs to it' : 'nothing yet'}`),
     ]),
   },
   {
     id: 'window',
     header: 'Runs',
     meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
-    cell: ({ row }) => `${saysDay(row.original.startsOn)} to ${saysDay(row.original.endsOn)}`,
+    cell: ({ row }) => `${saysDayRange(row.original.startsOn, row.original.endsOn)}`,
   },
   {
     id: 'inUse',

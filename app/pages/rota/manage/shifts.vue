@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
+import { saysDay, saysDayRange, saysClock, saysDayLong } from '#shared/utils/when'
 import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
@@ -85,7 +85,7 @@ const activeFilters = computed<ActiveFilter[]>(() => {
   if (window.from === opened.from && window.to === opened.to) return []
   return [{
     key: 'window',
-    label: `${saysDay(window.from)} to ${saysDay(window.to)}`,
+    label: `${saysDayRange(window.from, window.to)}`,
     icon: 'i-lucide-calendar-range',
     clear: () => Object.assign(window, defaultBoardWindow(new Date())),
   }]

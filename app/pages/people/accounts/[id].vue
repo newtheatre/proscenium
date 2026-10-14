@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysDay, saysDayLong, saysWhen } from '#shared/utils/when'
+import { saysDay, saysDayRange, saysDayLong, saysWhen } from '#shared/utils/when'
 import { can, createAccounts, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
 import { describeAction } from '#shared/utils/audit-actions'
@@ -496,7 +496,7 @@ onMounted(load)
             v-for="membership in view.memberships"
             :key="membership.id"
           >
-            {{ saysDay(membership.startsOn) }} to {{ saysDay(membership.expiresOn) }}
+            {{ saysDayRange(membership.startsOn, membership.expiresOn) }}
             ({{ membership.source.toLowerCase() }}{{ membership.confirmedAt ? ', checked' : ', not yet checked' }})
           </li>
         </ul>
