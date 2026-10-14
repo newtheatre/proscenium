@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import * as z from 'zod'
+import type * as z from 'zod'
 import { passwordProblem } from '#shared/utils/auth'
 import { saysPasswordPolicy } from '#shared/utils/password-messages'
-import { withNext } from '#shared/utils/sign-in'
+import { registerForm, withNext } from '#shared/utils/sign-in'
 import type { AuthFormField, FormError, FormSubmitEvent } from '@nuxt/ui'
 
 // Somebody already signed in has nothing to do here, and typing a second set of details would
@@ -12,11 +12,7 @@ definePageMeta({ middleware: 'signed-out' })
 const route = useRoute()
 const policy = usePasswordPolicy()
 
-const schema = z.object({
-  name: z.string().trim().min(1, 'Enter your name').max(200, 'That name is too long'),
-  email: z.string().email('Enter an email address'),
-  password: z.string().min(1, 'Choose a password'),
-})
+const schema = registerForm
 
 const fields: AuthFormField[] = [
   { name: 'name', type: 'text', label: 'Name', autocomplete: 'name', required: true },

@@ -284,17 +284,18 @@ describe('the guidance a booker is told before they come (D-102 criterion 4)', (
   const violence = { title: 'Gun violence', kind: 'GENERAL' as const, level: 'DEPICTED' as const }
   const smoking = { title: 'Smoking', kind: 'GENERAL' as const, level: 'MENTIONED' as const }
 
+  // A staging warning names its group as a content warning names its level, so none reads bare.
   test('age guidance comes first, then each warning with its level', () => {
     expect(saysShowGuidance({ ageGuidance: 'Recommended 14 and over', assessment: 'WARNED', warnings: [strobe, violence] })).toEqual([
       'Age guidance: Recommended 14 and over',
-      'Content warnings: Strobe lighting; Gun violence: depicted',
+      'Content warnings: Strobe lighting: staging; Gun violence: depicted',
     ])
   })
 
   // The show page's own grouping: staging, then depicted, discussed and mentioned, strongest first.
   test('the warnings follow the show page\'s order, whatever order they arrive in', () => {
     expect(saysShowGuidance({ ageGuidance: null, assessment: 'WARNED', warnings: [smoking, violence, strobe] })[1])
-      .toBe('Content warnings: Strobe lighting; Gun violence: depicted; Smoking: mentioned')
+      .toBe('Content warnings: Strobe lighting: staging; Gun violence: depicted; Smoking: mentioned')
   })
 
   test('unset age guidance says so in the house words', () => {

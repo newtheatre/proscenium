@@ -229,13 +229,15 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
   const tonight = currentShowNight()
 
   const venues = new Map<string, string>()
-  venues.set('house', ensure(target, 'venues', { column: 'name', value: 'The Nottingham New Theatre' }, {
+  // Named and addressed as content/about.md and the technical page describe where we perform, so
+  // the booking journey and those pages agree (0122). Keyed by id, so an older name is kept on a re-run.
+  venues.set('house', ensure(target, 'venues', { column: 'id', value: seedId('venue', 'house') }, {
     id: seedId('venue', 'house'),
-    name: 'The Nottingham New Theatre',
-    address: 'Nottingham University Students Union, University Park',
+    name: 'The Portland Studio',
+    address: 'University Park, Nottingham NG7 2RD, opposite Mooch',
     capacity: 120,
     is_external: 0,
-    description: 'The house. General admission, no seat map, because we have never had one.',
+    description: 'The house while our own building is closed. General admission, no seat map.',
     room_id: target.get<{ id: string }>('SELECT id FROM rooms WHERE name = ?', 'The Auditorium')?.id ?? null,
   }).id)
 
@@ -254,7 +256,7 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
     target.batch([insert('venue_emergency_info', {
       id: seedId('emergency', 'house'),
       venue_id: venues.get('house')!,
-      address: 'The Nottingham New Theatre, Cherry Tree Hill, University Park, Nottingham NG7 2RD',
+      address: 'The Portland Studio, opposite Mooch, University Park, Nottingham NG7 2RD',
       assembly_point: 'The car park behind the Portland Building',
       exits: 'Two: stage left to the alley, and the foyer to Portland Hill.',
       isolation_points: 'Lighting isolation is in the box; gas is in the workshop corridor.',

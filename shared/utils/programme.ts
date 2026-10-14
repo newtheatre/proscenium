@@ -364,6 +364,7 @@ export interface AdminPerformance {
   showId: string
   venueId: string
   venueName: string
+  venueAddress: string | null
   startsAt: number
   doorsAt: number | null
   durationMinutes: number | null
@@ -404,6 +405,8 @@ export interface PublicPerformance {
   intervalCount: number
   intervalMinutes: number | null
   venueName: string
+  // Where to go: the venue's own stored address, null until somebody records one (0122).
+  venueAddress: string | null
   externalBookingUrl: string | null
   bookingClosesAt: number
   cancelled: boolean
@@ -517,6 +520,11 @@ export function saysLatecomerPolicy(policy: string | null): string {
   if (policy === 'AT_INTERVAL') return 'Latecomers admitted at the interval'
   if (policy === 'NOT_ADMITTED') return 'Latecomers not admitted'
   return TO_BE_CONFIRMED
+}
+
+// The show page's practical line, where a bare "To be confirmed" would not say what is unsettled.
+export function saysLatecomers(policy: string | null): string {
+  return policy ? saysLatecomerPolicy(policy) : 'Latecomer policy to be confirmed'
 }
 
 // The performance's own offset, then the show's, then curtain-up. NULL means inherit and an
@@ -636,6 +644,7 @@ export function saleRefusal(
 export function publicPerformance(performance: PerformanceSaleState & {
   id: string
   venueName: string
+  venueAddress?: string | null
   doorsAt: number | null
   durationMinutes: number | null
   intervalCount: number
@@ -650,6 +659,7 @@ export function publicPerformance(performance: PerformanceSaleState & {
     intervalCount: performance.intervalCount,
     intervalMinutes: performance.intervalMinutes ?? null,
     venueName: performance.venueName,
+    venueAddress: performance.venueAddress ?? null,
     externalBookingUrl: performance.externalBookingUrl,
     bookingClosesAt: onlineClosesAt(performance, holdReleaseMinutes),
     cancelled: performance.status === 'CANCELLED',
@@ -661,6 +671,15 @@ export function publicPerformance(performance: PerformanceSaleState & {
 export const TO_BE_CONFIRMED = 'To be confirmed'
 export const SAYS_BOOKING_HOLDS = 'Booking online holds your seats.'
 export const SAYS_PAYMENT = 'You pay at the box office when you arrive.'
+
+// A run sold wholly by another box office pays there, never at ours (D-122).
+export function saysHowToPay(performances: { externalBookingUrl: string | null, cancelled: boolean }[]): string {
+  const onOffer = performances.filter(one => !one.cancelled)
+  if (onOffer.length > 0 && onOffer.every(one => one.externalBookingUrl)) {
+    return 'Tickets for this show are sold by the venue\'s own box office, so book and pay with them.'
+  }
+  return SAYS_PAYMENT
+}
 
 // What a visitor is told about a house, computed here so the listing and the show page cannot
 // disagree (D-101 criterion 2). Cancelled and external are carried by the projection beside it.

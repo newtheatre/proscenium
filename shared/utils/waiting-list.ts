@@ -63,3 +63,10 @@ export function partySizeMismatchReason(requested: number, partySize: number): s
   if (requested === partySize) return null
   return `This offer is for ${partySize === 1 ? '1 seat' : `${partySize} seats`}; the request asked for ${requested}.`
 }
+
+// The list is for a party the house cannot seat (0120): with room for every one of them, or no cap
+// at all, the answer is to book now rather than wait for an offer nobody needs to make.
+export function waitingListJoinRefusal(remaining: number | null, partySize: number): string | null {
+  if (remaining !== null && remaining < partySize) return null
+  return 'Seats are still on sale for this performance, so book them now rather than joining the waiting list.'
+}

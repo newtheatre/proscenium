@@ -1,5 +1,6 @@
 import { formatLondon } from '#shared/utils/london'
 import { saysTotalDue } from '#shared/utils/reservations'
+import { saysClock } from '#shared/utils/when'
 
 // The booking the exchanged cookie names, read live (D-108 criteria 1, 4). The cookie is the
 // only credential this route asks for; no account session is required.
@@ -19,10 +20,11 @@ export default defineEventHandler(async (event) => {
   // Guidance is for somebody still coming, from the rows the show page reads (D-102 criterion 4):
   // a cancelled, lapsed, exchanged or already admitted booking is told nothing.
   const coming = reservation.status === 'PENDING' || reservation.status === 'COLLECTED'
-  const [ticketLines, guidance] = await Promise.all([
+  const [ticketLines, shown] = await Promise.all([
     namedTicketLines(reservationId),
-    coming ? bookingGuidance(referenceShowScope(reservation.reference)) : null,
+    bookingGuidance(referenceShowScope(reservation.reference)),
   ])
+  const guidance = coming ? shown : null
 
   return {
     reference: reservation.reference,
@@ -36,8 +38,19 @@ export default defineEventHandler(async (event) => {
     totalDue: saysTotalDue(reservation.status, reservation.holdExpiresAt, reservation.totalPence),
     qrSvg: qrSvgBase64(url),
     lines: ticketLines,
+    // Where to go, when the doors open and when an unpaid hold is let go, as the booking form
+    // said them (D-106 criterion 1, 0122).
+    venue: { name: reservation.venueName, address: reservation.venueAddress },
+    doors: reservation.doorsAt ? saysClock(reservation.doorsAt) : null,
+    releasesAt: coming && reservation.holdExpiresAt ? saysClock(reservation.holdExpiresAt) : null,
+    // A booking that ended without a replacement points back at the show, never a dead end (0122).
+    bookAgainUrl: ['CANCELLED', 'EXPIRED'].includes(reservation.status) && !reservation.exchangedToReference && shown?.slug ? `/shows/${shown.slug}` : null,
     exchangedTo: reservation.exchangedToShowTitle && reservation.exchangedToStartsAt
-      ? { showTitle: reservation.exchangedToShowTitle, when: formatLondon(new Date(reservation.exchangedToStartsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }
+      ? {
+          showTitle: reservation.exchangedToShowTitle,
+          when: formatLondon(new Date(reservation.exchangedToStartsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+          reference: reservation.exchangedToReference ?? undefined,
+        }
       : null,
   }
 })

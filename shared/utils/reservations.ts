@@ -132,10 +132,13 @@ export function otherBookingReason(showing: string | undefined, held: string): s
 // The two reads the booking page makes before a change name the booking in the query string.
 export const showingBookingQuery = z.object({ reference: showingReference })
 
+// Said by the edit form at zero and by the write path alike, so both point at cancelling (D-110).
+const SAYS_KEEP_ONE_TICKET = 'A booking must keep at least one ticket. Cancel it instead if none are wanted.'
+
 // D-110: self-service edit while unpaid. Desired totals per type, the same shape a fresh
 // booking uses, so "each type appears at most once" is one rule either way (criterion 1).
 export const reservationEditForm = z.strictObject({
-  lines: z.array(reservationLineForm).min(1, 'A booking needs at least one line').max(MAX_LINES)
+  lines: z.array(reservationLineForm).min(1, SAYS_KEEP_ONE_TICKET).max(MAX_LINES)
     .refine(
       lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
       'A ticket type appears once; add to its quantity instead of a second line',
@@ -195,7 +198,34 @@ export function sameTicketLines(one: TicketTypeCount[], other: TicketTypeCount[]
 // Criterion 2: a reservation with nothing left is a cancellation, not an edit.
 export function belowMinimumTicketsReason(desiredTotal: number): string | null {
   if (desiredTotal >= 1) return null
-  return 'A booking must keep at least one ticket. Cancel it instead if none are wanted.'
+  return SAYS_KEEP_ONE_TICKET
+}
+
+// How far one type's stepper may rise: its own limit, and no further than the order has room for,
+// so the cap is met at the button rather than in a refusal after it (D-104 criterion 2).
+export function stepperMax(quantities: Record<string, number>, typeId: string, cap: number, ownMax = cap): number {
+  const others = Object.entries(quantities).reduce((total, [id, quantity]) => (id === typeId ? total : total + quantity), 0)
+  return Math.max(0, Math.min(ownMax, cap - others))
+}
+
+// The cap, said before it bites, with what is left of it (D-104 criterion 2).
+export function saysOrderCap(cap: number, chosen: number): string {
+  if (chosen >= cap) return 'That is the most one online order can hold. For a larger party, contact the box office.'
+  if (chosen === 0) return `Up to ${plural(cap, 'ticket')} in one online order.`
+  return `Up to ${plural(cap, 'ticket')} in one online order: ${cap - chosen} more can be added.`
+}
+
+// What a booking's lines cost at another night's prices, or null when that night does not offer
+// one of its types: the total D-111 criterion 2 shows before the exchange is confirmed.
+export function exchangeTotalPence(lines: TicketTypeCount[], offered: { id: string, price: number }[]): number | null {
+  const prices = new Map(offered.map(type => [type.id, type.price]))
+  let total = 0
+  for (const line of lines) {
+    const price = prices.get(line.ticketTypeId)
+    if (price === undefined) return null
+    total += price * line.quantity
+  }
+  return total
 }
 
 // One night in the exchange list: the date leads, because a venue and a state name no night a
@@ -229,6 +259,18 @@ export function sameNightReason(currentPerformanceId: string, targetPerformanceI
 export interface QrExchangedTo {
   showTitle: string
   when: string
+  // The booking that replaced this one, which is the one to bring (D-111 criterion 4).
+  reference?: string
+}
+
+export type QrStatusTone = 'success' | 'warning' | 'neutral' | 'info'
+
+// The badge colour for each state, so unpaid and cancelled never read alike (D-108 criterion 5).
+export function qrStatusTone(status: string, totalDue: string | null, exchanged: boolean): QrStatusTone {
+  if (status === 'PENDING') return totalDue ? 'warning' : 'success'
+  if (status === 'COLLECTED' || status === 'DOOR') return 'success'
+  if (status === 'CANCELLED' && exchanged) return 'info'
+  return 'neutral'
 }
 
 export interface QrStatusDisplay {
@@ -288,7 +330,8 @@ export function qrStatusDisplay(
       // Exchanged is cancelled-with-a-pointer (D-111), not a fourth status: `reservations.status`
       // carries a restrict-FK'd dependent, so its CHECK constraint cannot be extended (0010).
       if (exchangedTo) {
-        return { headline: 'Exchanged', detail: `Exchanged for ${exchangedTo.showTitle}, ${exchangedTo.when}.` }
+        const replacement = exchangedTo.reference ? ` Your booking now has reference ${exchangedTo.reference}; this one no longer admits anybody.` : ''
+        return { headline: 'Exchanged', detail: `Exchanged for ${exchangedTo.showTitle}, ${exchangedTo.when}.${replacement}` }
       }
       return {
         headline: 'Cancelled',
