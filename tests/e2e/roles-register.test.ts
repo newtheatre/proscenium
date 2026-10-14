@@ -330,8 +330,8 @@ describe.skipIf(skip !== null)('the page grants and revokes without the account 
 
       await pickPerson(view, '[data-test="grant-person"]', holder.email.split('@')[0]!, holder.name)
       await click(view, '[data-test="grant-submit"]')
-      // The table, not the page: the picker already shows the chosen name before the grant lands.
-      await waitFor(view, `document.querySelector('[data-test="holders-table"]')?.innerText.includes(${JSON.stringify(holder.name)})`)
+      // This holder's own row, by id: synthetic names repeat, so another suite's holder can share it.
+      await waitFor(view, `document.querySelector('[data-test="revoke-${holder.id}-FOH_MANAGER"]')`)
 
       expect(read<{ role: string }>('SELECT role FROM role_grants WHERE user_id = ?', holder.id)?.role).toBe('FOH_MANAGER')
       // And the register shows the year, which is what makes a lapse next summer read as one.
