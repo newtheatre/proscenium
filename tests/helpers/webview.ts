@@ -279,7 +279,7 @@ export async function waitForInteractive(view: Bun.WebView, marker = 'main'): Pr
 }
 
 // Navigate and wait until the screen will answer a click. Every browser test starts here. The
-// dashboard shell renders no <main>, so an admin screen names an element of its own.
+// console's <main> is drawn before its data, so an admin screen names an element of its own.
 export async function visit(view: Bun.WebView, url: string, marker?: string): Promise<void> {
   await view.navigate(url)
   await waitForInteractive(view, marker)
