@@ -253,7 +253,8 @@ describe.skipIf(skip !== null)('the listing is cacheable and still tells the tru
     expect(JSON.stringify(answered)).not.toContain('The fog machine leaks')
     expect(Object.keys(answered.performances[0] ?? {}).sort()).toEqual([
       'availability', 'bookingClosesAt', 'cancelled', 'doorsAt', 'durationMinutes', 'externalBookingUrl',
-      'id', 'intervalCount', 'intervalMinutes', 'prices', 'remaining', 'says', 'startsAt', 'venueName',
+      'id', 'intervalCount', 'intervalMinutes', 'prices', 'remaining', 'says', 'startsAt',
+      'venueAddress', 'venueName',
     ])
   })
 })
