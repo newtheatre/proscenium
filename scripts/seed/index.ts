@@ -1,7 +1,7 @@
 // The one composer. Every door runs this, so a development database and a fixture never diverge
 // in what they contain, only in where they are written (K-120).
 
-import { seedBar } from './bar'
+import { seedBar, seedStocktakes } from './bar'
 import { seedBookings } from './bookings'
 import { seedGovernance } from './governance'
 import { seedMoney } from './money'
@@ -52,6 +52,8 @@ export async function seed(target: SeedTarget, options: SeedOptions): Promise<Se
   const showNight = await seedShowNight(target, people, programme, { now, token: options.token })
   const bar = seedBar(target, people, programme, now)
   const money = await seedMoney(target, people, programme, bookings, bar, now)
+  // After the ledger's bar sales, so a count expects what they left on the shelf (F-115).
+  seedStocktakes(target, bar.items, people, now)
   const governance = seedGovernance(target, people, now)
 
   return {

@@ -2,7 +2,7 @@
 // member, unverified, disabled, guest and tombstone. One body of data, read by both seed doors.
 
 import { erasureStatements } from '../../shared/utils/erasure'
-import { PERSONAS, PERSONA_PASSWORD } from '../../shared/utils/personas'
+import { PERSONAS, PERSONA_PASSWORD, PERSONA_TOTP_SECRET } from '../../shared/utils/personas'
 import { PROTECTED_ROLE, defaultRoleExpiry } from '../../shared/utils/roles'
 import { boundFromSQL, holds, insert, seedId } from './statements'
 import type { BoundStatement, SeedTarget } from './statements'
@@ -161,6 +161,16 @@ export async function seedPeople(target: SeedTarget, options: PeopleOptions): Pr
         granted_by: null,
         note: 'Seeded persona (K-124).',
       })])
+    }
+
+    // The shared authenticator, confirmed, as `/dev` seeds it: a staff role refuses every
+    // privileged screen to an account without one (A-112), and `/dev` says each persona has it.
+    if (persona.shape === 'full') {
+      target.batch([insert('totp_secrets', {
+        user_id: seeded.id,
+        secret: PERSONA_TOTP_SECRET,
+        confirmed_at: now,
+      }, '(user_id) DO NOTHING')])
     }
 
     // Anonymised last, and only once: the tombstone guard refuses any later write over it (0011).
