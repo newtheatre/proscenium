@@ -47,6 +47,19 @@ describe('a seeded persona already carries a second factor', () => {
     expect(admins.status).toBe(200)
   })
 
+  // The page said every full persona had the factor while none did, and listed nobody while the
+  // route listed eleven (review of 13 October 2026): it now serves both, and says per persona.
+  test.skipIf(Boolean(skip))('the page serves every persona, whether each has the factor, and the code to scan', async () => {
+    await request(app, 'POST', '/api/dev/seed')
+    const tools = await (await request(app, 'GET', '/api/dev')).json() as Tools & { personas: { shape: string, factor: boolean }[], totp: { qr: string } }
+    for (const persona of tools.personas.filter(one => one.shape === 'full')) expect(persona.factor).toBe(true)
+    expect(tools.totp.qr).toStartWith('data:image/svg+xml;base64,')
+
+    const html = await (await fetch(`${app.baseURL}/dev`)).text()
+    expect(html).toContain('data-test="dev-be-ADMIN"')
+    expect(html).toContain('src="data:image/svg+xml;base64,')
+  })
+
   // Issue 1338: the room forms refuse before they open without a membership, so the persona
   // their pictures are taken as holds a current one, made or already held.
   test.skipIf(Boolean(skip))('the booker holds a current membership, and the ordinary member none', async () => {
