@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysPrice, saysPriceSource } from '#shared/utils/ticket-types'
+import { priceOverridesForm, saysPrice, saysPriceSource } from '#shared/utils/ticket-types'
 import type { PriceSource } from '#shared/utils/ticket-types'
 
 // One level of the price chain, with every level shown beside it so an operator can see why a
@@ -61,17 +61,29 @@ watch(() => data.value.items, (items) => {
 
 const at = (id: string): Edited => edited.value.get(id) ?? { price: null, active: null }
 
-// The field takes pounds and the request carries pence, converted here and nowhere else (0004).
-function poundsFor(id: string): number | undefined {
+// The field holds pence: empty is inherit, and NaN is text that is not a price, held so the save
+// refuses it rather than sending it as inherit (0125).
+function penceFor(id: string): number | undefined {
   const price = at(id).price
-  return price === null ? undefined : price / 100
+  return price === null ? undefined : price
 }
 
-function setPounds(id: string, value: number | undefined): void {
+function setPence(id: string, value: number | undefined): void {
   const next = new Map(edited.value)
-  next.set(id, { ...at(id), price: value === undefined || Number.isNaN(value) ? null : Math.round(value * 100) })
+  next.set(id, { ...at(id), price: value === undefined ? null : value })
   edited.value = next
 }
+
+// The first row the save would refuse, named, so the officer knows which field to fix.
+const priceRefusal = computed(() => {
+  for (const item of data.value.items) {
+    const price = at(item.ticketTypeId).price
+    if (price === null) continue
+    const said = priceOverridesForm.safeParse({ overrides: [{ ticketTypeId: item.ticketTypeId, price, active: null }] }).error?.issues[0]?.message
+    if (said) return `${item.name}: ${said}`
+  }
+  return null
+})
 
 function setActive(id: string, value: boolean | null): void {
   const next = new Map(edited.value)
@@ -91,10 +103,11 @@ const resolvedByType = computed(() => {
   const map = new Map<string, { price: number, source: PriceSource, active: boolean }>()
   for (const item of data.value.items) {
     const mine = at(item.ticketTypeId)
+    const typed = mine.price !== null && Number.isNaN(mine.price) ? null : mine.price
     const show = props.level === 'show'
-      ? { price: mine.price, active: mine.active }
+      ? { price: typed, active: mine.active }
       : { price: item.showPrice, active: item.showActive }
-    const performance = props.level === 'performance' ? { price: mine.price, active: mine.active } : null
+    const performance = props.level === 'performance' ? { price: typed, active: mine.active } : null
     map.set(item.ticketTypeId, resolvePrice({ price: item.basePrice, activeByDefault: item.activeByDefault }, show, performance))
   }
   return map
@@ -105,8 +118,9 @@ function resolvedNow(item: PricedType): { price: number, source: PriceSource, ac
 }
 
 async function save(): Promise<void> {
+  failure.value = priceRefusal.value
+  if (failure.value) return
   saving.value = true
-  failure.value = null
   try {
     await $fetch(props.endpoint, {
       method: 'PUT',
@@ -154,8 +168,9 @@ async function save(): Promise<void> {
 
       <p class="text-sm text-muted">
         A price resolves this performance, then the show, then the ticket type. Leave a field empty
-        to inherit; an explicit nought is a free ticket and not an absence. Changing a price here
-        never reprices a ticket already sold.
+        to inherit; an explicit nought is a free ticket and not an absence. A figure that is not a
+        price, such as -5 or 7.555, is refused on save, never changed. Changing a price here never
+        reprices a ticket already sold.
       </p>
 
       <p
@@ -195,15 +210,13 @@ async function save(): Promise<void> {
             </span>
 
             <div class="ms-auto flex flex-wrap items-center gap-2">
-              <UInputNumber
-                :model-value="poundsFor(item.ticketTypeId)"
-                :min="0"
-                :step="0.01"
-                :format-options="{ style: 'currency', currency: 'GBP' }"
+              <PoundsField
+                :model-value="penceFor(item.ticketTypeId)"
                 placeholder="Inherit"
                 class="w-40"
+                :aria-label="`${item.name} price at this level`"
                 :data-test="`price-field-${item.ticketTypeId}`"
-                @update:model-value="value => setPounds(item.ticketTypeId, value)"
+                @update:model-value="value => setPence(item.ticketTypeId, value)"
               />
               <USelect
                 :model-value="at(item.ticketTypeId).active"
@@ -220,7 +233,8 @@ async function save(): Promise<void> {
                 size="sm"
                 color="neutral"
                 variant="ghost"
-                label="Inherit"
+                label="Clear row"
+                :aria-label="`Clear ${item.name}'s price and sale setting, so both inherit`"
                 :data-test="`clear-${item.ticketTypeId}`"
                 @click="clear(item.ticketTypeId)"
               />

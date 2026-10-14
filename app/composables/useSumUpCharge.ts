@@ -261,12 +261,14 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
 
   // Tonight's open charges (criterion 6), so the laptop can answer for a phone that left one. Read
   // whether or not the hand-off is on, since a typed charge needs no key (0096).
-  const openAttempts = ref<SumupAttemptView[]>([])
+  const listedAttempts = ref<SumupAttemptView[]>([])
+  // Filtered live: a charge recalled after a refresh is answered by the pinned buttons, never twice.
+  const openAttempts = computed(() => listedAttempts.value.filter(attempt => attempt.id !== sumup.pending.value?.id))
   async function refreshOpenAttempts(): Promise<void> {
     if (!venueId.value) return
     try {
       const answered = await request<{ attempts: SumupAttemptView[] }>('/api/till/payments', { query: { venueId: venueId.value } })
-      openAttempts.value = answered.attempts.filter(attempt => attempt.id !== sumup.pending.value?.id)
+      listedAttempts.value = answered.attempts
     }
     catch { /* the strip is a convenience; the till still sells */ }
   }

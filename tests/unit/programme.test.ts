@@ -12,6 +12,7 @@ import {
   performanceRunForm,
   performanceScreenForm,
   runScreenForm,
+  saysPerformanceStatus,
   preselectedVenueId,
   publicPerformance,
   publicShow,
@@ -474,6 +475,24 @@ describe('a run of nights becomes one instant per night (D-132 criterion 10)', (
     expect(screen(['2026-10-24', '2026-10-24']).success).toBe(false)
     expect(screen(['24/10/2026']).success).toBe(false)
   })
+
+  // An empty day is a missing day, on its own or beside another, never a repeated one.
+  test('empty days each say they need a day, and only a real repeat says each day once', () => {
+    const messages = (days: string[]) => runScreenForm.safeParse({ venueId: 'venue-a', days, clock: '19:30', doorsClock: '', durationMinutes: 120 })
+      .error?.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`) ?? []
+    expect(messages([''])).toEqual(['days.0: Each night needs a day'])
+    expect(messages(['', ''])).toEqual(['days.0: Each night needs a day', 'days.1: Each night needs a day'])
+    expect(messages(['2026-10-24', '2026-10-24'])).toEqual(['days: Each day once'])
+  })
+})
+
+// The field is labelled Web address, so its refusals say so rather than "slug".
+describe('a show\'s web address is called that when it is refused', () => {
+  test('a missing or malformed address names the field the officer can see', () => {
+    const said = (slug: string) => showForm.safeParse({ title: 'The Seagull', slug }).error?.issues[0]?.message
+    expect(said('')).toBe('A show needs a web address')
+    expect(said('The Seagull')).toBe('A web address is lowercase words joined by hyphens')
+  })
 })
 
 // A Details save states the season its form loaded, so the write can refuse one set since
@@ -490,5 +509,20 @@ describe('a Details save carries the season it loaded', () => {
   test('a refused save names the season the show has now, or says it has none', () => {
     expect(saysSeasonMoved('The Seagull', 'Autumn 2026')).toBe('The season of The Seagull changed to Autumn 2026 while you were editing it. Reload to see it, then choose again.')
     expect(saysSeasonMoved('The Seagull', null)).toBe('The season of The Seagull was cleared while you were editing it. Reload to see it, then choose again.')
+  })
+})
+
+// A performance whose night is over has played, whatever its sale status still says.
+describe('a performance badge says Played once its night is over', () => {
+  const curtain = Math.floor(Date.UTC(2026, 9, 13, 18, 30) / 1000)
+  test('on its own night it reads its status, and from the next night on it has played', () => {
+    expect(saysPerformanceStatus('ON_SALE', curtain, new Date(Date.UTC(2026, 9, 13, 22, 0)))).toBe('On sale')
+    expect(saysPerformanceStatus('ON_SALE', curtain, new Date(Date.UTC(2026, 9, 14, 12, 0)))).toBe('Played')
+    expect(saysPerformanceStatus('DRAFT', curtain, new Date(Date.UTC(2026, 9, 14, 12, 0)))).toBe('Played')
+  })
+
+  test('a cancelled one stays cancelled, and no curtain given reads the status alone', () => {
+    expect(saysPerformanceStatus('CANCELLED', curtain, new Date(Date.UTC(2026, 9, 20, 12, 0)))).toBe('Cancelled')
+    expect(saysPerformanceStatus('ON_SALE')).toBe('On sale')
   })
 })

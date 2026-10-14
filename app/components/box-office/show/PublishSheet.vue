@@ -19,9 +19,11 @@ interface PriceLine { ticketTypeId: string, name: string, price: number, active:
 
 const prices = ref<PriceLine[] | null>(null)
 
-// An access seat is never bought on its own; the route already leaves out pass admission (0074).
-const offered = computed(() => (prices.value ?? [])
-  .filter(one => one.active && !one.archived && one.accessKind === null))
+// An access seat is never bought on its own, so it is read back on a line of its own; the route
+// already leaves out pass admission (0074).
+const onSale = computed(() => (prices.value ?? []).filter(one => one.active && !one.archived))
+const offered = computed(() => onSale.value.filter(one => one.accessKind === null))
+const accessOffered = computed(() => onSale.value.filter(one => one.accessKind !== null))
 
 onMounted(async () => {
   if (!props.detail) return
@@ -98,6 +100,13 @@ const saysWarnings = computed(() => {
           : offered.length === 0
             ? 'No ticket type is on sale for this show.'
             : offered.map(one => `${one.name} ${saysPrice(one.price)}`).join(' · ') }}
+      </p>
+      <p
+        v-if="accessOffered.length"
+        class="text-sm text-muted"
+        data-test="publish-access-prices"
+      >
+        With a verified access profile: {{ accessOffered.map(one => `${one.name} ${saysPrice(one.price)}`).join(' · ') }}
       </p>
     </section>
 

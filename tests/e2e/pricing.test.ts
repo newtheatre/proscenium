@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -301,6 +301,32 @@ describe.skipIf(skip !== null)('the screen shows why a price is what it is (D-12
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+
+  // 0125: -5 was saved as a free ticket and then shown as Inherit; now it is refused and nothing moves.
+  test('a price that is not one is refused on save, naming the row, and nothing is written', async () => {
+    const type = await addType(900)
+    const show = await newShow()
+    const performance = await addPerformance(show.id)
+
+    const view = await openConsole()
+    try {
+      await visit(view, `${app.baseURL}/box-office/shows/${show.id}?tab=performances`, '[data-test="performances-table"]')
+      await waitFor(view, `document.querySelector('[data-test="prices-${performance}"]') !== null`)
+      await click(view, `[data-test="prices-${performance}"]`)
+      const field = `input[data-test="price-field-${type}"], [data-test="price-field-${type}"] input`
+      await fill(view, field, '-5')
+      expect(await textOf(view, `[data-test="clear-${type}"]`)).toContain('Clear row')
+      await click(view, '[data-test="save-prices"]')
+      await waitFor(view, `document.querySelector('[data-test="prices-failure"]') !== null`)
+      expect(await textOf(view, '[data-test="prices-failure"]')).toContain('Type a price in pounds and pence')
+    }
+    finally {
+      view.close()
+    }
+
+    expect(forType(await pricesOf(`/api/admin/performances/${performance}/prices`), type))
+      .toMatchObject({ price: 900, source: 'BASE' })
   }, CASE_TIMEOUT_MS)
 
   test('a performance price is set from the performance row and takes effect at once', async () => {

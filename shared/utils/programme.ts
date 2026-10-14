@@ -3,7 +3,7 @@ import { formatLondon, fromLondonWallClock } from './london'
 import { holdExpiresAt } from './reservations'
 import { plural } from './text'
 import { POSTER_PREFIX, posterUrl } from './seo'
-import { SHOW_NIGHT_START_HOUR } from './show-night'
+import { SHOW_NIGHT_START_HOUR, showNightOf } from './show-night'
 import type { PublicContentWarning, WarningAssessment } from './content-warnings'
 
 // The publish flow and the booking window (D-121, D-112). A show is draft until somebody
@@ -78,8 +78,8 @@ const optionalUrl = (max: number) => z.string().trim().max(max)
 
 export const showForm = z.object({
   title: z.string().trim().min(1, 'A show needs a title').max(MAX_SHOW_TITLE),
-  slug: z.string().trim().min(1, 'A show needs a slug').max(MAX_SHOW_SLUG)
-    .refine(value => SLUG.test(value), 'A slug is lowercase words joined by hyphens'),
+  slug: z.string().trim().min(1, 'A show needs a web address').max(MAX_SHOW_SLUG)
+    .refine(value => SLUG.test(value), 'A web address is lowercase words joined by hyphens'),
   subtitle: optionalText(200),
   description: optionalText(500),
   longDescription: optionalText(20_000),
@@ -194,7 +194,8 @@ export type PerformanceRunInput = z.output<typeof performanceRunForm>
 export const runScreenForm = z.object({
   ...runFields,
   days: z.array(z.string().regex(CIVIL_DAY, 'Each night needs a day')).min(1, 'A run needs a night').max(MAX_RUN_NIGHTS)
-    .refine(days => new Set(days).size === days.length, 'Each day once'),
+    // An empty day is reported as missing on its own, never as a repeat of another empty one.
+    .refine(days => new Set(days.filter(Boolean)).size === days.filter(Boolean).length, 'Each day once'),
   clock: z.string().regex(CLOCK, 'A curtain time reads HH:MM'),
   doorsClock: z.union([z.literal(''), z.string().regex(CLOCK, 'A doors time reads HH:MM')]),
 }).refine(doorsClockFirst, DOORS_CLOCK_FIRST)
@@ -520,9 +521,11 @@ export function saysShowStatus(status: string): string {
   return status === 'PUBLISHED' ? 'Published' : 'Draft'
 }
 
-export function saysPerformanceStatus(status: string): string {
-  if (status === 'ON_SALE') return 'On sale'
+// With its curtain given, a performance whose show night is over reads Played, not its sale status.
+export function saysPerformanceStatus(status: string, startsAt?: number, now: Date = new Date()): string {
   if (status === 'CANCELLED') return 'Cancelled'
+  if (startsAt !== undefined && showNightOf(new Date(startsAt * 1000)) < showNightOf(now)) return 'Played'
+  if (status === 'ON_SALE') return 'On sale'
   return 'Off sale'
 }
 

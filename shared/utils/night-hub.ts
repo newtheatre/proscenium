@@ -147,11 +147,18 @@ export function saysIntervals(intervalCount: number, intervalMinutes: number | n
   return intervalMinutes ? `${counted} of ${intervalMinutes} minutes` : counted
 }
 
-/** "2h 10 · 1 interval", the answer the door is asked most often after the price. */
+// One wording for a running time, on the public page, the publish summary and the glance alike.
+export function saysRunningTime(durationMinutes: number): string {
+  const hours = Math.floor(durationMinutes / 60)
+  const minutes = durationMinutes % 60
+  return [hours ? plural(hours, 'hour') : '', minutes || !hours ? plural(minutes, 'minute') : ''].filter(Boolean).join(' ')
+}
+
+// "2 hours 10 minutes · 1 interval", the answer the door is asked most often after the price.
 export function runningTimeLine(durationMinutes: number | null, intervalCount: number, intervalMinutes: number | null): string {
   const intervals = saysIntervals(intervalCount, intervalMinutes)
   if (durationMinutes === null) return `Running time not yet stated · ${intervals}`
-  return `${Math.floor(durationMinutes / 60)}h ${String(durationMinutes % 60).padStart(2, '0')} · ${intervals}`
+  return `${saysRunningTime(durationMinutes)} · ${intervals}`
 }
 
 // The door's numbers in one line, in the house's own words (issue 1150 item 16, issue 1307).

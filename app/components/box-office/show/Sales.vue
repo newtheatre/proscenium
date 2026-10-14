@@ -23,6 +23,14 @@ const figure = (value: string): VNode => h('span', { class: 'font-mono text-sm' 
 const unpaidTotal = computed(() => rows.value.reduce((sum, one) => sum + (one.externalBookingUrl ? 0 : one.unpaidTickets), 0))
 const soldTotal = computed(() => rows.value.reduce((sum, one) => sum + (one.externalBookingUrl ? 0 : one.soldTickets), 0))
 const capacityTotal = computed(() => rows.value.reduce((sum, one) => sum + (capacityOf(one) ?? 0), 0))
+const leftOf = (one: AdminPerformance): number | null => {
+  const capacity = capacityOf(one)
+  return capacity === null ? null : Math.max(capacity - one.soldTickets, 0)
+}
+// An uncapped night has no figure to add, so the run's total says so rather than undercounting.
+const leftTotal = computed(() => rows.value.some(one => !one.externalBookingUrl && capacityOf(one) === null)
+  ? 'No limit'
+  : `${rows.value.reduce((sum, one) => sum + (leftOf(one) ?? 0), 0)}`)
 
 const columns = computed<TableColumn<AdminPerformance>[]>(() => [
   {
@@ -72,11 +80,12 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
     id: 'remaining',
     header: 'Left',
     meta: RIGHT_ALIGNED,
+    footer: () => figure(leftTotal.value),
     cell: ({ row }) => {
-      const capacity = capacityOf(row.original)
+      const left = leftOf(row.original)
       if (row.original.externalBookingUrl) return h('span', { class: 'font-sans text-sm text-muted' }, 'n/a')
-      if (capacity === null) return h('span', { class: 'font-sans text-sm text-muted' }, 'No limit')
-      return figure(`${Math.max(capacity - row.original.soldTickets, 0)}`)
+      if (left === null) return h('span', { class: 'font-sans text-sm text-muted' }, 'No limit')
+      return figure(`${left}`)
     },
   },
 ])

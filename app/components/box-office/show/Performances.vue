@@ -306,10 +306,10 @@ const columns: TableColumn<AdminPerformance>[] = [
       h('div', { class: 'flex flex-wrap items-center gap-2' }, [
         h('span', {}, saysWhen(row.original.startsAt)),
         h(UBadge, {
-          color: row.original.status === 'ON_SALE' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
+          color: saysPerformanceStatus(row.original.status, row.original.startsAt) === 'On sale' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
           variant: 'subtle',
           size: 'sm',
-        }, () => saysPerformanceStatus(row.original.status)),
+        }, () => saysPerformanceStatus(row.original.status, row.original.startsAt)),
         row.original.externalBookingUrl
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Externally ticketed')
           : null,
@@ -560,6 +560,7 @@ const columns: TableColumn<AdminPerformance>[] = [
             v-else
             label="Days"
             name="days"
+            :error-pattern="/^days\.\d+$/"
             required
             description="Each day is one performance at the curtain below, on the day the curtain falls: a 00:15 Saturday curtain is the Saturday, and is Friday's show night."
           >
