@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { capacityOverrideRefusal, runningTimeRefusal, saleRefusal } from '#shared/utils/programme'
+import { capacityOverrideRefusal, performanceCancelForm, runningTimeRefusal, saleRefusal } from '#shared/utils/programme'
 import { showNightBounds } from '#shared/utils/show-night'
 import { effectiveCapacity, isOnSale, performanceNight } from '#server/utils/performances'
 import type { PerformanceSaleState } from '#shared/utils/programme'
@@ -178,5 +178,19 @@ describe('a performance at a venue we run carries its running time (D-121 criter
     expect(runningTimeRefusal(elsewhere, null)).toBeNull()
     expect(runningTimeRefusal(elsewhere, 90)).toBeNull()
     expect(runningTimeRefusal(house, null, 'CANCELLED')).toBeNull()
+  })
+})
+
+// D-121 criterion 5: the reason is optional, goes only to the holders, and an empty body still cancels.
+describe('cancelling a performance takes an optional reason', () => {
+  test('no body, an empty body and a blank reason all cancel with no reason', () => {
+    expect(performanceCancelForm.parse(undefined)).toEqual({ reason: null })
+    expect(performanceCancelForm.parse({})).toEqual({ reason: null })
+    expect(performanceCancelForm.parse({ reason: '   ' })).toEqual({ reason: null })
+  })
+
+  test('a reason is trimmed, and one too long to read in an email is refused', () => {
+    expect(performanceCancelForm.parse({ reason: '  The lead is unwell ' })).toEqual({ reason: 'The lead is unwell' })
+    expect(performanceCancelForm.safeParse({ reason: 'x'.repeat(501) }).success).toBe(false)
   })
 })

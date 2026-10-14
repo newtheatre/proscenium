@@ -189,6 +189,14 @@ function productFor(line: BasketLine): SaleProduct | undefined {
       item-test-prefix="discount"
       :items="discounts.map(discount => ({ id: discount.id, label: `${discount.name} (-${discount.percent}%)` }))"
     />
+    <!-- A discount never touches ticket money (F-122 criterion 4), so a ticket-only total stays put. -->
+    <p
+      v-if="discounts.length && hasTicketMoney"
+      class="text-xs text-muted"
+      data-test="discount-bar-only"
+    >
+      A discount comes off the drinks only, never the tickets.
+    </p>
 
     <ChoiceChips
       v-if="tabHolders.length && !hasTicketMoney"

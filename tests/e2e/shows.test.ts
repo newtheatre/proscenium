@@ -367,6 +367,46 @@ describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once 
     expect(entry?.detail.ticketsOwedARefund).toBe(0)
   })
 
+  test('every booking with an account is emailed once, with the reason, and the reason stays out of the trail', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+    const database = new Database(app.databaseFile)
+    try {
+      for (const [suffix, status] of [['paid', 'COLLECTED'], ['unpaid', 'PENDING'], ['gone', 'CANCELLED']] as const) {
+        database.run(
+          'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          [`r-${suffix}-${performance}`, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, status, 'WEB'],
+        )
+      }
+    }
+    finally {
+      database.close()
+    }
+
+    const answered = await send('POST', `/api/admin/performances/${performance}/cancel`, { reason: 'The lead is unwell' })
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toMatchObject({ status: 'CANCELLED', bookingsTold: 2 })
+    expect((await send('POST', `/api/admin/performances/${performance}/cancel`, { reason: 'Again' })).status).toBe(409)
+
+    const readOnly = new Database(app.databaseFile, { readonly: true })
+    try {
+      const told = readOnly
+        .query(`SELECT claim FROM notification_log WHERE user_id = ? AND type = 'reservation.performance-cancelled' AND claim LIKE ?`)
+        .all(member.id, `%${performance}`) as { claim: string }[]
+      expect(told.map(row => row.claim).sort()).toEqual([
+        `reservation.performance-cancelled:r-paid-${performance}`,
+        `reservation.performance-cancelled:r-unpaid-${performance}`,
+      ])
+    }
+    finally {
+      readOnly.close()
+    }
+
+    const entry = trail<{ detail: Record<string, unknown> }>('performance.cancelled', `performance:${performance}`)
+    expect(entry?.detail.bookingsTold).toBe(2)
+    expect(JSON.stringify(entry?.detail)).not.toContain('unwell')
+  })
+
   test('a cancelled performance cannot be put back on sale by the sale action', async () => {
     const id = await newShow()
     const performance = await addPerformance(id)

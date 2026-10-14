@@ -139,12 +139,13 @@ describe.skipIf(skip !== null)('signing off the night by hand (issue 1053)', () 
     }
   }, CASE_TIMEOUT_MS)
 
-  test('a matinee day opened cold asks which house before showing either report', async () => {
+  test('a matinee day opened cold shows the header\'s house, with the other one a tap away', async () => {
     const { email, password, performanceIds } = await dutyManagerOn('matinee', [10, 15.5])
     const view = await signedIn(email, password)
     try {
       await visit(view, `${app.baseURL}/tonight/report`)
       await waitFor(view, `document.querySelector('[data-test="report-performance-switcher"]')`)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="report-draft"]'))`)).toBe(true)
       await click(view, `[data-test="choose-${performanceIds[0]}"]`)
       await waitFor(view, `document.querySelector('[data-test="report-draft"]')`)
     }

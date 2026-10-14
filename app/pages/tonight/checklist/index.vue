@@ -2,6 +2,7 @@
 import { saysNightClosed, saysPhase } from '#shared/utils/checklist'
 import { holdsTheClose } from '#shared/utils/night-signoff'
 import { saysTillLeftOpen } from '#shared/utils/till'
+import { openingHouseId } from '#shared/utils/tonight'
 import type { ChecklistClose, ChecklistEntry, Phase, TonightChecklist } from '#shared/utils/checklist'
 import type { TillLeftOpen } from '#shared/utils/till'
 
@@ -41,8 +42,9 @@ const ambiguous = ref(false)
 // Whether the read named a house decides what a 400 means: with none named, more than one is running.
 interface ChecklistRead { named: boolean, settled: SettledRead<TonightChecklist> }
 
+// Unnamed, it opens on the house the header already shows, and the switcher changes it.
 async function read(): Promise<ChecklistRead> {
-  const named = performanceId.value
+  const named = performanceId.value ?? openingHouseId(authority.value.performances)
   const settled = await settleRead(() => request<TonightChecklist>(
     '/api/tonight/checklist',
     { query: named ? { performanceId: named } : {} },
@@ -140,6 +142,13 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
       class="space-y-6"
       data-test="checklist-list"
     >
+      <NightPerformanceSwitcher
+        v-if="choices.length > 1"
+        data-test="checklist-performance-switcher"
+        :performances="choices"
+        :selected-id="performanceId"
+        @choose="choose"
+      />
       <UAlert
         v-if="close"
         data-test="checklist-closed"

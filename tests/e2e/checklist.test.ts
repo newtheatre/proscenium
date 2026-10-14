@@ -414,6 +414,8 @@ describe.skipIf(skip !== null)('the checklist screen on a matinee day (E-127, is
       await visit(view, `${app.baseURL}/tonight/checklist`, '[data-test="checklist-performance-switcher"]')
       await waitFor(view, `document.querySelector('[data-test="choose-${houses.matineeId}"]')`)
       expect(await view.evaluate<number>(`document.querySelectorAll('[data-test="checklist-failure"]').length`)).toBe(0)
+      // Opened unnamed, it is already on a house, the one the header shows, rather than asking again.
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="checklist-list"]'))`)).toBe(true)
 
       await click(view, `[data-test="choose-${houses.matineeId}"]`)
       await waitFor(view, `document.querySelector('[data-test="checklist-list"]')`)

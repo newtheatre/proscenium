@@ -148,6 +148,16 @@ export function performanceSoldQuery(performanceId: string, references = soldRef
   return sql`SELECT ${sql.join(references.map(reference => heldTerm(reference, sql`${performanceId}`)), sql` + `)} AS sold`
 }
 
+// D-121 criterion 5: every live booking with an account to write to. A nameless walk-up has none,
+// and its holder is refunded at the desk on asking.
+export function cancelledPerformanceHoldersQuery(performanceId: string): SQL {
+  return sql`
+    SELECT id AS reservationId, reference, user_id AS userId, status = 'COLLECTED' AS collected
+    FROM reservations
+    WHERE performance_id = ${performanceId} AND user_id IS NOT NULL AND status IN ('PENDING', 'COLLECTED')
+  `
+}
+
 interface ShowRow extends Omit<AdminShow, 'warningsConfirmedNone' | 'posterUrl'> {
   warningsConfirmedNone: number
   posterKey: string | null

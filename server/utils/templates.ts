@@ -1675,6 +1675,30 @@ Changed your mind? Book again from the show's page while seats remain.
 The Nottingham New Theatre`,
     }
   },
+  // D-121 criterion 5 and D-116 criterion 1: money comes back in person, on the reader it went in on.
+  'reservation-performance-cancelled': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    const why = context.reason ? `The reason given: ${String(context.reason)}` : null
+    const next = context.collected
+      ? 'Bring this reference to the box office and every ticket you paid for is refunded at the box office, on the card reader, in person.'
+      : 'Nothing was charged: the booking was still unpaid, so there is nothing for you to do.'
+    return {
+      subject: `Cancelled: ${show}, ${when}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>We are sorry: ${show} on ${when} has been cancelled, so booking <strong>${reference}</strong>
+will not go ahead.</p>
+${why ? `<p>${why}</p>\n` : ''}<p>${next}</p>`),
+      text: `Hello ${context.name},
+
+We are sorry: ${show} on ${when} has been cancelled, so booking ${reference} will not go ahead.
+${why ? `\n${why}\n` : ''}
+${next}
+
+The Nottingham New Theatre`,
+    }
+  },
   // D-124 criterion 5: the same hosted PNG shape as the reservation confirmation, for the same
   // reason (Gmail), with the reference and the text link as the fallback.
   'pass-issued': (context: TemplateContext): Rendered => {

@@ -1146,11 +1146,12 @@ Answered on 23 September 2026 from the code, for the question in issue 1213:
 - **A booker cancelling their own unpaid booking** from its confirmation page is emailed
   `reservation.cancelled` (D-110 criterion 3).
 - **The desk cancelling a collected booking, or refunding a ticket, sends the booker nothing.**
-- **Cancelling a performance does not email its ticket holders.** It cancels the rota and emails
-  each person holding a claimed or confirmed shift `shift.performance-cancelled`, and it reports
-  how many tickets are owed a refund; the audience is not told. To tell them, send an
-  announcement to the performance's ticket holders from `/comms/announce`, choosing Send now if
-  it must arrive at once and regardless of preference, or, on the night, from `/tonight/message`.
+- **Cancelling a performance emails its ticket holders.** It cancels the rota and emails each
+  person holding a claimed or confirmed shift `shift.performance-cancelled`, and emails every
+  unpaid or paid booking with an account `reservation.performance-cancelled`, carrying the
+  officer's optional reason and, for a paid one, that the money comes back in person at the box
+  office (D-121 criterion 5, D-116 criterion 1). Each send is claimed per booking, so two officers
+  cancelling at once tell nobody twice. A walk-up sold with no name has nobody to email.
 
 The full catalogue of what is sent, by type, is the operator page **What the theatre sends**
 (`content/docs/12.communications/3.what-the-theatre-sends.md`).

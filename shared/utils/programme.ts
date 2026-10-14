@@ -344,6 +344,12 @@ export function runningTimeRefusal(venue: { name: string, isExternal: boolean },
   return `A performance at ${venue.name} needs its running time: every shift on its rota ends from it`
 }
 
+// D-121 criterion 5: an optional word for the ticket holders, so an empty body still cancels.
+export const PERFORMANCE_CANCEL_REASON_MAX = 500
+export const performanceCancelForm = z.object({
+  reason: z.string().trim().max(PERFORMANCE_CANCEL_REASON_MAX).nullish().transform(value => value || null),
+}).nullish().transform(body => ({ reason: body?.reason ?? null }))
+
 // 0124: selling above the venue's own house is deliberate oversell (D-105 criterion 4), confirmed.
 export function capacityOverrideRefusal(venue: { name: string, capacity: number | null }, capacityOverride: number | null | undefined, confirmed = false): string | null {
   if (confirmed || capacityOverride == null || venue.capacity === null || capacityOverride <= venue.capacity) return null

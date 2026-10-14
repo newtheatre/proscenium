@@ -4,6 +4,7 @@ import { formatLondon } from '#shared/utils/london'
 import { saysWhen } from '#shared/utils/when'
 import {
   MAX_RUN_NIGHTS,
+  PERFORMANCE_CANCEL_REASON_MAX,
   addPerformanceRefusal,
   bookingWindowSource,
   nightInstants,
@@ -208,6 +209,9 @@ async function setOnSale(one: AdminPerformance, onSale: boolean): Promise<void> 
 }
 
 const cancelling = ref<AdminPerformance | null>(null)
+const cancelReason = ref('')
+// The desk opens on the cancelled performance's own night, so its refunds are one click away (D-116).
+const refundsDue = ref<{ performanceId: string, night: string, tickets: number } | null>(null)
 const removing = ref<AdminPerformance | null>(null)
 const pricing = ref<AdminPerformance | null>(null)
 
@@ -217,16 +221,21 @@ async function cancelPerformance(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    const answer = await $fetch<{ ticketsOwedARefund: number }>(`/api/admin/performances/${one.id}/cancel`, { method: 'POST' })
+    const answer = await $fetch<{ ticketsOwedARefund: number, bookingsTold: number, night: string }>(`/api/admin/performances/${one.id}/cancel`, {
+      method: 'POST',
+      body: { reason: cancelReason.value },
+    })
+    refundsDue.value = answer.ticketsOwedARefund ? { performanceId: one.id, night: answer.night, tickets: answer.ticketsOwedARefund } : null
     toast.add({
       title: 'Performance cancelled',
-      description: answer.ticketsOwedARefund
-        ? `${plural(answer.ticketsOwedARefund, 'ticket')} to refund at the desk, and their holders to tell.`
-        : 'Nothing was sold for it.',
+      description: answer.bookingsTold
+        ? `${plural(answer.bookingsTold, 'booking')} emailed that it is off.`
+        : 'Nobody holding a booking needed telling.',
       icon: answer.ticketsOwedARefund ? 'i-lucide-triangle-alert' : 'i-lucide-check',
       color: answer.ticketsOwedARefund ? 'warning' : 'success',
     })
     cancelling.value = null
+    cancelReason.value = ''
     await changed()
   }
   catch (refused) {
@@ -405,6 +414,18 @@ const columns: TableColumn<AdminPerformance>[] = [
       color="error"
       variant="subtle"
       :description="failure"
+    />
+
+    <UAlert
+      v-if="refundsDue"
+      data-test="refunds-due"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      :description="`${plural(refundsDue.tickets, 'ticket')} on the cancelled performance to refund in person at the desk as their holders come in.`"
+      :actions="[{ label: 'Open it on the desk', to: `/box-office/desk?night=${refundsDue.night}&performance=${refundsDue.performanceId}`, color: 'warning', variant: 'outline' }]"
+      close
+      @update:open="refundsDue = null"
     />
 
     <AdminToolbar
@@ -768,7 +789,7 @@ const columns: TableColumn<AdminPerformance>[] = [
     <UModal
       :open="cancelling !== null"
       title="Cancel this performance"
-      description="It stops selling and stays on the record. Everybody holding a ticket has to be refunded at the desk and told."
+      description="It stops selling and stays on the record. Everybody holding a booking is emailed that it is off; paid tickets are refunded in person at the desk."
       @update:open="cancelling = null"
     >
       <template #body>
@@ -777,6 +798,20 @@ const columns: TableColumn<AdminPerformance>[] = [
             ? `${plural(cancelling.soldTickets, 'ticket')} sold. Refund them at the desk after cancelling.`
             : 'Nothing has been sold for it.' }}
         </p>
+        <UFormField
+          label="Reason for the ticket holders"
+          hint="Optional"
+          help="It goes in the email to every booking, and nowhere else."
+          class="mt-4"
+        >
+          <UTextarea
+            v-model="cancelReason"
+            :rows="2"
+            :maxlength="PERFORMANCE_CANCEL_REASON_MAX"
+            class="w-full"
+            data-test="cancel-reason"
+          />
+        </UFormField>
       </template>
 
       <template #footer>

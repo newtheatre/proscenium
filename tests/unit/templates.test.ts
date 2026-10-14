@@ -279,6 +279,21 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'BAR' }).text)).toContain('paid at the bar')
   })
 
+  // D-121 criterion 5: every holder is told, and a paid one where the money comes back (D-116).
+  test('a cancelled performance tells a paid holder to come to the box office, and gives the reason', () => {
+    const { subject, text } = render('reservation-performance-cancelled', { ...EVERYTHING, collected: true, reason: 'The lead is unwell' })
+    expect(subject).toBe('Cancelled: The Tempest, Friday 2 October 2026 at 19:30')
+    expect(flat(text)).toContain('The lead is unwell')
+    expect(flat(text)).toContain('refunded at the box office')
+  })
+
+  test('a cancelled performance tells an unpaid holder there is nothing to do, and needs no reason', () => {
+    const { text } = render('reservation-performance-cancelled', { ...EVERYTHING, collected: false, reason: null })
+    expect(flat(text)).toContain('Nothing was charged')
+    expect(flat(text)).not.toContain('refunded at the box office')
+    expect(flat(text)).not.toContain('The room is closed that week')
+  })
+
   test('the cancellation is a booking that was still unpaid', () => {
     const { subject, html } = render('reservation-cancelled', EVERYTHING)
     expect(subject).toBe('Your booking for The Tempest is cancelled')
