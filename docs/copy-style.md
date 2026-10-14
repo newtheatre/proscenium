@@ -203,7 +203,10 @@ bare "Loading…": a table carries its own loading state, and anything else hold
 `USkeleton` until the first read finishes (issue 1151 item 7).
 
 A refused or failed read is not an empty state either: the refusal or the failure is shown in its
-place, never "nothing here" (section 6).
+place, never "nothing here" (section 6). On a console screen that place is the whole screen:
+`ReadGate` draws the failure instead of the toolbar, the table and any create button, offers Try
+again only for a read that did not finish, and keeps the controls when the question itself was
+rejected (0119).
 
 ## 8. Buttons and labels
 

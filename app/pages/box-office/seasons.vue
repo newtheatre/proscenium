@@ -126,7 +126,7 @@ async function remove(): Promise<void> {
   }
 }
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The seasons could not be read.') : null))
+const listingFailure = useListFailure(error, 'The seasons could not be read.')
 
 const columns: TableColumn<AdminSeason>[] = [
   {
@@ -193,15 +193,11 @@ const columns: TableColumn<AdminSeason>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !open && removing === null"
       data-test="failure"
@@ -368,5 +364,5 @@ const columns: TableColumn<AdminSeason>[] = [
       @update:open="removing = null; failure = null"
       @confirm="remove"
     />
-  </div>
+  </ReadGate>
 </template>

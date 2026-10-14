@@ -19,17 +19,25 @@ const writes = computed(() => can(useViewer().value, manageSafety))
 const failure = ref<string | null>(null)
 const saving = ref<Severity | null>(null)
 
-const { data: severityData, status: severityStatus, refresh: refreshSeverities } = await useAsyncData(
+const { data: severityData, status: severityStatus, refresh: refreshSeverities, error: severityError } = await useAsyncData(
   'safety-severities',
   () => request<{ severities: SeverityRow[] }>('/api/admin/safety/severities'),
   { default: (): { severities: SeverityRow[] } => ({ severities: [] }) },
 )
 
-const { data: openData, status: openStatus, refresh: refreshOpen } = await useAsyncData(
+const { data: openData, status: openStatus, refresh: refreshOpen, error: openError } = await useAsyncData(
   'safety-open-items',
   () => request<{ items: OpenItem[] }>('/api/admin/safety/open-items'),
   { default: (): { items: OpenItem[] } => ({ items: [] }) },
 )
+
+const severityFailure = useListFailure(severityError, 'The severity routing could not be read.')
+const openFailure = useListFailure(openError, 'The open items could not be read.')
+const readFailure = computed(() => severityFailure.value ?? openFailure.value)
+
+async function reread(): Promise<void> {
+  await Promise.all([refreshSeverities(), refreshOpen()])
+}
 
 const severities = computed(() => [...severityData.value.severities].sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity)))
 
@@ -146,7 +154,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="reread"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -256,5 +268,5 @@ watch(modalOpen, (nowOpen) => {
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

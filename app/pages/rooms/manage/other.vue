@@ -233,18 +233,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listFailure"
-      data-test="load-failed"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-unplug"
-      :title="listFailure.message"
-      :description="READ_AGAIN"
-      :actions="listFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -294,7 +287,7 @@ watch(modalOpen, (nowOpen) => {
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ listFailure ? 'The rooms could not be read.' : filtered ? 'No room matches that.' : 'No rooms are listed here yet. Add one and members can ask for it by name.' }}
+          {{ filtered ? 'No room matches that.' : 'No rooms are listed here yet. Add one and members can ask for it by name.' }}
         </p>
       </template>
     </UTable>
@@ -520,5 +513,5 @@ watch(modalOpen, (nowOpen) => {
       @update:open="value => { if (!value) forgetting = null }"
       @confirm="forget"
     />
-  </div>
+  </ReadGate>
 </template>

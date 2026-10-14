@@ -61,13 +61,14 @@ const waiting = computed<boolean>({
   },
 })
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'rota-shifts-board',
   () => request<Board>('/api/admin/rota/shifts/board', {
     query: { from: window.from, to: window.to, waiting: waiting.value || undefined },
   }),
   { watch: [() => window.from, () => window.to, waiting], default: (): Board => ({ items: [], waiting: 0 }) },
 )
+const readFailure = useListFailure(error, 'The rota could not be read.')
 
 const opened = defaultBoardWindow(new Date())
 
@@ -264,7 +265,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -752,5 +757,5 @@ watch(modalOpen, (nowOpen) => {
       @close="closeDecline"
       @decline="submitDecline"
     />
-  </div>
+  </ReadGate>
 </template>

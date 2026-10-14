@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ListFailure } from '~/composables/useListFailure'
 import { saysDay, saysDayRange, saysDayLong, saysWhen } from '#shared/utils/when'
 import { can, createAccounts, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
@@ -24,6 +25,8 @@ const route = useRoute()
 const toast = useToast()
 const view = ref<View | null>(null)
 const failure = ref<string | null>(null)
+// The account's own read, apart from an operation's refusal, which leaves the account in view.
+const readFailure = ref<ListFailure | null>(null)
 const working = ref('')
 
 // The account this page shows is always the losing side: merging it away is one of its own
@@ -190,12 +193,12 @@ async function confirmMerge(): Promise<void> {
 }
 
 async function load(): Promise<void> {
-  failure.value = null
+  readFailure.value = null
   try {
     view.value = await $fetch<View>(`/api/admin/accounts/${route.params.id}`)
   }
   catch (error) {
-    failure.value = refusalText(error)
+    readFailure.value = listFailureFrom(error)
   }
 }
 
@@ -255,517 +258,523 @@ onMounted(load)
       :description="failure"
     />
 
-    <div
-      v-else-if="!view"
-      data-test="account-skeleton"
+    <ReadGate
+      :failure="readFailure"
       class="space-y-6"
+      @retry="load"
     >
-      <div class="space-y-2">
-        <USkeleton class="h-7 w-56" />
-        <USkeleton class="h-4 w-72" />
+      <div
+        v-if="!view"
+        data-test="account-skeleton"
+        class="space-y-6"
+      >
+        <div class="space-y-2">
+          <USkeleton class="h-7 w-56" />
+          <USkeleton class="h-4 w-72" />
+        </div>
+        <USkeleton
+          v-for="card in 3"
+          :key="card"
+          class="h-32 w-full"
+        />
       </div>
-      <USkeleton
-        v-for="card in 3"
-        :key="card"
-        class="h-32 w-full"
-      />
-    </div>
 
-    <div
-      v-if="view"
-      class="space-y-6"
-    >
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2
-            data-test="account-name"
-            class="nnt-headline text-xl"
+      <div
+        v-if="view"
+        class="space-y-6"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2
+              data-test="account-name"
+              class="nnt-headline text-xl"
+            >
+              {{ view.account.name }}
+            </h2>
+            <p
+              v-if="erased"
+              data-test="erased-line"
+              class="text-sm text-muted"
+            >
+              Erased on {{ saysDayLong(erased, { year: true }) }}. Kept only for the theatre's statistics.
+            </p>
+            <p
+              v-else
+              class="font-mono text-sm text-muted"
+            >
+              {{ view.account.email }}
+            </p>
+          </div>
+          <div class="flex gap-1">
+            <UBadge
+              v-if="erased"
+              data-test="state-erased"
+              color="neutral"
+              variant="subtle"
+            >
+              Erased
+            </UBadge>
+            <UBadge
+              v-else-if="view.account.disabled"
+              data-test="state-disabled"
+              color="error"
+              variant="subtle"
+            >
+              Disabled
+            </UBadge>
+            <UBadge
+              v-if="!erased && view.account.shadow"
+              data-test="state-shadow"
+              color="neutral"
+              variant="subtle"
+            >
+              Shadow
+            </UBadge>
+            <UBadge
+              v-else-if="!erased && !view.account.verified"
+              color="warning"
+              variant="subtle"
+            >
+              Unverified
+            </UBadge>
+          </div>
+        </div>
+
+        <UPageCard title="Signs in with">
+          <ul
+            v-if="signsInWith.length"
+            data-test="methods"
+            class="list-inside list-disc text-sm"
           >
-            {{ view.account.name }}
-          </h2>
-          <p
-            v-if="erased"
-            data-test="erased-line"
-            class="text-sm text-muted"
-          >
-            Erased on {{ saysDayLong(erased, { year: true }) }}. Kept only for the theatre's statistics.
-          </p>
+            <li
+              v-for="method in signsInWith"
+              :key="method"
+            >
+              {{ method }}
+            </li>
+          </ul>
           <p
             v-else
-            class="font-mono text-sm text-muted"
+            class="text-sm text-muted"
           >
-            {{ view.account.email }}
+            {{ erased ? 'Nothing. An erased account cannot sign in.' : 'Nothing yet. This account cannot sign in.' }}
           </p>
-        </div>
-        <div class="flex gap-1">
-          <UBadge
-            v-if="erased"
-            data-test="state-erased"
-            color="neutral"
-            variant="subtle"
-          >
-            Erased
-          </UBadge>
-          <UBadge
-            v-else-if="view.account.disabled"
-            data-test="state-disabled"
-            color="error"
-            variant="subtle"
-          >
-            Disabled
-          </UBadge>
-          <UBadge
-            v-if="!erased && view.account.shadow"
-            data-test="state-shadow"
-            color="neutral"
-            variant="subtle"
-          >
-            Shadow
-          </UBadge>
-          <UBadge
-            v-else-if="!erased && !view.account.verified"
-            color="warning"
-            variant="subtle"
-          >
-            Unverified
-          </UBadge>
-        </div>
-      </div>
 
-      <UPageCard title="Signs in with">
-        <ul
-          v-if="signsInWith.length"
-          data-test="methods"
-          class="list-inside list-disc text-sm"
-        >
-          <li
-            v-for="method in signsInWith"
-            :key="method"
+          <div
+            v-if="sees.prelinks && !view.methods.google && !erased"
+            data-test="google-link"
+            class="mt-3 space-y-3 border-t border-default pt-3"
           >
-            {{ method }}
-          </li>
-        </ul>
-        <p
-          v-else
-          class="text-sm text-muted"
-        >
-          {{ erased ? 'Nothing. An erased account cannot sign in.' : 'Nothing yet. This account cannot sign in.' }}
-        </p>
+            <p
+              v-if="view.account.pendingGoogleEmail"
+              data-test="google-link-pending"
+              class="text-sm"
+            >
+              Their first Google sign-in with
+              <span class="font-mono">{{ view.account.pendingGoogleEmail }}</span>
+              joins this account.
+            </p>
+            <UAlert
+              v-if="linkFailure && !clearingLink"
+              data-test="google-link-failure"
+              color="error"
+              variant="subtle"
+              :description="linkFailure"
+            />
+            <form
+              class="flex flex-wrap items-end gap-2"
+              @submit.prevent="saveGoogleLink(linkAddress)"
+            >
+              <UFormField
+                label="Workspace address"
+                description="A @newtheatre.org.uk address. Their own address stays as it is."
+                class="w-full sm:w-96"
+              >
+                <UInput
+                  v-model="linkAddress"
+                  data-test="google-link-address"
+                  type="email"
+                  required
+                  :placeholder="view.account.pendingGoogleEmail ?? 'name@newtheatre.org.uk'"
+                />
+              </UFormField>
+              <UButton
+                type="submit"
+                data-test="google-link-save"
+                variant="subtle"
+                :loading="working === 'google-link' && !clearingLink"
+              >
+                {{ view.account.pendingGoogleEmail ? 'Change the address' : 'Set the address' }}
+              </UButton>
+              <UButton
+                v-if="view.account.pendingGoogleEmail"
+                data-test="google-link-clear"
+                color="error"
+                variant="ghost"
+                @click="linkFailure = null; clearingLink = true"
+              >
+                Clear the address
+              </UButton>
+            </form>
+          </div>
+        </UPageCard>
 
-        <div
-          v-if="sees.prelinks && !view.methods.google && !erased"
-          data-test="google-link"
-          class="mt-3 space-y-3 border-t border-default pt-3"
+        <UPageCard title="Roles">
+          <p
+            v-if="!view.grants.length"
+            class="text-sm text-muted"
+          >
+            None.
+          </p>
+          <ul
+            v-else
+            data-test="grants"
+            class="space-y-1 text-sm"
+          >
+            <li
+              v-for="grant in view.grants"
+              :key="grant.role"
+              class="flex items-center justify-between gap-2"
+            >
+              <span>
+                <span>{{ saysRole(grant.role) }}</span>
+                <span class="text-muted">
+                  {{ grant.live ? 'until' : 'lapsed' }}
+                  {{ grant.expiresAt ? saysWhen(grant.expiresAt, { year: true }) : 'further notice' }}
+                </span>
+                <span
+                  v-if="grant.note"
+                  class="block text-xs text-muted"
+                  :data-test="`grant-note-${grant.role}`"
+                >
+                  {{ grant.note }}
+                </span>
+              </span>
+              <UButton
+                v-if="grant.live && sees.revokes && !erased"
+                size="xs"
+                color="error"
+                variant="ghost"
+                :loading="working === `revoke-${grant.role}`"
+                :data-test="`revoke-${grant.role}`"
+                @click="revokeFailure = null; revoking = grant.role"
+              >
+                Revoke
+              </UButton>
+            </li>
+          </ul>
+
+          <div
+            v-if="sees.grants && !erased"
+            class="mt-3 border-t border-default pt-3"
+          >
+            <RoleGrantForm
+              :user-id="String(route.params.id)"
+              :held="heldRoles"
+              @granted="load"
+            />
+          </div>
+
+          <UButton
+            class="mt-3"
+            to="/people/roles"
+            variant="link"
+            size="sm"
+            icon="i-lucide-shield"
+            label="Open the register"
+            data-test="open-register"
+          />
+        </UPageCard>
+
+        <UPageCard
+          title="Membership"
+          description="A term bought at the SU, not a committee year."
         >
           <p
-            v-if="view.account.pendingGoogleEmail"
-            data-test="google-link-pending"
+            v-if="!view.memberships.length"
+            class="text-sm text-muted"
+          >
+            No membership recorded.
+          </p>
+          <ul
+            v-else
             class="text-sm"
           >
-            Their first Google sign-in with
-            <span class="font-mono">{{ view.account.pendingGoogleEmail }}</span>
-            joins this account.
+            <li
+              v-for="membership in view.memberships"
+              :key="membership.id"
+            >
+              {{ saysDayRange(membership.startsOn, membership.expiresOn) }}
+              ({{ membership.source.toLowerCase() }}{{ membership.confirmedAt ? ', checked' : ', not yet checked' }})
+            </li>
+          </ul>
+        </UPageCard>
+
+        <UPageCard
+          v-if="view.fellowship"
+          data-test="fellowship"
+          title="Fellowship"
+          description="A permanent honour, and the theatre's own record."
+        >
+          <p class="text-sm">
+            Awarded {{ saysDay(view.fellowship.awardedOn) }} by {{ view.fellowship.awardedBy }}.
+            <UBadge
+              v-if="view.fellowship.revokedAt"
+              class="ml-1"
+              color="error"
+              variant="subtle"
+              size="sm"
+            >
+              Revoked
+            </UBadge>
           </p>
+          <p class="mt-2 text-sm text-muted">
+            {{ view.fellowship.citation }}
+          </p>
+        </UPageCard>
+
+        <UPageCard
+          v-if="sees.disables && !erased"
+          title="Security"
+          description="These take effect on the next request, everywhere."
+        >
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              data-test="sign-out-everywhere"
+              variant="subtle"
+              :loading="working === 'sign-out'"
+              @click="operate('sign-out')"
+            >
+              Sign out everywhere
+            </UButton>
+            <UButton
+              v-if="!view.account.disabled"
+              data-test="disable"
+              color="error"
+              variant="subtle"
+              :loading="working === 'disable'"
+              @click="secureFailure = null; securing = 'disable'"
+            >
+              Disable the account
+            </UButton>
+            <UButton
+              v-else
+              data-test="enable"
+              variant="subtle"
+              :loading="working === 'enable'"
+              @click="operate('enable')"
+            >
+              Enable the account
+            </UButton>
+            <UButton
+              data-test="reset-mfa"
+              color="error"
+              variant="subtle"
+              :loading="working === 'reset-mfa'"
+              @click="secureFailure = null; securing = 'reset-mfa'"
+            >
+              Reset the authenticator
+            </UButton>
+          </div>
+
+          <UButton
+            v-if="!eraseReveal"
+            class="mt-4"
+            color="error"
+            variant="soft"
+            data-test="erase-reveal"
+            @click="eraseReveal = true"
+          >
+            Erase this account
+          </UButton>
+
+          <div
+            v-else
+            class="mt-4 space-y-3 border-t border-default pt-3"
+            data-test="erase-confirm"
+          >
+            <p class="text-sm">
+              Anonymises the account in one transaction. Bookings, records and shifts stay; nothing
+              personal about {{ view.account.email }} survives it. This cannot be undone.
+            </p>
+            <UFormField :label="`Type ${view.account.email} to confirm`">
+              <UInput
+                v-model="eraseConfirmEmail"
+                data-test="erase-confirm-email"
+              />
+            </UFormField>
+            <div class="flex gap-2">
+              <UButton
+                color="error"
+                variant="subtle"
+                :loading="working === 'erase'"
+                :disabled="eraseConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
+                data-test="erase-submit"
+                @click="eraseAccount"
+              >
+                Erase the account
+              </UButton>
+              <UButton
+                variant="ghost"
+                @click="eraseReveal = false; eraseConfirmEmail = ''"
+              >
+                Cancel
+              </UButton>
+            </div>
+          </div>
+        </UPageCard>
+
+        <UPageCard
+          v-if="!erased"
+          data-test="merge"
+          title="Merge into another account"
+          description="A dry run first: nothing changes until the losing account's email is typed back as confirmation."
+        >
           <UAlert
-            v-if="linkFailure && !clearingLink"
-            data-test="google-link-failure"
+            v-if="mergeFailure"
+            data-test="merge-failure"
             color="error"
             variant="subtle"
-            :description="linkFailure"
+            :description="mergeFailure"
+            class="mb-3"
           />
-          <form
+
+          <div
+            v-if="!mergePreview"
             class="flex flex-wrap items-end gap-2"
-            @submit.prevent="saveGoogleLink(linkAddress)"
           >
             <UFormField
-              label="Workspace address"
-              description="A @newtheatre.org.uk address. Their own address stays as it is."
+              label="Winning account"
               class="w-full sm:w-96"
             >
-              <UInput
-                v-model="linkAddress"
-                data-test="google-link-address"
-                type="email"
-                required
-                :placeholder="view.account.pendingGoogleEmail ?? 'name@newtheatre.org.uk'"
+              <PersonPicker
+                v-model="mergeWinnerId"
+                data-test="merge-winner"
+                placeholder="Search by name, address or student number"
               />
             </UFormField>
             <UButton
-              type="submit"
-              data-test="google-link-save"
-              variant="subtle"
-              :loading="working === 'google-link' && !clearingLink"
-            >
-              {{ view.account.pendingGoogleEmail ? 'Change the address' : 'Set the address' }}
-            </UButton>
-            <UButton
-              v-if="view.account.pendingGoogleEmail"
-              data-test="google-link-clear"
-              color="error"
-              variant="ghost"
-              @click="linkFailure = null; clearingLink = true"
-            >
-              Clear the address
-            </UButton>
-          </form>
-        </div>
-      </UPageCard>
-
-      <UPageCard title="Roles">
-        <p
-          v-if="!view.grants.length"
-          class="text-sm text-muted"
-        >
-          None.
-        </p>
-        <ul
-          v-else
-          data-test="grants"
-          class="space-y-1 text-sm"
-        >
-          <li
-            v-for="grant in view.grants"
-            :key="grant.role"
-            class="flex items-center justify-between gap-2"
-          >
-            <span>
-              <span>{{ saysRole(grant.role) }}</span>
-              <span class="text-muted">
-                {{ grant.live ? 'until' : 'lapsed' }}
-                {{ grant.expiresAt ? saysWhen(grant.expiresAt, { year: true }) : 'further notice' }}
-              </span>
-              <span
-                v-if="grant.note"
-                class="block text-xs text-muted"
-                :data-test="`grant-note-${grant.role}`"
-              >
-                {{ grant.note }}
-              </span>
-            </span>
-            <UButton
-              v-if="grant.live && sees.revokes && !erased"
-              size="xs"
-              color="error"
-              variant="ghost"
-              :loading="working === `revoke-${grant.role}`"
-              :data-test="`revoke-${grant.role}`"
-              @click="revokeFailure = null; revoking = grant.role"
-            >
-              Revoke
-            </UButton>
-          </li>
-        </ul>
-
-        <div
-          v-if="sees.grants && !erased"
-          class="mt-3 border-t border-default pt-3"
-        >
-          <RoleGrantForm
-            :user-id="String(route.params.id)"
-            :held="heldRoles"
-            @granted="load"
-          />
-        </div>
-
-        <UButton
-          class="mt-3"
-          to="/people/roles"
-          variant="link"
-          size="sm"
-          icon="i-lucide-shield"
-          label="Open the register"
-          data-test="open-register"
-        />
-      </UPageCard>
-
-      <UPageCard
-        title="Membership"
-        description="A term bought at the SU, not a committee year."
-      >
-        <p
-          v-if="!view.memberships.length"
-          class="text-sm text-muted"
-        >
-          No membership recorded.
-        </p>
-        <ul
-          v-else
-          class="text-sm"
-        >
-          <li
-            v-for="membership in view.memberships"
-            :key="membership.id"
-          >
-            {{ saysDayRange(membership.startsOn, membership.expiresOn) }}
-            ({{ membership.source.toLowerCase() }}{{ membership.confirmedAt ? ', checked' : ', not yet checked' }})
-          </li>
-        </ul>
-      </UPageCard>
-
-      <UPageCard
-        v-if="view.fellowship"
-        data-test="fellowship"
-        title="Fellowship"
-        description="A permanent honour, and the theatre's own record."
-      >
-        <p class="text-sm">
-          Awarded {{ saysDay(view.fellowship.awardedOn) }} by {{ view.fellowship.awardedBy }}.
-          <UBadge
-            v-if="view.fellowship.revokedAt"
-            class="ml-1"
-            color="error"
-            variant="subtle"
-            size="sm"
-          >
-            Revoked
-          </UBadge>
-        </p>
-        <p class="mt-2 text-sm text-muted">
-          {{ view.fellowship.citation }}
-        </p>
-      </UPageCard>
-
-      <UPageCard
-        v-if="sees.disables && !erased"
-        title="Security"
-        description="These take effect on the next request, everywhere."
-      >
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            data-test="sign-out-everywhere"
-            variant="subtle"
-            :loading="working === 'sign-out'"
-            @click="operate('sign-out')"
-          >
-            Sign out everywhere
-          </UButton>
-          <UButton
-            v-if="!view.account.disabled"
-            data-test="disable"
-            color="error"
-            variant="subtle"
-            :loading="working === 'disable'"
-            @click="secureFailure = null; securing = 'disable'"
-          >
-            Disable the account
-          </UButton>
-          <UButton
-            v-else
-            data-test="enable"
-            variant="subtle"
-            :loading="working === 'enable'"
-            @click="operate('enable')"
-          >
-            Enable the account
-          </UButton>
-          <UButton
-            data-test="reset-mfa"
-            color="error"
-            variant="subtle"
-            :loading="working === 'reset-mfa'"
-            @click="secureFailure = null; securing = 'reset-mfa'"
-          >
-            Reset the authenticator
-          </UButton>
-        </div>
-
-        <UButton
-          v-if="!eraseReveal"
-          class="mt-4"
-          color="error"
-          variant="soft"
-          data-test="erase-reveal"
-          @click="eraseReveal = true"
-        >
-          Erase this account
-        </UButton>
-
-        <div
-          v-else
-          class="mt-4 space-y-3 border-t border-default pt-3"
-          data-test="erase-confirm"
-        >
-          <p class="text-sm">
-            Anonymises the account in one transaction. Bookings, records and shifts stay; nothing
-            personal about {{ view.account.email }} survives it. This cannot be undone.
-          </p>
-          <UFormField :label="`Type ${view.account.email} to confirm`">
-            <UInput
-              v-model="eraseConfirmEmail"
-              data-test="erase-confirm-email"
-            />
-          </UFormField>
-          <div class="flex gap-2">
-            <UButton
-              color="error"
-              variant="subtle"
-              :loading="working === 'erase'"
-              :disabled="eraseConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
-              data-test="erase-submit"
-              @click="eraseAccount"
-            >
-              Erase the account
-            </UButton>
-            <UButton
-              variant="ghost"
-              @click="eraseReveal = false; eraseConfirmEmail = ''"
-            >
-              Cancel
-            </UButton>
-          </div>
-        </div>
-      </UPageCard>
-
-      <UPageCard
-        v-if="!erased"
-        data-test="merge"
-        title="Merge into another account"
-        description="A dry run first: nothing changes until the losing account's email is typed back as confirmation."
-      >
-        <UAlert
-          v-if="mergeFailure"
-          data-test="merge-failure"
-          color="error"
-          variant="subtle"
-          :description="mergeFailure"
-          class="mb-3"
-        />
-
-        <div
-          v-if="!mergePreview"
-          class="flex flex-wrap items-end gap-2"
-        >
-          <UFormField
-            label="Winning account"
-            class="w-full sm:w-96"
-          >
-            <PersonPicker
-              v-model="mergeWinnerId"
-              data-test="merge-winner"
-              placeholder="Search by name, address or student number"
-            />
-          </UFormField>
-          <UButton
-            data-test="merge-preview"
-            variant="subtle"
-            :loading="mergeWorking"
-            :disabled="!mergeWinnerId"
-            @click="previewMerge"
-          >
-            Preview the merge
-          </UButton>
-        </div>
-
-        <div
-          v-else
-          data-test="merge-preview-result"
-          class="space-y-3"
-        >
-          <p class="text-sm">
-            <span class="font-medium">{{ view.account.email }}</span> moves into
-            <span class="font-medium">{{ mergePreview.winner.email }}</span> and is emptied.
-            Nothing here is undone once confirmed.
-          </p>
-          <ul class="list-inside list-disc text-sm">
-            <li>{{ plural(mergePreview.counts.bookings, 'booking') }}</li>
-            <li>{{ plural(mergePreview.counts.records, 'training record') }}</li>
-            <li>{{ plural(mergePreview.counts.shifts, 'shift') }}</li>
-            <li>{{ plural(mergePreview.counts.memberships, 'membership') }}</li>
-            <li>{{ plural(mergePreview.counts.grants, 'role grant') }}</li>
-          </ul>
-          <UFormField :label="`Type ${view.account.email} to confirm`">
-            <UInput
-              v-model="mergeConfirmEmail"
-              data-test="merge-confirm-email"
-            />
-          </UFormField>
-          <div class="flex gap-2">
-            <UButton
-              data-test="merge-confirm"
-              color="error"
+              data-test="merge-preview"
               variant="subtle"
               :loading="mergeWorking"
-              :disabled="mergeConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
-              @click="confirmMerge"
+              :disabled="!mergeWinnerId"
+              @click="previewMerge"
             >
-              Merge the accounts
-            </UButton>
-            <UButton
-              variant="ghost"
-              @click="mergePreview = null; mergeConfirmEmail = ''"
-            >
-              Cancel
+              Preview the merge
             </UButton>
           </div>
-        </div>
-      </UPageCard>
 
-      <UPageCard
-        title="Recent activity"
-        description="The last 25 entries naming this account."
-      >
-        <p
-          v-if="!view.history.length"
-          class="text-sm text-muted"
-        >
-          Nothing recorded, or you do not have permission to read the trail.
-        </p>
-        <ul
-          v-else
-          data-test="history"
-          class="space-y-1 text-sm"
-        >
-          <li
-            v-for="entry in view.history"
-            :key="`${entry.action}-${entry.createdAt}`"
+          <div
+            v-else
+            data-test="merge-preview-result"
+            class="space-y-3"
           >
-            <span class="text-muted">{{ saysWhen(entry.createdAt) }}</span>
-            {{ describeAction(entry.action).label }}
-            <span
-              v-if="!entry.byThem"
-              class="text-muted"
-            >(done to them)</span>
-          </li>
-        </ul>
-      </UPageCard>
-    </div>
+            <p class="text-sm">
+              <span class="font-medium">{{ view.account.email }}</span> moves into
+              <span class="font-medium">{{ mergePreview.winner.email }}</span> and is emptied.
+              Nothing here is undone once confirmed.
+            </p>
+            <ul class="list-inside list-disc text-sm">
+              <li>{{ plural(mergePreview.counts.bookings, 'booking') }}</li>
+              <li>{{ plural(mergePreview.counts.records, 'training record') }}</li>
+              <li>{{ plural(mergePreview.counts.shifts, 'shift') }}</li>
+              <li>{{ plural(mergePreview.counts.memberships, 'membership') }}</li>
+              <li>{{ plural(mergePreview.counts.grants, 'role grant') }}</li>
+            </ul>
+            <UFormField :label="`Type ${view.account.email} to confirm`">
+              <UInput
+                v-model="mergeConfirmEmail"
+                data-test="merge-confirm-email"
+              />
+            </UFormField>
+            <div class="flex gap-2">
+              <UButton
+                data-test="merge-confirm"
+                color="error"
+                variant="subtle"
+                :loading="mergeWorking"
+                :disabled="mergeConfirmEmail.trim().toLowerCase() !== view.account.email.toLowerCase()"
+                @click="confirmMerge"
+              >
+                Merge the accounts
+              </UButton>
+              <UButton
+                variant="ghost"
+                @click="mergePreview = null; mergeConfirmEmail = ''"
+              >
+                Cancel
+              </UButton>
+            </div>
+          </div>
+        </UPageCard>
 
-    <ConfirmModal
-      :open="revoking !== null"
-      name="revoke-role"
-      :title="revoking ? `Revoke ${saysRole(revoking)}` : ''"
-      :verb="revoking ? `Revoke ${saysRole(revoking)}` : ''"
-      consequence="Their permission stops now. Nothing they did under it is touched."
-      :loading="working.startsWith('revoke-')"
-      :failure="revokeFailure"
-      @update:open="value => { if (!value) revoking = null }"
-      @confirm="revokeRole"
-    />
+        <UPageCard
+          title="Recent activity"
+          description="The last 25 entries naming this account."
+        >
+          <p
+            v-if="!view.history.length"
+            class="text-sm text-muted"
+          >
+            Nothing recorded, or you do not have permission to read the trail.
+          </p>
+          <ul
+            v-else
+            data-test="history"
+            class="space-y-1 text-sm"
+          >
+            <li
+              v-for="entry in view.history"
+              :key="`${entry.action}-${entry.createdAt}`"
+            >
+              <span class="text-muted">{{ saysWhen(entry.createdAt) }}</span>
+              {{ describeAction(entry.action).label }}
+              <span
+                v-if="!entry.byThem"
+                class="text-muted"
+              >(done to them)</span>
+            </li>
+          </ul>
+        </UPageCard>
+      </div>
 
-    <ConfirmModal
-      :open="clearingLink"
-      name="clear-google-link"
-      title="Clear the Workspace address"
-      verb="Clear the address"
-      :consequence="`Their next Google sign-in with ${view?.account.pendingGoogleEmail ?? 'it'} makes a second, empty account instead of joining this one.`"
-      :loading="working === 'google-link'"
-      :failure="linkFailure"
-      @update:open="value => { if (!value) { clearingLink = false; linkFailure = null } }"
-      @confirm="saveGoogleLink(null)"
-    />
+      <ConfirmModal
+        :open="revoking !== null"
+        name="revoke-role"
+        :title="revoking ? `Revoke ${saysRole(revoking)}` : ''"
+        :verb="revoking ? `Revoke ${saysRole(revoking)}` : ''"
+        consequence="Their permission stops now. Nothing they did under it is touched."
+        :loading="working.startsWith('revoke-')"
+        :failure="revokeFailure"
+        @update:open="value => { if (!value) revoking = null }"
+        @confirm="revokeRole"
+      />
 
-    <ConfirmModal
-      :open="securing !== null"
-      name="secure-account"
-      :title="securing === 'disable' ? `Disable ${view?.account.name}'s account` : `Reset ${view?.account.name}'s authenticator`"
-      :verb="securing === 'disable' ? 'Disable the account' : 'Reset the authenticator'"
-      :consequence="securing === 'disable'
-        ? 'They are signed out everywhere and cannot sign in again until somebody enables the account.'
-        : 'Their authenticator and recovery codes go, and they are signed out everywhere. An officer holding a privileged role cannot sign in again until they enrol a new one.'"
-      :loading="working === securing"
-      :failure="secureFailure"
-      @update:open="value => { if (!value) securing = null }"
-      @confirm="secure"
-    />
+      <ConfirmModal
+        :open="clearingLink"
+        name="clear-google-link"
+        title="Clear the Workspace address"
+        verb="Clear the address"
+        :consequence="`Their next Google sign-in with ${view?.account.pendingGoogleEmail ?? 'it'} makes a second, empty account instead of joining this one.`"
+        :loading="working === 'google-link'"
+        :failure="linkFailure"
+        @update:open="value => { if (!value) { clearingLink = false; linkFailure = null } }"
+        @confirm="saveGoogleLink(null)"
+      />
+
+      <ConfirmModal
+        :open="securing !== null"
+        name="secure-account"
+        :title="securing === 'disable' ? `Disable ${view?.account.name}'s account` : `Reset ${view?.account.name}'s authenticator`"
+        :verb="securing === 'disable' ? 'Disable the account' : 'Reset the authenticator'"
+        :consequence="securing === 'disable'
+          ? 'They are signed out everywhere and cannot sign in again until somebody enables the account.'
+          : 'Their authenticator and recovery codes go, and they are signed out everywhere. An officer holding a privileged role cannot sign in again until they enrol a new one.'"
+        :loading="working === securing"
+        :failure="secureFailure"
+        @update:open="value => { if (!value) securing = null }"
+        @confirm="secure"
+      />
+    </ReadGate>
   </div>
 </template>

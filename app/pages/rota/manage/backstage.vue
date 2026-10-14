@@ -16,17 +16,25 @@ const writes = computed(() => can(useViewer().value, manageBoardConfig))
 const failure = ref<string | null>(null)
 
 // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
-const { data: typesData, status: typesStatus, refresh: refreshTypes } = await useAsyncData(
+const { data: typesData, status: typesStatus, refresh: refreshTypes, error: typesError } = await useAsyncData(
   'backstage-milestone-types',
   () => useRequestFetch()<{ types: MilestoneType[] }>('/api/admin/backstage/milestone-types'),
   { default: (): { types: MilestoneType[] } => ({ types: [] }) },
 )
 
-const { data: presetsData, status: presetsStatus, refresh: refreshPresets } = await useAsyncData(
+const { data: presetsData, status: presetsStatus, refresh: refreshPresets, error: presetsError } = await useAsyncData(
   'backstage-presets',
   () => useRequestFetch()<{ presets: Preset[] }>('/api/admin/backstage/presets'),
   { default: (): { presets: Preset[] } => ({ presets: [] }) },
 )
+
+const typesFailure = useListFailure(typesError, 'The milestone types could not be read.')
+const presetsFailure = useListFailure(presetsError, 'The presets could not be read.')
+const readFailure = computed(() => typesFailure.value ?? presetsFailure.value)
+
+async function reread(): Promise<void> {
+  await Promise.all([refreshTypes(), refreshPresets()])
+}
 
 const saving = ref(false)
 
@@ -275,7 +283,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="reread"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -510,5 +522,5 @@ watch(modalOpen, (nowOpen) => {
       @update:open="value => { if (!value) retiringPreset = null }"
       @confirm="retirePreset"
     />
-  </div>
+  </ReadGate>
 </template>

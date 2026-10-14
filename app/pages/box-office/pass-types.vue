@@ -214,7 +214,7 @@ async function saveShows(): Promise<void> {
   }
 }
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The passes could not be read.') : null))
+const listingFailure = useListFailure(error, 'The passes could not be read.')
 
 const columns: TableColumn<PassType>[] = [
   {
@@ -293,15 +293,11 @@ const columns: TableColumn<PassType>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !open && removing === null"
       data-test="failure"
@@ -662,5 +658,5 @@ const columns: TableColumn<PassType>[] = [
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

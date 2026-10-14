@@ -939,10 +939,13 @@ describe.skipIf(skip !== null)('a bar refusal held to a missing second factor na
 
       // No marker to hydrate on a refused screen: the failure itself is what the next line waits for.
       await view.navigate(`${app.baseURL}/bar/categories`)
-      await waitFor(view, `document.querySelector('[data-test="listing-failure"]')`)
-      const shown = await textOf(view, '[data-test="listing-failure"]')
+      await waitFor(view, `document.querySelector('[data-test="read-failure"]')`)
+      const shown = await textOf(view, '[data-test="read-failure"]')
       expect(shown).toMatch(/authenticator/i)
       expect(shown).toContain('Set up an authenticator app')
+      // The refusal stands in place of the list: no empty table, and no live Add beneath it (K-127).
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="add-category"]')`)).toBe(false)
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="bar-categories-table"]')`)).toBe(false)
       view.close()
     }
     finally {

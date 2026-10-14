@@ -24,7 +24,7 @@ const { data: locks, status: loading, error, refresh } = await useAsyncData(
   { default: (): PeriodLock[] => [] },
 )
 
-const locksFailure = computed(() => (error.value ? refusalText(error.value, 'The close history could not be read.') : null))
+const locksFailure = useListFailure(error, 'The close history could not be read.')
 
 // A term is named here and read by the money dashboard's own TERM selector (I-105 criterion 4);
 // naming one neither closes it nor is required before closing it.
@@ -180,15 +180,11 @@ async function confirmReopen(): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="locksFailure"
-      data-test="locks-failure"
-      color="error"
-      variant="subtle"
-      :description="locksFailure"
-    />
-
+  <ReadGate
+    :failure="locksFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       :filterable="false"
       :searchable="false"
@@ -471,5 +467,5 @@ async function confirmReopen(): Promise<void> {
         </div>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>
