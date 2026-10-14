@@ -202,14 +202,22 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     }
   }, 150_000)
 
+  // Signed in: a signed-out visitor to /tonight is sent to sign in and never sees the shell (E-112).
   test('the show-night shell is a dark subtree, not a dashboard', async () => {
-    const seen = await inspect<{ bg: string, dashboard: number }>('/tonight', `(() => ({
-      bg: getComputedStyle(document.querySelector('.dark')).backgroundColor,
-      dashboard: document.querySelectorAll('[class*="dashboard"]').length,
-    }))()`)
-    expect(seen.bg).toContain('oklch')
-    expect(seen.dashboard).toBe(0)
-  })
+    const view = await signInView(app, deskOfficer.email, deskOfficerPassword)
+    try {
+      await visit(view, `${app.baseURL}/tonight`)
+      const seen = await view.evaluate<{ bg: string, dashboard: number }>(`(() => ({
+        bg: getComputedStyle(document.querySelector('.dark')).backgroundColor,
+        dashboard: document.querySelectorAll('[class*="dashboard"]').length,
+      }))()`)
+      expect(seen.bg).toContain('oklch')
+      expect(seen.dashboard).toBe(0)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 
   // Issue 904: a resident device in the wings has no use for the public header, and one tap on
   // "What's on" sends the crew out of the board mid-show.
@@ -302,7 +310,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
       const text = await inspect<string>(`/sign-in?refused=${code}`, 'document.body.innerText')
       expect(`${code}: ${text.length > 40 && !text.includes('undefined')}`).toBe(`${code}: true`)
     }
-  })
+  }, 120_000)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

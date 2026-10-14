@@ -50,11 +50,12 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
 
 const empty = (): Listing => ({ venues: [], page: 1, pageSize: 0, total: 0, pages: 1 })
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'emergency-cards',
   () => request<Listing>('/api/admin/venues/emergency', { query: query.value }),
   { watch: [query], default: empty },
 )
+const readFailure = useListFailure(error, 'The emergency details could not be read.')
 
 interface FormState {
   address: string
@@ -171,7 +172,11 @@ const columns: TableColumn<VenueCard>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure"
       data-test="failure"
@@ -400,5 +405,5 @@ const columns: TableColumn<VenueCard>[] = [
         </form>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

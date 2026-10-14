@@ -3,7 +3,7 @@ import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 
 // Tonight's bar shift counts into the open stocktake from here (decision 0099); opening and
 // applying it stay on the console with bar.stocktake.
-definePageMeta({ layout: 'tonight', docs: '/docs/bar/stocktakes' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/bar/stocktakes' })
 useSeoMeta({ title: 'Stocktake' })
 
 interface OpenStocktake { stocktake: Stocktake | null, lines: StocktakeLine[] }

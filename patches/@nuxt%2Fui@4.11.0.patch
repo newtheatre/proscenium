@@ -1,0 +1,25 @@
+diff --git a/dist/runtime/components/NavigationMenu.vue b/dist/runtime/components/NavigationMenu.vue
+index 68e624b00eb7d06f99bde9f395c4d9ae18e1030e..5c27029dba9c9588b040b221336d904da4a0d1b9 100644
+--- a/dist/runtime/components/NavigationMenu.vue
++++ b/dist/runtime/components/NavigationMenu.vue
+@@ -112,7 +112,7 @@ function onLinkTrailingClick(e, item) {
+   }
+   if (props.orientation === "horizontal") {
+     e.preventDefault();
+-  } else if (props.orientation === "vertical" && !props.collapsed) {
++  } else if (props.orientation === "vertical" && !props.collapsed && (item.to || item.href)) {
+     e.preventDefault();
+     e.stopPropagation();
+   }
+@@ -149,9 +149,9 @@ function onLinkTrailingClick(e, item) {
+       </span>
+ 
+       <component
+-        :is="props.orientation === 'vertical' && item.children?.length && !props.collapsed ? AccordionTrigger : 'span'"
++        :is="props.orientation === 'vertical' && item.children?.length && !props.collapsed && (item.to || item.href) ? AccordionTrigger : 'span'"
+         v-if="item.badge || item.badge === 0 || props.orientation === 'horizontal' && (item.children?.length || !!slots[item.slot ? `${item.slot}-content` : 'item-content']) || props.orientation === 'vertical' && item.children?.length || item.trailingIcon || !!slots[item.slot ? `${item.slot}-trailing` : 'item-trailing']"
+-        :as="props.orientation === 'vertical' && item.children?.length && !props.collapsed ? 'span' : void 0"
++        :as="props.orientation === 'vertical' && item.children?.length && !props.collapsed && (item.to || item.href) ? 'span' : void 0"
+         data-slot="linkTrailing"
+         :class="ui.linkTrailing({ class: [props.ui?.linkTrailing, item.ui?.linkTrailing] })"
+         @click="(e) => onLinkTrailingClick(e, item)"

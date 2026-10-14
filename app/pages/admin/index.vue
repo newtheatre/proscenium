@@ -6,6 +6,8 @@ import { currentShowNight } from '#shared/utils/show-night'
 import { NAV_COUNTS, NAV_QUEUES } from '#shared/utils/site-nav'
 import { saysClock, saysDay, saysWhen } from '#shared/utils/when'
 import type { ConsoleOverview } from '#shared/utils/console-overview'
+import type { Ref } from 'vue'
+import type { ListFailure } from '~/composables/useListFailure'
 
 definePageMeta({ layout: 'console', title: 'Overview', middleware: 'console', docs: '/docs/system' })
 
@@ -17,7 +19,7 @@ const viewer = useViewer()
 
 // The sidebar's own counts, which the console layout reads on every screen: one answer, so the
 // badges and this list agree, and a queue the viewer cannot decide is never in it (issue 1358).
-const { counts, failed: waitingFailed } = useNavCounts()
+const { counts, failure: waitingFailure, refresh: refreshWaiting } = useNavCounts()
 const waiting = computed(() => NAV_COUNTS.flatMap(count => (counts.value[count] === undefined
   ? []
   : [{ count, ...NAV_QUEUES[count], total: counts.value[count] }])))
@@ -29,7 +31,7 @@ const { data: overview, error: overviewError } = await useAsyncData(
   () => request<ConsoleOverview>('/api/admin/overview'),
   { default: (): ConsoleOverview => ({ setUp: [], tonight: null }), immediate: false },
 )
-const overviewFailure = computed(() => (overviewError.value ? refusalText(overviewError.value, 'Tonight and the set-up still to do could not be read.') : null))
+const overviewFailure = useListFailure(overviewError, 'Tonight and the set-up still to do could not be read.')
 
 // A missed or failed drill stays in front of the committee until one passes (K-108 criterion 3).
 interface DrillStatus { lastDrillAt: string | null, lastDrillOutcome: 'PASS' | 'FAIL' | null, overdue: boolean }
@@ -39,7 +41,7 @@ const { data: drill, error: drillError } = await useAsyncData(
   () => request<DrillStatus>('/api/admin/backups'),
   { default: (): DrillStatus | null => null, immediate: false },
 )
-const drillFailure = computed(() => (drillError.value ? refusalText(drillError.value, 'Whether a restore drill is due could not be read.') : null))
+const drillFailure = useListFailure(drillError, 'Whether a restore drill is due could not be read.')
 const drillTitle = computed(() => {
   if (drill.value?.lastDrillOutcome === 'FAIL') return 'The last restore drill failed'
   return drill.value?.lastDrillAt ? 'A restore drill is overdue' : 'No restore drill has ever passed'
@@ -54,7 +56,17 @@ const { data: trouble, error: troubleError } = await useAsyncData(
   () => request<{ items: Trouble[], total: number }>('/api/admin/notifications/trouble'),
   { default: (): { items: Trouble[], total: number } => ({ items: [], total: 0 }), immediate: false },
 )
-const troubleFailure = computed(() => (troubleError.value ? refusalText(troubleError.value, 'The messages that did not arrive could not be read.') : null))
+const troubleFailure = useListFailure(troubleError, 'The messages that did not arrive could not be read.')
+
+// Every card refused for want of an authenticator is one fact, said once at the top with the way
+// through; a card keeps a failure of its own only when it is something else (A-112 criterion 1).
+const wall = computed(() => [waitingFailure, overviewFailure, drillFailure, troubleFailure]
+  .map(failure => failure.value).find(failure => failure?.enrolPath) ?? null)
+const ownFailure = (failure: Ref<ListFailure | null>) => computed(() => (failure.value?.enrolPath ? null : failure.value))
+const waitingOwn = ownFailure(waitingFailure)
+const overviewOwn = ownFailure(overviewFailure)
+const drillOwn = ownFailure(drillFailure)
+const troubleOwn = ownFailure(troubleFailure)
 
 // A published show nobody has assessed is a surprise waiting to be sprung on somebody, so it is
 // put where the committee looks rather than left for a visitor to find (D-102 criterion 2).
@@ -106,6 +118,12 @@ onMounted(() => {
       Signed in as {{ account.user?.name }}.
     </p>
 
+    <ReadFailure
+      v-if="wall"
+      :failure="wall"
+      data-test="authenticator-wall"
+    />
+
     <UAlert
       v-if="seesDrill && drill?.overdue"
       data-test="drill-overdue"
@@ -117,25 +135,24 @@ onMounted(() => {
       :actions="[{ label: 'Open backups', color: 'warning', variant: 'outline', to: '/admin/backups' }]"
     />
     <UAlert
-      v-else-if="seesDrill && drillFailure"
+      v-else-if="seesDrill && drillOwn"
       data-test="drill-failed"
       color="error"
       variant="subtle"
-      :description="drillFailure"
+      :description="drillOwn.message"
     />
 
     <UPageCard
-      v-if="waiting.length > 0 || (waitingFailed && decidesAny)"
+      v-if="waiting.length > 0 || (waitingOwn && decidesAny)"
       title="Waiting for you"
       description="Every queue you decide, with how many are in it now."
       data-test="waiting-for-you"
     >
-      <UAlert
-        v-if="waitingFailed"
+      <ReadFailure
+        v-if="waitingOwn"
+        :failure="waitingOwn"
         data-test="waiting-failed"
-        color="error"
-        variant="subtle"
-        description="What is waiting could not be read. Open another screen and come back to try again."
+        @retry="refreshWaiting"
       />
       <ul
         v-else
@@ -165,12 +182,11 @@ onMounted(() => {
 
     <MoneyNightsNeedingYou />
 
-    <UAlert
-      v-if="overviewFailure"
+    <ReadFailure
+      v-if="overviewOwn"
+      :failure="overviewOwn"
       data-test="overview-failed"
-      color="error"
-      variant="subtle"
-      :description="overviewFailure"
+      @retry="refreshNuxtData('console-overview')"
     />
 
     <UPageCard
@@ -239,12 +255,11 @@ onMounted(() => {
       description="Every send is logged, including the ones that never reached a provider. A failure here is a person who was not told something."
       data-test="delivery-trouble"
     >
-      <UAlert
-        v-if="troubleFailure"
+      <ReadFailure
+        v-if="troubleOwn"
+        :failure="troubleOwn"
         data-test="trouble-failed"
-        color="error"
-        variant="subtle"
-        :description="troubleFailure"
+        @retry="refreshNuxtData('delivery-trouble')"
       />
 
       <p

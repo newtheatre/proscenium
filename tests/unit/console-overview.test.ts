@@ -90,7 +90,7 @@ describe('the overview screen', () => {
   test('a failed count is said only to somebody who decides a queue', async () => {
     const source = await read(OVERVIEW)
     expect(source).toContain('queuesFor(')
-    expect(source).toMatch(/v-if="waiting\.length > 0 \|\| \(waitingFailed && decidesAny\)"/)
+    expect(source).toMatch(/v-if="waiting\.length > 0 \|\| \(waitingOwn && decidesAny\)"/)
   })
 
   // A refused or failed read is not "nothing has failed" (issue 1358).

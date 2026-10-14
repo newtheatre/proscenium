@@ -52,8 +52,8 @@ const { data, status, error, refresh } = await useAsyncData(
   { default: () => null as Session | null },
 )
 
+// A refusal says who can change it, never that the session could not be read (issue 1336).
 const readFailure = useListFailure(error, 'That session could not be read.')
-const refused = computed(() => refusalStatus(error.value) === 403)
 
 const registerOpen = computed(() => data.value?.registerOpenedAt !== null)
 const marked = computed(() => data.value?.markedAt !== null)
@@ -251,20 +251,13 @@ const registerLabel = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- A refusal says who can change it, never that the session could not be read (issue 1336). -->
-    <UAlert
-      v-if="readFailure"
-      color="error"
-      variant="subtle"
-      :icon="refused ? 'i-lucide-lock' : 'i-lucide-unplug'"
-      data-test="load-failed"
-      :title="readFailure.message"
-      :description="refused ? undefined : 'Try again before you rely on what is on this page.'"
-    />
-
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <div
-      v-else-if="status === 'pending'"
+      v-if="status === 'pending'"
       class="flex items-center gap-3 py-8 text-muted"
     >
       <UIcon
@@ -668,5 +661,5 @@ const registerLabel = computed(() => {
         </template>
       </ConfirmModal>
     </template>
-  </div>
+  </ReadGate>
 </template>

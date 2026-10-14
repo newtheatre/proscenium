@@ -279,7 +279,7 @@ export async function waitForInteractive(view: Bun.WebView, marker = 'main'): Pr
 }
 
 // Navigate and wait until the screen will answer a click. Every browser test starts here. The
-// dashboard shell renders no <main>, so an admin screen names an element of its own.
+// console's <main> is drawn before its data, so an admin screen names an element of its own.
 export async function visit(view: Bun.WebView, url: string, marker?: string): Promise<void> {
   await view.navigate(url)
   await waitForInteractive(view, marker)
@@ -362,6 +362,18 @@ export async function fillNumber(view: Bun.WebView, selector: string, value: str
     field.blur()
     // A page without the window's focus fires no blur of its own, so the field is told directly.
     if (!focused) field.dispatchEvent(new FocusEvent('blur'))
+  })()`)
+}
+
+// Types into a number input and stays in it, for a test that commits with Enter: input alone,
+// since a change event puts the old text back a frame later and Enter would then commit nothing.
+export async function typeNumber(view: Bun.WebView, selector: string, value: string): Promise<void> {
+  await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
+  await view.evaluate(`(() => {
+    const field = document.querySelector(${JSON.stringify(selector)})
+    field.focus()
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ${JSON.stringify(value)})
+    field.dispatchEvent(new Event('input', { bubbles: true }))
   })()`)
 }
 

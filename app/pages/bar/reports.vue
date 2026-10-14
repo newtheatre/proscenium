@@ -166,7 +166,11 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="reportFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       :filterable="false"
       :searchable="false"
@@ -225,17 +229,8 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
       </template>
     </AdminToolbar>
 
-    <UAlert
-      v-if="reportFailure"
-      data-test="report-failure"
-      color="error"
-      variant="subtle"
-      :description="reportFailure.message"
-      :actions="reportFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: reportFailure.enrolPath, color: 'error' }] : []"
-    />
-
     <!-- Data stays on screen while a new period refetches, rather than blanking (0032). -->
-    <template v-else-if="data">
+    <template v-if="data">
       <section
         v-for="section in ([
           ['sales', 'Sales'], ['gp', 'Gross profit'], ['variance', 'Stocktake variance'],
@@ -358,5 +353,5 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
         </p>
       </section>
     </template>
-  </div>
+  </ReadGate>
 </template>
