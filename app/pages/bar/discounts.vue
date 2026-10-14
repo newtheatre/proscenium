@@ -11,7 +11,7 @@ const toast = useToast()
 const failure = ref<string | null>(null)
 const saving = ref(false)
 
-interface Listing { items: Discount[], total: number, pageSize: number, pages: number }
+interface Listing { items: Discount[], total: number, pageSize: number, pages: number, maxPercent?: number }
 
 const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 
@@ -34,12 +34,12 @@ watch(open, (isOpen) => {
   if (!isOpen) failure.value = null
 })
 
-const state = reactive({ name: '', percent: 0 })
+const state = reactive({ name: '', percent: undefined as number | undefined })
 
 function edit(discount: Discount | null): void {
   editing.value = discount
   failure.value = null
-  Object.assign(state, { name: discount?.name ?? '', percent: discount?.percent ?? 0 })
+  Object.assign(state, { name: discount?.name ?? '', percent: discount?.percent ?? undefined })
   open.value = true
 }
 
@@ -256,12 +256,10 @@ const columns: TableColumn<Discount>[] = [
             label="Percent off"
             name="percent"
             required
-            description="A whole number, 1 to 100. Refused above the house cap."
+            :description="data.maxPercent ? `A whole number from 1 to ${data.maxPercent}, the most the bar allows.` : 'A whole number, such as 10.'"
           >
-            <UInputNumber
+            <WholeField
               v-model="state.percent"
-              :min="1"
-              :max="100"
               class="w-full"
               data-test="discount-percent"
             />

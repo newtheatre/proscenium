@@ -56,13 +56,13 @@ export function productActivationReferences(references = BAR_PRODUCT_REFERENCES)
   return references.filter(reference => reference.requiredToActivate !== null)
 }
 
-// A correlated EXISTS per sale table, binding nothing: the parameter count is fixed however many
-// products or lines exist (0003, 0006).
 // A sale line names a size, never the product, so a sale under any size counts too.
 function soldUnderASize(product: SQL): SQL {
   return sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${product} AND ${variantEverSoldColumn('pv')} = 1)`
 }
 
+// A correlated EXISTS per sale table, binding nothing: the parameter count is fixed however many
+// products or lines exist (0003, 0006).
 export function productEverSoldColumn(alias: string, references = productSaleReferences()): SQL {
   const terms = references.map(reference =>
     sql`EXISTS (SELECT 1 FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${sql.raw(alias)}.id)`)
@@ -259,6 +259,12 @@ export function allergensUnansweredCount(): SQL {
 // (F-114 criterion 2).
 export function onHandColumn(alias: string): SQL {
   return sql`(SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = ${sql.raw(alias)}.id)`
+}
+
+// A hand-entered movement's own predicate: taking stock away stops at nothing, since the sale
+// trigger refuses below it and the till would grey out what is on the shelf (0127).
+export function staysInStock(itemId: string, qty: number): SQL {
+  return sql`(${qty} > 0 OR (SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = ${itemId}) + ${qty} >= 0)`
 }
 
 export function onHandOf(itemId: string): SQL {

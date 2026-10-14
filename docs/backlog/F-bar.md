@@ -314,6 +314,11 @@ Open questions:
      Amended by issue 1299: a product's Check ID follows what it pours (F-106 criterion 1), so
      only a stocked item keeps a stated default; a new product's own switch, "restricted anyway",
      starts off.
+     Amended 14 October 2026 after the hands-on review of 13 October: in the guided set-up, a
+     new stocked item's flag and a packaged product's serving start from the chosen category
+     (`stockItemAgeRestrictedFor`, `packagedKindFor`), so a snack is sold each and asks for no
+     ID; the stated default still holds where the category says nothing, and a hand-set switch
+     is never overwritten.
 - Source: Prompt Book F-2; audit PR-12, PR-7 (archive-not-delete judgment); criterion 6 from
   issue 1151 item 10, 21 September 2026.
 

@@ -368,15 +368,7 @@ async function saveRecipe(): Promise<void> {
 
 const pricing = ref<ProductVariant | null>(null)
 const history = ref<VariantPrice[]>([])
-const price = reactive({ pricePence: 0, effectiveFrom: '' })
-
-// The field takes pounds and the request carries pence, converted here and nowhere else (0004).
-const pounds = computed({
-  get: () => price.pricePence / 100,
-  set: (value: number) => {
-    price.pricePence = Math.round((value ?? 0) * 100)
-  },
-})
+const price = reactive({ pricePence: undefined as number | undefined, effectiveFrom: '' })
 
 async function editPrices(variant: ProductVariant): Promise<void> {
   pricing.value = variant
@@ -385,7 +377,7 @@ async function editPrices(variant: ProductVariant): Promise<void> {
   try {
     const answered = await request<{ prices: VariantPrice[], on: string }>(`/api/admin/bar/variants/${variant.id}/prices`)
     history.value = answered.prices
-    Object.assign(price, { pricePence: variant.pricePence ?? 0, effectiveFrom: answered.on })
+    Object.assign(price, { pricePence: variant.pricePence ?? undefined, effectiveFrom: answered.on })
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -795,9 +787,8 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               :name="`components.${index}.qty`"
               class="w-40"
             >
-              <UInputNumber
+              <WholeField
                 v-model="line.qty"
-                :min="1"
                 class="w-full"
                 :data-test="`recipe-qty-${index}`"
               />
@@ -874,13 +865,10 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               label="Price"
               name="pricePence"
               required
-              description="In pounds. It is held in pence and formatted only when it is shown."
+              description="In pounds and pence, such as 2.50."
             >
-              <UInputNumber
-                v-model="pounds"
-                :min="0"
-                :step="0.01"
-                :format-options="{ style: 'currency', currency: 'GBP' }"
+              <PoundsField
+                v-model="price.pricePence"
                 class="w-full"
                 data-test="price-amount"
               />
@@ -987,9 +975,8 @@ const priceColumns: TableColumn<VariantPrice>[] = [
             name="qty"
             description="How much of whichever option is chosen a sale depletes, in that item's own unit."
           >
-            <UInputNumber
+            <WholeField
               v-model="choiceState.qty"
-              :min="1"
               class="w-full"
               data-test="choice-qty"
             />
@@ -1104,9 +1091,8 @@ const priceColumns: TableColumn<VariantPrice>[] = [
               :name="`options.${index}.qty`"
               class="w-40"
             >
-              <UInputNumber
+              <WholeField
                 v-model="line.qty"
-                :min="1"
                 class="w-full"
                 :data-test="`new-group-qty-${index}`"
               />

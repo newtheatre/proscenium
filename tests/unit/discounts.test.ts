@@ -16,6 +16,12 @@ describe('a discount is a name and a percentage above zero (criterion 1)', () =>
     expect(discountForm.safeParse({ name: 'X', percent: 100 }).success).toBe(true)
   })
 
+  // -10 went live as 1% and 12.5 as 13% through a number field (0127); the refusal is in words.
+  test('a percentage typed as something other than a whole number is refused in words', () => {
+    expect(discountForm.safeParse({ name: 'X', percent: Number.NaN }).error?.issues[0]?.message).toBe('Type a whole number, such as 10')
+    expect(discountForm.safeParse({ name: 'X', percent: 12.5 }).error?.issues[0]?.message).toContain('whole points')
+  })
+
   test('a fractional percentage is refused: whole points only', () => {
     expect(discountForm.safeParse({ name: 'X', percent: 12.5 }).success).toBe(false)
   })

@@ -15,6 +15,9 @@ import {
   saysAtTheTill,
   deliveryCostBasis,
   effectivePriceRow,
+  firstUnreadable,
+  packagedKindFor,
+  stockItemAgeRestrictedFor,
   movementEntryForm,
   movementForm,
   priceRef,
@@ -231,6 +234,49 @@ describe('a serving size is a row, priced by a dated series (F-112, F-116)', () 
     expect(priceForm.safeParse({ pricePence: -100, effectiveFrom: '2026-09-14' }).success).toBe(false)
     expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '14/09/2026' }).success).toBe(false)
     expect(priceForm.safeParse({ pricePence: 1800, effectiveFrom: '2026-09-14' }).success).toBe(true)
+  })
+
+  // A £0.00 price went live with no comp asked for, and a field's unreadable text went in as no
+  // price at all (0127). NaN is what PoundsField sends for text that is not a sum of money.
+  test('a bar price is at least a penny, and unreadable text is refused in words', () => {
+    const zero = priceForm.safeParse({ pricePence: 0, effectiveFrom: '2026-09-14' })
+    expect(zero.success).toBe(false)
+    expect(zero.error?.issues[0]?.message).toContain('a comp')
+    expect(categoryPriceForm.safeParse({ servingKind: 'single', pricePence: 0, effectiveFrom: '2026-09-14' }).success).toBe(false)
+
+    const unreadable = priceForm.safeParse({ pricePence: Number.NaN, effectiveFrom: '2026-09-14' })
+    expect(unreadable.error?.issues[0]?.message).toBe('Type pounds and pence with a full stop, such as 2.50')
+    expect(priceForm.safeParse({ pricePence: 1, effectiveFrom: '2026-09-14' }).success).toBe(true)
+  })
+
+  // The set-up page has no schema of its own; an opening of -5 became 1, a price of £2 none (0127).
+  test('the set-up names the first price or quantity it cannot read, and passes the rest', () => {
+    expect(firstUnreadable({ prices: [{ label: 'Single', pence: null }, { label: 'Double', pence: 450 }], quantities: [{ label: 'Opening', qty: 6 }] })).toBeNull()
+    expect(firstUnreadable({ prices: [{ label: 'Single', pence: Number.NaN }] })).toBe('Single: Type pounds and pence with a full stop, such as 2.50.')
+    expect(firstUnreadable({ prices: [{ label: 'Can', pence: 0 }] })).toContain('at least 1p')
+    expect(firstUnreadable({ quantities: [{ label: 'How many', qty: Number.NaN }] })).toBe('How many: Type a whole number, such as 12.')
+    expect(firstUnreadable({ quantities: [{ label: 'How many', qty: 0 }] })).toBe('How many: it has to be at least 1.')
+    expect(firstUnreadable({ quantities: [{ label: 'How many', qty: null }] })).toBe('How many: Type a whole number, such as 12.')
+  })
+
+  // A crisp packet set up under Snacks came out age restricted and sold as a "Can" (F-111 c6).
+  test('a new stocked item and its packaged kind start from what the category says it is', () => {
+    expect(stockItemAgeRestrictedFor('Snacks')).toBe(false)
+    expect(stockItemAgeRestrictedFor('Soft drinks')).toBe(false)
+    expect(stockItemAgeRestrictedFor('Spirits')).toBe(true)
+    expect(stockItemAgeRestrictedFor('Beer and cider')).toBe(true)
+    expect(stockItemAgeRestrictedFor('Merchandise')).toBe(STOCK_ITEM_AGE_RESTRICTED_DEFAULT)
+
+    expect(packagedKindFor('Snacks')).toBe('item')
+    expect(packagedKindFor('Soft drinks')).toBe('can')
+    expect(packagedKindFor('Bottled beer')).toBe('bottle')
+    expect(packagedKindFor('Cans and bottles')).toBe('can')
+    expect(packagedKindFor('Merchandise')).toBe('item')
+  })
+
+  test('a movement quantity that is not a whole number is refused in words', () => {
+    const parsed = movementEntryForm.safeParse({ kind: 'ADJUST', qty: Number.NaN, reason: 'OTHER' })
+    expect(parsed.error?.issues[0]?.message).toBe('Type a whole number, such as 12')
   })
 
   test('a date the calendar does not have is refused, not stored to sort first (0014)', () => {
