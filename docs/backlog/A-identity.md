@@ -208,7 +208,13 @@ Open questions for the committee:
   6. Enrolment has a way out at every step before the codes are shown: somebody who began it by
      mistake, or cannot reach their phone, leaves without an unfinished factor and without
      hunting for the back button.
-- Source: Prompt Book A-4 and module 0 roles table; audit SD-5, SD-8.
+  7. Added 14 October 2026: a grant of a privileged role to a password account with no confirmed
+     factor (or to an address still to set its password) says on the grant form that the role
+     does nothing until they set one up. The console overview says the refusal once, with the
+     enrolment link, however many of its cards it refused, and a list screen shows it in place of
+     the list (0119).
+- Source: Prompt Book A-4 and module 0 roles table; audit SD-5, SD-8; criterion 7 from the
+  hands-on review of 13 October 2026.
 
 ## A-113: Manage sign-in methods on one account
 
