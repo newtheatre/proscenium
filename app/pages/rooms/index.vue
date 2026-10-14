@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatLondon, fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import { closedOn, dateStrip } from '#shared/utils/rooms'
+import { closureCover, slotInstant } from '#shared/utils/room-grid'
 import { addDays } from '#shared/utils/series'
 import { SU_ROOM_ASK } from '#shared/utils/external-requests'
 import { londonDate } from '#shared/utils/working-days'
@@ -105,8 +106,11 @@ const columns = computed<GridColumn[]>(() => {
   return days.value.map(day => ({ key: day, label: labelFor(day), room, day }))
 })
 
+// The first hour the day view draws, and the start of the span the week table reads closures over.
+const GRID_FROM_HOUR = 8
+
 // A week across every room would be seven days by ten rooms of quarter hours, which nobody can
-// read. It becomes a count per room per day, and a cell opens that room on that day.
+// read. It becomes a count per room per day, closures read over the day view's hours (C-114).
 const summary = computed(() => rooms.value.map(room => ({
   room,
   days: days.value.map(day => ({
@@ -114,9 +118,21 @@ const summary = computed(() => rooms.value.map(room => ({
     // A room shut that day is neither free nor busy, and saying "Free" invites a click that the
     // day view would then refuse.
     closed: closedOn(room.hours, londonWeekday(noonOn(day))),
+    shut: closureCover(room.closed, slotInstant(day, GRID_FROM_HOUR * 60), slotInstant(day, 24 * 60)),
+    past: day < todayInLondon(),
     held: room.taken.filter(taken => taken.startsAt >= dayStart(day) && taken.startsAt < dayStart(addDays(day, 1))).length,
   })),
 })))
+
+function saysCell(cell: { shut: 'none' | 'part' | 'all', past: boolean, held: number }): string {
+  if (cell.past) return 'Past'
+  if (cell.shut === 'all') return 'Closed'
+  const said = [
+    cell.held ? plural(cell.held, 'booking') : null,
+    cell.shut === 'part' ? 'Closed in part' : null,
+  ].filter(Boolean).join(', ')
+  return said || 'Free'
+}
 
 function dayStart(day: string): number {
   const [year, month, date] = day.split('-').map(Number)
@@ -161,7 +177,7 @@ useSeoMeta({ title: 'Rooms' })
   <UContainer :class="MEMBER_PAGE_WIDE">
     <UPageHeader
       title="Rooms"
-      description="What is free, and when. Choose a free slot to book an hour, or drag across several; on a touch screen, tap where it starts and then where it ends. A slot somebody else holds reads as booked and nothing more."
+      description="What is free, and when. Choose a free slot to book an hour from it, or drag across several; on a touch screen, tap where it starts and then where it ends. A slot somebody else holds reads as booked and nothing more."
       :links="SECOND_PAGE"
       :ui="MEMBER_PAGE_HEADER"
     />
@@ -201,6 +217,7 @@ useSeoMeta({ title: 'Rooms' })
         v-model="roomId"
         :items="roomOptions"
         class="w-52"
+        aria-label="Which room"
         data-test="calendar-room"
       />
 
@@ -359,14 +376,15 @@ useSeoMeta({ title: 'Rooms' })
               <UButton
                 v-else
                 size="xs"
-                :color="cell.held ? 'primary' : 'neutral'"
-                :variant="cell.held ? 'subtle' : 'ghost'"
-                class="w-full justify-center"
-                :aria-label="`${row.room.name}, ${labelFor(cell.day)}: ${cell.held ? plural(cell.held, 'booking') : 'nothing booked'}`"
+                :color="cell.past ? 'neutral' : cell.shut !== 'none' ? 'error' : cell.held ? 'primary' : 'neutral'"
+                :variant="!cell.past && (cell.held || cell.shut !== 'none') ? 'subtle' : 'ghost'"
+                class="w-full justify-center whitespace-normal"
+                :class="cell.past ? 'text-muted' : ''"
+                :aria-label="`${row.room.name}, ${labelFor(cell.day)}: ${saysCell(cell)}`"
                 :data-test="`summary-${row.room.id}-${cell.day}`"
                 @click="openDay(row.room.id, cell.day)"
               >
-                {{ cell.held ? plural(cell.held, 'booking') : 'Free' }}
+                {{ saysCell(cell) }}
               </UButton>
             </td>
           </tr>
@@ -385,6 +403,7 @@ useSeoMeta({ title: 'Rooms' })
       <RoomGrid
         class="mt-3"
         :columns="columns"
+        :starts-at="GRID_FROM_HOUR"
         data-test="calendar-grid"
         @pick="book"
       />
@@ -396,6 +415,7 @@ useSeoMeta({ title: 'Rooms' })
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-primary/30" /> Booked</span>
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-warning/30" /> Awaiting a decision</span>
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-muted" /> Not open</span>
+      <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-muted/50" /> Past</span>
       <span class="flex items-center gap-2"><span class="size-3 rounded-sm bg-error/20" /> Closed</span>
     </div>
   </UContainer>

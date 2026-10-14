@@ -139,7 +139,7 @@ pattern). The same file's other refusals hold the shape without needing a link, 
 fixes them elsewhere: "That slot has already happened", "The room is closed that day".
 
 A message of one sentence carries no full stop; two or more sentences carry all of them.
-"Somebody booked that slot first" against "That link has expired or has already been used. Ask
+"That slot has already happened" against "That link has expired or has already been used. Ask
 for a new one." The rule holds for a field message as much as for the sentence a refusal sends.
 
 This used to break down where a refusal named a parameter rather than saying what to do:

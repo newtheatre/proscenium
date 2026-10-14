@@ -133,12 +133,30 @@ export function overlaps(a: Span, b: Span): boolean {
 export interface Conflict extends Span {
   title?: string
   bookedBy?: string
+  // The holder's account id, read on the server to word the refusal and never sent anywhere.
+  heldBy?: string
 }
 
 // Rebuilt rather than edited, so nothing identifying can survive in a field the masking forgot.
 export function maskConflicts(conflicts: Conflict[], canSeeDetail: boolean): Conflict[] {
-  if (canSeeDetail) return conflicts
+  if (canSeeDetail) {
+    return conflicts.map(conflict => ({
+      startsAt: conflict.startsAt,
+      endsAt: conflict.endsAt,
+      ...(conflict.title === undefined ? {} : { title: conflict.title }),
+      ...(conflict.bookedBy === undefined ? {} : { bookedBy: conflict.bookedBy }),
+    }))
+  }
   return conflicts.map(conflict => ({ startsAt: conflict.startsAt, endsAt: conflict.endsAt, title: 'Booked' }))
+}
+
+// A taken slot is the member's own more often than a race: Back and submit again, or a second
+// tab. Saying so names nobody else, so it is no exception to the masking (C-103 criterion 4).
+export function saysClash(conflicts: Conflict[], viewerId: string): string {
+  const theirOwn = conflicts.length > 0 && conflicts.every(conflict => conflict.heldBy === viewerId)
+  return theirOwn
+    ? 'You already have that room booked then. It is on My bookings.'
+    : 'That room is already booked then. Choose another time or room.'
 }
 
 const instant = z.string().datetime()
