@@ -22,23 +22,41 @@ export interface AgeCheckExportRow {
   supersededBy: string | null
 }
 
-// Superseded entries included, with their supersedes links intact, so nothing is omitted
-// (criterion 2). Time order, oldest first: this is a document read start to end, not a feed.
+// One register row, superseded entries included with their supersedes links intact (criterion 2).
+const REGISTER_ROW = sql`
+  a.id AS id, a.created_at AS createdAt, v.name AS venueName,
+  a.outcome AS outcome, a.id_type AS idType, a.reason AS reason,
+  a.description AS description, a.product AS product, a.notes AS notes,
+  u.name AS checkedByName, a.supersedes_id AS supersedesId,
+  (SELECT s.id FROM age_checks s WHERE s.supersedes_id = a.id) AS supersededBy
+  FROM age_checks a
+  JOIN users u ON u.id = a.checked_by
+  LEFT JOIN performances p ON p.id = a.performance_id
+  LEFT JOIN venues v ON v.id = p.venue_id
+`
+
+// Time order, oldest first: this is a document read start to end, not a feed.
 export function exportQuery(from: number, to: number): SQL {
   return sql`
-    SELECT a.id AS id, a.created_at AS createdAt, v.name AS venueName,
-           a.outcome AS outcome, a.id_type AS idType, a.reason AS reason,
-           a.description AS description, a.product AS product, a.notes AS notes,
-           u.name AS checkedByName, a.supersedes_id AS supersedesId,
-           (SELECT s.id FROM age_checks s WHERE s.supersedes_id = a.id) AS supersededBy
-    FROM age_checks a
-    JOIN users u ON u.id = a.checked_by
-    LEFT JOIN performances p ON p.id = a.performance_id
-    LEFT JOIN venues v ON v.id = p.venue_id
+    SELECT ${REGISTER_ROW}
     WHERE a.created_at >= ${from} AND a.created_at < ${to}
     ORDER BY a.created_at ASC
     LIMIT ${EXPORT_LIMIT}
   `
+}
+
+// The same rows on screen, a page at a time and newest first, as tonight's register reads (0136).
+export function registerPageQuery(from: number, to: number, limit: number, offset: number): SQL {
+  return sql`
+    SELECT ${REGISTER_ROW}
+    WHERE a.created_at >= ${from} AND a.created_at < ${to}
+    ORDER BY a.created_at DESC, a.id DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+export function registerCountQuery(from: number, to: number): SQL {
+  return sql`SELECT count(*) AS total FROM age_checks WHERE created_at >= ${from} AND created_at < ${to}`
 }
 
 export async function exportRows(from: number, to: number): Promise<AgeCheckExportRow[]> {
