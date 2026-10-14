@@ -66,6 +66,15 @@ function seasonRow(id: string, name: string, startsOn: string, endsOn: string): 
   }
 }
 
+describe.skipIf(skip !== null)('the period screens load directly from their address', () => {
+  test('every screen with a period picker renders on a first request rather than a 500', async () => {
+    for (const path of ['/money', '/money/shows', '/money/reports', '/money/exports', '/reports', '/money?kind=MONTH&year=2026&month=9']) {
+      const response = await send('GET', path, undefined, treasurer.cookie)
+      expect({ path, status: response.status }).toEqual({ path, status: 200 })
+    }
+  })
+})
+
 describe.skipIf(skip !== null)('/money: the dashboard over one of the theatre\'s seasons (0087)', () => {
   // Every post role carries `finance.summary` (0113), so the refusal is a member holding no role.
   test('the committee lists the seasons, a member without a committee role may not', async () => {

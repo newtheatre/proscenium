@@ -13,6 +13,9 @@ export interface PeriodFormOptions {
 // The money dashboard's period controls, shared by every screen that sends a `periodForm` (0087).
 // Each screen names where its terms and seasons come from, so a reader holds only its own gate.
 export async function usePeriodForm(key: string, choices: () => Promise<PeriodChoices>, options: PeriodFormOptions = {}) {
+  // Nuxt's context is gone after the first await, so the route and the component's scope are held first.
+  const route = useRoute()
+  const scope = getCurrentScope()
   const { data } = await useAsyncData(key, choices, { default: (): PeriodChoices => ({ terms: [], seasons: [] }) })
   const terms = computed(() => data.value.terms)
   const seasons = computed(() => data.value.seasons)
@@ -30,7 +33,6 @@ export async function usePeriodForm(key: string, choices: () => Promise<PeriodCh
 
   // The chosen period lives in the URL, so a reload or a shared link keeps it; anything the URL
   // says that this screen does not offer is ignored and the screen opens on its default.
-  const route = useRoute()
   const fromUrl = periodFromQuery(route.query, selectableKinds.value)
   const urlTerm = fromUrl?.kind === 'TERM' && !customRange
     ? terms.value.find(one => one.fromDay === fromUrl.fromDay && one.toDay === fromUrl.toDay)
@@ -69,10 +71,12 @@ export async function usePeriodForm(key: string, choices: () => Promise<PeriodCh
   const query = computed(() => periodQuery(period.value))
 
   // Replaced, not pushed, so Back leaves the screen rather than stepping through every choice.
-  watch(query, (chosen) => {
+  const follow = () => watch(query, (chosen) => {
     const kept = Object.fromEntries(Object.entries(route.query).filter(([key]) => !(PERIOD_QUERY_KEYS as readonly string[]).includes(key)))
     void navigateTo({ query: { ...kept, ...chosen } }, { replace: true })
   })
+  if (scope) scope.run(follow)
+  else follow()
   // Only a typed range can end before it starts; a screen withholds its request until it does not.
   const complete = computed(() => {
     const chosen = period.value
