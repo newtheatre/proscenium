@@ -58,19 +58,35 @@ export function productActivationReferences(references = BAR_PRODUCT_REFERENCES)
 
 // A correlated EXISTS per sale table, binding nothing: the parameter count is fixed however many
 // products or lines exist (0003, 0006).
+// A sale line names a size, never the product, so a sale under any size counts too.
+function soldUnderASize(product: SQL): SQL {
+  return sql`EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = ${product} AND ${variantEverSoldColumn('pv')} = 1)`
+}
+
 export function productEverSoldColumn(alias: string, references = productSaleReferences()): SQL {
-  if (references.length === 0) return sql`0`
   const terms = references.map(reference =>
     sql`EXISTS (SELECT 1 FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${sql.raw(alias)}.id)`)
-  return sql`CASE WHEN ${sql.join(terms, sql` OR `)} THEN 1 ELSE 0 END`
+  return sql`CASE WHEN ${sql.join([...terms, soldUnderASize(sql.raw(`${alias}.id`))], sql` OR `)} THEN 1 ELSE 0 END`
 }
 
 // The same question about one product, bound by its id. One parameter per sale table, no list.
 export function productEverSoldQuery(productId: string, references = productSaleReferences()): SQL {
-  if (references.length === 0) return sql`SELECT 0 AS sold`
   const terms = references.map(reference =>
     sql`EXISTS (SELECT 1 FROM ${sql.raw(reference.table)} WHERE ${sql.raw(reference.column)} = ${productId})`)
-  return sql`SELECT CASE WHEN ${sql.join(terms, sql` OR `)} THEN 1 ELSE 0 END AS sold`
+  return sql`SELECT CASE WHEN ${sql.join([...terms, soldUnderASize(sql`${productId}`)], sql` OR `)} THEN 1 ELSE 0 END AS sold`
+}
+
+// A priced size keeps its append-only price rows, so such a product is retired, never deleted (F-116).
+function pricedUnderASize(product: SQL): SQL {
+  return sql`EXISTS (SELECT 1 FROM product_variants pv JOIN variant_prices vp ON vp.variant_id = pv.id WHERE pv.product_id = ${product})`
+}
+
+export function productEverPricedColumn(alias: string): SQL {
+  return sql`CASE WHEN ${pricedUnderASize(sql.raw(`${alias}.id`))} THEN 1 ELSE 0 END`
+}
+
+export function productEverPricedQuery(productId: string): SQL {
+  return sql`SELECT CASE WHEN ${pricedUnderASize(sql`${productId}`)} THEN 1 ELSE 0 END AS priced`
 }
 
 // Every ACTIVE size needs something a sale can deplete, an item directly or a choice group
@@ -329,10 +345,11 @@ export async function claimName(entity: NamedEntity, name: string, exceptId?: st
   return row
 }
 
-interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold' | 'restrictedPours' | 'allergens'> {
+interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold' | 'everPriced' | 'restrictedPours' | 'allergens'> {
   staffedOnly: number
   ageRestricted: number
   everSold: number
+  everPriced: number
   restrictedPours: string | null
 }
 
@@ -341,6 +358,7 @@ const readProduct = (row: ProductRow, allergens: AllergenAnswer): BarProduct => 
   staffedOnly: row.staffedOnly === 1,
   ageRestricted: row.ageRestricted === 1,
   everSold: row.everSold === 1,
+  everPriced: row.everPriced === 1,
   restrictedPours: readRestrictedPours(row.restrictedPours),
   allergens,
 })
@@ -380,7 +398,7 @@ export function productsClause(query: ListQuery): ListClause {
 // Every column readProduct reads: a function, since productEverSoldColumn reads the references
 // afresh on each call.
 const productRowColumns = (): SQL =>
-  sql`${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold, ${restrictedPoursColumn('p')} AS restrictedPours`
+  sql`${PRODUCT_COLUMNS}, ${productEverSoldColumn('p')} AS everSold, ${productEverPricedColumn('p')} AS everPriced, ${restrictedPoursColumn('p')} AS restrictedPours`
 
 export function productsQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`

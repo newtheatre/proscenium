@@ -596,6 +596,8 @@ export interface BarProduct {
   // What the till says: read from every item its live sizes pour, plus the addition (issue 1348).
   allergens: AllergenAnswer
   everSold: boolean
+  // Any size has a price row, which is append-only: such a product is retired, never deleted.
+  everPriced: boolean
   // The age-restricted stocked items its live sizes pour, choices included, derived rather than
   // stored; switched off with any here is a product on the tidy-up list (issue 1299).
   restrictedPours: string[]
