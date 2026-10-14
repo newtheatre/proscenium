@@ -425,6 +425,12 @@ Open questions:
      Front of House Manager's, who takes the full count (`bar.stocktake`). Amended 29 September
      2026 by decision 0111: the bar manager's role folded into the Front of House Manager's, and
      the Front of House Manager reviews every line before Apply.
+  8. Added 14 October 2026 (decision 0126): a count is compared with on-hand at the moment it is
+     saved, not when the stocktake opened, so sales between the two are not counted again as a
+     loss; this amends criteria 1, 3 and 4. Apply refuses, naming each item, a stocktake that
+     would leave any counted item below zero, on the freezing write's own predicate. A count
+     under half or over double what was expected is listed to check before Apply, and the
+     confirmation lists every adjustment it will post.
 - Source: Prompt Book F-2; audit PR-12 (stocktake blanks recorded as zero).
 
 ## F-116: Dated append-only prices with same-day correction
