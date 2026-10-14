@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -111,6 +112,33 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
         expect(shape.table).toBe('none')
         expect(shape.cards === null || shape.cards !== 'none').toBe(true)
       }
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the stock register keeps every row action on screen at 390px', async () => {
+    const itemId = `bi-${crypto.randomUUID().slice(0, 8)}`
+    const database = new Database(app.databaseFile)
+    try {
+      database.run('INSERT INTO bar_items (id, name, unit, container_ml) VALUES (?, ?, ?, ?)', [itemId, 'House gin with a long name', 'ML', 700])
+    }
+    finally {
+      database.close()
+    }
+    const view = await openSignedOutView(app.baseURL, PHONE)
+    try {
+      await signInAsBoxOffice(view)
+      await view.navigate(`${app.baseURL}/bar/stock`)
+      await waitFor(view, `document.querySelector('[data-test="edit-${itemId}"]')`)
+      const offscreen = await view.evaluate<string[]>(`(() => {
+        const row = document.querySelector('[data-test="edit-${itemId}"]').closest('tr')
+        return [...row.querySelectorAll('button')]
+          .filter(button => button.getBoundingClientRect().right > document.documentElement.clientWidth)
+          .map(button => button.textContent.trim() || button.getAttribute('aria-label'))
+      })()`)
+      expect(offscreen).toEqual([])
     }
     finally {
       view.close()

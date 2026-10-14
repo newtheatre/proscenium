@@ -379,9 +379,9 @@ const columns: TableColumn<StockItem>[] = [
     id: 'act',
     header: ACTIONS_HEADER,
     meta: ACTIONS_COLUMN,
-    // The two movements a bar records by hand sit on the row; an adjustment, a retirement and a
-    // deletion are rarer and go behind More actions (issue 1350, K-123 criterion 10).
-    cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
+    // The two hand movements sit on the row, the rarer actions behind More actions (issue 1350,
+    // K-123 criterion 10); on a phone they wrap rather than run off the card.
+    cell: ({ row }) => h('div', { class: 'flex flex-wrap justify-end gap-1' }, [
       ...(row.original.status === 'ACTIVE'
         ? [
             h(UButton, {
