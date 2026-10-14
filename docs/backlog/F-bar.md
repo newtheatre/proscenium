@@ -516,6 +516,10 @@ Open questions:
   5. Access is limited to the Front of House Manager's role, the treasurer and administrators.
      Amended 29 September 2026 by decision 0111: the bar manager's role folded into the Front of
      House Manager's.
+  6. Amended 14 October 2026 by decision 0128 (criteria 1 and 2): an export carries money as
+     pounds and moments as ISO London dates under declared headings, in a file named for its
+     section and period; a discount counts the sales that carried it; a variance line names its
+     stocktake, date and unit, with the period's total; gross profit lists what it could not cost.
 - Source: Prompt Book F-2, P4; audit PR-12, PR-7 (CSV injection guard).
 
 ## F-120: Par levels and the suggested order list
