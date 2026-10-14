@@ -273,6 +273,12 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     }
   })
 
+  // D-115 criterion 6: the desk's walk-up sends the till's confirmation, naming where it was paid.
+  test('a walk-up paid at the desk says the box office, and one at the bar says the bar', () => {
+    expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'DESK' }).text)).toContain('paid at the box office')
+    expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'BAR' }).text)).toContain('paid at the bar')
+  })
+
   test('the cancellation is a booking that was still unpaid', () => {
     const { subject, html } = render('reservation-cancelled', EVERYTHING)
     expect(subject).toBe('Your booking for The Tempest is cancelled')

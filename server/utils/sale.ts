@@ -858,6 +858,7 @@ export async function commitSale(
         startsAt: walkUp.startsAt,
         paidPence: walkUp.amountPence,
         qrToken: token,
+        paidAt: 'BAR',
       })
     }
   }

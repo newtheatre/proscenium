@@ -1634,18 +1634,19 @@ The Nottingham New Theatre`,
     const show = String(context.show)
     const when = String(context.when)
     const paid = String(context.paid)
+    const where = context.paidAt === 'DESK' ? 'at the box office' : 'at the bar'
     const url = String(context.url)
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
     return {
       subject: `Your tickets for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}, paid at the bar.</p>
+<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}, paid ${where}.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
       text: `Hello ${context.name},
 
-Reference ${reference} for ${show}, ${when}: ${paid}, paid at the bar.
+Reference ${reference} for ${show}, ${when}: ${paid}, paid ${where}.
 
 Show this code at the door, or open it yourself: ${url}
 

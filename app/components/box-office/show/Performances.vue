@@ -83,6 +83,7 @@ const form = reactive({
   intervalCount: 0,
   intervalMinutes: null as number | null,
   capacityOverride: null as number | null,
+  aboveVenueCapacity: false,
   bookingClosesHoursBefore: null as number | null,
   holdReleaseMinutesBefore: null as number | null,
   externalBookingUrl: '',
@@ -95,7 +96,7 @@ const dayOf = (at: number): string => formatLondon(new Date(at * 1000), { year: 
   .split('/').reverse().join('-')
 const clockOf = (at: number): string => formatLondon(new Date(at * 1000), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
-const NO_OVERRIDES = { capacityOverride: null, bookingClosesHoursBefore: null, holdReleaseMinutesBefore: null, externalBookingUrl: '', notes: '' }
+const NO_OVERRIDES = { capacityOverride: null, aboveVenueCapacity: false, bookingClosesHoursBefore: null, holdReleaseMinutesBefore: null, externalBookingUrl: '', notes: '' }
 
 // A run starts empty or, for Duplicate, from a performance's venue, clocks and running time; only
 // its nights are new (D-132 criterion 10).
@@ -131,6 +132,7 @@ function editPerformance(one: AdminPerformance): void {
     intervalCount: one.intervalCount,
     intervalMinutes: one.intervalMinutes,
     capacityOverride: one.capacityOverride,
+    aboveVenueCapacity: false,
     bookingClosesHoursBefore: one.bookingClosesHoursBefore,
     holdReleaseMinutesBefore: one.holdReleaseMinutesBefore,
     externalBookingUrl: one.externalBookingUrl ?? '',
@@ -155,6 +157,7 @@ async function savePerformance(): Promise<void> {
           intervalCount: form.intervalCount,
           intervalMinutes: form.intervalMinutes,
           capacityOverride: form.capacityOverride,
+          aboveVenueCapacity: form.aboveVenueCapacity,
           bookingClosesHoursBefore: form.bookingClosesHoursBefore,
           holdReleaseMinutesBefore: form.holdReleaseMinutesBefore,
           externalBookingUrl: blank(form.externalBookingUrl),
@@ -262,6 +265,10 @@ const bookableVenues = computed(() => props.venues.filter(one => !one.archived))
 const addRefusal = computed(() => addPerformanceRefusal(bookableVenues.value.length))
 
 const venueOf = (venueId: string): ShowVenue | undefined => props.venues.find(one => one.id === venueId)
+const aboveVenue = computed(() => {
+  const capacity = venueOf(form.venueId)?.capacity
+  return capacity != null && form.capacityOverride !== null && form.capacityOverride > capacity
+})
 const runningTimeOptional = computed(() => editingPerformance.value?.status === 'CANCELLED' || (venueOf(form.venueId)?.isExternal ?? false))
 
 // The route's own rule, asked before the request so the field says it rather than a banner (D-121).
@@ -656,13 +663,23 @@ const columns: TableColumn<AdminPerformance>[] = [
               label="Capacity"
               name="capacityOverride"
               hint="Optional"
-              description="Leave it empty to take the venue's. Nought is a closed house."
+              :description="venueOf(form.venueId)?.capacity == null
+                ? 'Leave it empty to take the venue\'s. Nought is a closed house.'
+                : `Leave it empty to take the venue's ${venueOf(form.venueId)!.capacity} seats. Nought is a closed house.`"
             >
               <UInputNumber
                 v-model="form.capacityOverride"
                 :min="0"
                 class="w-full"
                 data-test="performance-capacity"
+              />
+              <!-- Deliberate oversell is confirmed here rather than a typing slip saved (0124). -->
+              <UCheckbox
+                v-if="aboveVenue"
+                v-model="form.aboveVenueCapacity"
+                class="mt-2"
+                label="Sell above the venue's capacity"
+                data-test="performance-above-venue"
               />
             </UFormField>
 

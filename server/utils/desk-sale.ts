@@ -11,7 +11,7 @@ import type { BatchItem } from 'drizzle-orm/batch'
 
 export interface WalkUpSaleInput {
   performanceId: string
-  userId: string
+  userId: string | null
   lines: ReservationLineToWrite[]
   capacity: number | null
   windowBypassed: boolean

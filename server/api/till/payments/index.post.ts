@@ -18,6 +18,10 @@ export default defineEventHandler(async (event) => {
 
   await refuseBookingsInOpenAttempts(resolved.night, input.tickets.map(ticket => ticket.reservationId))
 
+  // Asked before the reader is, never once it has answered (0123).
+  const bookerRefusal = await walkUpBookerRefusal(input.walkUpGuest)
+  if (bookerRefusal) throw createError({ statusCode: 409, statusMessage: bookerRefusal })
+
   // The same cross-check the sale runs, without the write: a basket the till could not sell is
   // refused here, before the reader is ever asked for it (criterion 2).
   const scope = {

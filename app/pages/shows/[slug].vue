@@ -461,7 +461,7 @@ function saysInterval(performance: ListedPerformance): string {
             </p>
 
             <p
-              v-if="performance.prices.length"
+              v-if="performance.prices.length && !performance.cancelled"
               class="font-mono text-sm text-muted"
               :data-test="`prices-${performance.id}`"
             >

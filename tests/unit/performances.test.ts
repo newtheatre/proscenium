@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { runningTimeRefusal, saleRefusal } from '#shared/utils/programme'
+import { capacityOverrideRefusal, runningTimeRefusal, saleRefusal } from '#shared/utils/programme'
 import { showNightBounds } from '#shared/utils/show-night'
 import { effectiveCapacity, isOnSale, performanceNight } from '#server/utils/performances'
 import type { PerformanceSaleState } from '#shared/utils/programme'
@@ -128,6 +128,34 @@ describe('the programme utilities derive the night rather than restating it', ()
     expect(source).toContain('showNightOf')
     expect(/hour\s*[<>]=?\s*4\b/.test(source)).toBe(false)
     expect(source).not.toContain('SHOW_NIGHT_START_HOUR =')
+  })
+})
+
+// 0124: selling above the venue's house is deliberate oversell (D-105 criterion 4), never a slip.
+describe('a performance above its venue is confirmed, not typed (0124)', () => {
+  const house = { name: 'The Studio', capacity: 120 }
+
+  test('an override above the venue is refused, quoting both figures and the venue', () => {
+    const refusal = capacityOverrideRefusal(house, 10_000)
+    expect(refusal).toContain('120')
+    expect(refusal).toContain('10000')
+    expect(refusal).toContain('The Studio')
+  })
+
+  test('an override at or below the venue, a closed house of nought, and no override at all are taken', () => {
+    expect(capacityOverrideRefusal(house, 120)).toBeNull()
+    expect(capacityOverrideRefusal(house, 80)).toBeNull()
+    expect(capacityOverrideRefusal(house, 0)).toBeNull()
+    expect(capacityOverrideRefusal(house, null)).toBeNull()
+    expect(capacityOverrideRefusal(house, undefined)).toBeNull()
+  })
+
+  test('the officer\'s say-so lets a deliberate oversell through', () => {
+    expect(capacityOverrideRefusal(house, 130, true)).toBeNull()
+  })
+
+  test('a venue with no capacity set caps nothing', () => {
+    expect(capacityOverrideRefusal({ name: 'The Corn Exchange', capacity: null }, 400)).toBeNull()
   })
 })
 

@@ -122,6 +122,8 @@ const performanceFields = {
   intervalCount: z.number().int().nonnegative().max(5).default(0),
   intervalMinutes: z.number().int().nonnegative().max(120).nullish(),
   capacityOverride: z.number().int().nonnegative().nullish(),
+  // The officer's say-so for a figure above the venue's own: deliberate oversell, never a slip (0124).
+  aboveVenueCapacity: z.boolean().default(false),
   bookingClosesHoursBefore: hoursBefore.nullish(),
   // Null inherits the configured default; an explicit value is this performance's own (D-106).
   holdReleaseMinutesBefore: z.number().int().nonnegative().max(MAX_HOLD_RELEASE_MINUTES).nullish(),
@@ -340,6 +342,12 @@ export function publishChecklist(show: PublishReadiness): PublishCheck[] {
 export function runningTimeRefusal(venue: { name: string, isExternal: boolean }, durationMinutes: number | null | undefined, status?: PerformanceStatus): string | null {
   if (venue.isExternal || status === 'CANCELLED' || durationMinutes != null) return null
   return `A performance at ${venue.name} needs its running time: every shift on its rota ends from it`
+}
+
+// 0124: selling above the venue's own house is deliberate oversell (D-105 criterion 4), confirmed.
+export function capacityOverrideRefusal(venue: { name: string, capacity: number | null }, capacityOverride: number | null | undefined, confirmed = false): string | null {
+  if (confirmed || capacityOverride == null || venue.capacity === null || capacityOverride <= venue.capacity) return null
+  return `${venue.name} seats ${venue.capacity}, and ${capacityOverride} is more than that. Check the figure, or tick "Sell above the venue's capacity" to oversell on purpose.`
 }
 
 export function saysPublishCheck(check: PublishCheck): string {

@@ -7,7 +7,7 @@ import { heldSeatsSubquery, showUnpaidSeatsColumn, unpaidSeatsColumn } from './c
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { saysNoSuch } from '#shared/utils/no-such'
 import { performancesList } from '#shared/utils/performances-list'
-import { runningTimeRefusal } from '#shared/utils/programme'
+import { capacityOverrideRefusal, runningTimeRefusal } from '#shared/utils/programme'
 import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
@@ -483,12 +483,14 @@ export async function listVenues(): Promise<ShowVenue[]> {
 }
 
 // The one set of refusals both ways of adding a performance make, in the same order (D-121, D-131).
-export async function bookableVenueOrThrow(venueId: string, durationMinutes: number | null | undefined): Promise<ShowVenue> {
+export async function bookableVenueOrThrow(venueId: string, durationMinutes: number | null | undefined, capacityOverride?: number | null, aboveVenueCapacity = false): Promise<ShowVenue> {
   const venue = (await listVenues()).find(one => one.id === venueId)
   if (!venue) throw createError({ statusCode: 400, statusMessage: saysNoSuch('venue') })
   if (venue.archived) throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
   const untimed = runningTimeRefusal(venue, durationMinutes)
   if (untimed) throw createError({ statusCode: 400, statusMessage: untimed })
+  const oversized = capacityOverrideRefusal(venue, capacityOverride, aboveVenueCapacity)
+  if (oversized) throw createError({ statusCode: 400, statusMessage: oversized })
   return venue
 }
 

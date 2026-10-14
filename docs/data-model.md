@@ -538,9 +538,9 @@ for the two that read and `ticketing.write` for the rest:
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. `loadedSeasonId` (required, null for none) is the season the form loaded: a `seasonId` equal to it leaves the stored season as it is, and a different one is written only over the loaded season, else a 409 naming the season the show has now, so a save never undoes one set since (D-131 criterion 2, 0003). A retired season or category newly chosen is a 409 naming it, and an unknown one a 400; one the show already carries is kept (criterion 5). Every refusal rides the UPDATE, and the `show.updated` row rides its batch on `changes()`, recording the season pair only where the form chose one (0049). |
 | `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. `coverPassTypeIds` adds the show to each named pass in the same batch, with a `pass-type.shows.updated` audit row wherever the row went in (0049); a pass not among `coveringPasses` is a 409 naming it and nothing is published, and one already covering is left alone (D-123 criterion 4, issue 1323). |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
-| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6). A show with no season and no earlier live performance takes the unretired season this night falls in, in the same batch, audited as `show.updated` with `filledFrom` (D-131 criterion 2). |
+| `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6), and so is a `capacityOverride` above the venue's own capacity, quoting both, unless `aboveVenueCapacity` confirms it (0124). A show with no season and no earlier live performance takes the unretired season this night falls in, in the same batch, audited as `show.updated` with `filledFrom` (D-131 criterion 2). |
 | `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). A show with no season and no earlier live performance takes the unretired season the run's earliest night falls in, in the same batch, audited once as `show.updated` (D-131 criterion 2). |
-| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). |
+| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). A `capacityOverride` above the venue's own capacity is a 400 quoting both unless `aboveVenueCapacity` is true: deliberate oversell is confirmed, never typed (0124, D-105 criterion 4). |
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
 | `POST /api/admin/performances/[id]/cancel` | Cancels one, and answers with how many tickets are owed a refund. |
 | `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |
@@ -876,7 +876,23 @@ conditional on the entry's existence, so a losing claim posts no ledger row eith
 migration (0001). `POST /api/box-office/desk/reservations/[id]/cancel` is refused while any
 ticket still holds unrefunded money, quoting the amount (criterion 6); once every ticket is
 refunded it cancels with `cancelled_by = 'STAFF'`. Refunded tickets leave `deskReservation()`'s
-own ticket list immediately (criterion 5), the same filter that already frees capacity.
+own ticket list immediately (criterion 5), the same filter that already frees capacity, and move
+to its `refundedTickets`, which the desk shows struck through and no route reads. The desk sends
+the cancel itself straight after the last ticket's refund, so a fully refunded booking never sits
+as "Paid, £0.00"; the cancel is still its own request, refused while anything is unrefunded.
+
+**Walk-ups at the desk (D-115).** `POST /api/box-office/desk/reservations` creates a `DOOR`-source
+booking and collects it in the same flow (`sellWalkUp()` in `server/utils/desk-sale.ts`), with
+the expected-total cross-check. The name and the email are optional and go together (criterion 6):
+with neither, the booking has no account and is found by reference; with both, the address
+resolves through `guestAccount()` and the paid confirmation and its QR are emailed
+(`sendWalkUpPaid()`, the template the till's walk-up sends). Before any account is touched, the
+route refuses an order larger than the seats left, quoting them, so a sale the house never had
+room for leaves nothing behind; the capacity predicate on the write still settles a race. An
+address that already belongs to an account in another name is refused with `EXISTING_ACCOUNT_SAYS`
+unless the guest carries `existingAccount: true`, the booker's say-so that the account is theirs;
+a walk-up never renames an account (0123). The till asks the same question
+(`walkUpBookerRefusal()`) when a charge starts, before the reader is asked for anything.
 
 **Reinstating a lapsed or self-cancelled hold (D-118).** `POST
 /api/box-office/desk/reservations/[id]/reinstate` flips a booking straight back to `PENDING`,
