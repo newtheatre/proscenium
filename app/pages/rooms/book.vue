@@ -76,6 +76,9 @@ const state = reactive<BookingForm>({
 
 const saving = ref(false)
 const failures = ref<Failure[]>([])
+// A refusal with no rule list behind it (a clash, a closure, a room gone), said on the form where
+// it was caused rather than in a toast that has gone by the time it is read.
+const refused = ref<string | null>(null)
 const refusals = ref<{ occurrence: number, day: string, failures: Failure[], conflicts: unknown[] }[]>([])
 
 // Read rather than restated: the cap is committee-editable, and a number written into a screen
@@ -93,7 +96,7 @@ const seriesCap = computed(() => rules.value.seriesCap)
 const form = computed(() => fields
   .refine(booking => booking.to > booking.from, { path: ['to'], message: 'A booking ends after it starts' })
   .superRefine((booking, context) => {
-    if (booking.asking && booking.reason.length === 0) {
+    if (booking.asking && !booking.repeats && booking.reason.length === 0) {
       context.addIssue({ code: 'custom', path: ['reason'], message: 'Say why this one is worth an exception' })
     }
     if (booking.repeats && booking.frequency === 'WEEKLY' && booking.weekdays.length === 0) {
@@ -157,6 +160,7 @@ async function bookSeries(): Promise<void> {
   saving.value = true
   failures.value = []
   refusals.value = []
+  refused.value = null
 
   try {
     const answer = await $fetch<{ id: string, status: string, occurrences: unknown[] }>('/api/rooms/series', {
@@ -179,7 +183,7 @@ async function bookSeries(): Promise<void> {
   catch (error) {
     const data = refusalData<{ refusals?: typeof refusals.value }>(error)
     refusals.value = data?.refusals ?? []
-    if (refusals.value.length === 0) toast.add({ title: refusalText(error), color: 'error' })
+    if (refusals.value.length === 0) refused.value = refusalText(error)
   }
   finally {
     saving.value = false
@@ -190,6 +194,7 @@ async function bookSeries(): Promise<void> {
 async function bookWithoutRefused(): Promise<void> {
   const skip = refusals.value.map(one => one.day)
   saving.value = true
+  refused.value = null
   try {
     const answer = await $fetch<{ occurrences: unknown[] }>('/api/rooms/series', {
       method: 'POST',
@@ -206,7 +211,7 @@ async function bookWithoutRefused(): Promise<void> {
   catch (error) {
     const data = refusalData<{ refusals?: typeof refusals.value }>(error)
     refusals.value = data?.refusals ?? []
-    if (refusals.value.length === 0) toast.add({ title: refusalText(error), color: 'error' })
+    if (refusals.value.length === 0) refused.value = refusalText(error)
   }
   finally {
     saving.value = false
@@ -286,17 +291,32 @@ const warnsUpFront = computed(() => {
   return null
 })
 
+// A refusal is about the span it was given, so changing the span puts it away.
+watch(() => [state.roomId, state.day, state.from, state.to], () => {
+  refused.value = null
+})
+
+// Such a booking is always a request, so the form is the request from the start rather than a
+// Book it that is bound to fail before Ask for it appears (C-105 criterion 5, C-108 criterion 5).
+const alwaysAsks = computed(() => standing.value.standing === 'PRE_APPROVAL' || Boolean(room.value?.sensitive))
+watch(alwaysAsks, () => {
+  failures.value = []
+  refused.value = null
+  state.asking = alwaysAsks.value
+}, { immediate: true })
+
 // Everything the form can send goes through the form (C-105 criterion 8): a series and a request
 // are the same fields with more asked of them, never a second path round the schema.
 async function submit(event: FormSubmitEvent<BookingForm>): Promise<void> {
-  if (state.asking) return ask()
   if (state.repeats) return bookSeries()
+  if (state.asking) return ask()
   return book(event)
 }
 
 async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
   saving.value = true
   failures.value = []
+  refused.value = null
 
   try {
     const answer = await $fetch<{ id: string, warning: string | null }>('/api/rooms/bookings', {
@@ -324,7 +344,7 @@ async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
     const data = refusalData<{ failures?: Failure[], canRequest?: boolean, conflicts?: unknown[] }>(error)
     failures.value = data?.failures ?? []
     state.asking = data?.canRequest ?? false
-    if (failures.value.length === 0 && !state.asking) toast.add({ title: refusalText(error), color: 'error' })
+    if (failures.value.length === 0 && !state.asking) refused.value = refusalText(error)
   }
   finally {
     saving.value = false
@@ -335,6 +355,7 @@ async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
 // member is not racing anybody for it while they wait (C-108 criterion 2).
 async function ask(): Promise<void> {
   saving.value = true
+  refused.value = null
   try {
     await $fetch('/api/rooms/requests', {
       method: 'POST',
@@ -359,7 +380,9 @@ async function ask(): Promise<void> {
     await navigateTo('/rooms/mine')
   }
   catch (error) {
-    toast.add({ title: refusalText(error), color: 'error' })
+    const data = refusalData<{ failures?: Failure[] }>(error)
+    if (data?.failures?.length) failures.value = data.failures
+    else refused.value = refusalText(error)
   }
   finally {
     saving.value = false
@@ -543,8 +566,9 @@ useSeoMeta({ title: 'Book a room' })
           <UButton
             color="neutral"
             variant="ghost"
-            class="w-full justify-between"
+            class="-ms-2.5"
             :icon="state.repeats ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+            :aria-expanded="state.repeats"
             data-test="repeat-toggle"
           >
             Repeat this booking
@@ -652,6 +676,16 @@ useSeoMeta({ title: 'Book a room' })
         </UAlert>
 
         <UAlert
+          v-if="refused"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-x"
+          title="That booking cannot be made"
+          :description="refused"
+          data-test="booking-refusal"
+        />
+
+        <UAlert
           v-if="failures.length"
           :color="state.asking ? 'warning' : 'error'"
           variant="subtle"
@@ -701,8 +735,8 @@ useSeoMeta({ title: 'Book a room' })
         </UAlert>
 
         <UFormField
-          v-if="state.asking"
-          label="Why this one is worth an exception"
+          v-if="state.asking && !state.repeats"
+          :label="failures.length || !alwaysAsks ? 'Why this one is worth an exception' : 'What the person deciding should know'"
           name="reason"
           required
           :description="`Shown to whoever decides. Up to ${REQUEST_REASON_LIMIT} characters.`"
@@ -718,21 +752,21 @@ useSeoMeta({ title: 'Book a room' })
 
         <div class="flex flex-wrap gap-2">
           <UButton
-            v-if="state.asking"
-            type="submit"
-            :loading="saving"
-            data-test="request-submit"
-          >
-            Ask for it
-          </UButton>
-          <UButton
-            v-else-if="state.repeats"
+            v-if="state.repeats"
             type="submit"
             :loading="saving"
             :disabled="!seriesReady"
             data-test="series-submit"
           >
-            Book {{ plural(state.occurrences, 'date') }}
+            {{ state.asking ? 'Ask for' : 'Book' }} {{ plural(state.occurrences, 'date') }}
+          </UButton>
+          <UButton
+            v-else-if="state.asking"
+            type="submit"
+            :loading="saving"
+            data-test="request-submit"
+          >
+            Ask for it
           </UButton>
           <UButton
             v-else

@@ -6,7 +6,7 @@ import { conflictsWith } from './bookings'
 import { closedNow, roomOpenTerms } from './performance-closures'
 import { chunked, refusalToDecide } from '#shared/utils/approvals'
 import { lostWriteCause } from '#shared/utils/blackouts'
-import { HOLDS_A_SLOT } from '#shared/utils/bookings'
+import { HOLDS_A_SLOT, maskConflicts } from '#shared/utils/bookings'
 import type { AuditRow } from '#shared/utils/audit'
 import type { Conflict } from '#shared/utils/bookings'
 import type { ShiftOffsets } from '#shared/utils/rota-times'
@@ -150,5 +150,5 @@ async function whyItFailed(id: string, intoRoom: string | null, offsets?: ShiftO
     return { id, ok: false, why: 'closed', says: 'The room is closed for that span' }
   }
   const conflicts = await conflictsWith({ roomId, startsAt: row.startsAt, endsAt: row.endsAt, exceptId: id })
-  return { id, ok: false, why: 'conflict', says: 'Somebody took that slot while this was waiting', conflicts }
+  return { id, ok: false, why: 'conflict', says: 'Somebody took that slot while this was waiting', conflicts: maskConflicts(conflicts, true) }
 }

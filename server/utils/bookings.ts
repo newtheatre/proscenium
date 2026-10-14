@@ -188,6 +188,7 @@ export async function conflictsWith(span: { roomId: string, startsAt: number, en
     endsAt: schema.roomBookings.endsAt,
     title: schema.roomBookings.title,
     bookedBy: schema.users.name,
+    heldBy: schema.roomBookings.userId,
   })
     .from(schema.roomBookings)
     .leftJoin(schema.users, eq(schema.users.id, schema.roomBookings.userId))
@@ -205,6 +206,7 @@ export async function conflictsWith(span: { roomId: string, startsAt: number, en
     endsAt: row.endsAt,
     title: row.title,
     bookedBy: row.bookedBy ?? undefined,
+    heldBy: row.heldBy,
   }))
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { describePurpose } from '#shared/utils/bookings'
 import { saysWhen } from '#shared/utils/when'
 import type { MySummary } from '#shared/utils/my-summary'
 
@@ -21,7 +22,7 @@ defineProps<{ summary: MySummary }>()
       v-if="summary.room?.purpose"
       class="text-sm text-muted"
     >
-      {{ summary.room.purpose }}
+      {{ describePurpose(summary.room.purpose) }}
     </p>
     <p
       v-if="summary.room?.cancellable"
