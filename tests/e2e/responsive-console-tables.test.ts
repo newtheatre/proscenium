@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, forgetSpentStep, grantRole, markVerified, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -28,8 +28,6 @@ beforeAll(async () => {
   app = await startApp()
 
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
-  const officer = await registerMember(app, 'grantor', generatePassword())
-  await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
   await request(app, 'POST', '/api/auth/register', { email: adminEmail, name: person.name, password: adminPassword })
@@ -40,6 +38,10 @@ beforeAll(async () => {
   adminSecret = enrolled.secret
   await request(app, 'POST', '/api/account/mfa/confirm', { code: await codeForStep(adminSecret, stepFor(new Date())) }, cookie)
   expect(Bun.spawnSync(['bun', 'scripts/grant-admin.ts', adminEmail, app.databaseFile]).exitCode).toBe(0)
+
+  // Only an IT Manager can grant: a plain member's grant is refused and the stock screen with it.
+  const officer = await adminSession(app, { additional: true })
+  expect((await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)).ok).toBe(true)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
