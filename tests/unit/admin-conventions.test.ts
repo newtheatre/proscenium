@@ -57,6 +57,8 @@ const REPORTS_WITHOUT_A_TOOLBAR = [
   // there is nothing to search across and nothing to filter by (E-120, G-108, H-112).
   'app/pages/rota/manage/backstage.vue',
   'app/pages/rota/manage/safety.vue',
+  // The register's only narrowing is the export's own range, held beside the buttons it exports (0136).
+  'app/pages/rota/manage/age-checks.vue',
   'app/pages/training/manage/requests.vue',
 ]
 
@@ -886,7 +888,7 @@ describe('every console control says what it is (K-101 criterion 5, issue 1151 i
 
   test('a row action that repeats down a column names what it acts on', async () => {
     const requests = await Bun.file('app/pages/training/manage/requests.vue').text()
-    expect(requests).toContain('\'aria-label\': `Answer ${row.original.name}\'s request`')
+    expect(requests).toContain('\'aria-label\': `Decline ${row.original.name}\'s request`')
   })
 
   // The settings screen repeats the same two words down every row, so each pair says which

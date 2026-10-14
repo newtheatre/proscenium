@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { recordAgeCheck, supersedeAgeCheck } from '#server/utils/age-checks'
-import { exportQuery, numberedPdfRows } from '#server/utils/age-checks-export'
+import { exportQuery, numberedPdfRows, registerCountQuery, registerPageQuery } from '#server/utils/age-checks-export'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -62,6 +62,24 @@ describe('the date range (criterion 1)', () => {
       const found = run(database, exportQuery(WITHIN_RANGE - 3600, WITHIN_RANGE + 3600))
       expect(found.find(row => row.id === 'ac-venued')?.venueName).not.toBeNull()
       expect(found.find(row => row.id === 'ac-bar')?.venueName).toBeNull()
+    })
+  })
+})
+
+// The screen reads the rows the export would carry, a page at a time, newest first (0136).
+describe('the register on screen', () => {
+  test('a page holds the range\'s rows newest first, and the count is the whole range', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer')
+      for (const [id, at] of [['ac-1', WITHIN_RANGE], ['ac-2', WITHIN_RANGE + 60], ['ac-3', WITHIN_RANGE + 120], ['ac-old', OUT_OF_RANGE]] as const) {
+        run(database, recordAgeCheck(officer, accepted, id, new Date(at * 1000)).statement)
+      }
+      const from = WITHIN_RANGE - 3600
+      const to = WITHIN_RANGE + 3600
+
+      expect(run(database, registerPageQuery(from, to, 2, 0)).map(row => row.id)).toEqual(['ac-3', 'ac-2'])
+      expect(run(database, registerPageQuery(from, to, 2, 2)).map(row => row.id)).toEqual(['ac-1'])
+      expect(run(database, registerCountQuery(from, to))).toEqual([{ total: 3 }])
     })
   })
 })

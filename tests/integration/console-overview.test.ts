@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { barSetUpQuery, waitingCountsQuery } from '#server/utils/console-overview'
+import { barSetUpQuery, safetyRoutingQuery, waitingCountsQuery } from '#server/utils/console-overview'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -152,6 +152,17 @@ describe('the bar\'s set-up still to do (issue 1358)', () => {
         ['INSERT INTO bar_products (id, category_id, name) VALUES (?, ?, ?)', 'p-2', 'cat-1', 'Also unanswered on the product'],
       ])
       expect(read<BarSetUp>(database, barSetUpQuery())[0]?.allergensUnknown).toBe(3)
+    })
+  })
+})
+
+// E-116: severities ship routing nowhere (migration 0074), so the overview says so until one routes.
+describe('whether any incident severity routes to follow-up', () => {
+  test('as migrated, none does; opting one in is enough', async () => {
+    await withDatabase((database) => {
+      expect(read<{ anySeverityRoutes: number }>(database, safetyRoutingQuery())).toEqual([{ anySeverityRoutes: 0 }])
+      database.batch([['UPDATE incident_severity_config SET requires_follow_up = 1 WHERE severity = ?', 'SERIOUS']])
+      expect(read<{ anySeverityRoutes: number }>(database, safetyRoutingQuery())).toEqual([{ anySeverityRoutes: 1 }])
     })
   })
 })
