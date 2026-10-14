@@ -23,6 +23,9 @@ const when = computed(() => ('session' in props.action
   ? `${saysDay(props.action.session.heldOn)} at ${props.action.session.startsAt}${props.action.session.place ? ` · ${props.action.session.place}` : ''}`
   : null))
 
+// Why one role offers Sign up and another a waiting list: the soonest session for this one is full.
+const whenShown = computed(() => (when.value && props.action.kind === 'JOIN_WAITING_LIST' ? `${when.value}, which is full` : when.value))
+
 async function signUp(): Promise<void> {
   if (!('session' in props.action)) return
   working.value = true
@@ -90,6 +93,6 @@ async function signUp(): Promise<void> {
     <span
       v-if="when"
       class="text-sm text-muted"
-    >{{ when }}</span>
+    >{{ whenShown }}</span>
   </div>
 </template>

@@ -47,6 +47,7 @@ export default defineEventHandler(async (event) => {
       prerequisites: (prerequisites.get(module.id) ?? []).map(edge => ({
         moduleId: edge.requiresId,
         name: edge.requiresName,
+        listed: edge.requiresStatus === 'ACTIVE',
         held: held ? held.has(edge.requiresId) : null,
       })),
       // A Drive folder is not a public page, so a signed-out visitor is not given the link.

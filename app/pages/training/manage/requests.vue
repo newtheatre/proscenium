@@ -39,8 +39,8 @@ async function answer(): Promise<void> {
       body: { reason: reason.value },
     })
     toast.add({
-      title: 'Answered',
-      description: 'They have been told why.',
+      title: 'Declined',
+      description: 'They have been told why. To say yes, schedule a session for the module instead.',
       icon: 'i-lucide-message-circle',
       color: 'success',
     })
@@ -80,12 +80,12 @@ function requesterColumns(moduleId: string, moduleName: string): TableColumn<Req
         'size': 'xs',
         'color': 'neutral',
         'variant': 'outline',
-        'aria-label': `Answer ${row.original.name}'s request`,
-        'data-test': `answer-${moduleId}`,
+        'aria-label': `Decline ${row.original.name}'s request`,
+        'data-test': `decline-${moduleId}`,
         'onClick': () => {
           answering.value = { id: row.original.id, name: row.original.name, moduleName }
         },
-      }, () => 'Answer'),
+      }, () => 'Decline'),
     },
   ]
 }
@@ -201,16 +201,16 @@ watch(modalOpen, (nowOpen) => {
       </section>
 
       <p class="text-sm text-muted">
-        The busiest modules are shown first. Answer or schedule some of these to see the rest.
+        The busiest modules are shown first. Schedule or decline some of these to see the rest.
       </p>
     </div>
 
     <ConfirmModal
       :open="answering !== null"
-      name="answer-request"
-      title="Answer this request"
-      verb="Send the reply"
-      color="primary"
+      name="decline-request"
+      title="Decline this request"
+      verb="Decline and tell them"
+      color="error"
       :loading="saving"
       :disabled="reason.trim().length < 3"
       :failure="failure"
@@ -222,8 +222,9 @@ watch(modalOpen, (nowOpen) => {
           v-if="answering"
           class="text-sm text-muted"
         >
-          {{ answering.name }} asked for {{ answering.moduleName }}. They are shown what you write, so
-          tell them where it stands, not only that it is declined.
+          {{ answering.name }} asked for {{ answering.moduleName }}. Their request is closed as declined, and
+          they are shown what you write, so tell them where it stands. To say yes, schedule a session
+          for the module instead: that answers everyone asking for it.
         </p>
 
         <UFormField
@@ -237,7 +238,7 @@ watch(modalOpen, (nowOpen) => {
             :maxlength="DECLINE_REASON_LIMIT"
             placeholder="Not running this term, but it is on the list for next"
             class="w-full"
-            data-test="answer-reason"
+            data-test="decline-reason"
           />
         </UFormField>
       </template>

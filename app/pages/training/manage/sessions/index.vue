@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { can, nameTrainers, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { saysDay } from '#shared/utils/when'
+import { addDays } from '#shared/utils/series'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, plannerModuleOptions, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -130,6 +131,8 @@ const today = computed(() => {
   const pad = (part: number, width: number): string => String(part).padStart(width, '0')
   return `${pad(parts.year, 4)}-${pad(parts.month, 2)}-${pad(parts.day, 2)}`
 })
+// The write path refuses today, so the picker never offers it (G-112 criterion 1).
+const tomorrow = computed(() => addDays(today.value, 1))
 
 // Sign-up opening is one instant on the wire, collected as a day and a wall clock and read in
 // London like every other domain date (0014): a browser in another zone would be wrong.
@@ -548,7 +551,7 @@ const columns: TableColumn<Session>[] = [
           >
             <DateField
               v-model="state.heldOn"
-              :min="today"
+              :min="tomorrow"
               data-test="session-day"
               class="w-full"
             />
