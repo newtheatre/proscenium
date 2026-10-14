@@ -429,8 +429,7 @@ onMounted(load)
             class="flex items-center justify-between gap-2"
           >
             <span>
-              <span>{{ saysRole(grant.role) }}</span>
-              <span class="text-muted">
+              <span>{{ saysRole(grant.role) }}</span>{{ ' ' }}<span class="text-muted">
                 {{ grant.live ? 'until' : 'lapsed' }}
                 {{ grant.expiresAt ? saysWhen(grant.expiresAt, { year: true }) : 'further notice' }}
               </span>

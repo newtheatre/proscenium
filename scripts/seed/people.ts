@@ -303,7 +303,8 @@ export function seedPersonDetail(target: SeedTarget, people: People, now: number
       id: seedId('fellowship', person.slug),
       user_id: person.id,
       awarded_on: dayOffset(now, days),
-      awarded_by: personIn(people, 'rowan').id,
+      // The meeting that resolved it, in words, as the award form asks: never an account id.
+      awarded_by: 'Annual general meeting',
       citation,
       revoked_at: revoked ? now - 200 * DAY : null,
       revoked_by: revoked ? personIn(people, 'rowan').id : null,

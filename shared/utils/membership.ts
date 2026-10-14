@@ -111,3 +111,10 @@ export function membershipState(term: Term | null, today: string, graceDays: num
   if (isCurrent(term, today, graceDays)) return { kind: 'current', until: term.expiresOn }
   return { kind: 'lapsed', expiredOn: term.expiresOn }
 }
+
+// Where a term came from, in words: the stored value is a code (A-117 criterion 1).
+export function saysMembershipSource(source: string): string {
+  if (source === 'ROSTER') return 'SU roster'
+  if (source === 'MANUAL') return 'Recorded by hand'
+  return source
+}

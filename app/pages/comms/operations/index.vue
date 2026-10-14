@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { saysWhen } from '#shared/utils/when'
+import { saysDay, saysWhen } from '#shared/utils/when'
 import { sendLogList } from '#shared/utils/send-log-list'
 import { saysNotificationStatus } from '#shared/utils/notifications'
 import type { DailyCount, SendLogRow } from '#shared/utils/notification-log'
@@ -110,7 +110,7 @@ const dailyColumns: TableColumn<DailyCount>[] = [
     id: 'day',
     header: 'Day',
     cell: ({ row }) => h('div', {}, [
-      h('div', {}, row.original.day),
+      h('div', { class: 'whitespace-nowrap' }, saysDay(row.original.day)),
       // Below sm the type is hidden: shown here instead, so a phone keeps the outcome and the
       // count in view without losing what it said (issue 922).
       h('div', { class: 'sm:hidden font-mono text-xs text-muted' }, row.original.type),

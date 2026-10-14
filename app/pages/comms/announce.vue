@@ -266,6 +266,7 @@ async function send(): Promise<void> {
       <UInput
         v-model="subject"
         data-test="announce-subject"
+        class="w-full"
       />
     </UFormField>
 
