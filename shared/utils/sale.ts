@@ -47,8 +47,25 @@ export const walkUpLineForm = z.object({
 // Encouraged, so the booker gets the confirmation and its QR, and optional (D-115 criterion 6).
 export const walkUpGuestForm = z.object({
   name: z.string().trim().min(1, 'Enter a name').max(200),
-  email: z.string().email('Enter a real email address').max(320),
+  email: z.string().trim().email('Enter a real email address').max(320),
+  // Sent once the booker has said an address held in another name is theirs (0123).
+  existingAccount: z.boolean().default(false),
 })
+
+// Who a found booking is for: a lapsed or cancelled one holds no seats, which "party of 0" misread.
+export function saysTillParty(booking: { bookerFirstName: string | null, partySize: number }): string {
+  const who = booking.bookerFirstName ?? 'Walk-up'
+  return booking.partySize > 0 ? `${who} · party of ${booking.partySize}` : `${who} · no seats held`
+}
+
+const nameKey = (name: string): string => name.trim().replace(/\s+/g, ' ').toLowerCase()
+
+// Whether the name typed at the counter is the account's own; a nameless account never matches.
+export function sameBookerName(held: string | null, typed: string): boolean {
+  return held !== null && nameKey(held) !== '' && nameKey(held) === nameKey(typed)
+}
+
+export const EXISTING_ACCOUNT_SAYS = 'That email address belongs to an account in another name. Check the address with the booker. If the account is theirs, tick "It is their account" and sell again. Nothing has been charged.'
 
 // The screen's own belief of the total (0004, F-104 criterion 1), an inline Challenge 25 outcome
 // when the basket needs one (F-106), and a tab holder to charge instead of the reader (F-108).

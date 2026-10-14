@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -247,13 +247,13 @@ describe.skipIf(skip !== null)('an override change is audited and reaches only n
 // D-105 criterion 4. Nothing has been sold yet anywhere, so the refusal cannot be shown against a
 // real ticket; what is proved here is that the path is open and the guard is on the statement.
 describe.skipIf(skip !== null)('capacity moves by its own action (D-105 criterion 4)', () => {
-  test('raising capacity is always allowed, which is how a deliberate oversell is done', async () => {
+  test('raising capacity above the venue is allowed once confirmed, which is how a deliberate oversell is done', async () => {
     const show = await newShow()
     const performance = await addPerformance(show.id, { capacityOverride: 10 })
+    const raise = { venueId, startsAt: nextWeek(), durationMinutes: 120, capacityOverride: 500 }
 
-    const answered = await send('PUT', `/api/admin/performances/${performance}`, {
-      venueId, startsAt: nextWeek(), durationMinutes: 120, capacityOverride: 500,
-    })
+    expect((await send('PUT', `/api/admin/performances/${performance}`, raise)).status).toBe(400)
+    const answered = await send('PUT', `/api/admin/performances/${performance}`, { ...raise, aboveVenueCapacity: true })
     expect(answered.status).toBe(200)
   })
 
@@ -301,6 +301,32 @@ describe.skipIf(skip !== null)('the screen shows why a price is what it is (D-12
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+
+  // 0125: -5 was saved as a free ticket and then shown as Inherit; now it is refused and nothing moves.
+  test('a price that is not one is refused on save, naming the row, and nothing is written', async () => {
+    const type = await addType(900)
+    const show = await newShow()
+    const performance = await addPerformance(show.id)
+
+    const view = await openConsole()
+    try {
+      await visit(view, `${app.baseURL}/box-office/shows/${show.id}?tab=performances`, '[data-test="performances-table"]')
+      await waitFor(view, `document.querySelector('[data-test="prices-${performance}"]') !== null`)
+      await click(view, `[data-test="prices-${performance}"]`)
+      const field = `input[data-test="price-field-${type}"], [data-test="price-field-${type}"] input`
+      await fill(view, field, '-5')
+      expect(await textOf(view, `[data-test="clear-${type}"]`)).toContain('Clear row')
+      await click(view, '[data-test="save-prices"]')
+      await waitFor(view, `document.querySelector('[data-test="prices-failure"]') !== null`)
+      expect(await textOf(view, '[data-test="prices-failure"]')).toContain('Type a price in pounds and pence')
+    }
+    finally {
+      view.close()
+    }
+
+    expect(forType(await pricesOf(`/api/admin/performances/${performance}/prices`), type))
+      .toMatchObject({ price: 900, source: 'BASE' })
   }, CASE_TIMEOUT_MS)
 
   test('a performance price is set from the performance row and takes effect at once', async () => {

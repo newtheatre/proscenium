@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import { readScannedCode } from './door'
 import { saysSeatsLeft } from './night-hub'
-import { guestDetailsForm } from './reservations'
 import { pageQuery } from './pagination'
+import { walkUpGuestForm } from './sale'
 import { saysPrice } from './ticket-types'
 import { saysReservationStatus } from './capacity'
 import { showNightOf } from './show-night'
@@ -89,7 +89,7 @@ const saysStatus = (status: string): string => saysReservationStatus(status)
 
 // What a booking's own status says about whether it can be collected right now, in the
 // booker-facing words the desk screen shows. Null means it can.
-export function uncollectableReason(status: string): string | null {
+export function uncollectableReason(status: string, cancelledBy: string | null = null): string | null {
   switch (status) {
     case 'PENDING':
       return null
@@ -98,7 +98,9 @@ export function uncollectableReason(status: string): string | null {
     case 'DOOR':
       return 'This booking was already admitted at the door.'
     case 'CANCELLED':
-      return 'This booking was cancelled and cannot be collected. Box office can reinstate it if the seats are still free.'
+      return cancelledBy === 'STAFF'
+        ? 'This booking was refunded and cancelled at the desk. It cannot be brought back; take a new booking instead.'
+        : 'This booking was cancelled and cannot be collected. Box office can reinstate it if the seats are still free.'
     case 'EXPIRED':
       return 'This hold has lapsed. Box office can reinstate it if the seats are still free.'
     case 'NO_SHOW':
@@ -118,8 +120,8 @@ export const deskSaleLineForm = z.object({
   quantity: z.number().int().positive().max(DESK_SALE_LINE_QUANTITY_CAP),
 })
 
-// A name and an email, the same two fields D-104's guest checkout takes: nothing about a walk-up
-// needs to be anonymous, and it is what keeps this reservation findable by search like any other.
+// The till's own optional pair (D-115 criterion 6): neither is a booking with no account behind
+// it, found by reference alone; both send the confirmation and its QR.
 export const deskSaleForm = z.strictObject({
   performanceId: z.string().trim().min(1, 'Say which performance you mean'),
   lines: z.array(deskSaleLineForm).min(1, 'A sale needs at least one line').max(MAX_DESK_SALE_LINES)
@@ -127,7 +129,7 @@ export const deskSaleForm = z.strictObject({
       lines => new Set(lines.map(line => line.ticketTypeId)).size === lines.length,
       'A ticket type appears once; add to its quantity instead of a second line',
     ),
-  guest: guestDetailsForm,
+  guest: walkUpGuestForm.nullish().transform(value => value ?? null),
   expectedTotalPence: z.number().int().min(0),
   // COMP is excluded here: D-117's request-and-approval workflow names an existing reservation,
   // which a walk-up does not have until this write creates one.
@@ -209,11 +211,34 @@ export function walkUpTotalPence(lines: WalkUpLine[]): number {
   return lines.reduce((total, line) => total + line.pricePence * line.quantity, 0)
 }
 
-export function walkUpRefusal(lines: WalkUpLine[], guest: { name: string, email: string }): string | null {
-  if (!lines.some(line => line.quantity > 0)) return 'Choose at least one ticket.'
-  if (guest.name.trim().length === 0) return 'Enter the booker\'s name.'
-  if (guest.email.trim().length === 0) return 'Enter the booker\'s email address.'
+// How many more of one type the screen offers: the line cap, less what the other lines already take
+// of the seats left. The route's capacity predicate still decides (D-105); this only stops asking.
+export function walkUpLineMax(seatsLeft: number | null, otherLines: number): number {
+  if (seatsLeft === null) return DESK_SALE_LINE_QUANTITY_CAP
+  return Math.max(0, Math.min(DESK_SALE_LINE_QUANTITY_CAP, seatsLeft - otherLines))
+}
+
+export function walkUpRefusal(lines: WalkUpLine[], guest: { name: string, email: string }, seatsLeft: number | null): string | null {
+  if (seatsLeft === 0) return 'Sold out.'
+  const chosen = lines.reduce((total, line) => total + line.quantity, 0)
+  if (chosen === 0) return 'Choose at least one ticket.'
+  if (seatsLeft !== null && chosen > seatsLeft) return `Only ${seatsLeft} ${seatsLeft === 1 ? 'seat' : 'seats'} left.`
+  const named = guest.name.trim().length > 0
+  const addressed = guest.email.trim().length > 0
+  if (named && !addressed) return 'Enter the booker\'s email address too, or clear the name.'
+  if (addressed && !named) return 'Enter the booker\'s name too, or clear the email address.'
   return null
+}
+
+// A walk-up sold with neither a name nor an email has no account behind it (D-115 criterion 6).
+export function saysBooker(name: string | null): string {
+  return name?.trim() || 'Walk-up, no name given'
+}
+
+// The route's own refusal for an order the house cannot hold, read before anything is written.
+export function walkUpShortSays(remaining: number): string {
+  if (remaining <= 0) return 'This performance is sold out. Nothing has been charged.'
+  return `Only ${remaining} ${remaining === 1 ? 'seat is' : 'seats are'} left on this performance. Nothing has been charged.`
 }
 
 // The card searches on its own as soon as a performance is chosen, so an empty table is either

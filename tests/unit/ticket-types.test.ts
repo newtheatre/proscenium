@@ -6,6 +6,7 @@ import {
   isPublicTicketType,
   isSystemTicketType,
   newTicketTypeForm,
+  priceOverridesForm,
   publicTicketTypes,
   saysAccessKind,
   saysPrice,
@@ -42,6 +43,21 @@ describe('a ticket type carries a base price in integer pence (criterion 1)', ()
   test('a price of nought is a price, and a negative one is not', () => {
     expect(newTicketTypeForm.safeParse({ name: 'Comp', price: 0 }).success).toBe(true)
     expect(newTicketTypeForm.safeParse({ name: 'Owed', price: -1 }).success).toBe(false)
+  })
+
+  // A refused price says what to type in the officer's own terms, never zod's (item 7 of the review).
+  test('a refused price says why: unreadable, below nought or above the most a ticket costs', () => {
+    const said = (price: number) => newTicketTypeForm.safeParse({ name: 'Standard', price }).error?.issues[0]?.message
+    expect(said(Number.NaN)).toBe('Type a price in pounds and pence, such as 7.50')
+    expect(said(-500)).toBe('A price cannot be below nought')
+    expect(said(MAX_TICKET_PRICE_PENCE + 1)).toBe('A ticket costs at most £1,000.00')
+  })
+
+  test('an override says the same, and an unreadable one is refused rather than read as inherit', () => {
+    const said = (price: number | null) => priceOverridesForm.safeParse({ overrides: [{ ticketTypeId: 't-1', price, active: null }] }).error?.issues[0]?.message
+    expect(said(null)).toBeUndefined()
+    expect(said(Number.NaN)).toBe('Type a price in pounds and pence, such as 7.50')
+    expect(said(-500)).toBe('A price cannot be below nought')
   })
 
   // Pounds typed into a field that takes pence is the mistake this catches.

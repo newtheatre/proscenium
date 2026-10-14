@@ -16,6 +16,8 @@ import {
   readDeskScan,
   saysDeskNight,
   saysDeskStatus,
+  saysBooker,
+  walkUpLineMax,
   walkUpRefusal,
   walkUpTotalPence,
   refundTicketForm,
@@ -97,6 +99,14 @@ describe('a booking is collectable only while PENDING (criterion 2)', () => {
 
   test('a lapsed hold names who can bring it back', () => {
     expect(uncollectableReason('EXPIRED')).toContain('Box office can reinstate it')
+  })
+
+  // The cancel confirmation says a refunded booking cannot be brought back, so the cancelled one
+  // never offers to reinstate it (D-118 criterion 5).
+  test('a booking the desk refunded and cancelled never says it can be reinstated', () => {
+    expect(uncollectableReason('CANCELLED', 'STAFF')).not.toContain('reinstate')
+    expect(uncollectableReason('CANCELLED', 'STAFF')).toContain('refunded')
+    expect(uncollectableReason('CANCELLED', 'CUSTOMER')).toContain('reinstate')
   })
 })
 
@@ -217,9 +227,22 @@ describe('a walk-up sale allows up to 20 a line and no order total cap (D-115 cr
     expect(result.success).toBe(false)
   })
 
-  test('a name and an email are required, the same as a guest booking online', () => {
+  test('a name and an email are optional: a walk-up sold with neither has no account (D-115 criterion 6)', () => {
     const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: 1 }], guest: undefined })
+    expect(result.success).toBe(true)
+    expect(result.data?.guest).toBeNull()
+  })
+
+  test('a name with no email is refused: the pair goes together or not at all', () => {
+    const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: 1 }], guest: { name: 'Door Sale', email: '' } })
     expect(result.success).toBe(false)
+  })
+
+  test('filing under an account in another name is off unless the desk says so (0123)', () => {
+    const result = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: 1 }] })
+    expect(result.data?.guest?.existingAccount).toBe(false)
+    const confirmed = deskSaleForm.safeParse({ ...base, lines: [{ ticketTypeId: 'tt-1', quantity: 1 }], guest: { ...base.guest, existingAccount: true } })
+    expect(confirmed.data?.guest?.existingAccount).toBe(true)
   })
 })
 
@@ -326,30 +349,72 @@ describe('a walk-up totals the lines it holds', () => {
 
 describe('a walk-up says what it still needs before any money moves', () => {
   const GUEST = { name: 'Ada Kowalski', email: 'ada@example.com' }
+  const NOBODY = { name: '', email: '' }
   const LINE = [{ pricePence: 650, quantity: 1 }]
 
   test('with nothing chosen it asks for a ticket', () => {
-    expect(walkUpRefusal([], GUEST)).toContain('ticket')
+    expect(walkUpRefusal([], GUEST, null)).toContain('ticket')
   })
 
-  test('with no name it asks for the booker', () => {
-    expect(walkUpRefusal(LINE, { name: '  ', email: 'ada@example.com' })).toContain('name')
+  test('with neither a name nor an email it sells: both are optional (D-115 criterion 6)', () => {
+    expect(walkUpRefusal(LINE, NOBODY, null)).toBeNull()
   })
 
-  test('with no email it asks for that', () => {
-    expect(walkUpRefusal(LINE, { name: 'Ada Kowalski', email: '' })).toContain('email')
+  test('with a name and no email it asks for the email', () => {
+    expect(walkUpRefusal(LINE, { name: 'Ada Kowalski', email: '' }, null)).toContain('email')
+  })
+
+  test('with an email and no name it asks for the name', () => {
+    expect(walkUpRefusal(LINE, { name: '  ', email: 'ada@example.com' }, null)).toContain('name')
   })
 
   test('a sale that is ready has nothing to say', () => {
-    expect(walkUpRefusal(LINE, GUEST)).toBeNull()
+    expect(walkUpRefusal(LINE, GUEST, null)).toBeNull()
+  })
+
+  test('a sold-out house says so before anything is chosen to sell', () => {
+    expect(walkUpRefusal(LINE, GUEST, 0)).toBe('Sold out.')
+  })
+
+  test('an order larger than the seats left quotes what is left', () => {
+    expect(walkUpRefusal([{ pricePence: 650, quantity: 3 }], GUEST, 2)).toBe('Only 2 seats left.')
+  })
+
+  test('an order that exactly fills the house sells', () => {
+    expect(walkUpRefusal([{ pricePence: 650, quantity: 2 }], GUEST, 2)).toBeNull()
   })
 
   test('nothing it says explains itself or names the machine', () => {
-    const said = [walkUpRefusal([], GUEST), walkUpRefusal(LINE, { name: '', email: '' })]
+    const said = [walkUpRefusal([], GUEST, null), walkUpRefusal(LINE, { name: 'Ada', email: '' }, null), walkUpRefusal(LINE, GUEST, 0), walkUpRefusal(LINE, GUEST, 0)]
     for (const says of said) {
       expect(says).not.toMatch(/\b(because|so that|reservation|row|write)\b/i)
       expect(says?.endsWith('.')).toBe(true)
     }
+  })
+})
+
+describe('a booking with no name on it reads as a walk-up, never as nothing', () => {
+  test('a named booker is their name', () => {
+    expect(saysBooker('Ada Kowalski')).toBe('Ada Kowalski')
+  })
+
+  test('no account behind it is a nameless walk-up, never "null" (D-115 criterion 6)', () => {
+    expect(saysBooker(null)).toBe('Walk-up, no name given')
+    expect(saysBooker('  ')).toBe('Walk-up, no name given')
+  })
+})
+
+describe('a walk-up line offers no more than the house has left', () => {
+  test('an uncapped house allows the line cap', () => {
+    expect(walkUpLineMax(null, 0)).toBe(DESK_SALE_LINE_QUANTITY_CAP)
+  })
+
+  test('the other lines already chosen come off what this one may take', () => {
+    expect(walkUpLineMax(5, 3)).toBe(2)
+  })
+
+  test('a full house allows nothing more, never a negative', () => {
+    expect(walkUpLineMax(2, 3)).toBe(0)
   })
 })
 

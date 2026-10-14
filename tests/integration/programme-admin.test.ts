@@ -6,6 +6,7 @@ import { londonDay } from '#shared/utils/membership'
 import {
   PERFORMANCE_REFERENCES,
   cascadeOnSaleQuery,
+  cancelledPerformanceHoldersQuery,
   countPerformancesQuery,
   pagedPerformancesQuery,
   performanceSoldQuery,
@@ -527,6 +528,37 @@ describe('a show names the venue its latest performance was added at (issue 1319
       const rows = read<{ id: string, lastVenueId: string | null }>(database, showsQuery(everyShow(), 25, 0))
       expect(rows.find(one => one.id === seeded.showId)?.lastVenueId).toBe('venue-studio')
       expect(rows.find(one => one.id === 'show-empty')?.lastVenueId).toBeNull()
+    })
+  })
+})
+
+// D-121 criterion 5: who is told when a performance is cancelled. A booking with nobody to write to,
+// one already over and one on another performance are not.
+describe('cancelledPerformanceHoldersQuery finds every live booking with somebody to tell', () => {
+  test('unpaid and paid bookings are found, and nothing else is', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const other = tonightsPerformance(database, { suffix: 'other' })
+      database.batch([
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-1', 'one@newtheatre.test', 'One'],
+        ...([
+          ['r-pending', seeded.performanceId, 'u-1', 'PENDING'],
+          ['r-collected', seeded.performanceId, 'u-1', 'COLLECTED'],
+          ['r-nameless', seeded.performanceId, null, 'COLLECTED'],
+          ['r-cancelled', seeded.performanceId, 'u-1', 'CANCELLED'],
+          ['r-expired', seeded.performanceId, 'u-1', 'EXPIRED'],
+          ['r-elsewhere', other.performanceId, 'u-1', 'COLLECTED'],
+        ] as const).map(([id, performanceId, userId, status]) => [
+          'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          id, id.toUpperCase(), performanceId, userId, status, 'WEB',
+        ] as [string, ...unknown[]]),
+      ])
+
+      const found = read<{ reservationId: string, userId: string, collected: number }>(database, cancelledPerformanceHoldersQuery(seeded.performanceId))
+      expect(found.map(row => [row.reservationId, row.userId, Boolean(row.collected)]).sort()).toEqual([
+        ['r-collected', 'u-1', true],
+        ['r-pending', 'u-1', false],
+      ])
     })
   })
 })

@@ -1,4 +1,4 @@
-import { deskSaleForm } from '#shared/utils/desk'
+import { deskSaleForm, walkUpShortSays } from '#shared/utils/desk'
 import { saleRefusal } from '#shared/utils/programme'
 import { holdExpiresAt } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
@@ -35,13 +35,22 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Read before any account is made, so an order the house never had room for refuses in its own
+  // words and leaves nobody behind; the predicate on the write still decides a race (D-105).
   const capacity = effectiveCapacity(performance)
+  const wanted = lines.reduce((total, line) => total + line.quantity, 0)
+  const remaining = capacity === null ? null : Math.max(0, capacity - Number(performance.soldTickets))
+  if (remaining !== null && wanted > remaining) throw createError({ statusCode: 409, statusMessage: walkUpShortSays(remaining) })
+
+  const bookerRefusal = await walkUpBookerRefusal(input.guest)
+  if (bookerRefusal) throw createError({ statusCode: 409, statusMessage: bookerRefusal })
+
   const releaseMinutes = await holdReleaseMinutesFor(event, performance)
-  const booker = await guestAccount(input.guest.email, input.guest.name)
+  const booker = input.guest ? await guestAccount(input.guest.email, input.guest.name) : null
 
   const outcome = await sellWalkUp({
     performanceId: input.performanceId,
-    userId: booker.id,
+    userId: booker?.id ?? null,
     lines,
     capacity,
     windowBypassed,
@@ -51,7 +60,21 @@ export default defineEventHandler(async (event) => {
   })
 
   if (!outcome.applied) {
-    throw createError({ statusCode: 409, statusMessage: 'This performance no longer has room for that order' })
+    throw createError({ statusCode: 409, statusMessage: 'This performance filled while the sale was being made. Nothing has been charged.' })
+  }
+
+  // The booker who gave an address gets the paid confirmation and its QR, as the till's does (D-115
+  // criterion 6); the sale has committed, so a send that fails never unsells it.
+  if (booker) {
+    await sendWalkUpPaid(event, {
+      userId: booker.id,
+      reference: outcome.result.reference,
+      showTitle: performance.showTitle,
+      startsAt: performance.startsAt,
+      paidPence: outcome.result.totalPence,
+      qrToken: await qrTokenFor(outcome.result.reservationId),
+      paidAt: 'DESK',
+    })
   }
 
   return { ok: true, reference: outcome.result.reference, entryId: outcome.result.entryId, totalPence: outcome.result.totalPence }

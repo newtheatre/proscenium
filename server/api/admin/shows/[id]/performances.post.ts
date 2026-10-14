@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   if (!show) throw noSuch('show')
 
   const input = await readValidatedBodyOrThrow(event, performanceForm)
-  await bookableVenueOrThrow(input.venueId, input.durationMinutes)
+  await bookableVenueOrThrow(input.venueId, input.durationMinutes, input.capacityOverride, input.aboveVenueCapacity)
 
   const id = newId()
 

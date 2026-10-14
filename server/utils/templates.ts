@@ -1634,18 +1634,19 @@ The Nottingham New Theatre`,
     const show = String(context.show)
     const when = String(context.when)
     const paid = String(context.paid)
+    const where = context.paidAt === 'DESK' ? 'at the box office' : 'at the bar'
     const url = String(context.url)
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
     return {
       subject: `Your tickets for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}, paid at the bar.</p>
+<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}, paid ${where}.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
       text: `Hello ${context.name},
 
-Reference ${reference} for ${show}, ${when}: ${paid}, paid at the bar.
+Reference ${reference} for ${show}, ${when}: ${paid}, paid ${where}.
 
 Show this code at the door, or open it yourself: ${url}
 
@@ -1670,6 +1671,30 @@ Reference ${reference} for ${show}, ${when}, is now cancelled at your request. N
 charged: the booking was still unpaid.
 
 Changed your mind? Book again from the show's page while seats remain.
+
+The Nottingham New Theatre`,
+    }
+  },
+  // D-121 criterion 5 and D-116 criterion 1: money comes back in person, on the reader it went in on.
+  'reservation-performance-cancelled': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    const why = context.reason ? `The reason given: ${String(context.reason)}` : null
+    const next = context.collected
+      ? 'Bring this reference to the box office and every ticket you paid for is refunded at the box office, on the card reader, in person.'
+      : 'Nothing was charged: the booking was still unpaid, so there is nothing for you to do.'
+    return {
+      subject: `Cancelled: ${show}, ${when}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>We are sorry: ${show} on ${when} has been cancelled, so booking <strong>${reference}</strong>
+will not go ahead.</p>
+${why ? `<p>${why}</p>\n` : ''}<p>${next}</p>`),
+      text: `Hello ${context.name},
+
+We are sorry: ${show} on ${when} has been cancelled, so booking ${reference} will not go ahead.
+${why ? `\n${why}\n` : ''}
+${next}
 
 The Nottingham New Theatre`,
     }

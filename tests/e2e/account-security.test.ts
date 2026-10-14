@@ -115,7 +115,7 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
       await click(view, '[data-test="begin"]')
       await waitFor(view, 'document.querySelector(\'[data-test="mfa-secret"]\')')
 
-      expect(await textOf(view, '[data-test="mfa-secret"]')).toMatch(/[A-Z2-7]{16,}/)
+      expect(await textOf(view, '[data-test="mfa-secret"]')).toMatch(/^([A-Z2-7]{4} ){3,}[A-Z2-7]{1,4}$/)
       expect(await view.evaluate<string>('document.querySelector(\'[data-test="mfa-qr"]\').src')).toContain('image/svg+xml')
 
       await fillPin(view, CONFIRM, await codeForStep(secretFor(email), stepFor(new Date())))

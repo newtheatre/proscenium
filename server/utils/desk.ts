@@ -39,6 +39,22 @@ export async function performancesForNight(night: string): Promise<DeskPerforman
   return db.all<DeskPerformance>(performancesForNightQuery(night))
 }
 
+// The nearest night either side with a performance on it, so the arrows never land on an empty one.
+export function neighbouringNightsQuery(night: string): SQL {
+  return sql`
+    SELECT
+      (SELECT max(date(p.starts_at, 'unixepoch', '-4 hours')) FROM performances p
+        WHERE date(p.starts_at, 'unixepoch', '-4 hours') < ${night}) AS previousNight,
+      (SELECT min(date(p.starts_at, 'unixepoch', '-4 hours')) FROM performances p
+        WHERE date(p.starts_at, 'unixepoch', '-4 hours') > ${night}) AS nextNight
+  `
+}
+
+export async function neighbouringNights(night: string): Promise<{ previousNight: string | null, nextNight: string | null }> {
+  const [row] = await db.all<{ previousNight: string | null, nextNight: string | null }>(neighbouringNightsQuery(night))
+  return { previousNight: row?.previousNight ?? null, nextNight: row?.nextNight ?? null }
+}
+
 // A typed percent sign is a character somebody is looking for, not a wildcard, matching the
 // admin listings' own escaping (server/utils/ticket-types.ts).
 const contains = (term: string): string => `%${term.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
@@ -47,7 +63,7 @@ export interface DeskSearchRow {
   id: string
   reference: string
   status: string
-  bookerName: string
+  bookerName: string | null
   totalPence: number
   // With the total, tells a pass booking, which owes nothing, from an unpaid one (issue 1390).
   holdExpiresAt: number | null
@@ -113,6 +129,10 @@ export interface DeskTicketLine {
   accessKind: TicketTypeAccessKind | null
 }
 
+export interface DeskRefundedTicket extends DeskTicketLine {
+  refundedAt: number
+}
+
 export interface DeskReservationDetail {
   id: string
   reference: string
@@ -124,9 +144,11 @@ export interface DeskReservationDetail {
   performanceId: string
   showTitle: string
   startsAt: number
-  bookerName: string
-  bookerEmail: string
+  bookerName: string | null
+  bookerEmail: string | null
   tickets: DeskTicketLine[]
+  // Shown struck through, never owed: the routes read `tickets` alone (D-116 criterion 5).
+  refundedTickets: DeskRefundedTicket[]
   // The booking and nothing more: null unless it holds an access or companion ticket, whatever
   // else the booker's own profile carries (D-127 criterion 3, D-128 criterion 4).
   doorWording: string | null
@@ -158,6 +180,17 @@ export function deskTicketsQuery(reservationId: string): SQL {
     JOIN ticket_types tt ON tt.id = t.ticket_type_id
     WHERE t.reservation_id = ${reservationId} AND t.refunded_at IS NULL
     ORDER BY t.id
+  `
+}
+
+export function deskRefundedTicketsQuery(reservationId: string): SQL {
+  return sql`
+    SELECT t.id AS ticketId, tt.name AS ticketTypeName, t.price_paid AS pricePaid, tt.access_kind AS accessKind,
+           t.refunded_at AS refundedAt
+    FROM tickets t
+    JOIN ticket_types tt ON tt.id = t.ticket_type_id
+    WHERE t.reservation_id = ${reservationId} AND t.refunded_at IS NOT NULL
+    ORDER BY t.refunded_at, t.id
   `
 }
 
@@ -228,9 +261,10 @@ export async function deskReservationByReference(reference: string): Promise<Des
 }
 
 export async function deskReservation(id: string): Promise<DeskReservationDetail | undefined> {
-  const [row] = await db.all<Omit<DeskReservationDetail, 'tickets' | 'doorWording' | 'compRequest'> & { bookerUserId: string }>(deskReservationQuery(id))
+  const [row] = await db.all<Omit<DeskReservationDetail, 'tickets' | 'refundedTickets' | 'doorWording' | 'compRequest'> & { bookerUserId: string | null }>(deskReservationQuery(id))
   if (!row) return undefined
   const tickets = await db.all<DeskTicketLine>(deskTicketsQuery(id))
+  const refundedTickets = await db.all<DeskRefundedTicket>(deskRefundedTicketsQuery(id))
   const { bookerUserId, ...detail } = row
   const holdsAccessTicket = tickets.some(ticket => ticket.accessKind !== null)
   const expiryMinutes = await configValue(undefined, 'COMP_REQUEST_EXPIRY_MINUTES')
@@ -238,7 +272,8 @@ export async function deskReservation(id: string): Promise<DeskReservationDetail
   return {
     ...detail,
     tickets,
-    doorWording: holdsAccessTicket ? await doorWordingFor(bookerUserId) : null,
+    refundedTickets,
+    doorWording: holdsAccessTicket && bookerUserId ? await doorWordingFor(bookerUserId) : null,
     compRequest: compRequest ?? null,
   }
 }

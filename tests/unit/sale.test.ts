@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { MAX_BASKET_LINES, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, saysNoChoice, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
+import { EXISTING_ACCOUNT_SAYS, MAX_BASKET_LINES, saysTillParty, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, sameBookerName, saysNoChoice, saysPouredLine, saysPouredLines, walkUpGuestForm } from '#shared/utils/sale'
 import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
@@ -231,5 +231,45 @@ describe('an optional choice\'s answer of none (F-112 criterion 2)', () => {
   test('it reads as no mixer, in the choice\'s own words', () => {
     expect(saysNoChoice({ name: 'Mixer' })).toBe('No mixer')
     expect(saysNoChoice({ name: 'Mixers' })).toBe('No mixers')
+  })
+})
+
+describe('a booking found at the till says who and how many in the desk\'s terms', () => {
+  test('a named party says its first name and its size', () => {
+    expect(saysTillParty({ bookerFirstName: 'Ada', partySize: 2 })).toBe('Ada · party of 2')
+  })
+
+  test('a nameless walk-up says so', () => {
+    expect(saysTillParty({ bookerFirstName: null, partySize: 1 })).toBe('Walk-up · party of 1')
+  })
+
+  test('a lapsed or cancelled booking holds no seats, never a "party of 0"', () => {
+    expect(saysTillParty({ bookerFirstName: 'Ada', partySize: 0 })).toBe('Ada · no seats held')
+  })
+})
+
+// 0123: a walk-up's email finds the account it belongs to, and the desk is told when that
+// account is in somebody else's name rather than filing a stranger's booking under it.
+describe('a walk-up booker is the same person when the names agree', () => {
+  test('case, stray spaces and inner runs of spaces do not make a different person', () => {
+    expect(sameBookerName('Ada  Kowalski', ' ada kowalski ')).toBe(true)
+  })
+
+  test('a different name is a different person until the desk says otherwise', () => {
+    expect(sameBookerName('Ada Kowalski', 'Ben Okafor')).toBe(false)
+  })
+
+  test('an account with no name on it never matches a typed one', () => {
+    expect(sameBookerName(null, 'Ada Kowalski')).toBe(false)
+  })
+
+  test('the guest form carries the desk\'s say-so, off unless sent', () => {
+    expect(walkUpGuestForm.parse({ name: 'Ada', email: 'ada@example.com' }).existingAccount).toBe(false)
+    expect(walkUpGuestForm.parse({ name: 'Ada', email: 'ada@example.com', existingAccount: true }).existingAccount).toBe(true)
+  })
+
+  test('the refusal says what to check and what to do, and that nothing was charged', () => {
+    expect(EXISTING_ACCOUNT_SAYS).toContain('another name')
+    expect(EXISTING_ACCOUNT_SAYS).toContain('Nothing has been charged')
   })
 })

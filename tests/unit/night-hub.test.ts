@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, compApprovalLine, doorStripLine, doorStripNumbers, firstNameOf, groupedBoardCode, hubHouseAfter, hubHouseRefused, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, compApprovalLine, doorStripLine, doorStripNumbers, firstNameOf, groupedBoardCode, hubHouseAfter, hubHouseRefused, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysRunningTime, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
 
 // The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
@@ -189,11 +189,19 @@ describe('pass pressure answers the door, not a statistician (E-112 criterion 1)
 
 describe('the running time line (E-112 criterion 1, issue 905)', () => {
   test('hours, minutes and the interval in one line', () => {
-    expect(runningTimeLine(130, 1, 20)).toBe('2h 10 · 1 interval of 20 minutes')
+    expect(runningTimeLine(130, 1, 20)).toBe('2 hours 10 minutes · 1 interval of 20 minutes')
   })
 
   test('no interval says straight through rather than nothing', () => {
-    expect(runningTimeLine(95, 0, null)).toBe('1h 35 · straight through')
+    expect(runningTimeLine(95, 0, null)).toBe('1 hour 35 minutes · straight through')
+  })
+
+  // The same words on the public page, the publish summary and the glance, so no two disagree.
+  test('a running time reads in hours and minutes, dropping whichever is nought', () => {
+    expect(saysRunningTime(100)).toBe('1 hour 40 minutes')
+    expect(saysRunningTime(120)).toBe('2 hours')
+    expect(saysRunningTime(45)).toBe('45 minutes')
+    expect(saysRunningTime(61)).toBe('1 hour 1 minute')
   })
 
   test('an unstated running time names what is missing, never a bare "Not yet stated"', () => {

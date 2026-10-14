@@ -10,6 +10,8 @@ import { normaliseEmail } from '#shared/utils/auth'
 import { HOLDING_STATUSES, capacityRefusal } from '#shared/utils/capacity'
 import { generateReservationReference, resolveHoldReleaseMinutes } from '#shared/utils/reservations'
 import { resolvePrice } from '#shared/utils/ticket-types'
+import { EXISTING_ACCOUNT_SAYS, sameBookerName } from '#shared/utils/sale'
+import type { WalkUpGuestInput } from '#shared/utils/sale'
 import type { TicketToWrite } from './capacity'
 import type { CapacityRefusal } from '#shared/utils/capacity'
 import type { ReservationSource, TicketTypeCount } from '#shared/utils/reservations'
@@ -189,6 +191,15 @@ export async function guestAccount(email: string, name: string): Promise<GuestAc
   // Lost the race: somebody else's checkout won between the read above and this insert.
   const winner = await findByEmail(email)
   return { id: winner!.id, created: false }
+}
+
+// An address already held in another name is never filed under silently (0123): the desk and the
+// till both ask this before a charge, and the booker's say-so is what lets it through.
+export async function walkUpBookerRefusal(guest: WalkUpGuestInput | null): Promise<string | null> {
+  if (guest === null || guest.existingAccount) return null
+  const existing = await findByEmail(guest.email)
+  if (!existing || sameBookerName(existing.name, guest.name)) return null
+  return EXISTING_ACCOUNT_SAYS
 }
 
 // Every ticket statement carries the identical capacity condition: all match or none does

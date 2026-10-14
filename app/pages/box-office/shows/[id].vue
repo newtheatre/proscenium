@@ -94,7 +94,8 @@ async function setPublished(published: boolean, refuse?: (message: string) => vo
   finally {
     saving.value = false
     publishing.value = false
-    await refresh()
+    // Publishing can put every performance on sale, so the performance list is read again too.
+    await Promise.all([refresh(), refreshNuxtData(`box-office-show-performances-${id.value}`)])
   }
 }
 

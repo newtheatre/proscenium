@@ -58,7 +58,8 @@ async function reload(): Promise<void> {
 interface FormState {
   name: string
   description?: string
-  price: number
+  // Pence; undefined while empty and NaN for text that is not a price, both refused on save (0125).
+  price: number | undefined
   accessKind: TicketTypeAccessKind | null
   restrictedTo: TicketTypeRestriction | null
   activeByDefault: boolean
@@ -70,14 +71,6 @@ const state = reactive<FormState>({
   accessKind: null,
   restrictedTo: null,
   activeByDefault: true,
-})
-
-// The field takes pounds and the request carries pence, converted here and nowhere else (0004).
-const pounds = computed({
-  get: () => state.price / 100,
-  set: (value: number) => {
-    state.price = Math.round((value ?? 0) * 100)
-  },
 })
 
 // A companion ticket is always free (D-128 criterion 3); the field is forced rather than left to
@@ -390,12 +383,9 @@ const columns: TableColumn<TicketType>[] = [
             required
             :description="state.accessKind === 'COMPANION' ? 'A companion ticket is always free.' : 'In pounds. A show or a performance can override it later.'"
           >
-            <UInputNumber
-              v-model="pounds"
-              :min="0"
-              :step="0.01"
+            <PoundsField
+              v-model="state.price"
               :disabled="state.accessKind === 'COMPANION'"
-              :format-options="{ style: 'currency', currency: 'GBP' }"
               class="w-full"
               data-test="ticket-type-price"
             />

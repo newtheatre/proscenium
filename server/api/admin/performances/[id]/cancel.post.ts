@@ -1,13 +1,15 @@
 import { formatLondon } from '#shared/utils/london'
+import { performanceCancelForm } from '#shared/utils/programme'
 import { COMMITTED_SHIFT_STATUSES, saysShiftRole } from '#shared/utils/rota'
 
-// Cancel a performance. This is the only way out for one that has sold seats, and the count it
-// returns is what the refund workflow (D-116) and the holder notification (D-107) will act on.
+// Cancel a performance: the only way out for one that has sold seats. Every holder is told, with the
+// officer's reason, and refunds stay in person at the desk (D-121 criterion 5, D-116 criterion 1).
 const ALREADY_CANCELLED = 'This performance is already cancelled'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'ticketing.write')
+  const { reason } = await readValidatedBodyOrThrow(event, performanceCancelForm)
 
   const held = await performanceById(id)
   if (!held) throw noSuch('performance')
@@ -17,6 +19,7 @@ export default defineEventHandler(async (event) => {
 
   // Read before the write, because the cancellation is what takes the status away.
   const active = await activeShifts(id)
+  const bookings = await db.all<{ reservationId: string, reference: string, userId: string, collected: number }>(cancelledPerformanceHoldersQuery(id))
   // An open slot has nobody to tell; a claimed one is owed the same word a confirmed one is,
   // because it is what the delete route's own refusal promises (E-102 criterion 4).
   const holders = active.filter(shift => COMMITTED_SHIFT_STATUSES.includes(shift.status) && shift.userId !== null)
@@ -32,6 +35,7 @@ export default defineEventHandler(async (event) => {
       // such table exists (D-121 criterion 5).
       ticketsOwedARefund: held.soldTickets,
       shiftsCancelled: active.length,
+      bookingsTold: bookings.length,
     },
   })
 
@@ -72,5 +76,33 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { ok: true, status: 'CANCELLED', ticketsOwedARefund: held.soldTickets, shiftsCancelled: active.length }
+  // The reason is the officer's free text, so it goes to the holders and never into the audit (0011).
+  for (const booking of bookings) {
+    const key = `reservation.performance-cancelled:${booking.reservationId}`
+    const took = await claimNotification({ userId: booking.userId, type: 'reservation.performance-cancelled', key })
+    if (!took) continue
+
+    await notify(event, {
+      userId: booking.userId,
+      type: 'reservation.performance-cancelled',
+      claim: key,
+      context: {
+        name: '',
+        reference: booking.reference,
+        show: held.showTitle,
+        when,
+        collected: booking.collected === 1,
+        reason,
+      },
+    })
+  }
+
+  return {
+    ok: true,
+    status: 'CANCELLED',
+    night: performanceNight(held.startsAt),
+    ticketsOwedARefund: held.soldTickets,
+    shiftsCancelled: active.length,
+    bookingsTold: bookings.length,
+  }
 })
