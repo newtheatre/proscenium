@@ -31,6 +31,10 @@ const { data: openData, status: openStatus, refresh: refreshOpen } = await useAs
   { default: (): { items: OpenItem[] } => ({ items: [] }) },
 )
 
+// Every severity ships routing nowhere, so a fresh install tells nobody about anything (E-116).
+const routesNowhere = computed(() => severityStatus.value === 'success' && severityData.value.severities.length > 0
+  && severityData.value.severities.every(row => !row.requiresFollowUp))
+
 const severities = computed(() => [...severityData.value.severities].sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity)))
 
 async function toggle(row: SeverityRow, requiresFollowUp: boolean): Promise<void> {
@@ -98,6 +102,7 @@ const severityColumns: TableColumn<SeverityRow>[] = [
       'modelValue': row.original.requiresFollowUp,
       'disabled': writes.value === false,
       'loading': saving.value === row.original.severity,
+      'aria-label': `${saysSeverity(row.original.severity)} routes to follow-up`,
       'data-test': `severity-toggle-${row.original.severity}`,
       'onUpdate:modelValue': (value: boolean) => toggle(row.original, value),
     }),
@@ -158,6 +163,16 @@ watch(modalOpen, (nowOpen) => {
     <p class="text-sm text-muted">
       Who hears about an incident, by how serious it is.
     </p>
+
+    <UAlert
+      v-if="routesNowhere"
+      data-test="routing-off"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-siren"
+      title="No severity routes to follow-up"
+      :description="`An incident logged at any severity, ${saysSeverity('SERIOUS').toLowerCase()} included, reaches nobody and joins no open list. Switch on the severities that need following up.`"
+    />
 
     <UCard data-test="severity-config">
       <template #header>

@@ -243,8 +243,8 @@ export function restampShiftTimesStatement(performanceId: string, defaults: Shif
   `
 }
 
-// Stamping. The slot ordinals come out of a recursive count, so this binds only what `scope` binds
-// (0006). An external venue stamps nothing, even from a template it held before (E-101 criterion 5).
+// Stamping tops each role up to its template count of live shifts, numbering past every slot the
+// role holds, cancelled ones included (0135). Binds only what `scope` binds (0006); never external.
 function stampStatement(scope: SQL, defaults: ShiftOffsets): SQL {
   return sql`
     WITH RECURSIVE slot(i) AS (
@@ -253,12 +253,14 @@ function stampStatement(scope: SQL, defaults: ShiftOffsets): SQL {
       SELECT i + 1 FROM slot WHERE i < (SELECT coalesce(max("count"), 0) FROM shift_templates)
     )
     INSERT INTO shifts (id, performance_id, role, slot, status, starts_at, ends_at)
-    SELECT lower(hex(randomblob(16))), p.id, t.role, slot.i, 'OPEN',
-           ${windowStart(defaults)}, ${windowEnd(defaults)}
+    SELECT lower(hex(randomblob(16))), p.id, t.role,
+           (SELECT coalesce(max(held.slot), 0) FROM shifts held WHERE held.performance_id = p.id AND held.role = t.role) + slot.i,
+           'OPEN', ${windowStart(defaults)}, ${windowEnd(defaults)}
     FROM performances p
     JOIN venues v ON v.id = p.venue_id AND v.is_external = 0
     JOIN shift_templates t ON t.venue_id = p.venue_id
-    JOIN slot ON slot.i <= t."count"
+    JOIN slot ON slot.i <= t."count" - (SELECT count(*) FROM shifts live
+      WHERE live.performance_id = p.id AND live.role = t.role AND live.status <> 'CANCELLED')
     WHERE p.status <> 'CANCELLED' AND (${scope})
     ON CONFLICT DO NOTHING
     RETURNING id

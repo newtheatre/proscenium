@@ -330,6 +330,36 @@ describe('the backfill is idempotent (E-102 criterion 2)', () => {
     })
   })
 
+  // 0135: a slot stood down by a venue move still holds its number, so a top-up numbers past it.
+  test('a role short of its template is topped up past a cancelled slot, once', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
+      database.batch([['UPDATE shifts SET status = ? WHERE performance_id = ? AND role = ? AND slot = 2', 'CANCELLED', tonight.performanceId, 'DOOR']])
+
+      const first = run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
+      const second = run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS))
+
+      expect(first.length).toBe(1)
+      expect(second.length).toBe(0)
+      const doors = shiftsOn(database, tonight.performanceId).filter(shift => shift.role === 'DOOR')
+      expect(doors.map(shift => `${shift.slot}:${shift.status}`)).toEqual(['1:OPEN', '2:CANCELLED', '3:OPEN'])
+    })
+  })
+
+  test('a slot added by hand beyond the template is not counted against it', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId)
+      run(database, stampPerformanceStatement(tonight.performanceId, OFFSETS))
+      run(database, addShiftStatement('shift-extra', { performanceId: tonight.performanceId, role: 'BAR', slot: 2 }, 'actor', OFFSETS, GATE))
+
+      expect(run(database, backfillVenueStatement(tonight.venueId, 0, OFFSETS)).length).toBe(0)
+      expect(shiftsOn(database, tonight.performanceId).length).toBe(5)
+    })
+  })
+
   test('the backfill leaves a night that has already started alone', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)
@@ -1635,9 +1665,9 @@ describe('saving a template stamps the future performances never stamped before 
     })
   })
 
-  // A performance moved here from another venue keeps only the cancelled shifts the move left, and
-  // the board shows it as nobody rostered, so the save reaches it (issue 1319).
-  test('a performance holding only cancelled shifts is stamped, around the slot a cancelled row still holds', async () => {
+  // A performance moved here keeps only the cancelled shifts the move left, so the save reaches it
+  // (issue 1319), and the Bar it asks for is numbered past the cancelled row (0135).
+  test('a performance holding only cancelled shifts is stamped, past the slot a cancelled row still holds', async () => {
     await withDatabase(async (database) => {
       testVenue(database, { suffix: 'a' })
       const moved = tonightsPerformance(database, { suffix: 'moved', night: daysAfter(currentShowNight(), 3), venueId: 'venue-a' })
@@ -1647,7 +1677,7 @@ describe('saving a template stamps the future performances never stamped before 
       run(database, stampUnstampedStatement('venue-a', fromTonight(), OFFSETS))
 
       expect(shiftsOn(database, moved.performanceId).map(one => `${one.role}:${one.slot}:${one.status}`)).toEqual([
-        'BAR:1:CANCELLED', 'DOOR:1:OPEN', 'DOOR:2:OPEN', 'DUTY_MANAGER:1:OPEN',
+        'BAR:1:CANCELLED', 'BAR:2:OPEN', 'DOOR:1:OPEN', 'DOOR:2:OPEN', 'DUTY_MANAGER:1:OPEN',
       ])
     })
   })

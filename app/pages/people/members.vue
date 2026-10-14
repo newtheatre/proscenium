@@ -3,7 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { can, manageMembers } from '#shared/utils/abilities'
 import { recordMembership } from '#shared/utils/admin-forms'
 import { saysDay } from '#shared/utils/when'
-import { MEMBERSHIP_TERMS, daysAfter, isInGrace, londonDay } from '#shared/utils/membership'
+import { MEMBERSHIP_TERMS, daysAfter, isInGrace, londonDay, saysMembershipSource } from '#shared/utils/membership'
 import { claimDeclineForm } from '#shared/utils/membership-claims'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
@@ -268,7 +268,7 @@ const columns: TableColumn<Member>[] = [
       h('div', { class: 'font-mono text-xs text-muted' }, row.original.studentId ?? row.original.email),
       // Below sm the start day and the source are hidden: shown here instead, so a phone keeps
       // the end date and whether it is checked in view (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `From ${saysDay(row.original.startsOn)}, ${row.original.source}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `From ${saysDay(row.original.startsOn)}, ${saysMembershipSource(row.original.source)}`),
     ]),
   },
   {
@@ -287,7 +287,7 @@ const columns: TableColumn<Member>[] = [
         : null,
     ]),
   },
-  { accessorKey: 'source', header: 'Source', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
+  { id: 'source', header: 'Source', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } }, cell: ({ row }) => saysMembershipSource(row.original.source) },
   {
     id: 'confirmed',
     header: 'Checked',

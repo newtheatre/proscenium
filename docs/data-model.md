@@ -1309,8 +1309,9 @@ CHECK `shifts_open_names_nobody`: OPEN implies `user_id` NULL, `CLAIMED|CONFIRME
 implies NOT NULL, and CANCELLED says neither, because it keeps whoever held it and held
 nobody when it was open. Partial UNIQUE (`performance_id`) WHERE role='DUTY_MANAGER' AND
 status='CONFIRMED', which is per performance: two performances running at once need two
-confirmed duty managers. UNIQUE (`performance_id`, `role`, `slot`) is what makes stamping
-idempotent (E-102 criterion 2). Claims are conditional writes gated live on training records
+confirmed duty managers. UNIQUE (`performance_id`, `role`, `slot`) is what makes racing stamps
+idempotent (E-102 criterion 2); a stamp numbers a top-up past every slot the role holds, a
+cancelled one included (0135). Claims are conditional writes gated live on training records
 (E-1), and the same UPDATE's `NOT EXISTS` refuses a second shift on one performance for the
 same member (E-104). `SHIFT_CLAIM_AUTO_CONFIRM` decides whether a claim writes `CONFIRMED` or
 the queued `CLAIMED`; a queued claim is answered on the rota board's waiting filter

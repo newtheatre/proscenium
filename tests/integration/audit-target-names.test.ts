@@ -82,6 +82,40 @@ describe('a subject reads as its own name', () => {
     })
   })
 
+  // The review of 13 October 2026 found `booking:<id>` and its kind in the Subject column.
+  test('a room booking, a closure, a training request, a shift and a session', async () => {
+    await withDatabase((database) => {
+      const tonight = tonightsPerformance(database)
+      database.batch([
+        ['INSERT INTO users (id, email, name) VALUES (?, ?, ?)', 'u-1', 'u-1@example.invalid', 'Member One'],
+        ['INSERT INTO rooms (id, name) VALUES (?, ?)', 'r-1', 'Rehearsal Room'],
+        ['INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at) VALUES (?, ?, ?, ?, ?, ?)', 'b-1', 'r-1', 'u-1', 'Their own words', 1_790_000_000, 1_790_003_600],
+        ['INSERT INTO room_blackouts (id, room_id, reason, starts_at, ends_at) VALUES (?, ?, ?, ?, ?)', 'x-1', 'r-1', 'Fire alarm test', 1_790_100_000, 1_790_103_600],
+        ['INSERT INTO room_blackouts (id, room_id, reason, starts_at, ends_at) VALUES (?, ?, ?, ?, ?)', 'x-all', null, 'Building closed', 1_790_200_000, 1_790_203_600],
+        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'LX', 'Lighting'],
+        ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'm-1', 'LX', 'MODULE', 'Working at height'],
+        ['INSERT INTO module_requests (id, user_id, module_id) VALUES (?, ?, ?)', 'q-1', 'u-1', 'm-1'],
+        ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'sh-1', tonight.performanceId, 'DOOR', 1, 'OPEN'],
+        ['INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, trainer_id) VALUES (?, ?, ?, ?, ?, ?)', 'ts-1', '2026-11-02', '19:00', '21:00', 10, 'u-1'],
+        ['INSERT INTO session_modules (id, session_id, module_id) VALUES (?, ?, ?)', 'sm-1', 'ts-1', 'm-1'],
+      ])
+      entry(database, 'e-booking', 'booking:b-1')
+      entry(database, 'e-blackout', 'blackout:x-1')
+      entry(database, 'e-blackout-all', 'blackout:x-all')
+      entry(database, 'e-request', 'request:q-1')
+      entry(database, 'e-shift', 'shift:sh-1')
+      entry(database, 'e-session', 'session:ts-1')
+
+      // A booking's title is the member's own words, so the room names it and the time tells it apart.
+      expect(named(database, 'e-booking')).toEqual({ name: 'Rehearsal Room', at: 1_790_000_000, night: null })
+      expect(named(database, 'e-blackout')).toEqual({ name: 'Rehearsal Room', at: 1_790_100_000, night: null })
+      expect(named(database, 'e-blackout-all').name).toBe('Every room')
+      expect(named(database, 'e-request').name).toBe('Working at height')
+      expect(named(database, 'e-shift')).toEqual({ name: 'A Test Show', at: tonight.startsAt, night: null })
+      expect(named(database, 'e-session')).toEqual({ name: 'Working at height', at: null, night: '2026-11-02' })
+    })
+  })
+
   test('an erased person reads as their tombstone, never their old name', async () => {
     await withDatabase((database) => {
       database.batch([['INSERT INTO users (id, email, name) VALUES (?, ?, ?)', 'u-gone', 'u-gone@example.invalid', 'Somebody Real']])

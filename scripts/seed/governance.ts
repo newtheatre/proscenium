@@ -109,12 +109,12 @@ function seedAudit(target: SeedTarget, people: People, now: number): number {
 // Read and unread, because an inbox that is entirely one or the other never shows its own count.
 function seedInbox(target: SeedTarget, people: People, now: number): number {
   const rows: { person: string, slug: string, type: string, title: string, body: string, link: string, read: boolean, hoursAgo: number }[] = [
-    { person: 'rowan', slug: 'shift-reminder', type: 'SHIFT_REMINDER', title: 'You are duty manager tonight', body: 'Doors at 19:00, curtain at 19:30.', link: '/tonight', read: false, hoursAgo: 6 },
-    { person: 'rowan', slug: 'booking', type: 'RESERVATION_CONFIRMED', title: 'Your booking is confirmed', body: 'Two standard tickets for The Seagull.', link: '/my/bookings', read: true, hoursAgo: 72 },
-    { person: 'priya', slug: 'shift-open', type: 'SHIFT_OPEN', title: 'A door shift is open next week', body: 'The Seagull, next Thursday.', link: '/rota', read: false, hoursAgo: 20 },
-    { person: 'tomasz', slug: 'training-expiry', type: 'TRAINING_EXPIRING', title: 'Your safety brief has expired', body: 'You cannot take a shift until it is renewed.', link: '/training', read: false, hoursAgo: 30 * 24 },
-    { person: 'devon', slug: 'comp-decided', type: 'COMP_DECIDED', title: 'Your comp request was approved', body: 'Two cans of lager, approved by the duty manager.', link: '/tonight/till', read: true, hoursAgo: 1 },
-    { person: 'mira', slug: 'room-approved', type: 'ROOM_DECIDED', title: 'Your room request needs a decision', body: 'Auditions, spring slot: still waiting on the theatre manager.', link: '/rooms', read: false, hoursAgo: 48 },
+    { person: 'rowan', slug: 'shift-reminder', type: 'shift.reminder', title: 'You are duty manager tonight', body: 'Doors at 19:00, curtain at 19:30.', link: '/tonight', read: false, hoursAgo: 6 },
+    { person: 'rowan', slug: 'booking', type: 'reservation.confirmed', title: 'Your booking is confirmed', body: 'Two standard tickets for The Seagull.', link: '/my/bookings', read: true, hoursAgo: 72 },
+    { person: 'priya', slug: 'shift-open', type: 'shift.released', title: 'A door shift is open next week', body: 'The Seagull, next Thursday.', link: '/rota', read: false, hoursAgo: 20 },
+    { person: 'tomasz', slug: 'training-expiry', type: 'training.expiry.final', title: 'Your safety brief has expired', body: 'You cannot take a shift until it is renewed.', link: '/training', read: false, hoursAgo: 30 * 24 },
+    { person: 'devon', slug: 'announcement', type: 'admin.announcement', title: 'Get-in on Sunday', body: 'All hands from 10:00 to build the set for The Winter\'s Tale.', link: '/my/notifications', read: true, hoursAgo: 1 },
+    { person: 'mira', slug: 'room-approved', type: 'room.request.waiting', title: 'Your room request needs a decision', body: 'Auditions, spring slot: still waiting on the theatre manager.', link: '/rooms', read: false, hoursAgo: 48 },
   ]
 
   target.batch(rows.map(row => insert('inbox_items', {
@@ -134,12 +134,12 @@ function seedInbox(target: SeedTarget, people: People, now: number): number {
 // Every status the log records, including the two a retry screen is about (H-105).
 function seedNotifications(target: SeedTarget, people: People, now: number): number {
   const rows: { person: string, slug: string, type: string, channel: string, subject: string, status: string, hoursAgo: number, error?: string }[] = [
-    { person: 'rowan', slug: 'sent-email', type: 'SHIFT_REMINDER', channel: 'EMAIL', subject: 'You are duty manager tonight', status: 'SENT', hoursAgo: 6 },
-    { person: 'rowan', slug: 'sent-inbox', type: 'SHIFT_REMINDER', channel: 'INBOX', subject: 'You are duty manager tonight', status: 'SENT', hoursAgo: 6 },
-    { person: 'priya', slug: 'pending', type: 'SHIFT_OPEN', channel: 'EMAIL', subject: 'A door shift is open next week', status: 'PENDING', hoursAgo: 0 },
-    { person: 'tomasz', slug: 'retrying', type: 'TRAINING_EXPIRING', channel: 'EMAIL', subject: 'Your safety brief has expired', status: 'RETRYING', hoursAgo: 2, error: 'Upstream returned 502; the third attempt is queued.' },
-    { person: 'mira', slug: 'failed', type: 'ROOM_DECIDED', channel: 'EMAIL', subject: 'Your room request needs a decision', status: 'FAILED', hoursAgo: 48, error: 'Mailbox unavailable after four attempts.' },
-    { person: 'checkout-guest', slug: 'skipped', type: 'RESERVATION_CONFIRMED', channel: 'PUSH', subject: 'Your booking is confirmed', status: 'SKIPPED_UNDELIVERABLE', hoursAgo: 10, error: 'No push subscription for this account.' },
+    { person: 'rowan', slug: 'sent-email', type: 'shift.reminder', channel: 'EMAIL', subject: 'You are duty manager tonight', status: 'SENT', hoursAgo: 6 },
+    { person: 'rowan', slug: 'sent-inbox', type: 'shift.reminder', channel: 'INBOX', subject: 'You are duty manager tonight', status: 'SENT', hoursAgo: 6 },
+    { person: 'priya', slug: 'pending', type: 'shift.released', channel: 'EMAIL', subject: 'A door shift is open next week', status: 'PENDING', hoursAgo: 0 },
+    { person: 'tomasz', slug: 'retrying', type: 'training.expiry.final', channel: 'EMAIL', subject: 'Your safety brief has expired', status: 'RETRYING', hoursAgo: 2, error: 'Upstream returned 502; the third attempt is queued.' },
+    { person: 'mira', slug: 'failed', type: 'room.request.waiting', channel: 'EMAIL', subject: 'Your room request needs a decision', status: 'FAILED', hoursAgo: 48, error: 'Mailbox unavailable after four attempts.' },
+    { person: 'checkout-guest', slug: 'skipped', type: 'reservation.confirmed', channel: 'PUSH', subject: 'Your booking is confirmed', status: 'SKIPPED_UNDELIVERABLE', hoursAgo: 10, error: 'No push subscription for this account.' },
   ]
 
   target.batch(rows.map(row => insert('notification_log', {

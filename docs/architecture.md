@@ -1143,7 +1143,7 @@ shift per slot on a performance. `shift_templates` and `shifts` are in `docs/dat
 | --- | --- |
 | `templateRefusal(slots)` | Why a template may not be saved, or null. A venue template names each role once and holds exactly one duty manager, which correlates rows and so cannot be a CHECK (E-101 criterion 1). |
 | `stampPerformanceStatement(performanceId)` | The stamp for one performance, batched with the INSERT that creates it, so a performance can never exist staffed by nothing (E-102 criterion 1). |
-| `backfillVenueStatement(venueId, from)` | The same stamp over every performance at a venue from a given instant. `ON CONFLICT DO NOTHING` against the slot uniqueness makes a second run a no-op (E-102 criterion 2). |
+| `backfillVenueStatement(venueId, from)` | The same stamp over every performance at a venue from a given instant. Each role is topped up to its template count of live (uncancelled) shifts, numbered past the highest slot the role already holds, cancelled ones included (0135); a second run finds nothing short and is a no-op, and `ON CONFLICT DO NOTHING` against the slot uniqueness settles two racing stamps (E-102 criterion 2). |
 | `stampUnstampedStatement(venueId, from)` | The same stamp over only the performances at a venue from a given instant that hold no live (uncancelled) shift, batched with a template save, so a venue's first template reaches the diary already there and a rota already stamped is untouched (E-101 criterion 3, issue 1319). |
 | `unstaffedPerformancesQuery(from, to)` | The seven-day digest's rows: an open or declined shift, a duty manager unconfirmed or holding no live committee role at `from` (0115), or no shifts at a venue we run. An external night with no shifts is left out, since it is staffed by hand (E-108, issue 1319). |
 | `cancelShiftsStatement(performanceId)` | Cancels a performance's shifts, batched with the cancellation itself (E-102 criterion 4). |
@@ -1679,6 +1679,12 @@ takes a half-open `[from, to)` range in epoch seconds (`startOfLondonDay()` on e
 left-joins `performances`/`venues` so a bar-only check with no performance still appears, with
 its venue name null rather than dropped; every superseded entry and its correction both appear,
 linked by `supersedesId`/`supersededBy`, nothing filtered out (criteria 1, 2).
+
+`GET /api/admin/age-checks?from&to&page&pageSize`, on the same permission, is the screen's read of
+the same rows (0136): `registerPageQuery()` shares `exportQuery()`'s row, newest first and paged in
+SQL, with `registerCountQuery()` for the envelope's total. Reading is not audited; an export is. A
+row with no performance names its venue through `ageCheckVenue()`, "Bar (no performance)", in the
+CSV as well as on the PDF and the screen.
 
 CSV goes through `toCsv()`/`csvField()` (`server/utils/csv.ts`), the codebase's one
 formula-injection guard (D-129), not `admin/audit/export.get.ts`'s own older, unguarded `cell()`

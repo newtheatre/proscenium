@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
 import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
-import { SHIFT_ROLES, saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
+import { SHIFT_ROLES, saysShiftRole, saysShiftStatus, saysStamped } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { BoardEntry } from '#shared/utils/rota-board'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
@@ -112,8 +112,8 @@ const toneClass = { success: 'text-success', warning: 'text-warning', neutral: '
 async function addMissing(entry: RosterPerformance): Promise<void> {
   failure.value = null
   try {
-    const answer = await $fetch<{ stamped: number }>(`/api/admin/rota/templates/${entry.venueId}/stamp`, { method: 'POST' })
-    toast.add({ title: `${plural(answer.stamped, 'shift')} added`, icon: 'i-lucide-check', color: 'success' })
+    const answer = await $fetch<{ stamped: number, filled: number }>(`/api/admin/rota/templates/${entry.venueId}/stamp`, { method: 'POST' })
+    toast.add({ ...saysStamped(answer), icon: 'i-lucide-check', color: 'success' })
     await refresh()
   }
   catch (error) {
@@ -285,6 +285,14 @@ watch(modalOpen, (nowOpen) => {
       :searchable="false"
       @clear="clearFilters"
     >
+      <template #actions>
+        <p
+          class="text-sm text-muted"
+          data-test="board-span"
+        >
+          {{ waiting ? 'Every claim waiting, from tonight on' : `${saysDay(window.from)} to ${saysDay(window.to)}` }}
+        </p>
+      </template>
       <template #filters>
         <UCheckbox
           v-model="waiting"
