@@ -81,7 +81,8 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
     try {
       await signInAsBoxOffice(view)
       await view.navigate(`${app.baseURL}/box-office/shows`)
-      await waitFor(view, 'document.querySelector(\'main\')')
+      // The console shell renders no main of its own, so the list itself is what arrives.
+      await waitFor(view, 'document.querySelector(\'[data-test="shows-table"]\')')
       expect(await hasNoHorizontalOverflow(view)).toBe(true)
     }
     finally {
@@ -152,7 +153,8 @@ describe.skipIf(skip !== null)('console list tables fit a phone width (922)', ()
     try {
       await signInAsBoxOffice(view)
       await view.navigate(`${app.baseURL}/box-office/shows`)
-      await waitFor(view, 'document.querySelector(\'main\')')
+      // The console shell renders no main of its own, so the list itself is what arrives.
+      await waitFor(view, 'document.querySelector(\'[data-test="shows-table"]\')')
       const display = await view.evaluate<string | null>(
         '(() => { const t = document.querySelector(\'[data-test="shows-table"]\'); return t ? getComputedStyle(t).display : null })()',
       )
