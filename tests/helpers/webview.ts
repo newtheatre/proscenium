@@ -365,6 +365,18 @@ export async function fillNumber(view: Bun.WebView, selector: string, value: str
   })()`)
 }
 
+// Types into a number input and stays in it, for a test that commits with Enter: input alone,
+// since a change event puts the old text back a frame later and Enter would then commit nothing.
+export async function typeNumber(view: Bun.WebView, selector: string, value: string): Promise<void> {
+  await waitFor(view, `document.querySelector(${JSON.stringify(selector)})`)
+  await view.evaluate(`(() => {
+    const field = document.querySelector(${JSON.stringify(selector)})
+    field.focus()
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, ${JSON.stringify(value)})
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })()`)
+}
+
 // PinInput is one input per digit, so a six-digit code is six fills and not one.
 export async function fillPin(view: Bun.WebView, selector: string, code: string): Promise<void> {
   await waitFor(view, `document.querySelectorAll(${JSON.stringify(selector)}).length >= ${code.length}`)

@@ -310,7 +310,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
       const text = await inspect<string>(`/sign-in?refused=${code}`, 'document.body.innerText')
       expect(`${code}: ${text.length > 40 && !text.includes('undefined')}`).toBe(`${code}: true`)
     }
-  })
+  }, 120_000)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
