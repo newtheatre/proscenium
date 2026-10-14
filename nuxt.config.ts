@@ -222,7 +222,9 @@ export default defineNuxtConfig({
     // The end-to-end suite points this at a throwaway directory so a run cannot depend on, or
     // disturb, whatever is in a developer's local database.
     dir: HUB_DIR,
-    db: 'sqlite',
+    // Local libsql only: with no busy timeout a write meeting another writer fails at once, and
+    // libsql leaves that statement live, so every later commit on the connection is refused.
+    db: process.env.NODE_ENV === 'production' ? 'sqlite' : { dialect: 'sqlite', connection: { timeout: 10_000 } },
     kv: false,
     cache: false,
     // The Cloudflare preset would take the R2 driver everywhere, and `nuxt dev` has no binding to
