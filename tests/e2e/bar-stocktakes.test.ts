@@ -6,7 +6,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
-import { NIGHT_TARGETS, click, fill, fillNumber, openSignedOutView, shortOfFloor, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { NIGHT_TARGETS, click, fill, fillNumber, openSignedOutView, shortOfFloor, signInView, skipReason, startApp, textOf, typeNumber, visit, waitFor } from '#tests/helpers/webview'
 import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX } from '#shared/utils/night-shell'
 import type { AppUnderTest, NightTarget } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -607,8 +607,7 @@ describe.skipIf(skip !== null)('the screen counts on the floor (F-115 criterion 
       const [, typedInto, expectedNext] = beforeTyping
 
       // Typed and entered without leaving the field: a blur would commit it and drop the row first.
-      await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').focus()`)
-      await fill(view, `[data-test="${typedInto}"]`, '3')
+      await typeNumber(view, `[data-test="${typedInto}"]`, '3')
       await view.evaluate(`document.querySelector('[data-test="${typedInto}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
       await waitFor(view, `document.activeElement?.getAttribute('data-test') === '${expectedNext}'`)
     }
@@ -769,8 +768,7 @@ describe.skipIf(skip !== null)('the count is taken on a phone, shelf by shelf (i
     try {
       await visit(screen, `${app.baseURL}/bar/stock/stocktakes/${opened.stocktake.id}`, `[data-test="counted-${item.id}"]`)
       await click(screen, '[data-test="uncounted-only-filter"]')
-      await screen.evaluate(`document.querySelector('[data-test="counted-${item.id}"]').focus()`)
-      await fill(screen, `[data-test="counted-${item.id}"]`, '3')
+      await typeNumber(screen, `[data-test="counted-${item.id}"]`, '3')
       await screen.evaluate(`document.querySelector('[data-test="counted-${item.id}"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`)
       await waitFor(screen, `document.activeElement?.getAttribute('data-test') === 'counted-part-${item.id}'`)
 

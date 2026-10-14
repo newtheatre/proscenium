@@ -13,6 +13,7 @@ function night(availability: Availability, cancelled = false): ListedPerformance
     intervalCount: 0,
     intervalMinutes: null,
     venueName: 'Main Hall',
+    venueAddress: null,
     externalBookingUrl: null,
     bookingClosesAt: 0,
     cancelled,

@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
-const body = z.object({ token: z.string().min(20).max(200) })
+// A mangled link says so in house words, as /verify does; a validator's never reaches the page.
+const INCOMPLETE = 'That link is incomplete. Ask for a new one.'
+const body = z.object({ token: z.string(INCOMPLETE).min(20, INCOMPLETE).max(200, INCOMPLETE) })
 
 // Sign in with a link from a mailbox.
 export default defineEventHandler(async (event) => {

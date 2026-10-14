@@ -2,7 +2,7 @@
 import { saysNoSuch } from '#shared/utils/no-such'
 import { groupContentWarnings, saysAssessment } from '#shared/utils/content-warnings'
 import { saysClock, saysDay, saysWhenLong } from '#shared/utils/when'
-import { SAYS_BOOKING_HOLDS, SAYS_PAYMENT, TO_BE_CONFIRMED, saysLatecomerPolicy } from '#shared/utils/programme'
+import { SAYS_BOOKING_HOLDS, SAYS_PAYMENT, TO_BE_CONFIRMED, saysHowToPay, saysLatecomers } from '#shared/utils/programme'
 import { pounds, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
 import { DEFAULT_OG_IMAGE, SITE_ADDRESS } from '#shared/utils/seo'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
@@ -48,7 +48,7 @@ useSchemaOrg(computed(() => (data.value?.performances ?? []).map(performance => 
   'endDate': performance.durationMinutes !== null ? iso(performance.startsAt + performance.durationMinutes * 60) : undefined,
   'eventStatus': performance.cancelled ? 'EventCancelled' : 'EventScheduled',
   'eventAttendanceMode': 'OfflineEventAttendanceMode',
-  'location': { '@type': 'Place', 'name': performance.venueName, 'address': SITE_ADDRESS },
+  'location': { '@type': 'Place', 'name': performance.venueName, 'address': performance.venueAddress ?? SITE_ADDRESS },
   'organizer': { '@id': '#identity' },
   'offers': performance.prices.map(price => ({
     '@type': 'Offer',
@@ -86,6 +86,19 @@ const onOffer = computed(() => (data.value?.performances ?? []).filter(one => !o
 // Where the hero's one call to action points: the first night still bookable from this site.
 const bookable = computed(() => onOffer.value.find(one =>
   !one.externalBookingUrl && (one.availability === 'AVAILABLE' || one.availability === 'LIMITED')) ?? null)
+
+// A run sold only elsewhere still has one call to action: the first night's external link (D-122).
+const elsewhere = computed(() => (bookable.value ? null : onOffer.value.find(one => one.externalBookingUrl) ?? null))
+
+const payment = computed(() => saysHowToPay(data.value?.performances ?? []))
+const soldHere = computed(() => payment.value === SAYS_PAYMENT)
+
+// Where the run plays, address included, so the page answers "where do I go" (0122).
+const places = computed(() => {
+  const seen = new Map<string, string | null>()
+  for (const one of onOffer.value) if (!seen.has(one.venueName)) seen.set(one.venueName, one.venueAddress)
+  return [...seen.entries()].map(([name, address]) => ({ name, address }))
+})
 
 const runs = computed(() => {
   const times = onOffer.value.map(one => one.startsAt).sort((a, b) => a - b)
@@ -218,6 +231,18 @@ function saysInterval(performance: ListedPerformance): string {
               Book tickets
             </UButton>
             <UButton
+              v-else-if="elsewhere"
+              variant="marquee"
+              size="lg"
+              :to="elsewhere.externalBookingUrl!"
+              target="_blank"
+              rel="noopener"
+              trailing-icon="i-lucide-external-link"
+              data-test="show-book-elsewhere"
+            >
+              Book tickets elsewhere
+            </UButton>
+            <UButton
               v-else
               variant="poster"
               size="lg"
@@ -255,8 +280,25 @@ function saysInterval(performance: ListedPerformance): string {
           class="mt-4 text-sm text-muted"
           data-test="show-practical"
         >
-          {{ shape ? saysInterval(shape) : TO_BE_CONFIRMED }}. {{ saysLatecomerPolicy(show.latecomerPolicy) }}
+          {{ shape ? saysInterval(shape) : 'Interval to be confirmed' }}. {{ saysLatecomers(show.latecomerPolicy) }}.
         </p>
+
+        <div
+          v-if="places.length"
+          class="mt-6"
+          data-test="show-where"
+        >
+          <h3 class="font-semibold">
+            Where
+          </h3>
+          <p
+            v-for="place in places"
+            :key="place.name"
+            class="text-sm"
+          >
+            {{ [place.name, place.address].filter(Boolean).join(', ') }}
+          </p>
+        </div>
 
         <!-- Three states, not two: nobody having looked is not the same answer as somebody having
              looked and found nothing, so the page says which it is (D-102 criterion 2). -->
@@ -479,7 +521,10 @@ function saysInterval(performance: ListedPerformance): string {
             <span>{{ from ?? TO_BE_CONFIRMED }}</span>
           </div>
           <p class="mt-2 text-sm text-muted">
-            No booking fees. {{ SAYS_BOOKING_HOLDS }} {{ SAYS_PAYMENT }}
+            <template v-if="soldHere">
+              No booking fees. {{ SAYS_BOOKING_HOLDS }}
+            </template>
+            {{ payment }}
           </p>
         </template>
       </UCard>

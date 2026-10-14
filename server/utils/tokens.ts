@@ -62,6 +62,16 @@ export async function claimToken(plaintext: string, kind: TokenKind): Promise<Cl
   return { userId: row.userId, email: row.email }
 }
 
+// Whether a link would still be honoured, without spending it: a page asks before it asks the
+// reader for anything, so a dead link is said on arrival rather than after typing (0121).
+export async function tokenUsable(plaintext: string, kind: TokenKind): Promise<boolean> {
+  const [row] = await db.select({ expiresAt: schema.authTokens.expiresAt }).from(schema.authTokens).where(and(
+    eq(schema.authTokens.tokenHash, await hashToken(plaintext)),
+    eq(schema.authTokens.kind, kind),
+  ))
+  return Boolean(row && row.expiresAt * 1000 > Date.now())
+}
+
 // A claimed token is already deleted, so what expires here was never used.
 export async function sweepExpiredTokens(before: Date): Promise<number> {
   const gone = await db.delete(schema.authTokens)

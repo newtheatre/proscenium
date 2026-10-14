@@ -369,10 +369,10 @@ describe.skipIf(skip !== null)('the way in reads as one journey (A-103, A-112)',
   test('a spent reset link asks for a new one on the forgotten-password step', async () => {
     const view = await openSignedOutView(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/reset`)
-      await fill(view, 'form input[type="password"]', generatePassword())
-      await click(view, 'form button[type="submit"]')
+      // The link is checked on arrival (0121), so a spent one never offers the password field.
+      await visit(view, `${app.baseURL}/reset?token=${crypto.randomUUID()}${crypto.randomUUID()}`)
       await waitFor(view, `document.querySelector('[data-test=token-expired]')`)
+      expect(await view.evaluate<boolean>(`document.querySelector('form input[type="password"]') === null`)).toBe(true)
 
       await click(view, '[data-test=ask-again]')
       await waitFor(view, `location.pathname === '/sign-in'`, 30_000)
