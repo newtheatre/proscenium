@@ -973,11 +973,12 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(await textOf(view, '[data-test="publish-poster"]')).toContain('No poster')
     expect(await textOf(view, '[data-test="confirm-publish"]')).toContain('Put on sale')
 
-    // What a booker pays, never an access seat, which is not bought on its own.
+    // What a booker pays, and an access seat on its own line, since it is not bought on its own.
     await waitFor(view, `!document.querySelector('[data-test="publish-prices"]')?.textContent.includes('Reading the prices')`)
-    const prices = await textOf(view, '[data-test="publish-prices"]')
+    const prices = await textOf(view, '[data-test="publish-booker-prices"]')
     expect(prices).toContain(`${standard} £9.00`)
     expect(prices).not.toContain(access)
+    expect(await textOf(view, '[data-test="publish-access-prices"]')).toContain(`${access} £9.00`)
 
     await click(view, '[data-test="confirm-publish"]')
     await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)

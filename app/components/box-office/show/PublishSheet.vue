@@ -94,7 +94,10 @@ const saysWarnings = computed(() => {
       <p class="text-sm font-medium">
         Prices
       </p>
-      <p class="text-sm text-muted">
+      <p
+        class="text-sm text-muted"
+        data-test="publish-booker-prices"
+      >
         {{ prices === null
           ? 'Reading the prices'
           : offered.length === 0
