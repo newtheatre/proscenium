@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { PERIOD_KINDS, periodForm, periodQuery, saysPeriodKind } from '#shared/utils/season-dashboard'
+import { PERIOD_KINDS, periodForm, periodFromQuery, periodQuery, saysPeriodKind } from '#shared/utils/season-dashboard'
 
 describe('a money dashboard period', () => {
   test('a day takes a date', () => {
@@ -57,6 +57,21 @@ describe('a period as a query string', () => {
   ] as const)('%o is sent as %o', (period, sent) => {
     expect(periodQuery(period)).toEqual(sent)
     expect(periodForm.parse(periodQuery(period))).toEqual(period)
+  })
+})
+
+// The review of 13 October 2026: the dashboard's scope was lost on a reload or a shared link.
+describe('a period read back from a screen\'s URL', () => {
+  test('a period written as a query string reads back as itself, other keys ignored', () => {
+    const period = { kind: 'SEASON', seasonId: 'autumn-2026' } as const
+    expect(periodFromQuery({ ...periodQuery(period), tab: 'performances' })).toEqual(period)
+    expect(periodFromQuery({ kind: 'MONTH', year: ['2026'], month: '9' })).toEqual({ kind: 'MONTH', year: 2026, month: 9 })
+  })
+
+  test('nothing, nonsense or a kind the screen does not offer reads as no period at all', () => {
+    expect(periodFromQuery({})).toBeNull()
+    expect(periodFromQuery({ kind: 'DAY', day: 'yesterday' })).toBeNull()
+    expect(periodFromQuery({ kind: 'DAY', day: '2026-09-15' }, ['YEAR', 'SEASON'])).toBeNull()
   })
 })
 

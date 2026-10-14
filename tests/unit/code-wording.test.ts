@@ -48,7 +48,7 @@ describe('every code a reader can reach has wording (K-128, issue 1151 item 8)',
 
   test('every finance scope reads as words', () => {
     everyValueReads(FINANCE_SCOPES, scope => saysFinanceScope(scope))
-    expect(saysFinanceScope('PERIOD')).toBe('A date range')
+    expect(saysFinanceScope('PERIOD')).toBe('A period')
   })
 
   test('every stock movement source table reads as words', () => {

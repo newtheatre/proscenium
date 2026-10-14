@@ -303,6 +303,14 @@ describe('what a screen shows', () => {
     expect(saysMoney(0)).toBe('£0.00')
   })
 
+  // The review of 13 October 2026: imported history read "£1284.00".
+  test('money over a thousand pounds groups its thousands, either side of zero', () => {
+    expect(saysMoney(128_400)).toBe('£1,284.00')
+    expect(saysMoney(123_456_789)).toBe('£1,234,567.89')
+    expect(saysMoney(-100_005)).toBe('−£1,000.05')
+    expect(saysMoney(-5)).toBe('−£0.05')
+  })
+
   // The par-level status a manager scans the stocked items list for (#907).
   test('stock status compares on-hand to par, matching the order list\'s own shortfall rule', () => {
     expect(stockStatus(0, 48)).toBe('OUT')

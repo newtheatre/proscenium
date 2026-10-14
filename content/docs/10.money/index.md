@@ -3,7 +3,7 @@ title: Money
 description: The money dashboard, the reports built on the ledger, daily reconciliation, period close and the SU export.
 module: Finance
 audience: committee
-updatedOn: 2026-09-29
+updatedOn: 2026-10-14
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -60,15 +60,18 @@ Front of House Manager gave it on the [seasons](/docs/box-office/seasons) screen
    at least one term exists. A **Season** is listed by name, newest first, retired ones included,
    and Season appears only once at least one season exists.
    Changing any of these reads the ledger again at once; there is nothing else to press. Every
-   figure is a query, so a sale made a moment ago is already in the next read.
+   figure is a query, so a sale made a moment ago is already in the next read. The chosen period
+   stays in the page's address, so reloading or sharing the link keeps it.
 3. **Revenue by source**: what each surface took on a card, Desk, Till and so on, ending in a
    **Total** row: every card line in the range, summed by the ledger itself, so it always equals
    the rows above it. With the Treasurer, each row has an **Entries** button that opens the
    [ledger entries](/docs/money/ledger-entries) list filtered to that source's card takings and
    the dashboard's range; the total's opens every card entry in the range.
-4. **Refunds**, **Forgone comps**, **Forgone discounts** and **Open variance**: the money
-   handed back, the value given away rather than taken, and the sum of every night's reader
-   reading that still disagrees with the ledger and has not been written off. With the
+4. **Refunds**, **Forgone comps**, **Forgone discounts**, **Open variance** and **Written off**:
+   the money handed back, the value given away rather than taken, the sum of every night's reader
+   reading that still disagrees with the ledger and has not been written off, and the sum of the
+   differences that were written off. A variance says which way it is out, such as **£4.50
+   short** (the reader took less than we expect) or **£1.20 over**. With the
    Treasurer, each figure is a link: the first three open the ledger entries they are made of,
    and an open variance other than £0.00 moves to the **Needs you** list, whose nights each open
    their [daily reconciliation](/docs/money/daily-reconciliation). A night

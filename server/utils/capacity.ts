@@ -109,6 +109,18 @@ export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
   )`
 }
 
+// Seats sold for reporting: still held, or marked a no-show, which released the seat but was
+// still sold. Sold is in, plus no-shows, plus unpaid holds (architecture.md, Attendance).
+export function soldSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} sold_t
+    JOIN ${sql.raw(RESERVATIONS)} sold_r ON sold_r.id = sold_t.reservation_id
+    WHERE sold_t.performance_id = ${performanceId}
+      AND sold_t.refunded_at IS NULL
+      AND sold_r.status IN (${holding}, 'NO_SHOW')
+  )`
+}
+
 // Seats owing nothing, never admitted and not refunded: a no-show, derived and never written, so it
 // falls as the door admits people (issue 1296). A pass seat owes nothing though it stays PENDING.
 export function noShowSeatsSubquery(performanceId: SQL): SQL {

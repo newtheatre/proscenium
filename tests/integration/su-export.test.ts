@@ -365,4 +365,18 @@ describe('the yearly return, re-runnable identically (criterion 4)', () => {
       expect(counted?.rows).toBe(2)
     })
   })
+
+  // The review of 13 October 2026: every line went out UNMAPPED and nothing said so first.
+  test('the count also says how many lines would go out unmapped', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      mapNominal(database, 'WALK_UP', 'DESK', '4150')
+      line(database, entry(database, '2026-09-15'), 'WALK_UP', 900)
+      line(database, entry(database, '2026-09-16', 'TILL'), 'BAR_ITEM', 400)
+      line(database, entry(database, '2026-09-17', 'TILL', 'TAB'), 'BAR_ITEM', 300)
+
+      const [counted] = read<{ rows: number, unmapped: number }>(database, suExportCountQuery('2026-09-01', '2026-09-30'))
+      expect(counted).toEqual({ rows: 3, unmapped: 2 })
+    })
+  })
 })

@@ -4,7 +4,8 @@ import { adminSession, finishSignIn, grantRole, registerMember, request } from '
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
 import { saysDay } from '#shared/utils/when'
-import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { londonDayOf } from '#shared/utils/ledger'
+import { click, fill, openSignedOutView, pickOption, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -164,7 +165,7 @@ describe.skipIf(skip !== null)('/money/exports: editing a mapping before the CSV
     expect(exported.status).toBe(200)
     const csv = await exported.text()
     const [header, ...rows] = csv.trim().split('\r\n')
-    expect(header).toBe('"date","category","tender","nominalCode","amountPence","amountPounds"')
+    expect(header).toBe('"date","category","tender","nominalCode","amountPence","amountPounds","time","source","show","reference"')
     expect(rows.some(row => row.includes('"4150"'))).toBe(true)
   })
 
@@ -250,6 +251,45 @@ describe.skipIf(skip !== null)('/money/entries: opening one entry', () => {
       clearConfigOverride(app, 'PRIVILEGED_ROLES')
     }
   })
+})
+
+// The review of 13 October 2026: opened from the sidebar, Next changed the address but not the rows.
+describe.skipIf(skip !== null)('/money/entries: paging from a list opened from the sidebar (I-105 criterion 3)', () => {
+  test('the second page shows the older entries, and the first page comes back', async () => {
+    const today = londonDayOf(new Date())
+    const now = Math.floor(Date.now() / 1000)
+    const database = new Database(app.databaseFile)
+    try {
+      for (let index = 0; index < 30; index++) {
+        database.query('INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)')
+          .run(`screens-page-${index}`, today, 'TILL', 'CARD', now - 60 * (index + 1), 100 + index)
+        database.query('INSERT INTO ledger_lines (id, entry_id, kind, amount_pence) VALUES (?, ?, ?, ?)')
+          .run(`screens-page-line-${index}`, `screens-page-${index}`, 'BAR_ITEM', 100 + index)
+      }
+    }
+    finally {
+      database.close()
+    }
+
+    overrideConfig(app, 'PRIVILEGED_ROLES', ['ADMIN'])
+    const view = await signInView(app, treasurer.email, treasurerPassword)
+    try {
+      await visit(view, `${app.baseURL}/money`, '[data-test="period-kind"]')
+      await click(view, 'a[href="/money/entries"]')
+      await waitFor(view, `location.search.includes('happenedAt') && document.querySelector('[data-test="open-entry-screens-page-0"]')`)
+
+      await click(view, 'button[aria-label="Next Page"]')
+      await waitFor(view, `new URLSearchParams(location.search).get('page') === '2'`)
+      await waitFor(view, `document.querySelector('[data-test="open-entry-screens-page-29"]') && !document.querySelector('[data-test="open-entry-screens-page-0"]')`)
+
+      await click(view, 'button[aria-label="Previous Page"]')
+      await waitFor(view, `document.querySelector('[data-test="open-entry-screens-page-0"]')`)
+    }
+    finally {
+      view.close()
+      clearConfigOverride(app, 'PRIVILEGED_ROLES')
+    }
+  }, 120_000)
 })
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)
