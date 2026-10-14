@@ -169,6 +169,8 @@ export default defineEventHandler(async (event) => {
       last: formatLondon(occurrences.at(-1)!.startsAt, { dateStyle: 'full', timeStyle: 'short' }),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
+    // A term held at once reaches a calendar as a single booking does, one event per week (C-104).
+    ...(status === 'CONFIRMED' ? { attachments: [bookingsAttachment(event, await seriesEvents(seriesId, input.title, room.name))] } : {}),
   })
 
   return {

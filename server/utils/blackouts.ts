@@ -61,6 +61,7 @@ export interface Stranded {
   room: string
   title: string
   startsAt: number
+  endsAt: number
   seriesId: string | null
 }
 
@@ -73,6 +74,7 @@ export async function bookingsUnder(blackout: { roomId: string | null, startsAt:
     room: schema.rooms.name,
     title: schema.roomBookings.title,
     startsAt: schema.roomBookings.startsAt,
+    endsAt: schema.roomBookings.endsAt,
     seriesId: schema.roomBookings.seriesId,
   })
     .from(schema.roomBookings)
@@ -127,6 +129,8 @@ export async function tellStranded(event: H3Event | undefined, stranded: Strande
         })),
         roomsUrl: `${base}/rooms`,
       },
+      // Each one leaves the member's calendar, not only their bookings list (C-104 criterion 5).
+      attachments: [cancellationAttachment(event, theirs)],
     })
   }
 

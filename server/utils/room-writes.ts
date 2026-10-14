@@ -139,7 +139,7 @@ export function seriesCancelStatements(seriesId: string, userId: string, now: nu
            (SELECT count(*) AS n FROM external_requests WHERE ${theirs}) AS theirs
       WHERE ours.n + theirs.n > 0
     `,
-    ours: sql`UPDATE room_bookings SET status = 'CANCELLED', updated_at = ${now} WHERE ${ours} RETURNING id, starts_at AS startsAt`,
+    ours: sql`UPDATE room_bookings SET status = 'CANCELLED', updated_at = ${now} WHERE ${ours} RETURNING id, starts_at AS startsAt, ends_at AS endsAt`,
     theirs: sql`UPDATE external_requests SET status = 'CANCELLED', updated_at = ${now} WHERE ${theirs} RETURNING id, starts_at AS startsAt`,
   }
 }
