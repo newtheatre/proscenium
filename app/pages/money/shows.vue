@@ -49,6 +49,8 @@ const showColumns: TableColumn<ShowRow>[] = [
   {
     id: 'show',
     header: 'Show',
+    // Wraps rather than widening the table: at 390px the sub-line otherwise pushes Net off screen.
+    meta: { class: { td: 'whitespace-normal' } },
     cell: ({ row }) => h('div', {
       'class': row.original.unattributed ? 'italic' : undefined,
       'data-test': row.original.unattributed ? 'unattributed-row' : 'show-row',
@@ -78,6 +80,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
   {
     id: 'reference',
     header: 'Pass',
+    meta: { class: { td: 'whitespace-normal' } },
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.reference),
       // Below sm the type and the show counts are hidden: shown here instead, so a phone keeps

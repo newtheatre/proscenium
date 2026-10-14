@@ -1,4 +1,4 @@
-import { PERIOD_KINDS, periodQuery, saysPeriodKind } from '#shared/utils/season-dashboard'
+import { PERIOD_KINDS, PERIOD_QUERY_KEYS, periodFromQuery, periodQuery, saysPeriodKind } from '#shared/utils/season-dashboard'
 import { calendarYearChoices, currentYear, monthChoices, yearChoices } from '#shared/utils/year'
 import type { PeriodChoices, PeriodInput, PeriodKind } from '#shared/utils/season-dashboard'
 
@@ -13,6 +13,9 @@ export interface PeriodFormOptions {
 // The money dashboard's period controls, shared by every screen that sends a `periodForm` (0087).
 // Each screen names where its terms and seasons come from, so a reader holds only its own gate.
 export async function usePeriodForm(key: string, choices: () => Promise<PeriodChoices>, options: PeriodFormOptions = {}) {
+  // Nuxt's context is gone after the first await, so the route and the component's scope are held first.
+  const route = useRoute()
+  const scope = getCurrentScope()
   const { data } = await useAsyncData(key, choices, { default: (): PeriodChoices => ({ terms: [], seasons: [] }) })
   const terms = computed(() => data.value.terms)
   const seasons = computed(() => data.value.seasons)
@@ -28,17 +31,26 @@ export async function usePeriodForm(key: string, choices: () => Promise<PeriodCh
   const termItems = computed(() => terms.value.map(one => ({ label: one.label, value: one.id })))
   const seasonItems = computed(() => seasons.value.map(one => ({ label: one.name, value: one.id })))
 
-  const kind = ref<PeriodKind>('YEAR')
-  const seasonId = ref((seasons.value.find(one => one.fromDay <= today && today <= one.toDay) ?? seasons.value[0])?.id ?? '')
-  const termId = ref(terms.value[0]?.id ?? '')
-  const day = ref(today)
-  const fromDay = ref(today)
-  const toDay = ref(today)
-  const year = ref(currentYear())
+  // The chosen period lives in the URL, so a reload or a shared link keeps it; anything the URL
+  // says that this screen does not offer is ignored and the screen opens on its default.
+  const fromUrl = periodFromQuery(route.query, selectableKinds.value)
+  const urlTerm = fromUrl?.kind === 'TERM' && !customRange
+    ? terms.value.find(one => one.fromDay === fromUrl.fromDay && one.toDay === fromUrl.toDay)
+    : undefined
+
+  const kind = ref<PeriodKind>(fromUrl && (fromUrl.kind !== 'TERM' || customRange || urlTerm) ? fromUrl.kind : 'YEAR')
+  const seasonId = ref(fromUrl?.kind === 'SEASON'
+    ? fromUrl.seasonId
+    : (seasons.value.find(one => one.fromDay <= today && today <= one.toDay) ?? seasons.value[0])?.id ?? '')
+  const termId = ref(urlTerm?.id ?? terms.value[0]?.id ?? '')
+  const day = ref(fromUrl?.kind === 'DAY' || fromUrl?.kind === 'WEEK' ? fromUrl.day : today)
+  const fromDay = ref(fromUrl?.kind === 'TERM' ? fromUrl.fromDay : today)
+  const toDay = ref(fromUrl?.kind === 'TERM' ? fromUrl.toDay : today)
+  const year = ref(fromUrl?.kind === 'YEAR' ? fromUrl.year : currentYear())
   // A month's year is a calendar year and a 1 August year is the one it ends in, so they are two
   // controls and two lists, never one number standing for both.
-  const monthYear = ref(Number(today.slice(0, 4)))
-  const month = ref(Number(today.slice(5, 7)))
+  const monthYear = ref(fromUrl?.kind === 'MONTH' ? fromUrl.year : Number(today.slice(0, 4)))
+  const month = ref(fromUrl?.kind === 'MONTH' ? fromUrl.month : Number(today.slice(5, 7)))
 
   const months = monthChoices()
   const years = yearChoices(year.value)
@@ -57,6 +69,14 @@ export async function usePeriodForm(key: string, choices: () => Promise<PeriodCh
   })
 
   const query = computed(() => periodQuery(period.value))
+
+  // Replaced, not pushed, so Back leaves the screen rather than stepping through every choice.
+  const follow = () => watch(query, (chosen) => {
+    const kept = Object.fromEntries(Object.entries(route.query).filter(([key]) => !(PERIOD_QUERY_KEYS as readonly string[]).includes(key)))
+    void navigateTo({ query: { ...kept, ...chosen } }, { replace: true })
+  })
+  if (scope) scope.run(follow)
+  else follow()
   // Only a typed range can end before it starts; a screen withholds its request until it does not.
   const complete = computed(() => {
     const chosen = period.value

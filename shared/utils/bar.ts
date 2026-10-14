@@ -906,8 +906,11 @@ export function saysQuantity(qty: number, unit: StockUnit): string {
 }
 
 // Negative reads as minus-sign-before-currency, never a bare hyphen glued to the pound sign (#908).
+// Whole pence split by integer arithmetic, so no float rounding; thousands grouped as en-GB does.
 export function saysMoney(pence: number): string {
-  return pence < 0 ? `−£${(-pence / 100).toFixed(2)}` : `£${(pence / 100).toFixed(2)}`
+  const size = Math.abs(pence)
+  const pounds = String(Math.floor(size / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `${pence < 0 ? '−' : ''}£${pounds}.${String(size % 100).padStart(2, '0')}`
 }
 
 // The field takes pounds and a request carries pence, converted at this one boundary (0004).

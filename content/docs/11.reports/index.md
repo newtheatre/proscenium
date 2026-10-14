@@ -3,7 +3,7 @@ title: Reports
 description: Incident trends and each performance's attendance and staffing across any period, with a CSV export of each.
 module: Show night
 audience: committee
-updatedOn: 2026-09-29
+updatedOn: 2026-10-14
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -54,13 +54,17 @@ the tab counts entries and never shows what was written in them.
 
 ## The Performances tab
 
-One row for each performance in the period, earliest first. A cancelled performance is left out.
+One row for each performance in the period, earliest first. A cancelled performance is left out,
+unless card money taken for it is still held: then it is listed, marked **Cancelled, £… still
+held**, so the money is on a report until it is refunded.
 
 - **Performance**: the show, with its date, curtain time and venue underneath.
-- **Sold**: seats held against the performance.
+- **Sold**: seats sold and not refunded, including seats later marked as a no-show, so no-shows
+  never outnumber sold.
 - **Admitted**: seats through the door, so a party of four is four.
 - **No-shows**: seats paid for (or booked on a pass) that nobody used and nobody refunded, the
-  same count the night report gives.
+  same count the night report gives. It reads **Not yet** until the curtain has gone up, and is
+  blank for a cancelled performance.
 - **Unfilled slots**: rota slots still open, claimed but not yet confirmed, or declined and not
   refilled.
 - **Officer bypass**: Yes when an officer acted on tonight's screens (the door, the till or the

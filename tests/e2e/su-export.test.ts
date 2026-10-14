@@ -100,10 +100,10 @@ describe.skipIf(skip !== null)('the CSV export (criteria 2, 3)', () => {
 
     const body = await answered.text()
     const header = body.trim().split('\r\n')[0]
-    expect(header).toBe('"date","category","tender","nominalCode","amountPence","amountPounds"')
+    expect(header).toBe('"date","category","tender","nominalCode","amountPence","amountPounds","time","source","show","reference"')
     expect(body).toContain('"2026-09-15","Walk-up sale","Card","4100","900","9.00"')
     // Issue #1363: the file closes on the card total, the figure the money dashboard calls revenue.
-    expect(body.trim().split('\r\n').at(-1)).toMatch(/^"","Card total, the same as the money dashboard's revenue","","","-?\d+","-?\d+\.\d{2}"$/)
+    expect(body.trim().split('\r\n').at(-1)).toMatch(/^"","Card total, the same as the money dashboard's revenue","","","-?\d+","-?\d+\.\d{2}","","","",""$/)
   })
 
   test('a line whose pair has no mapping exports on its own explicit unmapped line', async () => {
@@ -182,7 +182,7 @@ describe.skipIf(skip !== null)('the yearly return by name: a year or a season (c
   test('the status says what a download would cover without taking one, for the exporter only', async () => {
     const answered = await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, treasurer.cookie)
     expect(answered.status).toBe(200)
-    expect(await answered.json()).toEqual({ fromDay: '2011-08-01', toDay: '2012-07-31', rows: 1, closed: false })
+    expect(await answered.json()).toEqual({ fromDay: '2011-08-01', toDay: '2012-07-31', rows: 1, closed: false, unmapped: 0 })
     expect((await send('GET', `/api/admin/finance/export/coverage?kind=YEAR&year=${YEAR}`, undefined, committee.cookie)).status).toBe(403)
   })
 

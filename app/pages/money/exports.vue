@@ -2,7 +2,7 @@
 import { can, exportFinance, manageNominalMappings } from '#shared/utils/abilities'
 import { describeKind } from '#shared/utils/ledger'
 import type { EntrySource } from '#shared/utils/ledger'
-import { SU_EXPORT_KINDS, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportLines } from '#shared/utils/su-export'
+import { SU_EXPORT_KINDS, SU_EXPORT_ROW_CAP, suExportCapRefusal, suExportLines, suExportUnmappedWarning } from '#shared/utils/su-export'
 import type { FinanceSeason } from '#shared/utils/season-dashboard'
 import type { NominalMapping, SuExportCoverage } from '#shared/utils/su-export'
 import type { TableColumn } from '@nuxt/ui'
@@ -127,7 +127,14 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
       </AdminToolbar>
 
       <UAlert
-        v-if="coverageFailure"
+        v-if="!complete"
+        data-test="export-backwards"
+        color="error"
+        variant="subtle"
+        description="The range ends before it starts. Choose an end date on or after the start date."
+      />
+      <UAlert
+        v-else-if="coverageFailure"
         data-test="export-status-failure"
         color="error"
         variant="subtle"
@@ -140,8 +147,15 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
         variant="subtle"
         :description="suExportCapRefusal()"
       />
+      <UAlert
+        v-else-if="coverage && coverage.unmapped > 0"
+        data-test="export-unmapped"
+        color="warning"
+        variant="subtle"
+        :description="suExportUnmappedWarning(coverage.unmapped)"
+      />
       <p
-        v-if="coverage"
+        v-if="coverage && complete"
         class="text-sm text-muted"
         data-test="export-status"
       >
@@ -163,6 +177,9 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
       <h2 class="font-semibold">
         Nominal code mappings
       </h2>
+      <p class="text-sm text-muted">
+        A code belongs to a kind of line and where it was taken, whatever paid for it: a bar item put on a tab exports under Bar item, Till, the same as one paid by card.
+      </p>
 
       <UAlert
         v-if="mappingsFailure"
@@ -242,6 +259,7 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
             <UInput
               v-model="draftCode"
               class="w-full"
+              :maxlength="50"
               data-test="edit-code"
             />
           </UFormField>

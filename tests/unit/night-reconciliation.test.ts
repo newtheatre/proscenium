@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { nightsWithTakings, outstandingNights, resolvedReaderPence, zReadingStatement } from '#server/utils/night-reconciliation'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { liveVariance, nightFromQuery, nightsNeedingYou, nightsWithin, reconciliationHref, recordZReadingForm, zNightQuery } from '#shared/utils/night-reconciliation'
+import { expectedSheet, liveVariance, nightFromQuery, nightsNeedingYou, nightsWithin, reconciliationHref, recordZReadingForm, saysVariance, zNightQuery } from '#shared/utils/night-reconciliation'
+import type { NightExpected } from '#shared/utils/night-reconciliation'
 import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 
 // I-104: the reader keys in what it shows; a variance needs a note before it can be recorded,
@@ -218,5 +219,51 @@ describe('the nights a London day of takings belongs to', () => {
   test('the boundary is 04:00 London on both clock-change days', () => {
     expect(nightsWithTakings([{ firstAt: at('2026-10-25', 3, 59), lastAt: at('2026-10-25', 4) }])).toEqual(['2026-10-24', '2026-10-25'])
     expect(nightsWithTakings([{ firstAt: at('2026-03-29', 3, 59), lastAt: at('2026-03-29', 4) }])).toEqual(['2026-03-28', '2026-03-29'])
+  })
+})
+
+// The review of 13 October 2026: a variance read as a bare figure, with no way to tell over from short.
+describe('a variance says which way it runs', () => {
+  test('a reader above what we expect is over, below it is short, level is none', () => {
+    expect(saysVariance(120)).toBe('£1.20 over')
+    expect(saysVariance(-450)).toBe('£4.50 short')
+    expect(saysVariance(0)).toBe('none')
+  })
+})
+
+// The review of 13 October 2026: three walk-up tickets sold on the till read as bar card sales.
+describe('the expected sheet keeps the till\'s tickets apart from its drinks', () => {
+  const expected: NightExpected = {
+    night: '2026-10-13',
+    deskByKind: [{ kind: 'WALK_UP', totalPence: 700 }],
+    deskCompsPence: 0,
+    deskDiscountsPence: 0,
+    deskTakingsPence: 700,
+    bar: {
+      night: '2026-10-13',
+      cardSalesPence: 1870,
+      ticketsPence: 1900,
+      tabSettlementsPence: 0,
+      compsCount: 0,
+      compsForegonePence: 0,
+      discountsPence: 0,
+      refundsPence: 0,
+      tabChargesPence: 0,
+      expectedPence: 3770,
+    },
+    expectedPence: 4470,
+  }
+
+  test('bar card sales are the drinks alone, and the tickets sold at the bar are a row of their own', () => {
+    const rows = expectedSheet(expected)
+    expect(rows.find(row => row.label === 'Bar card sales')?.pence).toBe(1870)
+    expect(rows.find(row => row.label === 'Tickets sold at the bar')?.pence).toBe(1900)
+  })
+
+  test('the rows above the total add up to it', () => {
+    const rows = expectedSheet(expected)
+    const total = rows.find(row => row.strong)!
+    const parts = rows.filter(row => row.part).reduce((sum, row) => sum + row.pence, 0)
+    expect(parts).toBe(total.pence)
   })
 })

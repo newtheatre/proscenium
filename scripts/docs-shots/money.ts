@@ -38,7 +38,7 @@ export const money: Shot[] = [
     width: CONSOLE_WIDTH,
     annotations: [
       { selector: '[data-test="scope-kind"]', label: 'Scope' },
-      { selector: '[data-test="scope-from"]', label: 'Date range' },
+      { selector: '[data-test="period-kind"]', label: 'Period' },
       { selector: '[data-test="section-foregone"]', label: 'Foregone value' },
       { selector: '[data-test="section-access"]', label: 'Access and companion admissions' },
     ],

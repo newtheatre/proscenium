@@ -11,6 +11,7 @@ import {
   revenueTotalQuery,
   seasonRangeQuery,
   seasonRefundsQuery,
+  writtenOffQuery,
 } from '#server/utils/season-dashboard'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { ledgerEntriesList } from '#shared/utils/ledger-entries-list'
@@ -245,6 +246,30 @@ describe('the open variance total (criterion 2)', () => {
 
       const [row] = read<{ openVariancePence: number }>(database, openVarianceQuery('2026-09-14', '2026-09-16'))
       expect(row?.openVariancePence).toBe(0)
+    })
+  })
+})
+
+// The review of 13 October 2026: an accepted difference was a figure nobody could find again.
+describe('the written-off total', () => {
+  test('sums the live write-offs in range, signed as the variance was, and nothing superseded', async () => {
+    await withDatabase(async (database) => {
+      person(database, 'treasurer')
+      database.batch([
+        ['INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'z-short', '2026-09-14', 250, 500, -250, 'treasurer', 'Short'],
+        ['INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note, supersedes_id, written_off) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)',
+          'z-short-off', '2026-09-14', 250, 500, -250, 'treasurer', 'Accepted', 'z-short'],
+        ['INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'z-open', '2026-09-15', 600, 500, 100, 'treasurer', 'Over'],
+        ['INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'z-later', '2026-10-14', 400, 500, -100, 'treasurer', 'Short'],
+        ['INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note, supersedes_id, written_off) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)',
+          'z-later-off', '2026-10-14', 400, 500, -100, 'treasurer', 'Accepted', 'z-later'],
+      ])
+
+      const [row] = read<{ writtenOffPence: number }>(database, writtenOffQuery('2026-09-01', '2026-09-30'))
+      expect(row?.writtenOffPence).toBe(-250)
     })
   })
 })
