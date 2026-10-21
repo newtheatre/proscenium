@@ -142,6 +142,9 @@ export function saysPayAtDesk(prices: readonly { price: number }[]): string {
   return `Pay ${figures.join(' or ')} at the box office desk`
 }
 
+// The ticket and pass terms (D-137); on the booking policy page, which quotes the live settings (0012).
+export const PASS_TERMS_PATH = '/policies/booking'
+
 export interface PassOffer {
   id: string
   name: string
@@ -158,4 +161,14 @@ export function saysPassOffer(offer: { name: string, coveredShows: number, price
   if (offer.prices.length === 0) return `${covers}.`
   const cheapest = Math.min(...offer.prices.map(one => one.price))
   return `${covers}, from ${saysPrice(cheapest)}.`
+}
+
+// The bar's reminder after a sale (D-136): the first pass on sale tonight with a price to quote,
+// never when that sale has just sold one.
+export function passPromptFor(offers: readonly PassOffer[], soldOne: boolean): { passTypeId: string, says: string } | null {
+  if (soldOne) return null
+  const offer = offers.find(one => one.prices.length > 0)
+  if (!offer) return null
+  const cheapest = Math.min(...offer.prices.map(one => one.price))
+  return { passTypeId: offer.id, says: `Mention the ${offer.name}: it covers ${plural(offer.coveredShows, 'show')}, from ${saysPrice(cheapest)}.` }
 }

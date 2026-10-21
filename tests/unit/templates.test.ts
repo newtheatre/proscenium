@@ -34,6 +34,7 @@ const EVERYTHING: TemplateContext = {
   registerUrl: 'https://newtheatre.org.uk/training/manage/register/1',
   rolesUrl: 'https://newtheatre.org.uk/people/accounts',
   entryUrl: 'https://newtheatre.org.uk/waiting-list/entry/tok',
+  termsUrl: 'https://newtheatre.org.uk/policies/booking',
   imageUrl: 'https://newtheatre.org.uk/qr/r-1.sig/image.png',
   expiresAt: new Date('2026-10-02T18:30:00Z'),
   method: 'Google',
@@ -627,5 +628,23 @@ describe('every typed value is escaped in the HTML part, and only there (issue 1
     const rendered = render('membership-expiring', { ...EVERYTHING, purchaseUrl: 'https://su.example.invalid/buy?a=1&b=2' })
     expect(rendered.html).toContain('href="https://su.example.invalid/buy?a=1&amp;b=2"')
     expect(rendered.text).toContain('https://su.example.invalid/buy?a=1&b=2')
+  })
+})
+
+// D-137: the pass email says how to book ahead, that turning up is subject to space, and links the terms.
+describe('the pass email follows the ticket terms (D-137)', () => {
+  const { html, text } = render('pass-issued', EVERYTHING)
+
+  test('it says booking ahead uses the pass, signed in on this email address', () => {
+    for (const part of [html, text]) expect(flat(part)).toContain('To book ahead, sign in with this email address and choose "Use my pass" when you book.')
+  })
+
+  test('it says turning up without booking is subject to space', () => {
+    for (const part of [html, text]) expect(flat(part)).toContain('You can also just turn up, subject to space on the night.')
+  })
+
+  test('it links the ticket and pass terms in both parts', () => {
+    expect(html).toContain('<a href="https://newtheatre.org.uk/policies/booking">The ticket and pass terms</a>')
+    expect(text).toContain('The ticket and pass terms: https://newtheatre.org.uk/policies/booking')
   })
 })

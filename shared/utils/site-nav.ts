@@ -358,7 +358,7 @@ export const PUBLIC_NAV: NavEntry[] = [
   // Module J: governance
 
   // Policy pages, whose numbers are the live settings rather than prose about them (0012, J-110).
-  { label: 'Tickets and refunds', icon: 'i-lucide-receipt', to: '/policies/booking', ability: anybody, group: 'Visit' },
+  { label: 'Ticket and pass terms', icon: 'i-lucide-receipt', to: '/policies/booking', ability: anybody, group: 'Visit' },
   { label: 'Room booking policy', icon: 'i-lucide-calendar-check', to: '/policies/rooms', ability: anybody, group: 'Visit' },
 
   // Public help, the documentation's one signed-out tier (J-109 criterion 6, 0093).

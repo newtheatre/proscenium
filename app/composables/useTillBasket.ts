@@ -6,6 +6,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { AGE_CHECK_PRODUCT_MAX } from '#shared/utils/age-checks'
 import type { InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 import type { PricedBasket, PricedLine, SaleChoice, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
+import type { TillPassLine } from './useTillPass'
 
 type RestrictableLine = Pick<BasketLine, 'variantId' | 'choiceItemId'>
 
@@ -43,6 +44,8 @@ export interface TillBasketDeps {
   walkUpGuest: ComputedRef<{ name: string, email: string } | null>
   ticketsPence: ComputedRef<number>
   walkUpsPence: ComputedRef<number>
+  // A season pass in the basket (D-134); absent where the till sells none.
+  passLine?: Ref<TillPassLine | null>
   // Injected rather than a bare $fetch, so the pure basket logic type-checks and runs under
   // bun:test with no Nuxt runtime beneath it (tests/tsconfig.json).
   requestPrice: (body: { venueId: string, lines: { variantId: string, qty: number, choiceItemId: string | null }[], discountId: string | null }) => Promise<PricedBasket>
@@ -57,6 +60,7 @@ export interface TillBasketDeps {
 
 export function useTillBasket(deps: TillBasketDeps) {
   const { venueId, products, selectedDiscountId, selectedTabHolderId, ticketLines, walkUpLines, walkUpGuest, ticketsPence, walkUpsPence, requestPrice, recordAgeCheck, online } = deps
+  const passLine = deps.passLine ?? ref<TillPassLine | null>(null)
 
   const basket = ref<BasketLine[]>([])
 
@@ -147,7 +151,7 @@ export function useTillBasket(deps: TillBasketDeps) {
     else line.qty -= 1
   }
 
-  const hasTicketMoney = computed(() => ticketLines.value.length > 0 || walkUpLines.value.length > 0)
+  const hasTicketMoney = computed(() => ticketLines.value.length > 0 || walkUpLines.value.length > 0 || passLine.value !== null)
   const basketEmpty = computed(() => basket.value.length === 0 && !hasTicketMoney.value)
 
   // Every rule that makes a chosen discount or tab holder impossible lands here, so the next
@@ -227,7 +231,7 @@ export function useTillBasket(deps: TillBasketDeps) {
   // booking's amount owed and every walk-up, none of which a discount touches (criterion 4).
   const grandTotalPence = computed(() => (basket.value.length ? priced.value?.totalPence ?? null : 0) === null
     ? null
-    : (basket.value.length ? priced.value!.totalPence : 0) + ticketsPence.value + walkUpsPence.value)
+    : (basket.value.length ? priced.value!.totalPence : 0) + ticketsPence.value + walkUpsPence.value + (passLine.value?.price ?? 0))
 
   // What the line pours, already on the catalogue this screen holds: no second lookup, and no
   // route sells one without an outcome on record first (F-106 criteria 1, 5, issue 1299).
@@ -294,6 +298,7 @@ export function useTillBasket(deps: TillBasketDeps) {
       tickets: ticketLines.value.map(booking => ({ reservationId: booking.id })),
       walkUps: walkUpLines.value.map(line => ({ performanceId: line.performanceId, ticketTypeId: line.ticketTypeId, quantity: line.quantity })),
       walkUpGuest: walkUpGuest.value,
+      pass: passLine.value ? { passTypeId: passLine.value.passTypeId, passTypePriceId: passLine.value.passTypePriceId, email: passLine.value.email } : null,
     }
   }
 

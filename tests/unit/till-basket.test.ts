@@ -6,6 +6,7 @@ import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import { AGE_CHECK_PRODUCT_MAX } from '#shared/utils/age-checks'
 import { MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import type { PricedBasket, SaleProduct, SaleVariant, TillBooking } from '#shared/utils/sale'
+import type { TillPassLine } from '#composables/useTillPass'
 
 // F-103, F-104, F-106: what a tap puts in the basket, what a charge submits, and what an
 // age-check refusal takes back out.
@@ -317,6 +318,7 @@ describe('saleBody sends exactly what the sale route and the SumUp hand-off both
       tickets: [],
       walkUps: [],
       walkUpGuest: null,
+      pass: null,
     })
     scope.stop()
   })
@@ -608,6 +610,34 @@ describe('Check ID follows what the line pours, not the product switch alone (is
     await basket.refuseAgeCheck({ outcome: 'REFUSED', idType: null, reason: 'NO_ID_SHOWN', description: 'Declined to show ID', notes: null })
     expect(register.recorded[0]!.product!.length).toBeLessThanOrEqual(AGE_CHECK_PRODUCT_MAX)
     expect(basket.refusedLinesNote.value!.length).toBeGreaterThan(AGE_CHECK_PRODUCT_MAX)
+    scope.stop()
+  })
+})
+
+// D-134: a season pass rides the basket as ticket money does: on the reader, never on a tab.
+describe('a season pass in the basket is charged on the reader with everything else (D-134)', () => {
+  const aPass = (): TillPassLine => ({ passTypeId: 'pt-1', passTypePriceId: 'price-1', passName: 'Season pass', priceLabel: 'Standard', price: 4500, email: 'buyer@example.invalid' })
+
+  test('its price joins the total, and the basket is no longer empty', () => {
+    const { basket, scope } = setup([aProduct()], { passLine: ref(aPass()) })
+    expect(basket.basketEmpty.value).toBe(false)
+    expect(basket.grandTotalPence.value).toBe(4500)
+    scope.stop()
+  })
+
+  test('the sale names the pass and the buyer by email, nothing else about it', () => {
+    const { basket, scope } = setup([aProduct()], { passLine: ref(aPass()) })
+    expect(basket.saleBody(null, 4500).pass).toEqual({ passTypeId: 'pt-1', passTypePriceId: 'price-1', email: 'buyer@example.invalid' })
+    scope.stop()
+  })
+
+  test('a tab holder already chosen is cleared, since a pass is never put on a tab', async () => {
+    const passLine = ref<TillPassLine | null>(null)
+    const selectedTabHolderId = ref<string | null>('holder-1')
+    const { scope } = setup([aProduct()], { passLine, selectedTabHolderId })
+    passLine.value = aPass()
+    await nextTick()
+    expect(selectedTabHolderId.value).toBeNull()
     scope.stop()
   })
 })

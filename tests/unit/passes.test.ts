@@ -6,6 +6,7 @@ import {
   generatePassReference,
   issuePassForm,
   passCapReason,
+  passPromptFor,
   passSaleRefusal,
   requestPassForm,
   saysPassStatus,
@@ -165,5 +166,23 @@ describe('a pass offered while booking says what it covers and what it costs', (
 
   test('a pass with no price point yet quotes none', () => {
     expect(saysPassOffer({ name: 'Season pass', coveredShows: 6, prices: [] })).toBe('Season pass covers 6 shows.')
+  })
+})
+
+// D-136 criterion 1: one line after a sale, only when the sale did not already sell the pass.
+describe('the bar is reminded to mention a pass after a sale', () => {
+  const offer = { id: 'pt-1', name: 'Season pass', description: null, coveredShows: 6, prices: [{ id: 'p-1', label: 'Standard', price: 4500 }], requested: false }
+
+  test('a pass on sale tonight is named with its price', () => {
+    expect(passPromptFor([offer], false)).toEqual({ passTypeId: 'pt-1', says: 'Mention the Season pass: it covers 6 shows, from £45.00.' })
+  })
+
+  test('nothing is prompted when the sale just sold one', () => {
+    expect(passPromptFor([offer], true)).toBeNull()
+  })
+
+  test('nothing is prompted on a night with no pass on sale, or none priced yet', () => {
+    expect(passPromptFor([], false)).toBeNull()
+    expect(passPromptFor([{ ...offer, prices: [] }], false)).toBeNull()
   })
 })
