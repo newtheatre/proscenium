@@ -2149,7 +2149,9 @@ reads 19:00 in both halves of the year (criterion 4). `shared/utils/ics.ts` buil
 pure, so both transitions are unit cases rather than a hope.
 
 `GET /api/rooms/bookings/[id]/ics` is the same builder for one booking, and the confirmation email
-carries that file as an attachment (criterion 1).
+carries that file as an attachment (criterion 1), as do an approval and a series confirmed at once.
+A message that ends a booking (the member's cancel, a closure, a bump) carries the same event with
+`METHOD:CANCEL` and a fresh `SEQUENCE`, so a client that imported it takes it away (0132).
 
 ### Utilisation reporting
 No table: the figures are counted from `room_bookings`, `room_hours` and `room_no_shows` on demand

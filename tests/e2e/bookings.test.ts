@@ -198,6 +198,21 @@ describe.skipIf(skip !== null)('one slot, one winner (C-107)', () => {
     expect(data.conflicts).toHaveLength(1)
   })
 
+  // Back and submit again is the usual way to clash, and "somebody booked it first" sent members
+  // looking for a somebody who was them (review of 13 October 2026).
+  test('booking a slot you already hold says it is yours, and anybody else\'s says it is booked', async () => {
+    const room = await makeRoom()
+    const holder = await freshBooker()
+    expect((await book(room, soon(14, 10, 2), holder)).status).toBe(200)
+
+    const again = await book(room, soon(14, 10, 2), holder)
+    expect(again.status).toBe(409)
+    expect((await again.json() as { statusMessage: string }).statusMessage).toBe('You already have that room booked then. It is on My bookings.')
+
+    const other = await book(room, soon(14, 11, 2), await freshBooker())
+    expect((await other.json() as { statusMessage: string }).statusMessage).toBe('That room is already booked then. Choose another time or room.')
+  })
+
   // Criterion 4, and C-103 criteria 4 and 5: the same masking on any payload listing conflicts.
   test('a member is told the slot is taken, never whose it is', async () => {
     const room = await makeRoom()

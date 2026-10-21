@@ -390,17 +390,17 @@ The Nottingham New Theatre`,
     const reason = String(context.reason ?? '')
     return {
       subject: bookings.length === 1
-        ? `Not approved: ${bookings[0]!.room}, ${bookings[0]!.when}`
-        : `Not approved: ${bookings.length} room requests`,
+        ? `Turned down: ${bookings[0]!.room}, ${bookings[0]!.when}`
+        : `Turned down: ${bookings.length} room requests`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>${bookings.length === 1 ? 'Your request was not approved.' : 'Your requests were not approved.'}</p>
+<p>${bookings.length === 1 ? 'Your request was turned down.' : 'Your requests were turned down.'}</p>
 <ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
 <p>Why: ${reason}</p>
 <p>The slot is free again.</p>
 <p><a href="${String(context.roomsUrl)}">Find another slot</a></p>`),
       text: `Hello ${context.name},
 
-${bookings.length === 1 ? 'Your request was not approved.' : 'Your requests were not approved.'}
+${bookings.length === 1 ? 'Your request was turned down.' : 'Your requests were turned down.'}
 
 ${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
 

@@ -104,7 +104,7 @@ Counts: 24 MVP stories (C-101 to C-124), 6 V2 stories (C-201 to C-206), 2 Later 
   2. Each member has a personal feed URL covering their upcoming bookings; confirmed bookings appear as confirmed and pending requests as tentative.
   3. The feed URL contains a revocable token; regenerating it invalidates the old URL, and the URL grants access to that member's bookings only.
   4. Feed events carry correct times across DST transitions (VTIMEZONE for Europe/London); a 19:00 booking is 19:00 local in every client, in both halves of the year.
-  5. A cancelled or bumped booking disappears from the feed (or is marked cancelled) on the feed's next fetch.
+  5. A cancelled or bumped booking disappears from the feed (or is marked cancelled) on the feed's next fetch. **Amended by decision 0132**: the message that ends a booking (a cancellation, a closure, a bump) carries a calendar file that cancels its event, so a booking imported from a confirmation's file leaves the calendar too, and an approval or a series confirmed at once carries the booking's own file.
 - Source: Prompt Book C-1; audit RM-7 (calendar promised, never built).
 
 ## C-105: Instant booking within policy
