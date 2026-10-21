@@ -334,6 +334,47 @@ describe.skipIf(skip !== null)('the till layout is read, not deployed (F-111 cri
   })
 })
 
+describe.skipIf(skip !== null)('a category is dragged into its place on the till (0143)', () => {
+  const tillOrder = (): string[] => {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return (database.query('SELECT id FROM bar_categories ORDER BY sort, name COLLATE NOCASE').all() as { id: string }[]).map(row => row.id)
+    }
+    finally {
+      database.close()
+    }
+  }
+  const sorts = (): number[] => {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return (database.query('SELECT sort FROM bar_categories ORDER BY sort').all() as { sort: number }[]).map(row => row.sort)
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('a move puts it at that place and renumbers the rest around it, one audit row', async () => {
+    const first = await addCategory({ name: named('Dragged A'), sort: undefined })
+    const second = await addCategory({ name: named('Dragged B'), sort: undefined })
+
+    // Added with no place named, each goes last.
+    expect(tillOrder().slice(-2)).toEqual([first, second])
+
+    expect((await send('POST', `/api/admin/bar/categories/${second}/move`, { position: 0 })).status).toBe(200)
+    const moved = tillOrder()
+    expect(moved[0]).toBe(second)
+    expect(moved.at(-1)).toBe(first)
+    expect(sorts()).toEqual(moved.map((_, index) => index))
+    expect(auditCount('bar.category.moved', `bar-category:${second}`)).toBe(1)
+  })
+
+  test('an ordinary member cannot move one', async () => {
+    const category = await addCategory({ name: named('Not moved') })
+    expect((await send('POST', `/api/admin/bar/categories/${category}/move`, { position: 0 }, member.cookie)).status).toBe(403)
+  })
+})
+
 describe.skipIf(skip !== null)('every change is audited with a from and a to (F-111 criterion 5)', () => {
   test('creation names the actor and what was created', async () => {
     const categoryId = await addCategory()

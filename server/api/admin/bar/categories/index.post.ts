@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm'
 import { categoryForm } from '#shared/utils/bar'
 
-// Add a till category. The name is held once, whatever the capitals.
+// Add a till category, last on the till unless a place is named (0143). The name is held once,
+// whatever the capitals.
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'bar.write')
   const input = await readValidatedBodyOrThrow(event, categoryForm)
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
   const applied = await auditedWrite(
     db.all<{ id: string }>(sql`
       INSERT INTO bar_categories (id, name, sort, colour)
-      SELECT ${id}, ${input.name}, ${input.sort}, ${input.colour ?? null}
+      SELECT ${id}, ${input.name}, ${input.sort ?? sql`(SELECT coalesce(max(sort) + 1, 0) FROM bar_categories)`}, ${input.colour ?? null}
       WHERE NOT EXISTS (SELECT 1 FROM bar_categories WHERE name = ${input.name} COLLATE NOCASE)
       RETURNING id
     `),
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'bar.category.created',
       target: `bar-category:${id}`,
-      detail: { name: input.name, sort: input.sort },
+      detail: { name: input.name, sort: input.sort ?? 'last' },
     }),
   )
 

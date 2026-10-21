@@ -313,11 +313,15 @@ const hexColour = z.string().trim()
   .transform(value => value || null)
   .refine(value => value === null || /^#[0-9a-f]{6}$/i.test(value), 'A colour is six hexadecimal characters after a hash')
 
+// The order on the till is set by dragging (0143), so a form need not say it: a new category goes
+// last and an edit keeps its place. A caller that names one is still honoured.
 export const categoryForm = z.object({
   name: label('category'),
-  sort: z.number().int().min(0).max(999).default(0),
+  sort: z.number().int().min(0).max(999).optional(),
   colour: hexColour.nullish(),
 })
+
+export const categoryMoveForm = z.object({ position: z.number().int().min(0).max(999) })
 
 export const productForm = z.object({
   name: label('product'),
