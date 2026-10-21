@@ -203,7 +203,10 @@ bare "Loading…": a table carries its own loading state, and anything else hold
 `USkeleton` until the first read finishes (issue 1151 item 7).
 
 A refused or failed read is not an empty state either: the refusal or the failure is shown in its
-place, never "nothing here" (section 6).
+place, never "nothing here" (section 6). On a console screen that place is the whole screen:
+`ReadGate` draws the failure instead of the toolbar, the table and any create button, offers Try
+again only for a read that did not finish, and keeps the controls when the question itself was
+rejected (0119).
 
 ## 8. Buttons and labels
 
@@ -251,8 +254,11 @@ builds its own options object. `formatLondon()` (`shared/utils/london.ts`) is th
 underneath, and a page, a component or a shared helper calls the shapes rather than it.
 
 A year is shown only when the date falls outside the committee year in hand (0009), or when the
-caller asks for it with `{ year: true }`. An input keeps its machine value: only what is read
-changes. `toLocaleDateString`, `toLocaleString` and `toLocaleTimeString` are banned under `app/`,
+caller asks for it with `{ year: true }`. A span of days is said by `saysDayRange()`, which names
+the year whenever an end leaves the calendar year in hand, once at the end or at both ends when
+they differ (0117). Every shape is built from numbers and fixed names, never from the locale's
+joined string, so the server and the browser render the same characters. An input keeps its
+machine value: only what is read changes. `toLocaleDateString`, `toLocaleString` and `toLocaleTimeString` are banned under `app/`,
 and `tests/unit/admin-conventions.test.ts` and `tests/unit/design-language.test.ts` enforce that
 and the ban on a bespoke options object, the second against a named list that may shrink and may
 not grow.

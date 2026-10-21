@@ -34,6 +34,8 @@ const CONFIG: [string, unknown][] = [
   ['SHIFT_ELIGIBILITY_BAR_MODULE', 'ADMN-102'],
 ]
 
+const TAB_PERSONA = 'dev-member@e2e.newtheatre.org.uk'
+
 export function seedGovernance(target: SeedTarget, people: People, now: number): Governance {
   const officer = personIn(people, 'rowan').id
   const statements: BoundStatement[] = []
@@ -46,6 +48,17 @@ export function seedGovernance(target: SeedTarget, people: People, now: number):
       updated_at: now - 45 * DAY,
     }, '(key) DO NOTHING'))
   }
+
+  // The two people whose tabs the ledger already carries, and the ordinary member persona, so a
+  // developer can charge a tab at the till as somebody (F-108). Empty is the shipped default.
+  const tabHolders = [personIn(people, 'sam').id, personIn(people, 'iris').id, people.byEmail.get(TAB_PERSONA)?.id]
+    .filter((id): id is string => Boolean(id))
+  statements.push(insert('config', {
+    key: 'BAR_AUTHORISED_TAB_HOLDERS',
+    value: JSON.stringify(tabHolders),
+    updated_by: officer,
+    updated_at: now - 45 * DAY,
+  }, '(key) DO NOTHING'))
 
   target.batch(statements)
 
@@ -63,7 +76,7 @@ export function seedGovernance(target: SeedTarget, people: People, now: number):
     closed_at: now - 9 * DAY + 2 * 3600,
   })])
 
-  return { counts: { config: CONFIG.length, audit, inbox, notifications, drills } }
+  return { counts: { config: CONFIG.length + 1, audit, inbox, notifications, drills } }
 }
 
 // Through `auditEntry` even from a script, so the action catalogue governs every writer and not

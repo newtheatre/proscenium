@@ -47,7 +47,7 @@ const { data: listing, status: fetchStatus, error, refresh } = await useAsyncDat
 )
 
 const loading = computed(() => fetchStatus.value === 'pending')
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The declarations could not be read.') : null))
+const listingFailure = useListFailure(error, 'The declarations could not be read.')
 
 // The sidebar counts the pending declarations, so deciding one moves it too (issue 1334).
 const nav = useNavCounts()
@@ -171,15 +171,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -422,5 +418,5 @@ watch(modalOpen, (nowOpen) => {
         </UForm>
       </template>
     </ConfirmModal>
-  </div>
+  </ReadGate>
 </template>

@@ -22,7 +22,7 @@ const noStocktakes = (): Listing<Stocktake> => ({ items: [], total: 0, pageSize:
 // not only the page already on screen.
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(stocktakesList)
 
-const { data, status, error } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'bar-stocktakes',
   () => request<Listing<Stocktake>>('/api/admin/bar/stocktakes', { query: query.value }),
   { watch: [query], default: noStocktakes },
@@ -97,15 +97,11 @@ const columns: TableColumn<Stocktake>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure"
       data-test="open-failure"
@@ -166,5 +162,5 @@ const columns: TableColumn<Stocktake>[] = [
         :items-per-page="data.pageSize"
       />
     </div>
-  </div>
+  </ReadGate>
 </template>

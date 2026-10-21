@@ -4,7 +4,7 @@ import { saysClock } from '#shared/utils/when'
 import { openingHouseId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/challenge-25' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/challenge-25' })
 useSeoMeta({ title: 'Challenge 25 register' })
 
 interface Entry {

@@ -39,11 +39,12 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
 
 const empty = (): Listing => ({ venues: [], page: 1, pageSize: 0, total: 0, pages: 1 })
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'rota-shift-templates',
   () => request<Listing>('/api/admin/rota/templates', { query: query.value }),
   { watch: [query], default: empty },
 )
+const readFailure = useListFailure(error, 'The templates could not be read.')
 
 const editing = ref<VenueTemplate | null>(null)
 const open = ref(false)
@@ -236,7 +237,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -418,5 +423,5 @@ watch(modalOpen, (nowOpen) => {
       @update:open="value => { if (!value) stamping = null }"
       @confirm="stamp"
     />
-  </div>
+  </ReadGate>
 </template>

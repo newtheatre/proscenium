@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysDay, saysClock, saysDayLong } from '#shared/utils/when'
+import { saysDay, saysDayRange, saysClock, saysDayLong } from '#shared/utils/when'
 import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus, saysStamped } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
@@ -61,13 +61,14 @@ const waiting = computed<boolean>({
   },
 })
 
-const { data, status, refresh } = await useAsyncData(
+const { data, status, refresh, error } = await useAsyncData(
   'rota-shifts-board',
   () => request<Board>('/api/admin/rota/shifts/board', {
     query: { from: window.from, to: window.to, waiting: waiting.value || undefined },
   }),
   { watch: [() => window.from, () => window.to, waiting], default: (): Board => ({ items: [], waiting: 0 }) },
 )
+const readFailure = useListFailure(error, 'The rota could not be read.')
 
 const opened = defaultBoardWindow(new Date())
 
@@ -85,7 +86,7 @@ const activeFilters = computed<ActiveFilter[]>(() => {
   if (window.from === opened.from && window.to === opened.to) return []
   return [{
     key: 'window',
-    label: `${saysDay(window.from)} to ${saysDay(window.to)}`,
+    label: `${saysDayRange(window.from, window.to)}`,
     icon: 'i-lucide-calendar-range',
     clear: () => Object.assign(window, defaultBoardWindow(new Date())),
   }]
@@ -264,7 +265,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -760,5 +765,5 @@ watch(modalOpen, (nowOpen) => {
       @close="closeDecline"
       @decline="submitDecline"
     />
-  </div>
+  </ReadGate>
 </template>

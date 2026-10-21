@@ -25,6 +25,9 @@ const { data, status, error, refresh } = await useAsyncData(
   () => request<{ items: Demand[] }>('/api/admin/training/requests'),
   { default: () => ({ items: [] as Demand[] }) },
 )
+// A failed read and an empty one look the same, and "nobody is asking for anything" is an
+// answer a lead would act on. So a failure says so rather than rendering as quiet.
+const readFailure = useListFailure(error, 'The board could not be read.')
 
 // The sidebar counts open requests, so answering one moves it too (A-130 criterion 11, issue 1358).
 const nav = useNavCounts()
@@ -100,7 +103,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -113,20 +120,8 @@ watch(modalOpen, (nowOpen) => {
       What people are asking to be taught.
     </p>
 
-    <!-- A failed read and an empty one look the same, and "nobody is asking for anything" is an
-      answer a lead would act on. So a failure says so rather than rendering as quiet. -->
-    <UAlert
-      v-if="error"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-unplug"
-      data-test="load-failed"
-      title="The board could not be read"
-      :description="READ_AGAIN"
-    />
-
     <div
-      v-else-if="status === 'pending'"
+      v-if="status === 'pending'"
       class="flex items-center gap-3 text-muted"
     >
       <UIcon
@@ -243,5 +238,5 @@ watch(modalOpen, (nowOpen) => {
         </UFormField>
       </template>
     </ConfirmModal>
-  </div>
+  </ReadGate>
 </template>

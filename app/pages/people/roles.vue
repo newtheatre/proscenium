@@ -197,16 +197,11 @@ const columns: TableColumn<Holder>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="!register.permanentItManager"
       data-test="no-permanent-it-manager"
@@ -285,7 +280,7 @@ const columns: TableColumn<Holder>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ listingFailure ? listingFailure.message : filtered ? 'Nobody holds that.' : 'No role has been granted yet.' }}
+          {{ filtered ? 'Nobody holds that.' : 'No role has been granted yet.' }}
         </p>
       </template>
     </UTable>
@@ -294,7 +289,7 @@ const columns: TableColumn<Holder>[] = [
       v-if="!register.items.length"
       class="py-6 text-center text-sm text-muted sm:hidden"
     >
-      {{ listingFailure ? listingFailure.message : filtered ? 'Nobody holds that.' : 'No role has been granted yet.' }}
+      {{ filtered ? 'Nobody holds that.' : 'No role has been granted yet.' }}
     </p>
     <ul
       v-else
@@ -455,5 +450,5 @@ const columns: TableColumn<Holder>[] = [
       @update:open="value => { if (!value) revoking = null }"
       @confirm="revoke"
     />
-  </div>
+  </ReadGate>
 </template>

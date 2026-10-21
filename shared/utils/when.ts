@@ -1,6 +1,6 @@
 // The two reader-facing date shapes (copy-style §9): short in a list, long in prose. Every one
 // is Europe/London by construction (0014), and the separators are literal so no locale moves them.
-import { committeeYearOf, formatLondon, isMonthDay, startOfLondonDay } from './london'
+import { committeeYearOf, formatLondon, isMonthDay, londonParts, startOfLondonDay } from './london'
 
 // A number is epoch seconds, the wire convention throughout, or milliseconds above the line below.
 // A bare YYYY-MM-DD is a London day, not the UTC midnight `new Date` would take it for.
@@ -30,13 +30,17 @@ function showsYear(at: Date, options: WhenOptions): boolean {
   return committeeYearOf(at) !== committeeYearOf(options.now ?? new Date())
 }
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec']
+
+// Built from numbers, never from the locale's joined shape: browsers' ICU puts a comma after the
+// weekday that the server's does not, and the difference broke hydration on every dated page.
 function saysDate(at: Date, long: boolean, year: boolean): string {
-  const named = formatLondon(at, {
-    weekday: long ? 'long' : 'short',
-    day: 'numeric',
-    month: long ? 'long' : 'short',
-  })
-  return year ? `${named} ${formatLondon(at, { year: 'numeric' })}` : named
+  const { year: number, month, day } = londonParts(at)
+  const weekday = WEEKDAYS[new Date(Date.UTC(number, month - 1, day)).getUTCDay()]!
+  const named = `${long ? weekday : weekday.slice(0, 3)} ${day} ${(long ? MONTHS : SHORT_MONTHS)[month - 1]}`
+  return year ? `${named} ${number}` : named
 }
 
 // The 24-hour clock, because the box office prints 19:30 on the ticket.
@@ -75,4 +79,16 @@ export function saysWhen(value: When, options: WhenOptions = {}): string {
 export function saysWhenLong(value: When, options: WhenOptions = {}): string {
   const at = whenInstant(value)
   return `${saysDate(at, true, showsYear(at, options))} at ${saysClock(value)}`
+}
+
+// A span of days names its year whenever an end leaves the calendar year the reader is in, once
+// at the end when both share it and at both ends when they do not (0117).
+export function saysDayRange(from: When, to: When, options: Pick<WhenOptions, 'now'> = {}): string {
+  const first = whenInstant(from)
+  const last = whenInstant(to)
+  const thisYear = londonParts(options.now ?? new Date()).year
+  const firstYear = londonParts(first).year
+  const lastYear = londonParts(last).year
+  const dated = firstYear !== thisYear || lastYear !== thisYear
+  return `${saysDate(first, false, dated && firstYear !== lastYear)} to ${saysDate(last, false, dated)}`
 }
