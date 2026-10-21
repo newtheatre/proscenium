@@ -284,6 +284,15 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // Transactional: money handed back on the reader is told to whoever it went back to.
+  'reservation.refunded': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'reservation-refunded',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // Transactional, same reach as the confirmation it undoes (D-110 criterion 3).
   'reservation.cancelled': {
     topic: null,

@@ -314,6 +314,7 @@ export function qrStatusDisplay(
   cancelledBy: string | null,
   totalDue: string | null,
   exchangedTo: QrExchangedTo | null = null,
+  refunded: string | null = null,
 ): QrStatusDisplay {
   switch (status) {
     case 'PENDING':
@@ -321,7 +322,7 @@ export function qrStatusDisplay(
         ? { headline: 'Unpaid', detail: `${totalDue} due at the box office on the night.` }
         : { headline: 'Booked', detail: 'Nothing is due.' }
     case 'COLLECTED':
-      return { headline: 'Paid', detail: 'You paid for this at the box office.' }
+      return { headline: 'Paid', detail: refunded ? `You paid for this at the box office. ${refunded} of it was refunded.` : 'You paid for this at the box office.' }
     case 'DOOR':
       return { headline: 'Admitted', detail: 'Already checked in at the door.' }
     case 'EXPIRED':
@@ -335,7 +336,9 @@ export function qrStatusDisplay(
       }
       return {
         headline: 'Cancelled',
-        detail: cancelledBy === 'CUSTOMER' ? 'Cancelled by the booker.' : 'Cancelled by the box office.',
+        detail: cancelledBy === 'CUSTOMER'
+          ? 'Cancelled by the booker.'
+          : refunded ? `Cancelled by the box office. ${refunded} was refunded.` : 'Cancelled by the box office.',
       }
     case 'NO_SHOW':
       return { headline: 'No-show', detail: 'Recorded as not attended.' }

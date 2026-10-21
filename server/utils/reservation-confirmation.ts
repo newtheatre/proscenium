@@ -91,6 +91,8 @@ export interface WalkUpPaidContext {
   qrToken: string
   // Where the money was taken, which the email names: the till's walk-up or the desk's (D-115).
   paidAt: 'BAR' | 'DESK'
+  // A comp collected at the desk: nothing was paid, so the email says it was given.
+  comp?: boolean
 }
 
 // A walk-up sold to somebody who gave an address (F-123 criterion 2, D-115 criterion 6): the door
@@ -106,7 +108,35 @@ export async function sendWalkUpPaid(event: H3Event | undefined, context: WalkUp
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       paid: saysPrice(context.paidPence),
       paidAt: context.paidAt,
+      comp: context.comp === true,
       ...bookingLink(event, context.qrToken),
+    },
+  })
+}
+
+export interface RefundedContext {
+  userId: string
+  reservationId: string
+  refundedPence: number
+  // The last ticket: the desk cancels the booking once nothing is left on it (D-116 criterion 6).
+  cancelled: boolean
+}
+
+// Money handed back at the desk is told to the booker, with what is left of the booking, so a
+// refund never shows only as "Cancelled by the box office" (process map, 21 October).
+export async function sendReservationRefunded(event: H3Event | undefined, context: RefundedContext): Promise<void> {
+  const state = await reservationCurrentState(context.reservationId)
+  if (!state) return
+  await notify(event, {
+    userId: context.userId,
+    type: 'reservation.refunded',
+    context: {
+      name: '',
+      reference: state.reference,
+      show: state.showTitle,
+      when: formatLondon(new Date(state.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      refunded: saysPrice(context.refundedPence),
+      cancelled: context.cancelled,
     },
   })
 }

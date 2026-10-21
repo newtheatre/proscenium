@@ -1678,22 +1678,45 @@ The Nottingham New Theatre`,
     const reference = String(context.reference)
     const show = String(context.show)
     const when = String(context.when)
-    const paid = String(context.paid)
     const where = context.paidAt === 'DESK' ? 'at the box office' : 'at the bar'
+    const paid = context.comp === true ? `complimentary, given ${where}` : `${String(context.paid)}, paid ${where}`
     const url = String(context.url)
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
     return {
       subject: `Your tickets for ${show}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}, paid ${where}.</p>
+<p>Reference <strong>${reference}</strong> for ${show}, ${when}: ${paid}.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
       text: `Hello ${context.name},
 
-Reference ${reference} for ${show}, ${when}: ${paid}, paid ${where}.
+Reference ${reference} for ${show}, ${when}: ${paid}.
 
 Show this code at the door, or open it yourself: ${url}
+
+The Nottingham New Theatre`,
+    }
+  },
+  // A refund at the desk: how much went back, and whether the booking still stands.
+  'reservation-refunded': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    const refunded = String(context.refunded)
+    const after = context.cancelled === true
+      ? 'Every ticket on the booking has now been refunded, so it is cancelled and its code no longer admits anybody.'
+      : 'The rest of the booking stands, and the same code admits you.'
+    return {
+      subject: `${refunded} refunded on your booking for ${show}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${refunded} was refunded to your card at the box office on reference <strong>${reference}</strong> for ${show}, ${when}.</p>
+<p>${after}</p>`),
+      text: `Hello ${context.name},
+
+${refunded} was refunded to your card at the box office on reference ${reference} for ${show}, ${when}.
+
+${after}
 
 The Nottingham New Theatre`,
     }
