@@ -736,8 +736,11 @@ export function writeOffSizes(item: { unit: StockUnit, containerMl: number | nul
 }
 
 // The button that writes a movement says what it will write (issue 1350).
-export function saysMovementAction(movement: { kind: StockMovementKind, qty: number, unit: StockUnit, itemName: string, adds?: boolean }): string {
-  const amount = saysQuantity(Math.abs(movement.qty), movement.unit)
+export function saysMovementAction(movement: { kind: StockMovementKind, qty: number, unit: StockUnit, itemName: string, adds?: boolean, containerMl?: number | null }): string {
+  const per = movement.containerMl ?? 0
+  const amount = per > 0 && movement.qty % per === 0
+    ? `${Math.abs(movement.qty) / per} × ${per} ml`
+    : saysQuantity(Math.abs(movement.qty), movement.unit)
   if (movement.kind === 'WASTAGE') return `Write off ${amount} of ${movement.itemName}`
   if (movement.kind === 'DELIVERY') return `Record a delivery of ${amount} ${movement.unit === 'ML' ? 'of ' : ''}${movement.itemName}`
   return movement.adds ? `Add ${amount} to ${movement.itemName}` : `Take ${amount} off ${movement.itemName}`
@@ -958,6 +961,16 @@ export function saysMovementSource(table: string): string {
 // (F-114 criterion 2).
 export function saysQuantity(qty: number, unit: StockUnit): string {
   return unit === 'ML' ? `${qty} ml` : `${qty}`
+}
+
+// What a shelf of a measured item looks like, so nobody divides 3150 ml by 700 in their head
+// (0140). Null where there is no one container size, or nothing on the shelf to describe.
+export function saysInContainers(qty: number, containerMl: number | null): string | null {
+  if (!containerMl || qty <= 0) return null
+  const full = Math.floor(qty / containerMl)
+  const part = qty % containerMl
+  if (full === 0) return `${part} ml open`
+  return `${full} full${part ? ` and ${part} ml open` : ''}`
 }
 
 // Negative reads as minus-sign-before-currency, never a bare hyphen glued to the pound sign (#908).

@@ -82,6 +82,9 @@ describe('a movement is named before it is written', () => {
     expect(saysMovementAction({ kind: 'DELIVERY', qty: 24, unit: 'ITEM', itemName: 'Cider can' })).toBe('Record a delivery of 24 Cider can')
     expect(saysMovementAction({ kind: 'ADJUST', qty: 3, unit: 'ITEM', itemName: 'Crisps', adds: true })).toBe('Add 3 to Crisps')
     expect(saysMovementAction({ kind: 'ADJUST', qty: 3, unit: 'ITEM', itemName: 'Crisps', adds: false })).toBe('Take 3 off Crisps')
+    // 0140: a delivery counted in whole containers says so.
+    expect(saysMovementAction({ kind: 'DELIVERY', qty: 2100, unit: 'ML', itemName: 'Gin', containerMl: 700 })).toBe('Record a delivery of 3 × 700 ml of Gin')
+    expect(saysMovementAction({ kind: 'DELIVERY', qty: 250, unit: 'ML', itemName: 'Gin', containerMl: 700 })).toBe('Record a delivery of 250 ml of Gin')
   })
 
   test('a write-off offers the amounts poured from the item, and the whole container once', () => {

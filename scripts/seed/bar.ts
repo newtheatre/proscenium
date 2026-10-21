@@ -2,6 +2,7 @@
 // stocktake applied and another open, and a till session for tonight and one already closed.
 
 import { deliveryCost } from '../../shared/utils/bar'
+import type { ServingKind } from '../../shared/utils/bar'
 import { londonDayOf } from '../../shared/utils/ledger'
 import { ensure, holds, insert, insertOnly, seedId } from './statements'
 import { personIn } from './people'
@@ -51,7 +52,7 @@ const ITEMS: SeedItem[] = [
 
 interface SeedVariant {
   slug: string
-  servingKind: string
+  servingKind: ServingKind
   label: string
   // Left out on one variant per category, so the category default is what resolves it (F-121).
   pricePence?: number
@@ -84,10 +85,10 @@ const CATEGORIES: { slug: string, name: string, sort: number, colour: string | n
 
 // Every spirit is the same price as a single and as a double, which is what a category price is
 // for: the doubles below that differ carry a price row of their own (0017, F-121).
-const CATEGORY_PRICES: { category: string, servingKind: string, pricePence: number }[] = [
+const CATEGORY_PRICES: { category: string, servingKind: ServingKind, pricePence: number }[] = [
   { category: 'spirits', servingKind: 'single', pricePence: 250 },
   { category: 'spirits', servingKind: 'double', pricePence: 400 },
-  { category: 'soft', servingKind: 'glass', pricePence: 120 },
+  { category: 'soft', servingKind: '250ml', pricePence: 120 },
 ]
 
 const CHOICE_GROUPS: { slug: string, name: string, options: { item: string, qty: number }[] }[] = [
@@ -225,8 +226,8 @@ const PRODUCTS: SeedProduct[] = [
     ageRestricted: false,
     allergenState: 'NONE',
     variants: [
-      { slug: 'glass', servingKind: 'glass', label: 'Glass', choice: 'mixers' },
-      { slug: 'large', servingKind: 'large', label: 'Large glass', pricePence: 180, choice: 'mixers' },
+      { slug: 'glass', servingKind: '250ml', label: 'Glass', choice: 'mixers' },
+      { slug: 'large', servingKind: 'pint', label: 'Large glass', pricePence: 180, choice: 'mixers' },
     ],
   },
   {
@@ -236,7 +237,7 @@ const PRODUCTS: SeedProduct[] = [
     status: 'ACTIVE',
     ageRestricted: false,
     allergenState: 'NONE',
-    variants: [{ slug: 'bag', servingKind: 'bag', label: 'Bag', pricePence: 100, recipe: { item: 'crisps', qty: 1 } }],
+    variants: [{ slug: 'bag', servingKind: 'item', label: 'Bag', pricePence: 100, recipe: { item: 'crisps', qty: 1 } }],
   },
   {
     slug: 'chocolate',
@@ -245,7 +246,7 @@ const PRODUCTS: SeedProduct[] = [
     status: 'ACTIVE',
     ageRestricted: false,
     allergenState: 'NONE',
-    variants: [{ slug: 'bar', servingKind: 'bar', label: 'Bar', pricePence: 110, recipe: { item: 'chocolate', qty: 1 } }],
+    variants: [{ slug: 'bar', servingKind: 'item', label: 'Bar', pricePence: 110, recipe: { item: 'chocolate', qty: 1 } }],
   },
   {
     slug: 'mulled-wine',
@@ -257,7 +258,7 @@ const PRODUCTS: SeedProduct[] = [
     // What the bar adds to the wine it pours: the one product-level answer left (issue 1348).
     allergenState: 'RECORDED',
     allergenNote: 'Mulled with cinnamon and cloves.',
-    variants: [{ slug: 'mug', servingKind: 'mug', label: 'Mug', pricePence: 300, recipe: { item: 'house-red', qty: 200 } }],
+    variants: [{ slug: 'mug', servingKind: 'item', label: 'Mug', pricePence: 300, recipe: { item: 'house-red', qty: 200 } }],
   },
   {
     slug: 'alcopop',
@@ -407,7 +408,7 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
   }
 }
 
-function categoryPriceOf(category: string, servingKind: string): number {
+function categoryPriceOf(category: string, servingKind: ServingKind): number {
   const found = CATEGORY_PRICES.find(price => price.category === category && price.servingKind === servingKind)
   return found?.pricePence ?? 0
 }

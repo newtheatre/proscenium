@@ -439,7 +439,10 @@ const columns: TableColumn<ProductVariant>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'flex flex-wrap items-center gap-2' }, [
         h('span', {}, row.original.label),
-        h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => says(row.original.servingKind)),
+        // The kind a category default prices on, shown only where the label does not already say it.
+        row.original.label.trim().toLowerCase() === says(row.original.servingKind).toLowerCase()
+          ? null
+          : h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => says(row.original.servingKind)),
         row.original.status === 'RETIRED'
           ? h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Retired')
           : null,

@@ -1033,12 +1033,14 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, `[data-test="deliver-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
 
-    await fillNumber(view, '[data-test="movement-qty"]', '250')
-    await waitFor(view, `document.querySelector('[data-test="movement-submit"]')?.textContent.includes('Record a delivery of 250 ml')`)
+    // 0140: a 750 ml item's delivery is counted in whole bottles, and the register holds millilitres.
+    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Full containers')
+    await fillNumber(view, '[data-test="movement-qty"]', '2')
+    await waitFor(view, `document.querySelector('[data-test="movement-submit"]')?.textContent.includes('Record a delivery of 2 × 750 ml')`)
     await click(view, '[data-test="movement-submit"]')
     await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
 
-    expect(await onHand(itemId)).toBe(3250)
+    expect(await onHand(itemId)).toBe(4500)
     view.close()
   }, 120_000)
 
@@ -1116,7 +1118,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
     expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost of one container')
 
-    await fillNumber(view, '[data-test="movement-qty"]', '4200')
+    await fillNumber(view, '[data-test="movement-qty"]', '6')
     // £6.50 for 700 ml is 0.93p a ml, which a whole penny a ml kept as £7.00 a bottle (issue 1320).
     await fillNumber(view, '[data-test="movement-cost"]', '6.5')
     await click(view, '[data-test="movement-submit"]')

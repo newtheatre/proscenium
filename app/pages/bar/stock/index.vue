@@ -11,6 +11,7 @@ import {
   movementEntryForm,
   says,
   saysMovementAction,
+  saysInContainers,
   saysQuantity,
   saysStockStatus,
   stockItemForm,
@@ -142,9 +143,27 @@ const MOVEMENT_TITLES: Record<HandEnteredKind, string> = {
 // An empty or unreadable field is no amount: NaN is not above nothing either.
 const hasAmount = computed(() => (movement.qty ?? 0) > 0)
 
+// A delivery comes in whole bottles or kegs, so it is counted in them where the item has one
+// size, as opening stock and a stocktake are (0140); the register still holds millilitres.
+const containerMl = computed(() => (movement.kind === 'DELIVERY' && moving.value?.unit === 'ML' ? moving.value.containerMl ?? null : null))
+const inUnit = computed(() => (movement.qty ?? 0) * (containerMl.value ?? 1))
+
 const submitLabel = computed(() => (moving.value && hasAmount.value
-  ? saysMovementAction({ kind: movement.kind, qty: movement.qty ?? 0, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds })
+  ? saysMovementAction({ kind: movement.kind, qty: inUnit.value, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds, containerMl: containerMl.value })
   : 'Say how much first'))
+
+const qtyQuestion = computed(() => {
+  if (containerMl.value) {
+    return {
+      label: 'Full containers',
+      description: `How many full ${containerMl.value} ml bottles or kegs came in${hasAmount.value ? `: ${inUnit.value} ml` : ''}. This adds to what is on hand.`,
+    }
+  }
+  return {
+    label: 'Quantity',
+    description: `In ${moving.value ? says(moving.value.unit).toLowerCase() : 'the item\'s own unit'}. This ${adding.value ? 'adds to' : 'comes off'} what is on hand.`,
+  }
+})
 
 async function save(): Promise<void> {
   saving.value = true
@@ -182,7 +201,7 @@ async function save(): Promise<void> {
 // The screen states the sign rather than leaving somebody to type a minus. A delivery only adds,
 // wastage only takes away, and an adjustment is whichever the manager chose.
 const adding = computed(() => movement.kind === 'DELIVERY' || (movement.kind === 'ADJUST' && movement.adds))
-const signedQty = computed(() => (adding.value ? Math.abs(movement.qty ?? 0) : -Math.abs(movement.qty ?? 0)))
+const signedQty = computed(() => (adding.value ? Math.abs(inUnit.value) : -Math.abs(inUnit.value)))
 
 async function record(): Promise<void> {
   const item = moving.value
@@ -324,6 +343,7 @@ const columns: TableColumn<StockItem>[] = [
       // instead, so a phone keeps the row actions in view without losing what they said (922).
       h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
         `${saysQuantity(row.original.onHand, row.original.unit)} on hand`,
+        row.original.unit === 'ML' && saysInContainers(row.original.onHand, row.original.containerMl) ? ` (${saysInContainers(row.original.onHand, row.original.containerMl)})` : '',
         row.original.parQty === null ? '' : `, par ${saysQuantity(row.original.parQty, row.original.unit)}`,
         stockStatus(row.original.onHand, row.original.parQty) === null ? '' : `, ${saysStockStatus(stockStatus(row.original.onHand, row.original.parQty)!).toLowerCase()}`,
         row.original.category ? `, ${row.original.category}` : '',
@@ -334,7 +354,15 @@ const columns: TableColumn<StockItem>[] = [
     id: 'onHand',
     header: 'On hand',
     meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
-    cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit),
+    cell: ({ row }) => {
+      const shelf = row.original.unit === 'ML' ? saysInContainers(row.original.onHand, row.original.containerMl) : null
+      return shelf === null
+        ? saysQuantity(row.original.onHand, row.original.unit)
+        : h('div', {}, [
+            h('div', {}, saysQuantity(row.original.onHand, row.original.unit)),
+            h('div', { 'class': 'font-sans text-xs text-muted', 'data-test': `on-hand-containers-${row.original.id}` }, shelf),
+          ])
+    },
   },
   {
     id: 'par',
@@ -725,10 +753,10 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
-            label="Quantity"
+            :label="qtyQuestion.label"
             name="qty"
             required
-            :description="`In ${moving ? says(moving.unit).toLowerCase() : 'the item\'s own unit'}. This ${adding ? 'adds to' : 'comes off'} what is on hand.`"
+            :description="qtyQuestion.description"
           >
             <WholeField
               v-model="movement.qty"
