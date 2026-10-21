@@ -22,7 +22,11 @@ export const MAX_TICKET_TYPE_NAME = 80
 // that takes pence.
 export const MAX_TICKET_PRICE_PENCE = 100_000
 
-const pence = z.number().int().nonnegative().max(MAX_TICKET_PRICE_PENCE)
+// Each refusal says what to type: a field never turns -5 into nought or 7.555 into £7.55 (0125).
+const pence = z.number({ error: 'Type a price in pounds and pence, such as 7.50' })
+  .int('Type a price in pounds and pence, such as 7.50')
+  .nonnegative('A price cannot be below nought')
+  .max(MAX_TICKET_PRICE_PENCE, 'A ticket costs at most £1,000.00')
 
 // Name, price and description are what an operator may change. Access kind is what a sold ticket
 // was sold under, so it is set once (D-119 criterion 2). Kind is not asked: every made type is SINGLE (0074).

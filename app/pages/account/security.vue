@@ -2,6 +2,7 @@
 import { renderSVG } from 'uqr'
 import { securityNextStep } from '#shared/utils/sign-in-methods'
 import { saysDayLong } from '#shared/utils/when'
+import { groupedSecret } from '#shared/utils/totp'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/getting-started/your-account' })
 
@@ -278,7 +279,7 @@ useSeoMeta({ title: 'Security' })
           data-test="mfa-secret"
           class="font-mono text-sm break-all text-muted"
         >
-          {{ secret }}
+          {{ groupedSecret(secret) }}
         </p>
 
         <UForm

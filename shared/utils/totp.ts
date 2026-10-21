@@ -43,6 +43,11 @@ export function base32Decode(encoded: string): Uint8Array {
   return new Uint8Array(out)
 }
 
+// Read back in fours for typing into an authenticator, which ignores the spaces.
+export function groupedSecret(secret: string): string {
+  return secret.match(/.{1,4}/g)?.join(' ') ?? ''
+}
+
 export function generateSecret(): string {
   return base32Encode(crypto.getRandomValues(new Uint8Array(TOTP_SECRET_BYTES)))
 }

@@ -267,7 +267,7 @@ onUnmounted(() => {
       />
     </div>
     <p class="pt-2 text-center text-sm text-muted">
-      The door never sells tickets: unpaid and walk-ups go to the bar.
+      The door never sells tickets: unpaid bookings and walk-ups pay at the bar or the box office desk.
     </p>
   </div>
 </template>

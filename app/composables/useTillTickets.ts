@@ -4,6 +4,7 @@ import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
 import { newestRequest } from '#shared/utils/night-cache'
+import { openingHouseId } from '#shared/utils/tonight'
 import type { TillBooking, WalkUpOption } from '#shared/utils/sale'
 import type { ScannerFailure } from '#shared/utils/door'
 import type { TillSession } from '#shared/utils/till'
@@ -94,13 +95,19 @@ export function useTillTickets(venueId: Ref<string | null>, session: Ref<TillSes
   const walkUpQty = ref<Record<string, number>>({})
   const walkUpGuestName = ref('')
   const walkUpGuestEmail = ref('')
+  // The booker's say-so for an address already held in another name (0123), forgotten if it changes.
+  const walkUpGuestExistingAccount = ref(false)
+  watch(walkUpGuestEmail, () => {
+    walkUpGuestExistingAccount.value = false
+  })
 
   const walkUpLines = ref<WalkUpLine[]>([])
   const walkUpsPence = computed(() => walkUpLines.value.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0))
 
   const tonightsPerformances = computed(() => authority.value.performances)
+  // The house the header names, so a walk-up starts on the show already on screen (issue 901).
   watch(tonightsPerformances, (performances) => {
-    if (!walkUpPerformanceId.value && performances.length === 1) walkUpPerformanceId.value = performances[0]!.id
+    if (!walkUpPerformanceId.value) walkUpPerformanceId.value = openingHouseId(performances) ?? undefined
   }, { immediate: true })
 
   // The newest read alone may answer, so a slower one for a house no longer chosen never prices the
@@ -147,7 +154,7 @@ export function useTillTickets(venueId: Ref<string | null>, session: Ref<TillSes
   const walkUpGuest = computed(() => {
     const name = walkUpGuestName.value.trim()
     const email = walkUpGuestEmail.value.trim()
-    return name && email ? { name, email } : null
+    return name && email ? { name, email, existingAccount: walkUpGuestExistingAccount.value } : null
   })
   const walkUpGuestIncomplete = computed(() => Boolean(walkUpGuestName.value.trim()) !== Boolean(walkUpGuestEmail.value.trim()))
 
@@ -156,6 +163,7 @@ export function useTillTickets(venueId: Ref<string | null>, session: Ref<TillSes
     walkUpLines.value = []
     walkUpGuestName.value = ''
     walkUpGuestEmail.value = ''
+    walkUpGuestExistingAccount.value = false
     found.value = []
     lookupTerm.value = ''
   }
@@ -181,6 +189,7 @@ export function useTillTickets(venueId: Ref<string | null>, session: Ref<TillSes
     walkUpQty,
     walkUpGuestName,
     walkUpGuestEmail,
+    walkUpGuestExistingAccount,
     walkUpLines,
     walkUpsPence,
     tonightsPerformances,

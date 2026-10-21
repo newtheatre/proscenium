@@ -1,19 +1,21 @@
 import { z } from 'zod'
-import { addDays } from '#shared/utils/series'
 import { currentShowNight, isShowNight } from '#shared/utils/show-night'
 
 const query = z.object({ night: z.string().refine(isShowNight, 'Not a valid night').optional() })
 
-// Today's performance(s), with the adjacent nights to browse to either side (criterion 1).
+// A night's performances, with the nearest night either side that has one (criterion 1): null where
+// nothing is on in that direction at all.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'ticketing.read')
   const { night } = await getValidatedQueryOrThrow(event, query)
   const on = night ?? currentShowNight()
+  const { previousNight, nextNight } = await neighbouringNights(on)
 
   return {
     night: on,
-    previousNight: addDays(on, -1),
-    nextNight: addDays(on, 1),
+    tonight: currentShowNight(),
+    previousNight,
+    nextNight,
     performances: await performancesForNight(on),
   }
 })

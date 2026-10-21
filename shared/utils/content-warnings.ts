@@ -68,8 +68,8 @@ export const WARNING_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const optionalText = (max: number) => z.string().trim().max(max).nullish()
 
 export const contentWarningForm = z.object({
-  slug: z.string().trim().min(1, 'A warning needs a slug').max(MAX_WARNING_SLUG)
-    .refine(value => WARNING_SLUG.test(value), 'A slug is lowercase words joined by hyphens'),
+  slug: z.string().trim().min(1, 'A warning needs a web address').max(MAX_WARNING_SLUG)
+    .refine(value => WARNING_SLUG.test(value), 'A web address is lowercase words joined by hyphens'),
   title: z.string().trim().min(1, 'A warning needs a title').max(MAX_WARNING_TITLE),
   kind: z.enum(CONTENT_WARNING_KINDS),
   category: optionalText(80),

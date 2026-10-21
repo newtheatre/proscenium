@@ -293,6 +293,16 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // Transactional: a preference cannot hide that a performance is off, and a guest is owed it as
+  // much as a member (D-121 criterion 5).
+  'reservation.performance-cancelled': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'reservation-performance-cancelled',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // Transactional (the pass exists because of this message, not despite a preference), reaching
   // an unverified account the same way a reservation confirmation does (D-124 criterion 5).
   'pass.issued': {

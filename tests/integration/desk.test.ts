@@ -6,7 +6,9 @@ import {
   deskReservationQuery,
   deskSearchQuery,
   deskSummaryQuery,
+  deskRefundedTicketsQuery,
   deskTicketsQuery,
+  neighbouringNightsQuery,
   onShiftQuery,
   performancesForNightQuery,
 } from '#server/utils/desk'
@@ -56,6 +58,28 @@ describe('performancesForNightQuery finds only the night asked for', () => {
       const seeded = tonightsPerformance(database)
       const found = read<{ id: string }>(database, performancesForNightQuery(seeded.night))
       expect(found.map(row => row.id)).toEqual([seeded.performanceId])
+    })
+  })
+})
+
+// The arrows step to the nearest night with something on, so a run a month away is two presses,
+// not thirty-seven (D-114 criterion 1).
+describe('neighbouringNightsQuery skips the nights with nothing on', () => {
+  test('the nearest night either side with a performance, however far', async () => {
+    await withDatabase((database) => {
+      tonightsPerformance(database, { night: '2026-10-13', suffix: 'a' })
+      tonightsPerformance(database, { night: '2026-11-20', suffix: 'b' })
+      tonightsPerformance(database, { night: '2026-11-21', suffix: 'c' })
+      const [around] = read<{ previousNight: string | null, nextNight: string | null }>(database, neighbouringNightsQuery('2026-10-20'))
+      expect(around).toEqual({ previousNight: '2026-10-13', nextNight: '2026-11-20' })
+    })
+  })
+
+  test('the night itself is neither neighbour, and nothing beyond is null', async () => {
+    await withDatabase((database) => {
+      tonightsPerformance(database, { night: '2026-10-13', suffix: 'a' })
+      const [around] = read<{ previousNight: string | null, nextNight: string | null }>(database, neighbouringNightsQuery('2026-10-13'))
+      expect(around).toEqual({ previousNight: null, nextNight: null })
     })
   })
 })
@@ -260,6 +284,24 @@ describe('deskReservationQuery and deskTicketsQuery read the collection screen i
 
       const tickets = read<{ ticketId: string, ticketTypeName: string, pricePaid: number, accessKind: string | null }>(database, deskTicketsQuery('r-1'))
       expect(tickets).toEqual([{ ticketId: 't-1', ticketTypeName: 'Standard', pricePaid: 900, accessKind: null }])
+    })
+  })
+
+  // A refund takes the ticket off what is owed, never off the booking's history on screen.
+  test('a refunded ticket leaves the owed list and stays on the refunded one', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
+      reservation(database, 'r-1', seeded.performanceId, 'u-1', 'COLLECTED')
+      database.batch([['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-1', 'Standard', 900, 'SINGLE']])
+      ticket(database, 't-1', 'r-1', seeded.performanceId, 'tt-1', 900)
+      ticket(database, 't-2', 'r-1', seeded.performanceId, 'tt-1', 900)
+      database.batch([['UPDATE tickets SET refunded_at = unixepoch() WHERE id = ?', 't-2']])
+
+      expect(read<{ ticketId: string }>(database, deskTicketsQuery('r-1')).map(row => row.ticketId)).toEqual(['t-1'])
+      const refunded = read<{ ticketId: string, ticketTypeName: string, pricePaid: number }>(database, deskRefundedTicketsQuery('r-1'))
+      expect(refunded.map(row => ({ ticketId: row.ticketId, ticketTypeName: row.ticketTypeName, pricePaid: row.pricePaid })))
+        .toEqual([{ ticketId: 't-2', ticketTypeName: 'Standard', pricePaid: 900 }])
     })
   })
 })

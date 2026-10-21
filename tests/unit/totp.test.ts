@@ -6,6 +6,7 @@ import {
   codeForStep,
   enrolmentUri,
   generateSecret,
+  groupedSecret,
   stepFor,
   verifyCode,
 } from '#shared/utils/totp'
@@ -125,5 +126,16 @@ describe('enrolment', () => {
     expect(uri.searchParams.get('digits')).toBe('6')
     expect(uri.searchParams.get('period')).toBe('30')
     expect(uri.searchParams.get('algorithm')).toBe('SHA1')
+  })
+})
+
+// Typed by hand into an authenticator, so read back in fours like any long key.
+describe('the secret is shown in groups of four', () => {
+  test('a 32-character secret reads as eight groups, and decodes the same with or without the spaces', () => {
+    const secret = generateSecret()
+    const grouped = groupedSecret(secret)
+    expect(grouped.split(' ')).toHaveLength(Math.ceil(secret.length / 4))
+    expect(grouped.replaceAll(' ', '')).toBe(secret)
+    expect(groupedSecret('ABCDEFGHIJ')).toBe('ABCD EFGH IJ')
   })
 })

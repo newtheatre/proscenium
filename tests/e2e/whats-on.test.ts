@@ -594,6 +594,22 @@ describe.skipIf(skip !== null)('the pages read without an account', () => {
     }
   }, CASE_TIMEOUT_MS)
 
+  // A price beside "Cancelled" reads as something still on sale.
+  test('a cancelled performance on the show page says so and quotes no prices', async () => {
+    const show = await publishedShow()
+    expect((await send('POST', `/api/admin/performances/${show.performanceId}/cancel`, {})).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/shows/${show.slug}`, '[data-test="show-page"]')
+      await waitFor(view, `document.querySelector('[data-test="cancelled-${show.performanceId}"]') !== null`)
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="prices-${show.performanceId}"]') === null`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('a draft show\'s address is a 404 page, not a thin one', async () => {
     const created = await newShow()
     await addPerformance(created.id)

@@ -5,6 +5,7 @@ import { saysClock, saysDay, saysWhenLong } from '#shared/utils/when'
 import { SAYS_BOOKING_HOLDS, SAYS_PAYMENT, TO_BE_CONFIRMED, saysHowToPay, saysLatecomers } from '#shared/utils/programme'
 import { pounds, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
 import { DEFAULT_OG_IMAGE, SITE_ADDRESS } from '#shared/utils/seo'
+import { saysRunningTime } from '#shared/utils/night-hub'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
 
 // Deliberately public: one show, its warnings and the practical details somebody needs before they
@@ -197,7 +198,7 @@ function saysInterval(performance: ListedPerformance): string {
                 Running time
               </dt>
               <dd data-test="running-time">
-                {{ shape?.durationMinutes ? `${shape.durationMinutes} minutes` : TO_BE_CONFIRMED }}
+                {{ shape?.durationMinutes ? saysRunningTime(shape.durationMinutes) : TO_BE_CONFIRMED }}
               </dd>
             </div>
             <div>
@@ -503,7 +504,7 @@ function saysInterval(performance: ListedPerformance): string {
             </p>
 
             <p
-              v-if="performance.prices.length"
+              v-if="performance.prices.length && !performance.cancelled"
               class="font-mono text-sm text-muted"
               :data-test="`prices-${performance.id}`"
             >

@@ -367,6 +367,46 @@ describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once 
     expect(entry?.detail.ticketsOwedARefund).toBe(0)
   })
 
+  test('every booking with an account is emailed once, with the reason, and the reason stays out of the trail', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+    const database = new Database(app.databaseFile)
+    try {
+      for (const [suffix, status] of [['paid', 'COLLECTED'], ['unpaid', 'PENDING'], ['gone', 'CANCELLED']] as const) {
+        database.run(
+          'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          [`r-${suffix}-${performance}`, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, status, 'WEB'],
+        )
+      }
+    }
+    finally {
+      database.close()
+    }
+
+    const answered = await send('POST', `/api/admin/performances/${performance}/cancel`, { reason: 'The lead is unwell' })
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toMatchObject({ status: 'CANCELLED', bookingsTold: 2 })
+    expect((await send('POST', `/api/admin/performances/${performance}/cancel`, { reason: 'Again' })).status).toBe(409)
+
+    const readOnly = new Database(app.databaseFile, { readonly: true })
+    try {
+      const told = readOnly
+        .query(`SELECT claim FROM notification_log WHERE user_id = ? AND type = 'reservation.performance-cancelled' AND claim LIKE ?`)
+        .all(member.id, `%${performance}`) as { claim: string }[]
+      expect(told.map(row => row.claim).sort()).toEqual([
+        `reservation.performance-cancelled:r-paid-${performance}`,
+        `reservation.performance-cancelled:r-unpaid-${performance}`,
+      ])
+    }
+    finally {
+      readOnly.close()
+    }
+
+    const entry = trail<{ detail: Record<string, unknown> }>('performance.cancelled', `performance:${performance}`)
+    expect(entry?.detail.bookingsTold).toBe(2)
+    expect(JSON.stringify(entry?.detail)).not.toContain('unwell')
+  })
+
   test('a cancelled performance cannot be put back on sale by the sale action', async () => {
     const id = await newShow()
     const performance = await addPerformance(id)
@@ -922,25 +962,28 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect((await send('POST', '/api/admin/ticket-types', { name: access, price: 900, accessKind: 'ACCESS' })).status).toBe(200)
 
     const view = await signedIn()
-    await visit(view, `${app.baseURL}/box-office/shows/${id}`, '[data-test="publish"]')
+    await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, `[data-test="sale-${performance}"]`)
     await click(view, '[data-test="publish"]')
     await waitFor(view, `document.querySelector('[data-test="publish-night-${performance}"]')`)
     const night = await textOf(view, `[data-test="publish-night-${performance}"]`)
     expect(night).toContain('The Test House')
-    expect(night).toContain('2h 15')
+    expect(night).toContain('2 hours 15 minutes')
     expect(night).toContain('No shifts')
     expect(await textOf(view, '[data-test="publish-warnings"]')).toContain('Not yet assessed')
     expect(await textOf(view, '[data-test="publish-poster"]')).toContain('No poster')
     expect(await textOf(view, '[data-test="confirm-publish"]')).toContain('Put on sale')
 
-    // What a booker pays, never an access seat, which is not bought on its own.
+    // What a booker pays, and an access seat on its own line, since it is not bought on its own.
     await waitFor(view, `!document.querySelector('[data-test="publish-prices"]')?.textContent.includes('Reading the prices')`)
-    const prices = await textOf(view, '[data-test="publish-prices"]')
+    const prices = await textOf(view, '[data-test="publish-booker-prices"]')
     expect(prices).toContain(`${standard} £9.00`)
     expect(prices).not.toContain(access)
+    expect(await textOf(view, '[data-test="publish-access-prices"]')).toContain(`${access} £9.00`)
 
     await click(view, '[data-test="confirm-publish"]')
     await waitFor(view, `document.querySelector('[data-test="show-status"]')?.textContent.includes('Published')`)
+    // The rows below follow the publish without a reload.
+    await waitFor(view, `document.querySelector('[data-test="sale-${performance}"]')?.textContent.includes('Off sale')`)
     view.close()
   }, 120_000)
 
