@@ -110,13 +110,15 @@ function event(booking: CalendarEvent, host: string): string[] {
   ]
 }
 
-export function calendarFor(bookings: CalendarEvent[], options: { name: string, host: string }): string {
+// CANCEL is what makes a client take away an event it imported from an earlier file: a PUBLISH
+// marked cancelled is struck through by some and ignored by others (RFC 5546, C-104 criterion 5).
+export function calendarFor(bookings: CalendarEvent[], options: { name: string, host: string, method?: 'PUBLISH' | 'CANCEL' }): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//The Nottingham New Theatre//Rooms//EN',
     'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
+    `METHOD:${options.method ?? 'PUBLISH'}`,
     `X-WR-CALNAME:${escapeText(options.name)}`,
     `X-WR-TIMEZONE:${LONDON_TZID}`,
     ...VTIMEZONE,

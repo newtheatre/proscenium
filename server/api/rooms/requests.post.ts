@@ -1,5 +1,5 @@
 import { requestForm } from '#shared/utils/requests'
-import { bookingTier, maskConflicts } from '#shared/utils/bookings'
+import { bookingTier, maskConflicts, saysClash } from '#shared/utils/bookings'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { formatLondon } from '#shared/utils/london'
 
@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
   }))
 
   if (!claimed.won && claimed.why === 'closed') {
-    throw (await closedOver(event, room.id, from, to)) ?? createError({ statusCode: 409, statusMessage: 'Somebody booked that slot first' })
+    throw (await closedOver(event, room.id, from, to)) ?? createError({ statusCode: 409, statusMessage: 'That slot could not be held. Try again.' })
   }
   if (!claimed.won && claimed.why === 'gone') {
     throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
   if (!claimed.won) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Somebody booked that slot first',
+      statusMessage: saysClash(claimed.conflicts, account.id),
       data: { conflicts: maskConflicts(claimed.conflicts, permissions.has('rooms.read')) },
     })
   }
@@ -102,7 +102,7 @@ export default defineEventHandler(async (event) => {
         room: room.name,
         title: input.title,
         when: formatLondon(startsAt, { dateStyle: 'full', timeStyle: 'short' }),
-        queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests`,
+        queueUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/manage/requests`,
       },
     })
   }

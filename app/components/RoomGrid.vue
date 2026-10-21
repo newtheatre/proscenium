@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
-import { saysClock } from '#shared/utils/when'
+import { fromLondonWallClock, londonClock, londonWeekday } from '#shared/utils/london'
+import { clickSpan, saysRoomClosure, slotInstant, slotPassed } from '#shared/utils/room-grid'
 import type { RoomHours } from '#shared/utils/rooms'
 
 // One grid, two shapes. A column is a room on a day, so a week of one room and a day of every
@@ -86,10 +86,17 @@ function inDrag(column: GridColumn, minutes: number): boolean {
 // caller send only the click. So click is the fallback, suppressed when a drag just answered.
 const dragged = ref(false)
 
+// An hour from the slot pressed, as the calendar says, cut short where the room stops being free:
+// a quarter of an hour is shorter than any booking the policy takes.
+function pickHour(column: GridColumn, minutes: number): void {
+  const span = clickSpan(minutes, props.slotMinutes, at => stateOf(column, at) === 'free')
+  emit('pick', column, clockAt(span.from), clockAt(Math.min(span.to, 24 * 60 - 1)))
+}
+
 function pick(column: GridColumn, minutes: number): void {
   if (dragged.value) return
   if (!byTouch.value) {
-    emit('pick', column, clockAt(minutes), clockAt(minutes + props.slotMinutes * 4))
+    pickHour(column, minutes)
     return
   }
 
@@ -113,6 +120,12 @@ function finish(column: GridColumn): void {
     dragged.value = false
   })
 
+  // A press and release on one slot is a click, which every mouse sends as a drag of one slot.
+  if (drag.from === drag.to) {
+    pickHour(column, drag.from)
+    return
+  }
+
   const first = Math.min(drag.from, drag.to)
   // The end is the far edge of the last slot, so one slot is a whole slot rather than nothing.
   const last = Math.max(drag.from, drag.to) + props.slotMinutes
@@ -129,12 +142,31 @@ function clockAt(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
-// London wall clock to the instant it names. Never `new Date('...T09:00')`, which a server reads
-// as UTC and a browser as whatever the machine happens to be set to.
-function instantOf(day: string, minutes: number): number {
-  const [year, month, date] = day.split('-').map(Number)
-  return Math.floor(fromLondonWallClock(year!, month!, date!, Math.floor(minutes / 60), minutes % 60).getTime() / 1000)
+const instantOf = slotInstant
+
+// Read once a minute, so a slot greys out as it passes while the page is left open.
+const now = ref(Math.floor(Date.now() / 1000))
+let ticking: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  now.value = Math.floor(Date.now() / 1000)
+  ticking = setInterval(() => {
+    now.value = Math.floor(Date.now() / 1000)
+  }, 60_000)
+})
+onBeforeUnmount(() => clearInterval(ticking))
+
+// Today opens at the hour now rather than at eight, so the evening is not below the fold of a
+// box that otherwise reads as a morning of free slots.
+const box = ref<HTMLElement | null>(null)
+async function scrollToNow(): Promise<void> {
+  await nextTick()
+  const hour = Math.max(props.startsAt, Number(londonClock(new Date()).slice(0, 2)) - 1)
+  const today = props.columns.some(column => slotInstant(column.day, 0) <= now.value && now.value < slotInstant(column.day, 24 * 60))
+  const row = today ? box.value?.querySelector<HTMLElement>(`[data-hour="${hour}"]`) : null
+  if (box.value) box.value.scrollTop = row ? row.offsetTop - 40 : 0
 }
+onMounted(scrollToNow)
+watch(() => props.columns.map(column => column.day).join(), scrollToNow)
 
 function bookingAt(column: GridColumn, minutes: number): GridTaken | undefined {
   const at = instantOf(column.day, minutes)
@@ -149,7 +181,7 @@ function openAt(column: GridColumn, minutes: number): boolean {
   return column.room.hours.some(hours => hours.weekday === weekday && clock >= hours.opens && clock < hours.closes)
 }
 
-type SlotState = 'closed' | 'blacked-out' | 'mine' | 'booked' | 'pending' | 'free'
+type SlotState = 'past' | 'closed' | 'blacked-out' | 'mine' | 'booked' | 'pending' | 'free'
 
 function closureAt(column: GridColumn, minutes: number): GridClosure | undefined {
   const at = instantOf(column.day, minutes)
@@ -162,21 +194,21 @@ function stateOf(column: GridColumn, minutes: number): SlotState {
   if (closureAt(column, minutes)) return 'blacked-out'
   if (!openAt(column, minutes)) return 'closed'
   const taken = bookingAt(column, minutes)
-  if (!taken) return 'free'
+  if (!taken) return slotPassed(column.day, minutes, props.slotMinutes, now.value) ? 'past' : 'free'
   if (taken.mine) return 'mine'
   return taken.status === 'PENDING_APPROVAL' ? 'pending' : 'booked'
 }
 
-// Every closure on a visible day, said in text: a tooltip is unreachable by touch and announced by
-// nothing (C-102 criterion 7). One line per closure, however many columns it appears under.
+// Every closure the grid shows, said in text: a tooltip is unreachable by touch and announced by
+// nothing (C-102 criterion 7). Only the hours drawn, so last night's late show is not listed today.
 const closures = computed(() => {
   const found = new Map<string, string>()
   for (const column of props.columns) {
-    const opens = instantOf(column.day, 0)
-    const shuts = instantOf(column.day, 24 * 60)
+    const opens = instantOf(column.day, props.startsAt * 60)
+    const shuts = instantOf(column.day, props.endsAt * 60)
     for (const closure of column.room.closed ?? []) {
       if (closure.endsAt <= opens || closure.startsAt >= shuts) continue
-      found.set(`${column.room.id}-${closure.startsAt}-${closure.endsAt}`, `${column.room.name}, ${column.label}, ${saysClock(closure.startsAt)} to ${saysClock(closure.endsAt)}: ${closure.reason}`)
+      found.set(`${column.room.id}-${closure.startsAt}-${closure.endsAt}`, saysRoomClosure(column.room.name, closure))
     }
   }
   return [...found].map(([key, says]) => ({ key, says }))
@@ -184,6 +216,7 @@ const closures = computed(() => {
 
 // Colour is never the only carrier: every slot names its state to a screen reader (K-101).
 const SAYS: Record<SlotState, string> = {
+  'past': 'past',
   'blacked-out': 'closed',
   'closed': 'not open',
   'mine': 'yours',
@@ -193,6 +226,7 @@ const SAYS: Record<SlotState, string> = {
 }
 
 const FILLS: Record<SlotState, string> = {
+  'past': 'bg-muted/50 cursor-not-allowed',
   'blacked-out': 'bg-error/20 cursor-not-allowed',
   'closed': 'bg-muted cursor-not-allowed',
   'mine': 'bg-secondary/40 cursor-not-allowed',
@@ -229,7 +263,8 @@ function labelOf(column: GridColumn, minutes: number): string {
     <!-- Its own scroll box, so the room names stay pinned along its top and the times down its left
       (issue 1346); the scroll padding keeps a focused slot out from under either. -->
     <div
-      class="max-h-[75vh] scroll-pt-20 scroll-pl-16 overflow-auto"
+      ref="box"
+      class="relative max-h-[75vh] scroll-pt-20 scroll-pl-16 overflow-auto"
       data-test="grid-scroll"
       @pointerup="dragging = null"
       @pointerleave="dragging = null"
@@ -256,7 +291,10 @@ function labelOf(column: GridColumn, minutes: number): string {
           v-for="slot in slots"
           :key="slot.minutes"
         >
-          <div class="sticky left-0 z-10 bg-default px-2 py-1 text-right text-xs text-muted">
+          <div
+            class="sticky left-0 z-10 bg-default px-2 py-1 text-right text-xs text-muted"
+            :data-hour="slot.minutes % 60 === 0 ? slot.minutes / 60 : undefined"
+          >
             <span v-if="slot.minutes % 60 === 0">{{ slot.label }}</span>
           </div>
           <button
