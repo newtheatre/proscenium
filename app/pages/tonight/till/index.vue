@@ -11,7 +11,8 @@ import type { ChargedReceipt } from '~/composables/useSumUpCharge'
 import type { ServedCatalogue } from '~/composables/useTillCatalogue'
 import type { AgeCheckStep } from '~/components/till/Challenge25Modal.vue'
 
-definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/till' })
+// Wide, so a tablet at the bar sees the drinks and the basket side by side (0144).
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/till', nightWide: true })
 useSeoMeta({ title: 'Till' })
 
 // The guard is the route's, not this screen's: what a refusal says is written where it is
@@ -556,7 +557,7 @@ watch(basket, () => {
 
 // Opening the note never leaves the sale: this is a modal over the basket, never a navigation, so
 // what was tapped in is still there on return (F-107 criterion 2).
-const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], note: string | null } | null>(null)
+const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], note: string | null, allergens: SaleProduct['allergens'] } | null>(null)
 
 // One basket drawn in two places, under the grid and in the sheet, so the two never disagree.
 const basketBindings = computed(() => ({
@@ -764,94 +765,110 @@ const basketBindings = computed(() => ({
           <div
             :inert="basketLocked"
             :class="{ 'opacity-50': basketLocked }"
-            class="space-y-6"
+            class="space-y-6 @2xl/night:grid @2xl/night:grid-cols-[minmax(0,1fr)_20rem] @2xl/night:items-start @2xl/night:gap-6 @2xl/night:space-y-0"
+            data-test="till-work"
           >
-            <!-- The tabs are hand-rolled rather than UTabs, because the panes need ids that name
+            <div class="min-w-0 space-y-6">
+              <!-- The tabs are hand-rolled rather than UTabs, because the panes need ids that name
                  their own tab and neither pane may be torn down (K-101, issue 1150 item 8). -->
-            <div
-              class="grid grid-cols-2 gap-1 rounded-lg bg-elevated p-1"
-              role="tablist"
-              aria-label="What is being sold"
-              data-test="till-panes"
-              @keydown.left="pane = 'bar'"
-              @keydown.right="pane = 'tickets'"
-            >
-              <button
-                v-for="tab in PANE_TABS"
-                :id="`till-pane-${tab.value}`"
-                :key="tab.value"
-                type="button"
-                role="tab"
-                :aria-selected="pane === tab.value"
-                :aria-controls="`pane-${tab.value}-panel`"
-                :tabindex="pane === tab.value ? 0 : -1"
-                class="min-h-12 rounded-md text-sm font-medium"
-                :class="pane === tab.value ? 'bg-default text-highlighted' : 'text-muted'"
-                :data-test="`till-pane-${tab.value}`"
-                @click="pane = tab.value"
+              <div
+                class="grid grid-cols-2 gap-1 rounded-lg bg-elevated p-1"
+                role="tablist"
+                aria-label="What is being sold"
+                data-test="till-panes"
+                @keydown.left="pane = 'bar'"
+                @keydown.right="pane = 'tickets'"
               >
-                {{ tab.label }}
-              </button>
+                <button
+                  v-for="tab in PANE_TABS"
+                  :id="`till-pane-${tab.value}`"
+                  :key="tab.value"
+                  type="button"
+                  role="tab"
+                  :aria-selected="pane === tab.value"
+                  :aria-controls="`pane-${tab.value}-panel`"
+                  :tabindex="pane === tab.value ? 0 : -1"
+                  class="min-h-12 rounded-md text-sm font-medium"
+                  :class="pane === tab.value ? 'bg-default text-highlighted' : 'text-muted'"
+                  :data-test="`till-pane-${tab.value}`"
+                  @click="pane = tab.value"
+                >
+                  {{ tab.label }}
+                </button>
+              </div>
+
+              <TillTicketsPane
+                v-show="pane === 'tickets'"
+                id="pane-tickets-panel"
+                v-model:lookup-term="lookupTerm"
+                v-model:camera-open="cameraOpen"
+                v-model:walk-up-performance-id="walkUpPerformanceId"
+                v-model:walk-up-guest-name="walkUpGuestName"
+                v-model:walk-up-guest-email="walkUpGuestEmail"
+                v-model:walk-up-guest-existing-account="walkUpGuestExistingAccount"
+                role="tabpanel"
+                aria-labelledby="till-pane-tickets"
+                tabindex="0"
+                :looking-up="lookingUp"
+                :camera-note="cameraNote"
+                :lookup-failure="lookupFailure"
+                :found="found"
+                :ticket-lines="ticketLines"
+                :tonights-performances="tonightsPerformances"
+                :walk-up-options-failure="walkUpOptionsFailure"
+                :walk-up-options="walkUpOptions"
+                :walk-up-qty="walkUpQty"
+                :walk-up-guest-incomplete="walkUpGuestIncomplete"
+                :ask-existing-account="chargeFailure === EXISTING_ACCOUNT_SAYS"
+                :look-up="lookUp"
+                :scan-decoded="scanDecoded"
+                :open-camera="openCamera"
+                :fall-back-to-typing="fallBackToTyping"
+                :add-booking="addBooking"
+                :bump-walk-up="bumpWalkUp"
+                :add-walk-ups="addWalkUps"
+              />
+
+              <TillProductGrid
+                v-show="pane === 'bar'"
+                id="pane-bar-panel"
+                role="tabpanel"
+                aria-labelledby="till-pane-bar"
+                tabindex="0"
+                :categories="categories"
+                :products-in="productsIn"
+                :sizing="sizing"
+                :choosing="choosing"
+                :tap-product="tapProduct"
+                :tap-variant="tapVariant"
+                :choose-option="chooseOption"
+                @open-allergens="allergenOpen = $event"
+                @close-sizing="sizing = null"
+                @close-choosing="choosing = null"
+              />
             </div>
 
-            <TillTicketsPane
-              v-show="pane === 'tickets'"
-              id="pane-tickets-panel"
-              v-model:lookup-term="lookupTerm"
-              v-model:camera-open="cameraOpen"
-              v-model:walk-up-performance-id="walkUpPerformanceId"
-              v-model:walk-up-guest-name="walkUpGuestName"
-              v-model:walk-up-guest-email="walkUpGuestEmail"
-              v-model:walk-up-guest-existing-account="walkUpGuestExistingAccount"
-              role="tabpanel"
-              aria-labelledby="till-pane-tickets"
-              tabindex="0"
-              :looking-up="lookingUp"
-              :camera-note="cameraNote"
-              :lookup-failure="lookupFailure"
-              :found="found"
-              :ticket-lines="ticketLines"
-              :tonights-performances="tonightsPerformances"
-              :walk-up-options-failure="walkUpOptionsFailure"
-              :walk-up-options="walkUpOptions"
-              :walk-up-qty="walkUpQty"
-              :walk-up-guest-incomplete="walkUpGuestIncomplete"
-              :ask-existing-account="chargeFailure === EXISTING_ACCOUNT_SAYS"
-              :look-up="lookUp"
-              :scan-decoded="scanDecoded"
-              :open-camera="openCamera"
-              :fall-back-to-typing="fallBackToTyping"
-              :add-booking="addBooking"
-              :bump-walk-up="bumpWalkUp"
-              :add-walk-ups="addWalkUps"
-            />
-
-            <TillProductGrid
-              v-show="pane === 'bar'"
-              id="pane-bar-panel"
-              role="tabpanel"
-              aria-labelledby="till-pane-bar"
-              tabindex="0"
-              :categories="categories"
-              :products-in="productsIn"
-              :sizing="sizing"
-              :choosing="choosing"
-              :tap-product="tapProduct"
-              :tap-variant="tapVariant"
-              :choose-option="chooseOption"
-              @open-allergens="allergenOpen = $event"
-              @close-sizing="sizing = null"
-              @close-choosing="choosing = null"
-            />
-
-            <TillBasket
-              v-if="!basketEmpty"
-              v-model:selected-discount-id="selectedDiscountId"
-              v-model:selected-tab-holder-id="selectedTabHolderId"
-              v-bind="basketBindings"
-              @open-allergens="allergenOpen = $event"
-              @retry-sumup="() => chargeOnSumUp()"
-            />
+            <!-- Beside the panes where the column is wide enough, held in view as the grid scrolls. -->
+            <div
+              class="@2xl/night:sticky @2xl/night:top-4"
+              data-test="till-basket-column"
+            >
+              <TillBasket
+                v-if="!basketEmpty"
+                v-model:selected-discount-id="selectedDiscountId"
+                v-model:selected-tab-holder-id="selectedTabHolderId"
+                v-bind="basketBindings"
+                @open-allergens="allergenOpen = $event"
+                @retry-sumup="() => chargeOnSumUp()"
+              />
+              <p
+                v-else
+                class="hidden rounded-lg border border-dashed border-default p-6 text-center text-sm text-muted @2xl/night:block"
+                data-test="till-basket-empty"
+              >
+                The basket is empty. Tap a drink, or find a booking under Tickets.
+              </p>
+            </div>
           </div>
         </template>
 
@@ -1024,7 +1041,7 @@ const basketBindings = computed(() => ({
               size="sm"
               color="neutral"
               variant="subtle"
-              class="min-h-12 shrink-0"
+              class="min-h-12 shrink-0 @2xl/night:hidden"
               trailing-icon="i-lucide-chevron-up"
               :disabled="basketLocked"
               data-test="basket-summary-open"

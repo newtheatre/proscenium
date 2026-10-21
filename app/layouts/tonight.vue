@@ -10,6 +10,8 @@ const { account } = useAccount()
 
 // The hub is the way back, so it does not offer a link to itself.
 const atTheHub = computed(() => route.path === '/tonight')
+// The header spans what the screen below spans, so a wide screen's header is not a phone strip.
+const column = computed(() => (route.meta.nightWide === true ? 'max-w-5xl' : 'max-w-md'))
 
 const header = useNightHeader()
 const authority = useNightAuthority()
@@ -46,13 +48,19 @@ onMounted(async () => {
 
 <template>
   <div class="dark flex min-h-dvh flex-col bg-default text-default [color-scheme:dark]">
-    <div class="mx-auto flex min-h-12 w-full max-w-md items-center justify-end gap-1 px-2">
+    <div
+      class="mx-auto flex min-h-12 w-full items-center justify-end gap-1 px-2"
+      :class="column"
+    >
       <FeedbackButton shell="tonight" />
       <DocsLink />
       <AuthStatus />
     </div>
     <header class="border-b border-default">
-      <div class="mx-auto flex w-full max-w-md items-start gap-2 px-4 pb-3">
+      <div
+        class="mx-auto flex w-full items-start gap-2 px-4 pb-3"
+        :class="column"
+      >
         <UButton
           v-if="!atTheHub"
           to="/tonight"

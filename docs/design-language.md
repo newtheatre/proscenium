@@ -227,7 +227,8 @@ Eleven rules follow:
    and the pinned area pads by `env(safe-area-inset-bottom)`, so a phone's own browser chrome and
    home indicator never sit on top of the action under the thumb. `tests/unit/night-shell.test.ts`
    holds all of these. Every page on the `tonight` layout is a capped column at any window width
-   (`max-w-md` for a show-night screen, `max-w-xl` for the training register), so anything in it
+   (`max-w-md` for a show-night screen, `max-w-xl` for the training register, and `max-w-5xl` for
+   the till, the one page that declares `nightWide`, 0144), so anything in it
    that changes shape with width keys to its own container, with `@container` and an `@` variant as
    the desk results do (rule 6), and never to the window, whose variants fire while the column is
    still a phone's width (issue 1520). `tests/unit/night-shell.test.ts` holds this too. A screen
