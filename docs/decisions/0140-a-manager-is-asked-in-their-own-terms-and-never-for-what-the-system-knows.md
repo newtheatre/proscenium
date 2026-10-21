@@ -18,6 +18,12 @@ system could work out, or answered in a unit the manager does not think in:
   number lives on Settings, a screen the Front of House Manager cannot open.
 - **The tonight stocktake** told the counter the Bar Manager checks the count, a role retired by
   0113.
+- **Record a delivery** of a measured item asked for millilitres, so a delivery of six 700 ml
+  bottles meant typing 4200. Stock already knows each item's container size.
+- **The order list** said how far below par an item was, in millilitres, and left the manager to
+  turn 2250 ml of wine into bottles.
+- **On hand** showed 5175 ml of gin, where a count of the shelf finds seven bottles and an open one.
+- **Plan a bar opening** opened with no venue chosen when the theatre has only one.
 
 ## Decision
 
@@ -34,6 +40,15 @@ slot is honoured as before.
 field's placeholder and in its description ("Leave it blank for the house default, 30 minutes").
 Nothing stored changes: a blank still means the venue follows the house default (0078).
 
+**A figure is asked for and shown in what the manager counts.** For an item measured in
+millilitres with a container size, a delivery asks for full containers and stores the product in
+ml, saying the total beside the field; anything else is asked for as before. The order list adds
+"To order", the shortfall rounded up to whole containers ("2 × 750 ml"), to the screen and the CSV.
+On hand adds the shelf reading ("7 full and 275 ml open"). Movements of a whole number of
+containers read the same way. The stored unit stays ml, so nothing about counting or reports moves.
+
+**A choice of one is already made.** Plan a bar opening starts on the venue when only one exists.
+
 **Screens name the posts that do the work today** (0113): the stocktake names the Front of House
 Manager.
 
@@ -44,5 +59,7 @@ Manager.
   moment still collide, and the second is told so.
 - A template's blank fields read true to whoever opens them, and a change to the house default on
   Settings shows on the form the next time it loads.
+- A write-off keeps offering the measures the bar pours, and an adjustment stays in ml, because
+  neither is usually a whole container.
 - The rule stands for the screens that follow: a question the system can answer is not put to the
   person, and a figure is shown in the unit the person counts in.
