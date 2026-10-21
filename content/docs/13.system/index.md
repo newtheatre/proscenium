@@ -3,7 +3,7 @@ title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
 audience: committee
-updatedOn: 2026-09-29
+updatedOn: 2026-10-14
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -88,6 +88,7 @@ The IT Manager holds every permission, so sees every line.
 | Nothing is on hand at the bar | whoever reads the bar | [Stock](/docs/bar/stock) |
 | No stocktake has been applied yet | whoever reads the bar or takes a stocktake | [Stocktakes](/docs/bar/stocktakes) |
 | Stocked items with no allergen answer, counting any not retired | whoever reads the bar | [Allergens](/docs/bar/stock#allergens) |
+| No incident severity routes to follow-up, so a serious incident reaches nobody | whoever changes the routing: the Theatre Manager and the IT Manager | [Safety](/docs/rota/safety) |
 
 ### An overdue restore drill
 

@@ -342,7 +342,7 @@ const CATALOGUE = {
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
   'record.delivery-logged': { label: 'Delivered training logged', module: 'training' },
   'session.capacity.changed': { label: 'Training session capacity changed', module: 'training' },
-  'request.declined': { label: 'Training request answered', module: 'training' },
+  'request.declined': { label: 'Training request declined', module: 'training' },
   'register.opened': { label: 'Register opened', module: 'training' },
   'session.attendee.added': { label: 'Added to a register', module: 'training' },
   'session.cancelled': { label: 'Training session cancelled', module: 'training' },
@@ -365,6 +365,7 @@ const CATALOGUE = {
 
   'finance.z-reading.recorded': { label: 'Daily Z reading recorded', module: 'finance' },
   'finance.period.defined': { label: 'Term defined', module: 'finance' },
+  'finance.period.removed': { label: 'Term removed', module: 'finance' },
   'finance.period.closed': { label: 'Period closed', module: 'finance' },
   'finance.period.reopened': { label: 'Period reopened', module: 'finance' },
   'finance.nominal-mapping.changed': { label: 'SU nominal code mapping changed', module: 'finance' },

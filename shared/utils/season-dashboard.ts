@@ -61,6 +61,16 @@ export function periodQuery(period: PeriodInput): Record<string, string> {
   }
 }
 
+// The keys a period writes into a screen's URL, so the screen can drop the old ones on a change.
+export const PERIOD_QUERY_KEYS = ['kind', 'day', 'year', 'month', 'fromDay', 'toDay', 'seasonId'] as const
+
+// A period read back from a screen's URL, or null when it is absent, malformed or not offered there.
+export function periodFromQuery(query: Record<string, unknown>, kinds: readonly PeriodKind[] = PERIOD_KINDS): PeriodInput | null {
+  const flat = Object.fromEntries(PERIOD_QUERY_KEYS.map(key => [key, Array.isArray(query[key]) ? query[key][0] : query[key]]))
+  const parsed = periodForm.safeParse(flat)
+  return parsed.success && kinds.includes(parsed.data.kind) ? parsed.data : null
+}
+
 export interface RevenueBySource { source: EntrySource, totalPence: number }
 
 // Every figure derived from ledger rows (criterion 2): comps and discounts are I-103's own
@@ -74,6 +84,8 @@ export interface SeasonSummary {
   compsPence: number
   discountsPence: number
   openVariancePence: number
+  // Live write-offs in the range, signed as the variance was: reader less expected.
+  writtenOffPence: number
   // Nights in the range with takings and no reading: their variance is not known, so the open
   // variance beside it is not the whole story (I-104 criterion 5, issue 1360).
   unreconciledNights: number

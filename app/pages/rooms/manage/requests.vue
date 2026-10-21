@@ -4,7 +4,7 @@ import { BULK_LIMIT, REJECTION_REASON_LIMIT } from '#shared/utils/approvals'
 import { describePurpose, saysBookingState } from '#shared/utils/bookings'
 import { EXTERNAL_REASON_LIMIT, SU_ROOM_ASK, saysExternalState, saysExternalStatus } from '#shared/utils/external-requests'
 import { saysVerdict } from '#shared/utils/external-spaces'
-import { saysClock, saysWhen } from '#shared/utils/when'
+import { saysClock, saysDayLong, saysWhen } from '#shared/utils/when'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { TableColumn } from '@nuxt/ui'
@@ -280,7 +280,7 @@ async function decide(ids: string[], action: 'APPROVE' | 'REJECT', body: Record<
     const refused = answered.outcomes.filter(outcome => !outcome.ok)
     toast.add({
       title: answered.decided > 0
-        ? `${plural(answered.decided, 'request')} ${action === 'APPROVE' ? 'approved' : 'rejected'}`
+        ? `${plural(answered.decided, 'request')} ${action === 'APPROVE' ? 'approved' : 'turned down'}`
         : 'Nothing was decided',
       // A batch that partly failed says how many and why, rather than reading as a success.
       description: refused.length ? `${plural(refused.length, 'request')} could not be: ${refused[0]!.says}` : undefined,
@@ -382,7 +382,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
               : null,
           ]),
           row.original.formDueBy
-            ? h('p', { 'class': 'text-sm', 'data-test': `due-${row.original.id}` }, `Form in by ${row.original.formDueBy}`)
+            ? h('p', { 'class': 'text-sm', 'data-test': `due-${row.original.id}` }, `Form in by ${saysDayLong(row.original.formDueBy)}`)
             : null,
           row.original.notes ? h('p', { class: 'text-sm text-muted' }, row.original.notes) : null,
         ])
@@ -444,7 +444,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
               'variant': 'ghost',
               'data-test': `reject-${row.original.id}`,
               'onClick': () => askToReject([row.original.id]),
-            }, () => 'Reject'),
+            }, () => 'Turn down'),
             rowOverflow(row.original.id, [
               { label: 'Not one of ours', onSelect: () => beginMove('unlist', row.original) },
             ]),
@@ -526,7 +526,7 @@ onMounted(loadRooms)
           :loading="acting"
           @click="askToReject(selected)"
         >
-          Reject
+          Turn down
         </UButton>
       </template>
     </AdminToolbar>
@@ -560,7 +560,7 @@ onMounted(loadRooms)
     >
       <template #body>
         <UFormField
-          label="Why it is not approved"
+          label="Why it is turned down"
           required
           :description="`Up to ${REJECTION_REASON_LIMIT} characters.`"
         >
@@ -581,7 +581,7 @@ onMounted(loadRooms)
           data-test="confirm-rejection"
           @click="confirmRejection"
         >
-          Reject {{ plural(decidingOn.length, 'request') }}
+          Turn down {{ plural(decidingOn.length, 'request') }}
         </UButton>
         <UButton
           color="neutral"

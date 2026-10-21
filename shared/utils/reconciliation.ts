@@ -23,6 +23,8 @@ export interface BarReconciliation {
 export interface NightReconciliation {
   bar: BarReconciliation
   deskTakingsPence: number
+  // Tickets sold on every till that night, whichever bar the breakdown above is scoped to.
+  wholeNightTicketsPence: number
   wholeNightExpectedPence: number
 }
 
@@ -30,33 +32,42 @@ export interface NightReconciliation {
 // has one reader and one login for the desk and the bar, so the Z is the whole night's.
 export interface ReaderExpectation {
   totalPence: number
+  // Drinks and tab settlements: what the bar report calls the bar's own takings.
   barPence: number
+  // Tickets sold on the till: the same reader, but never bar takings (F-122 criterion 6).
+  ticketsPence: number
   deskPence: number
 }
 
 export function readerExpectation(night: NightReconciliation): ReaderExpectation {
   return {
     totalPence: night.wholeNightExpectedPence,
-    barPence: night.wholeNightExpectedPence - night.deskTakingsPence,
+    barPence: night.wholeNightExpectedPence - night.deskTakingsPence - night.wholeNightTicketsPence,
+    ticketsPence: night.wholeNightTicketsPence,
     deskPence: night.deskTakingsPence,
   }
 }
 
+function sidesOf(expected: ReaderExpectation): { says: string, alone: string, pence: number }[] {
+  return [
+    { says: 'bar', alone: 'all of it at the bar', pence: expected.barPence },
+    { says: 'tickets at the bar', alone: 'all of it tickets at the bar', pence: expected.ticketsPence },
+    { says: 'box office', alone: 'all of it at the box office', pence: expected.deskPence },
+  ].filter(side => side.pence !== 0)
+}
+
 // Where the figure came from, leaving out a side that took nothing.
 export function saysWhereItWasTaken(expected: ReaderExpectation): string {
-  if (expected.barPence !== 0 && expected.deskPence !== 0) {
-    return `bar ${saysMoney(expected.barPence)}, box office ${saysMoney(expected.deskPence)}`
-  }
-  if (expected.barPence !== 0) return 'all of it at the bar'
-  if (expected.deskPence !== 0) return 'all of it at the box office'
-  return ''
+  const sides = sidesOf(expected)
+  if (sides.length === 1) return sides[0]!.alone
+  return sides.map(side => `${side.says} ${saysMoney(side.pence)}`).join(', ')
 }
 
 export function saysExpectedOnTheReader(expected: ReaderExpectation): string {
   const total = saysMoney(expected.totalPence)
   const where = saysWhereItWasTaken(expected)
   if (!where) return total
-  return expected.barPence !== 0 && expected.deskPence !== 0 ? `${total} (${where})` : `${total}, ${where}`
+  return sidesOf(expected).length > 1 ? `${total} (${where})` : `${total}, ${where}`
 }
 
 // Over is positive; the screen's preview and the close's own record share this one sum.
@@ -94,7 +105,7 @@ export const closeTillSessionForm = z.object({
   actualZPence: pence,
   // Required only when the reader disagrees with the ledger; the route enforces that half, since
   // whether they disagree is only known once the expected figure is recomputed (criterion 3).
-  varianceNote: z.string().trim().min(1, 'Say why the reader and the ledger disagree').max(500).optional(),
+  varianceNote: z.string().trim().min(1, 'Say why the reader and the ledger disagree').max(500, 'Keep the note to 500 characters').optional(),
 })
 
 export type CloseTillSessionInput = z.output<typeof closeTillSessionForm>

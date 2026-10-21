@@ -43,17 +43,34 @@ const NAMES = {
   'backstage-milestone-type': key => sql`SELECT ${schema.backstageMilestoneTypes.label} FROM ${schema.backstageMilestoneTypes} WHERE ${schema.backstageMilestoneTypes.id} = ${key}`,
   'checklist-item': key => sql`SELECT ${schema.checklistItems.label} FROM ${schema.checklistItems} WHERE ${schema.checklistItems.id} = ${key}`,
   'period': key => sql`SELECT ${schema.periods.label} FROM ${schema.periods} WHERE ${schema.periods.id} = ${key}`,
+  // A booking's title is the member's own words, so the room names it and its time tells it apart.
+  'booking': key => sql`SELECT ${schema.rooms.name} FROM ${schema.roomBookings}
+    JOIN ${schema.rooms} ON ${schema.rooms.id} = ${schema.roomBookings.roomId} WHERE ${schema.roomBookings.id} = ${key}`,
+  'blackout': key => sql`SELECT coalesce((SELECT ${schema.rooms.name} FROM ${schema.rooms} WHERE ${schema.rooms.id} = ${schema.roomBlackouts.roomId}), 'Every room')
+    FROM ${schema.roomBlackouts} WHERE ${schema.roomBlackouts.id} = ${key}`,
+  'request': key => sql`SELECT ${schema.trainingModules.name} FROM ${schema.moduleRequests}
+    JOIN ${schema.trainingModules} ON ${schema.trainingModules.id} = ${schema.moduleRequests.moduleId} WHERE ${schema.moduleRequests.id} = ${key}`,
+  'shift': key => sql`SELECT ${schema.shows.title} FROM ${schema.shifts}
+    JOIN ${schema.performances} ON ${schema.performances.id} = ${schema.shifts.performanceId}
+    JOIN ${schema.shows} ON ${schema.shows.id} = ${schema.performances.showId} WHERE ${schema.shifts.id} = ${key}`,
+  'session': key => sql`SELECT group_concat(${schema.trainingModules.name}, ', ') FROM ${schema.sessionModules}
+    JOIN ${schema.trainingModules} ON ${schema.trainingModules.id} = ${schema.sessionModules.moduleId} WHERE ${schema.sessionModules.sessionId} = ${key}`,
 } satisfies Record<string, Lookup>
 
 // A performance or an opening is one of many under the same name, told apart by when it starts.
 const TIMES = {
   'performance': key => sql`SELECT ${schema.performances.startsAt} FROM ${schema.performances} WHERE ${schema.performances.id} = ${key}`,
   'bar-opening': key => sql`SELECT ${schema.barOpenings.startsAt} FROM ${schema.barOpenings} WHERE ${schema.barOpenings.id} = ${key}`,
+  'booking': key => sql`SELECT ${schema.roomBookings.startsAt} FROM ${schema.roomBookings} WHERE ${schema.roomBookings.id} = ${key}`,
+  'blackout': key => sql`SELECT ${schema.roomBlackouts.startsAt} FROM ${schema.roomBlackouts} WHERE ${schema.roomBlackouts.id} = ${key}`,
+  'shift': key => sql`SELECT ${schema.performances.startsAt} FROM ${schema.shifts}
+    JOIN ${schema.performances} ON ${schema.performances.id} = ${schema.shifts.performanceId} WHERE ${schema.shifts.id} = ${key}`,
 } satisfies Record<string, Lookup>
 
 // A till session is one night rather than one instant, so it says its London show night (0014).
 const NIGHTS = {
   till: key => sql`SELECT ${tillNight(key)} FROM ${schema.venues} WHERE ${schema.venues.id} = ${tillVenue(key)}`,
+  session: key => sql`SELECT ${schema.trainingSessions.heldOn} FROM ${schema.trainingSessions} WHERE ${schema.trainingSessions.id} = ${key}`,
 } satisfies Record<string, Lookup>
 
 export const NAMED_TARGET_KINDS = Object.keys(NAMES)

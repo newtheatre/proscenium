@@ -28,6 +28,7 @@ export interface SetUpFacts {
   anythingOnHand?: boolean
   anyStocktake?: boolean
   allergensUnknown?: number
+  anySeverityRoutes?: boolean
 }
 
 export type SetUpLine
@@ -35,6 +36,7 @@ export type SetUpLine
     | { kind: 'NOTHING_ON_HAND' }
     | { kind: 'NO_STOCKTAKE' }
     | { kind: 'ALLERGENS_UNKNOWN', items: number }
+    | { kind: 'NO_SAFETY_ROUTING' }
 
 export function setUpLines(facts: SetUpFacts): SetUpLine[] {
   return [
@@ -42,6 +44,7 @@ export function setUpLines(facts: SetUpFacts): SetUpLine[] {
     ...(facts.anythingOnHand === false ? [{ kind: 'NOTHING_ON_HAND' as const }] : []),
     ...(facts.anyStocktake === false ? [{ kind: 'NO_STOCKTAKE' as const }] : []),
     ...(facts.allergensUnknown ? [{ kind: 'ALLERGENS_UNKNOWN' as const, items: facts.allergensUnknown }] : []),
+    ...(facts.anySeverityRoutes === false ? [{ kind: 'NO_SAFETY_ROUTING' as const }] : []),
   ]
 }
 
@@ -51,6 +54,7 @@ export function saysSetUp(line: SetUpLine): string {
     case 'NOTHING_ON_HAND': return 'Nothing is on hand at the bar: record a delivery or an opening count.'
     case 'NO_STOCKTAKE': return 'No stocktake has been applied yet, so on-hand is what deliveries and sales say, not a count.'
     case 'ALLERGENS_UNKNOWN': return `${plural(line.items, 'stocked item')} ${line.items === 1 ? 'has' : 'have'} no allergen answer.`
+    case 'NO_SAFETY_ROUTING': return 'No incident severity routes to follow-up, so a serious incident reaches nobody.'
     default: return line satisfies never
   }
 }
@@ -62,6 +66,7 @@ export function setUpHref(line: SetUpLine): string {
     case 'NOTHING_ON_HAND': return '/bar/stock'
     case 'NO_STOCKTAKE': return '/bar/stock/stocktakes'
     case 'ALLERGENS_UNKNOWN': return '/bar/stock/allergens'
+    case 'NO_SAFETY_ROUTING': return '/rota/manage/safety'
     default: return line satisfies never
   }
 }

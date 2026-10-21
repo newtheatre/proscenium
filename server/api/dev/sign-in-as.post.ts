@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 const body = z.object({ userId: z.string().min(1).max(64) })
@@ -13,8 +14,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'That account is a tombstone: there is nobody to be' })
   }
 
-  // The same session every other path writes, so what is being tested is the real thing (0007).
-  // 'password' is a stand-in: this bypass proves nothing about a factor.
+  // The same session and the same last-seen stamp every other path writes, so what is being tested
+  // is the real thing (0007). 'password' is a stand-in: this bypass proves nothing about a factor.
+  await db.update(schema.users).set({ lastLoginAt: Math.floor(Date.now() / 1000) }).where(eq(schema.users.id, account.id))
   await startSession(event, account, 'password')
   return { ok: true, name: account.name }
 })

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, manageRota } from '#shared/utils/abilities'
-import { MAX_SHIFT_OFFSET_MINUTES, MAX_SLOT_COUNT, SHIFT_ROLES, orderedSlots, saysShiftRole, templateRefusal } from '#shared/utils/rota'
+import { MAX_SHIFT_OFFSET_MINUTES, MAX_SLOT_COUNT, SHIFT_ROLES, orderedSlots, saysShiftRole, saysStamped, templateRefusal } from '#shared/utils/rota'
 import { rotaTemplatesList } from '#shared/utils/rota-templates-list'
 import type { ShiftRole, TemplateSlot } from '#shared/utils/rota'
 import type { TableColumn } from '@nuxt/ui'
@@ -137,23 +137,32 @@ async function remove(): Promise<void> {
   }
 }
 
-async function stamp(venue: VenueTemplate): Promise<void> {
-  failure.value = null
+// Stamping writes to every night from tonight on at the venue, so it asks first, naming the venue.
+const stamping = ref<VenueTemplate | null>(null)
+const stampFailure = ref<string | null>(null)
+const stampWorking = ref(false)
+
+function askToStamp(venue: VenueTemplate): void {
+  stampFailure.value = null
+  stamping.value = venue
+}
+
+async function stamp(): Promise<void> {
+  const venue = stamping.value
+  if (!venue || stampWorking.value) return
+  stampWorking.value = true
+  stampFailure.value = null
   try {
     const answer = await $fetch<{ stamped: number, filled: number }>(`/api/admin/rota/templates/${venue.venueId}/stamp`, { method: 'POST' })
-    const said = answer.filled === 0 ? '' : ` ${plural(answer.filled, 'shift')} gained the times its template asks for.`
-    toast.add({
-      title: answer.stamped === 0 ? 'Nothing to add' : `${plural(answer.stamped, 'shift')} added`,
-      description: (answer.stamped === 0
-        ? 'Every performance from tonight onwards already has its slots.'
-        : 'Performances from tonight onwards now carry every slot the template asks for.') + said,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
+    toast.add({ ...saysStamped(answer), icon: 'i-lucide-check', color: 'success' })
+    stamping.value = null
     await refresh()
   }
   catch (error) {
-    failure.value = refusalText(error)
+    stampFailure.value = refusalText(error)
+  }
+  finally {
+    stampWorking.value = false
   }
 }
 
@@ -191,7 +200,7 @@ const columns: TableColumn<VenueTemplate>[] = [
                 'size': 'sm',
                 'variant': 'subtle',
                 'data-test': `stamp-${row.original.venueId}`,
-                'onClick': () => stamp(row.original),
+                'onClick': () => askToStamp(row.original),
               }, () => 'Stamp the diary'),
           row.original.archived
             ? null
@@ -400,6 +409,19 @@ watch(modalOpen, (nowOpen) => {
       :failure="removeFailure"
       @update:open="value => { if (!value) removing = null }"
       @confirm="remove"
+    />
+
+    <ConfirmModal
+      :open="stamping !== null"
+      name="stamp-diary"
+      :title="stamping ? `Stamp the ${stamping.venueName} diary` : ''"
+      verb="Stamp the diary"
+      color="primary"
+      consequence="Every performance there from tonight onwards is topped up to the slots the template asks for, as open shifts anyone qualified can claim. Shifts already there, and who holds them, are left alone."
+      :loading="stampWorking"
+      :failure="stampFailure"
+      @update:open="value => { if (!value) stamping = null }"
+      @confirm="stamp"
     />
   </ReadGate>
 </template>

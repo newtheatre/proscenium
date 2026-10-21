@@ -82,6 +82,11 @@ function todayAt(hour: number): Date {
   return when
 }
 
+// The London day after today, as the grid's slots name it.
+function tomorrow(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date(Date.now() + 86_400_000))
+}
+
 // One browser backs every view, so a signed-in session has to be ended before another begins.
 async function signInOn(view: Bun.WebView, email: string, password: string): Promise<void> {
   await view.navigate(`${app.baseURL}/`)
@@ -328,15 +333,26 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
       await click(view, '[data-test="calendar-day"]')
-      await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
+      await click(view, '[data-test="calendar-forward"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-"][data-test*="-${tomorrow()}-"]').length > 0`, 30_000)
 
-      await view.evaluate(`[...document.querySelectorAll('[data-test^="slot-"]')].find(button => !button.disabled).click()`)
+      // As a mouse sends it: press, release and click on one slot, which once read as a quarter
+      // hour drag and filled a booking shorter than any the policy takes (review of 13 October).
+      await view.evaluate(`(() => {
+        const slot = [...document.querySelectorAll('[data-test^="slot-"][data-test*="-${tomorrow()}-"]')].find(button => !button.disabled)
+        slot.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse' }))
+        slot.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }))
+        slot.click()
+      })()`)
       await waitFor(view, `document.querySelector('[data-test="booking-form"]')`, 30_000)
 
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
       // The room, the day and the time came with the click (criterion 2).
       const day = await view.evaluate<string>(`[...document.querySelectorAll('[data-test="booking-day"] input')].map(field => field.value).join('')`)
       expect(day.replace(/\D/g, '')).toHaveLength(8)
+      // An hour from the slot pressed, which is what the calendar says a click books.
+      const minutes = (clock: string): number => Number(clock.split(':')[0]) * 60 + Number(clock.split(':')[1])
+      expect(minutes(await readTime(view, '[data-test="booking-to"]')) - minutes(await readTime(view, '[data-test="booking-from"]'))).toBe(60)
     }
     finally {
       view.close()
@@ -448,11 +464,13 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
       await click(view, '[data-test="calendar-day"]')
-      await waitFor(view, `document.querySelectorAll('[data-test^="slot-${room}-"]').length > 0`, 30_000)
+      // Tomorrow, so the time of day the suite runs at leaves every slot still to come.
+      await click(view, '[data-test="calendar-forward"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-${room}-${tomorrow()}-"]').length > 0`, 30_000)
 
       // Pointer events rather than a click: the drag is what is under test.
       await view.evaluate(`(() => {
-        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-"]')].filter(one => !one.disabled)
+        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-${tomorrow()}-"]')].filter(one => !one.disabled)
         const down = (element, type) => element.dispatchEvent(new PointerEvent(type, { bubbles: true }))
         down(slots[8], 'pointerdown')
         down(slots[9], 'pointerenter')
@@ -492,10 +510,12 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
 
       await visit(view, `${app.baseURL}/rooms`, '[data-test="calendar-span"]')
       await click(view, '[data-test="calendar-day"]')
-      await waitFor(view, `document.querySelectorAll('[data-test^="slot-${room}-"]').length > 0`, 30_000)
+      // Tomorrow, so the time of day the suite runs at leaves every slot still to come.
+      await click(view, '[data-test="calendar-forward"]')
+      await waitFor(view, `document.querySelectorAll('[data-test^="slot-${room}-${tomorrow()}-"]').length > 0`, 30_000)
 
       await view.evaluate(`(() => {
-        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-"]')].filter(one => !one.disabled)
+        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-${tomorrow()}-"]')].filter(one => !one.disabled)
         const touch = element => element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))
         touch(slots[8])
         slots[8].click()
@@ -506,7 +526,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       expect(await textOf(view, '[data-test="grid-tap-hint"]')).toContain('Now tap where it ends')
 
       await view.evaluate(`(() => {
-        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-"]')].filter(one => !one.disabled)
+        const slots = [...document.querySelectorAll('[data-test^="slot-${room}-${tomorrow()}-"]')].filter(one => !one.disabled)
         const touch = element => element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))
         touch(slots[11])
         slots[11].click()

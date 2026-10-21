@@ -1253,7 +1253,9 @@ rather than resolving its own (I-107). A term has no fixed formula, so it is nam
 of closing it: `POST /api/admin/finance/terms` defines the range, `GET` lists every one, and the
 money dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
 not reference this table: a lock names a range directly, whether or not that range was ever
-defined as a term.
+defined as a term. A term whose label (ignoring case) or range is already named is refused on the
+insert itself, and `DELETE /api/admin/finance/terms/:id` removes a mistaken one, audited as
+`finance.period.removed`: nothing references a term, so removing one changes no figure (0129).
 
 ### period_locks
 `id` PK · `from_day`, `to_day` (`london_day` format, both inclusive; CHECK `to_day >= from_day`) ·
@@ -1266,7 +1268,11 @@ locked is read off the latest row (by `created_at`, then `rowid`, the order rows
 `REOPENED` allows, and no row at all is open. Reopening inserts a new `REOPENED` row for the
 same range rather than editing the `CLOSED` one it reopens, and re-closing after that is another
 new row; nothing here supersedes by reference; the "latest row wins" rule already answers which
-one governs.
+one governs. A `CLOSED` row is refused, on its own insert, while any day of its range is already
+closed, so every day has one close in force; a `REOPENED` row copies the lock's label and is
+written only while that lock still governs a day (0129). The history route reports each row's
+standing (closed, partly closed, reopened, or no longer in force) by the same rule; the standing
+is derived, never stored.
 
 **`ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`, is the actual
 enforcement.** It reads the latest `period_locks` row for `NEW.london_day` the same way (migration
@@ -1302,8 +1308,10 @@ figures for the same range, because nothing here computes a total at all. Rows a
 truncated silently. The export is audited (`finance.exported`) with who, when and the range.
 An open range exports anyway, permitted rather than refused: the `x-period-status` response
 header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
-`GET /api/admin/finance/export/coverage` takes the same query and answers `{ fromDay, toDay, rows,
-closed }` from a count over the same predicate, so the screen shows the period's state and the
+Four columns follow the six the SU reads: `time`, `source`, `show` and `reference`, read through
+`LEFT JOIN`s on the line's `performance_id` and `reservation_id` and blank where the line has none
+(0130). `GET /api/admin/finance/export/coverage` takes the same query and answers `{ fromDay,
+toDay, rows, closed, unmapped }` from a count over the same predicate, so the screen shows the period's state and the
 cap before anything is downloaded.
 
 ## Show night (module E)
@@ -1340,8 +1348,9 @@ CHECK `shifts_open_names_nobody`: OPEN implies `user_id` NULL, `CLAIMED|CONFIRME
 implies NOT NULL, and CANCELLED says neither, because it keeps whoever held it and held
 nobody when it was open. Partial UNIQUE (`performance_id`) WHERE role='DUTY_MANAGER' AND
 status='CONFIRMED', which is per performance: two performances running at once need two
-confirmed duty managers. UNIQUE (`performance_id`, `role`, `slot`) is what makes stamping
-idempotent (E-102 criterion 2). Claims are conditional writes gated live on training records
+confirmed duty managers. UNIQUE (`performance_id`, `role`, `slot`) is what makes racing stamps
+idempotent (E-102 criterion 2); a stamp numbers a top-up past every slot the role holds, a
+cancelled one included (0135). Claims are conditional writes gated live on training records
 (E-1), and the same UPDATE's `NOT EXISTS` refuses a second shift on one performance for the
 same member (E-104). `SHIFT_CLAIM_AUTO_CONFIRM` decides whether a claim writes `CONFIRMED` or
 the queued `CLAIMED`; a queued claim is answered on the rota board's waiting filter
@@ -2164,7 +2173,9 @@ reads 19:00 in both halves of the year (criterion 4). `shared/utils/ics.ts` buil
 pure, so both transitions are unit cases rather than a hope.
 
 `GET /api/rooms/bookings/[id]/ics` is the same builder for one booking, and the confirmation email
-carries that file as an attachment (criterion 1).
+carries that file as an attachment (criterion 1), as do an approval and a series confirmed at once.
+A message that ends a booking (the member's cancel, a closure, a bump) carries the same event with
+`METHOD:CANCEL` and a fresh `SEQUENCE`, so a client that imported it takes it away (0132).
 
 ### Utilisation reporting
 No table: the figures are counted from `room_bookings`, `room_hours` and `room_no_shows` on demand

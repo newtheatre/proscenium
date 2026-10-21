@@ -501,6 +501,10 @@ describe.skipIf(skip !== null)('the screen the officer works from', () => {
 
       await waitFor(view, `!!document.querySelector('[data-test="stamp-${fresh.venueId}"]')`)
       await click(view, `[data-test="stamp-${fresh.venueId}"]`)
+      // Stamping writes to every night ahead, so it asks first and nothing is sent until confirmed.
+      await waitFor(view, '!!document.querySelector(\'[data-test="confirm-stamp-diary-verb"]\')')
+      expect(await textOf(view, '[role="dialog"]:has([data-test="confirm-stamp-diary-verb"])')).toContain('from tonight onwards')
+      await click(view, '[data-test="confirm-stamp-diary-verb"]')
       await waitFor(view, 'document.body.innerText.includes(\'already has its slots\')')
     }
     finally {

@@ -50,11 +50,15 @@ export async function setNominalMapping(input: NominalMappingInput, actorId: str
 // the mapping table, and a line with no mapping still exports with a null code (criterion 3).
 export function suExportQuery(fromDay: string, toDay: string): SQL {
   return sql`
-    SELECT le.london_day AS londonDay, ll.kind AS kind, le.source AS source, le.tender AS tender,
-           m.nominal_code AS nominalCode, ll.amount_pence AS amountPence
+    SELECT le.london_day AS londonDay, le.happened_at AS happenedAt, ll.kind AS kind, le.source AS source,
+           le.tender AS tender, m.nominal_code AS nominalCode, ll.amount_pence AS amountPence,
+           s.title AS showTitle, r.reference AS reference
     FROM ledger_lines ll
     JOIN ledger_entries le ON le.id = ll.entry_id
     LEFT JOIN su_nominal_mappings m ON m.kind = ll.kind AND m.source = le.source
+    LEFT JOIN performances p ON p.id = ll.performance_id
+    LEFT JOIN shows s ON s.id = p.show_id
+    LEFT JOIN reservations r ON r.id = ll.reservation_id
     WHERE le.london_day BETWEEN ${fromDay} AND ${toDay}
     ORDER BY le.london_day, le.happened_at, ll.id
   `
@@ -64,17 +68,19 @@ export async function suExportRows(fromDay: string, toDay: string): Promise<SuEx
   return db.all<SuExportRow>(suExportQuery(fromDay, toDay))
 }
 
-// The same predicate as suExportQuery, counted: what the screen checks against the cap first.
+// The same predicate as suExportQuery, counted: what the screen checks against the cap first, and
+// how many of those lines would go out unmapped, which it warns about before the download.
 export function suExportCountQuery(fromDay: string, toDay: string): SQL {
   return sql`
-    SELECT count(*) AS rows
+    SELECT count(*) AS rows, coalesce(sum(CASE WHEN m.nominal_code IS NULL THEN 1 ELSE 0 END), 0) AS unmapped
     FROM ledger_lines ll
     JOIN ledger_entries le ON le.id = ll.entry_id
+    LEFT JOIN su_nominal_mappings m ON m.kind = ll.kind AND m.source = le.source
     WHERE le.london_day BETWEEN ${fromDay} AND ${toDay}
   `
 }
 
-export async function suExportRowCount(fromDay: string, toDay: string): Promise<number> {
-  const [row] = await db.all<{ rows: number }>(suExportCountQuery(fromDay, toDay))
-  return row?.rows ?? 0
+export async function suExportRowCount(fromDay: string, toDay: string): Promise<{ rows: number, unmapped: number }> {
+  const [row] = await db.all<{ rows: number, unmapped: number }>(suExportCountQuery(fromDay, toDay))
+  return { rows: row?.rows ?? 0, unmapped: row?.unmapped ?? 0 }
 }

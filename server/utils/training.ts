@@ -215,6 +215,7 @@ export async function prerequisitesOf(moduleIds: string[]): Promise<Map<string, 
     requiresId: schema.modulePrerequisites.requiresId,
     requiresName: schema.trainingModules.name,
     requiresKind: schema.trainingModules.kind,
+    requiresStatus: schema.trainingModules.status,
   })
     .from(schema.modulePrerequisites)
     .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.modulePrerequisites.requiresId))
@@ -233,6 +234,8 @@ export interface PrerequisiteRow {
   requiresId: string
   requiresName: string
   requiresKind: string
+  // A draft or retired prerequisite has no member page, so it is named and never linked (G-103).
+  requiresStatus: string
 }
 
 export interface NextSession {

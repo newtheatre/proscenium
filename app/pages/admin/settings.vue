@@ -57,6 +57,8 @@ const search = ref('')
 const settings = ref<Setting[]>([])
 const drafts = reactive<Record<string, string>>({})
 const notices = reactive<Record<string, string>>({})
+// A refusal stays beside the field it refuses until the next try, however far down the page that is.
+const errors = reactive<Record<string, string>>({})
 const saving = ref('')
 const failure = ref<ListFailure | null>(null)
 // The settings' own read, apart from a save's refusal, so a refused save never hides the list.
@@ -168,6 +170,7 @@ async function save(setting: Setting, value: unknown, confirmation?: string): Pr
   saving.value = setting.key
   failure.value = null
   notices[setting.key] = ''
+  errors[setting.key] = ''
 
   try {
     await $fetch(`/api/admin/config/${setting.key}`, { method: 'PUT', body: { value, confirmation } })
@@ -175,7 +178,9 @@ async function save(setting: Setting, value: unknown, confirmation?: string): Pr
     notices[setting.key] = 'Saved'
   }
   catch (error) {
-    failure.value = { message: refusalText(error), enrolPath: enrolPath(error) }
+    errors[setting.key] = refusalText(error)
+    // The authenticator wall is the page's, not the field's, so it keeps its way out up top.
+    if (enrolPath(error)) failure.value = { message: refusalText(error), enrolPath: enrolPath(error) }
   }
   finally {
     saving.value = ''
@@ -247,6 +252,7 @@ async function revertNow(setting: Setting, confirmation?: string): Promise<void>
   reverting.value = setting.key
   failure.value = null
   notices[setting.key] = ''
+  errors[setting.key] = ''
 
   try {
     await $fetch(`/api/admin/config/${setting.key}/revert`, { method: 'POST', body: { confirmation } })
@@ -616,6 +622,14 @@ onMounted(read)
                   class="text-sm text-muted"
                 >{{ notices[setting.key] }}</span>
               </div>
+              <p
+                v-if="edits && !setting.synced && errors[setting.key]"
+                class="mt-2 text-sm text-error"
+                role="alert"
+                :data-test="`refused-${setting.key}`"
+              >
+                Not saved: {{ (errors[setting.key] ?? '').replace(/\.$/, '') }}. It still stands at {{ saysStanding(setting) }}.
+              </p>
               <p
                 v-else-if="!setting.synced"
                 class="mt-3 text-sm font-medium"
