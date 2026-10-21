@@ -417,7 +417,7 @@ describe('a booking reads its show\'s guidance, and links only a published show 
     await withDatabase((database) => {
       booked(database, 'PUBLISHED')
       expect(guidanceFor(database, 'ABCDEF')).toEqual({
-        lines: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting'],
+        lines: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting: staging'],
         slug: 'a-test-show-a',
       })
     })
@@ -427,7 +427,7 @@ describe('a booking reads its show\'s guidance, and links only a published show 
     await withDatabase((database) => {
       booked(database, 'DRAFT')
       expect(guidanceFor(database, 'ABCDEF')).toEqual({
-        lines: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting'],
+        lines: ['Age guidance: Recommended 14 and over', 'Content warnings: Strobe lighting: staging'],
         slug: null,
       })
     })

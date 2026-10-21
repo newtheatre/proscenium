@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { saysNoSuch } from '#shared/utils/no-such'
-import { saysWhen, saysWhenLong } from '#shared/utils/when'
+import { saysClock, saysWhen, saysWhenLong } from '#shared/utils/when'
 import { SAYS_PAYMENT, saysAvailability, saysNightLine } from '#shared/utils/programme'
-import { overCapReason } from '#shared/utils/reservations'
+import { overCapReason, saysOrderCap, stepperMax } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { plural } from '#shared/utils/text'
 import type { ListedShow } from '#shared/utils/programme'
@@ -33,7 +33,7 @@ interface BookingInfo {
   performanceId: string
   showId: string
   show: { slug: string, title: string }
-  performance: { startsAt: number, venueName: string }
+  performance: { startsAt: number, doorsAt: number | null, venueName: string, venueAddress: string | null }
   refusal: { reason: string, says: string, closedAt?: number, externalBookingUrl?: string, waitingListUrl?: string } | null
   cap: number
   holdReleaseMinutes: number
@@ -81,13 +81,14 @@ const lines = computed(() => Object.entries(quantities)
 
 const capReason = computed(() => (data.value ? overCapReason(lines.value, data.value.cap) : null))
 
-// An access or companion row's own remaining entitlement, never the general order cap: the
-// whole point is a limit of one and a limit of the verified number (D-128 criteria 1, 2).
+// An access row's own entitlement (D-128 criteria 1, 2), and never past the room the order has
+// left, so the cap is met at the button rather than in a refusal after it (D-104 criterion 2).
 function maxFor(type: BookableTicketType): number {
   const entitlement = data.value?.accessEntitlement
-  if (type.accessKind === 'ACCESS' && entitlement) return Math.min(data.value!.cap, entitlement.access)
-  if (type.accessKind === 'COMPANION' && entitlement) return Math.min(data.value!.cap, entitlement.companion)
-  return data.value!.cap
+  const cap = data.value!.cap
+  if (type.accessKind === 'ACCESS' && entitlement) return stepperMax(quantities, type.id, cap, entitlement.access)
+  if (type.accessKind === 'COMPANION' && entitlement) return stepperMax(quantities, type.id, cap, entitlement.companion)
+  return stepperMax(quantities, type.id, cap)
 }
 
 const typeFor = (id: string): BookableTicketType | undefined => data.value?.ticketTypes.find(one => one.id === id)
@@ -102,6 +103,22 @@ const totalPence = computed(() => ordered.value.reduce((total, line) => total + 
 const seats = computed(() => ordered.value.reduce((total, line) => total + line.quantity, 0))
 
 const when = computed(() => (data.value ? saysWhenLong(data.value.performance.startsAt) : ''))
+
+// Where to go and when the doors open, said before anybody books (0122).
+const arrival = computed(() => {
+  const performance = data.value?.performance
+  if (!performance) return ''
+  return [
+    performance.venueAddress ? `${performance.venueName}, ${performance.venueAddress}` : performance.venueName,
+    performance.doorsAt ? `Doors ${saysClock(performance.doorsAt)}` : null,
+  ].filter(Boolean).join(' · ')
+})
+
+const capRule = computed(() => (data.value ? saysOrderCap(data.value.cap, seats.value) : ''))
+
+function toSummary(): void {
+  document.getElementById('booking-summary')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 const refusalTitle = computed(() => {
   const refusal = data.value?.refusal
@@ -235,7 +252,7 @@ useSeoMeta({
 
     <UPageHeader
       :title="`Book · ${data!.show.title}`"
-      :description="`${when} · ${data!.performance.venueName}`"
+      :description="`${when} · ${arrival}`"
       :ui="{ title: 'nnt-headline' }"
     />
 
@@ -424,6 +441,13 @@ useSeoMeta({
           >
             Nothing is on sale for this performance yet.
           </p>
+          <p
+            v-else
+            class="mt-2 text-sm text-muted"
+            data-test="booking-cap-rule"
+          >
+            {{ capRule }}
+          </p>
         </section>
 
         <!-- H-201's marketing consent is a V2 story and has nowhere to be stored yet, so this
@@ -474,8 +498,9 @@ useSeoMeta({
           heading="Before you book"
         />
         <UCard
+          id="booking-summary"
           variant="ticket"
-          class="lg:sticky lg:top-24"
+          class="scroll-mt-24 lg:sticky lg:top-24"
           data-test="booking-summary"
         >
           <template #header>
@@ -486,7 +511,7 @@ useSeoMeta({
               {{ data!.show.title }}
             </h2>
             <p class="text-sm text-muted">
-              {{ when }} · {{ data!.performance.venueName }}
+              {{ when }} · {{ arrival }}
             </p>
           </template>
 
@@ -588,6 +613,22 @@ useSeoMeta({
           </template>
         </UCard>
       </div>
+    </div>
+
+    <!-- Below lg the stub sits after the form, so a phone keeps the total and the way to it in view. -->
+    <div
+      v-if="!data!.refusal && seats > 0"
+      class="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-between gap-3 border-t border-default bg-default/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:hidden"
+      data-test="booking-sticky-total"
+    >
+      <span class="font-mono">{{ plural(seats, 'ticket') }} · {{ saysPrice(totalPence) }}</span>
+      <UButton
+        size="sm"
+        trailing-icon="i-lucide-arrow-down"
+        @click="toSummary"
+      >
+        Review and book
+      </UButton>
     </div>
   </UContainer>
 </template>
