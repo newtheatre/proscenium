@@ -68,11 +68,11 @@ export const recordManualEntry = z.object({
 
 // The form takes the day it happened; the endpoint takes the second that day began. Stated as its
 // own object rather than derived, because a derived one types as loosely as its loosest part.
-// Checked here as well as by the route, so a future date is refused before the second factor is asked.
 export const manualEntryForm = z.object({
   action: z.enum(MANUAL_ACTION_NAMES as [AuditActionName, ...AuditActionName[]]),
   target: z.string('Choose who it was about').min(1, 'Choose who it was about').max(64),
   onBehalfOf: z.string('Choose who decided it').min(1, 'Choose who decided it').max(64),
+  // Checked here as well as by the route, so a future date is refused before a second factor is asked.
   occurredOn: londonDayField.refine(day => day <= londonDay(new Date()), 'That date has not happened yet'),
   role: z.enum(ROLES, 'Choose which role').optional(),
 }).refine(input => !MANUAL_ROLE_ACTIONS.includes(input.action) || input.role !== undefined, { path: ['role'], message: 'Choose which role' })
