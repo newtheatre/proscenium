@@ -4,6 +4,7 @@ import { newId } from './accounts'
 import { auditWhere, entryLanded } from './audit'
 import { derivedAllergens, itemAllergenState, itemAllergensUnticked, pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, poursRestrictedSwitchedOffPredicate } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
+import type { AuditRow } from '#shared/utils/audit'
 import { SERVING_KINDS, effectivePriceRow, readAllergens } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import { barItemsList } from '#shared/utils/bar-items-list'
@@ -12,7 +13,6 @@ import { barProductsList } from '#shared/utils/bar-products-list'
 import { aliasColumns, count, predicate, whereFrom, yesNo } from './list-filters'
 import type { AllergenAnswer, BarCategory, BarProduct, CategoryPrice, ChoiceGroup, ProductVariant, StockItem, StockMovement, VariantComponent, VariantPrice } from '#shared/utils/bar'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { AuditRow } from '#shared/utils/audit'
 import type { ListClause, Reference } from './list-filters'
 
 // Reading the bar's catalogue and its stock. Two questions the module leans on live here: what a
@@ -318,6 +318,18 @@ export async function listCategories(clause: ListClause, limit: number, offset: 
 
 export async function countCategories(clause: ListClause): Promise<number> {
   return count(sql`SELECT count(*) AS total FROM bar_categories c${predicate(clause)}`)
+}
+
+// A category's audit row carrying the place the write gave it, read back from the row, because a
+// new category goes last and a move is clamped to the list (0143). Written only if the row is there.
+export function categoryAuditWithSort(entry: AuditRow, id: string): SQL {
+  return sql`
+    INSERT INTO audit_log (id, actor_id, action, target, detail)
+    SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target},
+           json_set(${JSON.stringify(entry.detail ?? {})}, '$.changes.sort.to', c.sort)
+    FROM bar_categories c WHERE c.id = ${id}
+    RETURNING id
+  `
 }
 
 export async function categoryById(id: string): Promise<BarCategory | undefined> {

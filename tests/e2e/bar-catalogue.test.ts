@@ -378,6 +378,30 @@ describe.skipIf(skip !== null)('a category is dragged into its place on the till
     expect(auditCount('bar.category.moved', `bar-category:${second}`)).toBe(1)
   })
 
+  // The trail says where a category landed, read from the row: last when added, clamped when moved.
+  test('the trail records the place the write gave, not the one asked for', async () => {
+    type Sorted = { detail: { changes: { sort: { to: number } } } }
+    const added = await addCategory({ name: named('Placed last'), sort: undefined })
+    const database = new Database(app.databaseFile, { readonly: true })
+    const stored = (database.query('SELECT sort FROM bar_categories WHERE id = ?').get(added) as { sort: number }).sort
+    database.close()
+    expect(trail<Sorted>('bar.category.created', `bar-category:${added}`)?.detail.changes.sort.to).toBe(stored)
+    expect(stored).toBe(Math.max(...sorts()))
+
+    expect((await send('POST', `/api/admin/bar/categories/${added}/move`, { position: 999 })).status).toBe(200)
+    const last = tillOrder().length - 1
+    expect(tillOrder()[last]).toBe(added)
+    expect(trail<Sorted>('bar.category.moved', `bar-category:${added}`)?.detail.changes.sort.to).toBe(last)
+  })
+
+  // An edit leaves the place alone, so a save made after somebody else dragged keeps their order.
+  test('editing a category keeps the place a drag gave it', async () => {
+    const edited = await addCategory({ name: named('Edited in place'), sort: undefined })
+    expect((await send('POST', `/api/admin/bar/categories/${edited}/move`, { position: 0 })).status).toBe(200)
+    expect((await send('PUT', `/api/admin/bar/categories/${edited}`, { name: named('Edited in place'), colour: '#8b1e3f' })).status).toBe(200)
+    expect(tillOrder()[0]).toBe(edited)
+  })
+
   test('an ordinary member cannot move one', async () => {
     const category = await addCategory({ name: named('Not moved') })
     expect((await send('POST', `/api/admin/bar/categories/${category}/move`, { position: 0 }, member.cookie)).status).toBe(403)

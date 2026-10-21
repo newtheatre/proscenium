@@ -8,6 +8,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { AppUnderTest } from '#tests/helpers/webview'
+import { MAX_SLOT_COUNT } from '#shared/utils/rota'
 
 // E-107: release and reassignment, through the real routes. `tests/integration/rota.test.ts`
 // pins the two UPDATEs directly against the migrations; this is the wiring and the notifications.
@@ -407,6 +408,16 @@ describe.skipIf(skip !== null)('an officer adds a one-off shift outside the temp
       `performance:${house.performanceId}`,
     )
     expect(audited?.slot).toBe(2)
+  })
+
+  test('an added shift never numbers past the most a role may hold, and says so', async () => {
+    const house = performance(7, 'add-slot-cap')
+    write('INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', `${house.performanceId}-DOOR-${MAX_SLOT_COUNT}`, house.performanceId, 'DOOR', MAX_SLOT_COUNT, 'OPEN')
+
+    const refused = await send('POST', '/api/admin/rota/shifts/add', { performanceId: house.performanceId, role: 'DOOR' }, foh.cookie)
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain(`${MAX_SLOT_COUNT}`)
+    expect(read<{ n: number }>('SELECT count(*) AS n FROM shifts WHERE performance_id = ? AND role = ?', house.performanceId, 'DOOR')?.n).toBe(2)
   })
 
   test('naming an eligible person confirms it at once, and they are told', async () => {

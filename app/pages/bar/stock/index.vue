@@ -151,6 +151,11 @@ const hasAmount = computed(() => (movement.qty ?? 0) > 0)
 // size, as opening stock and a stocktake are (0140); the register still holds millilitres.
 const containerMl = computed(() => (movement.kind === 'DELIVERY' && moving.value?.unit === 'ML' ? moving.value.containerMl ?? null : null))
 const inUnit = computed(() => (movement.qty ?? 0) * (containerMl.value ?? 1))
+// The field means containers for a delivery and millilitres otherwise, so a number typed under
+// one is cleared on the switch rather than read in the other unit.
+watch(containerMl, (now, before) => {
+  if (now !== before) movement.qty = undefined
+})
 
 const submitLabel = computed(() => (moving.value && hasAmount.value
   ? saysMovementAction({ kind: movement.kind, qty: inUnit.value, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds, containerMl: containerMl.value })

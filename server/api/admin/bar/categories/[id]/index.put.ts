@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const applied = await auditedWrite(
     db.all<{ id: string }>(sql`
       UPDATE bar_categories
-      SET name = ${input.name}, sort = ${input.sort ?? held.sort}, colour = ${colour}
+      SET name = ${input.name}, sort = coalesce(${input.sort ?? null}, sort), colour = ${colour}
       WHERE id = ${id}
         AND NOT EXISTS (SELECT 1 FROM bar_categories WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
       RETURNING id
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
       target: `bar-category:${id}`,
       detail: changes({
         name: [held.name, input.name],
-        sort: [held.sort, input.sort ?? held.sort],
+        ...(input.sort === undefined ? {} : { sort: [held.sort, input.sort] }),
         colour: [held.colour, colour],
       }),
     }),

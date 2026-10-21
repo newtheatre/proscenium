@@ -245,7 +245,7 @@ const columns: TableColumn<BarCategory>[] = [
 
     <CategoryOrder
       :categories="tillOrder.items"
-      @moved="refresh"
+      @moved="reloadAll"
     />
 
     <AdminToolbar

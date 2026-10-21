@@ -39,11 +39,12 @@ async function move(id: string, position: number): Promise<void> {
   }
 }
 
+// One move at a time: a second dropped while the first saves would be lost if the first failed.
 function dropAt(position: number): void {
   const id = dragging.value
   dragging.value = null
   over.value = null
-  if (id) void move(id, position)
+  if (id && !saving.value) void move(id, position)
 }
 </script>
 
@@ -83,7 +84,7 @@ function dropAt(position: number): void {
         :key="category.id"
         class="flex items-center gap-3 p-2"
         :class="{ 'bg-elevated': over === index, 'opacity-50': dragging === category.id }"
-        draggable="true"
+        :draggable="!saving"
         :data-test="`category-order-${category.id}`"
         @dragstart="dragging = category.id"
         @dragend="dragging = null; over = null"

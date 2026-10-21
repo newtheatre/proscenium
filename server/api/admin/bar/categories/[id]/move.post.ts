@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     detail: changes({ sort: [held.sort, position] }),
   })
   // Every category's row changes, so the audit is gated on the moved one being there rather than
-  // on auditedWrite's changes() = 1, which a move of more than one row never meets.
+  // on auditedWrite's changes() = 1, and records the place it was clamped to.
   const [moved] = await db.batch([
     db.all<{ id: string }>(sql`
       UPDATE bar_categories SET sort = placed.position
@@ -33,9 +33,9 @@ export default defineEventHandler(async (event) => {
       WHERE placed.id = bar_categories.id
       RETURNING bar_categories.id
     `),
-    db.all<{ id: string }>(auditIfRow(entry, 'bar_categories', id)),
+    db.all<{ id: string }>(categoryAuditWithSort(entry, id)),
   ])
-  const applied = moved.length > 0
+  const applied = moved.some(row => row.id === id)
   if (!applied) throw noSuch('category')
 
   return { ok: true }
