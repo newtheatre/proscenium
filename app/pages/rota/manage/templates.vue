@@ -20,6 +20,7 @@ interface VenueTemplate {
 
 interface Listing {
   venues: VenueTemplate[]
+  houseDefaults?: { startBeforeDoorsMinutes: number, endAfterEndMinutes: number }
   page: number
   pageSize: number
   total: number
@@ -78,6 +79,10 @@ const chosen = computed<TemplateSlot[]>(() =>
   })))
 
 const refusal = computed(() => templateRefusal(chosen.value))
+
+const saysHouseDefault = (minutes: number | undefined): string => (minutes === undefined
+  ? 'Minutes. Leave it blank for the house default.'
+  : `Minutes. Leave it blank for the house default, ${plural(minutes, 'minute')}.`)
 
 const totalSlots = (slots: TemplateSlot[]): number =>
   slots.reduce((running, slot) => running + slot.count, 0)
@@ -339,26 +344,26 @@ watch(modalOpen, (nowOpen) => {
             >
               <UFormField
                 label="Starts before doors"
-                :description="`Minutes. Blank takes the house default.`"
+                :description="saysHouseDefault(data.houseDefaults?.startBeforeDoorsMinutes)"
               >
                 <UInputNumber
                   v-model="offsets[role].start"
                   :min="0"
                   :max="MAX_SHIFT_OFFSET_MINUTES"
-                  placeholder="Default"
+                  :placeholder="data.houseDefaults ? String(data.houseDefaults.startBeforeDoorsMinutes) : 'Default'"
                   class="w-full"
                   :data-test="`starts-before-${role}`"
                 />
               </UFormField>
               <UFormField
                 label="Ends after the show"
-                description="Minutes. Blank takes the house default."
+                :description="saysHouseDefault(data.houseDefaults?.endAfterEndMinutes)"
               >
                 <UInputNumber
                   v-model="offsets[role].end"
                   :min="0"
                   :max="MAX_SHIFT_OFFSET_MINUTES"
-                  placeholder="Default"
+                  :placeholder="data.houseDefaults ? String(data.houseDefaults.endAfterEndMinutes) : 'Default'"
                   class="w-full"
                   :data-test="`ends-after-${role}`"
                 />

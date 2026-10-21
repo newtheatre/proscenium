@@ -345,7 +345,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // only (K-102 criterion 2).
 
   // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
-  test.skip('Close till is reached from the overflow menu, not the pinned actions, and still closes the session', async () => {
+  test.skip('Close till is a labelled button at the top, not one of the pinned actions, and still closes the session', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-close', screenPassword)
     await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
@@ -362,9 +362,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="open-close-till"]')`)).toBe(false)
 
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
     // A blank field is not a reading, so the nought the reader shows is keyed in.
     await fillNumber(view, '[data-test="actual-z-input"]', '0')
@@ -393,9 +391,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
 
     // A blank field is not a reading, even though it prices as nought (finding 13 follow-up).
@@ -430,9 +426,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
 
     await fillNumber(view, '[data-test="actual-z-input"]', '5')
@@ -466,9 +460,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
 
     // The modal opened on a nought expectation; a sale elsewhere then moves it to £2.50.
@@ -1013,7 +1005,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
       ...document.querySelectorAll('[data-test="category-chips"] button'),
       document.querySelector('[data-test="allergen-${productId}"]'),
       document.querySelector('[data-test="till-comp-chip"]'),
-      document.querySelector('[data-test="till-overflow-menu"]'),
+      document.querySelector('[data-test="till-close"]'),
       document.querySelector('[data-test="basket-summary-open"]'),
       document.querySelector('[data-test="basket-added-undo"]'),
       ...document.querySelectorAll('[role="tab"]'),

@@ -390,6 +390,25 @@ describe.skipIf(skip !== null)('an officer adds a one-off shift outside the temp
     )).toMatchObject({ status: 'OPEN', user_id: null })
   })
 
+  // 0140: the officer is not asked which number it is, and the trail still says which it took.
+  test('a shift added with no slot named takes the next number of its role', async () => {
+    const house = performance(7, 'add-next-slot')
+
+    const door = await send('POST', '/api/admin/rota/shifts/add', { performanceId: house.performanceId, role: 'DOOR' }, foh.cookie)
+    expect(door.status).toBe(200)
+    expect((await door.json() as { slot: number }).slot).toBe(2)
+
+    const bar = await send('POST', '/api/admin/rota/shifts/add', { performanceId: house.performanceId, role: 'BAR' }, foh.cookie)
+    expect((await bar.json() as { slot: number }).slot).toBe(1)
+
+    const audited = read<{ slot: number }>(
+      `SELECT json_extract(detail, '$.changes.slot.to') AS slot FROM audit_log
+       WHERE action = 'shift.added' AND target = ? AND json_extract(detail, '$.changes.role.to') = 'DOOR'`,
+      `performance:${house.performanceId}`,
+    )
+    expect(audited?.slot).toBe(2)
+  })
+
   test('naming an eligible person confirms it at once, and they are told', async () => {
     const house = performance(7, 'add-confirmed')
     const member = await registerMember(app, 'add-shift-eligible', generatePassword())

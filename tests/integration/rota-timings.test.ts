@@ -333,3 +333,20 @@ describe('the statements bind a fixed number of parameters (0003, 0006)', () => 
     })
   })
 })
+
+// 0140: an officer adding a shift is not asked which of its role it is.
+describe('a shift added with no slot named is numbered after its role', () => {
+  test('it takes one past the highest of its role, and the first of a role it lacks', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      template(database, tonight.venueId, [{ role: 'DUTY_MANAGER', count: 1 }, { role: 'DOOR', count: 2 }])
+      run(database, stampPerformanceStatement(tonight.performanceId, DEFAULTS))
+
+      const door = run(database, addShiftStatement('added-door', { performanceId: tonight.performanceId, role: 'DOOR' }, 'actor', DEFAULTS, BAR_GATE))
+      const bar = run(database, addShiftStatement('added-bar', { performanceId: tonight.performanceId, role: 'BAR' }, 'actor', DEFAULTS, BAR_GATE))
+
+      expect(door).toEqual([{ id: 'added-door', slot: 3 }])
+      expect(bar).toEqual([{ id: 'added-bar', slot: 1 }])
+    })
+  })
+})

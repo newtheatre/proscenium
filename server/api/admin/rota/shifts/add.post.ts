@@ -3,7 +3,7 @@ import { formatLondon } from '#shared/utils/london'
 import { addShiftForm, saysShiftRole } from '#shared/utils/rota'
 
 // An ad hoc shift on a performance, outside the venue template (E-107 criterion 5, issue 933):
-// the role and slot are the officer's own choice, an optional person confirms it at once.
+// the role is the officer's choice, the slot the next free one, an optional person confirms it.
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'rota.write')
   const input = await readValidatedBodyOrThrow(event, addShiftForm)
@@ -29,12 +29,16 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'shift.added',
     target: `performance:${input.performanceId}`,
-    detail: changes({ role: [null, input.role], slot: [null, input.slot], userId: [null, input.userId ?? null] }),
+    // The number may be the write's to choose, so the audit statement fills it in from the row.
+    detail: changes({ role: [null, input.role], slot: [null, input.slot ?? null], userId: [null, input.userId ?? null] }),
   })
 
   const offsets = await shiftOffsetDefaults(event)
-  const added = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(addShiftStatement(shiftId, input, resolved.account.id, offsets, gate)), entry))
-  if (!added) {
+  const [added] = await withShiftConstraints(() => db.batch([
+    db.all<{ id: string, slot: number }>(addShiftStatement(shiftId, input, resolved.account.id, offsets, gate)),
+    db.run(addedShiftAuditStatement(entry, shiftId)),
+  ]))
+  if (added.length === 0) {
     if (input.userId && subject) {
       throw ineligibleRefusal(input.role, (await shiftEligibilities(event, input.userId, today))[input.role], subject.name)
     }
@@ -50,5 +54,5 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { ok: true, shiftId }
+  return { ok: true, shiftId, slot: added[0]!.slot }
 })

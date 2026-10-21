@@ -79,7 +79,7 @@ export const showNight: Shot[] = [
       { selector: '[data-test="till-panes"] button[role="tab"]:nth-of-type(2)', label: 'Tickets' },
       { selector: 'button[data-test^="product-"]', label: 'A product' },
       { selector: '[data-test^="allergen-"]', label: 'Allergens' },
-      { selector: '[data-test="till-overflow-menu"]', label: 'Close till (not a per-sale action)' },
+      { selector: '[data-test="till-close"]', label: 'Close till (not a per-sale action)' },
     ],
   },
   {

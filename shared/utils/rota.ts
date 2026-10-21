@@ -169,12 +169,12 @@ export const shiftAssignForm = z.object({
   userId: z.string().min(1, 'Say which person you mean').max(64),
 })
 
-// An ad hoc shift, outside the template: the officer names the role and the slot themselves,
-// with an optional person that confirms it at once (E-107 criterion 5, issue 933).
+// An ad hoc shift, outside the template, with an optional person that confirms it at once
+// (E-107 criterion 5, issue 933). With no slot named it takes the role's next number (0140).
 export const addShiftForm = z.object({
   performanceId: z.string().min(1).max(64),
   role: z.enum(SHIFT_ROLES),
-  slot: z.number().int().min(1).max(MAX_SLOT_COUNT),
+  slot: z.number().int().min(1).max(MAX_SLOT_COUNT).optional(),
   userId: z.string().min(1).max(64).optional(),
 })
 

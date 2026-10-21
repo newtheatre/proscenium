@@ -252,9 +252,7 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
 
       expect(await violationsOn(view, `/tonight/till?venueId=${venueId}`, '[data-test="till-panes"]')).toEqual([])
 
-      await click(view, '[data-test="till-overflow-menu"]')
-      await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-      await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+      await click(view, '[data-test="till-close"]')
       await waitFor(view, `document.querySelector('[data-test="reader-should-show"]')`)
       expect(await violationsHere(view)).toEqual([])
     }

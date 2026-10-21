@@ -138,7 +138,7 @@ const statusColor: Record<ShiftStatus, 'success' | 'warning' | 'neutral' | 'erro
 const assigning = ref<{ shiftId: string, role: ShiftRole } | null>(null)
 // Declared before the candidate search below reads it: an ad hoc shift's role narrows the same
 // eligibility search an existing shift's id would.
-const adding = ref<{ performanceId: string, role: ShiftRole | undefined, slot: number } | null>(null)
+const adding = ref<{ performanceId: string, role: ShiftRole | undefined } | null>(null)
 const submitting = ref(false)
 const candidateSearch = ref('')
 const candidateSettled = useDebounced(candidateSearch, 250)
@@ -226,7 +226,7 @@ async function unconfirm(): Promise<void> {
 
 // Adding a one-off shift outside the template (issue 933).
 function beginAdding(performanceId: string): void {
-  adding.value = { performanceId, role: undefined, slot: 1 }
+  adding.value = { performanceId, role: undefined }
   chosen.value = null
   candidateSearch.value = ''
   failure.value = null
@@ -239,7 +239,7 @@ async function submitAdd(): Promise<void> {
   try {
     await $fetch('/api/admin/rota/shifts/add', {
       method: 'POST',
-      body: { performanceId: form.performanceId, role: form.role, slot: form.slot, userId: chosen.value?.id },
+      body: { performanceId: form.performanceId, role: form.role, userId: chosen.value?.id },
     })
     toast.add({ title: 'Shift added', icon: 'i-lucide-check', color: 'success' })
     adding.value = null
@@ -459,11 +459,11 @@ watch(modalOpen, (nowOpen) => {
             <li
               v-for="shift in entry.shifts"
               :key="shift.shiftId"
-              class="flex items-center justify-between gap-2 rounded-lg border p-2"
+              class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2"
               :class="shift.status === 'OPEN' || shift.status === 'DECLINED' ? 'border-warning' : 'border-default'"
               :data-test="`shift-${shift.shiftId}`"
             >
-              <div>
+              <div class="min-w-0">
                 <p class="text-xs text-muted">
                   {{ saysShiftRole(shift.role) }}
                 </p>
@@ -472,7 +472,8 @@ watch(modalOpen, (nowOpen) => {
                 </p>
               </div>
 
-              <div class="flex items-center gap-2">
+              <!-- Wraps under the name rather than out of the card, three cards to a row (0140). -->
+              <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                 <UBadge
                   :color="statusColor[shift.status]"
                   variant="subtle"
@@ -654,7 +655,7 @@ watch(modalOpen, (nowOpen) => {
     <UModal
       :open="adding !== null"
       title="Add a shift"
-      description="A one-off, outside the venue's template. Leave nobody chosen to leave it open."
+      description="One more place on this performance, outside the venue's template. Leave nobody chosen to leave it open for a member to claim."
       @update:open="value => { if (!value) adding = null }"
     >
       <template #body>
@@ -678,18 +679,6 @@ watch(modalOpen, (nowOpen) => {
               placeholder="Choose a role"
               class="w-full"
               data-test="add-shift-role"
-            />
-          </UFormField>
-
-          <UFormField
-            label="Slot"
-            hint="The role's ordinal on this performance: 1 for the first door shift, 2 for the second"
-          >
-            <UInputNumber
-              v-model="adding.slot"
-              :min="1"
-              class="w-full"
-              data-test="add-shift-slot"
             />
           </UFormField>
 

@@ -656,24 +656,29 @@ const basketBindings = computed(() => ({
           >
             Open since {{ saysClock(session.openedAt) }}.
           </p>
-          <!-- Not a per-sale action, so it lives here rather than under the thumb (K-102
-               criterion 2). -->
-          <UDropdownMenu
-            :items="[[
-              { label: 'Close till', icon: 'i-lucide-lock', onSelect: () => openCloseModal() },
-              ...(usingDevice ? [{ label: 'Change bar', icon: 'i-lucide-map-pin', onSelect: changeVenue }] : []),
-            ]]"
-          >
+          <!-- Not a per-sale action, so it sits up here rather than under the thumb (K-102
+               criterion 2), labelled rather than in a menu of one (0141). -->
+          <div class="flex items-center gap-2">
             <UButton
-              icon="i-lucide-ellipsis-vertical"
+              v-if="usingDevice"
+              data-test="till-open-change-venue"
               color="neutral"
               variant="ghost"
-              size="sm"
-              class="size-12"
-              aria-label="More till actions"
-              data-test="till-overflow-menu"
+              class="min-h-12"
+              icon="i-lucide-map-pin"
+              label="Change bar"
+              @click="changeVenue"
             />
-          </UDropdownMenu>
+            <UButton
+              data-test="till-close"
+              color="neutral"
+              variant="outline"
+              class="min-h-12"
+              icon="i-lucide-lock"
+              label="Close till"
+              @click="openCloseModal()"
+            />
+          </div>
         </div>
 
         <UAlert

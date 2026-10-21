@@ -679,14 +679,26 @@ export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId
   return sql`
     INSERT INTO shifts (id, performance_id, role, slot, user_id, status, assigned_by, claimed_at, confirmed_at, starts_at, ends_at)
     SELECT
-      ${shiftId}, p.id, ${input.role}, ${input.slot},
+      ${shiftId}, p.id, ${input.role}, ${input.slot ?? sql`coalesce((SELECT max(s.slot) FROM shifts s WHERE s.performance_id = p.id AND s.role = ${input.role}), 0) + 1`},
       ${input.userId ?? null}, ${confirmed ? 'CONFIRMED' : 'OPEN'}, ${confirmed ? actorId : null},
       ${confirmed ? sql`unixepoch()` : sql`NULL`}, ${confirmed ? sql`unixepoch()` : sql`NULL`},
       ${windowStart(defaults)}, ${windowEnd(defaults)}
     FROM performances p
     LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = ${input.role} AND ${ourVenue('t')}
     WHERE p.id = ${input.performanceId}${trained}
-    RETURNING id
+    RETURNING id, slot
+  `
+}
+
+// The added shift's audit row, conditional on the insert and carrying the number it took, which
+// the write chooses when the officer named none (0140), as an opening's slot does (0049).
+export function addedShiftAuditStatement(entry: AuditRow, shiftId: string): SQL {
+  return sql`
+    INSERT INTO audit_log (id, actor_id, action, target, detail)
+    SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target},
+           json_set(${JSON.stringify(entry.detail ?? {})}, '$.changes.slot.to', s.slot)
+    FROM shifts s
+    WHERE s.id = ${shiftId} AND changes() = 1
   `
 }
 
