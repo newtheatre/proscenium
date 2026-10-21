@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A resident device in the wings, joined by a spoken code and no account (E-120). One tap out of
 // the board mid-show is the defect, so there is nothing here to tap out to.
-useHead({ bodyAttrs: { class: 'nnt-night' } })
+useHead({ bodyAttrs: { class: 'nnt-night dark' } })
 </script>
 
 <template>

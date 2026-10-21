@@ -322,7 +322,7 @@ async function remove(): Promise<void> {
 
 const listingFailure = useListFailure(error, 'The stocked items could not be read.')
 
-const columns: TableColumn<StockItem>[] = [
+const allColumns: TableColumn<StockItem>[] = [
   {
     id: 'name',
     header: 'Stocked item',
@@ -461,6 +461,11 @@ const columns: TableColumn<StockItem>[] = [
     ]),
   },
 ]
+
+// A bar that keeps no stock groups is not shown an empty column for them.
+const columns = computed(() => (data.value.items.some(item => item.category)
+  ? allColumns
+  : allColumns.filter(column => column.id !== 'category')))
 </script>
 
 <template>

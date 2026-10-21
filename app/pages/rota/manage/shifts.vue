@@ -399,7 +399,9 @@ watch(modalOpen, (nowOpen) => {
                   {{ shift.holderName ?? 'Unfilled' }}
                 </p>
               </div>
+              <!-- An open slot already reads Unfilled with a warning border; Open beside it says it twice. -->
               <UBadge
+                v-if="shift.status !== 'OPEN'"
                 :color="statusColor[shift.status]"
                 variant="subtle"
                 size="sm"
@@ -475,6 +477,7 @@ watch(modalOpen, (nowOpen) => {
               <!-- Wraps under the name rather than out of the card, three cards to a row (0140). -->
               <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                 <UBadge
+                  v-if="shift.status !== 'OPEN'"
                   :color="statusColor[shift.status]"
                   variant="subtle"
                   size="sm"

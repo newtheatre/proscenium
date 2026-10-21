@@ -121,6 +121,22 @@ function edit(product: BarProduct | null): void {
   open.value = true
 }
 
+// A product's own page links here with ?edit=, so its details open where they are edited. In the
+// browser only: the read needs the session cookie, which a server-side $fetch would not carry.
+const route = useRoute()
+async function editFromQuery(): Promise<void> {
+  const id = route.query.edit
+  if (typeof id !== 'string' || !id) return
+  try {
+    const sizes = await $fetch<{ product: BarProduct | null }>(`/api/admin/bar/products/${id}/variants`)
+    if (sizes.product) edit(sizes.product)
+  }
+  catch { /* the listing still shows; the product is a press away */ }
+  await navigateTo({ query: { ...route.query, edit: undefined } }, { replace: true })
+}
+onMounted(editFromQuery)
+watch(() => route.query.edit, editFromQuery)
+
 async function save(): Promise<void> {
   saving.value = true
   failure.value = null

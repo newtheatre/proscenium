@@ -209,7 +209,8 @@ Eleven rules follow:
    48 by 48 pixels, not only the primary actions K-102 criterion 2 names: a cold hand in a dark
    foyer does not aim, and a secondary control missed twice costs more than the room it saved.
    That floor is one rule, `.nnt-night` in `app/assets/css/theme.css`, and the two show-night
-   layouts put the class on the body so a teleported modal is inside it too; a screen never asks
+   layouts put the class on the body, with `dark`, so a teleported modal is inside both and keeps the
+   floor and the stage-black ground; a screen never asks
    for it field by field. A Nuxt UI switch, checkbox or radio meets the floor by its row, not by
    the control it draws: Reka renders each as a button, and floored, a switch's track became a 48
    pixel circle (issue 1520). The element floor leaves out exactly that shape (a `base` button with

@@ -18,8 +18,8 @@ const authority = useNightAuthority()
 const badge = computed(() => onShiftLabel(authority.value.via, account.value.user?.name))
 
 // On the body rather than the subtree, so a modal teleported out of it inherits the shell's
-// target floor too (docs/design-language.md rule 4).
-useHead({ bodyAttrs: { class: 'nnt-night' } })
+// target floor and the dark ground too (docs/design-language.md rule 4).
+useHead({ bodyAttrs: { class: 'nnt-night dark' } })
 
 // A screen that names no show still sits on one: whichever house is running now fills the header
 // in, and a screen that knows better (the hub, the glance) overrides it.

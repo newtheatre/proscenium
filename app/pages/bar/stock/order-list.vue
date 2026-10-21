@@ -2,6 +2,7 @@
 import { h } from 'vue'
 import { saysQuantity } from '#shared/utils/bar'
 import { saysToOrder } from '#shared/utils/ordering'
+import { NO_STOCK_GROUP } from '#shared/utils/stocktakes'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -22,7 +23,7 @@ const grouped = computed(() => {
   // to hold two spellings of one category apart from being the same heading.
   const groups = new Map<string, { label: string, rows: OrderListRow[] }>()
   for (const row of data.value.shortfalls) {
-    const label = row.category ?? 'Uncategorised'
+    const label = row.category ?? NO_STOCK_GROUP
     const key = label.toLowerCase()
     const held = groups.get(key) ?? { label, rows: [] }
     held.rows.push(row)
@@ -30,6 +31,9 @@ const grouped = computed(() => {
   }
   return [...groups.values()].map(group => [group.label, group.rows] as const)
 })
+
+// A bar with no stock groups gets no heading saying so over its only list.
+const onlyUngrouped = computed(() => grouped.value.length === 1 && grouped.value[0]![0] === NO_STOCK_GROUP)
 
 const columns: TableColumn<OrderListRow>[] = [
   {
@@ -107,7 +111,10 @@ const columns: TableColumn<OrderListRow>[] = [
       class="space-y-2"
       data-test="order-list-group"
     >
-      <h3 class="font-semibold">
+      <h3
+        v-if="!onlyUngrouped"
+        class="font-semibold"
+      >
         {{ category }}
       </h3>
       <!-- Never reached: a group exists only because grouped (above) put a row in it. Said
