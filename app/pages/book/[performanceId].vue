@@ -5,6 +5,7 @@ import { SAYS_PAYMENT, saysAvailability, saysNightLine } from '#shared/utils/pro
 import { overCapReason, saysOrderCap, stepperMax } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { plural } from '#shared/utils/text'
+import type { PassOffer } from '#shared/utils/passes'
 import type { ListedShow } from '#shared/utils/programme'
 
 // The reservation flow (D-104): a guest or a signed-in account holds seats online; the box
@@ -40,6 +41,7 @@ interface BookingInfo {
   ticketTypes: BookableTicketType[]
   accessEntitlement: AccessEntitlement | null
   redeemablePass: RedeemablePass | null
+  passOffers: PassOffer[]
 }
 
 const route = useRoute()
@@ -331,6 +333,12 @@ useSeoMeta({
             data-test="redeem-notice"
           />
         </UCard>
+
+        <PassOffer
+          :offers="data!.passOffers"
+          :signed-in="account.signedIn"
+          :return-to="route.fullPath"
+        />
 
         <section
           v-if="nights.length > 1"

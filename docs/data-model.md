@@ -1109,6 +1109,15 @@ issue that itself failed the cap. `passes:expire-requests` (daily, `PASS_REQUEST
 lapses a still-`PENDING` request once its product's own `sales_close_at` has passed, D-106's own
 hold-release shape.
 
+**Offered while booking (D-133).** `GET /api/performances/[id]/booking` returns `passOffers`: each
+pass type on sale today (`ON_SALE`, inside its sales window, not past `valid_until`, under its
+cap, never the Fellowship) that covers the performance's show and that the caller does not hold,
+with how many shows it covers, its price points, and whether the caller already has an open
+request. `passOffersQuery()` binds the same parameters for a guest as for a signed-in caller
+(a guest's NULL id matches no row). It is empty when the performance is refused or the caller
+already has a pass to redeem there. The page asks through the same request route; a guest is sent
+to register or sign in first, since a pass always needs an account.
+
 **The holder's own QR (criterion 5).** `passQrTokenFor()`/`verifyPassQrToken()`
 (`server/utils/pass-qr-tokens.ts`) reuse D-108's HMAC scheme over `"pass:" + passId` rather than a
 second secret: the prefix domain-separates a pass token from a reservation token, so neither

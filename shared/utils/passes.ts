@@ -141,3 +141,21 @@ export function saysPayAtDesk(prices: readonly { price: number }[]): string {
   const figures = [...new Set([...prices].sort((a, b) => a.price - b.price).map(one => saysPrice(one.price)))]
   return `Pay ${figures.join(' or ')} at the box office desk`
 }
+
+export interface PassOffer {
+  id: string
+  name: string
+  description: string | null
+  coveredShows: number
+  prices: { label: string, price: number }[]
+  requested: boolean
+}
+
+// What the booking page says of a pass that covers the show (D-133 criterion 1): the cheapest
+// figure, since a booker reads "from", and the desk quotes every price point anyway.
+export function saysPassOffer(offer: Pick<PassOffer, 'name' | 'coveredShows' | 'prices'>): string {
+  const covers = `${offer.name} covers ${plural(offer.coveredShows, 'show')}`
+  if (offer.prices.length === 0) return `${covers}.`
+  const cheapest = Math.min(...offer.prices.map(one => one.price))
+  return `${covers}, from ${saysPrice(cheapest)}.`
+}
