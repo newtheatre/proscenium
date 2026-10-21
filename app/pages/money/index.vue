@@ -151,6 +151,13 @@ const figures = computed<Figure[]>(() => (data.value
           </div>
         </dl>
         <p
+          v-if="!mayDrillDown && data.openVariancePence !== 0"
+          class="text-sm text-muted"
+          data-test="variance-is-the-treasurers"
+        >
+          The Treasurer resolves an open variance at Daily reconciliation.
+        </p>
+        <p
           v-if="data.unreconciledNights > 0"
           class="text-sm text-warning"
           data-test="unreconciled-nights"

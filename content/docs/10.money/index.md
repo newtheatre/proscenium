@@ -51,7 +51,8 @@ Front of House Manager gave it on the [seasons](/docs/box-office/seasons) screen
 
 ![The money dashboard with the period kind (1), the period's own controls (2), revenue by source (3) and the other figures (4)](/images/docs/money/dashboard.png)
 
-1. **Period kind**: Day, Week, Month, Term, Season or Year. A day or a week takes a date; a
+1. **Period kind**: Day, 7 days from, Month, Term, Season or Year. A day takes a date, and
+   **7 days from** takes the date its seven days start on, whatever weekday that is; a
    month takes a month and a calendar year; a term, a season and a year are each chosen from a
    list of themselves.
 2. **Month** and **Calendar year** are each a list, and a **Year** reads as the two calendar
@@ -77,12 +78,15 @@ Front of House Manager gave it on the [seasons](/docs/box-office/seasons) screen
    their [daily reconciliation](/docs/money/daily-reconciliation). A night
    with no reading has no variance to add yet, so when the period holds any, a line beneath says
    how many the open variance leaves out, and the Treasurer's copy links to reconciling them.
+   Everyone else is told beneath the figures that the Treasurer resolves an open variance at
+   daily reconciliation.
 
 The range the figures cover is printed above them, from and to, as London days such as **Sat 1 Aug 2026**.
 
 Beneath the period controls, **Needs you: nights to reconcile** lists every night that took card
-money with no Z reading, and every night whose reading still disagrees with what we expect,
-whatever period is chosen. Each night links to its
+money with no Z reading, every night whose reading still disagrees with what we expect, and
+every night where one bar's till close replaced another bar's different reading, whatever
+period is chosen. Each night links to its
 [daily reconciliation](/docs/money/daily-reconciliation). It is shown to somebody who reads the
 money records, and only while a night is waiting; the console overview carries the same list.
 

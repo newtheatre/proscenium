@@ -30,11 +30,16 @@ export function saysFinanceScope(scope: FinanceScope): string {
   return FINANCE_SCOPE_WORDING[scope]
 }
 
+// The totals, and the share of each rung up on a till: a show's bar drinks are not its tickets.
 export interface ForegoneReport {
   compsPence: number
   compCount: number
   discountsPence: number
   discountCount: number
+  barCompsPence: number
+  barCompCount: number
+  barDiscountsPence: number
+  barDiscountCount: number
 }
 
 // Counts and value only, never a need or a name (criterion 3): nothing here joins a declaration.

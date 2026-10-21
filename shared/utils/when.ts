@@ -82,13 +82,13 @@ export function saysWhenLong(value: When, options: WhenOptions = {}): string {
 }
 
 // A span of days names its year whenever an end leaves the calendar year the reader is in, once
-// at the end when both share it and at both ends when they do not (0117).
-export function saysDayRange(from: When, to: When, options: Pick<WhenOptions, 'now'> = {}): string {
+// at the end when both share it and at both ends when they do not (0117). `year` always names it.
+export function saysDayRange(from: When, to: When, options: Pick<WhenOptions, 'now'> & { year?: boolean } = {}): string {
   const first = whenInstant(from)
   const last = whenInstant(to)
   const thisYear = londonParts(options.now ?? new Date()).year
   const firstYear = londonParts(first).year
   const lastYear = londonParts(last).year
-  const dated = firstYear !== thisYear || lastYear !== thisYear
+  const dated = options.year === true || firstYear !== thisYear || lastYear !== thisYear
   return `${saysDate(first, false, dated && firstYear !== lastYear)} to ${saysDate(last, false, dated)}`
 }
