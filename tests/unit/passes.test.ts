@@ -9,6 +9,7 @@ import {
   passSaleRefusal,
   requestPassForm,
   saysPassStatus,
+  saysPassOffer,
   saysPayAtDesk,
   showsPassQr,
 } from '#shared/utils/passes'
@@ -147,5 +148,22 @@ describe('a request says where it is paid for, and what it costs', () => {
 
   test('a pass with no price yet says so', () => {
     expect(saysPayAtDesk([])).toBe('Pay at the box office desk; the price is set when it is issued')
+  })
+})
+
+// D-133 criterion 1: the booking page names what the pass covers and quotes the cheapest figure.
+describe('a pass offered while booking says what it covers and what it costs', () => {
+  test('one show is singular and the cheapest price is the one quoted', () => {
+    expect(saysPassOffer({ name: 'Season pass', coveredShows: 1, prices: [{ label: 'Standard', price: 4500 }, { label: 'Member', price: 3000 }] }))
+      .toBe('Season pass covers 1 show, from £30.00.')
+  })
+
+  test('several shows are counted', () => {
+    expect(saysPassOffer({ name: 'Season pass', coveredShows: 6, prices: [{ label: 'Standard', price: 4500 }] }))
+      .toBe('Season pass covers 6 shows, from £45.00.')
+  })
+
+  test('a pass with no price point yet quotes none', () => {
+    expect(saysPassOffer({ name: 'Season pass', coveredShows: 6, prices: [] })).toBe('Season pass covers 6 shows.')
   })
 })

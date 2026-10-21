@@ -948,6 +948,87 @@ Open questions:
   over a thousand lines. Criteria 6 to 8 added 13 September 2026 from the committee's
   `admin-show-editor` mockup; criterion 9 from issue 1151 item 10, 21 September 2026.
 
+## D-133: The season pass is offered while booking
+
+- Role: Audience account
+- Phase: MVP
+- Story: As somebody booking a show, I want to be told about the season pass that covers it so
+  that I can save on coming back, and ask for it before I arrive to pay.
+- Depends on: D-104, D-123, D-124
+- Acceptance criteria:
+  1. The booking page for a performance on sale offers each pass on sale today that covers its
+     show: name, description, how many shows it covers and what it costs, through the shared
+     money wording. A pass past its validity, outside its sales window, at its cap or reserved
+     (the Fellowship) is never offered.
+  2. A signed-in booker asks for it in one tap, through D-124's own request; one who already
+     holds it is offered "Use my pass" (D-125) instead, and one who has already asked is told so
+     and where to pay, rather than offered it again.
+  3. A guest is asked to create an account, or sign in, to ask for it, and comes back to the same
+     booking page afterwards. Using or asking for a pass always needs an account (decided by the
+     IT Manager, 21 October 2026).
+  4. The offer asks for nothing and moves no money (0005): the request reserves nothing, and the
+     booking form works exactly as it did whether the offer is taken or not.
+- Source: Season pass flow review, 21 October 2026.
+
+## D-134: Sell a pass on the show-night till
+
+- Role: Front of house volunteer
+- Phase: MVP
+- Story: As whoever is on the till at the first show, I want to sell a season pass there so that
+  the person in front of me pays once and walks in on it.
+- Depends on: D-124, F-122, F-124
+- Acceptance criteria:
+  1. The till sells a pass under the till's own night authority, on the SumUp hand-off the till
+     already uses, under the expected-total cross-check, writing the same pass-sale ledger line
+     and email as the desk (D-124 criteria 1, 2, 5).
+  2. The buyer is chosen by name or email. A buyer with no account is asked to create one (D-133
+     criterion 3), and the sale waits for it.
+  3. A buyer holding a booking for tonight that the pass covers has it moved onto the pass in the
+     same transaction: the unpaid booking is cancelled and the pass redeemed for that performance,
+     so the seat is not counted twice and nothing is charged for it.
+  4. The buyer's open request for the same pass, if any, is fulfilled by the sale (issue 1331).
+- Source: Season pass flow review, 21 October 2026.
+
+## D-135: A pass holder is asked to make an account to book ahead
+
+- Role: Audience account
+- Phase: MVP
+- Story: As somebody holding a pass bought at the till, I want the pass page to show me how to
+  book ahead so that I do not just have to turn up and hope.
+- Depends on: D-124, D-125
+- Acceptance criteria:
+  1. The pass page opened from the pass email says that booking ahead uses the pass, and offers
+     to create an account (or sign in) on the email the pass was issued to; once signed in, the
+     booking page offers "Use my pass" as D-125 already does.
+  2. Turning up without booking stays possible and is described as subject to space.
+- Source: Season pass flow review, 21 October 2026.
+
+## D-136: The bar prompts a season pass
+
+- Role: Front of house volunteer
+- Phase: MVP
+- Story: As whoever is on the bar, I want a reminder to mention the season pass so that the
+  upsell happens without anybody having to remember it.
+- Depends on: D-134, F-101
+- Acceptance criteria:
+  1. On a night with a pass on sale that covers tonight's show, the bar till shows one line after
+     a completed sale naming the pass and its price, with a way into D-134's sale.
+  2. It is dismissed in one tap and is never a step a sale has to pass through.
+- Source: Season pass flow review, 21 October 2026.
+
+## D-137: Pass wording follows the ticket terms
+
+- Role: Audience account
+- Phase: MVP
+- Story: As a pass holder, I want the email and the pages to say what the pass lets me do, in
+  line with the theatre's ticket terms, so that nothing is a surprise at the door.
+- Depends on: D-133, D-135
+- Acceptance criteria:
+  1. The pass email says how to book ahead and that turning up is subject to space.
+  2. The booking offer, the pass page and the pass email link the ticket terms. Until the terms
+     are published, the link points at a placeholder page marked as placeholder (0051).
+- Source: Season pass flow review, 21 October 2026.
+
 ## D-201: Named allocations reserve capacity without tickets
 
 - Role: Box Office officer
