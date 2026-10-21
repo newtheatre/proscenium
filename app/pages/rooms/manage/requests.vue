@@ -83,9 +83,8 @@ const { data: listing, status, refresh, error } = await useAsyncData(
   { watch: [query], default: empty },
 )
 
-watch(error, (raised) => {
-  if (raised) failure.value = refusalText(raised)
-})
+// The queue's own read, apart from a decision's refusal, which leaves the queue in view.
+const readFailure = useListFailure(error, 'The requests could not be read.')
 
 // The sidebar counts this queue, so every decision moves it too (A-130 criterion 11, issue 1358).
 const nav = useNavCounts()
@@ -473,7 +472,11 @@ onMounted(loadRooms)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="reload"
+  >
     <UAlert
       v-if="failure"
       data-test="failure"
@@ -987,5 +990,5 @@ onMounted(loadRooms)
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

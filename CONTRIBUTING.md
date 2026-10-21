@@ -80,7 +80,9 @@ old rooms application is the cautionary tale.
   that binds a parameter. `tests/unit/d1-batch-raw.test.ts` is that patch's contract, and the
   patch may be dropped only on the day that test passes without it. A dependency bump that makes
   a patch stop applying fails `bun install`, which is the behaviour wanted: re-apply it or retire
-  it deliberately, never delete it to make the install quiet.
+  it deliberately, never delete it to make the install quiet. `@nuxt/ui` is patched for decision 0118:
+  a sidebar group's chevron is a second accordion trigger carrying `aria-expanded` on a `span`;
+  `tests/unit/navigation-menu-patch.test.ts` is that patch's contract.
 
 - **Domain rules live in `shared/utils/`**, which Nuxt auto-imports into both the application
   and the server. A route or a server utility names them with no import at all.

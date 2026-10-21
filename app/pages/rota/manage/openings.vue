@@ -63,11 +63,12 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
 
 const empty = (): Listing => ({ items: [], slots: [], page: 1, pageSize: 0, total: 0, pages: 1 })
 
-const { data: listing, status, refresh } = await useAsyncData(
+const { data: listing, status, refresh, error } = await useAsyncData(
   'rota-openings',
   () => request<Listing>('/api/rota/openings', { query: query.value }),
   { watch: [query], default: empty },
 )
+const readFailure = useListFailure(error, 'The bar openings could not be read.')
 
 // Only venues whose template staffs a bar: anywhere else stamps nothing, and offering it would
 // be a form that always refuses (E-130 criterion 2).
@@ -387,7 +388,11 @@ watch(modalOpen, (nowOpen) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -603,5 +608,5 @@ watch(modalOpen, (nowOpen) => {
       @close="closeDecline"
       @decline="submitDecline"
     />
-  </div>
+  </ReadGate>
 </template>

@@ -1,6 +1,6 @@
 # 0110: CI runs its gates in parallel, and runs only what a change can reach
 
-- Status: Proposed
+- Status: Accepted (IT Manager, 30 September 2026)
 - Date: 2026-09-29
 - Amends: 0109 ("every pull request into `unified/main`" runs the end-to-end suites) and 0029
   (`bun run test` "finishes in under a second")

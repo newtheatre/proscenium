@@ -37,14 +37,15 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 // The DevTools overlay is Nuxt's own markup, injected in development and absent from a build.
 // Scanning it would hold this project to somebody else's contrast.
 
-async function violationsOn(view: Bun.WebView, path: string, marker?: string): Promise<Violation[]> {
+async function violationsOn(view: Bun.WebView, path: string, marker?: string, rules?: string[]): Promise<Violation[]> {
   await visit(view, `${app.baseURL}${path}`, marker)
-  return violationsHere(view)
+  return violationsHere(view, rules)
 }
 
 // For a state reached by interaction rather than a URL (a modal, say): scans the page as it
 // currently stands, with no navigation to lose it.
-async function violationsHere(view: Bun.WebView): Promise<Violation[]> {
+async function violationsHere(view: Bun.WebView, rules?: string[]): Promise<Violation[]> {
+  const only = rules ? { type: 'rule', values: rules } : { type: 'tag', values: TAGS }
   // Injected as a script element rather than evaluated: axe is a UMD bundle, and an expression
   // is not what it is.
   await view.evaluate(`(() => {
@@ -58,7 +59,7 @@ async function violationsHere(view: Bun.WebView): Promise<Violation[]> {
   // one, which axe reports as being already running.
   await view.evaluate(`(() => {
     window.__axeResult = null
-    axe.run({ exclude: [['nuxt-devtools-frame']] }, { runOnly: { type: 'tag', values: ${JSON.stringify(TAGS)} } })
+    axe.run({ exclude: [['nuxt-devtools-frame']] }, { runOnly: ${JSON.stringify(only)} })
       .then(result => {
         window.__axeResult = JSON.stringify(result.violations.map(violation => ({
           id: violation.id,
@@ -105,9 +106,6 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
     { name: 'the listing', path: '/whats-on', marker: '[data-test="whats-on-page"]', skipped: true },
     { name: 'signing in', path: '/sign-in', marker: 'form', skipped: true },
     { name: 'registering', path: '/register', marker: 'form', skipped: true },
-    // K-102 criterion 3: the show-night shell is dark by default and still clears AA contrast.
-    // The hub is unguarded today; it moves to the signed-in cases when E-112 puts authority on it.
-    { name: 'the tonight hub', path: '/tonight', marker: 'main', skipped: false },
   ]
 
   for (const screen of PUBLIC) {
@@ -130,6 +128,39 @@ describe.skipIf(skip !== null)('the accessibility baseline (K-101)', () => {
     try {
       expect(await violationsOn(view, '/account/profile', '[data-test="profile-form"]')).toEqual([])
       expect(await violationsOn(view, '/account/security', '[data-test="methods"]')).toEqual([])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // K-102 criterion 3: the show-night shell is dark by default and still clears AA contrast. The
+  // hub sends a signed-out visitor to sign in (E-112), so it is scanned signed in.
+  test('the tonight hub has no WCAG 2.2 AA violation', async () => {
+    const view = await signedInView()
+    try {
+      expect(await violationsOn(view, '/tonight', 'main')).toEqual([])
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // The console's own structure, apart from the contrast #1574 still holds: one main landmark, and
+  // no state attribute on an element whose role cannot carry it (review of 13 October 2026).
+  test('the console layout has a main landmark and allowed attributes only', async () => {
+    const officerPassword = generatePassword()
+    const theatre = await registerMember(app, 'a11y-landmarks', officerPassword)
+    await grantRole(app, theatre, 'THEATRE_MANAGER', (await adminSession(app)).cookie)
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', theatre.email)
+      await fill(view, 'form input[type="password"]', officerPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, theatre.email)
+      const rules = ['landmark-one-main', 'landmark-no-duplicate-main', 'aria-allowed-attr']
+      expect(await violationsOn(view, '/rooms/manage', 'main', rules)).toEqual([])
     }
     finally {
       view.close()

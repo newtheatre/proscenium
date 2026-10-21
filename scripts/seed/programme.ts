@@ -104,8 +104,9 @@ const SHOWS: SeedShow[] = [
     latecomerPolicy: 'NOT_ADMITTED',
     warnings: [{ slug: 'bereavement', level: 'DISCUSSED' }],
     performances: [
-      // Six seats and six sold, so the house-full state exists without seeding a full house.
-      { slug: 'soldout', nights: 0, venue: 'house', status: 'ON_SALE', capacityOverride: 6, hoursAfterNightStart: 20 },
+      // Six seats and six sold, so the house-full state exists without seeding a full house. A
+      // matinee, so tonight has two performances at the house without one starting at midnight.
+      { slug: 'soldout', nights: 0, venue: 'house', status: 'ON_SALE', capacityOverride: 6, hoursAfterNightStart: 10.5 },
       { slug: 'later', nights: 10, venue: 'house', status: 'ON_SALE' },
     ],
   },
@@ -409,15 +410,17 @@ export function seedProgramme(target: SeedTarget, people: People, now: number): 
     }
   }
 
-  // One override apiece, so both levels of the price resolution have a row to resolve through
-  // rather than only the base (D-120).
-  statements.push(insert('show_ticket_overrides', {
-    id: seedId('showprice', 'new-writing-night', 'standard'),
-    show_id: shows.get('new-writing-night')!,
-    ticket_type_id: ticketTypes.get('standard')!,
-    price: 300,
-    active: 1,
-  }))
+  // Both levels of the price resolution have a row to resolve through rather than only the base
+  // (D-120). A cheaper night lowers its concession too, so it is never dearer than the full price.
+  for (const [slug, price] of [['standard', 300], ['concession', 200]] as const) {
+    statements.push(insert('show_ticket_overrides', {
+      id: seedId('showprice', 'new-writing-night', slug),
+      show_id: shows.get('new-writing-night')!,
+      ticket_type_id: ticketTypes.get(slug)!,
+      price,
+      active: 1,
+    }))
+  }
 
   statements.push(insert('performance_ticket_overrides', {
     id: seedId('performanceprice', 'the-seagull', 'tonight'),

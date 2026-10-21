@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import type { H3Event } from 'h3'
 import { changes } from '#shared/utils/audit'
 import { isWorkspaceEmail, normaliseEmail } from '#shared/utils/auth'
 import { CHOOSE_INSTEAD, PRE_LINKED, pendingGrantConstraintRefusal, pendingGrantDetail, pendingGrantStatements } from '#shared/utils/pending-grants'
@@ -20,6 +21,14 @@ const body = z.object({
   note: z.string().max(MAX_NOTE).optional(),
 }).refine(input => (input.userId === undefined) !== (input.email === undefined), { message: 'Choose somebody, or give an address' })
   .refine(input => input.email === undefined || input.name !== undefined, { message: 'Give their name', path: ['name'] })
+
+// Whether the role does nothing for its holder until they set up an authenticator (A-112 criterion
+// 7): a password account with none, or one still to set its password, given a privileged role.
+async function waitsOnFactor(event: H3Event, role: string, holder: { id: string, password: string | null } | null): Promise<boolean> {
+  if (holder !== null && holder.password === null) return false
+  if (!(await configValue(event, 'PRIVILEGED_ROLES') as readonly string[]).includes(role)) return false
+  return holder === null || !await confirmedFactor(holder.id)
+}
 
 // Grant a role, expiring at the committee year unless told otherwise.
 export default defineEventHandler(async (event) => {
@@ -82,7 +91,8 @@ export default defineEventHandler(async (event) => {
 
     // A Workspace address is claimed by Google sign-in alone, so it is sent nothing (0008).
     if (!isWorkspaceEmail(email)) await inviteToSetPassword(event, userId, name)
-    return { ok: true, role: input.role, expiresAt, renewed: false, pending: true, userId }
+    const waits = !isWorkspaceEmail(email) && await waitsOnFactor(event, input.role, null)
+    return { ok: true, role: input.role, expiresAt, renewed: false, pending: true, userId, waitsOnFactor: waits }
   }
 
   const subject = await findById(input.userId!)
@@ -134,5 +144,6 @@ export default defineEventHandler(async (event) => {
     })),
   ], () => refuseProtectedGrant(subject.id, expiresAt))
 
-  return { ok: true, role: input.role, expiresAt, renewed: Boolean(held), pending: false, userId: subject.id }
+  const waits = await waitsOnFactor(event, input.role, subject)
+  return { ok: true, role: input.role, expiresAt, renewed: Boolean(held), pending: false, userId: subject.id, waitsOnFactor: waits }
 })

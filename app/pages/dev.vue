@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { renderSVG } from 'uqr'
 import type { Persona } from '#shared/utils/personas'
 
 // Development only: nuxt.config keeps this file out of a production build (K-124).
@@ -7,29 +6,28 @@ import type { Persona } from '#shared/utils/personas'
 definePageMeta({ layout: 'console', title: 'Developer tools' })
 
 interface Seeded { id: string, email: string, name: string, anonymisedAt: number | null }
-interface Row extends Persona { account: Seeded | null }
+interface Row extends Persona { account: Seeded | null, factor: boolean }
 interface Letter { name: string, to: string, subject: string, body: string, html: boolean }
 
 interface Tools {
   session: { id: string, name: string, email: string, roles: string[], permissions: string[], factor: boolean } | null
   personas: Row[]
   mailbox: Letter[]
-  totp: { secret: string, uri: string }
+  totp: { secret: string, uri: string, qr: string }
 }
 
 const toast = useToast()
 const { refresh: refreshAccount } = useAccount()
-const tools = ref<Tools | null>(null)
+const request = useRequestFetch()
 const working = ref('')
 const reading = ref<Letter | null>(null)
 
 // The letter's own stem, resolved server-side against the mailbox directory (K-124 criterion 5).
 const htmlUrl = (letter: Letter): string => `/api/dev/mail/${letter.name.replace(/\.txt$/, '.html')}`
-const totpQr = computed(() => tools.value ? `data:image/svg+xml;base64,${btoa(renderSVG(tools.value.totp.uri))}` : '')
 
-async function load(): Promise<void> {
-  tools.value = await $fetch<Tools>('/api/dev')
-}
+// Read while the page is served, QR included, so the list and the code never wait on a script.
+const { data: tools, error, refresh: load } = await useAsyncData('dev-tools', () => request<Tools>('/api/dev'))
+const failure = useListFailure(error, 'The developer tools could not be read.')
 
 async function seed(): Promise<void> {
   working.value = 'seed'
@@ -59,8 +57,6 @@ async function be(row: Row): Promise<void> {
     working.value = ''
   }
 }
-
-onMounted(load)
 </script>
 
 <template>
@@ -79,6 +75,12 @@ onMounted(load)
       icon="i-lucide-database"
       title="This seeds the accounts only"
       description="Shows, performances, bookings, the rota, the bar and the ledger come from `bun run seed`, which prints the credentials it generates once. Both write the same personas, so either order works."
+    />
+
+    <ReadFailure
+      v-if="failure"
+      :failure="failure"
+      @retry="load"
     />
 
     <UCard>
@@ -125,6 +127,15 @@ onMounted(load)
               >
                 {{ row.shape }}
               </UBadge>
+              <UBadge
+                v-else-if="row.account && !row.factor"
+                color="warning"
+                variant="subtle"
+                size="sm"
+                :data-test="`dev-no-factor-${row.role ?? row.shape}`"
+              >
+                no authenticator
+              </UBadge>
             </p>
             <p class="text-sm text-muted">
               {{ row.describes }}
@@ -165,15 +176,16 @@ onMounted(load)
       <div class="flex flex-wrap items-center gap-4">
         <img
           data-test="dev-totp-qr"
-          :src="totpQr"
+          :src="tools?.totp.qr"
           alt="QR code for the shared persona authenticator secret"
           class="size-32 rounded border border-default"
         >
         <div class="space-y-1 text-sm">
           <p class="text-muted">
-            Every seeded 'full' persona already has this confirmed as its second factor, so no
-            admin screen refuses one for lacking an authenticator. Scan it once and the same code
-            works for any of them, across every reseed.
+            Both seeds confirm this as each 'full' persona's second factor, so no admin screen
+            refuses one for lacking an authenticator; a persona marked otherwise above needs
+            seeding again. Scan it once and the same code works for any of them, across every
+            reseed.
           </p>
           <p
             data-test="dev-totp-secret"

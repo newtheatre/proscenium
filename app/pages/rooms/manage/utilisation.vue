@@ -34,7 +34,7 @@ const by = computed<'room' | 'tier'>(() => (conditions.value.find(condition => c
 const empty = (): Report => ({ from: span.from, to: span.to, by: 'room', items: [], page: 1, pageSize: 0, total: 0, pages: 1, totals: { confirmedHours: 0, cancelledHours: 0, noShowHours: 0, openHours: 0, bookings: 0 } })
 
 const request = useRequestFetch()
-const { data: report, status, error } = await useAsyncData(
+const { data: report, status, error, refresh } = await useAsyncData(
   'rooms-utilisation',
   () => request<Report>('/api/admin/rooms/reports/utilisation', { query: { ...query.value, from: span.from, to: span.to } }),
   { watch: [query, () => span.from, () => span.to], default: empty },
@@ -82,18 +82,11 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="failure"
-      data-test="load-failed"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-unplug"
-      :title="failure.message"
-      :description="READ_AGAIN"
-      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="failure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <p class="text-sm text-muted">
       Booked hours against the hours a room is open.
     </p>
@@ -149,7 +142,7 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ failure ? 'The utilisation report could not be read.' : filtered ? 'Nothing matches that.' : 'Nothing was booked in that span.' }}
+          {{ filtered ? 'Nothing matches that.' : 'Nothing was booked in that span.' }}
         </p>
       </template>
     </UTable>
@@ -170,5 +163,5 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
         :items-per-page="report.pageSize"
       />
     </div>
-  </div>
+  </ReadGate>
 </template>
