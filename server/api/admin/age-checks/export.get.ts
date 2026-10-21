@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { toCsv } from '#server/utils/csv'
 import { numberedPdfRows } from '#server/utils/age-checks-export'
 import { buildTablePdf } from '#server/utils/pdf'
-import { saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
+import { ageCheckVenue, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { formatLondon, startOfLondonDayAfter } from '#shared/utils/london'
 
 const query = z.object({
@@ -29,13 +29,13 @@ export default defineEventHandler(async (event) => {
   }))
 
   const period = `${formatLondon(new Date(fromAt * 1000), { dateStyle: 'medium' })} to ${formatLondon(new Date(toAt * 1000 - 1000), { dateStyle: 'medium' })}`
-  const venues = [...new Set(rows.map(row => row.venueName ?? 'Bar (no performance)'))]
+  const venues = [...new Set(rows.map(row => ageCheckVenue(row.venueName)))]
 
   if (format === 'csv') {
     const csv = toCsv(rows.map(row => ({
       id: row.id,
       when: formatLondon(new Date(row.createdAt * 1000), { dateStyle: 'short', timeStyle: 'short' }),
-      venue: row.venueName ?? '',
+      venue: ageCheckVenue(row.venueName),
       outcome: saysOutcome(row.outcome),
       idType: row.idType ? saysIdType(row.idType) : '',
       reason: row.reason ? saysRefusalReason(row.reason) : '',

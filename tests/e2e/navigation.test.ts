@@ -169,9 +169,20 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
     expect(Array.isArray(officerView.body.tonight)).toBe(true)
     expect(Array.isArray(officerView.body.setUp)).toBe(true)
 
-    const trainerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
-    expect(trainerView.body.tonight).toBeNull()
-    expect(trainerView.body.setUp).toEqual([])
+    // Every severity ships routing nowhere, so the Theatre Manager is told until one is routed.
+    const unrouted = await read<{ setUp: Array<{ kind: string }>, tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
+    expect(unrouted.body.tonight).toBeNull()
+    expect(unrouted.body.setUp).toEqual([{ kind: 'NO_SAFETY_ROUTING' }])
+
+    expect((await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: true }, theatre.cookie)).status).toBe(200)
+    try {
+      const trainerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
+      expect(trainerView.body.tonight).toBeNull()
+      expect(trainerView.body.setUp).toEqual([])
+    }
+    finally {
+      await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: false }, theatre.cookie)
+    }
   })
 
   test('the placeholder is gone from the overview', async () => {

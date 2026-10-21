@@ -53,3 +53,16 @@ export function byNight<T extends { startsAt: number }>(items: readonly T[]): { 
   }
   return [...nights.entries()].map(([night, grouped]) => ({ night, items: grouped }))
 }
+
+// Two open Door places on one performance are one choice to a member, so they read as one row
+// saying how many; claiming it takes the first, and the server's race settles the rest.
+export function oneRowPerRole<T extends { performanceId: string, role: string }>(items: readonly T[]): (T & { places: number })[] {
+  const rows = new Map<string, T & { places: number }>()
+  for (const item of items) {
+    const key = `${item.performanceId}:${item.role}`
+    const held = rows.get(key)
+    if (held) held.places++
+    else rows.set(key, { ...item, places: 1 })
+  }
+  return [...rows.values()]
+}

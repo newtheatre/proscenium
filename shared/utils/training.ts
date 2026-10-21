@@ -472,7 +472,7 @@ export const SESSION_CAPACITY_MIN = 1
 export const SESSION_CAPACITY_MAX = 60
 
 export const sessionForm = z.object({
-  heldOn: z.string().regex(CIVIL_DATE, 'A session date reads as YYYY-MM-DD'),
+  heldOn: z.string().min(1, 'Choose the day it is held').regex(CIVIL_DATE, 'Choose the day from the calendar'),
   startsAt: z.string().regex(TIME, 'A time reads as HH:MM'),
   endsAt: z.string().regex(TIME, 'A time reads as HH:MM'),
   place: text(120),

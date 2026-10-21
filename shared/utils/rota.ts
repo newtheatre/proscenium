@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { constraintRefusal } from './constraint-refusal'
 import { NIGHT_ROLES } from './night-authority'
+import { plural } from './text'
 import type { NightRole } from './night-authority'
 
 // The rota's vocabulary: what a venue's template holds, and what a stamped shift is (E-101,
@@ -208,4 +209,16 @@ export const SHIFT_CONSTRAINT_REFUSALS: { violated: string, says: string }[] = [
 // caller reads back, and anything unrecognised is rethrown rather than hidden behind a 409.
 export function shiftConstraintRefusal(error: unknown): { statusCode: 409, statusMessage: string } | null {
   return constraintRefusal(SHIFT_CONSTRAINT_REFUSALS, error)
+}
+
+// What Stamp the diary did, said once: slots added, times filled, or neither (E-102, E-131).
+export function saysStamped(answer: { stamped: number, filled: number }): { title: string, description: string } {
+  const filled = answer.filled === 0 ? '' : ` ${plural(answer.filled, 'shift')} gained the times ${answer.filled === 1 ? 'its' : 'their'} template asks for.`
+  if (answer.stamped > 0) {
+    return { title: `${plural(answer.stamped, 'shift')} added`, description: `Performances from tonight onwards now carry every slot the template asks for.${filled}` }
+  }
+  if (answer.filled > 0) {
+    return { title: `Times added to ${plural(answer.filled, 'shift')}`, description: 'Every performance from tonight onwards already had its slots; these shifts now say when they are worked.' }
+  }
+  return { title: 'Nothing to add', description: 'Every performance from tonight onwards already has its slots and their times.' }
 }

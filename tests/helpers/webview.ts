@@ -293,9 +293,9 @@ export async function openSignedOutView(baseURL: string, size?: { width: number,
   await waitFor(view, 'document.body')
   // The browser is shared, so a charge another suite left unanswered would come back on this till.
   await view.evaluate(`Object.keys(localStorage).filter(key => key.startsWith('nnt-till-sumup')).forEach(key => localStorage.removeItem(key))`)
-  // Waited for: a sign-out answering after the case has signed in would clear the new session.
-  await view.evaluate(`(window.__signedOut = false, fetch('/api/auth/sign-out', { method: 'POST' }).finally(() => { window.__signedOut = true }), true)`)
-  await waitFor(view, 'window.__signedOut === true')
+  // Waited for, since a late sign-out would clear the case's new session. A cold dev server reloads
+  // open pages when it bundles a newly found dependency, so a window without the flag signs out anew.
+  await waitFor(view, `window.__signedOut === true || (window.__signedOut === undefined && (window.__signedOut = false, fetch('/api/auth/sign-out', { method: 'POST' }).finally(() => { window.__signedOut = true }), false))`)
   return view
 }
 

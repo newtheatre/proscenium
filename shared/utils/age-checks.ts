@@ -21,6 +21,11 @@ export function saysOutcome(outcome: AgeCheckOutcome): string {
   return 'Visibly over 25'
 }
 
+// An entry taken at the till with no performance that night has no venue to name (E-119 criterion 1).
+export function ageCheckVenue(venueName: string | null): string {
+  return venueName ?? 'Bar (no performance)'
+}
+
 export function saysIdType(idType: IdType): string {
   if (idType === 'PASSPORT') return 'Passport'
   if (idType === 'DRIVING_LICENCE') return 'Photocard driving licence'

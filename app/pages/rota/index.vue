@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysDay, saysWhenLong } from '#shared/utils/when'
-import { ROTA_WEEKS, byNight, rotaWeekSpan, saysRotaWeek } from '#shared/utils/my-rota'
+import { ROTA_WEEKS, byNight, oneRowPerRole, rotaWeekSpan, saysRotaWeek } from '#shared/utils/my-rota'
 import { saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
 import { saysNotOpenYet } from '#shared/utils/rota-readiness'
 import { saysWindow } from '#shared/utils/rota-times'
@@ -142,13 +142,13 @@ function askToRelease(one: Releasing): void {
 const askToReleaseShift = (shift: MyShift): void => askToRelease({
   id: shift.shiftId,
   route: `/api/rota/shifts/${shift.shiftId}/release`,
-  says: `${saysShiftRole(shift.role)} at ${shift.venueName}`,
+  says: `${saysShiftRole(shift.role)} for ${shift.showTitle}, ${saysWhenLong(shift.startsAt)}`,
 })
 
 const askToReleaseSlot = (slot: MyOpeningShift): void => askToRelease({
   id: slot.slotId,
   route: `/api/rota/openings/shifts/${slot.slotId}/release`,
-  says: `${slot.label} at ${slot.venueName}`,
+  says: `${slot.label} at ${slot.venueName}, ${saysWhenLong(slot.startsAt)}`,
 })
 
 async function release(): Promise<void> {
@@ -207,6 +207,8 @@ async function dismissOpening(slot: MyOpeningShift): Promise<void> {
 // The same race-safe claim the rota's own slots ride, under its own route because the slot lives
 // in its own table (E-130 criterion 3, 0077).
 async function claimOpening(slot: OpenOpeningShift): Promise<void> {
+  // A second press lands before the first has redrawn the button, so the guard is here, not only on it.
+  if (claiming.value) return
   claiming.value = slot.slotId
   try {
     const answer = await $fetch<{ status: 'CLAIMED' | 'CONFIRMED' }>(`/api/rota/openings/shifts/${slot.slotId}/claim`, { method: 'POST' })
@@ -243,6 +245,7 @@ const SHARE_CHOICES = [
 ]
 
 function startClaim(shift: OpenShift): void {
+  if (claiming.value) return
   if (shift.role !== 'DUTY_MANAGER') {
     void claim(shift)
     return
@@ -259,6 +262,7 @@ async function claimAsked(): Promise<void> {
 }
 
 async function claim(shift: OpenShift, body?: { shareNumber: boolean }): Promise<void> {
+  if (claiming.value) return
   claiming.value = shift.shiftId
   claimFailure.value = null
   try {
@@ -278,6 +282,8 @@ async function claim(shift: OpenShift, body?: { shareNumber: boolean }): Promise
     // Inside the dialogue that asked, where one did: a toast would sit behind it (0032).
     if (askingFor.value) claimFailure.value = refusalText(error)
     else toast.add({ title: 'Could not claim that', description: refusalText(error), icon: 'i-lucide-x', color: 'error' })
+    // A place somebody else took is gone from the list, and another of the same role may remain.
+    await refresh()
   }
   finally {
     claiming.value = null
@@ -529,7 +535,7 @@ useSeoMeta({ title: 'Rota' })
           </h3>
           <ul class="mt-2 divide-y divide-default">
             <li
-              v-for="shift in group.items"
+              v-for="shift in oneRowPerRole(group.items)"
               :key="shift.shiftId"
               class="flex flex-wrap items-center gap-3 py-3"
               :data-test="`open-shift-${shift.shiftId}`"
@@ -540,6 +546,13 @@ useSeoMeta({ title: 'Rota' })
                 </p>
                 <p class="text-sm text-muted">
                   {{ spanOf(shift.startsAt) }} · {{ shift.showTitle }}
+                </p>
+                <p
+                  v-if="shift.places > 1"
+                  class="text-sm text-muted"
+                  data-test="open-shift-places"
+                >
+                  {{ shift.places }} places open
                 </p>
               </div>
               <UButton

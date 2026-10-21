@@ -30,7 +30,7 @@ the sessions they can sign up for and the public catalogue, is described in
   One person's history: signing off, recording an outside certificate, revoking, expiry.
   ::
   ::card{icon="i-lucide-hand" title="Requests" to="/docs/training/requests"}
-  The demand board: what members are asking to be taught, and answering them.
+  The demand board: what members are asking to be taught, and declining them.
   ::
   ::card{icon="i-lucide-calendar-days" title="Sessions" to="/docs/training/sessions"}
   Scheduling, places and the waiting list, logging past teaching, and the register on the door.

@@ -20,7 +20,7 @@ withDefaults(defineProps<{
       :external="external"
       :highlight="highlight"
       highlight-color="primary"
-      :ui="{ root: 'h-full min-h-12', container: 'h-full' }"
+      :ui="{ root: 'h-full min-h-12', container: 'h-full lg:flex', wrapper: 'flex-none' }"
     >
       <div class="flex flex-1 flex-col gap-4">
         <div class="flex-1">

@@ -5,7 +5,7 @@ import { saysDay } from '#shared/utils/when'
 import type { DeliveryMode, ExpiryMode, ModuleKind } from '#shared/utils/training'
 import type { TrainingAction } from '#shared/utils/training-action'
 
-interface Prerequisite { moduleId: string, name: string, held: boolean | null }
+interface Prerequisite { moduleId: string, name: string, held: boolean | null, listed: boolean }
 interface NextSession { id: string, heldOn: string, startsAt: string, place: string | null }
 
 interface Module {
@@ -217,6 +217,7 @@ useSeoMeta({
             :key="need.moduleId"
           >
             <ULink
+              v-if="need.listed"
               :to="`/training/modules/${need.moduleId}`"
               class="flex items-center justify-between gap-3 rounded-md border border-default px-3 py-2 text-sm transition-colors hover:bg-elevated/50"
             >
@@ -233,6 +234,24 @@ useSeoMeta({
                 {{ need.held ? 'Held' : 'Not held' }}
               </UBadge>
             </ULink>
+            <!-- Not yet taught, or no longer: there is no page to open, so it is named and not linked. -->
+            <div
+              v-else
+              class="flex items-center justify-between gap-3 rounded-md border border-dashed border-default px-3 py-2 text-sm"
+              data-test="module-need-unlisted"
+            >
+              <span>
+                <span class="font-mono text-xs text-muted">{{ need.moduleId }}</span>
+                {{ need.name }}
+              </span>
+              <UBadge
+                :color="need.held ? 'success' : 'neutral'"
+                variant="subtle"
+                size="sm"
+              >
+                {{ need.held ? 'Held' : 'Not taught at the moment' }}
+              </UBadge>
+            </div>
           </li>
         </ul>
       </section>
