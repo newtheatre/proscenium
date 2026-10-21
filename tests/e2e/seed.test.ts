@@ -132,7 +132,7 @@ describe.skipIf(skip !== null)('seeded data is usable (K-120)', () => {
       WHERE v.product_id = ? AND c.choice_group_id IS NOT NULL
     `, gin?.id)?.n).toBe(2)
 
-    expect(read<{ n: number }>(`SELECT count(*) n FROM bar_products WHERE allergen_state = 'RECORDED'`)?.n)
+    expect(read<{ n: number }>(`SELECT count(*) n FROM bar_items WHERE allergen_state = 'RECORDED' AND allergens IS NOT NULL`)?.n)
       .toBeGreaterThan(0)
   })
 

@@ -92,6 +92,8 @@ export const barProducts = sqliteTable('bar_products', {
   // Only what the bar adds to what the product pours, such as a garnish; the till's answer is
   // derived from the items' own answers with this after them (issue 1348, deriveAllergens).
   allergenNote: text('allergen_note'),
+  // The ticked allergens of what the bar adds, comma-separated in ALLERGENS order (0142).
+  allergens: text('allergens'),
   sort: integer('sort').notNull().default(0),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
@@ -120,6 +122,9 @@ export const barItems = sqliteTable('bar_items', {
   // unanswered, or recorded where a note was written before the answer had a state of its own.
   allergenState: text('allergen_state'),
   allergenNotes: text('allergen_notes'),
+  // The ticked allergens, comma-separated in ALLERGENS order (0142). NULL on a free-text answer
+  // from before ticks, which the allergen review lists until somebody ticks it.
+  allergens: text('allergens'),
   status: text('status').notNull().default('ACTIVE'),
   createdAt: integer('created_at').notNull().default(now),
 }, table => [

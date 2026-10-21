@@ -2,9 +2,9 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { newId } from './accounts'
 import { auditWhere, entryLanded } from './audit'
-import { derivedAllergens, itemAllergenState, pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, poursRestrictedSwitchedOffPredicate } from './bar-linkage'
+import { derivedAllergens, itemAllergenState, itemAllergensUnticked, pourSizesColumn, pouredByColumn, readPourSizes, readPouredBy, readRestrictedPours, restrictedPoursColumn, poursRestrictedSwitchedOffPredicate } from './bar-linkage'
 import type { SQL } from 'drizzle-orm'
-import { SERVING_KINDS, effectivePriceRow } from '#shared/utils/bar'
+import { SERVING_KINDS, effectivePriceRow, readAllergens } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import { barItemsList } from '#shared/utils/bar-items-list'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
@@ -351,7 +351,8 @@ export async function claimName(entity: NamedEntity, name: string, exceptId?: st
   return row
 }
 
-interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold' | 'everPriced' | 'restrictedPours' | 'allergens'> {
+interface ProductRow extends Omit<BarProduct, 'staffedOnly' | 'ageRestricted' | 'everSold' | 'everPriced' | 'restrictedPours' | 'allergens' | 'addedAllergens'> {
+  addedAllergens: string | null
   staffedOnly: number
   ageRestricted: number
   everSold: number
@@ -366,6 +367,7 @@ const readProduct = (row: ProductRow, allergens: AllergenAnswer): BarProduct => 
   everSold: row.everSold === 1,
   everPriced: row.everPriced === 1,
   restrictedPours: readRestrictedPours(row.restrictedPours),
+  addedAllergens: readAllergens(row.addedAllergens),
   allergens,
 })
 
@@ -379,7 +381,8 @@ export const PRODUCT_COLUMNS = sql`
   p.staffed_only AS staffedOnly,
   p.age_restricted AS ageRestricted,
   p.allergen_state AS allergenState,
-  p.allergen_note AS allergenNote
+  p.allergen_note AS allergenNote,
+  p.allergens AS addedAllergens
 `
 
 // The category's own columns sit behind their own key, so a sort by them still runs one query
@@ -438,7 +441,8 @@ export async function productById(id: string): Promise<BarProduct | undefined> {
   return readProduct(row, (await derivedAllergens(sql`SELECT ${id}`, [row])).get(row.id)!)
 }
 
-interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements' | 'pouredBy' | 'pourSizes'> {
+interface ItemRow extends Omit<StockItem, 'ageRestricted' | 'hasMovements' | 'pouredBy' | 'pourSizes' | 'allergens'> {
+  allergens: string | null
   pourSizes: string | null
   ageRestricted: number
   hasMovements: number
@@ -452,6 +456,7 @@ const readItem = (row: ItemRow): StockItem => ({
   hasMovements: row.hasMovements === 1,
   pouredBy: readPouredBy(row.pouredBy),
   pourSizes: readPourSizes(row.pourSizes),
+  allergens: readAllergens(row.allergens),
 })
 
 const ITEM_COLUMNS = sql`
@@ -464,16 +469,17 @@ const ITEM_COLUMNS = sql`
   i.age_restricted AS ageRestricted,
   ${itemAllergenState('i')} AS allergenState,
   i.allergen_notes AS allergenNotes,
+  i.allergens AS allergens,
   i.status AS status
 `
 
 const MOVED = sql`CASE WHEN EXISTS (SELECT 1 FROM stock_movements m WHERE m.item_id = i.id) THEN 1 ELSE 0 END`
 
 // The allergen answer is an expression rather than a column, so a filter and a sort by it read the
-// same reading every screen shows (issue 1348); unanswered sorts first.
+// same reading every screen shows (issue 1348); unanswered sorts first, then words only (0142).
 function itemColumns(name: string): Reference {
   if (name === 'allergen_state') return itemAllergenState('i')
-  if (name === 'allergen_order') return sql`CASE ${itemAllergenState('i')} WHEN 'UNKNOWN' THEN 0 ELSE 1 END`
+  if (name === 'allergen_order') return sql`CASE WHEN ${itemAllergenState('i')} = 'UNKNOWN' THEN 0 WHEN ${itemAllergensUnticked('i')} THEN 1 ELSE 2 END`
   return aliasColumns('i')(name)
 }
 

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ALLERGEN_STATES, productForm, says, saysAtTheTill, saysRestricted, poursRestrictedSwitchedOff } from '#shared/utils/bar'
+import { ALLERGEN_STATES, productForm, says, saysAllergens, saysAtTheTill, saysRestricted, poursRestrictedSwitchedOff } from '#shared/utils/bar'
 import { barProductsList } from '#shared/utils/bar-products-list'
 import { encodeCondition } from '#shared/utils/list-filters'
 import type { FilterCondition, FilterOption } from '#shared/utils/list-filters'
-import type { AllergenState, BarCategory, BarProduct, ProductStatus } from '#shared/utils/bar'
+import type { Allergen, AllergenState, BarCategory, BarProduct, ProductStatus } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Products', middleware: 'console', docs: '/docs/bar/products' })
@@ -80,6 +80,7 @@ interface FormState {
   ageRestricted: boolean
   allergenState: AllergenState
   allergenNote?: string
+  addedAllergens: Allergen[]
 }
 
 const state = reactive<FormState>({
@@ -90,12 +91,14 @@ const state = reactive<FormState>({
   // Restricted anyway only: what it pours decides the rest (issue 1299).
   ageRestricted: false,
   allergenState: 'UNKNOWN',
+  addedAllergens: [],
 })
 
-// The note field is hidden when nothing is recorded, so the value behind it goes too: otherwise
-// the form refuses over a field the reader cannot see.
+// The note field is hidden when nothing is recorded, and the ticks unless something is, so the
+// values behind them go too: otherwise the form refuses over a field the reader cannot see.
 watch(() => state.allergenState, (chosen) => {
   if (chosen === 'UNKNOWN') state.allergenNote = undefined
+  if (chosen !== 'RECORDED') state.addedAllergens = []
 })
 
 const allergenOptions = ALLERGEN_STATES.map(value => ({ label: says(value), value }))
@@ -117,6 +120,7 @@ function edit(product: BarProduct | null): void {
     ageRestricted: product ? product.ageRestricted || product.restrictedPours.length > 0 : false,
     allergenState: product?.allergenState ?? 'UNKNOWN',
     allergenNote: product?.allergenNote ?? undefined,
+    addedAllergens: [...(product?.addedAllergens ?? [])],
   })
   open.value = true
 }
@@ -148,6 +152,7 @@ async function save(): Promise<void> {
     ageRestricted: state.ageRestricted,
     allergenState: state.allergenState,
     allergenNote: state.allergenNote?.trim() || null,
+    addedAllergens: state.addedAllergens,
   }
   try {
     if (editing.value) await $fetch(`/api/admin/bar/products/${editing.value.id}`, { method: 'PUT', body })
@@ -256,6 +261,7 @@ const columns: TableColumn<BarProduct>[] = [
       // so a phone keeps the row actions in view without losing what those columns said (922).
       h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
         says(row.original.allergens.state),
+        row.original.allergens.allergens.length ? `, contains ${saysAllergens(row.original.allergens.allergens).toLowerCase()}` : '',
         row.original.allergens.note ? `, ${row.original.allergens.note}` : '',
         row.original.everSold ? ', has been sold' : ', never sold',
       ].join('')),
@@ -268,6 +274,9 @@ const columns: TableColumn<BarProduct>[] = [
     cell: ({ row }) => h('div', {}, [
       // What the till says, read from the stock it pours (issue 1348).
       h('div', { 'class': 'text-sm', 'data-test': `allergens-${row.original.id}` }, says(row.original.allergens.state)),
+      row.original.allergens.allergens.length
+        ? h('div', { 'class': 'text-xs', 'data-test': `allergens-ticked-${row.original.id}` }, `Contains ${saysAllergens(row.original.allergens.allergens).toLowerCase()}`)
+        : null,
       row.original.allergens.note ? h('div', { class: 'text-xs text-muted' }, row.original.allergens.note) : null,
     ]),
   },
@@ -500,11 +509,24 @@ const columns: TableColumn<BarProduct>[] = [
           </UFormField>
 
           <UFormField
+            v-if="state.allergenState === 'RECORDED'"
+            label="What the addition contains"
+            name="addedAllergens"
+            required
+            description="Tick each one; the till reads them out with the stock's own."
+          >
+            <AllergenTicks
+              v-model="state.addedAllergens"
+              test-prefix="product-allergen"
+            />
+          </UFormField>
+
+          <UFormField
             v-if="state.allergenState !== 'UNKNOWN'"
             label="Allergen note"
             name="allergenNote"
-            :required="state.allergenState === 'RECORDED'"
-            description="What the addition contains, read out at the bar after the stock's own answers."
+            hint="Optional"
+            description="Anything a tick cannot say about the addition, read out after the stock's own answers."
           >
             <UTextarea
               v-model="state.allergenNote"

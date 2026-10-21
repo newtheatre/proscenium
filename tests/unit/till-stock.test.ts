@@ -10,7 +10,7 @@ function aVariant(id: string, stock: SaleVariant['stock']): SaleVariant {
 }
 
 function aProduct(variants: SaleVariant[]): SaleProduct {
-  return { id: 'p', name: 'Lager', categoryId: 'c', ageRestricted: false, allergenState: 'NONE', allergenNote: null, variants }
+  return { id: 'p', name: 'Lager', categoryId: 'c', ageRestricted: false, allergenState: 'NONE', allergenNote: null, allergens: [], variants }
 }
 
 describe('a size\'s stock as the till reads it', () => {

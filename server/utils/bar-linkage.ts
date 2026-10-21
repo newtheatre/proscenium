@@ -1,9 +1,9 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { auditEntry, changes } from '#shared/utils/audit'
-import { deriveAllergens } from '#shared/utils/bar'
+import { deriveAllergens, readAllergens } from '#shared/utils/bar'
 import type { SQL } from 'drizzle-orm'
-import type { AllergenAnswer, AllergenState, PouredAllergen } from '#shared/utils/bar'
+import type { Allergen, AllergenAnswer, AllergenState, PouredAllergen } from '#shared/utils/bar'
 
 // F-128: both directions are read from the components that already exist. Nothing stores a link,
 // and every predicate here scopes by subquery rather than by an id list read first (0006).
@@ -55,25 +55,34 @@ export function pourSizesColumn(alias: string): SQL {
 }
 
 // An item's answer, failing closed as deriveAllergens does: a note from before the column is
-// recorded, and recorded with nothing written, or a state no form writes, is unanswered (issue 1348).
+// recorded, and recorded with nothing ticked or written, or a state no form writes, is unanswered.
 export function itemAllergenState(alias: string): SQL {
   const item = sql.raw(alias)
   return sql`CASE
     WHEN ${item}.allergen_state = 'NONE' THEN 'NONE'
-    WHEN coalesce(${item}.allergen_state, 'RECORDED') = 'RECORDED' AND coalesce(trim(${item}.allergen_notes), '') <> '' THEN 'RECORDED'
+    WHEN coalesce(${item}.allergen_state, 'RECORDED') = 'RECORDED'
+      AND (coalesce(${item}.allergens, '') <> '' OR coalesce(trim(${item}.allergen_notes), '') <> '') THEN 'RECORDED'
     ELSE 'UNKNOWN' END`
+}
+
+// Recorded in words only, from before an answer ticked the fourteen (0142): readable at the till,
+// and listed for ticking until somebody does. Never read into ticks by guessing at the words.
+export function itemAllergensUnticked(alias: string): SQL {
+  const item = sql.raw(alias)
+  return sql`(${itemAllergenState(alias)} = 'RECORDED' AND coalesce(${item}.allergens, '') = '')`
 }
 
 // Every item each product's live sizes pour, a choice's options included, with the item's own
 // answer (issue 1348, F-107 criterion 4). Scoped by subquery, so it binds nothing per product (0006).
 export function pouredAllergensQuery(products: SQL): SQL {
   return sql`
-    SELECT v.product_id AS productId, r.name AS itemName, ${itemAllergenState('r')} AS state, r.allergen_notes AS note
+    SELECT v.product_id AS productId, r.name AS itemName, ${itemAllergenState('r')} AS state, r.allergen_notes AS note,
+      r.allergens AS allergens
     FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
     JOIN bar_items r ON r.id = c.item_id
     WHERE v.status = 'ACTIVE' AND v.product_id IN (${products})
     UNION
-    SELECT v.product_id, r.name, ${itemAllergenState('r')}, r.allergen_notes
+    SELECT v.product_id, r.name, ${itemAllergenState('r')}, r.allergen_notes, r.allergens
     FROM product_variants v JOIN variant_components c ON c.variant_id = v.id
     JOIN choice_group_items g ON g.choice_group_id = c.choice_group_id
     JOIN bar_items r ON r.id = g.item_id
@@ -82,19 +91,25 @@ export function pouredAllergensQuery(products: SQL): SQL {
   `
 }
 
-export interface PouredAllergenRow extends PouredAllergen {
+interface PouredAllergenRow extends Omit<PouredAllergen, 'allergens'> {
   productId: string
+  allergens: string | null
 }
 
 // Each product's derived answer, keyed by product, from one read of what they all pour.
 export async function derivedAllergens(
   products: SQL,
-  additions: readonly { id: string, allergenState: AllergenState, allergenNote: string | null }[],
+  additions: readonly { id: string, allergenState: AllergenState, allergenNote: string | null, addedAllergens?: string | readonly Allergen[] | null }[],
 ): Promise<Map<string, AllergenAnswer>> {
-  const rows = await db.all<PouredAllergenRow>(pouredAllergensQuery(products))
+  const rows = (await db.all<PouredAllergenRow>(pouredAllergensQuery(products)))
+    .map(row => ({ ...row, allergens: readAllergens(row.allergens) }))
   return new Map(additions.map(product => [
     product.id,
-    deriveAllergens(rows.filter(row => row.productId === product.id), { state: product.allergenState, note: product.allergenNote }),
+    deriveAllergens(rows.filter(row => row.productId === product.id), {
+      state: product.allergenState,
+      note: product.allergenNote,
+      allergens: typeof product.addedAllergens === 'string' || product.addedAllergens == null ? readAllergens(product.addedAllergens) : product.addedAllergens,
+    }),
   ]))
 }
 

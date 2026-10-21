@@ -19,7 +19,7 @@ import {
   writeOffSizes,
 } from '#shared/utils/bar'
 import { barItemsList } from '#shared/utils/bar-items-list'
-import type { AllergenState, MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
+import type { Allergen, AllergenState, MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Stock', middleware: 'console', docs: '/docs/bar/stock' })
@@ -71,14 +71,17 @@ interface ItemState {
   ageRestricted: boolean
   allergenState: AllergenState
   allergenNotes?: string
+  allergens: Allergen[]
 }
 
-const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT, allergenState: 'UNKNOWN' })
+const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT, allergenState: 'UNKNOWN', allergens: [] })
 const allergenOptions = ALLERGEN_STATES.map(value => ({ label: says(value), value }))
 
-// The note field is hidden when nothing is recorded, so the value behind it goes too.
+// The note field is hidden when nothing is recorded, and the ticks unless something is, so the
+// values behind them go too.
 watch(() => state.allergenState, (chosen) => {
   if (chosen === 'UNKNOWN') state.allergenNotes = undefined
+  if (chosen !== 'RECORDED') state.allergens = []
 })
 
 type HandEnteredKind = Exclude<StockMovementKind, 'SALE' | 'COMP' | 'STOCKTAKE' | 'TRANSFER' | 'REVERSAL'>
@@ -123,6 +126,7 @@ function edit(item: StockItem | null): void {
     ageRestricted: item?.ageRestricted ?? STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
     allergenState: item?.allergenState ?? 'UNKNOWN',
     allergenNotes: item?.allergenNotes ?? undefined,
+    allergens: [...(item?.allergens ?? [])],
   })
   open.value = true
 }
@@ -177,6 +181,7 @@ async function save(): Promise<void> {
     ageRestricted: state.ageRestricted,
     allergenState: state.allergenState,
     allergenNotes: state.allergenNotes?.trim() || null,
+    allergens: state.allergens,
   }
   try {
     if (editing.value) await $fetch(`/api/admin/bar/items/${editing.value.id}`, { method: 'PUT', body })
@@ -658,11 +663,24 @@ const columns = computed(() => (data.value.items.some(item => item.category)
           </UFormField>
 
           <UFormField
+            v-if="state.allergenState === 'RECORDED'"
+            label="What it contains"
+            name="allergens"
+            required
+            description="Tick each one. The till reads these out, so a typed note is no longer enough."
+          >
+            <AllergenTicks
+              v-model="state.allergens"
+              test-prefix="item-allergen"
+            />
+          </UFormField>
+
+          <UFormField
             v-if="state.allergenState !== 'UNKNOWN'"
             label="Allergen note"
             name="allergenNotes"
-            :required="state.allergenState === 'RECORDED'"
-            description="What staff read out at the bar."
+            hint="Optional"
+            description="Anything a tick cannot say, such as which nuts, or may contain."
           >
             <UTextarea
               v-model="state.allergenNotes"

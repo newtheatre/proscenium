@@ -20,6 +20,8 @@ interface SeedItem {
   parQty: number | null
   ageRestricted: boolean
   allergenNotes: string | null
+  // The ticked fourteen (0142); a note with none ticked is a words-only answer the review lists.
+  allergens?: string
   // What one container of a measured item, or one whole item, was bought for (0100).
   costPence: number
   caseSize: number
@@ -37,15 +39,15 @@ const ITEMS: SeedItem[] = [
   { slug: 'lemonade', name: 'Lemonade', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, costPence: 90, caseSize: 12 },
   { slug: 'cola', name: 'Cola', unit: 'ML', containerMl: 1000, parQty: 6000, ageRestricted: false, allergenNotes: null, costPence: 95, caseSize: 12 },
   { slug: 'orange-juice', name: 'Orange juice', unit: 'ML', containerMl: 1000, parQty: 3000, ageRestricted: false, allergenNotes: null, costPence: 120, caseSize: 8 },
-  { slug: 'house-red', name: 'House red', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: 'Contains sulphites.', costPence: 650, caseSize: 6 },
-  { slug: 'house-white', name: 'House white', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: 'Contains sulphites.', costPence: 650, caseSize: 6 },
-  { slug: 'prosecco', name: 'Prosecco', unit: 'ML', containerMl: 750, parQty: 1500, ageRestricted: true, allergenNotes: 'Contains sulphites.', costPence: 800, caseSize: 6 },
-  { slug: 'lager', name: 'Lager', unit: 'ITEM', containerMl: null, parQty: 72, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', costPence: 90, caseSize: 24 },
-  { slug: 'ale', name: 'Pale ale', unit: 'ITEM', containerMl: null, parQty: 48, ageRestricted: true, allergenNotes: 'Contains barley (gluten).', costPence: 130, caseSize: 24 },
+  { slug: 'house-red', name: 'House red', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: null, allergens: 'SULPHITES', costPence: 650, caseSize: 6 },
+  { slug: 'house-white', name: 'House white', unit: 'ML', containerMl: 750, parQty: 3000, ageRestricted: true, allergenNotes: null, allergens: 'SULPHITES', costPence: 650, caseSize: 6 },
+  { slug: 'prosecco', name: 'Prosecco', unit: 'ML', containerMl: 750, parQty: 1500, ageRestricted: true, allergenNotes: null, allergens: 'SULPHITES', costPence: 800, caseSize: 6 },
+  { slug: 'lager', name: 'Lager', unit: 'ITEM', containerMl: null, parQty: 72, ageRestricted: true, allergenNotes: 'Barley.', allergens: 'GLUTEN', costPence: 90, caseSize: 24 },
+  { slug: 'ale', name: 'Pale ale', unit: 'ITEM', containerMl: null, parQty: 48, ageRestricted: true, allergenNotes: 'Barley.', allergens: 'GLUTEN', costPence: 130, caseSize: 24 },
   { slug: 'cider', name: 'Cider', unit: 'ITEM', containerMl: null, parQty: 48, ageRestricted: true, allergenNotes: null, costPence: 120, caseSize: 24 },
-  { slug: 'alcohol-free-lager', name: 'Alcohol-free lager', unit: 'ITEM', containerMl: null, parQty: 24, ageRestricted: false, allergenNotes: 'Contains barley (gluten).', costPence: 100, caseSize: 24 },
+  { slug: 'alcohol-free-lager', name: 'Alcohol-free lager', unit: 'ITEM', containerMl: null, parQty: 24, ageRestricted: false, allergenNotes: 'Barley.', allergens: 'GLUTEN', costPence: 100, caseSize: 24 },
   { slug: 'crisps', name: 'Crisps', unit: 'ITEM', containerMl: null, parQty: 60, ageRestricted: false, allergenNotes: 'May contain milk.', costPence: 30, caseSize: 48 },
-  { slug: 'chocolate', name: 'Chocolate bar', unit: 'ITEM', containerMl: null, parQty: 40, ageRestricted: false, allergenNotes: 'Contains milk, soya and may contain nuts.', costPence: 45, caseSize: 48 },
+  { slug: 'chocolate', name: 'Chocolate bar', unit: 'ITEM', containerMl: null, parQty: 40, ageRestricted: false, allergenNotes: 'May contain nuts.', allergens: 'MILK,SOYA', costPence: 45, caseSize: 48 },
   // Retired, so the catalogue screen shows the state and the history that names it survives.
   { slug: 'alcopop', name: 'Alcopop', unit: 'ITEM', containerMl: null, parQty: null, ageRestricted: true, allergenNotes: null, costPence: 110, caseSize: 24, status: 'RETIRED' },
 ]
@@ -256,7 +258,8 @@ const PRODUCTS: SeedProduct[] = [
     status: 'HIDDEN',
     ageRestricted: true,
     // What the bar adds to the wine it pours: the one product-level answer left (issue 1348).
-    allergenState: 'RECORDED',
+    // Neither spice is one of the fourteen, so it is confirmed none with the note read out (0142).
+    allergenState: 'NONE',
     allergenNote: 'Mulled with cinnamon and cloves.',
     variants: [{ slug: 'mug', servingKind: 'item', label: 'Mug', pricePence: 300, recipe: { item: 'house-red', qty: 200 } }],
   },
@@ -297,9 +300,10 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
       par_qty: item.parQty,
       age_restricted: item.ageRestricted ? 1 : 0,
       // Answered once on the item, which every product pouring it reads (issue 1348); cider is
-      // left unanswered so the allergen review has something to show.
-      allergen_state: item.allergenNotes ? 'RECORDED' : item.slug === 'cider' || item.status === 'RETIRED' ? null : 'NONE',
+      // left unanswered, and crisps in words only, so the allergen review has something to show.
+      allergen_state: item.allergenNotes || item.allergens ? 'RECORDED' : item.slug === 'cider' || item.status === 'RETIRED' ? null : 'NONE',
       allergen_notes: item.allergenNotes,
+      allergens: item.allergens ?? null,
       status: item.status ?? 'ACTIVE',
     }).id)
   }

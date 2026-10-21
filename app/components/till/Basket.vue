@@ -35,7 +35,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  openAllergens: [{ name: string, state: SaleProduct['allergenState'], note: string | null }]
+  openAllergens: [{ name: string, state: SaleProduct['allergenState'], note: string | null, allergens: SaleProduct['allergens'] }]
   retrySumup: []
 }>()
 
@@ -140,7 +140,7 @@ function productFor(line: BasketLine): SaleProduct | undefined {
           class="size-12"
           :aria-label="`Allergens for ${line.productName}`"
           :data-test="`line-allergen-${line.id}`"
-          @click="emit('openAllergens', { name: productFor(line)!.name, state: productFor(line)!.allergenState, note: productFor(line)!.allergenNote })"
+          @click="emit('openAllergens', { name: productFor(line)!.name, state: productFor(line)!.allergenState, note: productFor(line)!.allergenNote, allergens: productFor(line)!.allergens })"
         />
         <UButton
           size="sm"

@@ -69,8 +69,9 @@ const CIDER: Simple = {
     ageRestricted: true,
     allergenState: 'NONE',
     allergenNote: null,
+    addedAllergens: [],
   },
-  item: { mode: 'NEW', item: { name: 'Cider 440ml can', unit: 'ITEM', ageRestricted: true, allergenState: 'UNKNOWN' } },
+  item: { mode: 'NEW', item: { name: 'Cider 440ml can', unit: 'ITEM', ageRestricted: true, allergenState: 'UNKNOWN', allergens: [] } },
   serving: { servingKind: 'can', label: 'Can', qty: 1, pricePence: 300 },
   opening: null,
 }
@@ -85,8 +86,9 @@ const HOUSE_RED: ProductSetupInput = {
     ageRestricted: true,
     allergenState: 'RECORDED',
     allergenNote: 'Contains sulphites.',
+    addedAllergens: ['SULPHITES'],
   },
-  item: { mode: 'NEW', item: { name: 'House red 750ml', unit: 'ML', containerMl: 750, ageRestricted: true, allergenState: 'UNKNOWN' } },
+  item: { mode: 'NEW', item: { name: 'House red 750ml', unit: 'ML', containerMl: 750, ageRestricted: true, allergenState: 'UNKNOWN', allergens: [] } },
   sizes: [
     { servingKind: 'bottle', label: 'Bottle', qty: 750, pricePence: 1400 },
     { servingKind: '250ml', label: '250ml', qty: 250, pricePence: 500 },
@@ -106,6 +108,7 @@ const NEGRONI: ProductSetupInput = {
     ageRestricted: true,
     allergenState: 'NONE',
     allergenNote: null,
+    addedAllergens: [],
   },
   serving: { servingKind: 'item', label: 'Each', pricePence: 600 },
   components: [
@@ -117,6 +120,7 @@ const NEGRONI: ProductSetupInput = {
     group: { name: 'Garnish', options: [{ itemId: 'item-orange', qty: 1 }, { itemId: 'item-lemon', qty: 1 }] },
     qty: 1,
     includedInPrice: true,
+    optional: false,
   },
 } as ProductSetupInput
 
@@ -131,6 +135,7 @@ const GIN: ProductSetupInput = {
     ageRestricted: true,
     allergenState: 'NONE',
     allergenNote: null,
+    addedAllergens: [],
   },
   serving: { servingKind: 'single', label: 'Single', pricePence: 350 },
   components: [{ itemId: 'item-gin', qty: 25 }],
@@ -333,7 +338,7 @@ describe('nothing partial survives a collision (F-127 criterion 4)', () => {
       apply(database, planProductSetup(CIDER, context()))
 
       const again = planProductSetup(
-        { ...CIDER, item: { mode: 'NEW', item: { name: 'Cider 440ml can (2)', unit: 'ITEM', ageRestricted: true, allergenState: 'UNKNOWN' } } } as ProductSetupInput,
+        { ...CIDER, item: { mode: 'NEW', item: { name: 'Cider 440ml can (2)', unit: 'ITEM', ageRestricted: true, allergenState: 'UNKNOWN', allergens: [] } } } as ProductSetupInput,
         context(),
       )
       apply(database, again)

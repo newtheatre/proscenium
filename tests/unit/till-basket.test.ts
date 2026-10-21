@@ -33,6 +33,7 @@ function aProduct(over: Partial<SaleProduct> = {}): SaleProduct {
     ageRestricted: false,
     allergenState: 'NONE',
     allergenNote: null,
+    allergens: [],
     variants: [aVariant({ ageRestricted: over.ageRestricted ?? false })],
     ...over,
   }

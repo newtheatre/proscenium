@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { inlineAgeCheckForm } from './age-checks'
 import type { AgeCheckOutcome } from './age-checks'
-import type { AllergenState, BarPriceSource, ServingKind } from './bar'
+import type { Allergen, AllergenState, BarPriceSource, ServingKind } from './bar'
 
 // The till's basket: what is on offer and what pricing one up costs, in integer pence (F-103).
 // Nothing here writes anything; the sale itself is F-104's cross-check and F-105's atomic write.
@@ -253,6 +253,8 @@ export interface SaleProduct {
   ageRestricted: boolean
   allergenState: AllergenState
   allergenNote: string | null
+  // The ticked allergens of everything it pours and what the bar adds (0142).
+  allergens: Allergen[]
   variants: SaleVariant[]
 }
 

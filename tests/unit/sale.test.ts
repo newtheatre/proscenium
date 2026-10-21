@@ -177,6 +177,7 @@ describe('Check ID follows what a line pours (issue 1299)', () => {
     ageRestricted: true,
     allergenState: 'NONE',
     allergenNote: null,
+    allergens: [],
     variants: [
       { id: 'v-gin', servingKind: 'single', label: 'With gin', pricePence: 450, priceSource: 'variant', choice: null, stock: null, ageRestricted: true },
       {
