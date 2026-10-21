@@ -219,6 +219,7 @@ describe('a typed charge waits for the person at the reader (0096)', () => {
     entryId: 'entry-1', totalPence: 1900, lines: [], ageCheck: null, refusedLines: [], discount: null, tab: null, comp: null,
     tickets: [{ reservationId: 'r-1', reference: 'ABC123', amountPence: 900 }],
     walkUps: [],
+    pass: null,
   }
 
   test('Card declined brings the basket back and says the card was declined', async () => {
