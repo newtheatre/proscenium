@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { reportPeriodForm, saysPageOf } from '#shared/utils/bar-reports'
+import { BAR_REPORT_COLUMNS, barReportFileName, csvPounds, csvWhen, reportPeriodForm, saysPageOf } from '#shared/utils/bar-reports'
 import { fromLondonWallClock } from '#shared/utils/london'
 import { resolveReportPeriod } from '#server/utils/bar-reports'
 
@@ -126,5 +126,37 @@ describe('a section that does not fit says so rather than reading as the whole (
 
   test('a later page counts from its own offset', () => {
     expect(saysPageOf(page(12, 9, 212))).toBe('Showing 201 to 212 of 212. Narrow the period to see the rest.')
+  })
+})
+
+// The review could not sum a bar CSV: money was "£3.60" text with a Unicode minus, dates were
+// "13/10/2026, 15:15", the stocktake column was a raw id and every period had one file name (0128).
+describe('a bar report CSV is numbers a spreadsheet can sum (0128)', () => {
+  test('money is a plain decimal with an ASCII minus, and the heading says pounds', () => {
+    expect(csvPounds(360)).toBe('3.60')
+    expect(csvPounds(-9588)).toBe('-95.88')
+    expect(BAR_REPORT_COLUMNS.sales).toContain('Revenue (£)')
+  })
+
+  test('a moment is an ISO London date and a 24-hour clock', () => {
+    expect(csvWhen(at(2026, 10, 13, 15) + 15 * 60)).toBe('2026-10-13 15:15')
+    expect(csvWhen(at(2026, 7, 1, 21))).toBe('2026-07-01 21:00')
+  })
+
+  test('every section heads its columns, so an empty one is a header and not an empty file', () => {
+    for (const section of ['sales', 'gp', 'variance', 'comps', 'discounts', 'wastage'] as const) {
+      expect(BAR_REPORT_COLUMNS[section].length).toBeGreaterThan(0)
+    }
+    expect(BAR_REPORT_COLUMNS.comps).toContain('Forgone (£)')
+    expect(BAR_REPORT_COLUMNS.variance).toContain('Stocktake applied')
+    expect(BAR_REPORT_COLUMNS.variance.join()).not.toMatch(/id/i)
+  })
+
+  test('the file is named for its section and the period it covers', () => {
+    expect(barReportFileName('sales', { kind: 'NIGHT', night: '2026-10-13' })).toBe('bar-sales-night-2026-10-13')
+    expect(barReportFileName('gp', { kind: 'WEEK', day: '2026-10-12' })).toBe('bar-gp-week-from-2026-10-12')
+    expect(barReportFileName('comps', { kind: 'YEAR', year: 2027 })).toBe('bar-comps-year-to-july-2027')
+    expect(barReportFileName('variance', { kind: 'CUSTOM', from: '2026-10-01', to: '2026-10-13' }, { page: 2, pages: 3 }))
+      .toBe('bar-variance-2026-10-01-to-2026-10-13-page-2-of-3')
   })
 })

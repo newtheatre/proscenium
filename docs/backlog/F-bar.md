@@ -314,6 +314,11 @@ Open questions:
      Amended by issue 1299: a product's Check ID follows what it pours (F-106 criterion 1), so
      only a stocked item keeps a stated default; a new product's own switch, "restricted anyway",
      starts off.
+     Amended 14 October 2026 after the hands-on review of 13 October: in the guided set-up, a
+     new stocked item's flag and a packaged product's serving start from the chosen category
+     (`stockItemAgeRestrictedFor`, `packagedKindFor`), so a snack is sold each and asks for no
+     ID; the stated default still holds where the category says nothing, and a hand-set switch
+     is never overwritten.
 - Source: Prompt Book F-2; audit PR-12, PR-7 (archive-not-delete judgment); criterion 6 from
   issue 1151 item 10, 21 September 2026.
 
@@ -425,6 +430,12 @@ Open questions:
      Front of House Manager's, who takes the full count (`bar.stocktake`). Amended 29 September
      2026 by decision 0111: the bar manager's role folded into the Front of House Manager's, and
      the Front of House Manager reviews every line before Apply.
+  8. Added 14 October 2026 (decision 0126): a count is compared with on-hand at the moment it is
+     saved, not when the stocktake opened, so sales between the two are not counted again as a
+     loss; this amends criteria 1, 3 and 4. Apply refuses, naming each item, a stocktake that
+     would leave any counted item below zero, on the freezing write's own predicate. A count
+     under half or over double what was expected is listed to check before Apply, and the
+     confirmation lists every adjustment it will post.
 - Source: Prompt Book F-2; audit PR-12 (stocktake blanks recorded as zero).
 
 ## F-116: Dated append-only prices with same-day correction
@@ -510,6 +521,10 @@ Open questions:
   5. Access is limited to the Front of House Manager's role, the treasurer and administrators.
      Amended 29 September 2026 by decision 0111: the bar manager's role folded into the Front of
      House Manager's.
+  6. Amended 14 October 2026 by decision 0128 (criteria 1 and 2): an export carries money as
+     pounds and moments as ISO London dates under declared headings, in a file named for its
+     section and period; a discount counts the sales that carried it; a variance line names its
+     stocktake, date and unit, with the period's total; gross profit lists what it could not cost.
 - Source: Prompt Book F-2, P4; audit PR-12, PR-7 (CSV injection guard).
 
 ## F-120: Par levels and the suggested order list

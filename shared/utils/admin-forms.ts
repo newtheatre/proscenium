@@ -18,6 +18,19 @@ export function penceFromPounds(raw: string): number | null {
   return Number(match[1]!.replaceAll(',', '')) * 100 + Number(match[2] ?? 0)
 }
 
+// A typed price also takes one figure of pence, 1.5 being £1.50; "2,50" and 7.555 stay refused,
+// never read as £250 or rounded to £7.55 (0127).
+export function penceFromTyped(raw: string): number | null {
+  const trimmed = raw.trim()
+  return penceFromPounds(/\.\d$/.test(trimmed) ? `${trimmed}0` : trimmed)
+}
+
+// Digits only: a sign, a fraction or a separator is refused rather than clamped or rounded (0127).
+export function wholeFromTyped(raw: string): number | null {
+  const trimmed = raw.trim()
+  return /^\d{1,9}$/.test(trimmed) ? Number(trimmed) : null
+}
+
 export const awardFellowship = z.object({
   userId: accountId,
   awardedOn: londonDayField,

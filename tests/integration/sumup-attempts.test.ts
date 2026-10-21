@@ -162,6 +162,34 @@ describe('an attempt says which way the card was charged (0096)', () => {
   })
 })
 
+describe('an attempt says what is in its basket, so two of the same total can be told apart', () => {
+  test('the lines are named with their size and quantity, and bookings and walk-ups are counted', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const { venueId } = tonightsPerformance(database, { suffix: 'basket' })
+      insert(database, 'till_sessions', { id: 't-1', venue_id: venueId, night: '2026-09-14', opened_by: opener, opened_at: 1000 })
+      insert(database, 'bar_categories', { id: 'c-1', name: 'Beer' })
+      insert(database, 'bar_products', { id: 'p-1', category_id: 'c-1', name: 'House lager' })
+      insert(database, 'product_variants', { id: 'v-1', product_id: 'p-1', serving_kind: 'PINT', label: 'Pint' })
+      const sale = {
+        lines: [{ variantId: 'v-1', qty: 2 }],
+        tickets: [{ reservationId: 'r-1' }],
+        walkUps: [{ performanceId: 'x', ticketTypeId: 'y', quantity: 3 }],
+      }
+      insert(database, 'sumup_attempts', {
+        id: 'att-full', till_session_id: 't-1', venue_id: venueId, night: '2026-09-14', created_by: opener,
+        basket: JSON.stringify({ sale }), expected_total_pence: 250, status: 'STARTED',
+      })
+      attempt(database, 'att-empty', 't-1', venueId, opener)
+
+      const found = read<{ id: string, basketLines: string | null, basketBookings: number, basketWalkUps: number }>(database, stuckAttemptsQuery(4_000_000_000, 1))
+      const byId = Object.fromEntries(found.map(row => [row.id, row]))
+      expect(byId['att-full']).toMatchObject({ basketLines: '2× Pint House lager', basketBookings: 1, basketWalkUps: 3 })
+      expect(byId['att-empty']).toMatchObject({ basketLines: null, basketBookings: 0, basketWalkUps: 0 })
+    })
+  })
+})
+
 // The stuck clock runs from the answer, not from the hand-off: an attempt answered a moment ago
 // is still in flight however long ago it was started (F-124 criterion 5).
 describe('a completion is stuck when its answer is old, not when its hand-off is', () => {
