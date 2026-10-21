@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
+import type { PassOffer } from '#shared/utils/passes'
 
 // Reading what to sell, what is pending and what a member holds (D-124). Kept apart from
 // server/utils/pass-issue.ts's write path, matching D-114's own collect/desk split.
@@ -246,4 +247,51 @@ export async function passBuyers(q: string): Promise<PassBuyer[]> {
 
 export async function ownPassRequests(userId: string): Promise<OwnPassRequest[]> {
   return db.all<OwnPassRequest>(ownPassRequestsQuery(userId))
+}
+
+interface PassOfferRow {
+  id: string
+  name: string
+  description: string | null
+  coveredShows: number
+  pricesJson: string
+  requested: number
+}
+
+// D-133 criterion 1: on sale today, covering this show, under its cap and not already held. A
+// guest's NULL id matches no request and no pass, so the statement's shape never depends on it.
+export function passOffersQuery(showId: string, userId: string | null, now: number): SQL {
+  return sql`
+    SELECT t.id AS id, t.name AS name, t.description AS description,
+           (SELECT count(*) FROM pass_type_shows s WHERE s.pass_type_id = t.id) AS coveredShows,
+           COALESCE((
+             SELECT json_group_array(json_object('id', pr.id, 'label', pr.label, 'price', pr.price))
+             FROM pass_type_prices pr WHERE pr.pass_type_id = t.id
+           ), '[]') AS pricesJson,
+           EXISTS (
+             SELECT 1 FROM pass_requests r
+             WHERE r.pass_type_id = t.id AND r.user_id = ${userId} AND r.status = 'PENDING'
+           ) AS requested
+    FROM pass_types t
+    WHERE t.status = 'ON_SALE' AND t.slug != 'fellowship'
+      AND (t.sales_open_at IS NULL OR t.sales_open_at <= ${now})
+      AND (t.sales_close_at IS NULL OR t.sales_close_at > ${now})
+      AND t.valid_until >= ${now}
+      AND EXISTS (SELECT 1 FROM pass_type_shows s WHERE s.pass_type_id = t.id AND s.show_id = ${showId})
+      AND (t.max_issued IS NULL
+        OR (SELECT count(*) FROM passes p WHERE p.pass_type_id = t.id AND p.status != 'CANCELLED') < t.max_issued)
+      AND NOT EXISTS (
+        SELECT 1 FROM passes p WHERE p.pass_type_id = t.id AND p.user_id = ${userId} AND p.status = 'ACTIVE'
+      )
+    ORDER BY t.name COLLATE NOCASE
+  `
+}
+
+export async function passOffers(showId: string, userId: string | null, now: number): Promise<PassOffer[]> {
+  const rows = await db.all<PassOfferRow>(passOffersQuery(showId, userId, now))
+  return rows.map(({ pricesJson, requested, ...row }) => ({
+    ...row,
+    prices: JSON.parse(pricesJson) as PassOffer['prices'],
+    requested: requested === 1,
+  }))
 }

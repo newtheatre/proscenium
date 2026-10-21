@@ -45,6 +45,8 @@ export default defineEventHandler(async (event) => {
   // Offered automatically (D-125 criterion 1), same gate an ordinary ticket type sits behind:
   // nothing is offered against a performance that is not on sale in the first place.
   const redeemablePass = !refusal && account ? (await redeemablePassFor(account.id, id, performance.showId, now)) ?? null : null
+  // D-133: a holder is offered the pass they hold, never asked to buy another one.
+  const passOffersHere = refusal || redeemablePass ? [] : await passOffers(performance.showId, account?.id ?? null, now)
 
   // Allow-listed, and only what the form's own heading and summary read back: what a visitor is
   // about to book, so the page never has to fetch the show again to name it (D-104).
@@ -68,5 +70,6 @@ export default defineEventHandler(async (event) => {
     ticketTypes: visible,
     accessEntitlement: remaining,
     redeemablePass,
+    passOffers: passOffersHere,
   }
 })
