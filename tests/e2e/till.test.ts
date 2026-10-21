@@ -19,6 +19,8 @@ import type { TestMember } from '#tests/helpers/accounts'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+// The phone the show-night screens are built for; a wider view gets the till's wide layout (0144).
+const PHONE = { width: NIGHT_VIEWPORT_PX, height: 780 }
 
 let app: AppUnderTest
 let admin: TestMember
@@ -952,7 +954,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   // Issue 1311: the bar under the thumb opens the basket as a sheet, so checking or correcting it
   // never means scrolling past the grid and back.
   test('the summary bar opens the basket as a sheet, and a line changed there changes the total', async () => {
-    const { view, productId } = await atTheTill()
+    const { view, productId } = await atTheTill(false, PHONE)
     await click(view, `[data-test="product-${productId}"]`)
     await click(view, '[data-test="basket-summary-open"]')
     await waitFor(view, `document.querySelector('[data-test="basket-sheet"] [data-test^="line-plus-"]')`)
@@ -994,7 +996,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
 
   // Every control on a show-night screen, not only the primary ones (design-language.md rule 4).
   test('every control a thumb reaches for clears 48 pixels', async () => {
-    const { view, productId } = await atTheTill(true)
+    const { view, productId } = await atTheTill(true, PHONE)
     await waitFor(view, `document.querySelector('[data-test="category-chips"] button')`)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
@@ -1025,12 +1027,31 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   // K-102 criterion 1: the bar's one row, the press named with its Undo beside the comp chip and the
   // total, still fits the narrowest phone the show-night screens are built for.
   test('the bar under the thumb fits a 360 pixel phone while a press is named', async () => {
-    const { view, productId } = await atTheTill(false, { width: NIGHT_VIEWPORT_PX, height: 780 })
+    const { view, productId } = await atTheTill(false, PHONE)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket-added"]') && document.querySelector('[data-test="till-comp-chip"]')`)
     expect(await view.evaluate<boolean>(`document.documentElement.scrollWidth <= window.innerWidth`)).toBe(true)
+    view.close()
+  }, 120_000)
+
+  // 0144: a tablet sees the basket beside the drinks, with no sheet to open and no sideways scroll.
+  test('on a tablet the basket sits beside the drinks, and the sheet button is not drawn', async () => {
+    const { view, productId } = await atTheTill(false, { width: 1024, height: 768 })
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-basket-column"] [data-test^="line-qty-"]')`)
+    const placed = await view.evaluate<{ beside: boolean, summaryHidden: boolean, fits: boolean }>(`(() => {
+      const grid = document.querySelector('#pane-bar-panel').getBoundingClientRect()
+      const basket = document.querySelector('[data-test="till-basket-column"]').getBoundingClientRect()
+      const summary = document.querySelector('[data-test="basket-summary-open"]')
+      return {
+        beside: basket.left >= grid.right && basket.top < grid.bottom,
+        summaryHidden: !summary || summary.getBoundingClientRect().width === 0,
+        fits: document.documentElement.scrollWidth <= window.innerWidth,
+      }
+    })()`)
+    expect(placed).toEqual({ beside: true, summaryHidden: true, fits: true })
     view.close()
   }, 120_000)
 })
