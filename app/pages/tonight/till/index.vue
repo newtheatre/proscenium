@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { can, takeStocktakes } from '#shared/utils/abilities'
 import { saysMoney } from '#shared/utils/bar'
+import { passPromptFor } from '#shared/utils/passes'
 import { EXISTING_ACCOUNT_SAYS, needsTheReader, saleJustCompleted, uncountedProducts } from '#shared/utils/sale'
 import { chargePaths, saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
 import { saysClock } from '#shared/utils/when'
@@ -106,8 +107,7 @@ const online = useOnline()
 
 // Two panes over one basket (F-122), the tab list below the basket: neither pane is unmounted,
 // so the tickets scanner survives a switch (issue 1150 item 8).
-const pane = ref<'bar' | 'tickets'>('bar')
-const PANE_TABS: { value: 'bar' | 'tickets', label: string }[] = [{ value: 'bar', label: 'Bar' }, { value: 'tickets', label: 'Tickets' }]
+const pane = ref<'bar' | 'tickets' | 'pass'>('bar')
 
 const {
   cameraOpen,
@@ -141,6 +141,25 @@ const {
   walkUpGuestIncomplete,
   resetTickets,
 } = useTillTickets(venueId, session)
+
+const {
+  passOffers,
+  passOffersFailure,
+  passEmail,
+  passEmailValid,
+  passPriceId,
+  passLine,
+  addPass,
+  removePass,
+  resetPass,
+} = useTillPass(venueId, session, walkUpPerformanceId)
+
+// The pass pane is only offered on a night something can be sold from it (D-134).
+const PANE_TABS = computed<{ value: 'bar' | 'tickets' | 'pass', label: string }[]>(() => [
+  { value: 'bar', label: 'Bar' },
+  { value: 'tickets', label: 'Tickets' },
+  ...(passOffers.value.length ? [{ value: 'pass' as const, label: 'Season pass' }] : []),
+])
 
 const {
   basket,
@@ -184,6 +203,7 @@ const {
   walkUpGuest,
   ticketsPence,
   walkUpsPence,
+  passLine,
   requestPrice: body => $fetch<PricedBasket>('/api/till/price', { method: 'POST', body }),
   recordAgeCheck: body => $fetch('/api/tonight/age-checks', { method: 'POST', body }),
   online,
@@ -200,7 +220,8 @@ const hint = computed(() => {
 // past the whole grid first (K-102 criterion 3).
 const basketItemCount = computed(() => basket.value.reduce((sum, line) => sum + line.qty, 0)
   + ticketLines.value.length
-  + walkUpLines.value.reduce((sum, line) => sum + line.quantity, 0))
+  + walkUpLines.value.reduce((sum, line) => sum + line.quantity, 0)
+  + (passLine.value ? 1 : 0))
 
 // The basket as a sheet off that bar, so a check or a correction never scrolls past the grid; it
 // shuts when there is nothing left in it (issue 1311, K-102 criterion 3).
@@ -266,6 +287,7 @@ const {
   basket,
   ticketLines,
   walkUpLines,
+  passLine,
   selectedDiscountId,
   charged,
   chargeFailure,
@@ -402,6 +424,7 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
       tab: answered.tab,
       tickets: answered.tickets,
       walkUps: answered.walkUps,
+      pass: answered.pass,
       viaSumup: false,
     }
     ageCheckStep.value = 'closed'
@@ -504,9 +527,18 @@ async function refuseAtTheCharge(outcome: InlineAgeCheckInput, via: 'reader' | '
   if (!basketEmpty.value) await (via === 'sumup' ? chargeOnSumUp(null) : charge(null))
 }
 
+// One line after a sale, never a step the sale passes through; hidden for the night in one tap (D-136).
+const passPromptHidden = ref(false)
+const passPrompt = computed(() => passPromptHidden.value ? null : passPromptFor(passOffers.value, Boolean(charged.value?.pass)))
+function sellPassFromPrompt(): void {
+  nextSale()
+  pane.value = 'pass'
+}
+
 function nextSale(): void {
   resetBasket()
   resetTickets()
+  resetPass()
   resetSelections()
   charged.value = null
   chargeFailure.value = null
@@ -563,6 +595,8 @@ const allergenOpen = ref<{ name: string, state: SaleProduct['allergenState'], no
 const basketBindings = computed(() => ({
   ticketLines: ticketLines.value,
   walkUpLines: walkUpLines.value,
+  passLine: passLine.value,
+  removePass,
   basket: basket.value,
   products: products.value,
   lineAmount,
@@ -772,7 +806,8 @@ const basketBindings = computed(() => ({
               <!-- The tabs are hand-rolled rather than UTabs, because the panes need ids that name
                  their own tab and neither pane may be torn down (K-101, issue 1150 item 8). -->
               <div
-                class="grid grid-cols-2 gap-1 rounded-lg bg-elevated p-1"
+                class="grid gap-1 rounded-lg bg-elevated p-1"
+                :class="PANE_TABS.length === 3 ? 'grid-cols-3' : 'grid-cols-2'"
                 role="tablist"
                 aria-label="What is being sold"
                 data-test="till-panes"
@@ -827,6 +862,21 @@ const basketBindings = computed(() => ({
                 :add-booking="addBooking"
                 :bump-walk-up="bumpWalkUp"
                 :add-walk-ups="addWalkUps"
+              />
+
+              <TillPassPane
+                v-show="pane === 'pass'"
+                id="pane-pass-panel"
+                v-model:email="passEmail"
+                v-model:price-id="passPriceId"
+                role="tabpanel"
+                aria-labelledby="till-pane-pass"
+                tabindex="0"
+                :offers="passOffers"
+                :failure="passOffersFailure"
+                :email-valid="passEmailValid"
+                :in-basket="passLine"
+                :add="addPass"
               />
 
               <TillProductGrid
@@ -884,6 +934,37 @@ const basketBindings = computed(() => ({
             :label="chargedOn"
             :pence="charged.totalPence"
           />
+          <TillPassReceipt
+            v-if="charged?.pass"
+            :receipt="charged.pass"
+          />
+          <UAlert
+            v-if="passPrompt"
+            data-test="pass-prompt"
+            color="primary"
+            variant="subtle"
+            icon="i-lucide-ticket"
+            :description="passPrompt.says"
+          >
+            <template #actions>
+              <UButton
+                class="min-h-12"
+                data-test="pass-prompt-sell"
+                @click="sellPassFromPrompt"
+              >
+                Sell a pass
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                class="min-h-12"
+                data-test="pass-prompt-hide"
+                @click="passPromptHidden = true"
+              >
+                Not tonight
+              </UButton>
+            </template>
+          </UAlert>
           <UAlert
             v-if="charged && charged.tickets.length"
             data-test="tickets-paid-note"

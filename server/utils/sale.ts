@@ -24,6 +24,8 @@ import { effectiveCapacity } from '#server/utils/performances'
 import { qrTokenFor } from '#server/utils/qr-tokens'
 import { qrSvgBase64 } from '#server/utils/qr'
 import { sendWalkUpPaid } from '#server/utils/reservation-confirmation'
+import { sendPassIssued } from '#server/utils/pass-confirmation'
+import { passCapRaised, passCapSays, resolveTillPass, swapBookingOntoPass, tillPassStatements } from '#server/utils/till-pass'
 import { recordPostedSaleStatement } from '#server/utils/sumup-queries'
 import { lateAddendumStatement, lateSaleAudit, lateSaleAuditStatement } from '#server/utils/late-charge'
 import { barWindowsTonight, shiftOffsetDefaults } from '#server/utils/rota'
@@ -34,7 +36,8 @@ import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { Discount } from '#shared/utils/discounts'
 import type { DeskTicketLine } from '#server/utils/desk'
 import type { ReservationLineToWrite } from '#server/utils/reservations'
-import type { BasketLineInput, CollectedTicketLine, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleInput, SaleProduct, SaleReceipt, SaleVariant, TicketLineInput, WalkUpGuestInput, WalkUpLineInput, WalkUpReceipt } from '#shared/utils/sale'
+import type { ResolvedTillPass } from '#server/utils/till-pass'
+import type { BasketLineInput, CollectedTicketLine, PassSaleReceipt, PricedBasket, PricedLine, SaleCatalogue, SaleCategory, SaleChoice, SaleInput, SaleProduct, SaleReceipt, SaleVariant, TicketLineInput, TillPassInput, WalkUpGuestInput, WalkUpLineInput, WalkUpReceipt } from '#shared/utils/sale'
 import type { AuditRow } from '#shared/utils/audit'
 import type { EntryInput } from '#shared/utils/ledger'
 import type { SQL } from 'drizzle-orm'
@@ -350,6 +353,7 @@ export interface SaleExtras {
   tickets: TicketLineInput[]
   walkUps: WalkUpLineInput[]
   walkUpGuest: WalkUpGuestInput | null
+  pass?: TillPassInput | null
 }
 
 const NO_EXTRAS: SaleExtras = { tickets: [], walkUps: [], walkUpGuest: null }
@@ -540,6 +544,7 @@ interface PreparedSale {
   walkUps: ResolvedWalkUp[]
   ticketsPence: number
   walkUpsPence: number
+  pass: ResolvedTillPass | null
   soldTotalPence: number
 }
 
@@ -591,6 +596,7 @@ async function prepareSale(
   const walkUps = await resolveWalkUps(extras.walkUps, performanceIds, context.at ?? new Date())
   const ticketsPence = bookings.reduce((sum, booking) => sum + booking.owedPence, 0)
   const walkUpsPence = walkUps.reduce((sum, walkUp) => sum + walkUp.amountPence, 0)
+  const pass = extras.pass ? await resolveTillPass(extras.pass, performanceIds, Math.floor((context.at?.getTime() ?? Date.now()) / 1000)) : null
 
   refuseWithoutAgeCheck(restricted, priced, ageCheck, 'charged')
 
@@ -599,7 +605,7 @@ async function prepareSale(
   const refusedPriced = restricted.filter(index => !sold.includes(index)).map(index => priced[index]!)
   const barPence = soldPriced.reduce((sum, line) => sum + line.amountPence - line.discountPence, 0)
   // A discount never touches a ticket line (F-122 criterion 4): the bar subtotal is what it cut.
-  const soldTotalPence = barPence + ticketsPence + walkUpsPence
+  const soldTotalPence = barPence + ticketsPence + walkUpsPence + (pass?.pricePence ?? 0)
 
   if (soldTotalPence !== expectedTotalPence) {
     throw createError({
@@ -611,7 +617,7 @@ async function prepareSale(
   return {
     performanceId: await performanceForSale(context, Math.floor((context.at?.getTime() ?? Date.now()) / 1000)),
     resolved, priced, discount, restricted, soldResolved, soldPriced, refusedPriced,
-    bookings, walkUps, ticketsPence, walkUpsPence, soldTotalPence,
+    bookings, walkUps, ticketsPence, walkUpsPence, pass, soldTotalPence,
   }
 }
 
@@ -630,7 +636,7 @@ async function refuseShortBasket(lines: ResolvedLine[]): Promise<void> {
 // refused here means the app is never opened for it.
 export async function priceSaleForAttempt(input: SaleInput, on: string, context: SaleContext): Promise<PricedAttempt> {
   const prepared = await prepareSale(input.lines, on, input.expectedTotalPence, input.ageCheck, input.discountId, context,
-    { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest })
+    { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest, pass: input.pass })
   await refuseShortBasket(prepared.soldResolved)
   return { soldTotalPence: prepared.soldTotalPence, performanceId: prepared.performanceId }
 }
@@ -645,7 +651,7 @@ export async function commitSale(
   context: SaleContext,
   extras: SaleExtras = NO_EXTRAS,
 ): Promise<SaleReceipt> {
-  const { performanceId, priced, discount, restricted, soldResolved, soldPriced, refusedPriced, bookings, walkUps, soldTotalPence }
+  const { performanceId, priced, discount, restricted, soldResolved, soldPriced, refusedPriced, bookings, walkUps, pass, soldTotalPence }
     = await prepareSale(lines, on, expectedTotalPence, ageCheck, discountId, context, extras)
 
   // Only relevant when there is something to charge: a full age-check refusal leaves nothing for
@@ -699,6 +705,8 @@ export async function commitSale(
       ticketId: ticket.id,
       performanceId: walkUp.performanceId,
     }))),
+    // No dedicated column names a pass (0033): `priceRef` carries its id, as the desk's sale does.
+    ...(pass ? [{ kind: 'PASS_SALE' as const, amountPence: pass.pricePence, qty: 1, unitPricePence: pass.pricePence, priceRef: pass.passId }] : []),
   ]
 
   if (soldResolved.length > 0 || ticketLines.length > 0) {
@@ -726,6 +734,7 @@ export async function commitSale(
       })), ...ticketLines],
     }, context.at ?? new Date(), tab?.guard ?? undefined)
     statements.push(...posted.statements)
+    if (pass) statements.push(...tillPassStatements(pass, posted.id, context.actorId))
     // Every movement cites the sale line that caused it (F-105 criterion 3), which is only known
     // once `postEntry` has assigned that line's id; a movement of zero never reaches the batch (0010).
     soldResolved.forEach((line, index) => {
@@ -758,6 +767,7 @@ export async function commitSale(
         night: context.night,
         lines: soldResolved.length,
         ticketLines: ticketLines.length,
+        passId: pass?.passId ?? null,
         discountId: discount?.id ?? null,
         tender: tab ? 'TAB' : 'CARD',
       },
@@ -810,6 +820,7 @@ export async function commitSale(
     if (error instanceof Error && error.message.includes('stock_movements_sale_exceeds_on_hand')) {
       throw createError({ statusCode: 409, statusMessage: NOT_ENOUGH_STOCK })
     }
+    if (pass && passCapRaised(error)) throw createError({ statusCode: 409, statusMessage: passCapSays(pass.maxIssued) })
     if (error instanceof Error) {
       const refusal = ageCheckConstraintRefusal(error)
       if (refusal) throw createError(refusal)
@@ -864,6 +875,8 @@ export async function commitSale(
     }
   }
 
+  const passReceipt = pass ? await finishTillPass(pass, context) : null
+
   const collected: CollectedTicketLine[] = bookings.map(booking => ({ reservationId: booking.id, reference: booking.reference, amountPence: booking.owedPence }))
 
   return {
@@ -877,7 +890,19 @@ export async function commitSale(
     comp: null,
     tickets: collected,
     walkUps: walkUpReceipts,
+    pass: passReceipt,
   }
+}
+
+// After the sale's batch, so the pass exists: the email, then tonight's booking moved onto it
+// (D-134 criteria 1, 3). A move that loses a race leaves the booking as it was and says so.
+async function finishTillPass(pass: ResolvedTillPass, context: SaleContext): Promise<PassSaleReceipt> {
+  await sendPassIssued(context.event, { userId: pass.buyer.id, reference: pass.reference, passTypeName: pass.passTypeName, priceLabel: pass.priceLabel }, pass.passId)
+  const receipt: PassSaleReceipt = { reference: pass.reference, passTypeName: pass.passTypeName, holderName: pass.buyer.name, movedBooking: null, keptBooking: pass.keptBooking }
+  if (!pass.swap) return receipt
+  const moved = await swapBookingOntoPass(pass.passId, pass.buyer.id, pass.swap, context.actorId)
+  if (moved.moved && moved.reference) return { ...receipt, movedBooking: { from: pass.swap.reference, to: moved.reference, showTitle: pass.swap.showTitle } }
+  return { ...receipt, keptBooking: `${pass.swap.reference} could not be moved onto the pass just now: cancel it at the desk and scan the pass at the door.` }
 }
 
 // A Challenge 25 row and its audit, whether a sale follows it or not (F-106 criteria 3, 6).
@@ -960,7 +985,7 @@ export async function commitCompSale(
   if (soldResolved.length === 0) {
     const check = ageCheck && restricted.length > 0 ? ageCheckStatements(ageCheck, restricted, priced, performanceId, context.actorId) : null
     if (check) await withAgeCheckConstraints(() => runLedgerBatch(check.statements))
-    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: check?.result ?? null, refusedLines: refusedPriced, tab: null, discount: null, comp: null, tickets: [], walkUps: [] }
+    return { entryId: null, totalPence: 0, lines: soldPriced, ageCheck: check?.result ?? null, refusedLines: refusedPriced, tab: null, discount: null, comp: null, tickets: [], walkUps: [], pass: null }
   }
 
   const entryId = newId()
@@ -1046,5 +1071,6 @@ export async function commitCompSale(
     comp: { reason: request.reason, foregonePence },
     tickets: [],
     walkUps: [],
+    pass: null,
   }
 }

@@ -17,6 +17,7 @@ export const LEDGER_POSTING_PAIRS: readonly { kind: LineKind, source: EntrySourc
   { kind: 'WALK_UP', source: 'TILL' },
   { kind: 'PASS_SALE', source: 'DESK' },
   { kind: 'PASS_SALE', source: 'SYSTEM' },
+  { kind: 'PASS_SALE', source: 'TILL' },
   { kind: 'PASS_ADMISSION', source: 'DESK' },
   { kind: 'PASS_ADMISSION', source: 'SELF_SERVE' },
   { kind: 'BAR_ITEM', source: 'TILL' },

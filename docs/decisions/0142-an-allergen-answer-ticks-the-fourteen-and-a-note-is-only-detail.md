@@ -29,7 +29,7 @@ wizard) draws the same `AllergenTicks` component.
 - The till's allergen sheet lists the ticked allergens by name above the note, and the product
   editor's "At the till" line says "Contains milk and soya." before the note.
 - The ticks are one text column, comma-separated, on `bar_items.allergens` and
-  `bar_products.allergens` (migration 0132, two `ALTER TABLE ADD`s). An unknown code read back is
+  `bar_products.allergens` (migration 0133, two `ALTER TABLE ADD`s). An unknown code read back is
   dropped rather than guessed at. The audit diff carries the column as written; ticks are not
   personal data.
 

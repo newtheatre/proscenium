@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
       baseURL: useRuntimeConfig(event).public.baseURL,
       event,
     },
-    { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest },
+    { tickets: input.tickets, walkUps: input.walkUps, walkUpGuest: input.walkUpGuest, pass: input.pass },
   )
 
   return { ok: true, ...committed }

@@ -274,3 +274,20 @@ describe('a walk-up booker is the same person when the names agree', () => {
     expect(EXISTING_ACCOUNT_SAYS).toContain('Nothing has been charged')
   })
 })
+
+// D-134: a season pass is a basket of its own, never on a tab, and its buyer is a real address.
+describe('a season pass on the till', () => {
+  const pass = { passTypeId: 'pt-1', passTypePriceId: 'price-1', email: 'buyer@example.invalid' }
+
+  test('a basket holding only a pass is a basket', () => {
+    expect(saleForm.safeParse({ lines: [], expectedTotalPence: 4500, pass }).success).toBe(true)
+  })
+
+  test('a pass never goes on a tab', () => {
+    expect(saleForm.safeParse({ lines: [], expectedTotalPence: 4500, pass, tabHolderId: 'user-1' }).success).toBe(false)
+  })
+
+  test('the buyer is named by a real email address', () => {
+    expect(saleForm.safeParse({ lines: [], expectedTotalPence: 4500, pass: { ...pass, email: 'not an address' } }).success).toBe(false)
+  })
+})

@@ -52,6 +52,16 @@ export const walkUpGuestForm = z.object({
   existingAccount: z.boolean().default(false),
 })
 
+// A season pass sold on the till (D-134): the buyer is named by the email of their own account,
+// never searched for by name, so the till reads nobody's details it was not given.
+export const tillPassForm = z.object({
+  passTypeId: z.string().trim().min(1, 'Say which pass you mean'),
+  passTypePriceId: z.string().trim().min(1, 'Say which price you mean'),
+  email: z.string().trim().email('Enter a real email address').max(320),
+})
+
+export type TillPassInput = z.output<typeof tillPassForm>
+
 // Who a found booking is for: a lapsed or cancelled one holds no seats, which "party of 0" misread.
 export function saysTillParty(booking: { bookerFirstName: string | null, partySize: number }): string {
   const who = booking.bookerFirstName ?? 'Walk-up'
@@ -83,13 +93,14 @@ export const saleForm = basketForm.extend({
       'A ticket type appears once per performance; add to its quantity instead of a second line',
     ),
   walkUpGuest: walkUpGuestForm.nullish().transform(value => value ?? null),
+  pass: tillPassForm.nullish().transform(value => value ?? null),
 }).refine(
-  input => input.lines.length + input.tickets.length + input.walkUps.length > 0,
+  input => input.lines.length + input.tickets.length + input.walkUps.length + (input.pass ? 1 : 0) > 0,
   { path: ['lines'], message: 'A basket needs at least one line' },
 ).refine(
   // Credit never marks a booking paid (F-122 criterion 5): a tab carries bar lines only.
-  input => input.tabHolderId === null || (input.tickets.length === 0 && input.walkUps.length === 0),
-  { path: ['tabHolderId'], message: 'Ticket money cannot go on a tab' },
+  input => input.tabHolderId === null || (input.tickets.length === 0 && input.walkUps.length === 0 && input.pass === null),
+  { path: ['tabHolderId'], message: 'Ticket or pass money cannot go on a tab' },
 )
 
 export type SaleInput = z.output<typeof saleForm>
@@ -319,6 +330,16 @@ export interface SaleReceipt {
   // carries its door pass, the QR of its own booking link.
   tickets: CollectedTicketLine[]
   walkUps: WalkUpReceipt[]
+  pass: PassSaleReceipt | null
+}
+
+// What the till says once a pass is sold (D-134): its reference, and what became of tonight's booking.
+export interface PassSaleReceipt {
+  reference: string
+  passTypeName: string
+  holderName: string
+  movedBooking: { from: string, to: string, showTitle: string } | null
+  keptBooking: string | null
 }
 
 export interface CollectedTicketLine {

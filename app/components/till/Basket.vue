@@ -4,12 +4,15 @@ import type { Discount } from '#shared/utils/discounts'
 import type { PricedBasket, SaleProduct, TillBooking } from '#shared/utils/sale'
 import type { TabHolder } from '~/composables/useTillCatalogue'
 import type { BasketLine, WalkUpLine } from '~/composables/useTillBasket'
+import type { TillPassLine } from '~/composables/useTillPass'
 
 // The basket (F-122 criterion 3): drinks, ticket money and walk-ups in one list, one total.
 
 const props = defineProps<{
   ticketLines: TillBooking[]
   walkUpLines: WalkUpLine[]
+  passLine?: TillPassLine | null
+  removePass?: () => void
   basket: BasketLine[]
   products: SaleProduct[]
   lineAmount: (line: BasketLine) => string | null
@@ -111,6 +114,30 @@ function productFor(line: BasketLine): SaleProduct | undefined {
         :aria-label="`Remove the ${line.typeName} walk-up`"
         :data-test="`walk-up-line-remove-${line.ticketTypeId}`"
         @click="removeWalkUp(line)"
+      />
+    </div>
+    <div
+      v-if="passLine"
+      class="flex items-center justify-between gap-2"
+      data-test="pass-line"
+    >
+      <div class="min-w-0">
+        <p class="truncate text-sm font-medium text-secondary">
+          {{ passLine.passName }} · {{ passLine.priceLabel }}
+        </p>
+        <p class="truncate text-xs text-muted">
+          For {{ passLine.email }} · {{ saysMoney(passLine.price) }}
+        </p>
+      </div>
+      <UButton
+        size="sm"
+        color="error"
+        variant="ghost"
+        icon="i-lucide-x"
+        class="size-12"
+        :aria-label="`Remove the ${passLine.passName}`"
+        data-test="pass-line-remove"
+        @click="removePass?.()"
       />
     </div>
     <div
@@ -257,7 +284,7 @@ function productFor(line: BasketLine): SaleProduct | undefined {
         class="text-xs text-muted"
         data-test="basket-split"
       >
-        Bar {{ priced && !pricing ? saysMoney(priced.totalPence) : '…' }} · tickets {{ saysMoney(ticketsPence + walkUpsPence) }}, on one reader
+        Bar {{ priced && !pricing ? saysMoney(priced.totalPence) : '…' }} · tickets {{ saysMoney(ticketsPence + walkUpsPence + (passLine?.price ?? 0)) }}, on one reader
       </p>
     </template>
   </div>

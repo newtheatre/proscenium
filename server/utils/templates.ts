@@ -1762,18 +1762,27 @@ The Nottingham New Theatre`,
     const url = String(context.url)
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
+    const termsUrl = String(context.termsUrl)
     return {
       subject: `Your ${passType}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>Reference <strong>${reference}</strong>: ${passType} (${priceLabel}), issued and paid for at
-the box office.</p>
+<p>Reference <strong>${reference}</strong>: ${passType} (${priceLabel}), issued and paid for in
+person.</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Pass QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
-<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>`),
+<p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>
+<p>To book ahead, sign in with this email address and choose "Use my pass" when you book.
+You can also just turn up, subject to space on the night.</p>
+<p><a href="${termsUrl}">The ticket and pass terms</a></p>`),
       text: `Hello ${context.name},
 
-Reference ${reference}: ${passType} (${priceLabel}), issued and paid for at the box office.
+Reference ${reference}: ${passType} (${priceLabel}), issued and paid for in person.
 
 Open your pass: ${url}
+
+To book ahead, sign in with this email address and choose "Use my pass" when you book.
+You can also just turn up, subject to space on the night.
+
+The ticket and pass terms: ${termsUrl}
 
 The Nottingham New Theatre`,
     }

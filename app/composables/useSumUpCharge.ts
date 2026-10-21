@@ -8,6 +8,7 @@ import type { SaleReceipt, TillBooking } from '#shared/utils/sale'
 import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 import type { BasketLine, WalkUpLine } from './useTillBasket'
+import type { TillPassLine } from './useTillPass'
 import type { PendingAttempt } from './useSumUp'
 
 // The screen-side half of a SumUp hand-off (F-124): the attempt lifecycle, the poll, the
@@ -19,10 +20,11 @@ export interface ChargedReceipt {
   tab: SaleReceipt['tab']
   tickets: SaleReceipt['tickets']
   walkUps: SaleReceipt['walkUps']
+  pass?: SaleReceipt['pass']
   viaSumup: boolean
 }
 
-export type SumUpSnapshot = { bar: BasketLine[], tickets: TillBooking[], walkUps: WalkUpLine[], discountId: string | null }
+export type SumUpSnapshot = { bar: BasketLine[], tickets: TillBooking[], walkUps: WalkUpLine[], pass?: TillPassLine | null, discountId: string | null }
 
 // What the till reaches the payment routes with. A dependency rather than the `$fetch` global so
 // the unit test can answer for the app (tests/unit/sumup-charge.test.ts).
@@ -37,6 +39,8 @@ export interface SumUpChargeDeps {
   basket: Ref<BasketLine[]>
   ticketLines: Ref<TillBooking[]>
   walkUpLines: Ref<WalkUpLine[]>
+  // A season pass in the basket (D-134); absent where the till sells none.
+  passLine?: Ref<TillPassLine | null>
   selectedDiscountId: Ref<string | null>
   charged: Ref<ChargedReceipt | null>
   chargeFailure: Ref<string | null>
@@ -66,6 +70,7 @@ function returnedWords(attempt: { kind?: SumupAttemptKind, status: 'FAILED' | 'A
 
 export function useSumUpCharge(deps: SumUpChargeDeps) {
   const { request, venueId, sumupEnabled, selectedTabHolderId, session, basket, ticketLines, walkUpLines, selectedDiscountId, charged, chargeFailure, resetSelections } = deps
+  const passLine = deps.passLine ?? ref<TillPassLine | null>(null)
   const isVisible = deps.isVisible ?? (() => typeof document === 'undefined' || document.visibilityState !== 'hidden')
 
   const sumup = useSumUp<SumUpSnapshot>()
@@ -99,6 +104,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     basket.value = []
     ticketLines.value = []
     walkUpLines.value = []
+    passLine.value = null
     resetSelections()
   }
 
@@ -109,7 +115,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       kind,
       totalPence: started.totalPence,
       startedAt: Date.now(),
-      basket: { bar: basket.value, tickets: ticketLines.value, walkUps: walkUpLines.value, discountId: selectedDiscountId.value },
+      basket: { bar: basket.value, tickets: ticketLines.value, walkUps: walkUpLines.value, pass: passLine.value, discountId: selectedDiscountId.value },
     })
   }
 
@@ -124,6 +130,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
         tab: null,
         tickets: receipt?.tickets ?? [],
         walkUps: receipt?.walkUps ?? [],
+        pass: receipt?.pass ?? null,
         viaSumup: pending.kind !== 'TYPED',
       }
       clearBasket()
@@ -170,6 +177,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
       basket.value = restoring.basket.bar
       ticketLines.value = restoring.basket.tickets
       walkUpLines.value = restoring.basket.walkUps
+      passLine.value = restoring.basket.pass ?? null
       selectedDiscountId.value = restoring.basket.discountId
       // After the restore has flushed: the till clears this on any basket edit, and the restore
       // itself is one (issue 1144).
