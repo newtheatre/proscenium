@@ -10,9 +10,10 @@ export function csvField(value: unknown): string {
   return `"${guarded.replaceAll('"', '""')}"`
 }
 
-export function toCsv(rows: Record<string, unknown>[]): string {
-  if (rows.length === 0) return ''
-  const columns = Object.keys(rows[0]!)
+// Declared `headings` head the file even when no row follows; without them the first row decides.
+export function toCsv(rows: Record<string, unknown>[], headings?: readonly string[]): string {
+  if (rows.length === 0 && !headings) return ''
+  const columns = headings ?? Object.keys(rows[0]!)
   const lines = [columns.map(csvField).join(',')]
   for (const row of rows) lines.push(columns.map(column => csvField(row[column])).join(','))
   return `${lines.join('\r\n')}\r\n`

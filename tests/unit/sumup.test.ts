@@ -10,6 +10,7 @@ import {
   isTerminalAttempt,
   readSumupReturn,
   resolveAttemptForm,
+  saysAttemptBasket,
   saysAttemptStatus,
   startAttemptForm,
   sumupLaunchUrl,
@@ -210,5 +211,16 @@ describe('the return page says what happened and nothing it cannot know (criteri
     const words = sumupReturnWords({ status: 'MISMATCH', totalPence: 450, receiptTotalPence: null, error: 'That booking was collected at the desk.' })
     expect(words.detail).toContain('That booking was collected at the desk.')
     expect(words.detail).toContain('duty manager')
+  })
+})
+
+describe('an unanswered charge says what was in its basket, so two of one total differ', () => {
+  test('drinks, bookings and walk-up tickets are named in that order', () => {
+    expect(saysAttemptBasket({ basketLines: '2× Pint House lager', basketBookings: 1, basketWalkUps: 3 }))
+      .toBe('2× Pint House lager, 1 booking, 3 walk-up tickets')
+  })
+
+  test('a basket that names nothing says nothing', () => {
+    expect(saysAttemptBasket({ basketLines: null, basketBookings: 0, basketWalkUps: 0 })).toBeNull()
   })
 })

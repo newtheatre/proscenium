@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   if (held.everSold) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${held.label} has been sold, so it can only be retired: every line sold as it still has to resolve`,
+      statusMessage: `${held.label} has been sold, so it can only be retired. Its sales stay in the reports under its name.`,
     })
   }
 

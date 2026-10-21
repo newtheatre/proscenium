@@ -12,7 +12,9 @@ const NAME_LIMIT = 80
 // path rather than here: a settings change should not need a redeploy (0012).
 export const discountForm = z.object({
   name: z.string().trim().min(1, 'A discount needs a name').max(NAME_LIMIT),
-  percent: z.number().int().positive('A discount is a percentage above zero').max(100),
+  // Refused, never rounded or clamped: -10 went live as 1% and 12.5 as 13% (0127).
+  percent: z.number({ error: 'Type a whole number, such as 10' }).int('A discount is whole points, such as 12 or 13')
+    .positive('A discount is a percentage above zero').max(100, 'A discount is at most 100%'),
 })
 
 export type DiscountInput = z.output<typeof discountForm>

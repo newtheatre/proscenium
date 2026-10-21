@@ -1873,8 +1873,11 @@ pours: `stock_movements_sale_exceeds_on_hand` for a `SALE` and
 attempts racing for the last serving resolve to one winner (0006); the comp trigger raises the
 sale's name, so `commitSale` and `commitCompSale` catch one string between them and their two
 wordings cannot drift apart. `SALE` and `COMP` are the whole of the guarded set: every other kind
-may take the sum below nothing, deliberately, because a bottle that has gone missing has gone
-missing and a wastage, an adjustment or a stocktake that says so is the point of recording it.
+may take the sum below nothing at the database, deliberately, because a bottle that has gone
+missing has gone missing and a wastage, an adjustment or a stocktake that says so is the point of
+recording it. The write paths refuse it all the same (0127, 0126): a movement entered by hand
+carries `staysInStock` on its own `INSERT`, and a stocktake's apply refuses on its `UPDATE`, since
+on-hand below nothing makes the sale trigger refuse what is on the shelf.
 
 A delivery's cost arrives as one figure, what was paid the way the item is bought, and the route
 keeps it by `deliveryCost` (`shared/utils/bar.ts`): a whole item's cost a unit, a measured item's
@@ -1904,7 +1907,9 @@ separate `stock_deliveries` header table, so what follows is stocktakes alone (F
 a venue or night.
 
 `stocktake_lines`: `id` PK · `stocktake_id` → stocktakes cascade · `item_id` → bar_items restrict ·
-`expected_qty`, the item's on-hand at the moment the stocktake opened · `counted_qty` NULL,
+`expected_qty`, the item's on-hand at the moment the stocktake opened, taken again by the
+statement that records a count, so a count is compared with on-hand when it was entered (0126) ·
+`counted_qty` NULL,
 distinct from an entered zero throughout (criterion 2); CHECK not negative · `counted_by` NULL,
 the account that entered the count now standing and cleared with it, bare (a reference would
 rebuild the table) and registered as personal data kept on erasure (0099). UNIQUE
@@ -1919,8 +1924,9 @@ carry no expected figure, variance or cost (`countedBlind`, issue 1321). A holde
 authenticator on tonight's bar shift counts through the shift, as the till lets them sell (0044).
 
 Opening captures one line per `ACTIVE` item in a single `INSERT ... SELECT`, so later sales cannot
-muddy the comparison (criterion 1). Applying is one `db.batch`: an `UPDATE` on `stocktakes` carries
-the only predicate (`status = 'OPEN'`), the audit row rides `changes() = 1` from it, and the
+muddy the comparison (criterion 1). Applying is one `db.batch` (`applyStatements`, `server/utils/stocktakes.ts`): an `UPDATE` on
+`stocktakes` carries the predicate (`status = 'OPEN'`, and no counted line whose adjustment would
+leave its item's on-hand below zero, 0126), the audit row rides `changes() = 1` from it, and the
 adjustment movements ride `changes() = 1` from the audit row in turn, since a single `changes()`
 reports only the statement immediately before it and there are several line rows to guard, not
 one. One `STOCKTAKE` movement is posted per line whose count differs from what was expected

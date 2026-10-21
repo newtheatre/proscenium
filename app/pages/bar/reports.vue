@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, onBeforeUnmount, onMounted } from 'vue'
+import { h, onBeforeUnmount, onMounted, resolveComponent } from 'vue'
 import { says, saysMoney, saysQuantity } from '#shared/utils/bar'
 import { REPORT_PERIOD_KINDS, saysPageOf } from '#shared/utils/bar-reports'
 import { currentShowNight } from '#shared/utils/show-night'
@@ -119,9 +119,21 @@ const gpColumns: TableColumn<GpRow>[] = [
   { id: 'cost', header: 'Cost', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.costPence) },
 ]
 
+// Each line names its stocktake, so a figure traces back to the count that made it (0128).
 const varianceColumns: TableColumn<VarianceRow>[] = [
+  {
+    id: 'stocktake',
+    header: 'Stocktake applied',
+    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
+    cell: ({ row }) => h(resolveComponent('ULink'), { to: `/bar/stock/stocktakes/${row.original.stocktakeId}` }, () => saysWhen(row.original.appliedAt)),
+  },
   { id: 'item', header: 'Item', cell: ({ row }) => row.original.itemName },
-  { id: 'qty', header: 'Qty variance', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.qtyVariance) },
+  {
+    id: 'qty',
+    header: 'Variance',
+    meta: RIGHT_ALIGNED,
+    cell: ({ row }) => `${row.original.qtyVariance > 0 ? '+' : row.original.qtyVariance < 0 ? '-' : ''}${saysQuantity(Math.abs(row.original.qtyVariance), row.original.unit)}`,
+  },
   { id: 'value', header: 'Value', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.valuePence) },
 ]
 
@@ -160,7 +172,7 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
     ]),
   },
   { id: 'percent', header: 'Percent', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => `${row.original.percent}%` },
-  { id: 'timesApplied', header: 'Times applied', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.timesApplied) },
+  { id: 'timesApplied', header: 'Sales given it', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.timesApplied) },
   { id: 'givenAway', header: 'Given away', meta: RIGHT_ALIGNED, cell: ({ row }) => saysMoney(row.original.discountedPence) },
 ]
 </script>
@@ -279,6 +291,24 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
             Revenue {{ saysMoney(data.gp.revenuePence) }}, cost {{ saysMoney(data.gp.costPence) }},
             gross profit {{ saysMoney(data.gp.grossProfitPence) }}
           </p>
+          <UAlert
+            v-if="data.gp.unpoured.length > 0 || data.gp.uncosted.length > 0"
+            class="my-2"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            title="The cost is short, so gross profit reads high"
+            data-test="gp-short"
+          >
+            <template #description>
+              <p v-if="data.gp.unpoured.length > 0">
+                Sold without pouring any stock, so at no cost: {{ data.gp.unpoured.join(', ') }}. Give each size a recipe on its product page.
+              </p>
+              <p v-if="data.gp.uncosted.length > 0">
+                Poured with no delivery cost recorded, so at no cost: {{ data.gp.uncosted.join(', ') }}. Record a delivery with its cost on the stock register.
+              </p>
+            </template>
+          </UAlert>
           <UTable
             :data="data.gp.byItem"
             :columns="gpColumns"
@@ -292,18 +322,26 @@ const discountsColumns: TableColumn<DiscountRow>[] = [
           </UTable>
         </div>
 
-        <UTable
-          v-else-if="section[0] === 'variance'"
-          :data="data.variance.items"
-          :columns="varianceColumns"
-          :loading="loading"
-        >
-          <template #empty>
-            <p class="py-6 text-center text-sm text-muted">
-              No stocktake applied in this period.
-            </p>
-          </template>
-        </UTable>
+        <div v-else-if="section[0] === 'variance'">
+          <p
+            v-if="data.variance.total > 0"
+            class="text-sm"
+            data-test="variance-summary"
+          >
+            {{ plural(data.variance.total, 'adjustment') }}, net {{ saysMoney(data.variance.totalValuePence) }} at cost
+          </p>
+          <UTable
+            :data="data.variance.items"
+            :columns="varianceColumns"
+            :loading="loading"
+          >
+            <template #empty>
+              <p class="py-6 text-center text-sm text-muted">
+                No stocktake applied in this period.
+              </p>
+            </template>
+          </UTable>
+        </div>
 
         <UTable
           v-else-if="section[0] === 'comps'"

@@ -16,11 +16,11 @@ const saving = ref(false)
 
 interface HolderRow { holderId: string, holderName: string, outstandingPence: number }
 
-const { data, status, error, refresh } = await useAsyncData(
+const { data: register, status, error, refresh } = await useAsyncData(
   'bar-tabs',
-  () => request<{ ok: true, holders: HolderRow[] }>('/api/admin/bar/tabs').then(response => response.holders),
-  { default: () => [] as HolderRow[] },
+  () => request<{ ok: true, holders: HolderRow[], authorisedCount: number }>('/api/admin/bar/tabs'),
 )
+const data = computed(() => register.value?.holders ?? [])
 
 const listingFailure = useListFailure(error, 'The tab register could not be read.')
 
@@ -131,8 +131,22 @@ const columns: TableColumn<HolderRow>[] = [
     class="space-y-6"
     @retry="refresh"
   >
+    <UAlert
+      v-if="register && register.authorisedCount === 0"
+      data-test="no-tab-holders"
+      color="info"
+      variant="subtle"
+      icon="i-lucide-info"
+      title="Nobody may run a tab yet"
+      description="So the till offers no tab to charge to. Whoever looks after the settings names people under People who may run a tab, or roles under Roles that may run a tab, and the till offers their tabs from the next sale."
+      :actions="[{ label: 'Open the settings', to: '/admin/settings', color: 'info', variant: 'outline' }]"
+    />
+
     <p class="text-sm text-muted">
       Every holder still carrying a balance.
+      <template v-if="register && register.authorisedCount > 0">
+        {{ register.authorisedCount === 1 ? 'One person may' : `${register.authorisedCount} people may` }} run a tab.
+      </template>
     </p>
 
     <AdminToolbar
