@@ -153,7 +153,7 @@ export interface PassOffer {
 
 // What the booking page says of a pass that covers the show (D-133 criterion 1): the cheapest
 // figure, since a booker reads "from", and the desk quotes every price point anyway.
-export function saysPassOffer(offer: { name: string, coveredShows: number, prices: readonly { price: number }[] }): string {
+export function saysPassOffer(offer: { name: string, coveredShows: number, prices: readonly { label: string, price: number }[] }): string {
   const covers = `${offer.name} covers ${plural(offer.coveredShows, 'show')}`
   if (offer.prices.length === 0) return `${covers}.`
   const cheapest = Math.min(...offer.prices.map(one => one.price))
