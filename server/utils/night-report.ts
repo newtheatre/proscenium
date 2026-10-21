@@ -212,17 +212,19 @@ export async function reportStaffing(performanceId: string): Promise<ReportStaff
   return db.all<ReportStaffingRow>(reportStaffingQuery(performanceId))
 }
 
-// Every role an officer acted in on this performance, read from the targets the guard writes for
-// the venue's night, three bound whatever the night holds (E-123 criterion 1, 0098, 0006).
+// Every role an officer acted in here, from the guard's targets for the venue's night, three bound
+// (E-123 criterion 1, 0098, 0006); the rota as the row recorded it, or today's for an older row (0231).
 export function reportOfficerBypassesQuery(performanceId: string, venueId: string, night: string): SQL {
   const targets = NIGHT_ROLES.map(role => sql`${officerBypassTarget(night, venueId, role)}`)
   return sql`
     SELECT json_extract(a.detail, '$.role') AS role, u.name AS officerName,
-      EXISTS (
+      CASE WHEN json_type(a.detail, '$.confirmedPerformanceIds') = 'array' THEN EXISTS (
+        SELECT 1 FROM json_each(a.detail, '$.confirmedPerformanceIds') c WHERE c.value = ${performanceId}
+      ) ELSE EXISTS (
         SELECT 1 FROM shifts s
         WHERE s.performance_id = ${performanceId} AND s.status = 'CONFIRMED'
           AND s.role = json_extract(a.detail, '$.role')
-      ) AS confirmedShift
+      ) END AS confirmedShift
     FROM audit_log a
     LEFT JOIN users u ON u.id = a.actor_id
     WHERE a.action = ${OFFICER_BYPASS_ACTION}

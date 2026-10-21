@@ -931,6 +931,24 @@ export function tonightShiftWindowsQuery(userId: string, from: number, to: numbe
   `
 }
 
+// The venue's performances tonight with this role confirmed on the rota, for the officer bypass
+// row (0231). Scoped by the venue and the night, never by a list of ids (0006).
+export function performancesWithConfirmedRoleQuery(role: ShiftRole, venueId: string, night: string): SQL {
+  const { from, to } = showNightBounds(night)
+  return sql`
+    SELECT DISTINCT p.id AS performanceId
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    WHERE s.role = ${role} AND s.status = 'CONFIRMED' AND p.venue_id = ${venueId}
+      AND p.starts_at >= ${Math.floor(from.getTime() / 1000)} AND p.starts_at < ${Math.floor(to.getTime() / 1000)}
+    ORDER BY p.id
+  `
+}
+
+export async function performancesWithConfirmedRole(role: ShiftRole, venueId: string, night: string): Promise<string[]> {
+  return (await db.all<{ performanceId: string }>(performancesWithConfirmedRoleQuery(role, venueId, night))).map(row => row.performanceId)
+}
+
 // Inside a confirmed shift's own window with the guard's grace, read per request (0078, 0094).
 export async function onShiftTonight(event: H3Event, userId: string, at = new Date()): Promise<boolean> {
   const { from, to } = showNightBounds(showNightOf(at))
