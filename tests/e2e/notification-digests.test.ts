@@ -119,4 +119,21 @@ describe.skipIf(skip !== null)('the window resets after a flush (criterion 6)', 
   }, CASE_TIMEOUT_MS)
 })
 
+// The 21 Oct process map: a held announcement had no trace in a person's history until it went.
+describe.skipIf(skip !== null)('a person\'s history says what waits for a digest (H-106)', () => {
+  test('by topic, count and due time, never the subject', async () => {
+    const waiting = await registerMember(app, 'waiting-entry', generatePassword())
+    heldEntry(waiting.id, 'A private subject line', 5 * 60)
+
+    const answer = await send('GET', `/api/admin/comms/accounts/${waiting.id}/history`, officer)
+    expect(answer.status).toBe(200)
+    const text = await answer.text()
+    expect(text).not.toContain('A private subject line')
+    const { waiting: held } = JSON.parse(text) as { waiting: { topic: string, messages: number, dueAt: number }[] }
+    expect(held).toHaveLength(1)
+    expect(held[0]).toMatchObject({ topic: 'ROOMS', messages: 1 })
+    expect(held[0]!.dueAt).toBeGreaterThan(Math.floor(Date.now() / 1000))
+  }, CASE_TIMEOUT_MS)
+})
+
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

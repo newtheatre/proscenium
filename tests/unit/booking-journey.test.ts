@@ -13,6 +13,7 @@ import {
   stepperMax,
 } from '#shared/utils/reservations'
 import { registerForm } from '#shared/utils/sign-in'
+import { RESERVED_DOMAIN_REFUSAL } from '#shared/utils/deliverability'
 import { waitingListJoinRefusal } from '#shared/utils/waiting-list'
 
 // The public booking journey as the hands-on review of 13 October 2026 found it (D-104, D-108,
@@ -253,6 +254,14 @@ describe('the account pages', () => {
     const malformed = registerForm.safeParse({ name: 'QA', email: 'qa.reg1@', password: 'x' }).error?.issues.map(issue => issue.message)
     expect(malformed).toEqual([HOUSE_ERROR.email])
     expect(await source(`${PAGES}/register.vue`)).toContain('registerForm')
+  })
+
+  // The 21 Oct process map: a .test address was told to check its email, and nothing ever came.
+  test('/register refuses an address on a reserved domain rather than waiting on an email that never comes', () => {
+    registerHouseErrors()
+    const reserved = registerForm.safeParse({ name: 'QA', email: 'mon.skip@nnt-trial.test', password: 'x' }).error?.issues.map(issue => issue.message)
+    expect(reserved).toEqual([RESERVED_DOMAIN_REFUSAL])
+    expect(registerForm.safeParse({ name: 'QA', email: 'mon@nnt-trial.co.uk', password: 'x' }).success).toBe(true)
   })
 
   test('/verify never shows a validator\'s words, and a used link is not called expired', async () => {
