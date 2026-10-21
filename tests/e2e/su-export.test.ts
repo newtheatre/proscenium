@@ -208,6 +208,6 @@ describe.skipIf(skip !== null)('exporting is audited (criterion 5)', () => {
     const row = read<{ actor_id: string, detail: string }>(
       `SELECT actor_id, detail FROM audit_log WHERE action = 'finance.exported' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
     expect(row?.actor_id).toBe(treasurer.id)
-    expect(JSON.parse(row!.detail)).toMatchObject({ fromDay: '2026-09-01', toDay: '2026-09-30' })
+    expect(JSON.parse(row!.detail)).toMatchObject({ kind: 'CUSTOM', fromDay: '2026-09-01', toDay: '2026-09-30' })
   })
 })

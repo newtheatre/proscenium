@@ -31,6 +31,7 @@ export async function setNominalMapping(input: NominalMappingInput, actorId: str
     SELECT nominal_code AS nominalCode FROM su_nominal_mappings WHERE kind = ${input.kind} AND source = ${input.source}
   `)
   if (!current) return false
+  if (current.nominalCode === input.nominalCode) return true
 
   const write = db.all<{ kind: string }>(sql`
     UPDATE su_nominal_mappings SET nominal_code = ${input.nominalCode}, updated_by = ${actorId}, updated_at = unixepoch()
@@ -52,13 +53,14 @@ export function suExportQuery(fromDay: string, toDay: string): SQL {
   return sql`
     SELECT le.london_day AS londonDay, le.happened_at AS happenedAt, ll.kind AS kind, le.source AS source,
            le.tender AS tender, m.nominal_code AS nominalCode, ll.amount_pence AS amountPence,
-           s.title AS showTitle, r.reference AS reference
+           s.title AS showTitle, coalesce(r.reference, pa.reference) AS reference
     FROM ledger_lines ll
     JOIN ledger_entries le ON le.id = ll.entry_id
     LEFT JOIN su_nominal_mappings m ON m.kind = ll.kind AND m.source = le.source
     LEFT JOIN performances p ON p.id = ll.performance_id
     LEFT JOIN shows s ON s.id = p.show_id
     LEFT JOIN reservations r ON r.id = ll.reservation_id
+    LEFT JOIN passes pa ON ll.kind = 'PASS_SALE' AND pa.id = ll.price_ref
     WHERE le.london_day BETWEEN ${fromDay} AND ${toDay}
     ORDER BY le.london_day, le.happened_at, ll.id
   `
