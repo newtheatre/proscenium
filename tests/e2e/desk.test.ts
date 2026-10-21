@@ -773,3 +773,45 @@ describe.skipIf(skip !== null)('an empty results card says which kind of empty i
     }
   }, CASE_TIMEOUT_MS)
 })
+
+// The process map of 21 October: a booking for another performance opened on tonight's desk with
+// no date, and the pills filtered within a search nothing named.
+describe.skipIf(skip !== null)('the desk says what it is showing', () => {
+  test('a booking scanned for another performance says which, in amber', async () => {
+    const here = await bookableShow(900, twoHoursSeconds)
+    const elsewhere = await bookableShow(900, twoHoursSeconds + 3_600)
+    const { reference } = await bookedReservation(elsewhere.performanceId, elsewhere.ticketTypeId)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await atTheDesk(view, here.title)
+      await fill(view, '[data-test="desk-scan"]', reference)
+      await click(view, '[data-test="desk-scan-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-other-performance"]')`, 15_000)
+      expect(await textOf(view, '[data-test="desk-other-performance"]')).toContain(`This booking is for ${elsewhere.title}`)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a search is named under the pills, and clearing it lists the house again', async () => {
+    const { performanceId, ticketTypeId, title } = await bookableShow(900, twoHoursSeconds)
+    const { reference } = await bookedReservation(performanceId, ticketTypeId)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await atTheDesk(view, title)
+      await fill(view, '[data-test="desk-search"]', 'Nobody At All')
+      await click(view, '[data-test="desk-search-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-searched-for"]')?.innerText.includes('Nobody At All')`, 15_000)
+
+      await click(view, '[data-test="desk-search-clear"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-results"]')?.innerText.includes(${JSON.stringify(reference)})`, 15_000)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="desk-searched-for"]'))`)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})

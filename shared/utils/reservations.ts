@@ -38,6 +38,13 @@ export function looksLikeReference(value: string): boolean {
   return REFERENCE_SHAPE.test(value.toUpperCase())
 }
 
+// The start of a reference, as a booker reads part of one out: three characters up, never whole.
+const REFERENCE_PREFIX_SHAPE = new RegExp(`^[${REFERENCE_ALPHABET}]{3,${RESERVATION_REFERENCE_LENGTH - 1}}$`)
+
+export function looksLikeReferencePrefix(value: string): boolean {
+  return REFERENCE_PREFIX_SHAPE.test(value.toUpperCase())
+}
+
 // A structural ceiling only, well above anything a real order asks for: the actual cap is
 // `PUBLIC_ORDER_SEAT_CAP`, read at request time because it is configuration (0019).
 const MAX_LINE_QUANTITY = 999
