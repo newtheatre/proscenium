@@ -3,6 +3,7 @@ import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { saysEntrySource } from '#shared/utils/ledger'
 import { saysDay } from '#shared/utils/when'
+import { saysVariance } from '#shared/utils/night-reconciliation'
 import { can, viewFinanceReports } from '#shared/utils/abilities'
 import { entriesHref } from '#shared/utils/ledger-entries-list'
 import type { EntriesFilters } from '#shared/utils/ledger-entries-list'
@@ -59,15 +60,18 @@ const revenueColumns = computed<TableColumn<RevenueBySource>[]>(() => [
     : []),
 ])
 
-// The four figures below the revenue table are one thing each, not rows of a list, so they read
-// as a description list (design language rule 6).
-const figures = computed(() => (data.value
+// The figures below the revenue table are one thing each, not rows of a list, so they read as a
+// description list (design language rule 6). A variance says which way it is out, not a sign.
+interface Figure { label: string, test: string, pence: number, to: string | null, says?: string }
+const signed = (pence: number): string => (pence === 0 ? saysMoney(0) : saysVariance(pence))
+const figures = computed<Figure[]>(() => (data.value
   ? [
       { label: 'Refunds', test: 'refunds-pence', pence: data.value.refundsPence, to: entriesUrl({ kind: 'REFUND', tender: 'CARD' }) },
       { label: 'Forgone comps', test: 'comps-pence', pence: data.value.compsPence, to: entriesUrl({ tender: 'COMP' }) },
       { label: 'Forgone discounts', test: 'discounts-pence', pence: data.value.discountsPence, to: entriesUrl({ discounted: true }) },
       // An open variance is made of nights, each listed and linked in Needs you above; none is none.
-      { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence, to: data.value.openVariancePence === 0 ? null : '#nights-needing-you' },
+      { label: 'Open variance', test: 'open-variance-pence', pence: data.value.openVariancePence, says: signed(data.value.openVariancePence), to: data.value.openVariancePence === 0 ? null : '#nights-needing-you' },
+      { label: 'Written off', test: 'written-off-pence', pence: data.value.writtenOffPence, says: signed(data.value.writtenOffPence), to: null },
     ]
   : []))
 </script>
@@ -136,12 +140,12 @@ const figures = computed(() => (data.value
                 :to="figure.to"
                 class="underline underline-offset-4"
                 :data-test="`${figure.test}-link`"
-                :aria-label="`${figure.label}: ${saysMoney(figure.pence)}, open what it is made of`"
+                :aria-label="`${figure.label}: ${figure.says ?? saysMoney(figure.pence)}, open what it is made of`"
               >
-                {{ saysMoney(figure.pence) }}
+                {{ figure.says ?? saysMoney(figure.pence) }}
               </ULink>
               <template v-else>
-                {{ saysMoney(figure.pence) }}
+                {{ figure.says ?? saysMoney(figure.pence) }}
               </template>
             </dd>
           </div>
@@ -152,7 +156,7 @@ const figures = computed(() => (data.value
           data-test="unreconciled-nights"
         >
           The open variance leaves out {{ plural(data.unreconciledNights, 'night') }} in this period with no Z
-          reading yet, so their variance is not known.
+          reading yet, so {{ data.unreconciledNights === 1 ? 'its' : 'their' }} variance is not known.
           <ULink
             v-if="mayDrillDown"
             to="/money/reconciliation"

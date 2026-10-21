@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import { saysMoney } from './bar'
 import { constraintRefusal } from './constraint-refusal'
+import { describeKind } from './ledger'
 import { isShowNight } from './show-night'
 import type { BarReconciliation } from './reconciliation'
 
@@ -52,7 +54,7 @@ export const recordZReadingForm = z.object({
   readerPence: pence.optional(),
   // Required only when the reader disagrees with the ledger; the route enforces that half, since
   // whether they disagree is only known once the expected figure is recomputed (criterion 3).
-  note: z.string().trim().min(1, 'Say why the reader and the ledger disagree').max(500).optional(),
+  note: z.string().trim().min(1, 'Say why the reader and the ledger disagree').max(500, 'Keep the note to 500 characters').optional(),
   // The reading this one resolves: a correction (a different readerPence) or a write-off (the
   // same one, accepted rather than restated) both name what they resolve (criterion 4).
   supersedesId: z.string().trim().min(1, 'Say which reading this resolves').optional(),
@@ -87,6 +89,28 @@ export function reconciliationHref(night: string): string {
 // Reader less expected, the same sign the recorded variance carries; nothing until a figure is typed.
 export function liveVariance(readerPence: number | null, expectedPence: number): number | null {
   return readerPence === null ? null : readerPence - expectedPence
+}
+
+// Which way the reader is out, as well as by how much: reader less expected, as recorded.
+export function saysVariance(variancePence: number): string {
+  if (variancePence === 0) return 'none'
+  return `${saysMoney(Math.abs(variancePence))} ${variancePence > 0 ? 'over' : 'short'}`
+}
+
+// One row of the expected sheet: `part` rows add up to the total, a subtotal repeats some of them.
+export interface ExpectedRow { label: string, pence: number, part?: boolean, strong?: boolean, test?: string }
+
+// The desk by kind, then the till's drinks, its tickets and its tab settlements kept apart: tickets
+// sold on the till go through the same reader, but they were never bar sales (F-122 criterion 6).
+export function expectedSheet(expected: NightExpected): ExpectedRow[] {
+  return [
+    ...expected.deskByKind.map(row => ({ label: describeKind(row.kind), pence: row.totalPence, part: true })),
+    { label: 'Desk total', pence: expected.deskTakingsPence },
+    { label: 'Bar card sales', pence: expected.bar.cardSalesPence, part: true },
+    { label: 'Tickets sold at the bar', pence: expected.bar.ticketsPence, part: true },
+    { label: 'Bar tab settlements', pence: expected.bar.tabSettlementsPence, part: true },
+    { label: 'Expected total', pence: expected.expectedPence, test: 'expected-total', strong: true },
+  ]
 }
 
 export interface NightNeedingYou { night: string, says: 'No reading' | 'Open variance' }

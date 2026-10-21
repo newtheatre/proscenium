@@ -61,7 +61,9 @@ describe('nights needing a reading are listed where the Treasurer looks', () => 
     expect(source).toContain('liveVariance(')
     expect(source).toContain('data-test="live-variance"')
     expect(source).toContain('noteMissing')
-    expect(source).toContain('data-test="reader-zero"')
+    // The review of 13 October 2026: a "Reader shows £0.00" button beside the field read as a
+    // label and confused; typing 0 says the same, and the live line beneath confirms it.
+    expect(source).not.toContain('data-test="reader-zero"')
   })
 
   test('correct, check again and write off are separate actions, and a write-off retypes nothing', async () => {

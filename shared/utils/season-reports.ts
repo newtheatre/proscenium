@@ -30,8 +30,12 @@ export interface PerformanceReportRow {
   showTitle: string
   sold: number
   admitted: number
-  noShows: number
+  // Null until the curtain is up, and on a cancelled performance: nobody could have come yet.
+  noShows: number | null
   unfilledSlots: number
+  // Listed only while it still holds card money, which `heldPence` says.
+  cancelled: boolean
+  heldPence: number
   officerBypass: boolean
   autoClosed: boolean
 }

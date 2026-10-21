@@ -1,14 +1,14 @@
-import { closePeriodForm, periodLockConstraintRefusal } from '#shared/utils/period-locks'
+import { closePeriodForm, periodLockConstraintRefusal, saysClosedOverlap } from '#shared/utils/period-locks'
 
-// Closes a period; the treasurer's own write, warned by preview.post.ts first but not re-checked
-// here, since a blocking condition is advisory rather than a refusal (I-107 criteria 1, 5).
+// Closes a period. A blocking condition is advisory (I-107 criteria 1, 5); a day already closed
+// is refused, so two closes never govern one day (0129).
 export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'finance.write')
   const input = await readValidatedBodyOrThrow(event, closePeriodForm)
 
   try {
-    const { id, applied } = await closePeriod(input, resolved.account.id)
-    if (!applied) throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
+    const { id, applied, overlaps } = await closePeriod(input, resolved.account.id)
+    if (!applied) throw createError({ statusCode: 409, statusMessage: saysClosedOverlap(overlaps) })
     return { ok: true, id }
   }
   catch (error) {

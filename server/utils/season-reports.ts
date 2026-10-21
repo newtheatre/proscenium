@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { admittedSeatsSubquery, heldSeatsSubquery, noShowSeatsSubquery } from './capacity'
+import { admittedSeatsSubquery, noShowSeatsSubquery, soldSeatsSubquery } from './capacity'
 import { OFFICER_BYPASS_ACTION } from '#shared/utils/night-authority'
 import type { IncidentTrendFilter, IncidentTrendRow, OpeningBypassRow, PerformanceReportFilter, PerformanceReportRow } from '#shared/utils/season-reports'
 import type { SQL } from 'drizzle-orm'
@@ -68,14 +68,26 @@ function performanceFilters(filter: PerformanceReportFilter): SQL {
   return filter.venueId ? sql` AND p.venue_id = ${filter.venueId}` : sql``
 }
 
+// Card money a performance still holds, net of refunds: a cancelled one is listed while this is
+// not nothing, so money taken for a night that never happened is on a report (I-106).
+const heldPence = sql`(
+  SELECT coalesce(sum(held_ll.amount_pence), 0) FROM ledger_lines held_ll
+  JOIN ledger_entries held_le ON held_le.id = held_ll.entry_id
+  WHERE held_ll.performance_id = p.id AND held_le.tender = 'CARD'
+)`
+
+const listedPerformance = sql`(p.status != 'CANCELLED' OR ${heldPence} <> 0)`
+
 // One row per performance, attendance in seats by the night report's own helpers (issue 1326); a
 // claim still waiting for an officer is nobody confirmed, so it counts as a gap (criterion 1).
 export function performanceReportsQuery(fromAt: number, toAt: number, filter: PerformanceReportFilter, limit: number, offset: number): SQL {
   return sql`
     SELECT p.id AS performanceId, p.starts_at AS startsAt, v.id AS venueId, v.name AS venueName, s.title AS showTitle,
-      ${heldSeatsSubquery(sql`p.id`)} AS sold,
+      ${soldSeatsSubquery(sql`p.id`)} AS sold,
       ${admittedSeatsSubquery(sql`p.id`)} AS admitted,
-      ${noShowSeatsSubquery(sql`p.id`)} AS noShows,
+      CASE WHEN p.starts_at <= unixepoch() AND p.status != 'CANCELLED' THEN ${noShowSeatsSubquery(sql`p.id`)} END AS noShows,
+      p.status = 'CANCELLED' AS cancelled,
+      ${heldPence} AS heldPence,
       (SELECT count(*) FROM shifts sh WHERE sh.performance_id = p.id AND sh.status IN ('OPEN', 'CLAIMED', 'DECLINED')) AS unfilledSlots,
       EXISTS (
         SELECT 1 FROM audit_log a, json_each(a.detail, '$.performanceIds') pids
@@ -85,7 +97,7 @@ export function performanceReportsQuery(fromAt: number, toAt: number, filter: Pe
     FROM performances p
     JOIN venues v ON v.id = p.venue_id
     JOIN shows s ON s.id = p.show_id
-    WHERE p.starts_at >= ${fromAt} AND p.starts_at < ${toAt} AND p.status != 'CANCELLED'${performanceFilters(filter)}
+    WHERE p.starts_at >= ${fromAt} AND p.starts_at < ${toAt} AND ${listedPerformance}${performanceFilters(filter)}
     ORDER BY p.starts_at
     LIMIT ${limit} OFFSET ${offset}
   `
@@ -95,14 +107,14 @@ export function performanceReportsCountQuery(fromAt: number, toAt: number, filte
   return sql`
     SELECT count(*) AS total
     FROM performances p
-    WHERE p.starts_at >= ${fromAt} AND p.starts_at < ${toAt} AND p.status != 'CANCELLED'${performanceFilters(filter)}
+    WHERE p.starts_at >= ${fromAt} AND p.starts_at < ${toAt} AND ${listedPerformance}${performanceFilters(filter)}
   `
 }
 
-type PerformanceReportSqlRow = Omit<PerformanceReportRow, 'officerBypass' | 'autoClosed'> & { officerBypass: number, autoClosed: number }
+type PerformanceReportSqlRow = Omit<PerformanceReportRow, 'officerBypass' | 'autoClosed' | 'cancelled'> & { officerBypass: number, autoClosed: number, cancelled: number }
 
 function readBooleans(row: PerformanceReportSqlRow): PerformanceReportRow {
-  return { ...row, officerBypass: Boolean(row.officerBypass), autoClosed: Boolean(row.autoClosed) }
+  return { ...row, officerBypass: Boolean(row.officerBypass), autoClosed: Boolean(row.autoClosed), cancelled: Boolean(row.cancelled) }
 }
 
 export async function performanceReports(fromAt: number, toAt: number, filter: PerformanceReportFilter, limit: number, offset: number): Promise<{ items: PerformanceReportRow[], total: number }> {

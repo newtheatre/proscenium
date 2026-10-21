@@ -30,6 +30,8 @@ export default defineEventHandler(async (event) => {
     unfilledSlots: row.unfilledSlots,
     officerBypass: row.officerBypass ? 'Yes' : 'No',
     autoClosed: row.autoClosed ? 'Yes' : 'No',
+    cancelled: row.cancelled ? 'Yes' : 'No',
+    cardHeldPence: row.cancelled ? row.heldPence : '',
   })))
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')
   setResponseHeader(event, 'content-disposition', `attachment; filename="performance-report-${fromDay}-to-${toDay}.csv"`)

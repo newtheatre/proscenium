@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { describeKind, ENTRY_SOURCES, LINE_KINDS, saysTender, totalOf } from './ledger'
+import { describeKind, ENTRY_SOURCES, LINE_KINDS, saysEntrySource, saysTender, totalOf } from './ledger'
+import { londonClock } from './london'
 import type { EntrySource, LineKind, Tender } from './ledger'
 
 // I-108. A period export categorised for the SU's own accounting: every row but the last is a
@@ -36,7 +37,7 @@ export const nominalMappingForm = z.object({
   kind: z.enum(LINE_KINDS.map(one => one.name) as [LineKind, ...LineKind[]]),
   source: z.enum(ENTRY_SOURCES),
   // Cleared back to unmapped with an explicit null, never an empty string (criterion 3).
-  nominalCode: z.string().trim().min(1, 'Give it a nominal code').max(50).nullable(),
+  nominalCode: z.string().trim().min(1, 'Give it a nominal code').max(50, 'Keep the nominal code to 50 characters').nullable(),
 }).refine(input => isKnownPair(input.kind, input.source), {
   path: ['source'], message: 'No ledger line ever posts under that kind and source together',
 })
@@ -73,12 +74,21 @@ export interface SuExportCoverage {
   toDay: string
   rows: number
   closed: boolean
+  // Lines whose pair has no nominal code yet: they export on the explicit UNMAPPED line.
+  unmapped: number
 }
 
 const britishDigits = new Intl.NumberFormat('en-GB')
 
 export function suExportLines(rows: number): string {
   return `${britishDigits.format(rows)} ${rows === 1 ? 'line' : 'lines'}`
+}
+
+// Said before the download, since an unmapped line still exports and the SU cannot post it.
+export function suExportUnmappedWarning(unmapped: number): string {
+  const these = unmapped === 1 ? 'line has' : 'lines have'
+  return `${britishDigits.format(unmapped)} ${these} no nominal code yet and will export as UNMAPPED. `
+    + 'Give each pair a code under Nominal code mappings first, or tell the SU which ones are unmapped.'
 }
 
 export function suExportCapRefusal(): string {
@@ -96,11 +106,14 @@ export interface NominalMapping {
 
 export interface SuExportRow {
   londonDay: string
+  happenedAt: number
   kind: LineKind
   source: EntrySource
   tender: Tender
   nominalCode: string | null
   amountPence: number
+  showTitle: string | null
+  reference: string | null
 }
 
 // A plain decimal for a spreadsheet cell, never the £-prefixed display string `saysMoney` uses
@@ -118,7 +131,8 @@ function exportCategory(row: SuExportRow): string {
   return row.kind === 'BAR_ITEM' && row.tender === 'TAB' ? 'Bar item on a tab' : describeKind(row.kind)
 }
 
-// The file's rows, shaped once so every run of the same lines is the same bytes (criterion 4).
+// The file's rows, shaped once so every run of the same lines is the same bytes (criterion 4). The
+// six columns the SU reads come first and never move; what traces a line follows them (0130).
 export function suExportCsvRows(rows: SuExportRow[]): Record<string, unknown>[] {
   const cardPence = totalOf(rows.filter(row => row.tender === 'CARD'))
   return [
@@ -131,6 +145,10 @@ export function suExportCsvRows(rows: SuExportRow[]): Record<string, unknown>[] 
       nominalCode: row.nominalCode ?? 'UNMAPPED',
       amountPence: row.amountPence,
       amountPounds: formatPoundsForExport(row.amountPence),
+      time: londonClock(new Date(row.happenedAt * 1000)),
+      source: saysEntrySource(row.source),
+      show: row.showTitle ?? '',
+      reference: row.reference ?? '',
     })),
     // No tender, so a filter on Card leaves the total out rather than counting it twice.
     {
@@ -140,6 +158,10 @@ export function suExportCsvRows(rows: SuExportRow[]): Record<string, unknown>[] 
       nominalCode: '',
       amountPence: cardPence,
       amountPounds: formatPoundsForExport(cardPence),
+      time: '',
+      source: '',
+      show: '',
+      reference: '',
     },
   ]
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h } from 'vue'
+import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysOpeningBypass } from '#shared/utils/season-reports'
 import { saysDay, saysWhen } from '#shared/utils/when'
@@ -94,11 +95,16 @@ const performanceColumns: TableColumn<PerformanceReportRow>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.showTitle),
       h('div', { class: 'text-xs text-muted' }, `${saysWhen(row.original.startsAt)}, ${row.original.venueName}`),
+      // Listed only because it still holds card money: the treasurer's to refund or explain.
+      row.original.cancelled
+        ? h('div', { 'class': 'text-xs text-warning', 'data-test': `cancelled-${row.original.performanceId}` }, `Cancelled, ${saysMoney(row.original.heldPence)} still held`)
+        : null,
     ]),
   },
   { id: 'sold', header: 'Sold', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.sold) },
   { id: 'admitted', header: 'Admitted', meta: RIGHT_ALIGNED, cell: ({ row }) => String(row.original.admitted) },
-  { id: 'noShows', header: 'No-shows', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.noShows) },
+  // Nobody can fail to come before the curtain, so a performance still to play has none yet.
+  { id: 'noShows', header: 'No-shows', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => (row.original.cancelled ? '' : row.original.noShows === null ? 'Not yet' : String(row.original.noShows)) },
   { id: 'unfilledSlots', header: 'Unfilled slots', meta: RIGHT_ALIGNED_HIDE_BELOW_SM, cell: ({ row }) => String(row.original.unfilledSlots) },
   { id: 'officerBypass', header: 'Officer bypass', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => yesNo(row.original.officerBypass) },
   { id: 'autoClosed', header: 'Closed automatically', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } }, cell: ({ row }) => yesNo(row.original.autoClosed) },

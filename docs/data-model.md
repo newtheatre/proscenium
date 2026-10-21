@@ -1237,7 +1237,9 @@ rather than resolving its own (I-107). A term has no fixed formula, so it is nam
 of closing it: `POST /api/admin/finance/terms` defines the range, `GET` lists every one, and the
 money dashboard's `TERM` period kind (I-105) reads its bounds from here. Closing a period does
 not reference this table: a lock names a range directly, whether or not that range was ever
-defined as a term.
+defined as a term. A term whose label (ignoring case) or range is already named is refused on the
+insert itself, and `DELETE /api/admin/finance/terms/:id` removes a mistaken one, audited as
+`finance.period.removed`: nothing references a term, so removing one changes no figure (0129).
 
 ### period_locks
 `id` PK · `from_day`, `to_day` (`london_day` format, both inclusive; CHECK `to_day >= from_day`) ·
@@ -1250,7 +1252,11 @@ locked is read off the latest row (by `created_at`, then `rowid`, the order rows
 `REOPENED` allows, and no row at all is open. Reopening inserts a new `REOPENED` row for the
 same range rather than editing the `CLOSED` one it reopens, and re-closing after that is another
 new row; nothing here supersedes by reference; the "latest row wins" rule already answers which
-one governs.
+one governs. A `CLOSED` row is refused, on its own insert, while any day of its range is already
+closed, so every day has one close in force; a `REOPENED` row copies the lock's label and is
+written only while that lock still governs a day (0129). The history route reports each row's
+standing (closed, partly closed, reopened, or no longer in force) by the same rule; the standing
+is derived, never stored.
 
 **`ledger_entries_refuses_a_closed_period`, `BEFORE INSERT ON ledger_entries`, is the actual
 enforcement.** It reads the latest `period_locks` row for `NEW.london_day` the same way (migration
@@ -1286,8 +1292,10 @@ figures for the same range, because nothing here computes a total at all. Rows a
 truncated silently. The export is audited (`finance.exported`) with who, when and the range.
 An open range exports anyway, permitted rather than refused: the `x-period-status` response
 header says `closed` or `open`, read from `period_locks` the same way a single day is (I-107).
-`GET /api/admin/finance/export/coverage` takes the same query and answers `{ fromDay, toDay, rows,
-closed }` from a count over the same predicate, so the screen shows the period's state and the
+Four columns follow the six the SU reads: `time`, `source`, `show` and `reference`, read through
+`LEFT JOIN`s on the line's `performance_id` and `reservation_id` and blank where the line has none
+(0130). `GET /api/admin/finance/export/coverage` takes the same query and answers `{ fromDay,
+toDay, rows, closed, unmapped }` from a count over the same predicate, so the screen shows the period's state and the
 cap before anything is downloaded.
 
 ## Show night (module E)

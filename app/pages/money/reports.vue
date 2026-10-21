@@ -10,13 +10,20 @@ definePageMeta({ layout: 'console', title: 'Comps and discounts', middleware: 'c
 
 interface ShowOption { id: string, title: string, status: string }
 
+const route = useRoute()
 const request = useRequestFetch()
 
-const today = londonDay(new Date())
-const scopeKind = ref<'SHOW' | 'PERIOD'>('PERIOD')
-const showId = ref<string | undefined>(undefined)
-const from = ref(today)
-const to = ref(today)
+// The money dashboard's own period controls, opening on the year (0087); the scope and the show
+// sit in the URL beside the period, so a reload or a shared link asks the same question.
+const periodForm = await useFinancePeriodForm('foregone-period-choices')
+const scopeKind = computed<'SHOW' | 'PERIOD'>({
+  get: () => (route.query.scope === 'SHOW' ? 'SHOW' : 'PERIOD'),
+  set: value => void navigateTo({ query: { ...route.query, scope: value === 'SHOW' ? value : undefined } }, { replace: true }),
+})
+const showId = computed<string | undefined>({
+  get: () => (typeof route.query.showId === 'string' && route.query.showId ? route.query.showId : undefined),
+  set: value => void navigateTo({ query: { ...route.query, showId: value || undefined } }, { replace: true }),
+})
 
 const { data: shows } = await useAsyncData('finance-shows', () => request<ShowOption[]>('/api/admin/finance/shows'), { default: () => [] })
 const showOptions = computed(() => shows.value.map(one => ({ label: one.title, value: one.id })))
@@ -24,9 +31,9 @@ const showOptions = computed(() => shows.value.map(one => ({ label: one.title, v
 // A show scope has nothing to fetch until one is chosen; a period scope always has a range.
 const ready = computed(() => scopeKind.value === 'PERIOD' || Boolean(showId.value))
 
-const query = computed(() => (scopeKind.value === 'SHOW'
-  ? { scope: 'SHOW' as const, showId: showId.value ?? '' }
-  : { scope: 'PERIOD' as const, from: from.value, to: to.value }))
+const query = computed<Record<string, string>>(() => (scopeKind.value === 'SHOW'
+  ? { scope: 'SHOW', showId: showId.value ?? '' }
+  : periodForm.query.value))
 
 const { data, status, error, refresh } = await useAsyncData(
   'finance-foregone',
@@ -97,18 +104,10 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
           value-key="value"
           placeholder="Choose a show"
         />
-        <template v-if="scopeKind === 'PERIOD'">
-          <DateField
-            v-model="from"
-            aria-label="From"
-            data-test="scope-from"
-          />
-          <DateField
-            v-model="to"
-            aria-label="To"
-            data-test="scope-to"
-          />
-        </template>
+        <PeriodFields
+          v-if="scopeKind === 'PERIOD'"
+          :form="periodForm"
+        />
       </template>
     </AdminToolbar>
 

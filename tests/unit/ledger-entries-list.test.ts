@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { LINE_KINDS } from '#shared/utils/ledger'
-import { entriesHref, ledgerEntriesList, saysEntryWhat, saysNoEntries } from '#shared/utils/ledger-entries-list'
+import { entriesHref, ledgerEntriesList, saysEntryWhat, saysNoEntries, saysUnknownEntriesKeys, unknownEntriesKeys } from '#shared/utils/ledger-entries-list'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 
 // Issue 1361: a ledger entry says what it was, is filtered and searched by it, and every money
@@ -80,5 +80,32 @@ describe('an empty list says what was asked', () => {
     const source = await Bun.file('app/pages/money/entries.vue').text()
     expect(source).toContain('saysNoEntries(conditions, ')
     expect(source).not.toContain('filtered ?')
+  })
+})
+
+// The review of 13 October 2026: an unknown key in the address gave only a vague form error.
+describe('an address asking for something the list does not filter by', () => {
+  test('names only the keys the list does not own', () => {
+    expect(unknownEntriesKeys({ happenedAt: '2026-10-13', page: '2', tender: 'is:CARD', colour: 'red', amount: '5' })).toEqual(['amount', 'colour'])
+    expect(unknownEntriesKeys({ happenedAt: '2026-10-13', search: 'ABC', sort: 'happenedAt', direction: 'asc', pageSize: '25' })).toEqual([])
+  })
+
+  test('says which and what to do', () => {
+    expect(saysUnknownEntriesKeys(['colour'])).toBe('This link asks for something the ledger list does not filter by: colour. Remove it to see the entries.')
+  })
+
+  // The review of 13 October 2026: Next changed the address but not the rows after a navigation
+  // from inside the page's setup; the default day is a redirect before the page is made.
+  test('the default day is set by middleware, never by a navigation inside setup', async () => {
+    const source = await Bun.file('app/pages/money/entries.vue').text()
+    expect(source).not.toMatch(/^await navigateTo/m)
+    expect(source).not.toMatch(/^\s{2}await navigateTo/m)
+    expect(source).toMatch(/middleware: \[\s*'console',/)
+  })
+
+  test('the screen names them rather than showing the endpoint\'s refusal', async () => {
+    const source = await Bun.file('app/pages/money/entries.vue').text()
+    expect(source).toContain('unknownEntriesKeys(route.query)')
+    expect(source).toContain('data-test="entries-unknown-keys"')
   })
 })

@@ -100,10 +100,13 @@ describe('incidentTrendsQuery groups by category, severity and venue within a ra
   })
 })
 
+// No-shows are counted once the curtain is up, so a night of attendance is one already played.
+const TWO_DAYS_AGO = (): Date => new Date(Date.now() - 2 * 86_400_000)
+
 describe('performanceReportsQuery reads attendance and staffing per performance (criterion 1)', () => {
   test('sold, admitted and no-shows read from the live reservation rows', async () => {
     await withDatabase((database) => {
-      const seeded = tonightsPerformance(database)
+      const seeded = tonightsPerformance(database, { now: TWO_DAYS_AGO() })
       const booker = person(database, 'booker')
       database.batch([
         ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
@@ -122,7 +125,8 @@ describe('performanceReportsQuery reads attendance and staffing per performance 
       const [found] = run<{ sold: number, admitted: number, noShows: number }>(
         database, performanceReportsQuery(from, to, {}, 50, 0),
       )
-      expect(found).toMatchObject({ sold: 1, admitted: 1, noShows: 1 })
+      // A seat marked a no-show was still sold: sold is in, plus no-shows, plus unpaid holds.
+      expect(found).toMatchObject({ sold: 2, admitted: 1, noShows: 1 })
     })
   })
 
@@ -130,7 +134,7 @@ describe('performanceReportsQuery reads attendance and staffing per performance 
   // a no-show whether or not anything marked it, and every figure counts seats, as sold does.
   test('a paid seat never admitted is a no-show, and a party counts every seat on every line', async () => {
     await withDatabase((database) => {
-      const seeded = tonightsPerformance(database)
+      const seeded = tonightsPerformance(database, { now: TWO_DAYS_AGO() })
       const booker = person(database, 'booker')
       const reservation = (id: string, status: string): [string, ...unknown[]] =>
         ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
@@ -155,6 +159,66 @@ describe('performanceReportsQuery reads attendance and staffing per performance 
         database, performanceReportsQuery(seeded.startsAt - 3600, seeded.startsAt + 3600, {}, 50, 0),
       )
       expect(found).toMatchObject({ sold: 5, admitted: 3, noShows: 2 })
+    })
+  })
+
+  // The review of 13 October 2026: three no-shows from two sold, and no-shows before the curtain.
+  test('no-shows never outnumber the seats sold, and a performance still to come has none yet', async () => {
+    await withDatabase((database) => {
+      const past = tonightsPerformance(database, { suffix: 'past', curtainHoursAfterNightStart: 0.5, now: new Date(Date.now() - 7 * 86_400_000) })
+      const future = tonightsPerformance(database, { suffix: 'future', venueId: past.venueId, now: new Date(Date.now() + 7 * 86_400_000) })
+      const booker = person(database, 'booker')
+      const reservation = (id: string, performanceId: string, status: string): [string, ...unknown[]] =>
+        ['INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          id, id.toUpperCase().padEnd(6, 'X').slice(0, 6), performanceId, booker, status, 'WEB']
+      const seat = (id: string, reservationId: string, performanceId: string): [string, ...unknown[]] =>
+        ['INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+          id, reservationId, performanceId, 'tt-standard', 900, 'BASE']
+      database.batch([
+        ['INSERT INTO ticket_types (id, name, price, kind) VALUES (?, ?, ?, ?)', 'tt-standard', 'Standard', 900, 'SINGLE'],
+        reservation('r-marked', past.performanceId, 'NO_SHOW'),
+        seat('t-marked-1', 'r-marked', past.performanceId),
+        seat('t-marked-2', 'r-marked', past.performanceId),
+        reservation('r-paid', past.performanceId, 'COLLECTED'),
+        seat('t-paid', 'r-paid', past.performanceId),
+        reservation('r-ahead', future.performanceId, 'COLLECTED'),
+        seat('t-ahead', 'r-ahead', future.performanceId),
+      ])
+
+      const found = run<{ performanceId: string, sold: number, noShows: number | null }>(
+        database, performanceReportsQuery(past.startsAt - 3600, future.startsAt + 3600, {}, 50, 0),
+      )
+      expect(found.find(row => row.performanceId === past.performanceId)).toMatchObject({ sold: 3, noShows: 3 })
+      expect(found.find(row => row.performanceId === future.performanceId)).toMatchObject({ sold: 1, noShows: null })
+    })
+  })
+
+  // The review of 13 October 2026: card money held for a cancelled performance was on no report.
+  test('a cancelled performance is listed while it still holds money, and says so', async () => {
+    await withDatabase((database) => {
+      const held = tonightsPerformance(database, { suffix: 'held', status: 'CANCELLED' })
+      const settled = tonightsPerformance(database, { suffix: 'settled', venueId: held.venueId, status: 'CANCELLED' })
+      database.batch([
+        ['INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)',
+          'e-held', held.night, 'DESK', 'CARD', held.startsAt - 7200, 2000],
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id) VALUES (?, ?, ?, ?, ?)',
+          'l-held', 'e-held', 'PASS_SALE', 2000, held.performanceId],
+        ['INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)',
+          'e-in', settled.night, 'DESK', 'CARD', settled.startsAt - 7200, 700],
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id) VALUES (?, ?, ?, ?, ?)',
+          'l-in', 'e-in', 'PASS_SALE', 700, settled.performanceId],
+        ['INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)',
+          'e-out', settled.night, 'DESK', 'CARD', settled.startsAt - 3600, -700],
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, performance_id) VALUES (?, ?, ?, ?, ?)',
+          'l-out', 'e-out', 'REFUND', -700, settled.performanceId],
+      ])
+
+      const found = run<{ performanceId: string, cancelled: number, heldPence: number }>(
+        database, performanceReportsQuery(held.startsAt - 3600, held.startsAt + 3600, {}, 50, 0),
+      )
+      expect(found).toEqual([expect.objectContaining({ performanceId: held.performanceId, cancelled: 1, heldPence: 2000 })])
+      const [counted] = run<{ total: number }>(database, performanceReportsCountQuery(held.startsAt - 3600, held.startsAt + 3600, {}))
+      expect(counted?.total).toBe(1)
     })
   })
 

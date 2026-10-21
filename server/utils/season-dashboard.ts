@@ -129,9 +129,20 @@ export function openVarianceQuery(fromDay: string, toDay: string): SQL {
   `
 }
 
+// Differences accepted rather than explained (I-104 criterion 4), on each night's live reading and
+// netted as the open variance is, so the two figures read the same way.
+export function writtenOffQuery(fromDay: string, toDay: string): SQL {
+  return sql`
+    SELECT coalesce(sum(z.variance_pence), 0) AS writtenOffPence
+    FROM z_readings z
+    WHERE z.night >= ${fromDay} AND z.night <= ${toDay} AND z.written_off = 1
+      AND z.id NOT IN (SELECT supersedes_id FROM z_readings WHERE supersedes_id IS NOT NULL)
+  `
+}
+
 export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary> {
   const bounds = await resolvePeriodBounds(period)
-  const [[bySource, [revenueTotal]], [refunds], [openVariance], theForegone, missing] = await Promise.all([
+  const [[bySource, [revenueTotal]], [refunds], [openVariance], [writtenOff], theForegone, missing] = await Promise.all([
     // One batch, so a sale cannot land between the rows and the total they must equal (0001).
     db.batch([
       db.all<RevenueBySource>(revenueBySourceQuery(bounds.fromAt, bounds.toAt)),
@@ -139,6 +150,7 @@ export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary>
     ]),
     db.all<{ refundsPence: number }>(seasonRefundsQuery(bounds.fromAt, bounds.toAt)),
     db.all<{ openVariancePence: number }>(openVarianceQuery(bounds.fromDay, bounds.toDay)),
+    db.all<{ writtenOffPence: number }>(writtenOffQuery(bounds.fromDay, bounds.toDay)),
     foregone({ scope: 'PERIOD', from: bounds.fromDay, to: bounds.toDay }),
     nightsMissingAReading(),
   ])
@@ -151,6 +163,7 @@ export async function seasonSummary(period: PeriodInput): Promise<SeasonSummary>
     compsPence: theForegone.compsPence,
     discountsPence: theForegone.discountsPence,
     openVariancePence: openVariance?.openVariancePence ?? 0,
+    writtenOffPence: writtenOff?.writtenOffPence ?? 0,
     unreconciledNights: nightsWithin(missing, bounds.fromDay, bounds.toDay),
   }
 }

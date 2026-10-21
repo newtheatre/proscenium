@@ -137,3 +137,16 @@ export function saysNoEntries(conditions: readonly FilterCondition[], searched: 
   if (range.operator === 'before' || range.operator === 'after') return `Nothing was posted to the ledger ${range.operator} ${from}.`
   return `Nothing was posted to the ledger on ${from}.`
 }
+
+const LIST_KEYS: readonly string[] = ['page', 'pageSize', 'search', 'sort', 'direction', ...ledgerEntriesList.fields.map(field => field.key)]
+
+// Keys in an address the list does not filter by, such as an old or mistyped link: named on the
+// screen, since the endpoint refuses them and a generic form error says nothing useful.
+export function unknownEntriesKeys(query: Record<string, unknown>): string[] {
+  return Object.keys(query).filter(key => !LIST_KEYS.includes(key)).sort()
+}
+
+export function saysUnknownEntriesKeys(keys: readonly string[]): string {
+  return `This link asks for something the ledger list does not filter by: ${keys.join(', ')}. `
+    + 'Remove it to see the entries.'
+}
