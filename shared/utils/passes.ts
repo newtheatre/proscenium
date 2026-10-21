@@ -142,8 +142,8 @@ export function saysPayAtDesk(prices: readonly { price: number }[]): string {
   return `Pay ${figures.join(' or ')} at the box office desk`
 }
 
-// The season pass terms (D-137); a placeholder page until the committee's terms are published (0051).
-export const PASS_TERMS_PATH = '/policies/season-passes'
+// The ticket and pass terms (D-137); marked placeholder until the committee approves them (0051).
+export const PASS_TERMS_PATH = '/policies/terms'
 
 export interface PassOffer {
   id: string

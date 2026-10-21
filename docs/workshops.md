@@ -125,6 +125,6 @@ the prose around the numbers, not a value.
 
 | Page | What is needed |
 | --- | --- |
-| `content/policies/season-passes.md` | The season pass terms (D-137): what a pass covers, booking ahead and turning up, who may buy each price, refunds and transfers. The booking offer, the pass page and the pass email already link it. |
+| `content/policies/terms.md` | The committee's approval of the ticket and pass terms (D-137), and each [bracketed] decision in it: the effective date, refund turnaround, house opening time, unaccompanied child age, lost property period, pass orders by email, the pass refund threshold, companion tickets and the complaint reply time. The booking offer, the pass page and the pass email already link it. |
 | `content/get-involved.md` | How joining, auditioning and the technical and production roles actually work this year. |
 | `content/committee.yml` | Each year after the elections: every role's holders and any change of role address, with `updatedOn` moved to the day of the edit (0107). The 2026/27 committee was entered on 28 September 2026. |

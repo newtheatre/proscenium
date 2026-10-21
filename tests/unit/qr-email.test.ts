@@ -25,7 +25,7 @@ const PASS = {
   url: 'https://newtheatre.org.uk/passes/p-1.sig',
   imageUrl: 'https://newtheatre.org.uk/passes/p-1.sig/image.png',
   qrWidth: 165,
-  termsUrl: 'https://newtheatre.org.uk/policies/season-passes',
+  termsUrl: 'https://newtheatre.org.uk/policies/terms',
 }
 
 describe('the reservation confirmation carries a hosted QR image', () => {

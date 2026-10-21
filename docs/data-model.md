@@ -1136,7 +1136,7 @@ up without booking is subject to space, and offers a signed-out holder "Create a
 
 **Prompted at the bar, and the terms linked (D-136, D-137).** After a till sale that did not sell
 a pass, `passPromptFor()` turns the till's own pass offers into one dismissable line on the
-confirmation screen; it is never a step of the sale. `PASS_TERMS_PATH` (`/policies/season-passes`)
+confirmation screen; it is never a step of the sale. `PASS_TERMS_PATH` (`/policies/terms`)
 is linked from the booking offer, the pass page and the `pass-issued` email (`termsUrl`); the page
 is `placeholder: true` until the committee's terms land (0051).
 

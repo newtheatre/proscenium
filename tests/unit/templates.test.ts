@@ -34,7 +34,7 @@ const EVERYTHING: TemplateContext = {
   registerUrl: 'https://newtheatre.org.uk/training/manage/register/1',
   rolesUrl: 'https://newtheatre.org.uk/people/accounts',
   entryUrl: 'https://newtheatre.org.uk/waiting-list/entry/tok',
-  termsUrl: 'https://newtheatre.org.uk/policies/season-passes',
+  termsUrl: 'https://newtheatre.org.uk/policies/terms',
   imageUrl: 'https://newtheatre.org.uk/qr/r-1.sig/image.png',
   expiresAt: new Date('2026-10-02T18:30:00Z'),
   method: 'Google',
@@ -643,8 +643,8 @@ describe('the pass email follows the ticket terms (D-137)', () => {
     for (const part of [html, text]) expect(flat(part)).toContain('You can also just turn up, subject to space on the night.')
   })
 
-  test('it links the season pass terms in both parts', () => {
-    expect(html).toContain('<a href="https://newtheatre.org.uk/policies/season-passes">The season pass terms</a>')
-    expect(text).toContain('The season pass terms: https://newtheatre.org.uk/policies/season-passes')
+  test('it links the ticket and pass terms in both parts', () => {
+    expect(html).toContain('<a href="https://newtheatre.org.uk/policies/terms">The ticket and pass terms</a>')
+    expect(text).toContain('The ticket and pass terms: https://newtheatre.org.uk/policies/terms')
   })
 })

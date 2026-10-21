@@ -120,7 +120,7 @@ async function ask(offer: PassOffer): Promise<void> {
         :to="PASS_TERMS_PATH"
         data-test="pass-offer-terms"
       >
-        The season pass terms
+        The ticket and pass terms
       </NuxtLink>
     </p>
   </UCard>

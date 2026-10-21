@@ -1772,7 +1772,7 @@ person.</p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>
 <p>To book ahead, sign in with this email address and choose "Use my pass" when you book.
 You can also just turn up, subject to space on the night.</p>
-<p><a href="${termsUrl}">The season pass terms</a></p>`),
+<p><a href="${termsUrl}">The ticket and pass terms</a></p>`),
       text: `Hello ${context.name},
 
 Reference ${reference}: ${passType} (${priceLabel}), issued and paid for in person.
@@ -1782,7 +1782,7 @@ Open your pass: ${url}
 To book ahead, sign in with this email address and choose "Use my pass" when you book.
 You can also just turn up, subject to space on the night.
 
-The season pass terms: ${termsUrl}
+The ticket and pass terms: ${termsUrl}
 
 The Nottingham New Theatre`,
     }

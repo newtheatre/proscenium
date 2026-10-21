@@ -148,7 +148,7 @@ useSeoMeta({
               :to="PASS_TERMS_PATH"
               data-test="pass-terms"
             >
-              The season pass terms
+              The ticket and pass terms
             </NuxtLink>
           </p>
         </div>
