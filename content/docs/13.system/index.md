@@ -48,7 +48,8 @@ June is gone in August unless the incoming committee grants it again.
 
 The overview is what is waiting for you and what is still to be set up. Every part of it is shown
 only to somebody who could act on it, so two officers opening it see different screens, and a part
-with nothing in it for you is not drawn at all.
+with nothing in it for you is not drawn at all. When no part has anything for you, it says
+**Nothing is waiting for you**, with a link to the money dashboard for those who read it.
 
 ![The console overview with the help link (1), Waiting for you (2), Tonight (3), Set-up still to do (4) and the messages that did not arrive (5)](/images/docs/system/overview.png)
 
