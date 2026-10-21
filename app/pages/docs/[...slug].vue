@@ -54,17 +54,25 @@ const hasToc = computed(() => toc.value.length >= TOC_MINIMUM)
 const headline = computed(() => findPageHeadline(navigation?.value ?? [], route.path))
 
 const reporting = ref(false)
+const askingDrift = ref(false)
+const driftNote = ref('')
 
+// It emails every IT Manager, so it asks first, with room to say what is wrong.
 async function reportDrift(): Promise<void> {
   reporting.value = true
   try {
-    await $fetch('/api/docs/report-drift', { method: 'POST', body: { path: route.path } })
+    await $fetch('/api/docs/report-drift', { method: 'POST', body: { path: route.path, note: driftNote.value.trim() || undefined } })
+    askingDrift.value = false
+    driftNote.value = ''
     toast.add({
       title: 'Reported',
       description: 'The IT Manager has been told this page needs a look.',
       icon: 'i-lucide-check',
       color: 'success',
     })
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error, 'That report could not be sent.'), color: 'error' })
   }
   finally {
     reporting.value = false
@@ -92,13 +100,48 @@ useSeoMeta({
           variant="subtle"
           icon="i-lucide-flag"
           size="sm"
-          :loading="reporting"
-          @click="reportDrift"
+          @click="askingDrift = true"
         >
           Report as out of date
         </UButton>
       </template>
     </UPageHeader>
+
+    <UModal
+      v-model:open="askingDrift"
+      title="Report this page as out of date"
+      description="The IT Manager gets an email naming this page and you."
+    >
+      <template #body>
+        <UFormField
+          label="What is out of date?"
+          description="Optional, up to 500 characters."
+        >
+          <UTextarea
+            v-model="driftNote"
+            :maxlength="500"
+            class="w-full"
+            data-test="report-drift-note"
+          />
+        </UFormField>
+      </template>
+      <template #footer>
+        <UButton
+          data-test="report-drift-send"
+          :loading="reporting"
+          @click="reportDrift"
+        >
+          Send the report
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="askingDrift = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
+      </template>
+    </UModal>
 
     <UPageBody data-test="docs-body">
       <div class="mb-6 flex flex-wrap items-center gap-3 text-sm text-muted">
