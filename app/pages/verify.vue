@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import * as z from 'zod'
+import { HOUSE_ERROR } from '#shared/utils/house-errors'
 import { landingAfterSignIn } from '#shared/utils/night-authority'
 import { withNext } from '#shared/utils/sign-in'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
@@ -12,7 +13,7 @@ type Outcome = 'working' | 'verified' | 'expired' | 'sent'
 const outcome = ref<Outcome>('working')
 const notice = ref('')
 
-const addressOnly = z.object({ email: z.string().email('Enter an email address') })
+const addressOnly = z.object({ email: z.string({ error: 'Enter your email address' }).trim().min(1, 'Enter your email address').email(HOUSE_ERROR.email) })
 const addressField: AuthFormField[] = [
   { name: 'email', type: 'email', label: 'Email address', autocomplete: 'email', required: true },
 ]
@@ -22,7 +23,7 @@ onMounted(async () => {
   const token = route.query.token
   if (typeof token !== 'string' || !token) {
     outcome.value = 'expired'
-    notice.value = 'That link is incomplete.'
+    notice.value = 'That link is incomplete. Ask for a new one.'
     return
   }
 
@@ -107,11 +108,25 @@ useSeoMeta({
     >
       <div class="space-y-2">
         <h1 class="nnt-headline text-xl">
-          That link has expired
+          That link no longer works
         </h1>
         <p class="text-muted">
-          {{ notice }} A sign-in link confirms your address and signs you in at once.
+          {{ notice }}
         </p>
+        <!-- A used link and an expired one look alike from here, since claiming spends the token, so
+             the page names both and gives the likelier case its own way on (A-102 criterion 3). -->
+        <p class="text-muted">
+          If you have already confirmed your address, it is already confirmed: just sign in.
+          Otherwise a sign-in link confirms your address and signs you in at once.
+        </p>
+        <UButton
+          :to="withNext('/sign-in', route.query.next)"
+          variant="link"
+          class="min-h-11 px-0"
+          data-test="verify-sign-in"
+        >
+          Sign in
+        </UButton>
       </div>
 
       <UAuthForm

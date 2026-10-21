@@ -16,9 +16,9 @@ const toast = useToast()
 const settingFirst = computed(() => route.query.kind === 'set')
 const tokenKind = computed(() => (settingFirst.value ? 'SET_PASSWORD' : 'PASSWORD_RESET'))
 
-type Outcome = 'choosing' | 'challenge' | 'expired'
+type Outcome = 'checking' | 'choosing' | 'challenge' | 'expired'
 
-const outcome = ref<Outcome>('choosing')
+const outcome = ref<Outcome>('checking')
 const notice = ref('')
 const attemptId = ref('')
 
@@ -41,6 +41,26 @@ function checkPassword(state: Partial<z.output<typeof schema>>): FormError[] {
   const problem = state.password ? passwordProblem('', state.password, policy.value) : null
   return problem ? [{ name: 'password', message: explainPasswordProblem(problem) }] : []
 }
+
+const DEAD_LINK = 'That link has expired or has already been used. Ask for a new one.'
+
+// The link is checked on arrival, as /verify and /magic check theirs, so nobody types a new password
+// into a page whose link is already spent (0121). The check spends nothing.
+onMounted(async () => {
+  const token = route.query.token
+  if (typeof token !== 'string' || !token) {
+    notice.value = 'That link is incomplete. Ask for a new one.'
+    outcome.value = 'expired'
+    return
+  }
+  const answer = await $fetch<{ usable: boolean }>('/api/auth/password/check', { query: { token, kind: tokenKind.value } })
+    .catch(() => ({ usable: true }))
+  if (answer.usable) outcome.value = 'choosing'
+  else {
+    notice.value = DEAD_LINK
+    outcome.value = 'expired'
+  }
+})
 
 async function reset(payload: FormSubmitEvent<z.output<typeof schema>>): Promise<void> {
   notice.value = ''
@@ -83,6 +103,17 @@ useSeoMeta({ title: 'Set a new password' })
 
 <template>
   <WayIn>
+    <div
+      v-if="outcome === 'checking'"
+      class="flex items-center gap-3 text-muted"
+    >
+      <UIcon
+        name="i-lucide-loader-circle"
+        class="animate-spin"
+      />
+      <span>Checking your link.</span>
+    </div>
+
     <UAlert
       v-if="notice && outcome === 'choosing'"
       class="mb-6"
@@ -109,12 +140,12 @@ useSeoMeta({ title: 'Set a new password' })
     />
 
     <div
-      v-else
+      v-else-if="outcome === 'expired'"
       data-test="token-expired"
       class="space-y-3"
     >
       <h1 class="nnt-headline text-xl">
-        That link has expired
+        That link no longer works
       </h1>
       <p class="text-muted">
         {{ notice }}

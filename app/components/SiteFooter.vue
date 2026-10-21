@@ -95,6 +95,15 @@ const year = new Date().getFullYear()
         <UContainer>
           <div class="flex flex-wrap items-center justify-between gap-2 py-4 text-xs text-muted">
             <span>&copy; {{ year }} The Nottingham New Theatre</span>
+            <!-- How to reach a person, from every page, signed in or not: the about page's own
+                 address, rather than a second copy of it here. -->
+            <ULink
+              to="/about#getting-in-touch"
+              class="text-muted hover:text-default"
+              data-test="footer-contact"
+            >
+              Contact us
+            </ULink>
             <span class="font-mono">newtheatre.org.uk</span>
           </div>
         </UContainer>

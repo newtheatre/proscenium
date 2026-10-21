@@ -80,6 +80,26 @@ export default defineEventHandler(async (event) => {
   }
 
   const state = await reservationCurrentState(reservationId)
+
+  // The only email the booker held quoted the old total, so a change sends a fresh copy with the same
+  // QR (D-108 criterion 1, 0122). Sent after the commit, and its failure never undoes the edit (0003).
+  if (reservation.userId && state) {
+    try {
+      await sendReservationConfirmation(event, {
+        userId: reservation.userId,
+        reference: state.reference,
+        showTitle: state.showTitle,
+        startsAt: state.startsAt,
+        totalPence: Number(state.totalPence),
+        qrToken: await qrTokenFor(reservationId),
+        change: 'CHANGED',
+      })
+    }
+    catch (error) {
+      console.error('[qr] tickets changed but the fresh confirmation could not be sent', error)
+    }
+  }
+
   return { status: state?.status ?? 'PENDING', totalPence: state?.totalPence ?? 0 }
 })
 

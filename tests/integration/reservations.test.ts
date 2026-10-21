@@ -270,7 +270,7 @@ describe('the current ticket lines an edit reads as its "have" side (D-110 crite
 })
 
 describe('the named ticket lines a screen reads (D-110)', () => {
-  test('carries the type\'s name alongside the count', async () => {
+  test('carries the type\'s name alongside the count and what the line cost (0122)', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
       user(database, 'u-1', 'booker@example.invalid')
@@ -282,8 +282,8 @@ describe('the named ticket lines a screen reads (D-110)', () => {
           't-1', 'r-1', seeded.performanceId, 'tt-standard', 900, 'BASE'],
       ])
 
-      const [found] = read<{ ticketTypeId: string, ticketTypeName: string, quantity: number }>(database, namedTicketLinesQuery('r-1'))
-      expect(found).toEqual({ ticketTypeId: 'tt-standard', ticketTypeName: 'Standard', quantity: 1 })
+      const [found] = read<{ ticketTypeId: string, ticketTypeName: string, quantity: number, totalPence: number }>(database, namedTicketLinesQuery('r-1'))
+      expect(found).toEqual({ ticketTypeId: 'tt-standard', ticketTypeName: 'Standard', quantity: 1, totalPence: 900 })
     })
   })
 })

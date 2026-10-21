@@ -12,11 +12,14 @@ interface TicketType { id: string, name: string, description: string | null, pri
 
 interface Entry {
   status: 'WAITING' | 'OFFERED' | 'CLAIMED' | 'LAPSED' | 'REMOVED'
+  performanceId: string
   showTitle: string
   startsAt: number
   partySize: number
   offerExpiresAt: number | null
   ticketTypes: TicketType[]
+  // Seats on sale for the whole party right now, so waiting is not the only way in (0120).
+  bookable: boolean
 }
 
 const route = useRoute()
@@ -231,6 +234,20 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         :title="`Still on the list for ${plural(data!.partySize, 'seat')}`"
         description="We will email you the moment enough seats free up, in the order people joined."
       />
+      <div
+        v-if="data!.bookable"
+        class="flex flex-wrap items-center gap-3"
+      >
+        <p class="text-sm">
+          Seats for your whole party are on sale now, so you can book them without waiting.
+        </p>
+        <UButton
+          :to="`/book/${data!.performanceId}`"
+          data-test="waiting-list-book"
+        >
+          Book tickets
+        </UButton>
+      </div>
       <UButton
         variant="link"
         color="neutral"
@@ -255,13 +272,22 @@ useSeoMeta({ title: 'Your waiting-list entry' })
             ? 'These seats have already been claimed.'
             : 'You already left this waiting list.'"
       />
-      <UButton
-        to="/whats-on"
-        variant="subtle"
-        data-test="waiting-list-whats-on"
-      >
-        See what's on
-      </UButton>
+      <div class="flex flex-wrap gap-3">
+        <UButton
+          v-if="data!.bookable"
+          :to="`/book/${data!.performanceId}`"
+          data-test="waiting-list-book"
+        >
+          Book tickets
+        </UButton>
+        <UButton
+          to="/whats-on"
+          variant="subtle"
+          data-test="waiting-list-whats-on"
+        >
+          See what's on
+        </UButton>
+      </div>
     </div>
 
     <ConfirmModal

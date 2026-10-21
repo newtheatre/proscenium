@@ -107,6 +107,18 @@ function entriesFor(performanceId: string): { id: string, status: string, reserv
   }
 }
 
+// The list is for a party the house cannot seat (0120), so a party of one joins a night set to seat
+// nobody. Written past the admin route, whose own offer run would beat the test's to the freed seat.
+function seatHouse(performanceId: string, capacity: number | null): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.run('UPDATE performances SET capacity_override = ? WHERE id = ?', [capacity, performanceId])
+  }
+  finally {
+    database.close()
+  }
+}
+
 describe.skipIf(skip !== null)('a join is committed only alongside a link the joiner holds (criterion 1)', () => {
   test('the answer says the letter went, and the letter carries the entry link', async () => {
     const { performanceId } = await bookableShow()
@@ -133,6 +145,7 @@ describe.skipIf(skip !== null)('a join is committed only alongside a link the jo
 
   test('a second join on the same address is refused and writes nothing more', async () => {
     const { performanceId } = await bookableShow()
+    seatHouse(performanceId, 0)
     const email = registrableAddress('twice')
     const body = { performanceId, partySize: 1, guest: { name: 'Ada Twice', email } }
 
@@ -147,10 +160,12 @@ describe.skipIf(skip !== null)('a join is committed only alongside a link the jo
 describe.skipIf(skip !== null)('a claimed offer opens the booking it made (criterion 2)', () => {
   test('claiming lands on the booking page, headed booking made', async () => {
     const { performanceId } = await bookableShow()
+    seatHouse(performanceId, 0)
     const email = registrableAddress('claimer')
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada Claimer', email },
     }, '')).status).toBe(200)
+    seatHouse(performanceId, null)
     expect(await (await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)).json()).toEqual({ offered: 1 })
 
     const letter = (await letters(app)).find(text => text.includes(email)) ?? ''
@@ -215,7 +230,8 @@ describe.skipIf(skip !== null)('every email opens the entry page, and leaving go
       await view.navigate(`${app.baseURL}/waiting-list/leave/not-a-real-token`)
       await waitFor(view, `document.querySelector('[data-test="error-ways"]')`)
       expect(await view.evaluate<string>('location.pathname')).toBe('/waiting-list/entry/not-a-real-token')
-      expect(await textOf(view, 'main')).toContain('There is nothing here')
+      expect(await textOf(view, 'main')).toContain('That link does not lead anywhere now')
+      expect(await textOf(view, 'main')).toContain('That waiting list entry is no longer here')
     }
     finally {
       view.close()
@@ -249,7 +265,8 @@ describe.skipIf(skip !== null)('the join screen names what it is a list for (cri
 
     const view = await openSignedOutView(app.baseURL)
     try {
-      await visit(view, `${app.baseURL}/waiting-list/${performanceId}`, '[data-test="waiting-list-join-page"]')
+      await visit(view, `${app.baseURL}/waiting-list/${performanceId}`, '[data-test="waiting-list-on-sale"]')
+      await click(view, '[data-test="waiting-list-bigger-party"]')
       await fill(view, '[data-test="waiting-list-guest-email"]', 'not-an-address')
       await click(view, '[data-test="waiting-list-submit"]')
       await waitFor(view, `document.body.innerText.includes('does not look like an email address')`)
@@ -268,6 +285,7 @@ describe.skipIf(skip !== null)('the join screen names what it is a list for (cri
 describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () => {
   test('leaving opens a named confirmation, backing out leaves the entry alone, and once left it offers what is on', async () => {
     const { performanceId } = await bookableShow()
+    seatHouse(performanceId, 0)
     const email = registrableAddress('asked')
 
     const view = await openSignedOutView(app.baseURL)
@@ -316,10 +334,12 @@ describe.skipIf(skip !== null)('leaving is asked about first (criterion 4)', () 
 describe.skipIf(skip !== null)('an offer stands until online booking closes, and none is made after (criterion 2)', () => {
   test('an offer made before the cut-off lapses at the cut-off, not at curtain, and says first refusal', async () => {
     const { performanceId, startsAt } = await soonShow(30)
+    seatHouse(performanceId, 0)
     const email = registrableAddress('refusal')
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada First', email },
     }, '')).status).toBe(200)
+    seatHouse(performanceId, null)
 
     const offered = await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)
     expect(offered.status).toBe(200)
@@ -336,6 +356,7 @@ describe.skipIf(skip !== null)('an offer stands until online booking closes, and
 
   test('past the cut-off nothing is offered, and a join is refused naming the door', async () => {
     const { performanceId, startsAt } = await soonShow(5)
+    seatHouse(performanceId, 0)
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada Early', email: registrableAddress('early') },
     }, '')).status).toBe(200)
@@ -422,9 +443,11 @@ function trailFor(action: string, entryId: string): { detail: string | null }[] 
 describe.skipIf(skip !== null)('an offer and a claim are recorded once, however many race (criteria 2, 3)', () => {
   test('two offer runs at once make one offer and one trail row', async () => {
     const { performanceId } = await bookableShow()
+    seatHouse(performanceId, 0)
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada Raced', email: registrableAddress('raced') },
     }, '')).status).toBe(200)
+    seatHouse(performanceId, null)
 
     const runs = await race(2, () => send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`))
     const offered = await Promise.all(runs.map(async run => (await run.json() as { offered: number }).offered))
@@ -437,10 +460,12 @@ describe.skipIf(skip !== null)('an offer and a claim are recorded once, however 
 
   test('two claims at once make one booking, and one trail row naming it', async () => {
     const { performanceId } = await bookableShow()
+    seatHouse(performanceId, 0)
     const email = registrableAddress('claims')
     expect((await send('POST', `/api/performances/${performanceId}/waiting-list`, {
       performanceId, partySize: 1, guest: { name: 'Ada Twice', email },
     }, '')).status).toBe(200)
+    seatHouse(performanceId, null)
     expect(await (await send('POST', `/api/box-office/desk/performances/${performanceId}/waiting-list/offer`)).json()).toEqual({ offered: 1 })
 
     const letter = (await letters(app)).find(text => text.includes(email)) ?? ''

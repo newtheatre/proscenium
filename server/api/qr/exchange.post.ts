@@ -86,6 +86,8 @@ export default defineEventHandler(async (event) => {
       startsAt: target.startsAt,
       totalPence,
       qrToken,
+      change: 'EXCHANGED',
+      replaces: reservation.reference,
     })
   }
 
