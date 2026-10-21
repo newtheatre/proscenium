@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonDayOf } from '#shared/utils/ledger'
+import { daysAfter } from '#shared/utils/membership'
 import { adminSession, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -138,8 +140,8 @@ describe.skipIf(skip !== null)('the catalogue answers without an account (G-128)
   test('the catalogue names each module\'s earliest open session, from one grouped query (G-129)', async () => {
     const soon = await addModule({ name: 'Working the desk' })
     const untaught = await addModule({ name: 'Rigging a lantern' })
-    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-    const later = new Date(Date.now() + 172_800_000).toISOString().slice(0, 10)
+    const tomorrow = daysAfter(londonDayOf(new Date()), 1)
+    const later = daysAfter(londonDayOf(new Date()), 2)
 
     // Two sessions teach the same module; the catalogue names the earlier one.
     await send('POST', '/api/admin/training/sessions', {

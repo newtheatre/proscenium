@@ -93,8 +93,8 @@ async function makeRoom(over: Record<string, unknown> = {}): Promise<string> {
 
 // Weeks out, so every occurrence clears the notice window and the whole series confirms.
 function mondayIn(weeks: number): string {
-  const at = new Date()
-  at.setUTCDate(at.getUTCDate() + weeks * 7)
+  const today = londonParts(new Date())
+  const at = new Date(Date.UTC(today.year, today.month - 1, today.day + weeks * 7, 12))
   while (at.getUTCDay() !== 1) at.setUTCDate(at.getUTCDate() + 1)
   const { year, month, day } = londonParts(at)
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`

@@ -271,7 +271,7 @@ describe.skipIf(skip !== null)('/money/entries: paging from a list opened from t
     try {
       for (let index = 0; index < 30; index++) {
         database.query('INSERT INTO ledger_entries (id, london_day, source, tender, happened_at, total_pence) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(`screens-page-${index}`, today, 'TILL', 'CARD', now - 60 * (index + 1), 100 + index)
+          .run(`screens-page-${index}`, today, 'TILL', 'CARD', now - (index + 1), 100 + index)
         database.query('INSERT INTO ledger_lines (id, entry_id, kind, amount_pence) VALUES (?, ?, ?, ?)')
           .run(`screens-page-line-${index}`, `screens-page-${index}`, 'BAR_ITEM', 100 + index)
       }
