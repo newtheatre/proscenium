@@ -124,8 +124,10 @@ describe.skipIf(skip !== null)('finding the holder (D-126 criterion 1)', () => {
     expect((await send('POST', '/api/tonight/door/passes/scan', { reference, performanceId })).status).toBe(200)
 
     const [card] = await search(reference)
-    expect(card?.tonight).toBe('Already admitted tonight')
+    expect(card?.tonight).toMatch(/^Already admitted at \d\d:\d\d$/)
     expect(card?.admittedTonight).toBe(true)
+    // The card refuses in the scan's own words rather than offering Admit one (0233).
+    expect(card?.refusal).toBe(card?.tonight ?? '')
   }, CASE_TIMEOUT_MS)
 })
 
@@ -185,6 +187,32 @@ describe.skipIf(skip !== null)('a pass found through the door\'s one field (issu
       expect(verdict).toContain('PASS')
       expect(verdict).not.toContain('PAID')
       expect(verdict).not.toContain('£')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // The 21 October process map: a typed pass reference admitted at once, holder unseen (0233).
+  test('a typed pass reference lists the card too, and admits nobody until Admit one', async () => {
+    const { reference, holder } = await aPass()
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', door.email)
+      await fill(view, 'form input[type="password"]', doorPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, door.email)
+
+      await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
+      await waitFor(view, `document.querySelector('[data-test="door-reference"]')`)
+      await fill(view, '[data-test="door-reference"]', reference)
+      await click(view, '[data-test="door-scan"]')
+      await waitFor(view, `document.querySelector('[data-test="pass-card-${reference}"]')`)
+
+      expect(await textOf(view, `[data-test="pass-card-${reference}"]`)).toContain(holder.name)
+      const [card] = await search(reference)
+      expect(card?.tonight).toBe('Not yet redeemed')
     }
     finally {
       view.close()

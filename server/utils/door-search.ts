@@ -27,18 +27,21 @@ export interface DoorTicketSearchRow {
   holderName: string | null
   partySize: number
   admittedAt: number | null
+  holdExpiresAt: number | null
+  exchanged: number
 }
 
-// Live bookings only, this performance only; an erased booker is found by reference, never by
-// the name erasure removed (0011). A redeemed pass's seat is the pass card's to admit (D-126).
+// This performance only, lapsed and cancelled included so a typed name is not told to check the
+// spelling (0233); an erased booker by reference only (0011), a redeemed pass by its card (D-126).
 export function doorTicketSearchQuery(term: string, performanceId: string): SQL {
   return sql`
     SELECT rv.reference AS reference, rv.status AS status, u.name AS holderName,
-           ${heldSeatsForReservation(sql`rv.id`)} AS partySize, ${admittedAtColumn('rv')} AS admittedAt
+           ${heldSeatsForReservation(sql`rv.id`)} AS partySize, ${admittedAtColumn('rv')} AS admittedAt,
+           rv.hold_expires_at AS holdExpiresAt, rv.exchanged_to_reservation_id IS NOT NULL AS exchanged
     FROM reservations rv
     LEFT JOIN users u ON u.id = rv.user_id
     WHERE rv.performance_id = ${performanceId}
-      AND rv.status IN (${holding})
+      AND rv.status IN (${holding}, 'EXPIRED', 'CANCELLED')
       AND (rv.reference = ${term.toUpperCase()} OR (u.anonymised_at IS NULL AND u.name LIKE ${containsPattern(term)} ESCAPE '\\'))
       AND NOT EXISTS (
         SELECT 1 FROM tickets pt JOIN pass_admissions pa ON pa.ticket_id = pt.id WHERE pt.reservation_id = rv.id

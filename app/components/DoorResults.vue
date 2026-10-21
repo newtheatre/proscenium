@@ -11,6 +11,8 @@ const ticketBadge: Record<DoorFoundState, { label: string, color: 'success' | 's
   PAID: { label: 'Paid', color: 'success' },
   UNPAID: { label: 'Unpaid', color: 'secondary' },
   ADMITTED: { label: 'In', color: 'warning' },
+  LAPSED: { label: 'Lapsed', color: 'warning' },
+  CANCELLED: { label: 'Cancelled', color: 'warning' },
 }
 
 // Which Admit was pressed, so only its own button spins while the page's check runs.
@@ -51,7 +53,8 @@ function admitPass(pass: DoorPassCard): void {
     >
       <div class="flex items-start justify-between gap-3">
         <p class="nnt-headline text-xl">
-          {{ saysDoorParty(ticket.firstName, ticket.partySize) }}
+          <!-- A lapsed or cancelled booking holds no seats, so it is named without a count. -->
+          {{ ticket.partySize > 0 ? saysDoorParty(ticket.firstName, ticket.partySize) : (ticket.firstName ?? ticket.reference) }}
         </p>
         <UBadge
           :color="ticketBadge[ticket.state].color"

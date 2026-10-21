@@ -20,6 +20,7 @@ import {
   verdictBuzz,
   verdictHoldMs,
 } from '#shared/utils/door'
+import { doorStatusAt, saysAlreadyAdmitted } from '#shared/utils/reservations'
 
 // E-129 criteria 2 and 3: what a decoded QR resolves to, and why one code held in front of the
 // lens admits once. The camera itself is not here; this is the pure half.
@@ -176,7 +177,7 @@ describe('what the card says about tonight, which is what the volunteer reads be
   })
 
   test('redeemed and already through the door: admitting again is refused (criterion 4)', () => {
-    expect(saysPassTonight(1000, 'DOOR')).toEqual({ line: 'Already admitted tonight', admitted: true })
+    expect(saysPassTonight(1000, 'DOOR')).toEqual({ line: saysAlreadyAdmitted(1000), admitted: true })
   })
 
   test('redeemed but not yet arrived: the seat exists and the door still has a job', () => {
@@ -314,6 +315,35 @@ describe('a ticket found by name says paid, unpaid or in, with a first name only
 
   test('the surname never leaves the lookup', () => {
     expect(JSON.stringify(doorTicketFound({ ...row, status: 'COLLECTED' }))).not.toContain('Halvorsen')
+  })
+})
+
+// The 21 October process map: the door said UNPAID for ten minutes after a hold lapsed, and NOT
+// FOUND by name for a booking it called LAPSED by reference (0233).
+describe('a lapsed or cancelled booking says so, by name as by reference (0233)', () => {
+  const row = { reference: 'K7M4PQ', holderName: 'Mira Halvorsen', partySize: 2, admittedAt: null }
+  const now = 1_800_000_000
+
+  test('an unpaid hold past its release time is lapsed, before the release task has run', () => {
+    expect(doorStatusAt('PENDING', now - 60, now)).toBe('EXPIRED')
+    expect(doorStatusAt('PENDING', now, now)).toBe('EXPIRED')
+    expect(doorStatusAt('PENDING', now + 60, now)).toBe('PENDING')
+    expect(doorStatusAt('PENDING', null, now)).toBe('PENDING')
+    expect(doorStatusAt('COLLECTED', now - 60, now)).toBe('COLLECTED')
+  })
+
+  test('the name lookup lists it as lapsed rather than unpaid', () => {
+    const found = doorTicketFound({ ...row, status: 'PENDING', holdExpiresAt: now - 60 }, now)
+    expect(found.state).toBe('LAPSED')
+    expect(found.line).toBe('The hold was released. Send to the bar for a ticket.')
+  })
+
+  test('a released hold and a cancelled booking are listed with their state', () => {
+    expect(doorTicketFound({ ...row, status: 'EXPIRED' }, now).state).toBe('LAPSED')
+    expect(doorTicketFound({ ...row, status: 'CANCELLED', exchanged: 0 }, now))
+      .toMatchObject({ state: 'CANCELLED', line: 'Cancelled. Send to the bar for a ticket.' })
+    expect(doorTicketFound({ ...row, status: 'CANCELLED', exchanged: 1 }, now).line)
+      .toBe('Exchanged for another performance. Ask for the new booking.')
   })
 })
 

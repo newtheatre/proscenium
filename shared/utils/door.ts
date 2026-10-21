@@ -1,6 +1,6 @@
 import { firstNameOf } from './night-hub'
 import { MAX_LIKE_PATTERN } from './migrations'
-import { RESERVATION_REFERENCE_LENGTH, saysAlreadyAdmitted } from './reservations'
+import { RESERVATION_REFERENCE_LENGTH, doorStatusAt, saysAlreadyAdmitted } from './reservations'
 import { plural } from './text'
 
 // Door mode's own pure logic (E-129): what a camera hands the door, and what the verdict card is
@@ -192,7 +192,7 @@ export function saysPassCoverage(passTypeSlug: string, coveredCount: number): st
 // status an admitted seat carries, so a redeemed-but-not-arrived pass reads differently.
 export function saysPassTonight(tonightAt: number | null, tonightStatus: string | null): { line: string, admitted: boolean } {
   if (tonightAt === null) return { line: 'Not yet redeemed', admitted: false }
-  if (tonightStatus === 'DOOR') return { line: 'Already admitted tonight', admitted: true }
+  if (tonightStatus === 'DOOR') return { line: saysAlreadyAdmitted(tonightAt), admitted: true }
   if (tonightStatus === 'PENDING' || tonightStatus === 'COLLECTED') return { line: 'Redeemed, not yet in', admitted: false }
   return { line: 'Tonight\'s admission was cancelled', admitted: true }
 }
@@ -256,7 +256,7 @@ export function doorTypedAction(typed: string): 'Admit' | 'Find' | 'Admit or fin
   return doorNameTerm(typed) ? 'Find' : 'Admit or find'
 }
 
-export type DoorFoundState = 'PAID' | 'UNPAID' | 'ADMITTED'
+export type DoorFoundState = 'PAID' | 'UNPAID' | 'ADMITTED' | 'LAPSED' | 'CANCELLED'
 
 export interface DoorTicketFound {
   reference: string
@@ -266,17 +266,26 @@ export interface DoorTicketFound {
   line: string
 }
 
-// A ticket the name lookup found: a first name, a count, and paid, unpaid or in (E-129 criterion
-// 7). `admittedAt` is epoch seconds, or null for a booking not yet in.
+// A ticket the name lookup found: a first name, a count, and its state at the door (E-129
+// criterion 7, 0233). `admittedAt`, `holdExpiresAt` and `now` are epoch seconds.
 export function doorTicketFound(row: {
   reference: string
   holderName: string | null
   partySize: number
   status: string
   admittedAt: number | null
-}): DoorTicketFound {
+  holdExpiresAt?: number | null
+  exchanged?: number | boolean
+}, now = Math.floor(Date.now() / 1000)): DoorTicketFound {
   const found = { reference: row.reference, firstName: firstNameOf(row.holderName), partySize: row.partySize }
-  if (row.status === 'DOOR') return { ...found, state: 'ADMITTED', line: saysAlreadyAdmitted(row.admittedAt) }
-  if (row.status === 'PENDING') return { ...found, state: 'UNPAID', line: DOOR_TO_THE_BAR }
+  const status = doorStatusAt(row.status, row.holdExpiresAt ?? null, now)
+  if (status === 'DOOR') return { ...found, state: 'ADMITTED', line: saysAlreadyAdmitted(row.admittedAt) }
+  if (status === 'EXPIRED') return { ...found, state: 'LAPSED', line: 'The hold was released. Send to the bar for a ticket.' }
+  if (status === 'CANCELLED') {
+    return row.exchanged
+      ? { ...found, state: 'CANCELLED', line: 'Exchanged for another performance. Ask for the new booking.' }
+      : { ...found, state: 'CANCELLED', line: 'Cancelled. Send to the bar for a ticket.' }
+  }
+  if (status === 'PENDING') return { ...found, state: 'UNPAID', line: DOOR_TO_THE_BAR }
   return { ...found, state: 'PAID', line: 'Paid, admit' }
 }
