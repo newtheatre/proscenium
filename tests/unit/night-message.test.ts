@@ -122,7 +122,7 @@ describe('the announce composer says when a message goes (issue 1327)', () => {
   })
 
   test('before the window is known the choice still stands, naming the digest instead', () => {
-    expect(sendTimingOptions(true, null)[1]!.label).toBe('Send with their booking messages, in the next digest')
+    expect(sendTimingOptions(true, null)[1]!.label).toBe('Send with their booking messages, in their next digest')
   })
 
   test('the composer offers the choice in those words, where the tick box was', async () => {
