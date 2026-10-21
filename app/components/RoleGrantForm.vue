@@ -35,6 +35,8 @@ const day = ref<string | undefined>(undefined)
 const note = ref('')
 const working = ref(false)
 const failure = ref<string | null>(null)
+// The role just granted when it does nothing until its holder sets up an authenticator (A-112).
+const waitsOn = ref<Role | null>(null)
 
 // The address is only ever the fallback once the picker has found nobody (A-132, K-123 criterion 1).
 const nobody = ref<string | null>(null)
@@ -78,8 +80,9 @@ async function grant(): Promise<void> {
   if (!ready.value) return
   working.value = true
   failure.value = null
+  waitsOn.value = null
   try {
-    await $fetch('/api/admin/roles', {
+    const granted = await $fetch<{ role: Role, waitsOnFactor: boolean }>('/api/admin/roles', {
       method: 'POST',
       body: {
         ...(byAddress.value ? { email: address.value.trim(), name: name.value.trim() } : { userId: chosenPerson.value }),
@@ -88,6 +91,7 @@ async function grant(): Promise<void> {
         ...(note.value.trim() ? { note: note.value.trim() } : {}),
       },
     })
+    waitsOn.value = granted.waitsOnFactor ? granted.role : null
     if (!props.userId) chosenPerson.value = undefined
     searchAgain()
     if (!props.role) chosenRole.value = undefined
@@ -117,6 +121,16 @@ async function grant(): Promise<void> {
       color="error"
       variant="subtle"
       :description="failure"
+    />
+
+    <UAlert
+      v-if="waitsOn"
+      data-test="grant-waits-on-factor"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-smartphone"
+      :title="`Granted, but ${saysRole(waitsOn)} needs an authenticator app`"
+      description="It does nothing for them until they set one up under Sign-in and security in their account. Tell them now, before they meet a refused screen."
     />
 
     <div class="grid gap-3 sm:grid-cols-2">

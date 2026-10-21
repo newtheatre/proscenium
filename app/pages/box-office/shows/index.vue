@@ -46,7 +46,7 @@ const { search, conditions, sort, page, query, active, filtered, set, setSort, c
 
 // Searched and paged in SQL, so what the table shows and what the count says are the same
 // question asked once (CONTRIBUTING).
-const { data, status: loading, error } = await useAsyncData(
+const { data, status: loading, error, refresh } = await useAsyncData(
   'box-office-shows',
   () => request<Listing>('/api/admin/shows', { query: query.value }),
   { watch: [query], default: empty },
@@ -100,7 +100,7 @@ const ticketExportUrl = computed(() => `/api/admin/tickets/export?${new URLSearc
 
 // A listing that refused says so, or the table quietly keeps showing rows the filters no longer
 // describe.
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The shows could not be read.') : null))
+const listingFailure = useListFailure(error, 'The shows could not be read.')
 
 const columns: TableColumn<AdminShow>[] = [
   {
@@ -193,15 +193,11 @@ const untimedShows = computed(() => data.value.items.filter(one => one.untimedPe
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <div>
       <h2 class="text-lg font-semibold">
         Shows
@@ -396,5 +392,5 @@ const untimedShows = computed(() => data.value.items.filter(one => one.untimedPe
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

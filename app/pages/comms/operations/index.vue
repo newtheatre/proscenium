@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ListFailure } from '~/composables/useListFailure'
 import { h, resolveComponent } from 'vue'
 import { saysWhen } from '#shared/utils/when'
 import { sendLogList } from '#shared/utils/send-log-list'
@@ -33,7 +34,7 @@ const { search, conditions, sort, page, query, active, set, setSort, clear } = u
 
 const listing = ref<Listing | null>(null)
 const loading = ref(false)
-const failure = ref<string | null>(null)
+const failure = ref<ListFailure | null>(null)
 
 const daily = ref<DailyCount[] | null>(null)
 const dailyLoading = ref(true)
@@ -45,7 +46,7 @@ async function load(): Promise<void> {
     listing.value = await $fetch<Listing>('/api/admin/comms/send-log', { query: query.value })
   }
   catch (error) {
-    failure.value = refusalText(error)
+    failure.value = listFailureFrom(error)
   }
   finally {
     loading.value = false
@@ -128,14 +129,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="failure"
-      color="error"
-      variant="subtle"
-      :description="failure"
-    />
-
+  <ReadGate
+    :failure="failure"
+    class="space-y-6"
+    @retry="load"
+  >
     <section
       v-if="dailyLoading || daily"
       class="space-y-2"
@@ -203,5 +201,5 @@ onMounted(() => {
         :items-per-page="listing.pageSize"
       />
     </div>
-  </div>
+  </ReadGate>
 </template>

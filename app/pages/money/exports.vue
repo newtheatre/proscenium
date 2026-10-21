@@ -27,7 +27,7 @@ const { data: mappings, status: loading, error, refresh } = await useAsyncData(
   { default: (): NominalMapping[] => [] },
 )
 
-const mappingsFailure = computed(() => (error.value ? refusalText(error.value, 'The mappings could not be read.') : null))
+const mappingsFailure = useListFailure(error, 'The mappings could not be read.')
 
 const mayManage = computed(() => can(useViewer().value, manageNominalMappings))
 const mayExport = computed(() => can(useViewer().value, exportFinance))
@@ -98,7 +98,11 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
 </script>
 
 <template>
-  <div class="space-y-8">
+  <ReadGate
+    :failure="mappingsFailure"
+    class="space-y-8"
+    @retry="refresh"
+  >
     <section
       class="space-y-4"
       data-test="section-export"
@@ -163,14 +167,6 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
       <h2 class="font-semibold">
         Nominal code mappings
       </h2>
-
-      <UAlert
-        v-if="mappingsFailure"
-        data-test="mappings-failure"
-        color="error"
-        variant="subtle"
-        :description="mappingsFailure"
-      />
 
       <UTable
         :data="mappings"
@@ -263,5 +259,5 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
         </div>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

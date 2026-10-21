@@ -270,9 +270,12 @@ const PRODUCTS: SeedProduct[] = [
   },
 ]
 
+// What one serving takes from stock, so a seeded sale can move it the way the till does (F-105).
+export interface SeedComponent { itemId: string, qty: number }
+
 export interface Bar {
   items: Map<string, string>
-  variants: Map<string, { id: string, price: number, name: string }>
+  variants: Map<string, { id: string, price: number, name: string, components: SeedComponent[] }>
   tillSessions: { tonight: string, closed: string }
   counts: { categories: number, products: number, variants: number, items: number, movements: number, stocktakes: number }
 }
@@ -328,7 +331,7 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
     }
   }
 
-  const variants = new Map<string, { id: string, price: number, name: string }>()
+  const variants: Bar['variants'] = new Map()
   for (const [sort, product] of PRODUCTS.entries()) {
     const productId = ensure(target, 'bar_products', { column: 'name', value: product.name }, {
       id: seedId('barproduct', product.slug),
@@ -377,6 +380,7 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
         id,
         price: variant.pricePence ?? categoryPriceOf(product.category, variant.servingKind),
         name: `${product.name}, ${variant.label.toLowerCase()}`,
+        components: variant.recipe ? [{ itemId: items.get(variant.recipe.item)!, qty: variant.recipe.qty }] : [],
       })
     }
   }
@@ -385,7 +389,6 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
 
   seedPrices(target, categories, variants, today, manager)
   const movements = seedStock(target, items, keeper, now)
-  const stocktakes = seedStocktakes(target, items, people, now)
   const tillSessions = seedTillSessions(target, people, programme, now)
   seedCompRequests(target, people, programme, variants, now)
 
@@ -399,7 +402,7 @@ export function seedBar(target: SeedTarget, people: People, programme: Programme
       variants: variants.size,
       items: ITEMS.length,
       movements,
-      stocktakes,
+      stocktakes: 2,
     },
   }
 }
@@ -414,7 +417,7 @@ function categoryPriceOf(category: string, servingKind: string): number {
 function seedPrices(
   target: SeedTarget,
   categories: Map<string, string>,
-  variants: Map<string, { id: string, price: number, name: string }>,
+  variants: Bar['variants'],
   today: string,
   by: string,
 ): void {
@@ -553,57 +556,79 @@ function seedStock(target: SeedTarget, items: Map<string, string>, keeper: strin
   return movements
 }
 
-// One applied, so the stock screens have a count behind them, and one open, because a stocktake
-// half done is the state somebody walks back into. Only one may be open at a time.
-function seedStocktakes(target: SeedTarget, items: Map<string, string>, people: People, now: number): number {
+// One applied and one half done; seeded after the ledger's bar sales, so a line expects what the
+// movements had left on hand when it was opened.
+export function seedStocktakes(target: SeedTarget, items: Map<string, string>, people: People, now: number): number {
   const keeper = personIn(people, 'devon').id
-  const statements: BoundStatement[] = []
   const counted = ['gin', 'vodka', 'house-red', 'lager', 'crisps']
+  const onHandAt = (itemId: string, at: number): number =>
+    target.get<{ qty: number }>('SELECT coalesce(sum(qty), 0) AS qty FROM stock_movements WHERE item_id = ? AND created_at <= ?', itemId, at)!.qty
+  // A measure's worth short for a spirit or wine, one short for a can or a bag.
+  const shrinkOf = (slug: string): number => (ITEMS.find(item => item.slug === slug)!.unit === 'ML' ? 25 : 1)
 
   const appliedId = seedId('stocktake', 'applied')
+  const appliedAt = now - 14 * DAY + 3600
   if (!holds(target, 'stocktakes', { id: appliedId })) {
-    statements.push(insert('stocktakes', {
+    const statements: BoundStatement[] = [insert('stocktakes', {
       id: appliedId,
       status: 'APPLIED',
       opened_by: keeper,
       opened_at: now - 14 * DAY,
       applied_by: keeper,
-      applied_at: now - 14 * DAY + 3600,
-    }))
+      applied_at: appliedAt,
+    })]
     for (const slug of counted) {
+      const itemId = items.get(slug)!
+      const expected = onHandAt(itemId, now - 14 * DAY)
+      const lineId = seedId('stocktakeline', 'applied', slug)
       statements.push(insert('stocktake_lines', {
-        id: seedId('stocktakeline', 'applied', slug),
+        id: lineId,
         stocktake_id: appliedId,
-        item_id: items.get(slug)!,
-        expected_qty: 100,
-        counted_qty: 98,
+        item_id: itemId,
+        expected_qty: expected,
+        counted_qty: expected - shrinkOf(slug),
+      }))
+      // Applying a count moves stock by its difference, citing the line it came from (F-115).
+      statements.push(insertOnly('stock_movements', {
+        id: seedId('movement', slug, 'stocktake'),
+        item_id: itemId,
+        qty: -shrinkOf(slug),
+        kind: 'STOCKTAKE',
+        ref_table: 'stocktake_lines',
+        ref_id: lineId,
+        actor_id: keeper,
+        created_at: appliedAt,
       }))
     }
+    target.batch(statements)
   }
 
   const openId = seedId('stocktake', 'open')
+  const openedAt = now - 2 * 3600
   if (!holds(target, 'stocktakes', { status: 'OPEN' })) {
-    statements.push(insert('stocktakes', {
+    const statements: BoundStatement[] = [insert('stocktakes', {
       id: openId,
       status: 'OPEN',
       opened_by: keeper,
-      opened_at: now - 2 * 3600,
+      opened_at: openedAt,
       applied_by: null,
       applied_at: null,
-    }))
+    })]
     for (const [index, slug] of counted.entries()) {
+      const itemId = items.get(slug)!
+      const expected = onHandAt(itemId, openedAt)
       statements.push(insert('stocktake_lines', {
         id: seedId('stocktakeline', 'open', slug),
         stocktake_id: openId,
-        item_id: items.get(slug)!,
-        expected_qty: 100,
+        item_id: itemId,
+        expected_qty: expected,
         // Half counted, half still to do, which is what an open stocktake looks like.
-        counted_qty: index < 3 ? 96 : null,
+        counted_qty: index < 3 ? expected - shrinkOf(slug) : null,
       }))
     }
+    target.batch(statements)
   }
 
-  if (statements.length) target.batch(statements)
   return 2
 }
 
@@ -646,7 +671,7 @@ function seedCompRequests(
   target: SeedTarget,
   people: People,
   programme: Programme,
-  variants: Map<string, { id: string, price: number, name: string }>,
+  variants: Bar['variants'],
   now: number,
 ): void {
   const house = programme.venues.get('house')!

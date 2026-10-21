@@ -214,7 +214,7 @@ describe('a trainer reaches the register of their own session', () => {
   test('the session page shows the refusal it was given too', async () => {
     const source = await read('app/pages/training/manage/sessions/[id].vue')
     expect(source).toContain('useListFailure(error')
-    expect(source).toContain(':title="readFailure.message"')
+    expect(source).toContain(':failure="readFailure"')
     expect(source).not.toContain('title="That session could not be read"')
   })
 

@@ -6,7 +6,7 @@ import { openingHouseId } from '#shared/utils/tonight'
 import type { ChecklistClose, ChecklistEntry, Phase, TonightChecklist } from '#shared/utils/checklist'
 import type { TillLeftOpen } from '#shared/utils/till'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/checklist' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/checklist' })
 useSeoMeta({ title: 'Checklist' })
 
 const route = useRoute()

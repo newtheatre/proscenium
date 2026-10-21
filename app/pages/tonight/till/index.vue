@@ -11,7 +11,7 @@ import type { ChargedReceipt } from '~/composables/useSumUpCharge'
 import type { ServedCatalogue } from '~/composables/useTillCatalogue'
 import type { AgeCheckStep } from '~/components/till/Challenge25Modal.vue'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/till' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/till' })
 useSeoMeta({ title: 'Till' })
 
 // The guard is the route's, not this screen's: what a refusal says is written where it is

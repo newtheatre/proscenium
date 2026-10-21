@@ -14,7 +14,7 @@ import type { NightAuthorityVia, OfficerBypassLine } from '#shared/utils/night-a
 import type { NightReportSigner } from '#shared/utils/night-signoff'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/night-report' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/night-report' })
 useSeoMeta({ title: 'Night report' })
 
 interface Takings { tenders: { tender: string, totalPence: number }[], compsPence: number, discountsPence: number }

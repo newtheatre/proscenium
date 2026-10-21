@@ -1085,13 +1085,20 @@ It is re-runnable. Rows are matched on their natural key, so a database an earli
 earlier version of the seed wrote is adopted rather than duplicated, and the only thing a second
 run changes is the password it prints.
 
+It is internally consistent, and `tests/integration/seed.test.ts` holds it so: every bar sale,
+comp and tab charge in the ledger moves its stock as the till would, and a voided charge puts it
+back; a stocktake line expects what was on hand when it was opened; the people with tab charges
+are named in `BAR_AUTHORISED_TAB_HOLDERS`, with the ordinary member persona; Incident and Serious
+are routed to follow-up; no concession is dearer than the full price; and no performance on another
+night begins in the small hours.
+
 The builders live in `scripts/seed/`, one module per domain, and each returns a list of statements
 rather than writing anything itself. That is what lets the same builders back the test fixtures in
 `tests/helpers/`. Three things it deliberately does not seed:
 
 | Not seeded | Why |
 | --- | --- |
-| `totp_secrets`, `recovery_codes`, `passkeys`, `passkey_challenges`, `auth_tokens` | Credential material. A committed secret in a fixture is still a committed secret, and a passkey needs a real authenticator. Enrol a second factor through `/account/security` instead. |
+| `totp_secrets` (but for the personas), `recovery_codes`, `passkeys`, `passkey_challenges`, `auth_tokens` | Credential material. A committed secret in a fixture is still a committed secret, and a passkey needs a real authenticator. Enrol a second factor through `/account/security` instead. The one exception is each full development persona, which gets the shared development secret `/dev` shows, confirmed, exactly as `/dev`'s own seeding gives it (K-124): without it every staff persona is refused every privileged screen. |
 | `rate_limits`, `mfa_attempts` | Transient counters the runtime writes. Seeding them fakes throttling state a developer then has to wait out. |
 | `module_materials` | Every row would be a URL nobody has supplied. `data/catalogue.csv` carries none, and inventing them would put fiction on a training page. |
 

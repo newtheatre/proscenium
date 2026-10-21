@@ -36,7 +36,7 @@ const { data: passTypes, refresh: refreshPassTypes, error: passTypesError } = aw
 )
 
 // Shown rather than a bare "Nothing is on sale", which a refused fetch also rendered.
-const passTypesFailure = computed(() => (passTypesError.value ? refusalText(passTypesError.value, 'The sellable passes could not be read.') : null))
+const passTypesFailure = useListFailure(passTypesError, 'The sellable passes could not be read.')
 
 const passTypeId = ref<string | undefined>(undefined)
 watch(passTypes, (value) => {
@@ -118,9 +118,11 @@ async function issue(): Promise<void> {
 </script>
 
 <template>
-  <div
+  <ReadGate
+    :failure="passTypesFailure"
     class="space-y-6"
     data-test="desk-passes-page"
+    @retry="refreshPassTypes"
   >
     <UCard>
       <template #header>
@@ -129,16 +131,8 @@ async function issue(): Promise<void> {
         </h1>
       </template>
 
-      <UAlert
-        v-if="passTypesFailure"
-        color="error"
-        variant="subtle"
-        :description="passTypesFailure"
-        data-test="desk-passes-failure"
-      />
-
       <div
-        v-else-if="passTypes.length === 0"
+        v-if="passTypes.length === 0"
         class="py-6 text-center text-sm text-muted"
       >
         Nothing is on sale.
@@ -235,5 +229,5 @@ async function issue(): Promise<void> {
         </UButton>
       </div>
     </UCard>
-  </div>
+  </ReadGate>
 </template>
