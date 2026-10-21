@@ -56,19 +56,20 @@ function refuse(): void {
     :open="step !== 'closed'"
     title="Challenge 25"
     :description="says"
+    :ui="{ description: 'sr-only' }"
     @update:open="step = 'closed'"
   >
     <template #body>
+      <p
+        class="mb-3 text-sm text-muted"
+        data-test="age-check-product"
+      >
+        {{ says }}
+      </p>
       <div
         v-if="step === 'choose'"
         class="space-y-3"
       >
-        <p
-          class="text-sm text-muted"
-          data-test="age-check-product"
-        >
-          {{ says }}
-        </p>
         <UButton
           block
           color="neutral"

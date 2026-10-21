@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { NO_STOCK_GROUP, countedBlind, joinCount, saysCount, splitCount, stocktakeGroups, stocktakeCountsForm } from '#shared/utils/stocktakes'
+import { NO_STOCK_GROUP, countToCheck, countedBlind, joinCount, saysCount, splitCount, stocktakeGroups, stocktakeCountsForm } from '#shared/utils/stocktakes'
 import type { StocktakeLine } from '#shared/utils/stocktakes'
 
 // Issue 1321 (F-115): three and a half bottles were typed as 2625, so a measured item with a
@@ -83,5 +83,28 @@ describe('a single line saves on its own', () => {
   test('one count, or one line cleared back to blank, is a whole submission', () => {
     expect(stocktakeCountsForm.safeParse({ counts: [{ itemId: 'gin', counted: 2625 }] }).success).toBe(true)
     expect(stocktakeCountsForm.safeParse({ counts: [{ itemId: 'gin', counted: null }] }).success).toBe(true)
+  })
+})
+
+// The review applied 18 ml of whisky against 3150 ml expected without a word (0126).
+describe('a count far from what was expected is asked about before Apply', () => {
+  const line = (expectedQty: number | null, countedQty: number | null): StocktakeLine => ({
+    id: 'l', itemId: 'i', itemName: 'Whisky', unit: 'ML', containerMl: 700, category: null,
+    expectedQty, countedQty, variance: null, varianceCostPence: null, countedByName: null,
+  })
+
+  test('under half or over double what was expected is a count to check', () => {
+    expect(countToCheck(line(3150, 18))).toBe(true)
+    expect(countToCheck(line(3150, 1500))).toBe(true)
+    expect(countToCheck(line(100, 201))).toBe(true)
+    expect(countToCheck(line(0, 5))).toBe(true)
+  })
+
+  test('a count near what was expected, an uncounted line or a blind one is not', () => {
+    expect(countToCheck(line(3150, 3000))).toBe(false)
+    expect(countToCheck(line(100, 200))).toBe(false)
+    expect(countToCheck(line(0, 0))).toBe(false)
+    expect(countToCheck(line(3150, null))).toBe(false)
+    expect(countToCheck(line(null, 18))).toBe(false)
   })
 })

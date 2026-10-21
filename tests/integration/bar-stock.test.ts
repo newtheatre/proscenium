@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { onHandColumn, onHandOf } from '#server/utils/bar'
+import { sql } from 'drizzle-orm'
+import { onHandColumn, onHandOf, staysInStock } from '#server/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
 
@@ -175,6 +176,32 @@ describe('neither a sale nor a comp takes on-hand below nothing (F-105 criterion
       move(database, { qty: -750, kind: 'WASTAGE', reason: 'BREAKAGE' })
 
       expect(onHand(database, id)).toBe(-750)
+    })
+  })
+})
+
+// The review wrote off 1000 against 32 on hand and the till then refused what was on the shelf.
+describe('a movement entered by hand never takes on-hand below nothing (0127)', () => {
+  const stays = (database: TestDatabase, itemId: string, qty: number): boolean => {
+    const [statement, ...parameters] = boundStatement(database, sql`SELECT CASE WHEN ${staysInStock(itemId, qty)} THEN 1 ELSE 0 END AS ok`)
+    return rows<{ ok: number }>(database, statement, ...parameters)[0]!.ok === 1
+  }
+
+  test('writing off what is on hand is allowed, and one more is not', async () => {
+    await withDatabase((database) => {
+      const id = bottle(database)
+      move(database, { qty: 32, kind: 'DELIVERY' })
+      expect(stays(database, id, -32)).toBe(true)
+      expect(stays(database, id, -33)).toBe(false)
+      expect(stays(database, id, -1000)).toBe(false)
+    })
+  })
+
+  test('adding stock is always allowed, even to a register already below nothing', async () => {
+    await withDatabase((database) => {
+      const id = bottle(database)
+      move(database, { qty: -750, kind: 'WASTAGE', reason: 'BREAKAGE' })
+      expect(stays(database, id, 10)).toBe(true)
     })
   })
 })

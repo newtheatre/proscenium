@@ -142,7 +142,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().nonnegative(),
     default: 2000,
     workshop: 'money-and-box-office',
-    describes: 'Hard cap on an open bar tab, in pence. The old soft cap nagged and never blocked.',
+    describes: 'The most an open bar tab may owe. The old soft cap nagged and never blocked.',
   },
   BAR_TAB_CAP_MANAGER_OVERRIDE: {
     schema: z.boolean(),

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { saysMoney } from '#shared/utils/bar'
+import { saysMoney, saysQuantity } from '#shared/utils/bar'
+import { countToCheck } from '#shared/utils/stocktakes'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 
 definePageMeta({ layout: 'console', title: 'Stocktake', middleware: 'console', docs: '/docs/bar/stocktakes' })
@@ -76,6 +77,14 @@ const uncounted = computed(() => data.value?.lines.filter(line => line.countedQt
 const applyCounted = computed(() => data.value?.lines.filter(line => line.countedQty !== null).length ?? 0)
 const applyNetVarianceCostPence = computed(() =>
   data.value?.lines.reduce((total, line) => total + (line.varianceCostPence ?? 0), 0) ?? 0)
+// What Apply is about to post, line by line, so the decision is not made on one net figure.
+const applyAdjusts = computed(() => data.value?.lines.filter(line => (line.variance ?? 0) !== 0) ?? [])
+const applyToCheck = computed(() => applyAdjusts.value.filter(countToCheck))
+
+function saysVariance(line: StocktakeLine): string {
+  const variance = line.variance ?? 0
+  return `${variance > 0 ? '+' : '-'}${saysQuantity(Math.abs(variance), line.unit)}`
+}
 </script>
 
 <template>
@@ -192,6 +201,52 @@ const applyNetVarianceCostPence = computed(() =>
             </dd>
           </div>
         </dl>
+
+        <UAlert
+          v-if="applyToCheck.length > 0"
+          class="mt-4"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          title="Check these counts first"
+          data-test="apply-to-check"
+        >
+          <template #description>
+            <p>Each is under half or over double what was expected, which is usually a slip such as millilitres typed as bottles.</p>
+            <ul class="mt-1 list-disc pl-5">
+              <li
+                v-for="line in applyToCheck"
+                :key="line.id"
+              >
+                {{ line.itemName }}: counted {{ saysQuantity(line.countedQty ?? 0, line.unit) }}, expected {{ saysQuantity(line.expectedQty ?? 0, line.unit) }}
+              </li>
+            </ul>
+          </template>
+        </UAlert>
+
+        <div
+          v-if="applyAdjusts.length > 0"
+          class="mt-4"
+        >
+          <p class="text-sm font-medium">
+            {{ plural(applyAdjusts.length, 'adjustment') }} to post
+          </p>
+          <ul
+            class="mt-1 max-h-64 overflow-y-auto text-sm"
+            data-test="apply-lines"
+          >
+            <li
+              v-for="line in applyAdjusts"
+              :key="line.id"
+              class="flex justify-between gap-4 border-b border-default py-1"
+            >
+              <span>{{ line.itemName }}</span>
+              <span class="tabular-nums">
+                {{ saysVariance(line) }}<template v-if="line.varianceCostPence !== null">, {{ saysMoney(line.varianceCostPence) }}</template>
+              </span>
+            </li>
+          </ul>
+        </div>
       </template>
 
       <template #footer>
