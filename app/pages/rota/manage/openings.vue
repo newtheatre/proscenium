@@ -84,6 +84,11 @@ const venueOptions = computed(() => templates.value.venues
 
 const plan = reactive({ venueId: '', evening: '', opensAt: '18:00', closesAt: '23:00', label: '' })
 
+// One bar to open is the usual case, and there is nothing to choose between (0140).
+watch(venueOptions, (options) => {
+  if (!plan.venueId && options.length === 1) plan.venueId = options[0]!.value
+}, { immediate: true })
+
 // A wall-clock time as typed, or null: an empty field is a missing answer, never midnight.
 function clockParts(value: string): [number, number] | null {
   const [hour, minute] = value.split(':').map(Number)
@@ -498,6 +503,7 @@ watch(modalOpen, (nowOpen) => {
             <USelectMenu
               v-model="plan.venueId"
               :items="venueOptions"
+              placeholder="Choose a venue"
               value-key="value"
               data-test="opening-venue"
               class="w-full"
