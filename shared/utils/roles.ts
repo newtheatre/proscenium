@@ -131,6 +131,9 @@ export const PERMISSIONS = [
   // Cross-season incident, attendance and staffing trends: aggregate figures over the operational
   // tables, never a standing grant over any one night's own screens (E-126).
   'reports.read',
+  // Reading the problem reports and ideas sent from the megaphone: the IT Manager's alone, through
+  // ADMIN's grant of every permission, since a report's words may name somebody (K-134).
+  'feedback.read',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

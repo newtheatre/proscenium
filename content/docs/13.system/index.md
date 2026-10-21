@@ -39,7 +39,7 @@ overview may still be refused a screen the sidebar does not show them.
   Manager alone.
 - **The audit trail** is read by the IT Manager and the President, and the same two record an
   entry on it.
-- **Backups** are the IT Manager's alone.
+- **Backups** and **Problem reports** are the IT Manager's alone.
 
 Every standing role expires at the end of the committee year, 31 July, so a permission held in
 June is gone in August unless the incoming committee grants it again.
