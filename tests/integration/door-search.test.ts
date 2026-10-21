@@ -66,7 +66,8 @@ describe('a name finds tonight\'s tickets for this performance (issue 1301)', ()
     })
   })
 
-  test('a lapsed or cancelled booking is not offered; one already in is, with when', async () => {
+  // Listed with their state since 0233, so a name typed at the door is not told to check the spelling.
+  test('a lapsed or cancelled booking is listed with its status; one already in says when', async () => {
     await withDatabase((database) => {
       const tonight = tonightsPerformance(database)
       const mira = person(database, 'u-mira', 'Mira Halvorsen')
@@ -77,8 +78,9 @@ describe('a name finds tonight\'s tickets for this performance (issue 1301)', ()
         'al-in', mira, 'reservation.admitted', 'reservation:inside', 1_790_000_000]])
 
       const found = search(database, 'Mira', tonight.performanceId)
-      expect(found.map(row => row.reference)).toEqual(['INSIDE'])
-      expect(found[0]?.admittedAt).toBe(1_790_000_000)
+      expect(found.map(row => [row.reference, row.status])).toEqual([['CANCL1', 'CANCELLED'], ['INSIDE', 'DOOR'], ['LAPSE1', 'EXPIRED']])
+      expect(found.find(row => row.reference === 'INSIDE')?.admittedAt).toBe(1_790_000_000)
+      expect(found.find(row => row.reference === 'LAPSE1')?.partySize).toBe(0)
     })
   })
 
