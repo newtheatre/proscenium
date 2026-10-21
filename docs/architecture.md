@@ -379,6 +379,18 @@ well-defined answer without one. The typed confirmation is the range itself, rea
 lock being reopened and compared against what the caller submits, the same shape A-123's merge
 confirmation uses.
 
+Every day has one close in force (0129). `closePeriod()` is a conditional insert refused while any
+day of its range is already closed, by the same newest-row rule, probing only the days where the
+governing row can change (the range's first day and every row's edges inside it), so its bound
+parameters do not grow with the history. A refused close is a 409 naming the closes in the way,
+and the preview (`blockingConditionsFor()`'s `alreadyClosed`) names them first. `reopenPeriod()`
+applies only while the lock still governs one of its days, and copies its label. The history
+returns each row's `standing` (`lockStandings()` in `shared/utils/period-locks.ts`): Closed,
+Partly closed, Reopened, or no longer in force, computed over the listed rows by the trigger's
+own rule, so the screen and `isRangeClosed()` cannot disagree. A term is refused if its label or
+its range is already named, and can be removed (`DELETE /api/admin/finance/terms/:id`, audited
+`finance.period.removed`), since nothing references it.
+
 Closing warns before it commits (criterion 5): `blockingConditionsFor()` lists nights in the
 range with no Z reading at all, and nights whose reading still carries an open variance, both
 read from I-104's own outstanding-night queries rather than reimplemented. A night needs a reading
@@ -413,7 +425,15 @@ seasons, so it reads them through its own gate: `/money` through the two finance
 `/reports` through `GET /api/admin/reports/periods` under `reports.read` (E-126 criterion 5). A
 screen may narrow the kinds offered, relabel them, and take `TERM` as two typed days rather than a
 defined term (`customRange`): `/money/exports` does all three, and `complete` withholds its
-request while the typed range ends before it starts.
+request while the typed range ends before it starts, and the screen says why.
+
+The chosen period lives in the screen's URL: `usePeriodForm()` reads it back with
+`periodFromQuery()` on load, ignoring a kind the screen does not offer, and replaces the query's
+period keys (`PERIOD_QUERY_KEYS`) whenever it changes, keeping any other key the screen owns. The
+comps and discounts screen (`/money/reports`) uses the same controls through
+`useFinancePeriodForm()`, and `GET /api/admin/finance/foregone` accepts either one show
+(`scope=SHOW&showId=`) or a period, resolved through `resolvePeriodBounds()` (`financeForegoneForm`);
+the older `scope=PERIOD&from=&to=` still reads as that range.
 
 ### SU accounting exports (I-108)
 
@@ -447,6 +467,13 @@ sums the `CARD` lines of the file: the same lines `revenueBySourceQuery` sums fo
 dashboard (I-105), so the file and the dashboard agree on one figure for the same days, and an
 integration test holds them together. It is the file's only computed figure, and it is computed
 from the rows above it rather than by a second query.
+
+**Each line can be traced (0130).** After the six columns the SU reads come `time` (the London
+clock time of the entry), `source` (in the ledger screen's words), `show` (the title of the line's
+performance's show) and `reference` (its booking's reference), each blank where the line has none.
+The six never move, and the card total row leaves the four blank. The coverage route also counts
+the lines that would export `UNMAPPED` (`unmapped`), and the screen warns before the download; a
+mapping is keyed by kind and source, so a bar item on a tab maps under Bar item, Till.
 
 **An open period exports anyway, permitted but marked, never refused.** A treasurer may need a
 figure before closing (a return is due, a close is still being prepared), and refusing until
@@ -496,6 +523,14 @@ reconciliation narrows to one bar by that session, or to a venue's sessions by s
 own session's figure; the night report and I-104's whole-night figure pass no scope and so still
 read the estate's whole night. An entry naming no session, the desk's own money included, is
 outside every scope and counts only in the unscoped figure.
+
+The expected figure is shown in its parts, never as one bar line: drinks on card, tickets sold on
+the till (`ticketsAtTheBarQuery`), tab settlements and the desk (`expectedSheet()` in
+`shared/utils/night-reconciliation.ts`, `readerExpectation()` in `shared/utils/reconciliation.ts`).
+Tickets reach the same reader but are not bar takings, so the bar figure beside the bar report's
+own leaves them out (review of 13 October 2026). A variance reads as over or short, never as a sign
+(`saysVariance()`), and the money dashboard shows the live write-offs in its range beside the open
+variance (`writtenOffQuery`).
 
 | Money path | Posts when | Module | Source | Tender | Kind |
 | --- | --- | --- | --- | --- | --- |
@@ -1439,9 +1474,13 @@ through I-107), reused as-is rather than a second resolver of when a year starts
 0009 and this story both depend on is three answers to that question, not the absence of a
 helper. `GET /api/admin/reports/incidents` groups `incidents` by category, severity and venue
 inside the range, with each dimension an optional filter; `GET /api/admin/reports/performances`
-reads one row per performance, `sold` from `heldSeatsSubquery` the same way `tonight.ts` does,
-`admitted` and `noShows` from `admittedSeatsSubquery` and `noShowSeatsSubquery`, the night
-report's own seat counts (issue 1326), `unfilledSlots` from any `shifts` row still `OPEN`,
+reads one row per performance, `sold` from `soldSeatsSubquery` (the seats still held, plus those
+marked `NO_SHOW`, which released the seat but were still sold, so a no-show never outnumbers
+sold), `admitted` and `noShows` from `admittedSeatsSubquery` and `noShowSeatsSubquery`, the night
+report's own seat counts (issue 1326). `noShows` is null until the curtain has gone up, and for a
+cancelled performance. A cancelled performance is listed only while it still holds card money
+(`heldPence`, its `CARD` ledger lines net of refunds), so money taken for a night that never
+happened is on a report rather than missing from all of them. `unfilledSlots` from any `shifts` row still `OPEN`,
 `CLAIMED` or `DECLINED` (a claim waiting for an officer is nobody confirmed), and `officerBypass`/`autoClosed` from `audit_log` and `night_reports.
 signed_via` respectively. Both page in SQL (`shared/utils/pagination.ts`) and export to CSV
 through `toCsv()`, which already carries the formula-injection guard D-129 built.

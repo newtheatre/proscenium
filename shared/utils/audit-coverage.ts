@@ -811,6 +811,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/finance/seasons.get.ts', exempt: 'reads the seasons table, writing nothing' },
   { route: 'server/api/admin/finance/terms/index.get.ts', exempt: 'reads defined terms, writing nothing' },
   { route: 'server/api/admin/finance/terms/index.post.ts', actions: ['finance.period.defined'], via: ['server/utils/period-locks.ts'] },
+  { route: 'server/api/admin/finance/terms/[id].delete.ts', actions: ['finance.period.removed'], via: ['server/utils/period-locks.ts'] },
   { route: 'server/api/admin/finance/nominal-mappings/index.get.ts', exempt: 'reads the mapping, writing nothing' },
   { route: 'server/api/admin/finance/nominal-mappings/index.post.ts', actions: ['finance.nominal-mapping.changed'], via: ['server/utils/su-export.ts'] },
   { route: 'server/api/admin/finance/export.get.ts', actions: ['finance.exported'] },

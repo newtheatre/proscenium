@@ -111,6 +111,8 @@ const description = computed(() => (props.earlier
             v-model="actualZPounds"
             :min="0"
             :step="0.01"
+            :increment="false"
+            :decrement="false"
             :format-options="{ style: 'currency', currency: 'GBP' }"
             data-test="actual-z-input"
           />

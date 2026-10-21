@@ -24,24 +24,27 @@ function aBar(over: Partial<BarReconciliation> = {}): BarReconciliation {
 // The review's own night: £18.90 at the bar and £28.00 at the desk, on the one reader.
 function theReviewNight(): NightReconciliation {
   const bar = aBar({ cardSalesPence: 990, ticketsPence: 900, expectedPence: 1890 })
-  return { bar, deskTakingsPence: 2800, wholeNightExpectedPence: 4690 }
+  return { bar, deskTakingsPence: 2800, wholeNightTicketsPence: 900, wholeNightExpectedPence: 4690 }
 }
 
 describe('the close leads with what the reader should show for the whole night (criterion 1)', () => {
-  test('the whole night, split between the bar and the box office', () => {
-    expect(readerExpectation(theReviewNight())).toEqual({ totalPence: 4690, barPence: 1890, deskPence: 2800 })
-    expect(saysExpectedOnTheReader(readerExpectation(theReviewNight()))).toBe('£46.90 (bar £18.90, box office £28.00)')
+  // The review of 13 October 2026: tickets sold on the till were read as bar takings.
+  test('the whole night, split between the bar, the tickets sold at the bar and the box office', () => {
+    expect(readerExpectation(theReviewNight())).toEqual({ totalPence: 4690, barPence: 990, ticketsPence: 900, deskPence: 2800 })
+    expect(saysExpectedOnTheReader(readerExpectation(theReviewNight()))).toBe('£46.90 (bar £9.90, tickets at the bar £9.00, box office £28.00)')
   })
 
   test('the bar half is the whole night\'s bar, not only this session\'s share of it', () => {
-    const night = { bar: aBar({ cardSalesPence: 500, expectedPence: 500 }), deskTakingsPence: 1000, wholeNightExpectedPence: 2200 }
-    expect(readerExpectation(night)).toEqual({ totalPence: 2200, barPence: 1200, deskPence: 1000 })
+    const night = { bar: aBar({ cardSalesPence: 500, expectedPence: 500 }), deskTakingsPence: 1000, wholeNightTicketsPence: 300, wholeNightExpectedPence: 2200 }
+    expect(readerExpectation(night)).toEqual({ totalPence: 2200, barPence: 900, ticketsPence: 300, deskPence: 1000 })
   })
 
   test('a side that took nothing is not named at nought', () => {
-    expect(saysExpectedOnTheReader({ totalPence: 1890, barPence: 1890, deskPence: 0 })).toBe('£18.90, all of it at the bar')
-    expect(saysExpectedOnTheReader({ totalPence: 2800, barPence: 0, deskPence: 2800 })).toBe('£28.00, all of it at the box office')
-    expect(saysExpectedOnTheReader({ totalPence: 0, barPence: 0, deskPence: 0 })).toBe('£0.00')
+    expect(saysExpectedOnTheReader({ totalPence: 1890, barPence: 1890, ticketsPence: 0, deskPence: 0 })).toBe('£18.90, all of it at the bar')
+    expect(saysExpectedOnTheReader({ totalPence: 2800, barPence: 0, ticketsPence: 0, deskPence: 2800 })).toBe('£28.00, all of it at the box office')
+    expect(saysExpectedOnTheReader({ totalPence: 900, barPence: 0, ticketsPence: 900, deskPence: 0 })).toBe('£9.00, all of it tickets at the bar')
+    expect(saysExpectedOnTheReader({ totalPence: 2690, barPence: 1790, ticketsPence: 900, deskPence: 0 })).toBe('£26.90 (bar £17.90, tickets at the bar £9.00)')
+    expect(saysExpectedOnTheReader({ totalPence: 0, barPence: 0, ticketsPence: 0, deskPence: 0 })).toBe('£0.00')
   })
 })
 

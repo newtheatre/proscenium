@@ -302,7 +302,7 @@ describe('a figure read off the card reader is typed as pounds and pence', () =>
 
   test('what is typed round-trips to what the screen shows beside it', () => {
     expect(saysMoney(penceFromPounds('123.45')!)).toBe('\u00a3123.45')
-    expect(saysMoney(penceFromPounds('1,234.50')!)).toBe('\u00a31234.50')
+    expect(saysMoney(penceFromPounds('1,234.50')!)).toBe('\u00a31,234.50')
   })
 })
 

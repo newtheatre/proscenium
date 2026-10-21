@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { periodForm } from './season-dashboard'
 import type { TicketTypeAccessKind } from './ticket-types'
 
 // Foregone comp and discount value, and access/companion admissions, read cross-module by show
@@ -13,12 +14,16 @@ export const financeScopeForm = z.discriminatedUnion('scope', [
 
 export type FinanceScopeInput = z.output<typeof financeScopeForm>
 
+// What the comps and discounts screen sends: one show, or a named period the money dashboard also
+// offers (0087), resolved to its days on the server. Two bare dates still read as a range.
+export const financeForegoneForm = z.union([financeScopeForm, periodForm])
+
 export const FINANCE_SCOPES = ['SHOW', 'PERIOD'] as const
 export type FinanceScope = (typeof FINANCE_SCOPES)[number]
 
 const FINANCE_SCOPE_WORDING: Record<FinanceScope, string> = {
   SHOW: 'One show',
-  PERIOD: 'A date range',
+  PERIOD: 'A period',
 }
 
 export function saysFinanceScope(scope: FinanceScope): string {

@@ -3,23 +3,29 @@ import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { describeKind, saysEntrySource, saysTender } from '#shared/utils/ledger'
 import { saysWhen, saysWhenLong } from '#shared/utils/when'
-import { ledgerEntriesList, saysEntryWhat, saysNoEntries } from '#shared/utils/ledger-entries-list'
+import { ledgerEntriesList, saysEntryWhat, saysNoEntries, saysUnknownEntriesKeys, unknownEntriesKeys } from '#shared/utils/ledger-entries-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { LedgerEntryLine, LedgerEntryOpened, LedgerEntryRow } from '#shared/utils/ledger-entries-list'
 import type { Page } from '#shared/utils/pagination'
 
-definePageMeta({ layout: 'console', title: 'Ledger entries', middleware: 'console', docs: '/docs/money/ledger-entries' })
+// Opened cold, the list defaults to today's London day (I-105 criterion 3), by redirect before the
+// page is made: a navigation from inside setup left paging a step behind the address.
+definePageMeta({
+  layout: 'console',
+  title: 'Ledger entries',
+  middleware: [
+    'console',
+    (to) => {
+      if (typeof to.query.happenedAt === 'string') return
+      return navigateTo({ path: to.path, query: { ...to.query, happenedAt: londonDay(new Date()) } }, { replace: true })
+    },
+  ],
+  docs: '/docs/money/ledger-entries',
+})
 
 const route = useRoute()
 const request = useRequestFetch()
 const UButton = resolveComponent('UButton')
-
-// Opened cold (no query string at all), the list defaults to today's London day rather than
-// asking the endpoint for every entry the ledger has ever held (I-105 criterion 3).
-const today = londonDay(new Date())
-if (typeof route.query.happenedAt !== 'string') {
-  await navigateTo({ path: route.path, query: { ...route.query, happenedAt: today } }, { replace: true })
-}
 
 const { search, conditions, sort, page, query, active, set, setSort, clear } = useListQuery(ledgerEntriesList)
 
@@ -31,7 +37,13 @@ const { data, status: loading, error, refresh } = await useAsyncData(
   { watch: [query], default: empty },
 )
 
-const entriesFailure = useListFailure(error, 'The entries could not be read.')
+const unknownKeys = computed(() => unknownEntriesKeys(route.query))
+const listFailure = useListFailure(error, 'The entries could not be read.')
+const entriesFailure = computed(() => (unknownKeys.value.length === 0 ? listFailure.value : null))
+function removeUnknownKeys(): void {
+  const kept = Object.fromEntries(Object.entries(route.query).filter(([key]) => !unknownKeys.value.includes(key)))
+  void navigateTo({ query: kept }, { replace: true })
+}
 
 // One entry, opened in a drawer: who took it, who approved it, whose tab and every line (issue 1361).
 const opened = ref<LedgerEntryOpened | null>(null)
@@ -159,6 +171,15 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
     class="space-y-6"
     @retry="refresh"
   >
+    <UAlert
+      v-if="unknownKeys.length > 0"
+      data-test="entries-unknown-keys"
+      color="warning"
+      variant="subtle"
+      :description="saysUnknownEntriesKeys(unknownKeys)"
+      :actions="[{ label: 'Remove from the address', color: 'neutral', variant: 'outline', onClick: removeUnknownKeys }]"
+    />
+
     <AdminToolbar
       v-model:search="search"
       :placeholder="ledgerEntriesList.search.placeholder"

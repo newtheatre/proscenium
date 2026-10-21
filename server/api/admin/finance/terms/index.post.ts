@@ -8,7 +8,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const { id, applied } = await defineTerm(input, resolved.account.id)
-    if (!applied) throw createError({ statusCode: 500, statusMessage: 'That did not save. Try again, and tell the IT Manager if it keeps happening.' })
+    if (!applied) throw createError({ statusCode: 409, statusMessage: 'A term with that label or those dates is already defined. Use that one, or remove it first.' })
     return { ok: true, id }
   }
   catch (error) {

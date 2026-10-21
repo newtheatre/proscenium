@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { can, closeFinancePeriods, reopenFinancePeriods } from '#shared/utils/abilities'
-import { hasBlockingConditions } from '#shared/utils/period-locks'
-import { saysDayRange, saysWhen } from '#shared/utils/when'
+import { hasBlockingConditions, saysClosedOverlap, saysLockStanding } from '#shared/utils/period-locks'
+import { reconciliationHref } from '#shared/utils/night-reconciliation'
+import { saysDay, saysDayRange, saysWhen } from '#shared/utils/when'
 import type { TableColumn } from '@nuxt/ui'
-import type { BlockingConditions, Period, PeriodLock } from '#shared/utils/period-locks'
+import type { BlockingConditions, LockStanding, Period, PeriodLock } from '#shared/utils/period-locks'
 
 definePageMeta({ layout: 'console', title: 'Periods', middleware: 'console', docs: '/docs/money/periods' })
 
 const columns: TableColumn<PeriodLock>[] = [
-  { id: 'range', header: 'Range' },
+  { id: 'range', header: 'Range', meta: { class: { td: 'whitespace-normal' } } },
   { id: 'label', header: 'Label', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
-  { id: 'action', header: 'Action' },
+  { id: 'action', header: 'Standing' },
   { id: 'actor', header: 'By', meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } } },
   { id: 'act', header: ACTIONS_HEADER, meta: ACTIONS_COLUMN },
 ]
@@ -34,19 +35,10 @@ const { data: terms, refresh: refreshTerms } = await useAsyncData(
   { default: (): Period[] => [] },
 )
 
-// The list is newest first; the first row seen for a range is what governs it now, however many
-// times that same range has been closed and reopened since (I-107 criterion 4).
-const currentlyClosed = computed(() => {
-  const seen = new Set<string>()
-  const closed = new Set<string>()
-  for (const lock of locks.value) {
-    const key = `${lock.fromDay}:${lock.toDay}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    if (lock.action === 'CLOSED') closed.add(lock.id)
-  }
-  return closed
-})
+// The server reads each row's standing by the ledger's own rule, so the badge and the trigger agree (0129).
+const reopenable = (standing: LockStanding): boolean => standing === 'CLOSED' || standing === 'PARTLY_CLOSED'
+const anyClosed = computed(() => locks.value.some(lock => reopenable(lock.standing)))
+const STANDING_COLOUR: Record<LockStanding, 'warning' | 'neutral'> = { CLOSED: 'warning', PARTLY_CLOSED: 'warning', REOPENED: 'neutral', SUPERSEDED: 'neutral' }
 
 const mayClose = computed(() => can(useViewer().value, closeFinancePeriods))
 const mayReopen = computed(() => can(useViewer().value, reopenFinancePeriods))
@@ -68,6 +60,11 @@ function openClose(): void {
   closeFailure.value = null
   closeOpen.value = true
 }
+
+// A preview answers the range it was asked about, so changing the range asks again.
+watch([fromDay, toDay], () => {
+  preview.value = null
+})
 
 async function previewClose(): Promise<void> {
   previewing.value = true
@@ -129,7 +126,7 @@ async function confirmDefineTerm(): Promise<void> {
       method: 'POST',
       body: { label: termLabel.value.trim(), fromDay: termFrom.value, toDay: termTo.value },
     })
-    toast.add({ title: 'Term defined', description: `${termLabel.value.trim()} runs ${termFrom.value} to ${termTo.value}.`, icon: 'i-lucide-calendar-range', color: 'success' })
+    toast.add({ title: 'Term defined', description: `${termLabel.value.trim()} runs ${saysDay(termFrom.value, { year: true })} to ${saysDay(termTo.value, { year: true })}.`, icon: 'i-lucide-calendar-range', color: 'success' })
     termOpen.value = false
     await refreshTerms()
   }
@@ -138,6 +135,33 @@ async function confirmDefineTerm(): Promise<void> {
   }
   finally {
     defining.value = false
+  }
+}
+
+// A term is only a name for a range, so removing one changes no figure and no close (0129).
+const termToRemove = ref<Period | null>(null)
+const removingTerm = ref(false)
+const removeTermFailure = ref<string | null>(null)
+function askToRemove(term: Period): void {
+  termToRemove.value = term
+  removeTermFailure.value = null
+}
+async function removeTerm(): Promise<void> {
+  const term = termToRemove.value
+  if (!term) return
+  removingTerm.value = true
+  removeTermFailure.value = null
+  try {
+    await $fetch(`/api/admin/finance/terms/${term.id}`, { method: 'DELETE' })
+    toast.add({ title: 'Term removed', description: `${term.label} is no longer offered as a period.`, icon: 'i-lucide-trash-2', color: 'success' })
+    termToRemove.value = null
+    await refreshTerms()
+  }
+  catch (refused) {
+    removeTermFailure.value = refusalText(refused, 'That term could not be removed.')
+  }
+  finally {
+    removingTerm.value = false
   }
 }
 
@@ -210,6 +234,15 @@ async function confirmReopen(): Promise<void> {
       </template>
     </AdminToolbar>
 
+    <p
+      v-if="!mayReopen && anyClosed"
+      class="text-sm text-muted"
+      data-test="reopen-who"
+    >
+      Only the IT Manager can reopen a closed period. Ask them if a closed range needs an entry
+      dated inside it.
+    </p>
+
     <section
       v-if="terms.length > 0"
       class="space-y-1"
@@ -218,13 +251,38 @@ async function confirmReopen(): Promise<void> {
       <h2 class="font-semibold">
         Defined terms
       </h2>
-      <p
+      <div
         v-for="one in terms"
         :key="one.id"
-        class="text-sm text-muted"
+        class="flex flex-wrap items-center justify-between gap-2"
       >
-        {{ one.label }}: {{ saysDayRange(one.fromDay, one.toDay) }}, named by {{ one.createdByName }}
-      </p>
+        <p class="text-sm text-muted">
+          {{ one.label }}: {{ saysDayRange(one.fromDay, one.toDay) }}, named by {{ one.createdByName }}
+        </p>
+        <UButton
+          v-if="mayClose"
+          size="xs"
+          variant="ghost"
+          color="neutral"
+          icon="i-lucide-trash-2"
+          :aria-label="`Remove the term ${one.label}`"
+          :data-test="`remove-term-${one.id}`"
+          @click="askToRemove(one)"
+        >
+          Remove
+        </UButton>
+      </div>
+      <ConfirmModal
+        :open="termToRemove !== null"
+        name="remove-term"
+        :title="termToRemove ? `Remove the term ${termToRemove.label}` : ''"
+        verb="Remove the term"
+        consequence="It stops being offered as a period. No figure and no closed period changes."
+        :loading="removingTerm"
+        :failure="removeTermFailure"
+        @update:open="value => { if (!value) termToRemove = null }"
+        @confirm="removeTerm"
+      />
     </section>
 
     <UTable
@@ -239,19 +297,20 @@ async function confirmReopen(): Promise<void> {
           <!-- Below sm the label and who acted are hidden: shown here instead, so a phone keeps
             what happened and Reopen in view without losing what they said (issue 922). -->
           <div class="text-xs text-muted sm:hidden">
-            {{ row.original.label ?? 'None' }}, {{ row.original.actorName }}, {{ saysWhen(row.original.createdAt) }}
+            {{ [row.original.label, row.original.actorName, saysWhen(row.original.createdAt)].filter(Boolean).join(', ') }}
           </div>
         </div>
       </template>
       <template #label-cell="{ row }">
-        {{ row.original.label ?? 'None' }}
+        {{ row.original.label ?? '' }}
       </template>
       <template #action-cell="{ row }">
         <UBadge
-          :color="row.original.action === 'CLOSED' ? 'warning' : 'neutral'"
+          :color="STANDING_COLOUR[row.original.standing]"
           variant="subtle"
+          :data-test="`standing-${row.original.id}`"
         >
-          {{ row.original.action === 'CLOSED' ? 'Closed' : 'Reopened' }}
+          {{ saysLockStanding(row.original) }}
         </UBadge>
       </template>
       <template #actor-cell="{ row }">
@@ -259,7 +318,7 @@ async function confirmReopen(): Promise<void> {
       </template>
       <template #act-cell="{ row }">
         <UButton
-          v-if="mayReopen && row.original.action === 'CLOSED' && currentlyClosed.has(row.original.id)"
+          v-if="mayReopen && reopenable(row.original.standing)"
           size="sm"
           variant="subtle"
           color="neutral"
@@ -316,15 +375,52 @@ async function confirmReopen(): Promise<void> {
 
           <template v-if="preview">
             <UAlert
+              v-if="preview.alreadyClosed.length > 0"
+              data-test="close-overlap"
+              color="error"
+              variant="subtle"
+              title="Already closed"
+              :description="saysClosedOverlap(preview.alreadyClosed)"
+            />
+            <div
               v-if="hasBlockingConditions(preview)"
               data-test="close-blocking"
-              color="warning"
-              variant="subtle"
-              title="This range has open items"
-              :description="`${plural(preview.unreconciledNights.length, 'night')} with no recorded Z reading and ${plural(preview.openVarianceNights.length, 'night')} with an open variance. Closing does not settle them; it only stops new entries landing inside the range.`"
-            />
+              class="space-y-2 rounded-md bg-warning/10 p-3 text-sm"
+            >
+              <p class="font-medium">
+                This range has open items
+              </p>
+              <p>
+                Closing does not settle these; it only stops new entries landing inside the range.
+                Open a night to reconcile it first.
+              </p>
+              <p v-if="preview.unreconciledNights.length > 0">
+                No recorded Z reading:
+                <template
+                  v-for="(night, index) in preview.unreconciledNights"
+                  :key="night"
+                >
+                  <ULink
+                    :to="reconciliationHref(night)"
+                    class="underline"
+                  >{{ saysDay(night, { year: true }) }}</ULink>{{ index < preview.unreconciledNights.length - 1 ? ', ' : '.' }}
+                </template>
+              </p>
+              <p v-if="preview.openVarianceNights.length > 0">
+                An open variance:
+                <template
+                  v-for="(night, index) in preview.openVarianceNights"
+                  :key="night"
+                >
+                  <ULink
+                    :to="reconciliationHref(night)"
+                    class="underline"
+                  >{{ saysDay(night, { year: true }) }}</ULink>{{ index < preview.openVarianceNights.length - 1 ? ', ' : '.' }}
+                </template>
+              </p>
+            </div>
             <UAlert
-              v-else
+              v-else-if="preview.alreadyClosed.length === 0"
               data-test="close-clear"
               color="success"
               variant="subtle"
@@ -337,7 +433,7 @@ async function confirmReopen(): Promise<void> {
                 color="error"
                 variant="subtle"
                 :loading="closing"
-                :disabled="!fromDay || !toDay"
+                :disabled="!fromDay || !toDay || preview.alreadyClosed.length > 0"
                 @click="confirmClose"
               >
                 Close this period
@@ -368,7 +464,7 @@ async function confirmReopen(): Promise<void> {
     <UModal
       v-model:open="termOpen"
       title="Define a term"
-      description="Names a range so the money dashboard can report on it. It neither closes the range nor is needed before closing it, and a term is never redefined: correct a mistaken range by naming a fresh term."
+      description="Names a range so the money dashboard can report on it. It neither closes the range nor is needed before closing it. A term is never redefined: to correct one, remove it and name it again."
     >
       <template #body>
         <div class="space-y-4">
@@ -415,7 +511,7 @@ async function confirmReopen(): Promise<void> {
     <UModal
       :open="Boolean(reopenTarget)"
       title="Reopen this period"
-      description="Requires an administrator. Type the range back to confirm you are reopening the period above."
+      description="Only the IT Manager reopens a period. Enter its dates again to confirm which one you are reopening."
       @update:open="(open: boolean) => { if (!open) reopenTarget = null }"
     >
       <template #body>
@@ -434,13 +530,13 @@ async function confirmReopen(): Promise<void> {
             Reopening <span class="font-medium">{{ saysDayRange(reopenTarget.fromDay, reopenTarget.toDay) }}</span>.
             Nothing else here is undone.
           </p>
-          <UFormField :label="`Type ${reopenTarget.fromDay} to confirm the start`">
+          <UFormField :label="`Enter the start date, ${saysDay(reopenTarget.fromDay, { year: true })}`">
             <DateField
               v-model="confirmFromDay"
               data-test="confirm-from"
             />
           </UFormField>
-          <UFormField :label="`Type ${reopenTarget.toDay} to confirm the end`">
+          <UFormField :label="`Enter the end date, ${saysDay(reopenTarget.toDay, { year: true })}`">
             <DateField
               v-model="confirmToDay"
               data-test="confirm-to"
