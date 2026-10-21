@@ -100,7 +100,8 @@ function dropAt(position: number): void {
           v-if="category.colour"
           class="size-3 shrink-0 rounded-full border border-default"
           :style="{ backgroundColor: category.colour }"
-          aria-hidden="true"
+          role="img"
+          :aria-label="`Colour ${category.colour}`"
         />
         <span class="min-w-0 flex-1 truncate">{{ category.name }}</span>
         <UButton
