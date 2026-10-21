@@ -20,6 +20,7 @@ import {
   suggestedShape,
 } from '#shared/utils/bar'
 import type {
+  Allergen,
   AllergenState,
   BarCategory,
   CategoryPrice,
@@ -101,6 +102,7 @@ const product = reactive({
   ageRestricted: false,
   allergenState: 'UNKNOWN' as AllergenState,
   allergenNote: '',
+  addedAllergens: [] as Allergen[],
 })
 
 const itemMode = ref<'NEW' | 'EXISTING'>('NEW')
@@ -112,10 +114,12 @@ const newItem = reactive({
   ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   allergenState: 'UNKNOWN' as AllergenState,
   allergenNotes: '',
+  allergens: [] as Allergen[],
 })
 
 watch(() => newItem.allergenState, (state) => {
   if (state === 'UNKNOWN') newItem.allergenNotes = ''
+  if (state !== 'RECORDED') newItem.allergens = []
 })
 
 interface SizeRow {
@@ -261,6 +265,7 @@ watch(() => product.categoryId, async (id) => {
 
 watch(() => product.allergenState, (state) => {
   if (state === 'UNKNOWN') product.allergenNote = ''
+  if (state !== 'RECORDED') product.addedAllergens = []
 })
 
 function start(chosen: ProductShape): void {
@@ -268,7 +273,7 @@ function start(chosen: ProductShape): void {
   failure.value = null
   if (chosen === 'SIMPLE') {
     // Sold sealed, so nothing is added at the bar: its allergens are the stocked item's alone.
-    Object.assign(product, { allergenState: 'UNKNOWN', allergenNote: '' })
+    Object.assign(product, { allergenState: 'UNKNOWN', allergenNote: '', addedAllergens: [] })
     // Whole items only: the shape is about a thing that leaves the shelf, not a measure of one.
     Object.assign(newItem, { unit: 'ITEM', containerMl: undefined })
     existingItemId.value = ''
@@ -357,6 +362,7 @@ function itemPayload(): Record<string, unknown> {
       ageRestricted: newItem.ageRestricted,
       allergenState: newItem.allergenState,
       allergenNotes: newItem.allergenNotes.trim() || null,
+      allergens: newItem.allergens,
     },
   }
 }
@@ -370,6 +376,7 @@ function productPayload(): Record<string, unknown> {
     ageRestricted: ageRestricted.value,
     allergenState: product.allergenState,
     allergenNote: product.allergenNote.trim() || null,
+    addedAllergens: product.addedAllergens,
   }
 }
 
@@ -670,10 +677,22 @@ function moveFocus(step: number): void {
           </UFormField>
 
           <UFormField
+            v-if="shape !== 'SIMPLE' && product.allergenState === 'RECORDED'"
+            label="What the addition contains"
+            required
+            description="Tick each one; the till reads them out with the stock's own."
+          >
+            <AllergenTicks
+              v-model="product.addedAllergens"
+              test-prefix="setup-allergen"
+            />
+          </UFormField>
+
+          <UFormField
             v-if="shape !== 'SIMPLE' && product.allergenState !== 'UNKNOWN'"
             label="Allergen note"
-            :required="product.allergenState === 'RECORDED'"
-            description="What staff read out at the bar."
+            hint="Optional"
+            description="Anything a tick cannot say."
           >
             <UTextarea
               v-model="product.allergenNote"
@@ -775,9 +794,22 @@ function moveFocus(step: number): void {
             </UFormField>
 
             <UFormField
+              v-if="newItem.allergenState === 'RECORDED'"
+              label="What the stocked item contains"
+              required
+              description="Tick each one."
+            >
+              <AllergenTicks
+                v-model="newItem.allergens"
+                test-prefix="setup-item-allergen"
+              />
+            </UFormField>
+
+            <UFormField
               v-if="newItem.allergenState !== 'UNKNOWN'"
               label="The stocked item's allergen note"
-              :required="newItem.allergenState === 'RECORDED'"
+              hint="Optional"
+              description="Anything a tick cannot say, such as which nuts."
             >
               <UTextarea
                 v-model="newItem.allergenNotes"

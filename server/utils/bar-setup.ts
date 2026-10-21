@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { auditEntry } from '#shared/utils/audit'
-import { deliveryCost, says } from '#shared/utils/bar'
+import { deliveryCost, says, storeAllergens } from '#shared/utils/bar'
 import type { SQL } from 'drizzle-orm'
 import type { ProductSetupInput, ProductStatus, ServingKind, StockItem } from '#shared/utils/bar'
 
@@ -104,10 +104,10 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
 
   if (newItem && itemId) {
     statements.push(sql`
-      INSERT INTO bar_items (id, name, unit, container_ml, par_qty, category, age_restricted, allergen_state, allergen_notes, status)
+      INSERT INTO bar_items (id, name, unit, container_ml, par_qty, category, age_restricted, allergen_state, allergen_notes, allergens, status)
       SELECT ${itemId}, ${newItem.name}, ${newItem.unit}, ${newItem.containerMl ?? null}, ${newItem.parQty ?? null},
              ${newItem.category ?? null}, ${newItem.ageRestricted ? 1 : 0}, ${newItem.allergenState},
-             ${newItem.allergenNotes ?? null}, 'ACTIVE'
+             ${newItem.allergenNotes ?? null}, ${storeAllergens(newItem.allergens)}, 'ACTIVE'
       WHERE ${itemFree} AND ${productFree} AND ${groupFree}
     `)
     statements.push(auditStatement(context.actorId, 'bar.item.created', `bar-item:${itemId}`, {
@@ -123,9 +123,9 @@ export function planProductSetup(input: ProductSetupInput, context: SetupContext
     : sql`1 = 1`
 
   statements.push(sql`
-    INSERT INTO bar_products (id, category_id, name, status, staffed_only, age_restricted, allergen_state, allergen_note, sort)
+    INSERT INTO bar_products (id, category_id, name, status, staffed_only, age_restricted, allergen_state, allergen_note, allergens, sort)
     SELECT ${productId}, ${product.categoryId}, ${product.name}, ${status}, ${product.staffedOnly ? 1 : 0},
-           ${product.ageRestricted ? 1 : 0}, ${product.allergenState}, ${product.allergenNote ?? null}, ${product.sort}
+           ${product.ageRestricted ? 1 : 0}, ${product.allergenState}, ${product.allergenNote ?? null}, ${storeAllergens(product.addedAllergens)}, ${product.sort}
     WHERE ${productFree} AND ${groupFree} AND ${itemHeld}
   `)
 

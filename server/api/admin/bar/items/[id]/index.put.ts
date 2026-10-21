@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
-import { stockItemForm } from '#shared/utils/bar'
+import { stockItemForm, storeAllergens } from '#shared/utils/bar'
 
 // Edit a stocked item. Its unit and container size are fixed once stock has moved, because every
 // quantity already written is stated in them (0017, audit PR-12).
@@ -34,7 +34,8 @@ export default defineEventHandler(async (event) => {
           category = ${input.category ?? null},
           age_restricted = ${input.ageRestricted ? 1 : 0},
           allergen_state = ${input.allergenState},
-          allergen_notes = ${input.allergenNotes ?? null}
+          allergen_notes = ${input.allergenNotes ?? null},
+          allergens = ${storeAllergens(input.allergens)}
       WHERE id = ${id}
         AND NOT EXISTS (SELECT 1 FROM bar_items WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
       RETURNING id
@@ -53,6 +54,7 @@ export default defineEventHandler(async (event) => {
           category: [held.category, input.category ?? null],
           ageRestricted: [held.ageRestricted, input.ageRestricted],
           allergenState: [held.allergenState, input.allergenState],
+          allergens: [storeAllergens(held.allergens), storeAllergens(input.allergens)],
         }),
         allergenNotesChanged: (input.allergenNotes ?? null) !== held.allergenNotes,
       },

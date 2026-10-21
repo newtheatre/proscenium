@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
-import { checkIdRefusal, productForm } from '#shared/utils/bar'
+import { checkIdRefusal, productForm, storeAllergens } from '#shared/utils/bar'
 
 // Edit a product. Its status is a separate decision, so this does not take one, and one pouring
 // restricted stock is not saved without Check ID (issue 1299).
@@ -29,7 +29,8 @@ export default defineEventHandler(async (event) => {
           staffed_only = ${input.staffedOnly ? 1 : 0},
           age_restricted = ${input.ageRestricted ? 1 : 0},
           allergen_state = ${input.allergenState},
-          allergen_note = ${note}
+          allergen_note = ${note},
+          allergens = ${storeAllergens(input.addedAllergens)}
       WHERE id = ${id}
         AND NOT EXISTS (SELECT 1 FROM bar_products WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
         AND ${checkIdHeld(id, input.ageRestricted)}
@@ -48,6 +49,7 @@ export default defineEventHandler(async (event) => {
           staffedOnly: [held.staffedOnly, input.staffedOnly],
           ageRestricted: [held.ageRestricted, input.ageRestricted],
           allergenState: [held.allergenState, input.allergenState],
+          addedAllergens: [storeAllergens(held.addedAllergens), storeAllergens(input.addedAllergens)],
         }),
         allergenNoteChanged: note !== held.allergenNote,
       },

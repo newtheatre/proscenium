@@ -101,6 +101,7 @@ interface ListedProduct {
   ageRestricted: boolean
   allergenState: string
   allergenNote: string | null
+  addedAllergens: string[]
   everSold: boolean
   categoryName: string
 }
@@ -112,6 +113,8 @@ interface ListedItem {
   onHand: number
   status: string
   hasMovements: boolean
+  allergenState: string | null
+  allergens: string[]
 }
 
 interface ListedMovement {
@@ -166,6 +169,7 @@ describe.skipIf(skip !== null)('a product carries what the till shows (F-111 cri
       ageRestricted: true,
       allergenState: 'RECORDED',
       allergenNote: 'Sulphites',
+      addedAllergens: ['SULPHITES'],
     })
 
     expect((await products()).find(product => product.id === id)).toMatchObject({
@@ -173,6 +177,7 @@ describe.skipIf(skip !== null)('a product carries what the till shows (F-111 cri
       ageRestricted: true,
       allergenState: 'RECORDED',
       allergenNote: 'Sulphites',
+      addedAllergens: ['SULPHITES'],
       status: 'HIDDEN',
       everSold: false,
     })
@@ -188,14 +193,18 @@ describe.skipIf(skip !== null)('a product carries what the till shows (F-111 cri
     expect(listed.find(product => product.id === unknown)?.allergenState).toBe('UNKNOWN')
   })
 
-  test('recorded allergens without the note that records them are refused', async () => {
+  // 0142: a recorded answer ticks what it contains, so a note alone no longer records one.
+  test('recorded allergens with nothing ticked are refused, a note alone included', async () => {
     const categoryId = await addCategory()
-    const answered = await send('POST', '/api/admin/bar/products', {
-      name: named('Nut'),
-      categoryId,
-      allergenState: 'RECORDED',
-    })
-    expect(answered.status).toBe(400)
+    for (const note of [undefined, 'Contains nuts']) {
+      const answered = await send('POST', '/api/admin/bar/products', {
+        name: named('Nut'),
+        categoryId,
+        allergenState: 'RECORDED',
+        allergenNote: note,
+      })
+      expect(answered.status).toBe(400)
+    }
   })
 
   test('the name is held once whatever the capitals, and the refusal names the holder', async () => {
@@ -334,6 +343,71 @@ describe.skipIf(skip !== null)('the till layout is read, not deployed (F-111 cri
   })
 })
 
+describe.skipIf(skip !== null)('a category is dragged into its place on the till (0143)', () => {
+  const tillOrder = (): string[] => {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return (database.query('SELECT id FROM bar_categories ORDER BY sort, name COLLATE NOCASE').all() as { id: string }[]).map(row => row.id)
+    }
+    finally {
+      database.close()
+    }
+  }
+  const sorts = (): number[] => {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return (database.query('SELECT sort FROM bar_categories ORDER BY sort').all() as { sort: number }[]).map(row => row.sort)
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('a move puts it at that place and renumbers the rest around it, one audit row', async () => {
+    const first = await addCategory({ name: named('Dragged A'), sort: undefined })
+    const second = await addCategory({ name: named('Dragged B'), sort: undefined })
+
+    // Added with no place named, each goes last.
+    expect(tillOrder().slice(-2)).toEqual([first, second])
+
+    expect((await send('POST', `/api/admin/bar/categories/${second}/move`, { position: 0 })).status).toBe(200)
+    const moved = tillOrder()
+    expect(moved[0]).toBe(second)
+    expect(moved.at(-1)).toBe(first)
+    expect(sorts()).toEqual(moved.map((_, index) => index))
+    expect(auditCount('bar.category.moved', `bar-category:${second}`)).toBe(1)
+  })
+
+  // The trail says where a category landed, read from the row: last when added, clamped when moved.
+  test('the trail records the place the write gave, not the one asked for', async () => {
+    type Sorted = { detail: { changes: { sort: { to: number } } } }
+    const added = await addCategory({ name: named('Placed last'), sort: undefined })
+    const database = new Database(app.databaseFile, { readonly: true })
+    const stored = (database.query('SELECT sort FROM bar_categories WHERE id = ?').get(added) as { sort: number }).sort
+    database.close()
+    expect(trail<Sorted>('bar.category.created', `bar-category:${added}`)?.detail.changes.sort.to).toBe(stored)
+    expect(stored).toBe(Math.max(...sorts()))
+
+    expect((await send('POST', `/api/admin/bar/categories/${added}/move`, { position: 999 })).status).toBe(200)
+    const last = tillOrder().length - 1
+    expect(tillOrder()[last]).toBe(added)
+    expect(trail<Sorted>('bar.category.moved', `bar-category:${added}`)?.detail.changes.sort.to).toBe(last)
+  })
+
+  // An edit leaves the place alone, so a save made after somebody else dragged keeps their order.
+  test('editing a category keeps the place a drag gave it', async () => {
+    const edited = await addCategory({ name: named('Edited in place'), sort: undefined })
+    expect((await send('POST', `/api/admin/bar/categories/${edited}/move`, { position: 0 })).status).toBe(200)
+    expect((await send('PUT', `/api/admin/bar/categories/${edited}`, { name: named('Edited in place'), colour: '#8b1e3f' })).status).toBe(200)
+    expect(tillOrder()[0]).toBe(edited)
+  })
+
+  test('an ordinary member cannot move one', async () => {
+    const category = await addCategory({ name: named('Not moved') })
+    expect((await send('POST', `/api/admin/bar/categories/${category}/move`, { position: 0 }, member.cookie)).status).toBe(403)
+  })
+})
+
 describe.skipIf(skip !== null)('every change is audited with a from and a to (F-111 criterion 5)', () => {
   test('creation names the actor and what was created', async () => {
     const categoryId = await addCategory()
@@ -371,6 +445,7 @@ describe.skipIf(skip !== null)('every change is audited with a from and a to (F-
       categoryId,
       allergenState: 'RECORDED',
       allergenNote: 'Contains barley',
+      addedAllergens: ['GLUTEN'],
     })
 
     const entry = trail<{ detail: Record<string, unknown> }>('bar.product.updated', `bar-product:${id}`)
@@ -451,22 +526,26 @@ describe.skipIf(skip !== null)('a product pouring restricted stock asks for Chec
 describe.skipIf(skip !== null)('allergens are answered once, on the stocked item (issue 1348)', () => {
   interface ListedAnswer { id: string, allergenState: string, allergenNotes: string | null }
 
-  test('an item takes an answer, recorded needs its note, and the change is audited', async () => {
+  test('an item takes an answer, recorded needs a tick, and the change is audited', async () => {
     const id = await addItem({ allergenState: 'NONE' })
     expect((await items()).find(item => item.id === id) as unknown as ListedAnswer).toMatchObject({ allergenState: 'NONE' })
 
     const name = named('Answered red')
     const refused = await send('PUT', `/api/admin/bar/items/${id}`, { name, unit: 'ML', containerMl: 750, allergenState: 'RECORDED' })
     expect(refused.status).toBe(400)
+    const wordsOnly = await send('PUT', `/api/admin/bar/items/${id}`, { name, unit: 'ML', containerMl: 750, allergenState: 'RECORDED', allergenNotes: 'Contains sulphites' })
+    expect(wordsOnly.status).toBe(400)
     expect((await send('PUT', `/api/admin/bar/items/${id}`, {
       name,
       unit: 'ML',
       containerMl: 750,
       allergenState: 'RECORDED',
-      allergenNotes: 'Contains sulphites',
+      allergens: ['SULPHITES'],
     })).status).toBe(200)
-    const entry = trail<{ detail: { changes: { allergenState: { from: string, to: string } } } }>('bar.item.updated', `bar-item:${id}`)
+    expect((await items()).find(item => item.id === id)).toMatchObject({ allergenState: 'RECORDED', allergens: ['SULPHITES'] })
+    const entry = trail<{ detail: { changes: { allergenState: { from: string, to: string }, allergens: { from: string | null, to: string } } } }>('bar.item.updated', `bar-item:${id}`)
     expect(entry?.detail.changes.allergenState).toEqual({ from: 'NONE', to: 'RECORDED' })
+    expect(entry?.detail.changes.allergens).toEqual({ from: null, to: 'SULPHITES' })
   })
 
   test('the register lists the unanswered first, and filters to them', async () => {
@@ -483,13 +562,17 @@ describe.skipIf(skip !== null)('allergens are answered once, on the stocked item
   test('a product reads its answer from what it pours, with what the bar adds after', async () => {
     const categoryId = await addCategory()
     const wine = named('Poured white')
-    const itemId = await addItem({ name: wine, allergenState: 'RECORDED', allergenNotes: 'Contains sulphites' })
-    const productId = await addProduct(categoryId, { allergenState: 'RECORDED', allergenNote: 'Lemon twist' })
+    const itemId = await addItem({ name: wine, allergenState: 'RECORDED', allergens: ['SULPHITES'], allergenNotes: 'From a vineyard' })
+    const productId = await addProduct(categoryId, { allergenState: 'RECORDED', allergenNote: 'Lemon twist', addedAllergens: ['CELERY'] })
     const variantId = await addVariant(productId, { servingKind: '175ml', label: '175ml' })
     await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 175 }] })
 
-    const product = (await products()).find(one => one.id === productId) as unknown as { allergens: { state: string, note: string } }
-    expect(product.allergens).toEqual({ state: 'RECORDED', note: `${wine}: Contains sulphites. Added at the bar: Lemon twist.` })
+    const product = (await products()).find(one => one.id === productId) as unknown as { allergens: { state: string, note: string, allergens: string[] } }
+    expect(product.allergens).toEqual({
+      state: 'RECORDED',
+      note: `${wine}: From a vineyard. Added at the bar: Lemon twist.`,
+      allergens: ['CELERY', 'SULPHITES'],
+    })
   })
 })
 
@@ -1033,12 +1116,14 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, `[data-test="deliver-${itemId}"]`)
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
 
-    await fillNumber(view, '[data-test="movement-qty"]', '250')
-    await waitFor(view, `document.querySelector('[data-test="movement-submit"]')?.textContent.includes('Record a delivery of 250 ml')`)
+    // 0140: a 750 ml item's delivery is counted in whole bottles, and the register holds millilitres.
+    expect(await textOf(view, '[data-test="movement-form"]')).toContain('Full containers')
+    await fillNumber(view, '[data-test="movement-qty"]', '2')
+    await waitFor(view, `document.querySelector('[data-test="movement-submit"]')?.textContent.includes('Record a delivery of 2 × 750 ml')`)
     await click(view, '[data-test="movement-submit"]')
     await waitFor(view, `!document.querySelector('[data-test="movement-form"]')`)
 
-    expect(await onHand(itemId)).toBe(3250)
+    expect(await onHand(itemId)).toBe(4500)
     view.close()
   }, 120_000)
 
@@ -1116,7 +1201,7 @@ describe.skipIf(skip !== null)('the screens', () => {
     await waitFor(view, `document.querySelector('[data-test="movement-form"]')`)
     expect(await textOf(view, '[data-test="movement-form"]')).toContain('Cost of one container')
 
-    await fillNumber(view, '[data-test="movement-qty"]', '4200')
+    await fillNumber(view, '[data-test="movement-qty"]', '6')
     // £6.50 for 700 ml is 0.93p a ml, which a whole penny a ml kept as £7.00 a bottle (issue 1320).
     await fillNumber(view, '[data-test="movement-cost"]', '6.5')
     await click(view, '[data-test="movement-submit"]')
@@ -1170,6 +1255,34 @@ describe.skipIf(skip !== null)('the screens', () => {
     await click(view, `[data-test="allergen-save-${itemId}"]`)
     await waitFor(view, `!document.querySelector('[data-test="allergen-save-${itemId}"]')`)
     expect(((await items()).find(item => item.id === itemId) as unknown as { allergenState: string }).allergenState).toBe('NONE')
+    view.close()
+  }, 120_000)
+
+  // 0142: an answer from before ticks is flagged, and ticking what it says records it.
+  test('an answer in words only is flagged, and is ticked in place', async () => {
+    const itemName = named('Aaa words only')
+    const itemId = await addItem({ name: itemName, allergenState: 'RECORDED', allergens: ['MILK'], allergenNotes: 'May contain milk' })
+    const database = new Database(app.databaseFile)
+    try {
+      database.query('UPDATE bar_items SET allergens = NULL WHERE id = ?').run(itemId)
+    }
+    finally {
+      database.close()
+    }
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await finishSignIn(app, view, barManager.email)
+
+    await visit(view, `${app.baseURL}/bar/stock/allergens`, `[data-test="allergen-row-${itemId}"]`)
+    expect(await textOf(view, '[data-test="allergens-words-only"]')).toContain('in words only')
+    await click(view, `[data-test="allergen-${itemId}-tick-MILK"]`)
+    await click(view, `[data-test="allergen-save-${itemId}"]`)
+    await waitFor(view, `!document.querySelector('[data-test="allergen-save-${itemId}"]')`)
+    expect((await items()).find(item => item.id === itemId)).toMatchObject({ allergenState: 'RECORDED', allergens: ['MILK'] })
     view.close()
   }, 120_000)
 

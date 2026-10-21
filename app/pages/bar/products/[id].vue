@@ -6,6 +6,7 @@ import {
   componentsForm,
   priceForm,
   says,
+  saysAtTheTill,
   saysMoney,
   saysQuantity,
   variantChoiceForm,
@@ -429,7 +430,7 @@ const depletion = (variant: ProductVariant): string =>
     : variant.components
         .map(component => (component.itemId
           ? `${component.itemName}, ${saysQuantity(component.qty, component.unit ?? 'ITEM')}`
-          : `${component.choiceGroupName}, ${component.qty}${component.choiceOptional ? ', or none' : ''}`))
+          : `${component.qty === 1 ? 'a choice of' : `${component.qty} from`} ${component.choiceGroupName}${component.choiceOptional ? ', or none' : ''}`))
         .join('; ')
 
 const columns: TableColumn<ProductVariant>[] = [
@@ -439,7 +440,10 @@ const columns: TableColumn<ProductVariant>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', { class: 'flex flex-wrap items-center gap-2' }, [
         h('span', {}, row.original.label),
-        h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => says(row.original.servingKind)),
+        // The kind a category default prices on, shown only where the label does not already say it.
+        row.original.label.trim().toLowerCase() === says(row.original.servingKind).toLowerCase()
+          ? null
+          : h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => says(row.original.servingKind)),
         row.original.status === 'RETIRED'
           ? h(UBadge, { color: 'neutral', variant: 'outline', size: 'sm' }, () => 'Retired')
           : null,
@@ -575,15 +579,49 @@ const priceColumns: TableColumn<VariantPrice>[] = [
           {{ data.product?.categoryName }}
         </p>
       </div>
-      <UButton
-        to="/bar/products"
-        color="neutral"
-        variant="ghost"
-        icon="i-lucide-arrow-left"
-      >
-        Every product
-      </UButton>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          v-if="data.product"
+          :to="{ path: '/bar/products', query: { edit: data.product.id } }"
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-pencil"
+          data-test="edit-product"
+        >
+          Edit the product
+        </UButton>
+        <UButton
+          to="/bar/products"
+          color="neutral"
+          variant="ghost"
+          icon="i-lucide-arrow-left"
+        >
+          Every product
+        </UButton>
+      </div>
     </div>
+
+    <!-- The product's own answers, so this page says what the till will without a trip back. -->
+    <dl
+      v-if="data.product"
+      class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]"
+      data-test="product-details"
+    >
+      <dt class="text-muted">
+        On the till
+      </dt>
+      <dd>{{ says(data.product.status) }}{{ data.product.staffedOnly ? ', staffed bar only' : '' }}</dd>
+      <dt class="text-muted">
+        Check ID
+      </dt>
+      <dd>{{ data.product.ageRestricted || data.product.restrictedPours.length > 0 ? 'Yes' : 'No' }}</dd>
+      <dt class="text-muted">
+        Allergens
+      </dt>
+      <dd data-test="product-allergens">
+        {{ saysAtTheTill(data.product.allergens) }}
+      </dd>
+    </dl>
 
     <p class="text-sm text-muted">
       The sizes this product sells at, what each one pours and what it costs.

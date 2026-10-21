@@ -11,6 +11,7 @@ import {
   movementEntryForm,
   says,
   saysMovementAction,
+  saysInContainers,
   saysQuantity,
   saysStockStatus,
   stockItemForm,
@@ -18,7 +19,7 @@ import {
   writeOffSizes,
 } from '#shared/utils/bar'
 import { barItemsList } from '#shared/utils/bar-items-list'
-import type { AllergenState, MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
+import type { Allergen, AllergenState, MovementReason, StockItem, StockMovementKind, StockUnit } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Stock', middleware: 'console', docs: '/docs/bar/stock' })
@@ -70,14 +71,17 @@ interface ItemState {
   ageRestricted: boolean
   allergenState: AllergenState
   allergenNotes?: string
+  allergens: Allergen[]
 }
 
-const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT, allergenState: 'UNKNOWN' })
+const state = reactive<ItemState>({ name: '', unit: 'ML', ageRestricted: STOCK_ITEM_AGE_RESTRICTED_DEFAULT, allergenState: 'UNKNOWN', allergens: [] })
 const allergenOptions = ALLERGEN_STATES.map(value => ({ label: says(value), value }))
 
-// The note field is hidden when nothing is recorded, so the value behind it goes too.
+// The note field is hidden when nothing is recorded, and the ticks unless something is, so the
+// values behind them go too.
 watch(() => state.allergenState, (chosen) => {
   if (chosen === 'UNKNOWN') state.allergenNotes = undefined
+  if (chosen !== 'RECORDED') state.allergens = []
 })
 
 type HandEnteredKind = Exclude<StockMovementKind, 'SALE' | 'COMP' | 'STOCKTAKE' | 'TRANSFER' | 'REVERSAL'>
@@ -122,6 +126,7 @@ function edit(item: StockItem | null): void {
     ageRestricted: item?.ageRestricted ?? STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
     allergenState: item?.allergenState ?? 'UNKNOWN',
     allergenNotes: item?.allergenNotes ?? undefined,
+    allergens: [...(item?.allergens ?? [])],
   })
   open.value = true
 }
@@ -142,9 +147,32 @@ const MOVEMENT_TITLES: Record<HandEnteredKind, string> = {
 // An empty or unreadable field is no amount: NaN is not above nothing either.
 const hasAmount = computed(() => (movement.qty ?? 0) > 0)
 
+// A delivery comes in whole bottles or kegs, so it is counted in them where the item has one
+// size, as opening stock and a stocktake are (0140); the register still holds millilitres.
+const containerMl = computed(() => (movement.kind === 'DELIVERY' && moving.value?.unit === 'ML' ? moving.value.containerMl ?? null : null))
+const inUnit = computed(() => (movement.qty ?? 0) * (containerMl.value ?? 1))
+// The field means containers for a delivery and millilitres otherwise, so a number typed under
+// one is cleared on the switch rather than read in the other unit.
+watch(containerMl, (now, before) => {
+  if (now !== before) movement.qty = undefined
+})
+
 const submitLabel = computed(() => (moving.value && hasAmount.value
-  ? saysMovementAction({ kind: movement.kind, qty: movement.qty ?? 0, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds })
+  ? saysMovementAction({ kind: movement.kind, qty: inUnit.value, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds, containerMl: containerMl.value })
   : 'Say how much first'))
+
+const qtyQuestion = computed(() => {
+  if (containerMl.value) {
+    return {
+      label: 'Full containers',
+      description: `How many full ${containerMl.value} ml bottles or kegs came in${hasAmount.value ? `: ${inUnit.value} ml` : ''}. This adds to what is on hand.`,
+    }
+  }
+  return {
+    label: 'Quantity',
+    description: `In ${moving.value ? says(moving.value.unit).toLowerCase() : 'the item\'s own unit'}. This ${adding.value ? 'adds to' : 'comes off'} what is on hand.`,
+  }
+})
 
 async function save(): Promise<void> {
   saving.value = true
@@ -158,6 +186,7 @@ async function save(): Promise<void> {
     ageRestricted: state.ageRestricted,
     allergenState: state.allergenState,
     allergenNotes: state.allergenNotes?.trim() || null,
+    allergens: state.allergens,
   }
   try {
     if (editing.value) await $fetch(`/api/admin/bar/items/${editing.value.id}`, { method: 'PUT', body })
@@ -182,7 +211,7 @@ async function save(): Promise<void> {
 // The screen states the sign rather than leaving somebody to type a minus. A delivery only adds,
 // wastage only takes away, and an adjustment is whichever the manager chose.
 const adding = computed(() => movement.kind === 'DELIVERY' || (movement.kind === 'ADJUST' && movement.adds))
-const signedQty = computed(() => (adding.value ? Math.abs(movement.qty ?? 0) : -Math.abs(movement.qty ?? 0)))
+const signedQty = computed(() => (adding.value ? Math.abs(inUnit.value) : -Math.abs(inUnit.value)))
 
 async function record(): Promise<void> {
   const item = moving.value
@@ -303,7 +332,7 @@ async function remove(): Promise<void> {
 
 const listingFailure = useListFailure(error, 'The stocked items could not be read.')
 
-const columns: TableColumn<StockItem>[] = [
+const allColumns: TableColumn<StockItem>[] = [
   {
     id: 'name',
     header: 'Stocked item',
@@ -324,6 +353,7 @@ const columns: TableColumn<StockItem>[] = [
       // instead, so a phone keeps the row actions in view without losing what they said (922).
       h('div', { class: 'sm:hidden mt-1 text-xs text-muted' }, [
         `${saysQuantity(row.original.onHand, row.original.unit)} on hand`,
+        row.original.unit === 'ML' && saysInContainers(row.original.onHand, row.original.containerMl) ? ` (${saysInContainers(row.original.onHand, row.original.containerMl)})` : '',
         row.original.parQty === null ? '' : `, par ${saysQuantity(row.original.parQty, row.original.unit)}`,
         stockStatus(row.original.onHand, row.original.parQty) === null ? '' : `, ${saysStockStatus(stockStatus(row.original.onHand, row.original.parQty)!).toLowerCase()}`,
         row.original.category ? `, ${row.original.category}` : '',
@@ -334,7 +364,15 @@ const columns: TableColumn<StockItem>[] = [
     id: 'onHand',
     header: 'On hand',
     meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
-    cell: ({ row }) => saysQuantity(row.original.onHand, row.original.unit),
+    cell: ({ row }) => {
+      const shelf = row.original.unit === 'ML' ? saysInContainers(row.original.onHand, row.original.containerMl) : null
+      return shelf === null
+        ? saysQuantity(row.original.onHand, row.original.unit)
+        : h('div', {}, [
+            h('div', {}, saysQuantity(row.original.onHand, row.original.unit)),
+            h('div', { 'class': 'font-sans text-xs text-muted', 'data-test': `on-hand-containers-${row.original.id}` }, shelf),
+          ])
+    },
   },
   {
     id: 'par',
@@ -433,6 +471,11 @@ const columns: TableColumn<StockItem>[] = [
     ]),
   },
 ]
+
+// A bar that keeps no stock groups is not shown an empty column for them.
+const columns = computed(() => (data.value.items.some(item => item.category)
+  ? allColumns
+  : allColumns.filter(column => column.id !== 'category')))
 </script>
 
 <template>
@@ -625,11 +668,24 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
+            v-if="state.allergenState === 'RECORDED'"
+            label="What it contains"
+            name="allergens"
+            required
+            description="Tick each one. The till reads these out, so a typed note is no longer enough."
+          >
+            <AllergenTicks
+              v-model="state.allergens"
+              test-prefix="item-allergen"
+            />
+          </UFormField>
+
+          <UFormField
             v-if="state.allergenState !== 'UNKNOWN'"
             label="Allergen note"
             name="allergenNotes"
-            :required="state.allergenState === 'RECORDED'"
-            description="What staff read out at the bar."
+            hint="Optional"
+            description="Anything a tick cannot say, such as which nuts, or may contain."
           >
             <UTextarea
               v-model="state.allergenNotes"
@@ -725,10 +781,10 @@ const columns: TableColumn<StockItem>[] = [
           </UFormField>
 
           <UFormField
-            label="Quantity"
+            :label="qtyQuestion.label"
             name="qty"
             required
-            :description="`In ${moving ? says(moving.unit).toLowerCase() : 'the item\'s own unit'}. This ${adding ? 'adds to' : 'comes off'} what is on hand.`"
+            :description="qtyQuestion.description"
           >
             <WholeField
               v-model="movement.qty"

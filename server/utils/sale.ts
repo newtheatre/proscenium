@@ -185,7 +185,7 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
     ORDER BY sort, name COLLATE NOCASE
   `)
 
-  interface ProductRow { id: string, name: string, categoryId: string, ageRestricted: number, allergenState: SaleProduct['allergenState'], allergenNote: string | null }
+  interface ProductRow { id: string, name: string, categoryId: string, ageRestricted: number, allergenState: SaleProduct['allergenState'], allergenNote: string | null, addedAllergens: string | null }
   const productRows = await db.all<ProductRow>(sql`
     SELECT ${PRODUCT_COLUMNS} FROM bar_products p JOIN bar_categories c ON c.id = p.category_id
     WHERE p.status = 'ACTIVE'
@@ -216,6 +216,7 @@ export async function sellableCatalogue(on: string): Promise<SaleCatalogue> {
         ageRestricted: sizes.some(size => size.ageRestricted || size.choice?.options.some(option => option.ageRestricted) === true),
         allergenState: answer.state,
         allergenNote: answer.note,
+        allergens: answer.allergens,
         variants: sizes,
       }
     })

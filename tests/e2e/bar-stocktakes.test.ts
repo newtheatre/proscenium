@@ -8,6 +8,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { NIGHT_TARGETS, click, fill, fillNumber, openSignedOutView, shortOfFloor, signInView, skipReason, startApp, textOf, typeNumber, visit, waitFor } from '#tests/helpers/webview'
 import { NIGHT_TAP_TARGET_PX, NIGHT_VIEWPORT_PX } from '#shared/utils/night-shell'
+import { toOrder } from '#shared/utils/ordering'
 import type { AppUnderTest, NightTarget } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
@@ -975,6 +976,23 @@ describe.skipIf(skip !== null)('the suggested order list compares live on-hand t
     expect(row?.category).toBe(category)
   })
 
+  // 0140: a supplier is asked for whole bottles, so the list rounds a measured shortfall up.
+  test('a measured item with a container size is ordered in whole containers', async () => {
+    const category = named('Wine by the bottle')
+    const item = await anItem({ category, containerMl: 750 })
+    await send('PUT', `/api/admin/bar/items/${item.id}`, { name: item.name, unit: 'ML', containerMl: 750, parQty: 3000, category })
+    await deliver(item.id, 1725)
+
+    const listed = await (await send('GET', '/api/admin/bar/order-list')).json() as { shortfalls: OrderListRow[] }
+    const row = listed.shortfalls.find(candidate => candidate.id === item.id)!
+    expect(row).toMatchObject({ shortfall: 1275, containerMl: 750 })
+    expect(toOrder(row)).toBe(2)
+
+    const csv = await (await send('GET', '/api/admin/bar/order-list/export')).text()
+    expect(csv.split('\n')[0]).toContain('toOrder')
+    expect(csv.split('\n').find(line => line.includes(item.name))).toContain('"1275","2","750"')
+  })
+
   test('an item at or above par is not listed', async () => {
     const item = await anItem()
     await send('PUT', `/api/admin/bar/items/${item.id}`, { name: item.name, unit: item.unit, parQty: 5 })
@@ -1026,8 +1044,8 @@ describe.skipIf(skip !== null)('the suggested order list compares live on-hand t
     const ownGroup = `[...document.querySelectorAll('[data-test="order-list-group"]')].find(el => el.textContent.includes(${JSON.stringify(category)}))`
     await waitFor(view, `!!(${ownGroup})`)
     expect(await view.evaluate<string>(`(${ownGroup}).textContent`)).toContain(item.name)
-    expect(await view.evaluate<number>(`(${ownGroup}).querySelectorAll('th[scope="col"]').length`)).toBe(4)
-    expect(await view.evaluate<string>(`(${ownGroup}).querySelector('th:last-child').textContent`)).toBe('Shortfall')
+    expect(await view.evaluate<number>(`(${ownGroup}).querySelectorAll('th[scope="col"]').length`)).toBe(5)
+    expect(await view.evaluate<string>(`(${ownGroup}).querySelector('th:last-child').textContent`)).toBe('To order')
     view.close()
   }, 120_000)
 

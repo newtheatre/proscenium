@@ -26,6 +26,17 @@ const { data, status, error, refresh } = await useAsyncData(
   { watch: [query], default: empty },
 )
 
+// Every category in till order, for dragging; the table above it pages and searches (0143).
+const { data: tillOrder, refresh: refreshOrder } = await useAsyncData(
+  'bar-categories-till-order',
+  () => request<Listing>('/api/admin/bar/categories', { query: { pageSize: 100, sort: 'sort' } }),
+  { default: empty },
+)
+
+async function reloadAll(): Promise<void> {
+  await Promise.all([refresh(), refreshOrder()])
+}
+
 const editing = ref<BarCategory | null>(null)
 const open = ref(false)
 const removing = ref<BarCategory | null>(null)
@@ -34,14 +45,13 @@ watch(open, (isOpen) => {
   if (!isOpen) failure.value = null
 })
 
-const state = reactive({ name: '', sort: 0, colour: undefined as string | undefined })
+const state = reactive({ name: '', colour: undefined as string | undefined })
 
 function edit(category: BarCategory | null): void {
   editing.value = category
   failure.value = null
   Object.assign(state, {
     name: category?.name ?? '',
-    sort: category?.sort ?? 0,
     colour: category?.colour ?? undefined,
   })
   open.value = true
@@ -50,7 +60,7 @@ function edit(category: BarCategory | null): void {
 async function save(): Promise<void> {
   saving.value = true
   failure.value = null
-  const body = { name: state.name.trim(), sort: state.sort, colour: state.colour?.trim() || null }
+  const body = { name: state.name.trim(), colour: state.colour?.trim() || null }
   try {
     if (editing.value) await $fetch(`/api/admin/bar/categories/${editing.value.id}`, { method: 'PUT', body })
     else await $fetch('/api/admin/bar/categories', { method: 'POST', body })
@@ -62,7 +72,7 @@ async function save(): Promise<void> {
       color: 'success',
     })
     open.value = false
-    await refresh()
+    await reloadAll()
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -82,7 +92,7 @@ async function remove(): Promise<void> {
     await $fetch(`/api/admin/bar/categories/${category.id}`, { method: 'DELETE' })
     toast.add({ title: 'Product category deleted', icon: 'i-lucide-check', color: 'success' })
     removing.value = null
-    await refresh()
+    await reloadAll()
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -175,17 +185,11 @@ const columns: TableColumn<BarCategory>[] = [
         : null,
       h('div', {}, [
         h('span', {}, row.original.name),
-        // Below sm the order and the product count are hidden: shown here instead, so a phone
-        // keeps the row actions in view without losing what they said (issue 922).
-        h('div', { class: 'sm:hidden text-xs text-muted' }, `${plural(row.original.productCount, 'product')}, ${row.original.sort} on the till`),
+        // Below sm the product count is hidden: shown here instead, so a phone keeps the row
+        // actions in view without losing what it said (issue 922).
+        h('div', { class: 'sm:hidden text-xs text-muted' }, plural(row.original.productCount, 'product')),
       ]),
     ]),
-  },
-  {
-    id: 'sort',
-    header: 'Order on the till',
-    meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => String(row.original.sort),
   },
   {
     id: 'products',
@@ -238,6 +242,11 @@ const columns: TableColumn<BarCategory>[] = [
     <p class="text-sm text-muted">
       The groups the till shows, in the order it shows them.
     </p>
+
+    <CategoryOrder
+      :categories="tillOrder.items"
+      @moved="reloadAll"
+    />
 
     <AdminToolbar
       v-model:search="search"
@@ -298,7 +307,7 @@ const columns: TableColumn<BarCategory>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'Add a product category'"
-      description="A product category groups products on the till and decides the order they appear in."
+      description="A product category groups products on the till. A new one goes last; drag it into place after."
     >
       <template #body>
         <UForm
@@ -327,19 +336,6 @@ const columns: TableColumn<BarCategory>[] = [
               v-model="state.name"
               class="w-full"
               data-test="category-name"
-            />
-          </UFormField>
-
-          <UFormField
-            label="Order on the till"
-            name="sort"
-            description="Lower comes first. Product categories sharing a number fall back to their names."
-          >
-            <UInputNumber
-              v-model="state.sort"
-              :min="0"
-              class="w-full"
-              data-test="category-sort"
             />
           </UFormField>
 

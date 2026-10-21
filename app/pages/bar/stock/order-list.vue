@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { saysQuantity } from '#shared/utils/bar'
+import { saysToOrder } from '#shared/utils/ordering'
+import { NO_STOCK_GROUP } from '#shared/utils/stocktakes'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -21,7 +23,7 @@ const grouped = computed(() => {
   // to hold two spellings of one category apart from being the same heading.
   const groups = new Map<string, { label: string, rows: OrderListRow[] }>()
   for (const row of data.value.shortfalls) {
-    const label = row.category ?? 'Uncategorised'
+    const label = row.category ?? NO_STOCK_GROUP
     const key = label.toLowerCase()
     const held = groups.get(key) ?? { label, rows: [] }
     held.rows.push(row)
@@ -29,6 +31,9 @@ const grouped = computed(() => {
   }
   return [...groups.values()].map(group => [group.label, group.rows] as const)
 })
+
+// A bar with no stock groups gets no heading saying so over its only list.
+const onlyUngrouped = computed(() => grouped.value.length === 1 && grouped.value[0]![0] === NO_STOCK_GROUP)
 
 const columns: TableColumn<OrderListRow>[] = [
   {
@@ -38,7 +43,7 @@ const columns: TableColumn<OrderListRow>[] = [
       h('div', {}, row.original.name),
       // Below sm the on hand and par columns are hidden: shown here instead, so a phone keeps the
       // shortfall in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysQuantity(row.original.onHand, row.original.unit)} on hand, par ${saysQuantity(row.original.parQty, row.original.unit)}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysQuantity(row.original.onHand, row.original.unit)} on hand, par ${saysQuantity(row.original.parQty, row.original.unit)}, short ${saysQuantity(row.original.shortfall, row.original.unit)}`),
     ]),
   },
   {
@@ -56,9 +61,15 @@ const columns: TableColumn<OrderListRow>[] = [
   {
     id: 'shortfall',
     header: 'Shortfall',
-    // The one figure a supplier order actually needs, weighted against On hand and Par beside it.
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
+    cell: ({ row }) => saysQuantity(row.original.shortfall, row.original.unit),
+  },
+  {
+    id: 'toOrder',
+    header: 'To order',
+    // The one figure a supplier order needs: whole containers, rounded up (0140).
     meta: RIGHT_ALIGNED,
-    cell: ({ row }) => h('span', { class: 'font-medium' }, saysQuantity(row.original.shortfall, row.original.unit)),
+    cell: ({ row }) => h('span', { 'class': 'font-medium', 'data-test': `to-order-${row.original.id}` }, saysToOrder(row.original)),
   },
 ]
 </script>
@@ -100,7 +111,10 @@ const columns: TableColumn<OrderListRow>[] = [
       class="space-y-2"
       data-test="order-list-group"
     >
-      <h3 class="font-semibold">
+      <h3
+        v-if="!onlyUngrouped"
+        class="font-semibold"
+      >
         {{ category }}
       </h3>
       <!-- Never reached: a group exists only because grouped (above) put a row in it. Said

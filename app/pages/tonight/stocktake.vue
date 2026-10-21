@@ -57,8 +57,8 @@ function saved(line: StocktakeLine): void {
       class="space-y-4"
     >
       <p class="text-sm text-muted">
-        Each count saves when you leave its field or press Enter, with your name on it. The Bar
-        Manager or the Front of House Manager checks every line before applying the count.
+        Each count saves when you leave its field or press Enter, with your name on it. The Front of
+        House Manager checks every line before applying the count.
       </p>
 
       <StocktakeCounts

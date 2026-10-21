@@ -22,31 +22,89 @@ export type AllergenState = (typeof ALLERGEN_STATES)[number]
 // mostly is alcohol. A product has none: its Check ID follows what it pours (issue 1299).
 export const STOCK_ITEM_AGE_RESTRICTED_DEFAULT = true
 
+// The fourteen allergens UK law names (0142), in the order the Food Standards Agency lists them.
+// A recorded answer ticks them; the note is for detail a tick cannot carry, such as which nuts.
+export const ALLERGENS = [
+  'CELERY', 'GLUTEN', 'CRUSTACEANS', 'EGGS', 'FISH', 'LUPIN', 'MILK',
+  'MOLLUSCS', 'MUSTARD', 'NUTS', 'PEANUTS', 'SESAME', 'SOYA', 'SULPHITES',
+] as const
+export type Allergen = (typeof ALLERGENS)[number]
+
+const ALLERGEN_WORDS: Record<Allergen, string> = {
+  CELERY: 'Celery',
+  GLUTEN: 'Cereals containing gluten',
+  CRUSTACEANS: 'Crustaceans',
+  EGGS: 'Eggs',
+  FISH: 'Fish',
+  LUPIN: 'Lupin',
+  MILK: 'Milk',
+  MOLLUSCS: 'Molluscs',
+  MUSTARD: 'Mustard',
+  NUTS: 'Tree nuts',
+  PEANUTS: 'Peanuts',
+  SESAME: 'Sesame',
+  SOYA: 'Soya',
+  SULPHITES: 'Sulphur dioxide and sulphites',
+}
+
+export const saysAllergen = (allergen: Allergen): string => ALLERGEN_WORDS[allergen]
+
+// Stored as one comma-separated column in the list's own order; anything unrecognised is dropped
+// rather than guessed at, and the screens show what remains.
+export function readAllergens(stored: string | null | undefined): Allergen[] {
+  if (!stored) return []
+  const held = new Set(stored.split(','))
+  return ALLERGENS.filter(allergen => held.has(allergen))
+}
+
+export const storeAllergens = (allergens: readonly Allergen[] = []): string | null =>
+  allergens.length === 0 ? null : ALLERGENS.filter(allergen => allergens.includes(allergen)).join(',')
+
 export interface AllergenAnswer {
   state: AllergenState
   note: string | null
+  allergens: Allergen[]
 }
 
 export interface PouredAllergen {
   itemName: string
   state: AllergenState
   note: string | null
+  allergens?: readonly Allergen[]
+}
+
+// What deriveAllergens is handed for the bar's own addition, ticked or from before ticks existed.
+export interface AllergenInput {
+  state: AllergenState
+  note: string | null
+  allergens?: readonly Allergen[]
 }
 
 const sentence = (text: string): string => text.trim().replace(/\.+$/, '')
 
 const written = (note: string | null): note is string => Boolean(note?.trim())
 
-// An answer only when it is a clean one: confirmed none, or recorded with something written. A
-// recorded answer with no note, or a state no form writes, fails closed as no answer (F-107).
-const answered = (answer: AllergenAnswer): boolean =>
-  answer.state === 'NONE' || (answer.state === 'RECORDED' && written(answer.note))
+// An answer only when it is a clean one: confirmed none, or recorded with something ticked or
+// written. Recorded with neither, or a state no form writes, fails closed as no answer (F-107).
+const answered = (answer: AllergenInput): boolean =>
+  answer.state === 'NONE' || (answer.state === 'RECORDED' && ((answer.allergens?.length ?? 0) > 0 || written(answer.note)))
+
+// Ticked on a recorded answer only: a tick left on an answer since set to none says nothing.
+const ticked = (answer: AllergenInput): readonly Allergen[] =>
+  answer.state === 'RECORDED' && answered(answer) ? answer.allergens ?? [] : []
+
+const union = (lists: readonly (readonly Allergen[])[]): Allergen[] =>
+  ALLERGENS.filter(allergen => lists.some(list => list.includes(allergen)))
 
 // A product's answer from what it pours and what the bar adds (issue 1348, F-107 criteria 3 and 4):
 // unanswered while any part is, recorded while any is, and no note is hidden. UNKNOWN adds nothing.
-export function deriveAllergens(poured: readonly PouredAllergen[], addition: AllergenAnswer): AllergenAnswer {
+export function deriveAllergens(poured: readonly PouredAllergen[], addition: AllergenInput): AllergenAnswer {
   const additionUnanswered = addition.state !== 'UNKNOWN' && !answered(addition)
-  if (poured.length === 0) return additionUnanswered ? { state: 'UNKNOWN', note: null } : addition
+  if (poured.length === 0) {
+    return additionUnanswered
+      ? { state: 'UNKNOWN', note: null, allergens: [] }
+      : { state: addition.state, note: addition.note, allergens: union([ticked(addition)]) }
+  }
   const unknown = [...new Set([
     ...poured.filter(item => !answered(item)).map(item => item.itemName),
     ...(additionUnanswered ? ['what the bar adds'] : []),
@@ -58,14 +116,22 @@ export function deriveAllergens(poured: readonly PouredAllergen[], addition: All
     ...noted.map(item => `${item.itemName}: ${sentence(item.note!)}`),
     ...(added ? [`Added at the bar: ${sentence(added)}`] : []),
   ]
-  const recorded = poured.some(item => item.state === 'RECORDED' && answered(item)) || (addition.state === 'RECORDED' && added !== null)
+  const recorded = poured.some(item => item.state === 'RECORDED' && answered(item))
+    || (addition.state === 'RECORDED' && answered(addition))
   const state: AllergenState = unknown.length > 0 ? 'UNKNOWN' : recorded ? 'RECORDED' : 'NONE'
-  return { state, note: parts.length > 0 ? `${parts.join('. ')}.` : null }
+  const allergens = union([...poured.map(ticked), ticked(addition)])
+  return { state, note: parts.length > 0 ? `${parts.join('. ')}.` : null, allergens }
 }
 
-// What the product editor says the till will say: the answer, then its note, each a sentence.
+// "Milk, eggs and tree nuts": the ticked allergens as one phrase, in the list's own order.
+export function saysAllergens(allergens: readonly Allergen[]): string {
+  const words = allergens.map((allergen, index) => (index === 0 ? saysAllergen(allergen) : saysAllergen(allergen).toLowerCase()))
+  return words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words[0] ?? ''
+}
+
+// What the product editor says the till will say: the answer, what it contains, then its note.
 export const saysAtTheTill = (answer: AllergenAnswer): string =>
-  `${says(answer.state)}.${written(answer.note) ? ` ${sentence(answer.note)}.` : ''}`
+  `${says(answer.state)}.${answer.allergens.length > 0 ? ` Contains ${saysAllergens(answer.allergens).toLowerCase()}.` : ''}${written(answer.note) ? ` ${sentence(answer.note)}.` : ''}`
 
 // "Gin and Campari, which are age restricted": what every Check ID notice says a product pours.
 export function saysRestricted(names: readonly string[]): string {
@@ -313,11 +379,36 @@ const hexColour = z.string().trim()
   .transform(value => value || null)
   .refine(value => value === null || /^#[0-9a-f]{6}$/i.test(value), 'A colour is six hexadecimal characters after a hash')
 
+// The order on the till is set by dragging (0143), so a form need not say it: a new category goes
+// last and an edit keeps its place. A caller that names one is still honoured.
 export const categoryForm = z.object({
   name: label('category'),
-  sort: z.number().int().min(0).max(999).default(0),
+  sort: z.number().int().min(0).max(999).optional(),
   colour: hexColour.nullish(),
 })
+
+export const categoryMoveForm = z.object({ position: z.number().int().min(0).max(999) })
+
+// A recorded answer says what it contains by ticking it (0142): a note alone is free text the
+// till cannot check, so a write without a tick is refused. Ticks on any other answer are refused.
+const allergenTicks = z.array(z.enum(ALLERGENS)).max(ALLERGENS.length).default([])
+  .transform(ticks => ALLERGENS.filter(allergen => ticks.includes(allergen)))
+
+type Ticks<K extends string> = { allergenState: AllergenState } & Record<K, readonly Allergen[]>
+
+function TICKED_WHEN_RECORDED<K extends string>(key: K): [(value: Ticks<K>) => boolean, { message: string, path: PropertyKey[] }] {
+  return [
+    value => value.allergenState !== 'RECORDED' || value[key].length > 0,
+    { message: 'Tick each allergen it contains, or choose Confirmed no allergens', path: [key] },
+  ]
+}
+
+function UNTICKED_OTHERWISE<K extends string>(key: K): [(value: Ticks<K>) => boolean, { message: string, path: PropertyKey[] }] {
+  return [
+    value => value.allergenState === 'RECORDED' || value[key].length === 0,
+    { message: 'An allergen is ticked, so the answer is Allergens recorded', path: [key] },
+  ]
+}
 
 export const productForm = z.object({
   name: label('product'),
@@ -328,10 +419,8 @@ export const productForm = z.object({
   ageRestricted: z.boolean().default(false),
   allergenState: z.enum(ALLERGEN_STATES).default('UNKNOWN'),
   allergenNote: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
-}).refine(
-  value => value.allergenState !== 'RECORDED' || Boolean(value.allergenNote),
-  { message: 'Recorded allergens need the note that records them', path: ['allergenNote'] },
-).refine(
+  addedAllergens: allergenTicks,
+}).refine(...TICKED_WHEN_RECORDED('addedAllergens')).refine(...UNTICKED_OTHERWISE('addedAllergens')).refine(
   value => value.allergenState !== 'UNKNOWN' || !value.allergenNote,
   { message: 'A note is information, so it cannot be filed as unknown', path: ['allergenState'] },
 )
@@ -349,16 +438,14 @@ export const stockItemForm = z.object({
   ageRestricted: z.boolean().default(STOCK_ITEM_AGE_RESTRICTED_DEFAULT),
   allergenState: z.enum(ALLERGEN_STATES).nullish(),
   allergenNotes: z.string().trim().max(MAX_ALLERGEN_NOTE).nullish(),
+  allergens: allergenTicks,
 }).refine(
   value => value.unit === 'ML' || !value.containerMl,
   { message: 'A container size belongs to something measured in millilitres', path: ['containerMl'] },
 ).transform(value => ({
   ...value,
-  allergenState: value.allergenState ?? (value.allergenNotes ? 'RECORDED' : 'UNKNOWN') as AllergenState,
-})).refine(
-  value => value.allergenState !== 'RECORDED' || Boolean(value.allergenNotes),
-  { message: 'Recorded allergens need the note that records them', path: ['allergenNotes'] },
-).refine(
+  allergenState: value.allergenState ?? (value.allergens.length > 0 || value.allergenNotes ? 'RECORDED' : 'UNKNOWN') as AllergenState,
+})).refine(...TICKED_WHEN_RECORDED('allergens')).refine(...UNTICKED_OTHERWISE('allergens')).refine(
   value => value.allergenState !== 'UNKNOWN' || !value.allergenNotes,
   { message: 'A note is information, so it cannot be filed as unknown', path: ['allergenState'] },
 )
@@ -602,6 +689,7 @@ export interface BarProduct {
   // The product's own answer, which is now only what the bar adds to what it pours (a garnish).
   allergenState: AllergenState
   allergenNote: string | null
+  addedAllergens: Allergen[]
   // What the till says: read from every item its live sizes pour, plus the addition (issue 1348).
   allergens: AllergenAnswer
   everSold: boolean
@@ -710,6 +798,7 @@ export interface StockItem {
   ageRestricted: boolean
   allergenState: AllergenState
   allergenNotes: string | null
+  allergens: Allergen[]
   status: StockItemStatus
   onHand: number
   hasMovements: boolean
@@ -736,8 +825,11 @@ export function writeOffSizes(item: { unit: StockUnit, containerMl: number | nul
 }
 
 // The button that writes a movement says what it will write (issue 1350).
-export function saysMovementAction(movement: { kind: StockMovementKind, qty: number, unit: StockUnit, itemName: string, adds?: boolean }): string {
-  const amount = saysQuantity(Math.abs(movement.qty), movement.unit)
+export function saysMovementAction(movement: { kind: StockMovementKind, qty: number, unit: StockUnit, itemName: string, adds?: boolean, containerMl?: number | null }): string {
+  const per = movement.containerMl ?? 0
+  const amount = per > 0 && movement.qty % per === 0
+    ? `${Math.abs(movement.qty) / per} × ${per} ml`
+    : saysQuantity(Math.abs(movement.qty), movement.unit)
   if (movement.kind === 'WASTAGE') return `Write off ${amount} of ${movement.itemName}`
   if (movement.kind === 'DELIVERY') return `Record a delivery of ${amount} ${movement.unit === 'ML' ? 'of ' : ''}${movement.itemName}`
   return movement.adds ? `Add ${amount} to ${movement.itemName}` : `Take ${amount} off ${movement.itemName}`
@@ -958,6 +1050,16 @@ export function saysMovementSource(table: string): string {
 // (F-114 criterion 2).
 export function saysQuantity(qty: number, unit: StockUnit): string {
   return unit === 'ML' ? `${qty} ml` : `${qty}`
+}
+
+// What a shelf of a measured item looks like, so nobody divides 3150 ml by 700 in their head
+// (0140). Null where there is no one container size, or nothing on the shelf to describe.
+export function saysInContainers(qty: number, containerMl: number | null): string | null {
+  if (!containerMl || qty <= 0) return null
+  const full = Math.floor(qty / containerMl)
+  const part = qty % containerMl
+  if (full === 0) return `${part} ml open`
+  return `${full} full${part ? ` and ${part} ml open` : ''}`
 }
 
 // Negative reads as minus-sign-before-currency, never a bare hyphen glued to the pound sign (#908).

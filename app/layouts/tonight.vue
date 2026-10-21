@@ -10,6 +10,8 @@ const { account } = useAccount()
 
 // The hub is the way back, so it does not offer a link to itself.
 const atTheHub = computed(() => route.path === '/tonight')
+// The header spans what the screen below spans, so a wide screen's header is not a phone strip.
+const column = computed(() => (route.meta.nightWide === true ? 'max-w-5xl' : 'max-w-md'))
 
 const header = useNightHeader()
 const authority = useNightAuthority()
@@ -18,8 +20,8 @@ const authority = useNightAuthority()
 const badge = computed(() => onShiftLabel(authority.value.via, account.value.user?.name))
 
 // On the body rather than the subtree, so a modal teleported out of it inherits the shell's
-// target floor too (docs/design-language.md rule 4).
-useHead({ bodyAttrs: { class: 'nnt-night' } })
+// target floor and the dark ground too (docs/design-language.md rule 4).
+useHead({ bodyAttrs: { class: 'nnt-night dark' } })
 
 // A screen that names no show still sits on one: whichever house is running now fills the header
 // in, and a screen that knows better (the hub, the glance) overrides it.
@@ -46,13 +48,19 @@ onMounted(async () => {
 
 <template>
   <div class="dark flex min-h-dvh flex-col bg-default text-default [color-scheme:dark]">
-    <div class="mx-auto flex min-h-12 w-full max-w-md items-center justify-end gap-1 px-2">
+    <div
+      class="mx-auto flex min-h-12 w-full items-center justify-end gap-1 px-2"
+      :class="column"
+    >
       <FeedbackButton shell="tonight" />
       <DocsLink />
       <AuthStatus />
     </div>
     <header class="border-b border-default">
-      <div class="mx-auto flex w-full max-w-md items-start gap-2 px-4 pb-3">
+      <div
+        class="mx-auto flex w-full items-start gap-2 px-4 pb-3"
+        :class="column"
+      >
         <UButton
           v-if="!atTheHub"
           to="/tonight"

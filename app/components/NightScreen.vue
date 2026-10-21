@@ -17,6 +17,10 @@ const props = defineProps<{
 
 setNightEyebrow(() => props.title)
 
+// A page that asks for it (the till, 0144) is a wider capped column, which its own container
+// queries split; every other screen stays a phone's width at any window width.
+const wide = computed(() => useRoute().meta.nightWide === true)
+
 // Taken as seen until the phone says otherwise, so the server never draws a hint the phone then
 // takes away; a phone that cannot remember shows it every time (issue 1317).
 const seenBefore = ref(true)
@@ -32,7 +36,10 @@ watch(() => showsHint.value && !props.refused && props.stale != null, (drawn) =>
 </script>
 
 <template>
-  <section class="mx-auto flex w-full max-w-md grow flex-col gap-4">
+  <section
+    class="@container/night mx-auto flex w-full grow flex-col gap-4"
+    :class="wide ? 'max-w-5xl' : 'max-w-md'"
+  >
     <div class="flex justify-end">
       <NightStale
         :at="stale"
@@ -64,7 +71,7 @@ watch(() => showsHint.value && !props.refused && props.stale != null, (drawn) =>
          Stacked full width, so every action clears the target floor on its own. -->
     <div
       v-if="$slots.actions && !refused"
-      class="sticky bottom-0 flex flex-col gap-3 bg-default pb-4 pt-3"
+      class="sticky bottom-0 flex flex-col gap-3 bg-default pb-4 pt-3 @2xl/night:ml-auto @2xl/night:w-80"
       style="padding-bottom: calc(1rem + env(safe-area-inset-bottom))"
       data-test="night-actions"
     >

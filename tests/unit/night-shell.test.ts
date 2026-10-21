@@ -178,6 +178,21 @@ describe('the tonight shell (K-102 criteria 1 and 3)', () => {
     expect(offenders).toEqual([])
   })
 
+  // 0144: the till alone asks for the wider column, and splits it by the screen's own container.
+  test('only the till is wide, and it puts the basket beside the panes by container', async () => {
+    const pages = [...new Bun.Glob('**/*.vue').scanSync({ cwd: 'app/pages/tonight', onlyFiles: true })]
+    const wide = []
+    for (const page of pages) {
+      if (/nightWide:\s*true/.test(await read(`app/pages/tonight/${page}`))) wide.push(page)
+    }
+    expect(wide).toEqual(['till/index.vue'])
+    const screen = await component('NightScreen')
+    expect(screen).toContain('@container/night')
+    expect(screen).toMatch(/meta\.nightWide/)
+    expect(await read(LAYOUT)).toMatch(/meta\.nightWide/)
+    expect(await read('app/pages/tonight/till/index.vue')).toMatch(/@2xl\/night:grid-cols-/)
+  })
+
   // The hub still has to be a show-night screen in every other respect, so the two primitives it
   // does use are checked here rather than left to the e2e suite alone.
   test('the hub is built from the show-night primitives it does use', async () => {

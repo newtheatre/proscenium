@@ -87,8 +87,8 @@ const anItem = async (over: Record<string, unknown> = {}): Promise<string> =>
   created(await send('POST', '/api/admin/bar/items', { name: named('Tonic'), unit: 'ML', containerMl: 200, ageRestricted: false, ...over }))
 
 // The till answers allergens from the stock a size pours (issue 1348), so they are recorded there.
-async function aProductPouring(name: string, allergenNotes: string): Promise<{ productId: string }> {
-  const itemId = await anItem({ name: named(`${name} stock`), allergenState: 'RECORDED', allergenNotes })
+async function aProductPouring(name: string, allergen: string, allergenNotes: string): Promise<{ productId: string }> {
+  const itemId = await anItem({ name: named(`${name} stock`), allergenState: 'RECORDED', allergens: [allergen], allergenNotes })
   expect((await send('POST', '/api/admin/bar/movements', { itemId, kind: 'DELIVERY', qty: 5000, costPence: 5000 })).status).toBe(200)
   const productId = await aProductIn(await aCategory(), { name: named(name) })
   const variantId = await addVariant(productId)
@@ -388,7 +388,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
   test('the allergen affordance shows the state without leaving the sale (F-107 criteria 1, 2, 3)', async () => {
     const { venueId } = programme('sale-allergen')
-    const { productId } = await aProductPouring('Screen note', 'Contains nuts')
+    const { productId } = await aProductPouring('Screen note', 'NUTS', 'Contains nuts')
     await openTill(venueId)
 
     const view = await openSignedOutView(app.baseURL)
@@ -403,6 +403,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await waitFor(view, `document.querySelector('[data-test="allergen-note"]')`)
     expect(await textOf(view, '[data-test="allergen-state"]')).toContain('Allergens recorded')
     expect(await textOf(view, '[data-test="allergen-note"]')).toContain('Contains nuts')
+    expect(await textOf(view, '[data-test="allergen-list"]')).toContain('Tree nuts')
 
     // Closing the note returns to the same basket, not away from it.
     await click(view, `[data-test="product-${productId}"]`)
@@ -415,7 +416,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // since the question usually comes after the round is rung up.
   test('the allergen affordance is also on the basket line', async () => {
     const { venueId } = programme('sale-allergen-line')
-    const { productId } = await aProductPouring('Basket line note', 'Contains gluten')
+    const { productId } = await aProductPouring('Basket line note', 'GLUTEN', 'Contains gluten')
     await openTill(venueId)
 
     const view = await openSignedOutView(app.baseURL)
@@ -442,7 +443,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     const { venueId } = programme('sale-allergen-poured')
     const { productId, variantId } = await aSellableProduct({ name: named('Poured note') })
     const wine = named('Poured red')
-    const itemId = await anItem({ name: wine, allergenState: 'RECORDED', allergenNotes: 'Contains sulphites' })
+    const itemId = await anItem({ name: wine, allergenState: 'RECORDED', allergens: ['SULPHITES'], allergenNotes: 'Contains sulphites' })
     await send('PUT', `/api/admin/bar/variants/${variantId}/components`, { components: [{ itemId, qty: 25 }] })
     await openTill(venueId)
 
@@ -450,6 +451,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     expect(listed.products.find(product => product.id === productId)).toMatchObject({
       allergenState: 'RECORDED',
       allergenNote: `${wine}: Contains sulphites.`,
+      allergens: ['SULPHITES'],
     })
   })
 

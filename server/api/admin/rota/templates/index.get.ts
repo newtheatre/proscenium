@@ -10,11 +10,13 @@ export default defineEventHandler(async (event) => {
   const input = await getValidatedQueryOrThrow(event, query)
   const clause = venueTemplatesClause(input)
 
-  const [venues, total] = await Promise.all([
+  const [venues, total, houseDefaults] = await Promise.all([
     listVenueTemplates(clause, input.pageSize, offsetFor(input.page, input.pageSize)),
     countVenueTemplates(clause),
+    shiftOffsetDefaults(event),
   ])
   const { items, ...page } = envelope(venues, total, input.page, input.pageSize)
 
-  return { venues: items, ...page }
+  // What a blank offset stands for, so the form can say the number rather than "the default" (0140).
+  return { venues: items, ...page, houseDefaults }
 })

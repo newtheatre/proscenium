@@ -18,7 +18,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  openAllergens: [{ name: string, state: SaleProduct['allergenState'], note: string | null }]
+  openAllergens: [{ name: string, state: SaleProduct['allergenState'], note: string | null, allergens: SaleProduct['allergens'] }]
   closeSizing: []
   closeChoosing: []
 }>()
@@ -41,7 +41,7 @@ function priceLine(product: SaleProduct): string {
 </script>
 
 <template>
-  <div>
+  <div class="@container">
     <div
       v-if="nonEmptyCategories.length > 1"
       class="sticky top-0 z-10 -mx-4 mb-2 flex gap-2 overflow-x-auto bg-default px-4 py-2"
@@ -81,7 +81,7 @@ function priceLine(product: SaleProduct): string {
       <h2 class="mb-2 text-sm font-semibold text-muted">
         {{ category.name }}
       </h2>
-      <div class="mb-4 grid grid-cols-2 gap-2">
+      <div class="mb-4 grid grid-cols-2 gap-2 @lg:grid-cols-3">
         <!-- One row of controls: the allergen button sits in the tile's corner beside the product,
              not under it, so a tile is no taller than its name and price (F-107.1, issue 1311). -->
         <div
@@ -131,7 +131,7 @@ function priceLine(product: SaleProduct): string {
             class="absolute end-0 top-0 size-12 justify-center"
             :aria-label="`Allergens for ${product.name}`"
             :data-test="`allergen-${product.id}`"
-            @click="emit('openAllergens', { name: product.name, state: product.allergenState, note: product.allergenNote })"
+            @click="emit('openAllergens', { name: product.name, state: product.allergenState, note: product.allergenNote, allergens: product.allergens })"
           />
         </div>
       </div>

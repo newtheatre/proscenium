@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysMoney, saysQuantity } from '#shared/utils/bar'
-import { joinCount, saysCount, splitCount, stocktakeGroups } from '#shared/utils/stocktakes'
+import { joinCount, NO_STOCK_GROUP, saysCount, splitCount, stocktakeGroups } from '#shared/utils/stocktakes'
 import type { StocktakeLine } from '#shared/utils/stocktakes'
 
 // The count itself, shelf by shelf (issue 1321, F-115): each line saves as its field commits, and
@@ -118,6 +118,9 @@ const visibleGroups = computed(() => stocktakeGroups(uncountedOnly.value
   ? props.lines.filter(line => !counted(line) || line.itemId === opening.value)
   : props.lines))
 
+// A bar with no stock groups gets no heading saying so over its only list.
+const onlyUngrouped = computed(() => visibleGroups.value.length === 1 && visibleGroups.value[0]!.name === NO_STOCK_GROUP)
+
 const countedTotal = computed(() => props.lines.filter(counted).length)
 const failedTotal = computed(() => props.lines.filter(line => state.value[line.itemId] === 'failed').length)
 const savingNow = computed(() => props.lines.some(line => state.value[line.itemId] === 'saving'))
@@ -179,7 +182,10 @@ const FIELD = {
         :key="group.name"
         class="space-y-2"
       >
-        <h3 class="text-sm font-medium text-muted">
+        <h3
+          v-if="!onlyUngrouped"
+          class="text-sm font-medium text-muted"
+        >
           {{ group.name }}
         </h3>
         <ul class="divide-y divide-default rounded-md border border-default">
@@ -204,25 +210,31 @@ const FIELD = {
               @focusout="released"
             >
               <template v-if="open && byContainer(line)">
-                <UInputNumber
-                  v-bind="FIELD"
-                  :model-value="shown(line, 'full')"
-                  placeholder="Full"
-                  :aria-label="`Full containers, ${line.itemName}`"
-                  :data-test="`counted-${line.itemId}`"
-                  @update:model-value="value => commitHalf(line, 'full', value ?? undefined)"
-                  @keydown.enter.prevent="focusNext(line, 'full')"
-                />
-                <UInputNumber
-                  v-bind="FIELD"
-                  :model-value="shown(line, 'part')"
-                  :max="line.containerMl"
-                  placeholder="Open, ml"
-                  :aria-label="`Millilitres left in the open one, ${line.itemName}`"
-                  :data-test="`counted-part-${line.itemId}`"
-                  @update:model-value="value => commitHalf(line, 'part', value ?? undefined)"
-                  @keydown.enter.prevent="focusNext(line, 'part')"
-                />
+                <!-- Labelled on the line, not only by placeholder, so a typed figure still says
+                     which half it is (0142). -->
+                <label class="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
+                  Full
+                  <UInputNumber
+                    v-bind="FIELD"
+                    :model-value="shown(line, 'full')"
+                    :aria-label="`Full containers, ${line.itemName}`"
+                    :data-test="`counted-${line.itemId}`"
+                    @update:model-value="value => commitHalf(line, 'full', value ?? undefined)"
+                    @keydown.enter.prevent="focusNext(line, 'full')"
+                  />
+                </label>
+                <label class="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
+                  Open one, ml
+                  <UInputNumber
+                    v-bind="FIELD"
+                    :model-value="shown(line, 'part')"
+                    :max="line.containerMl"
+                    :aria-label="`Millilitres left in the open one, ${line.itemName}`"
+                    :data-test="`counted-part-${line.itemId}`"
+                    @update:model-value="value => commitHalf(line, 'part', value ?? undefined)"
+                    @keydown.enter.prevent="focusNext(line, 'part')"
+                  />
+                </label>
               </template>
               <UInputNumber
                 v-else-if="open"

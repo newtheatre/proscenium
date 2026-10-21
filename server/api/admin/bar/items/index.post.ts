@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { stockItemForm } from '#shared/utils/bar'
+import { stockItemForm, storeAllergens } from '#shared/utils/bar'
 
 // Add a stocked item, with the unit it is counted in.
 export default defineEventHandler(async (event) => {
@@ -11,9 +11,9 @@ export default defineEventHandler(async (event) => {
   // item and a refusal rather than a constraint error (0003, 0006, 0049).
   const applied = await auditedWrite(
     db.all<{ id: string }>(sql`
-      INSERT INTO bar_items (id, name, unit, container_ml, par_qty, category, age_restricted, allergen_state, allergen_notes, status)
+      INSERT INTO bar_items (id, name, unit, container_ml, par_qty, category, age_restricted, allergen_state, allergen_notes, allergens, status)
       SELECT ${id}, ${input.name}, ${input.unit}, ${input.containerMl ?? null}, ${input.parQty ?? null}, ${input.category ?? null},
-             ${input.ageRestricted ? 1 : 0}, ${input.allergenState}, ${input.allergenNotes ?? null}, 'ACTIVE'
+             ${input.ageRestricted ? 1 : 0}, ${input.allergenState}, ${input.allergenNotes ?? null}, ${storeAllergens(input.allergens)}, 'ACTIVE'
       WHERE NOT EXISTS (SELECT 1 FROM bar_items WHERE name = ${input.name} COLLATE NOCASE)
       RETURNING id
     `),
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'bar.item.created',
       target: `bar-item:${id}`,
-      detail: { name: input.name, unit: input.unit, containerMl: input.containerMl ?? null },
+      detail: { name: input.name, unit: input.unit, containerMl: input.containerMl ?? null, allergens: storeAllergens(input.allergens) },
     }),
   )
 

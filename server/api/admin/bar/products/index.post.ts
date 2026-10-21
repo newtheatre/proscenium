@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { productForm } from '#shared/utils/bar'
+import { productForm, storeAllergens } from '#shared/utils/bar'
 
 // Add a product. It arrives hidden: going on the till is its own decision, and its own refusal.
 export default defineEventHandler(async (event) => {
@@ -15,9 +15,9 @@ export default defineEventHandler(async (event) => {
   // product and a refusal rather than a constraint error (0003, 0006, 0049).
   const applied = await auditedWrite(
     db.all<{ id: string }>(sql`
-      INSERT INTO bar_products (id, category_id, name, status, staffed_only, age_restricted, allergen_state, allergen_note, sort)
+      INSERT INTO bar_products (id, category_id, name, status, staffed_only, age_restricted, allergen_state, allergen_note, allergens, sort)
       SELECT ${id}, ${input.categoryId}, ${input.name}, 'HIDDEN', ${input.staffedOnly ? 1 : 0},
-             ${input.ageRestricted ? 1 : 0}, ${input.allergenState}, ${input.allergenNote ?? null}, ${input.sort}
+             ${input.ageRestricted ? 1 : 0}, ${input.allergenState}, ${input.allergenNote ?? null}, ${storeAllergens(input.addedAllergens)}, ${input.sort}
       WHERE NOT EXISTS (SELECT 1 FROM bar_products WHERE name = ${input.name} COLLATE NOCASE)
       RETURNING id
     `),
@@ -30,6 +30,7 @@ export default defineEventHandler(async (event) => {
         categoryId: input.categoryId,
         ageRestricted: input.ageRestricted,
         allergenState: input.allergenState,
+        addedAllergens: storeAllergens(input.addedAllergens),
       },
     }),
   )

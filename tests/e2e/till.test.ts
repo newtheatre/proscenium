@@ -19,6 +19,8 @@ import type { TestMember } from '#tests/helpers/accounts'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+// The phone the show-night screens are built for; a wider view gets the till's wide layout (0144).
+const PHONE = { width: NIGHT_VIEWPORT_PX, height: 780 }
 
 let app: AppUnderTest
 let admin: TestMember
@@ -345,7 +347,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // only (K-102 criterion 2).
 
   // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
-  test.skip('Close till is reached from the overflow menu, not the pinned actions, and still closes the session', async () => {
+  test.skip('Close till is a labelled button at the top, not one of the pinned actions, and still closes the session', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-close', screenPassword)
     await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
@@ -362,9 +364,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="open-close-till"]')`)).toBe(false)
 
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
     // A blank field is not a reading, so the nought the reader shows is keyed in.
     await fillNumber(view, '[data-test="actual-z-input"]', '0')
@@ -393,9 +393,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
 
     // A blank field is not a reading, even though it prices as nought (finding 13 follow-up).
@@ -430,9 +428,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
 
     await fillNumber(view, '[data-test="actual-z-input"]', '5')
@@ -466,9 +462,7 @@ describe.skipIf(skip !== null)('the screen', () => {
     await finishSignIn(app, view, screenBar.email)
 
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
-    await click(view, '[data-test="till-overflow-menu"]')
-    await waitFor(view, `[...document.querySelectorAll('[role="menuitem"]')].some(el => el.textContent.includes('Close till'))`)
-    await view.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent.includes('Close till')).click()`)
+    await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
 
     // The modal opened on a nought expectation; a sale elsewhere then moves it to £2.50.
@@ -960,7 +954,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   // Issue 1311: the bar under the thumb opens the basket as a sheet, so checking or correcting it
   // never means scrolling past the grid and back.
   test('the summary bar opens the basket as a sheet, and a line changed there changes the total', async () => {
-    const { view, productId } = await atTheTill()
+    const { view, productId } = await atTheTill(false, PHONE)
     await click(view, `[data-test="product-${productId}"]`)
     await click(view, '[data-test="basket-summary-open"]')
     await waitFor(view, `document.querySelector('[data-test="basket-sheet"] [data-test^="line-plus-"]')`)
@@ -1002,7 +996,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
 
   // Every control on a show-night screen, not only the primary ones (design-language.md rule 4).
   test('every control a thumb reaches for clears 48 pixels', async () => {
-    const { view, productId } = await atTheTill(true)
+    const { view, productId } = await atTheTill(true, PHONE)
     await waitFor(view, `document.querySelector('[data-test="category-chips"] button')`)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
@@ -1014,7 +1008,7 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
       ...document.querySelectorAll('[data-test="category-chips"] button'),
       document.querySelector('[data-test="allergen-${productId}"]'),
       document.querySelector('[data-test="till-comp-chip"]'),
-      document.querySelector('[data-test="till-overflow-menu"]'),
+      document.querySelector('[data-test="till-close"]'),
       document.querySelector('[data-test="basket-summary-open"]'),
       document.querySelector('[data-test="basket-added-undo"]'),
       ...document.querySelectorAll('[role="tab"]'),
@@ -1033,12 +1027,31 @@ describe.skipIf(skip !== null)('the show-night layout (K-102, issue 1150 item 8)
   // K-102 criterion 1: the bar's one row, the press named with its Undo beside the comp chip and the
   // total, still fits the narrowest phone the show-night screens are built for.
   test('the bar under the thumb fits a 360 pixel phone while a press is named', async () => {
-    const { view, productId } = await atTheTill(false, { width: NIGHT_VIEWPORT_PX, height: 780 })
+    const { view, productId } = await atTheTill(false, PHONE)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="till-comp-chip"]')`)
     await click(view, `[data-test="product-${productId}"]`)
     await waitFor(view, `document.querySelector('[data-test="basket-added"]') && document.querySelector('[data-test="till-comp-chip"]')`)
     expect(await view.evaluate<boolean>(`document.documentElement.scrollWidth <= window.innerWidth`)).toBe(true)
+    view.close()
+  }, 120_000)
+
+  // 0144: a tablet sees the basket beside the drinks, with no sheet to open and no sideways scroll.
+  test('on a tablet the basket sits beside the drinks, and the sheet button is not drawn', async () => {
+    const { view, productId } = await atTheTill(false, { width: 1024, height: 768 })
+    await click(view, `[data-test="product-${productId}"]`)
+    await waitFor(view, `document.querySelector('[data-test="till-basket-column"] [data-test^="line-qty-"]')`)
+    const placed = await view.evaluate<{ beside: boolean, summaryHidden: boolean, fits: boolean }>(`(() => {
+      const grid = document.querySelector('#pane-bar-panel').getBoundingClientRect()
+      const basket = document.querySelector('[data-test="till-basket-column"]').getBoundingClientRect()
+      const summary = document.querySelector('[data-test="basket-summary-open"]')
+      return {
+        beside: basket.left >= grid.right && basket.top < grid.bottom,
+        summaryHidden: !summary || summary.getBoundingClientRect().width === 0,
+        fits: document.documentElement.scrollWidth <= window.innerWidth,
+      }
+    })()`)
+    expect(placed).toEqual({ beside: true, summaryHidden: true, fits: true })
     view.close()
   }, 120_000)
 })
