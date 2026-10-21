@@ -95,15 +95,7 @@ async function remove(): Promise<void> {
 const pricing = ref<BarCategory | null>(null)
 const history = ref<CategoryPrice[]>([])
 const kindOptions = SERVING_KINDS.map(value => ({ label: says(value), value }))
-const price = reactive({ servingKind: 'single' as ServingKind, pricePence: 0, effectiveFrom: '' })
-
-// The field takes pounds and the request carries pence, converted here and nowhere else (0004).
-const pounds = computed({
-  get: () => price.pricePence / 100,
-  set: (value: number) => {
-    price.pricePence = Math.round((value ?? 0) * 100)
-  },
-})
+const price = reactive({ servingKind: 'single' as ServingKind, pricePence: undefined as number | undefined, effectiveFrom: '' })
 
 async function editPrices(category: BarCategory): Promise<void> {
   pricing.value = category
@@ -112,7 +104,7 @@ async function editPrices(category: BarCategory): Promise<void> {
   try {
     const answered = await request<{ prices: CategoryPrice[], on: string }>(`/api/admin/bar/categories/${category.id}/prices`)
     history.value = answered.prices
-    Object.assign(price, { servingKind: 'single', pricePence: 0, effectiveFrom: answered.on })
+    Object.assign(price, { servingKind: 'single', pricePence: undefined, effectiveFrom: answered.on })
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -423,13 +415,10 @@ const columns: TableColumn<BarCategory>[] = [
               label="Price"
               name="pricePence"
               required
-              description="In pounds. It is held in pence and formatted only when it is shown."
+              description="In pounds and pence, such as 2.50."
             >
-              <UInputNumber
-                v-model="pounds"
-                :min="0"
-                :step="0.01"
-                :format-options="{ style: 'currency', currency: 'GBP' }"
+              <PoundsField
+                v-model="price.pricePence"
                 class="w-full"
                 data-test="category-price-amount"
               />

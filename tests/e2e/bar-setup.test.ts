@@ -328,7 +328,8 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
     }
   }, 120_000)
 
-  test('a can whose new stocked item is switched off sells without Check ID', async () => {
+  // A soft drink's new stocked item starts unrestricted from its category (F-111 criterion 6).
+  test('a can under soft drinks starts with its stocked item unrestricted and sells without Check ID', async () => {
     const categoryName = named('Soft drinks')
     const categoryId = await aCategory(categoryName)
     const productName = named('Cola')
@@ -343,7 +344,7 @@ describe.skipIf(skip !== null)('the product\'s age flag follows what it pours (i
       await fill(view, '[data-test="setup-name"]', productName)
       await pickOption(view, '[data-test="setup-category"]', categoryName)
       await fill(view, '[data-test="setup-item-name"]', named('Cola 330ml can'))
-      await click(view, '[data-test="setup-item-age-restricted"]')
+      await waitFor(view, `document.querySelector('[data-test="setup-item-age-restricted"]')?.getAttribute('aria-checked') === 'false'`)
       await fillNumber(view, '[data-test="setup-price"]', '1.5')
       await setUp(view)
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { compsCountQuery, compsReportQuery, gpDepletionQuery, gpRevenueQuery, varianceCountQuery, varianceQuery, wastageQuery } from '#server/utils/bar-reports'
+import { compsCountQuery, compsReportQuery, discountsReportQuery, gpDepletionQuery, gpRevenueQuery, gpUncostedQuery, gpUnpouredQuery, varianceCountQuery, varianceQuery, varianceTotalQuery, wastageQuery } from '#server/utils/bar-reports'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -420,6 +420,82 @@ describe('wastage groups by reason, item and category (0079, F-204 criterion 2)'
       depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
 
       expect(read<WastageRow>(database, wastageQuery(FROM_AT, TO_AT))).toEqual([])
+    })
+  })
+})
+
+// The review rang one two-line sale with a discount and "Times applied" went from 1 to 3 (F-117).
+describe('a discount counts the sales given it, not their lines (F-117 criterion 5)', () => {
+  test('a two-line sale is one use, however many lines carry the discount', async () => {
+    await withDatabase((database) => {
+      insert(database, 'discounts', { id: 'd-1', name: 'Members', percent: 10 })
+      const first = entry(database, 'e-1', INSIDE)
+      const second = entry(database, 'e-2', INSIDE)
+      for (const [id, entryId] of [['l-1', first], ['l-2', second], ['l-3', second]] as const) {
+        insert(database, 'ledger_lines', { id, entry_id: entryId, kind: 'BAR_ITEM', amount_pence: 450, discount_id: 'd-1', discount_percent: 10, discount_pence: 50 })
+      }
+
+      expect(read<{ timesApplied: number, discountedPence: number }>(database, discountsReportQuery(FROM_AT, TO_AT)))
+        .toEqual([expect.objectContaining({ timesApplied: 2, discountedPence: 150 })])
+    })
+  })
+})
+
+// The variance section had no stocktake date, no unit and no total (0128).
+describe('a variance line says which stocktake and in what unit, and the section totals (F-119)', () => {
+  test('each line carries its stocktake\'s opening and applying, and its unit', async () => {
+    await withDatabase((database) => {
+      const openedBy = person(database)
+      variance(database, '1', bottle(database, '1'), openedBy, -5)
+
+      expect(read(database, varianceQuery(FROM_AT, TO_AT, 10, 0)))
+        .toEqual([expect.objectContaining({ itemName: 'Gin 1', unit: 'ML', openedAt: BEFORE, appliedAt: INSIDE, qtyVariance: -5 })])
+    })
+  })
+
+  test('the total is of the whole period, not the page', async () => {
+    await withDatabase((database) => {
+      const openedBy = person(database)
+      const one = bottle(database, '1')
+      const two = bottle(database, '2')
+      delivery(database, 'd-1', one, 700, PENCE_PER_ML)
+      delivery(database, 'd-2', two, 700, PENCE_PER_ML)
+      variance(database, '1', one, openedBy, -5)
+      variance(database, '2', two, openedBy, 2)
+
+      expect(read<{ totalValuePence: number }>(database, varianceTotalQuery(FROM_AT, TO_AT))[0]?.totalValuePence).toBe(-3)
+    })
+  })
+})
+
+// Seeded sales of Lager moved no stock, so gross profit counted them at no cost and said nothing.
+describe('gross profit names what it could not cost (F-119 criterion 1)', () => {
+  test('a sale that poured nothing, and a pour with no delivered cost, are both named', async () => {
+    await withDatabase((database) => {
+      insert(database, 'bar_categories', { id: 'cat-1', name: 'Beer' })
+      insert(database, 'bar_products', { id: 'p-1', category_id: 'cat-1', name: 'Lager' })
+      insert(database, 'product_variants', { id: 'v-1', product_id: 'p-1', serving_kind: 'pint', label: 'Pint' })
+      insert(database, 'ledger_lines', { id: 'l-1', entry_id: entry(database, 'e-1', INSIDE), kind: 'BAR_ITEM', amount_pence: 450, product_variant_id: 'v-1' })
+
+      const itemId = bottle(database)
+      insert(database, 'stock_movements', { id: 'd-1', item_id: itemId, qty: 700, kind: 'DELIVERY', created_at: BEFORE })
+      const sale = line(database, 'l-2', entry(database, 'e-2', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
+
+      expect(read<{ productName: string }>(database, gpUnpouredQuery(FROM_AT, TO_AT)).map(row => row.productName)).toEqual(['Lager'])
+      expect(read<{ itemName: string }>(database, gpUncostedQuery(FROM_AT, TO_AT)).map(row => row.itemName)).toEqual(['Gin 1'])
+    })
+  })
+
+  test('a sale that poured from a delivered item is named in neither', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 700, PENCE_PER_ML)
+      const sale = line(database, 'l-1', entry(database, 'e-1', INSIDE), 500)
+      depletion(database, 'm-1', itemId, 50, 'SALE', sale, INSIDE)
+
+      expect(read(database, gpUnpouredQuery(FROM_AT, TO_AT))).toEqual([])
+      expect(read(database, gpUncostedQuery(FROM_AT, TO_AT))).toEqual([])
     })
   })
 })

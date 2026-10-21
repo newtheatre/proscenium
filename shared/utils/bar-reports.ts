@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { MOVEMENT_REASONS } from '#shared/utils/bar'
 import { londonDayField } from '#shared/utils/membership'
+import { londonClock } from '#shared/utils/london'
+import { londonDayOf } from '#shared/utils/ledger'
 import type { MovementReason, StockUnit } from '#shared/utils/bar'
 import type { Page } from '#shared/utils/pagination'
 
@@ -36,6 +38,40 @@ export const REPORT_EXPORT_PAGE_ROWS = 1000
 const NOT_A_LOSS: MovementReason[] = ['COUNT_CORRECTION', 'OPENING_BALANCE']
 export const WASTAGE_REASONS: MovementReason[] = MOVEMENT_REASONS.filter(reason => !NOT_A_LOSS.includes(reason))
 
+// A CSV is read by a spreadsheet, so money is a plain decimal under a "(£)" heading, a minus is
+// ASCII and a moment is an ISO London date: the SU export's conventions, not the screen's (0128).
+export const csvPounds = (pence: number): string => (pence / 100).toFixed(2)
+
+export function csvWhen(at: number): string {
+  const instant = new Date(at * 1000)
+  return `${londonDayOf(instant)} ${londonClock(instant)}`
+}
+
+// Declared rather than read off the first row, so a period with nothing in it still exports its heading.
+export const BAR_REPORT_COLUMNS: Record<ReportSection, string[]> = {
+  sales: ['Category', 'Product', 'Size', 'Quantity', 'Revenue (£)'],
+  gp: ['Item', 'Unit', 'Quantity poured', 'Cost (£)'],
+  variance: ['Stocktake opened', 'Stocktake applied', 'Item', 'Unit', 'Variance', 'Value (£)'],
+  comps: ['When', 'Reason', 'Approved by', 'Forgone (£)'],
+  discounts: ['Discount', 'Percent', 'Sales given it', 'Discounted (£)'],
+  wastage: ['Reason', 'Item', 'Stock group', 'Unit', 'Quantity wasted', 'Cost (£)'],
+}
+
+function periodForFile(period: ReportPeriodInput): string {
+  switch (period.kind) {
+    case 'NIGHT': return `night-${period.night}`
+    case 'WEEK': return `week-from-${period.day}`
+    case 'YEAR': return `year-to-july-${period.year}`
+    case 'CUSTOM': return `${period.from}-to-${period.to}`
+  }
+}
+
+// Two exports of different periods never share a name, so a download folder keeps both.
+export function barReportFileName(section: ReportSection, period: ReportPeriodInput, paging?: { page: number, pages: number }): string {
+  const paged = paging && paging.pages > 1 ? `-page-${paging.page}-of-${paging.pages}` : ''
+  return `bar-${section}-${periodForFile(period)}${paged}`
+}
+
 // What a paged section says when it does not fit, so the first page is never read as the whole.
 export function saysPageOf(page: Page<unknown>): string {
   if (page.items.length === 0) return `Nothing on this page. There are ${page.total} in the period.`
@@ -63,14 +99,25 @@ export interface GpReport {
   costPence: number
   grossProfitPence: number
   byItem: GpRow[]
+  // Products sold with no stock poured, and items poured with no delivered cost: either way the
+  // cost side is short, so the screen names them rather than overstating profit.
+  unpoured: string[]
+  uncosted: string[]
 }
 
 export interface VarianceRow {
   stocktakeId: string
   itemName: string
+  unit: StockUnit
+  openedAt: number
   appliedAt: number
   qtyVariance: number
   valuePence: number
+}
+
+export interface VarianceSection extends Page<VarianceRow> {
+  // The whole period's value, not the page's: quantities do not sum across units, money does.
+  totalValuePence: number
 }
 
 export interface CompRow {
@@ -105,7 +152,7 @@ export interface BarReport {
   toAt: number
   sales: SalesRow[]
   gp: GpReport
-  variance: Page<VarianceRow>
+  variance: VarianceSection
   comps: Page<CompRow>
   discounts: DiscountRow[]
   wastage: WastageRow[]

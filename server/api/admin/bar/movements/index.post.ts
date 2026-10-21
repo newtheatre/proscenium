@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
-import { HAND_ENTERED_KINDS, KINDS_NEEDING_A_REASON, MOVEMENT_WRITERS, REVERSIBLE_KINDS, deliveryCost, movementForm, says } from '#shared/utils/bar'
+import { staysInStock } from '#server/utils/bar'
+import { HAND_ENTERED_KINDS, KINDS_NEEDING_A_REASON, MOVEMENT_WRITERS, REVERSIBLE_KINDS, deliveryCost, movementForm, says, saysQuantity } from '#shared/utils/bar'
 
 // Record a stock movement by hand: a delivery, wastage, an adjustment, or a reversal of one of
 // them. The row is the record, so nothing here writes a second one to the trail (0010).
@@ -37,6 +38,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const reverses = await reversalTarget(input)
+  const shortOf = (): never => {
+    throw createError({
+      statusCode: 409,
+      statusMessage: `That takes away ${saysQuantity(-input.qty, item.unit)} of ${item.name}, but only ${saysQuantity(Math.max(item.onHand, 0), item.unit)} is on hand. Record the delivery first, or take a stocktake if the register is wrong.`,
+    })
+  }
+  if (input.qty < 0 && item.onHand + input.qty < 0) shortOf()
   const id = newId()
   // Kept the way the item is bought, never divided into a price a millilitre (0100).
   const cost = deliveryCost(item, input.qty, costPence)
@@ -49,10 +57,12 @@ export default defineEventHandler(async (event) => {
     SELECT ${id}, ${input.itemId}, ${input.qty}, ${input.kind}, ${reason}, ${cost.unitCostPence}, ${cost.containerCostPence},
            ${cost.containerQty}, ${reverses?.id ?? null}, ${resolved.account.id}
     WHERE ${reverses === null ? sql`1` : sql`NOT EXISTS (SELECT 1 FROM stock_movements WHERE reverses_id = ${reverses.id})`}
+      AND ${staysInStock(input.itemId, input.qty)}
     RETURNING id
   `)
 
   if (written.length === 0) {
+    if (input.qty < 0 && await onHand(input.itemId) + input.qty < 0) shortOf()
     throw createError({ statusCode: 409, statusMessage: 'That movement has already been reversed' })
   }
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { join } from 'node:path'
 import { CONFIRM_BACK_LABEL, statusCell } from '#shared/utils/admin-conventions'
-import { penceFromPounds } from '#shared/utils/admin-forms'
+import { penceFromPounds, penceFromTyped, wholeFromTyped } from '#shared/utils/admin-forms'
 import { saysMoney } from '#shared/utils/bar'
 import { plural } from '#shared/utils/text'
 
@@ -278,6 +278,25 @@ describe('a figure read off the card reader is typed as pounds and pence', () =>
   test('anything else is refused rather than guessed', () => {
     for (const raw of ['', '  ', 'abc', '12.345', '1.2.3', '-5', '12p', '\u00a3']) {
       expect(penceFromPounds(raw)).toBeNull()
+    }
+  })
+
+  // The review typed "2,50" as a bar price and the till charged £250.00 (0127).
+  test('a typed price takes one figure of pence, and refuses a decimal comma or a third figure', () => {
+    expect(penceFromTyped('1.5')).toBe(150)
+    expect(penceFromTyped('2.50')).toBe(250)
+    expect(penceFromTyped('£2')).toBe(200)
+    for (const raw of ['2,50', '2,00', '1.555', '7.555', '-1.50', '-5', '', 'abc', '2.5.0']) {
+      expect(penceFromTyped(raw)).toBeNull()
+    }
+  })
+
+  // An opening quantity of -5 became 1 and 2.5 became 3 (0127).
+  test('a typed quantity is digits only, never clamped or rounded', () => {
+    expect(wholeFromTyped('12')).toBe(12)
+    expect(wholeFromTyped(' 0 ')).toBe(0)
+    for (const raw of ['-5', '2.5', '1,000', '12.0', '', 'ten', '+3']) {
+      expect(wholeFromTyped(raw)).toBeNull()
     }
   })
 
