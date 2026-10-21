@@ -150,16 +150,11 @@ const columns: TableColumn<Discount>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <!-- Retire and Bring back act from the table, with no modal open to show the form's own alert. -->
     <UAlert
       v-if="failure && !open"
@@ -297,5 +292,5 @@ const columns: TableColumn<Discount>[] = [
       @update:open="value => { if (!value) retiring = null }"
       @confirm="retire"
     />
-  </div>
+  </ReadGate>
 </template>

@@ -48,6 +48,7 @@
     },
   },
   "patchedDependencies": {
+    "@nuxt/ui@4.11.0": "patches/@nuxt%2Fui@4.11.0.patch",
     "drizzle-orm@0.45.2": "patches/drizzle-orm@0.45.2.patch",
   },
   "overrides": {

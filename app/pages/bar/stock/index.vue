@@ -436,16 +436,11 @@ const columns: TableColumn<StockItem>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !open && moving === null && removing === null"
       data-test="failure"
@@ -900,5 +895,5 @@ const columns: TableColumn<StockItem>[] = [
       @update:open="value => { if (!value) retiring = null }"
       @confirm="retire"
     />
-  </div>
+  </ReadGate>
 </template>

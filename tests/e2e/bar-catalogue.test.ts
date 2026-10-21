@@ -953,10 +953,20 @@ describe.skipIf(skip !== null)('a bar refusal held to a missing second factor na
 
       // No marker to hydrate on a refused screen: the failure itself is what the next line waits for.
       await view.navigate(`${app.baseURL}/bar/categories`)
-      await waitFor(view, `document.querySelector('[data-test="listing-failure"]')`)
-      const shown = await textOf(view, '[data-test="listing-failure"]')
+      await waitFor(view, `document.querySelector('[data-test="read-failure"]')`)
+      const shown = await textOf(view, '[data-test="read-failure"]')
       expect(shown).toMatch(/authenticator/i)
       expect(shown).toContain('Set up an authenticator app')
+      // The refusal stands in place of the list: no empty table, and no live Add beneath it (0119).
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="add-category"]')`)).toBe(false)
+      expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="bar-categories-table"]')`)).toBe(false)
+
+      // The overview says the wall once, with the way through, and never sends them elsewhere (A-112).
+      await view.navigate(`${app.baseURL}/admin`)
+      await waitFor(view, `document.querySelector('[data-test="authenticator-wall"]')`)
+      expect(await textOf(view, '[data-test="authenticator-wall"]')).toContain('Set up an authenticator app')
+      expect(await view.evaluate<number>(`[...document.querySelectorAll('a')].filter(link => link.innerText.includes('Set up an authenticator app')).length`)).toBe(1)
+      expect(await view.evaluate<boolean>(`document.body.innerText.includes('Open another screen')`)).toBe(false)
       view.close()
     }
     finally {

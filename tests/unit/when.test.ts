@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { showNightOf } from '#shared/utils/show-night'
-import { saysClock, saysDay, saysDayLong, saysMonthDay, saysWhen, saysWhenLong } from '#shared/utils/when'
+import { saysClock, saysDay, saysDayLong, saysDayRange, saysMonthDay, saysWhen, saysWhenLong } from '#shared/utils/when'
 
 // A fixed "today" so the year rule is judged against a known committee year rather than the
 // clock the suite happens to run on (0009).
@@ -117,5 +117,54 @@ describe('a day of the year reads as a day and a month', () => {
   test('something that is not a day of the year is left as it was', () => {
     expect(saysMonthDay('02-29')).toBe('02-29')
     expect(saysMonthDay('')).toBe('')
+  })
+})
+
+// Chrome's ICU puts a comma after the weekday where the server's does not, so a shape that let
+// the locale join its parts rendered "Tue 13 Oct" on the server and "Tue, 13 Oct" after hydration.
+describe('the shapes are the same on the server and in every browser', () => {
+  test('a runtime that joins the weekday with a comma still reads "Tue 13 Oct"', () => {
+    const Native = Intl.DateTimeFormat
+    const Commaed = function (locale?: string | string[], options?: Intl.DateTimeFormatOptions) {
+      const native = new Native(locale, options)
+      const joined = Boolean(options?.weekday && (options.day || options.month))
+      return {
+        format: (at: Date) => (joined ? native.format(at).replace(/^(\w+) /, '$1, ') : native.format(at)),
+        formatToParts: (at: Date) => native.formatToParts(at),
+        resolvedOptions: () => native.resolvedOptions(),
+      }
+    } as unknown as typeof Intl.DateTimeFormat
+    Intl.DateTimeFormat = Commaed
+    try {
+      expect(saysDay('2026-10-13', { now: NOW })).toBe('Tue 13 Oct')
+      expect(saysWhen(seconds('2026-10-13T18:30:00Z'), { now: NOW })).toBe('Tue 13 Oct, 19:30')
+      expect(saysDayLong('2026-10-13', { now: NOW })).toBe('Tuesday 13 October')
+    }
+    finally {
+      Intl.DateTimeFormat = Native
+    }
+  })
+
+  test('every month has one short name', () => {
+    const names = Array.from({ length: 12 }, (_, index) => saysDay(`2026-${String(index + 1).padStart(2, '0')}-15`, { year: false }).split(' ')[2])
+    expect(names).toEqual(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'])
+  })
+})
+
+// "Mon 8 Sept 2025 to Thu 3 Sept" read as ending before it began (0117).
+describe('a span of days names its year when an end leaves this calendar year', () => {
+  const OCTOBER = new Date('2026-10-14T10:00:00Z')
+
+  test('a span inside this calendar year has no year', () => {
+    expect(saysDayRange('2026-10-01', '2026-11-30', { now: OCTOBER })).toBe('Thu 1 Oct to Mon 30 Nov')
+  })
+
+  test('a span crossing the new year names both years', () => {
+    expect(saysDayRange('2026-10-01', '2027-01-31', { now: OCTOBER })).toBe('Thu 1 Oct 2026 to Sun 31 Jan 2027')
+    expect(saysDayRange('2025-09-08', '2026-09-03', { now: OCTOBER })).toBe('Mon 8 Sept 2025 to Thu 3 Sept 2026')
+  })
+
+  test('a span wholly in another year names it once, at the end', () => {
+    expect(saysDayRange('2027-01-01', '2027-02-12', { now: OCTOBER })).toBe('Fri 1 Jan to Fri 12 Feb 2027')
   })
 })

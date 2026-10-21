@@ -148,16 +148,11 @@ const columns: TableColumn<Account>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <div
       v-if="listing.banners.privilegedWithoutFactor || listing.banners.insideRetentionWindow"
       class="flex flex-col gap-2"
@@ -220,7 +215,7 @@ const columns: TableColumn<Account>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ listingFailure ? listingFailure.message : filtered ? 'Nobody matches that.' : 'No accounts yet.' }}
+          {{ filtered ? 'Nobody matches that.' : 'No accounts yet.' }}
         </p>
       </template>
     </UTable>
@@ -315,5 +310,5 @@ const columns: TableColumn<Account>[] = [
         </form>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>
