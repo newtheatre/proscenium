@@ -33,7 +33,7 @@ export interface NightPerformance { id: string, showTitle: string, startsAt: num
 
 // What `GET /api/tonight/authority` answers for one role, or with none for the most specific of the
 // three; only the fields a screen reads.
-export interface NightAuthorityAnswer { via: NightAuthorityVia, performanceIds: string[], performances: NightPerformance[] }
+export interface NightAuthorityAnswer { via: NightAuthorityVia, venueId: string, performanceIds: string[], performances: NightPerformance[] }
 
 export type NightAuthorityAsk = NightRole | 'ANY'
 
@@ -100,12 +100,14 @@ async function readNightAuthority(): Promise<NightAuthority> {
   })
   const known = byRole.some(answer => answer.kind === 'READ' || answer.status === 403)
   const said = held.length === 0 && known && any.kind === 'FAILED' ? any.failure : null
+  // Roles held at two venues name no one house, so the header claims none until the hub's choice (0230).
+  const oneVenue = new Set(held.map(one => one.venueId)).size <= 1
   // A shift is the ordinary way in, so it wins the badge wherever the viewer holds both; a duty
   // manager covering the door is on their own shift, so cover reads as a shift too (0095).
   return {
     roles: held.map(one => one.role),
     via: held.some(one => one.via !== 'OFFICER') ? 'SHIFT' : (held.length > 0 ? 'OFFICER' : null),
-    performances: held[0]?.performances ?? [],
+    performances: oneVenue ? held[0]?.performances ?? [] : [],
     known,
     refusal: hubRefusal(said),
     answers,

@@ -160,6 +160,7 @@ describe('what a read of the house leaves on the hub (E-112 criterion 3, issue 1
   test('signed out or on no shift is a refusal; a server fault or no answer at all is a failure', () => {
     expect(hubHouseRefused(401, 'Sign in')).toEqual({ kind: 'REFUSED' })
     expect(hubHouseRefused(403, 'No shift')).toEqual({ kind: 'REFUSED' })
+    expect(hubHouseRefused(400, 'More than one venue is running tonight')).toEqual({ kind: 'REFUSED' })
     expect(hubHouseRefused(500, 'Broken')).toEqual({ kind: 'FAILED', reason: 'Broken' })
     expect(hubHouseRefused(undefined, '')).toEqual({ kind: 'FAILED', reason: '' })
   })

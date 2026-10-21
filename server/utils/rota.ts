@@ -1044,6 +1044,21 @@ export async function performancesWithConfirmedRole(role: ShiftRole, venueId: st
   return (await db.all<{ performanceId: string }>(performancesWithConfirmedRoleQuery(role, venueId, night))).map(row => row.performanceId)
 }
 
+// The venues a viewer's confirmed performance shifts are at tonight, for the hub's venue choice
+// (0230). Guidance only: the guard still decides what each shift opens.
+export async function tonightShiftVenues(userId: string, from: number, to: number): Promise<string[]> {
+  const found = await db.all<{ venueId: string }>(sql`
+    SELECT DISTINCT p.venue_id AS venueId
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    JOIN users u ON u.id = s.user_id
+    WHERE s.user_id = ${userId} AND s.status = 'CONFIRMED' AND p.status <> 'CANCELLED'
+      AND p.starts_at >= ${from} AND p.starts_at < ${to}
+      AND u.disabled = 0 AND u.anonymised_at IS NULL
+  `)
+  return found.map(row => row.venueId)
+}
+
 // Inside a confirmed shift's own window with the guard's grace, read per request (0078, 0094).
 export async function onShiftTonight(event: H3Event, userId: string, at = new Date()): Promise<boolean> {
   const { from, to } = showNightBounds(showNightOf(at))

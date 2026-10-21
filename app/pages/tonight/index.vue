@@ -58,13 +58,16 @@ async function readStocktake(): Promise<boolean> {
   return read.kind === 'READ' && read.value.stocktake !== null
 }
 
-interface HubRead { house: HubHouseRead<HouseTonight>, checklist: { items: ChecklistEntry[], close: ChecklistClose | null } | null, stocktakeOpen: boolean, at: number }
+// Where this phone works tonight, on a night more than one venue runs (0230).
+const venue = useNightVenue()
+
+interface HubRead { house: HubHouseRead<HouseTonight>, checklist: { items: ChecklistEntry[], close: ChecklistClose | null } | null, stocktakeOpen: boolean, venues: Awaited<ReturnType<typeof venue.read>>, at: number }
 
 // None depends on another's answer, so they run together. The checklist is read before house
 // open too, so its banner has data the instant `houseOpen` turns true.
 async function readHub(): Promise<HubRead> {
-  const [house, items, stocktakeOpen] = await Promise.all([readHouse(), readChecklist(), readStocktake()])
-  return { house, checklist: items, stocktakeOpen, at: Date.now() }
+  const [house, items, stocktakeOpen, venues] = await Promise.all([readHouse(), readChecklist(), readStocktake(), venue.read()])
+  return { house, checklist: items, stocktakeOpen, venues, at: Date.now() }
 }
 
 const shown = ref<HubHouseState<HouseTonight>>({ ...NO_HUB_HOUSE })
@@ -81,6 +84,7 @@ function apply(read: HubRead): void {
     closed.value = read.checklist.close
   }
   stocktakeOpen.value = read.stocktakeOpen
+  if (read.venues) venue.apply(read.venues)
   stamp(read.at)
 }
 
@@ -156,6 +160,16 @@ async function poll(): Promise<void> {
   apply(await readHub())
 }
 
+// Every role is asked again at the chosen venue, so the tiles and the badge are that venue's.
+const choosing = computed(() => venue.step.value === 'CHOOSE')
+async function chooseVenue(venueId: string): Promise<void> {
+  await venue.choose(venueId)
+  chosenId.value = null
+  shown.value = { ...NO_HUB_HOUSE }
+  await resolveNightAuthority()
+  await poll()
+}
+
 // The first read is the served one, or the one under way, so the first poll waits its turn.
 onMounted(() => {
   timer = setInterval(poll, POLL_MS)
@@ -201,16 +215,41 @@ onUnmounted(() => {
       description="Nobody holds tonight's duty manager shift, so nobody on tonight's rota can tick the pre-show checks. Tell the Front of House Manager."
     />
 
+    <!-- Asked before anything is drawn by role: until then the tiles would mix two venues' houses. -->
+    <div
+      v-if="choosing"
+      class="space-y-3 rounded-xl bg-elevated p-4 ring-1 ring-default"
+      data-test="hub-choose-venue"
+    >
+      <p class="font-semibold">
+        More than one venue is running tonight. Choose the one you are working.
+      </p>
+      <p class="text-sm text-muted">
+        Every screen then opens on that venue. You can change it here at any time.
+      </p>
+      <NightVenueSwitcher
+        :venues="venue.choices.value"
+        :chosen-id="null"
+        @choose="chooseVenue"
+      />
+    </div>
+    <NightVenueSwitcher
+      v-else-if="venue.step.value === 'CHOSEN'"
+      :venues="venue.choices.value"
+      :chosen-id="venue.chosen.value"
+      @choose="chooseVenue"
+    />
+
     <!-- A single performance has nothing to switch between, so this stays out of the way. -->
     <NightPerformanceSwitcher
-      v-if="performances.length > 1"
+      v-if="!choosing && performances.length > 1"
       :performances="performances"
       :selected-id="selectedId"
       @choose="chosenId = $event"
     />
 
     <div
-      v-if="kpis"
+      v-if="!choosing && kpis"
       class="grid grid-cols-3 gap-2"
       data-test="tonight-kpis"
     >
@@ -242,7 +281,7 @@ onUnmounted(() => {
 
     <!-- No role tonight: one card rather than tiles that each refuse (issue 1304). -->
     <div
-      v-if="noRole"
+      v-if="!choosing && noRole"
       class="space-y-3 rounded-xl bg-elevated p-4 ring-1 ring-default"
       data-test="hub-no-role"
     >
@@ -274,7 +313,7 @@ onUnmounted(() => {
       <!-- The viewer's own job first and in gold, then the rest in the order a night taps them,
            Emergency last and red so a thumb in the dark never lands on it by accident (E-112 1). -->
       <NightTile
-        v-for="tile in shownTiles"
+        v-for="tile in choosing ? shownTiles.filter(one => one.id === 'emergency') : shownTiles"
         :key="tile.id"
         :label="HUB_TILES[tile.id].label"
         :hint="tileHint(tile.id)"

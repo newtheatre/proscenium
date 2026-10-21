@@ -1,6 +1,8 @@
 import type { H3Event } from 'h3'
 import type { AccountRow } from '#server/utils/accounts'
 import type { Authority } from '#server/utils/authorise'
+import { getCookie } from 'h3'
+import { NIGHT_VENUE_COOKIE, heldNightVenueFromCookie } from '#shared/utils/night-venue'
 import type { NightAuthorityVia, NightRefusalKind, NightRole, NightScope, RecordsRead } from '#shared/utils/night-authority'
 
 // Shift-scoped authority, the guard every show-night route calls (E-111). A confirmed shift is
@@ -29,7 +31,7 @@ interface NightCoverage { venueId: string, performanceIds: string[], venuePerfor
 // nobody asked about. Shared, so both branches refuse it the same way (E-127 criterion 1).
 function refuseAmbiguousVenue(venues: string[]): void {
   if (venues.length > 1) {
-    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance', data: { chooseVenue: true } })
+    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: choose the one you are working on the Tonight hub', data: { chooseVenue: true } })
   }
 }
 
@@ -143,14 +145,14 @@ async function recordOfficerBypass(actorId: string, night: string, covered: Nigh
 // it is recorded as an act would be (0098).
 export interface NightAuthorityOptions { recordsRead?: RecordsRead }
 
-interface Caller { resolved: Authority, tonight: string }
+interface Caller { resolved: Authority, tonight: string, scope: NightScope }
 interface Refusal { kind: NightRefusalKind, error: unknown }
 
 const isAuthority = (answer: NightAuthority | ShiftBranch | ShortOfAuthority): answer is NightAuthority => 'via' in answer
 
 // Identity first, so a signed-out caller is told that and cannot read tonight's date off which
 // refusal it gets back; then the night asked about, which is tonight or nothing (E-111 criterion 2).
-async function callerTonight(event: H3Event, scope: NightScope): Promise<Caller> {
+async function callerTonight(event: H3Event, scope: NightScope, roles: NightRole[]): Promise<Caller> {
   const resolved = await authority(event)
   const tonight = currentShowNight()
   if (scope.night !== undefined && !isShowNight(scope.night)) {
@@ -160,7 +162,19 @@ async function callerTonight(event: H3Event, scope: NightScope): Promise<Caller>
   if (scope.night !== undefined && scope.night !== tonight) {
     throw createError({ statusCode: 403, statusMessage: 'Show-night tools open for tonight only, and that night has ended' })
   }
-  return { resolved, tonight }
+  return { resolved, tonight, scope: await withChosenVenue(event, tonight, scope, roles) }
+}
+
+// The venue the hub chose on this phone narrows a request that names none, and only one: it never
+// widens, and the till keeps its own remembered bar, so a BAR-only request ignores it (0230).
+async function withChosenVenue(event: H3Event, tonight: string, scope: NightScope, roles: NightRole[]): Promise<NightScope> {
+  if (scope.venueId || scope.performanceId) return scope
+  if (roles.length === 1 && roles[0] === 'BAR') return scope
+  const venueId = heldNightVenueFromCookie(getCookie(event, NIGHT_VENUE_COOKIE), tonight)
+  if (!venueId) return scope
+  // A venue with nothing on tonight is a stale choice, not a reason to refuse the whole night.
+  const running = (await performancesOnNight(tonight, venueId)).some(one => one.status !== 'CANCELLED')
+  return running ? { ...scope, venueId } : scope
 }
 
 // Tonight's confirmed duty manager opens the door for their own performance and window, after
@@ -269,18 +283,18 @@ export async function requireNightAuthority(
   scope: NightScope = {},
   options: NightAuthorityOptions = {},
 ): Promise<NightAuthority> {
-  const caller = await callerTonight(event, scope)
-  let answer = await throughShift(event, caller, role, scope)
+  const caller = await callerTonight(event, scope, [role])
+  let answer = await throughShift(event, caller, role, caller.scope)
   if (isAuthority(answer)) return answer
   if (role === 'DOOR') {
-    const cover = await throughCover(event, caller, scope, options)
+    const cover = await throughCover(event, caller, caller.scope, options)
     if (isAuthority(cover)) return cover
     // The door's own hours win; with none, a duty manager outside theirs is told those.
     if (!answer.outsideWindow) answer = cover
   }
   // An officer holding tonight's shift at the wrong hour keeps their bypass all the same (0078).
-  if (!caller.resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) throw (await shiftRefusal(caller, role, scope, answer)).error
-  return throughBypass(event, caller, role, scope, options)
+  if (!caller.resolved.permissions.has(NIGHT_ROLE_PERMISSION[role])) throw (await shiftRefusal(caller, role, caller.scope, answer)).error
+  return throughBypass(event, caller, role, caller.scope, options)
 }
 
 interface ShortOfAuthority { short: { role: NightRole, held: ShiftBranch }[], refusals: Refusal[] }
@@ -336,12 +350,12 @@ export async function requireAnyNightAuthority(
   scope: NightScope = {},
   options: NightAuthorityOptions = {},
 ): Promise<NightAuthority> {
-  const caller = await callerTonight(event, scope)
-  const found = await firstAuthority(event, caller, roles, scope, options)
+  const caller = await callerTonight(event, scope, roles)
+  const found = await firstAuthority(event, caller, roles, caller.scope, options)
   if (isAuthority(found)) return found
   // The refusal about the caller's own position, never merely the last role asked (issue 1303).
   const { short, refusals } = found
-  for (const { role, held } of short) refusals.push(await shiftRefusal(caller, role, scope, held))
+  for (const { role, held } of short) refusals.push(await shiftRefusal(caller, role, caller.scope, held))
   throw mostSpecificRefusal(refusals)?.error ?? createError(nightAuthorityRefusal('DUTY_MANAGER'))
 }
 
@@ -353,7 +367,8 @@ export async function nightAuthorityIfAny(
   scope: NightScope = {},
   options: NightAuthorityOptions = {},
 ): Promise<NightAuthority | null> {
-  const found = await firstAuthority(event, await callerTonight(event, scope), roles, scope, options)
+  const caller = await callerTonight(event, scope, roles)
+  const found = await firstAuthority(event, caller, roles, caller.scope, options)
   if (isAuthority(found)) return found
   // A step that failed is not a refusal: thrown, so a phone keeps the numbers it last had (A-114).
   const failed = found.refusals.find(({ error }) => ((error as { statusCode?: number }).statusCode ?? 500) >= 500)

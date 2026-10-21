@@ -1453,6 +1453,12 @@ scan (D-126) or an ordinary ticket scan (E-127 criterion 3) at `/tonight/door`, 
 count seats, so the glance's "to come" is people still expected, the desk's own rule (D-114
 criterion 7). The night report's attendance counts seats the same way on every line.
 
+On a night more than one venue runs, `GET /api/tonight/venues` lists them for the hub's choice of
+where the phone is working, and the choice is a night-scoped `nnt-night-venue` cookie that
+`server/utils/night-authority.ts` reads when a request names no venue or performance, so every
+show-night route narrows to the same venue without carrying it; it only ever narrows, and a
+bar-only request ignores it because the till keeps its own (0230).
+
 `GET /api/tonight/house` (issue 1307) is the same performance view for any of tonight's three
 roles, through `requireAnyNightAuthority()` and `tonightView()` in `server/utils/tonight-house.ts`,
 which the duty manager's route now builds on too, adding the team. The hub reads its numbers from

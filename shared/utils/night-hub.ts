@@ -118,8 +118,9 @@ export interface HubHouseState<T> {
 
 export const NO_HUB_HOUSE: HubHouseState<never> = { house: null, syncedAt: null, stale: false, staleReason: '' }
 
+// A 400 is the guard asking which venue: a definite answer, never last night's numbers going stale.
 export function hubHouseRefused(status: number | undefined, reason: string): HubHouseRead<never> {
-  return status === 401 || status === 403 ? { kind: 'REFUSED' } : { kind: 'FAILED', reason }
+  return status === 400 || status === 401 || status === 403 ? { kind: 'REFUSED' } : { kind: 'FAILED', reason }
 }
 
 // The served read and every poll after it go through here. A failure keeps the last numbers on
