@@ -131,6 +131,13 @@ const listedNote = (id: string): string | null => listedNotes.value[id]?.trim() 
         · {{ saysAttemptStatus(attempt.status, attempt.kind) }}
       </p>
       <p
+        v-if="attempt.basketSays"
+        class="text-xs text-muted"
+        :data-test="`sumup-open-basket-${attempt.id}`"
+      >
+        {{ attempt.basketSays }}
+      </p>
+      <p
         v-if="attempt.error"
         class="text-xs text-muted"
       >

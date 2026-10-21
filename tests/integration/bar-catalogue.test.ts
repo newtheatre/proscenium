@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { BAR_PRODUCT_REFERENCES, productActivationReferences, productEverSoldQuery, missingBeforeActiveQuery, productSaleReferences, variantsWithoutRecipeQuery } from '#server/utils/bar'
+import { BAR_PRODUCT_REFERENCES, productActivationReferences, productEverSoldQuery, productEverPricedQuery, missingBeforeActiveQuery, productSaleReferences, variantsWithoutRecipeQuery } from '#server/utils/bar'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { BarProductReference } from '#server/utils/bar'
 import type { BoundStatement, TestDatabase } from '#tests/helpers/database'
@@ -268,6 +268,34 @@ describe('a product that has sold is retired, never deleted (criterion 3)', () =
 
       insert(database, 'future_sale_lines', { id: 'l1', product_id: id })
       expect(sold(database, id, sales)).toBe(true)
+    })
+  })
+
+  // The review found every product reading "Never sold": a sale line names a size, not a product.
+  test('a sale under any one of its sizes makes the product sold', async () => {
+    await withDatabase((database) => {
+      category(database)
+      const id = product(database)
+      insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle' })
+      insert(database, 'product_variants', { id: 'var-2', product_id: id, serving_kind: '175ml', label: '175ml' })
+      expect(sold(database, id)).toBe(false)
+
+      insert(database, 'ledger_entries', { id: 'e-1', london_day: '2026-10-13', source: 'TILL', tender: 'CARD', total_pence: 450 })
+      insert(database, 'ledger_lines', { id: 'l-1', entry_id: 'e-1', kind: 'BAR_ITEM', amount_pence: 450, product_variant_id: 'var-2' })
+      expect(sold(database, id)).toBe(true)
+    })
+  })
+
+  test('a product whose sizes have a price history reads as priced, so the list offers no delete', async () => {
+    await withDatabase((database) => {
+      category(database)
+      const id = product(database)
+      insert(database, 'product_variants', { id: 'var-1', product_id: id, serving_kind: 'bottle', label: 'Bottle' })
+      const priced = (): boolean => ask<{ priced: number }>(database, productEverPricedQuery(id))[0]!.priced === 1
+      expect(priced()).toBe(false)
+
+      insert(database, 'variant_prices', { id: 'p-1', variant_id: 'var-1', price_pence: 450, effective_from: '2026-10-13' })
+      expect(priced()).toBe(true)
     })
   })
 

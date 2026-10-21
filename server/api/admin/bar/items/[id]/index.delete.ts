@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   if (held.hasMovements) {
     throw createError({
       statusCode: 409,
-      statusMessage: `${held.name} has stock movements, so it can only be retired: every movement still has to resolve`,
+      statusMessage: `${held.name} has stock movements, so it can only be retired. Its movements stay readable.`,
     })
   }
 

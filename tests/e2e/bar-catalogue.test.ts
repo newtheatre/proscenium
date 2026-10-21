@@ -673,6 +673,20 @@ describe.skipIf(skip !== null)('on hand is the sum of the movements (F-114 crite
     expect(await onHand(id)).toBe(5250)
   })
 
+  // The review wrote off 1000 against 32 on hand; the till then refused what was on the shelf (0127).
+  test('taking away more than is on hand is refused, naming what is there, and nothing moves', async () => {
+    const id = await addItem({ unit: 'ITEM', containerMl: null })
+    await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'DELIVERY', qty: 32 })
+
+    const refused = await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'WASTAGE', qty: -1000, reason: 'BREAKAGE' })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message?: string }).message).toContain('only 32 is on hand')
+    expect(await onHand(id)).toBe(32)
+
+    expect((await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'WASTAGE', qty: -32, reason: 'BREAKAGE' })).status).toBe(200)
+    expect(await onHand(id)).toBe(0)
+  })
+
   test('wastage without a reason is refused, because waste has to be reportable', async () => {
     const id = await addItem()
     expect((await send('POST', '/api/admin/bar/movements', { itemId: id, kind: 'WASTAGE', qty: -750 })).status).toBe(400)
