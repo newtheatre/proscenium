@@ -139,18 +139,11 @@ const columns: TableColumn<CatalogueModule>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="failure"
-      data-test="load-failed"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-unplug"
-      :title="failure.message"
-      :description="READ_AGAIN"
-      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="failure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       v-model:search="search"
       :placeholder="trainingModulesList.search?.placeholder"
@@ -189,11 +182,9 @@ const columns: TableColumn<CatalogueModule>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ failure
-            ? 'The catalogue could not be read.'
-            : departments.length === 0
-              ? 'Add a department first: every module belongs to one.'
-              : filtered ? 'No module matches that.' : 'Nothing in the catalogue yet. Add a module and it starts as a draft.' }}
+          {{ departments.length === 0
+            ? 'Add a department first: every module belongs to one.'
+            : filtered ? 'No module matches that.' : 'Nothing in the catalogue yet. Add a module and it starts as a draft.' }}
         </p>
       </template>
     </UTable>
@@ -212,5 +203,5 @@ const columns: TableColumn<CatalogueModule>[] = [
         :items-per-page="data.pageSize"
       />
     </div>
-  </div>
+  </ReadGate>
 </template>

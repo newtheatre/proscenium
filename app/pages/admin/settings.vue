@@ -59,6 +59,8 @@ const drafts = reactive<Record<string, string>>({})
 const notices = reactive<Record<string, string>>({})
 const saving = ref('')
 const failure = ref<ListFailure | null>(null)
+// The settings' own read, apart from a save's refusal, so a refused save never hides the list.
+const readFailure = ref<ListFailure | null>(null)
 const loaded = ref(false)
 
 const grouped = computed(() => Object.keys(WORKSHOPS).map(workshop => ({
@@ -278,21 +280,28 @@ function saveText(setting: Setting): Promise<void> {
   }
 }
 
-onMounted(async () => {
+async function read(): Promise<void> {
+  readFailure.value = null
   try {
     await load()
   }
   catch (error) {
-    failure.value = { message: refusalText(error), enrolPath: enrolPath(error) }
+    readFailure.value = listFailureFrom(error)
   }
   finally {
     loaded.value = true
   }
-})
+}
+
+onMounted(read)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="read"
+  >
     <p class="text-sm text-muted">
       Every operational number the theatre works to.
     </p>
@@ -701,5 +710,5 @@ onMounted(async () => {
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

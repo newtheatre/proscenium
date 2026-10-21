@@ -4,7 +4,7 @@ import { activePerformanceId } from '#shared/utils/tonight'
 import type { ChecklistEntry, TonightChecklist } from '#shared/utils/checklist'
 import type { HubHouse, HubHouseRead, HubHouseState, HubTileId } from '#shared/utils/night-hub'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight' })
 useSeoMeta({ title: 'Tonight' })
 
 interface Performance {

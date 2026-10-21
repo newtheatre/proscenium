@@ -1,9 +1,9 @@
 // One ledger entry for every (source, tender, kind) triple in architecture.md's money-path table,
 // posted through `postEntry`, which is the ledger's only writer (0004).
 
-import { boundFrom, holds, seedId } from './statements'
+import { boundFrom, holds, insertOnly, seedId } from './statements'
 import { personIn } from './people'
-import type { Bar } from './bar'
+import type { Bar, SeedComponent } from './bar'
 import type { Bookings } from './bookings'
 import type { People } from './people'
 import type { Programme } from './programme'
@@ -50,13 +50,44 @@ export async function seedMoney(
   const paths: string[] = []
   let entries = 0
 
+  const house = programme.venues.get('house')!
+  // Each bar line's depletion, as the till writes it: one movement per ingredient, citing the line
+  // (F-105 criterion 3), a comp's under its own kind (F-110).
+  const moved = new Map<string, { id: string, itemId: string, qty: number }[]>()
+  const deplete = (slug: string, lineIds: string[], input: Parameters<typeof postEntry>[0], at: Date, extra: SeedComponent[][]): void => {
+    const kind = input.tender === 'COMP' ? 'COMP' : 'SALE'
+    const made: { id: string, itemId: string, qty: number }[] = []
+    input.lines.forEach((line, index) => {
+      const variant = [...bar.variants.values()].find(one => one.id === line.productVariantId)
+      if (!variant || line.amountPence < 0) return
+      for (const [part, component] of [...variant.components, ...(extra[index] ?? [])].entries()) {
+        const id = seedId('movement', slug, index, part)
+        const qty = -(component.qty * (line.qty ?? 1))
+        made.push({ id, itemId: component.itemId, qty })
+        statements.push(insertOnly('stock_movements', {
+          id,
+          item_id: component.itemId,
+          qty,
+          kind,
+          ref_table: 'ledger_lines',
+          ref_id: lineIds[index]!,
+          actor_id: input.actorId,
+          location_venue_id: house,
+          created_at: Math.floor(at.getTime() / 1000),
+        }))
+      }
+    })
+    moved.set(slug, made)
+  }
+
   // A guard rather than a conflict clause: `postEntry` mints its own line ids, so a re-run that
   // posted again would append a second copy of every line.
-  const post = (slug: string, input: Parameters<typeof postEntry>[0], at: Date): string => {
+  const post = (slug: string, input: Parameters<typeof postEntry>[0], at: Date, extra: SeedComponent[][] = []): string => {
     const id = seedId('entry', slug)
     if (holds(target, 'ledger_entries', { id })) return id
     const posted = postEntry({ ...input, id }, at)
     statements.push(...boundFrom(posted.statements))
+    if (input.source === 'TILL' && !input.voidOfEntryId) deplete(slug, posted.lineIds, input, at, extra)
     paths.push(slug)
     entries++
     return id
@@ -219,7 +250,7 @@ export async function seedMoney(
       discountPence: gin.price - Math.round(gin.price * 0.8),
       choices: { Mixers: 'Tonic water' },
     }],
-  }, new Date((now - 80 * 60) * 1000))
+  }, new Date((now - 80 * 60) * 1000), [[{ itemId: bar.items.get('tonic')!, qty: 100 }]])
 
   // Zero taken, retail price kept, so what was given away is queryable (F-110).
   post('bar-comp', {
@@ -281,6 +312,21 @@ export async function seedMoney(
     tabDebtorId: personIn(people, 'iris').id,
     lines: [{ kind: 'BAR_ITEM' as const, amountPence: -gin.price, qty: 1, unitPricePence: gin.price, productVariantId: gin.id }],
   }, new Date((now - 3 * DAY) * 1000))
+
+  // The void puts back what the charge took, naming each movement it reverses (F-109 criterion 4).
+  for (const reversed of moved.get('tab-charge-voided') ?? []) {
+    statements.push(insertOnly('stock_movements', {
+      id: `${reversed.id}-void`,
+      item_id: reversed.itemId,
+      qty: -reversed.qty,
+      kind: 'REVERSAL',
+      reason: 'COUNT_CORRECTION',
+      reverses_id: reversed.id,
+      actor_id: barKeeper,
+      location_venue_id: house,
+      created_at: now - 3 * DAY,
+    }))
+  }
 
   // Six years of the old estate load as opening history, in closed periods, keeping their own
   // calendar day (I-109, K-114). Two rows stand in for it: one tendered, one recorded as neither.

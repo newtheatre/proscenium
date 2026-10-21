@@ -121,7 +121,7 @@ const { data: nightly, refresh: refreshNightly, error: nightlyError } = await us
 
 // The failure is shown rather than left to a silent "no results", since a fetch a shift opens on
 // can refuse for reasons the empty state cannot say.
-const nightlyFailure = computed(() => (nightlyError.value ? refusalText(nightlyError.value, 'Tonight could not be read.') : null))
+const nightlyFailure = useListFailure(nightlyError, 'Tonight could not be read.')
 
 watch(nightly, (value) => {
   if (value && !performanceId.value) performanceId.value = value.performances[0]?.id
@@ -538,9 +538,11 @@ const resultColumns: TableColumn<SearchRow>[] = [
 </script>
 
 <template>
-  <div
+  <ReadGate
+    :failure="nightlyFailure"
     class="space-y-6"
     data-test="desk-page"
+    @retry="refreshNightly"
   >
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2">
@@ -590,14 +592,6 @@ const resultColumns: TableColumn<SearchRow>[] = [
         Nothing on this night.
       </p>
     </div>
-
-    <UAlert
-      v-if="nightlyFailure"
-      color="error"
-      variant="subtle"
-      :description="nightlyFailure"
-      data-test="desk-nightly-failure"
-    />
 
     <UAlert
       v-if="summaryFailure"
@@ -1161,5 +1155,5 @@ const resultColumns: TableColumn<SearchRow>[] = [
       :failure="cancelFailure"
       @confirm="cancelCollected"
     />
-  </div>
+  </ReadGate>
 </template>
