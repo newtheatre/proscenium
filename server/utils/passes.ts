@@ -265,7 +265,7 @@ export function passOffersQuery(showId: string, userId: string | null, now: numb
     SELECT t.id AS id, t.name AS name, t.description AS description,
            (SELECT count(*) FROM pass_type_shows s WHERE s.pass_type_id = t.id) AS coveredShows,
            COALESCE((
-             SELECT json_group_array(json_object('label', pr.label, 'price', pr.price))
+             SELECT json_group_array(json_object('id', pr.id, 'label', pr.label, 'price', pr.price))
              FROM pass_type_prices pr WHERE pr.pass_type_id = t.id
            ), '[]') AS pricesJson,
            EXISTS (
