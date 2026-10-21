@@ -245,7 +245,7 @@ describe.skipIf(skip !== null)('the screen, with no camera to open (criteria 5, 
       await visit(view, `${app.baseURL}/tonight/door`, '[data-test="door-screen"]')
       await waitFor(view, `document.querySelector('[data-test="door-scan"]')`)
 
-      expect(await textOf(view, '[data-test="door-scan"]')).toContain('Check')
+      expect(await textOf(view, '[data-test="door-scan"]')).toContain('Admit or find')
       const screen = await textOf(view, '[data-test="door-screen"]')
       expect(screen).not.toContain('Scan next')
       expect(screen).not.toContain('Door mode')

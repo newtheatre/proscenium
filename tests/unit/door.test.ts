@@ -6,6 +6,7 @@ import {
   doorFailureVerdict,
   doorMissVerdict,
   doorNameTerm,
+  doorTypedAction,
   doorTicketFound,
   lookUpOutcome,
   saysUncheckedHalf,
@@ -265,6 +266,14 @@ describe('the one door field reads a code, and a name when it could be one (issu
   test('a six-letter name is a reference shape too, so it may still be looked up as a name', () => {
     expect(readScannedCode('HANNAH')).not.toBeNull()
     expect(doorNameTerm('Hannah')).toBe('Hannah')
+  })
+
+  // A typed reference admits its whole party at once, so the button says so before it is pressed.
+  test('the typed action says Admit for a code, Find for a name, and both while empty', () => {
+    expect(doorTypedAction('K7M4PQ')).toBe('Admit')
+    expect(doorTypedAction('https://newtheatre.org.uk/t/K7M4PQ')).toBe('Admit')
+    expect(doorTypedAction('Mira')).toBe('Find')
+    expect(doorTypedAction('  ')).toBe('Admit or find')
   })
 
   test('a URL is never a name, and nor is anything outside the search\'s bounds', () => {

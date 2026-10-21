@@ -250,6 +250,12 @@ export function doorNameTerm(typed: string): string | null {
   return !term.includes('/') && fitsDoorLookUp(term) ? term : null
 }
 
+// The typed field's button, named for what pressing it does: a code admits its whole party at once.
+export function doorTypedAction(typed: string): 'Admit' | 'Find' | 'Admit or find' {
+  if (readScannedCode(typed.trim())) return 'Admit'
+  return doorNameTerm(typed) ? 'Find' : 'Admit or find'
+}
+
 export type DoorFoundState = 'PAID' | 'UNPAID' | 'ADMITTED'
 
 export interface DoorTicketFound {

@@ -5,7 +5,7 @@ import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
 import { OFFICER_SIGN_OFF_NOTICE, holdsTheClose, openAtClose, saysSignOffOpens, saysSignedOff, tenderTotalPence } from '#shared/utils/night-signoff'
 import { saysShiftRole } from '#shared/utils/rota'
 import { newestRequest } from '#shared/utils/night-cache'
-import { saysTeamHolder } from '#shared/utils/tonight'
+import { openingHouseId, saysTeamHolder } from '#shared/utils/tonight'
 import { saysClock, saysDay } from '#shared/utils/when'
 import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { LateAddition } from '#shared/utils/sumup'
@@ -49,14 +49,19 @@ const busy = ref(false)
 const failure = ref<string | null>(null)
 const refusal = ref<string | null>(null)
 const report = ref<Report | null>(null)
-const performanceId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : null)
+// Unnamed, it opens on the house the shell's header already shows, and the switcher changes it.
+const shell = useNightAuthority()
+const performanceId = ref<string | null>(typeof route.query.performanceId === 'string' ? route.query.performanceId : openingHouseId(shell.value.performances))
 const ambiguous = ref(false)
 const { now, stamp } = useNightClock()
 
 // Asked for the duty manager's own role: the layout's badge prefers any shift, and a door shift
 // held alongside the officer role would hide that this sign-off is a stand-in (0044).
 const via = ref<NightAuthorityVia | null>(null)
-const choices = ref<{ performanceId: string, showTitle: string, startsAt: number }[]>([])
+const answeredHouses = ref<{ performanceId: string, showTitle: string, startsAt: number }[]>([])
+const choices = computed(() => shell.value.performances.length > 0
+  ? shell.value.performances.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt }))
+  : answeredHouses.value)
 
 const asking = newestRequest()
 
@@ -72,7 +77,7 @@ function applyAuthority(asked: string | null, answered: SettledRead<NightAuthori
     return
   }
   via.value = answered.value.via
-  if (!asked) choices.value = answered.value.performances.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt }))
+  if (!asked) answeredHouses.value = answered.value.performances.map(one => ({ performanceId: one.id, showTitle: one.showTitle, startsAt: one.startsAt }))
 }
 
 async function loadAuthority(): Promise<void> {
@@ -247,6 +252,13 @@ async function signOff(): Promise<void> {
       class="space-y-4"
       :data-test="signedOff ? 'report-frozen' : 'report-draft'"
     >
+      <NightPerformanceSwitcher
+        v-if="choices.length > 1"
+        data-test="report-performance-switcher"
+        :performances="choices"
+        :selected-id="performanceId"
+        @choose="choose"
+      />
       <UAlert
         v-if="signedOff"
         data-test="report-signed"

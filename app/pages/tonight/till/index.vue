@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can, takeStocktakes } from '#shared/utils/abilities'
 import { saysMoney } from '#shared/utils/bar'
-import { needsTheReader, saleJustCompleted, uncountedProducts } from '#shared/utils/sale'
+import { EXISTING_ACCOUNT_SAYS, needsTheReader, saleJustCompleted, uncountedProducts } from '#shared/utils/sale'
 import { chargePaths, saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
 import { saysClock } from '#shared/utils/when'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
@@ -129,6 +129,7 @@ const {
   walkUpQty,
   walkUpGuestName,
   walkUpGuestEmail,
+  walkUpGuestExistingAccount,
   walkUpLines,
   walkUpsPence,
   tonightsPerformances,
@@ -796,6 +797,7 @@ const basketBindings = computed(() => ({
               v-model:walk-up-performance-id="walkUpPerformanceId"
               v-model:walk-up-guest-name="walkUpGuestName"
               v-model:walk-up-guest-email="walkUpGuestEmail"
+              v-model:walk-up-guest-existing-account="walkUpGuestExistingAccount"
               role="tabpanel"
               aria-labelledby="till-pane-tickets"
               tabindex="0"
@@ -809,6 +811,7 @@ const basketBindings = computed(() => ({
               :walk-up-options="walkUpOptions"
               :walk-up-qty="walkUpQty"
               :walk-up-guest-incomplete="walkUpGuestIncomplete"
+              :ask-existing-account="chargeFailure === EXISTING_ACCOUNT_SAYS"
               :look-up="lookUp"
               :scan-decoded="scanDecoded"
               :open-camera="openCamera"

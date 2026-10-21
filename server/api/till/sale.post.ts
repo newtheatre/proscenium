@@ -22,6 +22,10 @@ export default defineEventHandler(async (event) => {
   // hand (F-124 criterion 7).
   await refuseBookingsInOpenAttempts(resolved.night, input.tickets.map(ticket => ticket.reservationId))
 
+  // 0123: the same question the card charge asks before the reader does.
+  const bookerRefusal = await walkUpBookerRefusal(input.walkUpGuest)
+  if (bookerRefusal) throw createError({ statusCode: 409, statusMessage: bookerRefusal })
+
   const committed = await commitSale(
     input.lines, londonDayOf(new Date()), input.expectedTotalPence, input.ageCheck, input.discountId, input.tabHolderId,
     {

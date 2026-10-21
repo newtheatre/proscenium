@@ -89,10 +89,12 @@ export interface WalkUpPaidContext {
   startsAt: number
   paidPence: number
   qrToken: string
+  // Where the money was taken, which the email names: the till's walk-up or the desk's (D-115).
+  paidAt: 'BAR' | 'DESK'
 }
 
-// A walk-up sold at the bar to somebody who gave an address (F-123 criterion 2): the door reads
-// the same QR whether it arrived this way or was photographed off the till.
+// A walk-up sold to somebody who gave an address (F-123 criterion 2, D-115 criterion 6): the door
+// reads the same QR whether it arrived this way or was photographed off the till.
 export async function sendWalkUpPaid(event: H3Event | undefined, context: WalkUpPaidContext): Promise<void> {
   await notify(event, {
     userId: context.userId,
@@ -103,6 +105,7 @@ export async function sendWalkUpPaid(event: H3Event | undefined, context: WalkUp
       show: context.showTitle,
       when: formatLondon(new Date(context.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
       paid: saysPrice(context.paidPence),
+      paidAt: context.paidAt,
       ...bookingLink(event, context.qrToken),
     },
   })

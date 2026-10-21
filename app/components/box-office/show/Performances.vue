@@ -4,6 +4,7 @@ import { formatLondon } from '#shared/utils/london'
 import { saysWhen } from '#shared/utils/when'
 import {
   MAX_RUN_NIGHTS,
+  PERFORMANCE_CANCEL_REASON_MAX,
   addPerformanceRefusal,
   bookingWindowSource,
   nightInstants,
@@ -83,6 +84,7 @@ const form = reactive({
   intervalCount: 0,
   intervalMinutes: null as number | null,
   capacityOverride: null as number | null,
+  aboveVenueCapacity: false,
   bookingClosesHoursBefore: null as number | null,
   holdReleaseMinutesBefore: null as number | null,
   externalBookingUrl: '',
@@ -95,7 +97,7 @@ const dayOf = (at: number): string => formatLondon(new Date(at * 1000), { year: 
   .split('/').reverse().join('-')
 const clockOf = (at: number): string => formatLondon(new Date(at * 1000), { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
-const NO_OVERRIDES = { capacityOverride: null, bookingClosesHoursBefore: null, holdReleaseMinutesBefore: null, externalBookingUrl: '', notes: '' }
+const NO_OVERRIDES = { capacityOverride: null, aboveVenueCapacity: false, bookingClosesHoursBefore: null, holdReleaseMinutesBefore: null, externalBookingUrl: '', notes: '' }
 
 // A run starts empty or, for Duplicate, from a performance's venue, clocks and running time; only
 // its nights are new (D-132 criterion 10).
@@ -131,6 +133,7 @@ function editPerformance(one: AdminPerformance): void {
     intervalCount: one.intervalCount,
     intervalMinutes: one.intervalMinutes,
     capacityOverride: one.capacityOverride,
+    aboveVenueCapacity: false,
     bookingClosesHoursBefore: one.bookingClosesHoursBefore,
     holdReleaseMinutesBefore: one.holdReleaseMinutesBefore,
     externalBookingUrl: one.externalBookingUrl ?? '',
@@ -155,6 +158,7 @@ async function savePerformance(): Promise<void> {
           intervalCount: form.intervalCount,
           intervalMinutes: form.intervalMinutes,
           capacityOverride: form.capacityOverride,
+          aboveVenueCapacity: form.aboveVenueCapacity,
           bookingClosesHoursBefore: form.bookingClosesHoursBefore,
           holdReleaseMinutesBefore: form.holdReleaseMinutesBefore,
           externalBookingUrl: blank(form.externalBookingUrl),
@@ -205,6 +209,9 @@ async function setOnSale(one: AdminPerformance, onSale: boolean): Promise<void> 
 }
 
 const cancelling = ref<AdminPerformance | null>(null)
+const cancelReason = ref('')
+// The desk opens on the cancelled performance's own night, so its refunds are one click away (D-116).
+const refundsDue = ref<{ performanceId: string, night: string, tickets: number } | null>(null)
 const removing = ref<AdminPerformance | null>(null)
 const pricing = ref<AdminPerformance | null>(null)
 
@@ -214,16 +221,21 @@ async function cancelPerformance(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    const answer = await $fetch<{ ticketsOwedARefund: number }>(`/api/admin/performances/${one.id}/cancel`, { method: 'POST' })
+    const answer = await $fetch<{ ticketsOwedARefund: number, bookingsTold: number, night: string }>(`/api/admin/performances/${one.id}/cancel`, {
+      method: 'POST',
+      body: { reason: cancelReason.value },
+    })
+    refundsDue.value = answer.ticketsOwedARefund ? { performanceId: one.id, night: answer.night, tickets: answer.ticketsOwedARefund } : null
     toast.add({
       title: 'Performance cancelled',
-      description: answer.ticketsOwedARefund
-        ? `${plural(answer.ticketsOwedARefund, 'ticket')} to refund at the desk, and their holders to tell.`
-        : 'Nothing was sold for it.',
+      description: answer.bookingsTold
+        ? `${plural(answer.bookingsTold, 'booking')} emailed that it is off.`
+        : 'Nobody holding a booking needed telling.',
       icon: answer.ticketsOwedARefund ? 'i-lucide-triangle-alert' : 'i-lucide-check',
       color: answer.ticketsOwedARefund ? 'warning' : 'success',
     })
     cancelling.value = null
+    cancelReason.value = ''
     await changed()
   }
   catch (refused) {
@@ -262,6 +274,10 @@ const bookableVenues = computed(() => props.venues.filter(one => !one.archived))
 const addRefusal = computed(() => addPerformanceRefusal(bookableVenues.value.length))
 
 const venueOf = (venueId: string): ShowVenue | undefined => props.venues.find(one => one.id === venueId)
+const aboveVenue = computed(() => {
+  const capacity = venueOf(form.venueId)?.capacity
+  return capacity != null && form.capacityOverride !== null && form.capacityOverride > capacity
+})
 const runningTimeOptional = computed(() => editingPerformance.value?.status === 'CANCELLED' || (venueOf(form.venueId)?.isExternal ?? false))
 
 // The route's own rule, asked before the request so the field says it rather than a banner (D-121).
@@ -290,10 +306,10 @@ const columns: TableColumn<AdminPerformance>[] = [
       h('div', { class: 'flex flex-wrap items-center gap-2' }, [
         h('span', {}, saysWhen(row.original.startsAt)),
         h(UBadge, {
-          color: row.original.status === 'ON_SALE' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
+          color: saysPerformanceStatus(row.original.status, row.original.startsAt) === 'On sale' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
           variant: 'subtle',
           size: 'sm',
-        }, () => saysPerformanceStatus(row.original.status)),
+        }, () => saysPerformanceStatus(row.original.status, row.original.startsAt)),
         row.original.externalBookingUrl
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Externally ticketed')
           : null,
@@ -398,6 +414,18 @@ const columns: TableColumn<AdminPerformance>[] = [
       color="error"
       variant="subtle"
       :description="failure"
+    />
+
+    <UAlert
+      v-if="refundsDue"
+      data-test="refunds-due"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-triangle-alert"
+      :description="`${plural(refundsDue.tickets, 'ticket')} on the cancelled performance to refund in person at the desk as their holders come in.`"
+      :actions="[{ label: 'Open it on the desk', to: `/box-office/desk?night=${refundsDue.night}&performance=${refundsDue.performanceId}`, color: 'warning', variant: 'outline' }]"
+      close
+      @update:open="refundsDue = null"
     />
 
     <AdminToolbar
@@ -532,6 +560,7 @@ const columns: TableColumn<AdminPerformance>[] = [
             v-else
             label="Days"
             name="days"
+            :error-pattern="/^days\.\d+$/"
             required
             description="Each day is one performance at the curtain below, on the day the curtain falls: a 00:15 Saturday curtain is the Saturday, and is Friday's show night."
           >
@@ -656,13 +685,23 @@ const columns: TableColumn<AdminPerformance>[] = [
               label="Capacity"
               name="capacityOverride"
               hint="Optional"
-              description="Leave it empty to take the venue's. Nought is a closed house."
+              :description="venueOf(form.venueId)?.capacity == null
+                ? 'Leave it empty to take the venue\'s. Nought is a closed house.'
+                : `Leave it empty to take the venue's ${venueOf(form.venueId)!.capacity} seats. Nought is a closed house.`"
             >
               <UInputNumber
                 v-model="form.capacityOverride"
                 :min="0"
                 class="w-full"
                 data-test="performance-capacity"
+              />
+              <!-- Deliberate oversell is confirmed here rather than a typing slip saved (0124). -->
+              <UCheckbox
+                v-if="aboveVenue"
+                v-model="form.aboveVenueCapacity"
+                class="mt-2"
+                label="Sell above the venue's capacity"
+                data-test="performance-above-venue"
               />
             </UFormField>
 
@@ -751,7 +790,7 @@ const columns: TableColumn<AdminPerformance>[] = [
     <UModal
       :open="cancelling !== null"
       title="Cancel this performance"
-      description="It stops selling and stays on the record. Everybody holding a ticket has to be refunded at the desk and told."
+      description="It stops selling and stays on the record. Everybody holding a booking is emailed that it is off; paid tickets are refunded in person at the desk."
       @update:open="cancelling = null"
     >
       <template #body>
@@ -760,6 +799,20 @@ const columns: TableColumn<AdminPerformance>[] = [
             ? `${plural(cancelling.soldTickets, 'ticket')} sold. Refund them at the desk after cancelling.`
             : 'Nothing has been sold for it.' }}
         </p>
+        <UFormField
+          label="Reason for the ticket holders"
+          hint="Optional"
+          help="It goes in the email to every booking, and nowhere else."
+          class="mt-4"
+        >
+          <UTextarea
+            v-model="cancelReason"
+            :rows="2"
+            :maxlength="PERFORMANCE_CANCEL_REASON_MAX"
+            class="w-full"
+            data-test="cancel-reason"
+          />
+        </UFormField>
       </template>
 
       <template #footer>

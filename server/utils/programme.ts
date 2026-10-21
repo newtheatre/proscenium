@@ -7,7 +7,7 @@ import { heldSeatsSubquery, showUnpaidSeatsColumn, unpaidSeatsColumn } from './c
 import { aliasColumns, whereFrom, yesNo } from './list-filters'
 import { saysNoSuch } from '#shared/utils/no-such'
 import { performancesList } from '#shared/utils/performances-list'
-import { runningTimeRefusal } from '#shared/utils/programme'
+import { capacityOverrideRefusal, runningTimeRefusal } from '#shared/utils/programme'
 import { showsList } from '#shared/utils/shows-list'
 import { posterUrl } from '#shared/utils/seo'
 import type { ListClause } from './list-filters'
@@ -146,6 +146,16 @@ export function showSoldColumn(alias: string, references = soldReferences()): SQ
 export function performanceSoldQuery(performanceId: string, references = soldReferences()): SQL {
   if (references.length === 0) return sql`SELECT 0 AS sold`
   return sql`SELECT ${sql.join(references.map(reference => heldTerm(reference, sql`${performanceId}`)), sql` + `)} AS sold`
+}
+
+// D-121 criterion 5: every live booking with an account to write to. A nameless walk-up has none,
+// and its holder is refunded at the desk on asking.
+export function cancelledPerformanceHoldersQuery(performanceId: string): SQL {
+  return sql`
+    SELECT id AS reservationId, reference, user_id AS userId, status = 'COLLECTED' AS collected
+    FROM reservations
+    WHERE performance_id = ${performanceId} AND user_id IS NOT NULL AND status IN ('PENDING', 'COLLECTED')
+  `
 }
 
 interface ShowRow extends Omit<AdminShow, 'warningsConfirmedNone' | 'posterUrl'> {
@@ -484,12 +494,14 @@ export async function listVenues(): Promise<ShowVenue[]> {
 }
 
 // The one set of refusals both ways of adding a performance make, in the same order (D-121, D-131).
-export async function bookableVenueOrThrow(venueId: string, durationMinutes: number | null | undefined): Promise<ShowVenue> {
+export async function bookableVenueOrThrow(venueId: string, durationMinutes: number | null | undefined, capacityOverride?: number | null, aboveVenueCapacity = false): Promise<ShowVenue> {
   const venue = (await listVenues()).find(one => one.id === venueId)
   if (!venue) throw createError({ statusCode: 400, statusMessage: saysNoSuch('venue') })
   if (venue.archived) throw createError({ statusCode: 409, statusMessage: `${venue.name} is retired and cannot be booked for a new performance` })
   const untimed = runningTimeRefusal(venue, durationMinutes)
   if (untimed) throw createError({ statusCode: 400, statusMessage: untimed })
+  const oversized = capacityOverrideRefusal(venue, capacityOverride, aboveVenueCapacity)
+  if (oversized) throw createError({ statusCode: 400, statusMessage: oversized })
   return venue
 }
 

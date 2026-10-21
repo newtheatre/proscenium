@@ -238,6 +238,13 @@ export default defineNuxtConfig({
     'nitro:config'(nitroConfig) {
       if (process.env.E2E_BASE_URL) nitroConfig.scheduledTasks = {}
     },
+    // The dev server's dependency scan cannot see past Nuxt's virtual modules, and a dependency first
+    // met by a browser reloads every open page. Warming the app's own files meets them all first.
+    'vite:extendConfig'(config, { isClient }) {
+      if (!isClient || !config.server) return
+      const appFiles = ['./pages/**/*.vue', './layouts/*.vue', './components/**/*.vue', './plugins/*.ts', './middleware/*.ts']
+      config.server.warmup = { ...config.server.warmup, clientFiles: [...config.server.warmup?.clientFiles ?? [], ...appFiles] }
+    },
   },
 
   // Adds the WebAuthn ceremony handlers and useWebAuthn, which do not exist without it (A-105).

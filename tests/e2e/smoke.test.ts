@@ -5,6 +5,8 @@ import type { AppUnderTest } from '#tests/helpers/webview'
 const skip = skipReason()
 // Booting the application is far past bun's five second default for a hook.
 const BOOT_TIMEOUT_MS = 180_000
+// The first page a browser opens waits on the dev server's client bundling, as every other suite allows.
+const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 
 beforeAll(async () => {
@@ -27,7 +29,7 @@ describe.skipIf(skip !== null)('the application serves a page (0022)', () => {
       expect(await view.evaluate<string>('document.title')).toContain('Nottingham New Theatre')
     }
     finally { view.close() }
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The design language's contrast floor, checked where it actually matters: as the browser
   // resolves it, not as the stylesheet declares it (0021).
@@ -48,7 +50,7 @@ describe.skipIf(skip !== null)('the application serves a page (0022)', () => {
       expect(tokens.font).toContain('Figtree')
     }
     finally { view.close() }
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The unit test proves the two lists agree; this proves Nitro can actually resolve every
   // handler, which is the half a text comparison cannot see.

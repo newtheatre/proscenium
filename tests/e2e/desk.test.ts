@@ -5,6 +5,7 @@ import { adminSession, finishSignIn, forgetSpentStep, grantRole, registerMember,
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, fillNumber, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { addDays } from '#shared/utils/series'
 import { showNightOf } from '#shared/utils/show-night'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -100,13 +101,13 @@ const weekOffsetSeconds = 7 * 86_400
 
 // The offset is a parameter because the desk screen opens on tonight and nothing else: a case
 // driving the screen needs a performance inside the night in progress, not one a week out.
-async function bookableShow(price = 900, offsetSeconds = weekOffsetSeconds): Promise<{ performanceId: string, ticketTypeId: string, startsAt: number, night: string, title: string }> {
+async function bookableShow(price = 900, offsetSeconds = weekOffsetSeconds, capacityOverride?: number): Promise<{ performanceId: string, ticketTypeId: string, startsAt: number, night: string, title: string }> {
   const title = named('The Seagull')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, officer.cookie)
   const showId = (await show.json() as { id: string }).id
 
   const startsAt = Math.floor(Date.now() / 1000) + offsetSeconds
-  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 }, officer.cookie)
+  const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120, capacityOverride }, officer.cookie)
   const performanceId = (await performance.json() as { id: string }).id
 
   const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price }, officer.cookie)
@@ -136,14 +137,24 @@ describe.skipIf(skip !== null)('the desk finds today\'s performance and browses 
 
     const onNight = await send('GET', `/api/box-office/desk/performances?night=${night}`)
     expect(onNight.status).toBe(200)
-    const body = await onNight.json() as { night: string, previousNight: string, nextNight: string, performances: { id: string }[] }
+    const body = await onNight.json() as { night: string, previousNight: string | null, nextNight: string | null, performances: { id: string }[] }
     expect(body.performances.some(p => p.id === performanceId)).toBe(true)
-    expect(body.previousNight < body.night).toBe(true)
-    expect(body.night < body.nextNight).toBe(true)
+    expect(body.previousNight === null || body.previousNight < body.night).toBe(true)
+    expect(body.nextNight === null || body.night < body.nextNight).toBe(true)
 
-    const dayBefore = await send('GET', `/api/box-office/desk/performances?night=${body.previousNight}`)
+    const dayBefore = await send('GET', `/api/box-office/desk/performances?night=${addDays(night, -1)}`)
     const beforeBody = await dayBefore.json() as { performances: { id: string }[] }
     expect(beforeBody.performances.some(p => p.id === performanceId)).toBe(false)
+  }, CASE_TIMEOUT_MS)
+
+  test('the arrows step over the empty nights to the next one with something on', async () => {
+    const first = await bookableShow(900, 400 * 86_400)
+    const second = await bookableShow(900, 437 * 86_400)
+
+    const onFirst = await (await send('GET', `/api/box-office/desk/performances?night=${first.night}`)).json() as { nextNight: string | null }
+    expect(onFirst.nextNight).toBe(second.night)
+    const onSecond = await (await send('GET', `/api/box-office/desk/performances?night=${second.night}`)).json() as { previousNight: string | null }
+    expect(onSecond.previousNight).toBe(first.night)
   }, CASE_TIMEOUT_MS)
 })
 
@@ -432,6 +443,96 @@ describe.skipIf(skip !== null)('a walk-up sale is one flow, source DOOR from cre
     )
     expect(row?.windowBypassed).toBe(1)
   }, CASE_TIMEOUT_MS)
+
+  test('sold with neither a name nor an email, it has no account and is found by reference (criterion 6)', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+
+    const sold = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId, quantity: 1 }],
+      expectedTotalPence: 900,
+      tender: 'CARD',
+    })
+    expect(sold.status).toBe(200)
+    const { reference } = await sold.json() as { reference: string }
+    expect(query<{ userId: string | null }>('SELECT user_id AS userId FROM reservations WHERE reference = ?', reference)?.userId).toBeNull()
+  }, CASE_TIMEOUT_MS)
+})
+
+// 0123: the typed email decides which account a walk-up is filed under, so an address already held
+// in another name is never filed under silently, and a refused sale creates nobody.
+describe.skipIf(skip !== null)('a walk-up never files a stranger\'s booking under somebody else\'s account', () => {
+  test('an address held in another name is refused until the desk says it is theirs', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+    const email = registrableAddress('holder')
+    const first = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId, lines: [{ ticketTypeId, quantity: 1 }], guest: { name: 'Ada Kowalski', email }, expectedTotalPence: 900, tender: 'CARD',
+    })
+    expect(first.status).toBe(200)
+
+    const stranger = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId, lines: [{ ticketTypeId, quantity: 1 }], guest: { name: 'Ben Okafor', email }, expectedTotalPence: 900, tender: 'CARD',
+    })
+    expect(stranger.status).toBe(409)
+    expect(await stranger.text()).toContain('another name')
+    expect(query<{ n: number }>('SELECT count(*) AS n FROM reservations WHERE performance_id = ?', performanceId)?.n).toBe(1)
+
+    const confirmed = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId, lines: [{ ticketTypeId, quantity: 1 }], guest: { name: 'Ben Okafor', email, existingAccount: true }, expectedTotalPence: 900, tender: 'CARD',
+    })
+    expect(confirmed.status).toBe(200)
+    // Filed under the account, and the account keeps its own name: a walk-up never renames anybody.
+    expect(query<{ name: string }>('SELECT name FROM users WHERE email = ?', email)?.name).toBe('Ada Kowalski')
+  }, CASE_TIMEOUT_MS)
+
+  test('the same name in other spacing or case is the same person, and sells at once', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900)
+    const email = registrableAddress('holder')
+    for (const name of ['Ada Kowalski', ' ada  KOWALSKI ']) {
+      const sold = await send('POST', '/api/box-office/desk/reservations', {
+        performanceId, lines: [{ ticketTypeId, quantity: 1 }], guest: { name, email }, expectedTotalPence: 900, tender: 'CARD',
+      })
+      expect(sold.status).toBe(200)
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('an order larger than the seats left is refused quoting them, and creates no account', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow(900, weekOffsetSeconds, 2)
+    const email = registrableAddress('toomany')
+
+    const refused = await send('POST', '/api/box-office/desk/reservations', {
+      performanceId, lines: [{ ticketTypeId, quantity: 3 }], guest: { name: 'Over Three', email }, expectedTotalPence: 2700, tender: 'CARD',
+    })
+    expect(refused.status).toBe(409)
+    const text = await refused.text()
+    expect(text).toContain('Only 2 seats are left')
+    expect(text).not.toContain('no longer')
+    expect(query<{ n: number }>('SELECT count(*) AS n FROM users WHERE email = ?', email)?.n).toBe(0)
+  }, CASE_TIMEOUT_MS)
+})
+
+// 0124: selling above the venue's own house is deliberate oversell, so it is confirmed, never typed.
+describe.skipIf(skip !== null)('a performance above its venue is confirmed, not typed (0124)', () => {
+  test('adding or editing one above the venue is refused with both figures until it is confirmed', async () => {
+    const title = named('The Seagull')
+    const showId = (await (await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, officer.cookie)).json() as { id: string }).id
+    const startsAt = Math.floor(Date.now() / 1000) + weekOffsetSeconds
+
+    const added = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120, capacityOverride: 10_000 }, officer.cookie)
+    expect(added.status).toBe(400)
+    expect(await added.text()).toContain('10000')
+
+    const performanceId = (await (await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 }, officer.cookie)).json() as { id: string }).id
+    const edited = await send('PUT', `/api/admin/performances/${performanceId}`, { venueId, startsAt, durationMinutes: 120, intervalCount: 0, capacityOverride: 10_000 }, officer.cookie)
+    expect(edited.status).toBe(400)
+    expect(query<{ capacityOverride: number | null }>('SELECT capacity_override AS capacityOverride FROM performances WHERE id = ?', performanceId)?.capacityOverride).toBeNull()
+
+    const lowered = await send('PUT', `/api/admin/performances/${performanceId}`, { venueId, startsAt, durationMinutes: 120, intervalCount: 0, capacityOverride: 60 }, officer.cookie)
+    expect(lowered.status).toBe(200)
+
+    const oversold = await send('PUT', `/api/admin/performances/${performanceId}`, { venueId, startsAt, durationMinutes: 120, intervalCount: 0, capacityOverride: 130, aboveVenueCapacity: true }, officer.cookie)
+    expect(oversold.status).toBe(200)
+  }, CASE_TIMEOUT_MS)
 })
 
 async function signInAsBoxOffice(baseURL: string): ReturnType<typeof openSignedOutView> {
@@ -576,9 +677,12 @@ describe.skipIf(skip !== null)('refunding a ticket confirms before anything move
       await click(view, `[data-test="desk-refund-${ticket.id}"]`)
       await waitFor(view, `document.querySelector('[data-test="confirm-desk-refund-verb"]')`, 15_000)
       await click(view, '[data-test="confirm-desk-refund-verb"]')
-      // The confirmation closes once the refund is written; nothing owing was true before it too.
+      // The confirmation closes once the refund is written. The last ticket out cancels the booking
+      // with it, and the refunded ticket stays on screen as history rather than vanishing.
       await waitFor(view, `!document.querySelector('[data-test="confirm-desk-refund-verb"]')`, 30_000)
-      await waitFor(view, `document.querySelector('[data-test="desk-nothing-owing"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="desk-uncollectable"]')?.innerText.includes('refunded and cancelled')`, 30_000)
+      expect(await textOf(view, '[data-test="desk-refunded"]')).toContain('£12.50')
+      expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', id)?.status).toBe('CANCELLED')
 
       const refund = query<{ amountPence: number }>(
         'SELECT amount_pence AS amountPence FROM ledger_lines WHERE kind = \'REFUND\' AND ticket_id = ?', ticket.id,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysClock, saysWhen } from '#shared/utils/when'
 import { saysMoney } from '#shared/utils/bar'
+import { saysTillParty } from '#shared/utils/sale'
 import type { TillBooking, WalkUpOption } from '#shared/utils/sale'
 import type { ScannerFailure } from '~/composables/useQrScanner'
 
@@ -20,6 +21,7 @@ defineProps<{
   walkUpOptions: WalkUpOption[]
   walkUpQty: Record<string, number>
   walkUpGuestIncomplete: boolean
+  askExistingAccount: boolean
   lookUp: () => Promise<void>
   scanDecoded: (value: string) => Promise<void>
   openCamera: () => void
@@ -34,6 +36,7 @@ const cameraOpen = defineModel<boolean>('cameraOpen', { required: true })
 const walkUpPerformanceId = defineModel<string | undefined>('walkUpPerformanceId')
 const walkUpGuestName = defineModel<string>('walkUpGuestName', { required: true })
 const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: true })
+const walkUpGuestExistingAccount = defineModel<boolean>('walkUpGuestExistingAccount', { required: true })
 </script>
 
 <template>
@@ -117,7 +120,7 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
           {{ booking.reference }}
         </p>
         <p class="text-sm">
-          {{ booking.bookerFirstName ?? 'Walk-up' }} · party of {{ booking.partySize }} · {{ booking.showTitle }}
+          {{ saysTillParty(booking) }} · {{ booking.showTitle }}
         </p>
         <p
           class="text-sm"
@@ -241,6 +244,15 @@ const walkUpGuestEmail = defineModel<string>('walkUpGuestEmail', { required: tru
       >
         Both a name and an email, or neither.
       </p>
+      <!-- Offered once the charge has said the address is held in another name (0123). -->
+      <UCheckbox
+        v-if="askExistingAccount || walkUpGuestExistingAccount"
+        v-model="walkUpGuestExistingAccount"
+        class="mt-2"
+        label="It is their account"
+        description="File the booking under the account this address already belongs to."
+        data-test="walk-up-existing-account"
+      />
     </NightBlock>
   </div>
 </template>

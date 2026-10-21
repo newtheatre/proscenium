@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { DESK_SALE_LINE_QUANTITY_CAP, DESK_STATUS_FILTERS, DESK_STATUS_LABELS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, deskFigures, reinstateRefusal, saysDeskStatus, saysDeskNight, uncollectableReason, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
+import { DESK_STATUS_FILTERS, DESK_STATUS_LABELS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, deskFigures, reinstateRefusal, saysDeskStatus, saysDeskNight, saysBooker, uncollectableReason, walkUpLineMax, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
 import { nothingToCollect, passCollectReason } from '#shared/utils/reservations'
+import { isShowNight } from '#shared/utils/show-night'
 import { saysClock } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskHouse, DeskStatusFilter, DeskTender } from '#shared/utils/desk'
+import { EXISTING_ACCOUNT_SAYS } from '#shared/utils/sale'
 import type { WalkUpOption } from '#shared/utils/sale'
 import type { ScannerFailure } from '~/composables/useQrScanner'
 import type { TableColumn } from '@nuxt/ui'
@@ -25,8 +27,10 @@ interface DeskPerformance {
 
 interface Nightly {
   night: string
-  previousNight: string
-  nextNight: string
+  tonight: string
+  // The nearest night either side with a performance on it, or null with none that way.
+  previousNight: string | null
+  nextNight: string | null
   performances: DeskPerformance[]
 }
 
@@ -34,7 +38,7 @@ interface SearchRow {
   id: string
   reference: string
   status: string
-  bookerName: string
+  bookerName: string | null
   totalPence: number
   holdExpiresAt: number | null
 }
@@ -64,9 +68,10 @@ interface ReservationDetail {
   holdExpiresAt: number | null
   showTitle: string
   startsAt: number
-  bookerName: string
-  bookerEmail: string
+  bookerName: string | null
+  bookerEmail: string | null
   tickets: TicketLine[]
+  refundedTickets: TicketLine[]
   doorWording: string | null
   compRequest: ReservationCompRequest | null
 }
@@ -80,8 +85,12 @@ interface DeskSummary extends DeskHouse {
 
 const request = useRequestFetch()
 const toast = useToast()
-const night = ref<string | null>(null)
-const performanceId = ref<string | undefined>(undefined)
+const route = useRoute()
+const router = useRouter()
+const queried = (key: string): string | null => (typeof route.query[key] === 'string' && route.query[key] !== '' ? route.query[key] as string : null)
+// The night and the performance live in the address, so a refresh or a shared link opens on them.
+const night = ref<string | null>(queried('night') !== null && isShowNight(queried('night')!) ? queried('night') : null)
+const performanceId = ref<string | undefined>(queried('performance') ?? undefined)
 const q = ref('')
 const statusFilter = ref<DeskStatusFilter>('ALL')
 const scanned = ref('')
@@ -124,17 +133,28 @@ const { data: nightly, refresh: refreshNightly, error: nightlyError } = await us
 const nightlyFailure = useListFailure(nightlyError, 'Tonight could not be read.')
 
 watch(nightly, (value) => {
-  if (value && !performanceId.value) performanceId.value = value.performances[0]?.id
+  if (!value) return
+  if (!performanceId.value || !value.performances.some(one => one.id === performanceId.value)) performanceId.value = value.performances[0]?.id
 }, { immediate: true })
 
-function goTo(target: string): void {
+function goTo(target: string | null): void {
+  if (!target) return
   night.value = target
   performanceId.value = undefined
 }
 
+const pickedNight = computed({
+  get: (): string | undefined => nightly.value?.night,
+  set: (value: string | undefined) => goTo(value ?? null),
+})
+
+watch([night, performanceId], ([onNight, onPerformance]) => {
+  void router.replace({ query: { ...route.query, night: onNight ?? undefined, performance: onPerformance ?? undefined } })
+})
+
 const walkUpOptions = ref<WalkUpOption[]>([])
 const walkUpQuantities = ref<Record<string, number>>({})
-const walkUpGuest = ref({ name: '', email: '' })
+const walkUpGuest = ref({ name: '', email: '', existingAccount: false })
 const walkUpOptionsFailure = ref<string | null>(null)
 const walkUpFailure = ref<string | null>(null)
 const selling = ref(false)
@@ -160,7 +180,13 @@ const walkUpLines = computed(() => walkUpOptions.value.map(option => ({
   quantity: walkUpQuantities.value[option.id] ?? 0,
 })))
 const walkUpTotal = computed(() => walkUpTotalPence(walkUpLines.value))
-const walkUpBlockedSays = computed(() => walkUpRefusal(walkUpLines.value, walkUpGuest.value))
+// The house on screen bounds what the steppers offer; the route's capacity predicate still decides.
+const seatsLeft = computed(() => (summary.value && summary.value.capacity !== null ? Math.max(0, summary.value.capacity - summary.value.sold) : null))
+const walkUpBlockedSays = computed(() => walkUpRefusal(walkUpLines.value, walkUpGuest.value, seatsLeft.value))
+const walkUpChosen = computed(() => walkUpLines.value.reduce((total, line) => total + line.quantity, 0))
+const lineMax = (typeId: string): number => walkUpLineMax(seatsLeft.value, walkUpChosen.value - (walkUpQuantities.value[typeId] ?? 0))
+// Offered only once the route has said the address is held in another name (0123).
+const askExistingAccount = computed(() => walkUpFailure.value === EXISTING_ACCOUNT_SAYS || walkUpGuest.value.existingAccount)
 
 // D-115 criterion 7: the sale and its payment are one write, and the figure on screen is the
 // figure sent, so a reader keyed to something else is refused before anything is created (0005).
@@ -174,14 +200,16 @@ async function takeWalkUp(): Promise<void> {
       body: {
         performanceId: performanceId.value,
         lines: walkUpLines.value.filter(line => line.quantity > 0).map(line => ({ ticketTypeId: line.ticketTypeId, quantity: line.quantity })),
-        guest: { name: walkUpGuest.value.name.trim(), email: walkUpGuest.value.email.trim() },
+        guest: walkUpGuest.value.name.trim() || walkUpGuest.value.email.trim()
+          ? { name: walkUpGuest.value.name.trim(), email: walkUpGuest.value.email.trim(), existingAccount: walkUpGuest.value.existingAccount }
+          : null,
         expectedTotalPence: walkUpTotal.value,
         tender: 'CARD',
       },
     })
     toast.add({ title: 'Walk-up sold', description: `Reference ${sold.reference}.`, icon: 'i-lucide-check', color: 'success' })
-    walkUpQuantities.value = {}
-    walkUpGuest.value = { name: '', email: '' }
+    walkUpQuantities.value = Object.fromEntries(walkUpOptions.value.map(option => [option.id, 0]))
+    walkUpGuest.value = { name: '', email: '', existingAccount: false }
     await search()
     void loadSummary()
   }
@@ -252,7 +280,7 @@ const reinstateReason = ref('')
 const reinstating = ref(false)
 const reinstateFailure = ref<string | null>(null)
 
-const uncollectableSays = computed(() => (selected.value ? uncollectableReason(selected.value.status) : null))
+const uncollectableSays = computed(() => (selected.value ? uncollectableReason(selected.value.status, selected.value.cancelledBy) : null))
 // The route refuses again on its own and re-checks capacity at the write: this only decides
 // whether the desk offers the form at all (D-118 criteria 1, 5).
 const reinstateSays = computed(() => (selected.value ? reinstateRefusal(selected.value.status, selected.value.cancelledBy) : null))
@@ -421,8 +449,14 @@ function askRefund(ticket: TicketLine): void {
   refunding.value = ticket
 }
 
-// D-116 criterion 5: refunded tickets leave this list the instant the write commits, since the
-// route that reads it already filters to what is still unrefunded.
+// The last ticket out closes the booking with it, so nothing reads "Paid, £0.00" afterwards.
+const refundingLast = computed(() => selected.value?.tickets.length === 1)
+const refundConsequence = computed(() => (refundingLast.value
+  ? 'Hand the money back on the reader first. This is the last ticket, so the booking is cancelled with it.'
+  : 'Hand the money back on the reader first. The seat goes back on sale.'))
+
+// D-116 criterion 5: refunded tickets leave the owed list the instant the write commits, and move
+// to the refunded one below it. Criterion 6's cancel follows the last refund, as its own request.
 async function refundTicket(): Promise<void> {
   const ticket = refunding.value
   if (!selected.value || !ticket) return
@@ -433,9 +467,16 @@ async function refundTicket(): Promise<void> {
       method: 'POST',
       body: { expectedTotalPence: ticket.pricePaid },
     })
-    toast.add({ title: 'Ticket refunded', icon: 'i-lucide-check', color: 'success' })
     refunding.value = null
-    selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
+    const after = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
+    selected.value = after
+    if (after.status === 'COLLECTED' && after.tickets.length === 0) {
+      await cancelCollected()
+      if (cancelFailure.value === null) toast.add({ title: 'Refunded in full', description: 'The booking is cancelled.', icon: 'i-lucide-check', color: 'success' })
+    }
+    else {
+      toast.add({ title: 'Ticket refunded', icon: 'i-lucide-check', color: 'success' })
+    }
     await search()
     void loadSummary()
   }
@@ -455,9 +496,9 @@ async function cancelCollected(): Promise<void> {
   cancelFailure.value = null
   try {
     await $fetch(`/api/box-office/desk/reservations/${selected.value.id}/cancel`, { method: 'POST' })
-    toast.add({ title: 'Booking cancelled', icon: 'i-lucide-check', color: 'success' })
+    if (cancelConfirming.value) toast.add({ title: 'Booking cancelled', icon: 'i-lucide-check', color: 'success' })
     cancelConfirming.value = false
-    open.value = false
+    selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
     await search()
     void loadSummary()
   }
@@ -496,14 +537,14 @@ const resultColumns: TableColumn<SearchRow>[] = [
       h('div', { class: 'font-mono' }, row.original.reference),
       // While the table is narrow its lesser columns carry over into the cells before them, so Open
       // stays in view beside the Tonight card and on a phone (K-123 criterion 9, issue 922).
-      h('div', { class: `${SHOW_BELOW_TABLE_2XL} text-xs text-muted` }, row.original.bookerName),
+      h('div', { class: `${SHOW_BELOW_TABLE_2XL} text-xs text-muted` }, saysBooker(row.original.bookerName)),
     ]),
   },
   {
     id: 'booker',
     header: 'Booked by',
     meta: { class: { th: HIDE_BELOW_TABLE_2XL, td: `${HIDE_BELOW_TABLE_2XL} whitespace-normal` } },
-    cell: ({ row }) => row.original.bookerName,
+    cell: ({ row }) => saysBooker(row.original.bookerName),
   },
   {
     id: 'status',
@@ -550,7 +591,8 @@ const resultColumns: TableColumn<SearchRow>[] = [
           icon="i-lucide-chevron-left"
           color="neutral"
           variant="ghost"
-          aria-label="Previous night"
+          :aria-label="nightly?.previousNight ? `Previous night with a performance, ${saysDeskNight(nightly.previousNight)}` : 'No earlier performances'"
+          :disabled="!nightly?.previousNight"
           data-test="desk-previous-night"
           @click="nightly && goTo(nightly.previousNight)"
         />
@@ -562,16 +604,23 @@ const resultColumns: TableColumn<SearchRow>[] = [
           icon="i-lucide-chevron-right"
           color="neutral"
           variant="ghost"
-          aria-label="Next night"
+          :aria-label="nightly?.nextNight ? `Next night with a performance, ${saysDeskNight(nightly.nextNight)}` : 'No later performances'"
+          :disabled="!nightly?.nextNight"
           data-test="desk-next-night"
           @click="nightly && goTo(nightly.nextNight)"
+        />
+        <DateField
+          v-model="pickedNight"
+          aria-label="Go to a night"
+          data-test="desk-night-picker"
         />
         <UButton
           size="xs"
           color="neutral"
           variant="ghost"
+          :disabled="nightly?.night === nightly?.tonight"
           data-test="desk-tonight"
-          @click="night = null; refreshNightly()"
+          @click="night = null; performanceId = undefined; refreshNightly()"
         >
           Tonight
         </UButton>
@@ -740,165 +789,174 @@ const resultColumns: TableColumn<SearchRow>[] = [
         </UTable>
       </UCard>
 
-      <UCard
-        v-if="summary"
-        data-test="desk-tonight"
-      >
-        <template #header>
-          <p class="font-medium">
-            Tonight
-          </p>
-        </template>
-        <dl class="space-y-3 text-sm">
-          <div class="flex items-baseline justify-between gap-2">
-            <dt class="text-muted">
-              Access bookings
-            </dt>
-            <dd data-test="desk-access-bookings">
-              {{ summary.accessBookings }}
-              <NuxtLink
-                to="/tonight/door"
-                class="text-xs text-muted underline"
-              >
-                see the door screen
-              </NuxtLink>
-            </dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-2">
-            <dt class="text-muted">
-              Pass admissions
-            </dt>
-            <dd data-test="desk-pass-admissions">
-              {{ summary.passAdmissions }}
-            </dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-2">
-            <dt class="text-muted">
-              Reservations release
-            </dt>
-            <dd
-              class="font-mono"
-              data-test="desk-reservations-release"
-            >
-              {{ releaseTime }}
-            </dd>
-          </div>
-          <div class="flex items-baseline justify-between gap-2">
-            <dt class="text-muted">
-              On shift
-            </dt>
-            <dd data-test="desk-on-shift">
-              {{ summary.onShift.length > 0 ? summary.onShift.join(' · ') : 'Nobody confirmed yet' }}
-            </dd>
-          </div>
-        </dl>
-      </UCard>
-
-      <UCard
-        v-if="performanceId"
-        data-test="desk-walk-up"
-      >
-        <template #header>
-          <p class="font-medium">
-            Walk-up
-          </p>
-        </template>
-
-        <UAlert
-          v-if="walkUpOptionsFailure"
-          color="error"
-          variant="subtle"
-          :description="walkUpOptionsFailure"
-          data-test="desk-walk-up-options-failure"
-        />
-        <p
-          v-else-if="walkUpOptions.length === 0"
-          class="text-sm text-muted"
-          data-test="desk-walk-up-empty"
+      <!-- Beside the bookings rather than under them, so a walk-up is never a scroll away. -->
+      <div class="space-y-6">
+        <UCard
+          v-if="performanceId"
+          data-test="desk-walk-up"
         >
-          No ticket types on this performance. Add one under Box office, Ticket types.
-        </p>
-        <div
-          v-else
-          class="space-y-3"
-        >
-          <UFormField
-            v-for="option in walkUpOptions"
-            :key="option.id"
-            :label="`${option.name} · ${saysPrice(option.price)}`"
-          >
-            <UInputNumber
-              v-model="walkUpQuantities[option.id]"
-              :min="0"
-              :max="DESK_SALE_LINE_QUANTITY_CAP"
-              class="w-32"
-              :data-test="`desk-walk-up-quantity-${option.id}`"
-            />
-          </UFormField>
-
-          <UFormField
-            label="Booker's name"
-            required
-          >
-            <UInput
-              v-model="walkUpGuest.name"
-              class="w-full"
-              data-test="desk-walk-up-name"
-            />
-          </UFormField>
-          <UFormField
-            label="Booker's email"
-            required
-          >
-            <UInput
-              v-model="walkUpGuest.email"
-              type="email"
-              class="w-full"
-              data-test="desk-walk-up-email"
-            />
-          </UFormField>
-
-          <p
-            class="text-lg font-semibold"
-            data-test="desk-walk-up-total"
-          >
-            Due now: {{ saysPrice(walkUpTotal) }}
-          </p>
+          <template #header>
+            <p class="font-medium">
+              Walk-up
+            </p>
+          </template>
 
           <UAlert
-            v-if="walkUpFailure"
+            v-if="walkUpOptionsFailure"
             color="error"
             variant="subtle"
-            :description="walkUpFailure"
-            data-test="desk-walk-up-failure"
+            :description="walkUpOptionsFailure"
+            data-test="desk-walk-up-options-failure"
           />
-
           <p
-            v-if="walkUpBlockedSays"
-            id="desk-walk-up-blocked"
+            v-else-if="walkUpOptions.length === 0"
             class="text-sm text-muted"
-            data-test="desk-walk-up-blocked"
+            data-test="desk-walk-up-empty"
           >
-            {{ walkUpBlockedSays }}
+            No ticket types on this performance. Add one under Box office, Ticket types.
           </p>
-
-          <UButton
-            :loading="selling"
-            :disabled="walkUpBlockedSays !== null"
-            :aria-describedby="walkUpBlockedSays === null ? undefined : 'desk-walk-up-blocked'"
-            data-test="desk-walk-up-sell"
-            @click="takeWalkUp"
+          <div
+            v-else
+            class="space-y-3"
           >
-            Sell {{ saysPrice(walkUpTotal) }}
-          </UButton>
-        </div>
-      </UCard>
+            <UFormField
+              v-for="option in walkUpOptions"
+              :key="option.id"
+              :label="`${option.name} · ${saysPrice(option.price)}`"
+            >
+              <UInputNumber
+                v-model="walkUpQuantities[option.id]"
+                :min="0"
+                :max="lineMax(option.id)"
+                :disabled="seatsLeft === 0"
+                class="w-32"
+                :data-test="`desk-walk-up-quantity-${option.id}`"
+              />
+            </UFormField>
+
+            <p class="text-sm text-muted">
+              A name and an email are optional. With them, the booking's QR is emailed; without, the reference is all they need.
+            </p>
+            <UFormField label="Booker's name">
+              <UInput
+                v-model="walkUpGuest.name"
+                class="w-full"
+                data-test="desk-walk-up-name"
+              />
+            </UFormField>
+            <UFormField label="Booker's email">
+              <UInput
+                v-model="walkUpGuest.email"
+                type="email"
+                class="w-full"
+                data-test="desk-walk-up-email"
+                @update:model-value="walkUpGuest.existingAccount = false"
+              />
+            </UFormField>
+            <UCheckbox
+              v-if="askExistingAccount"
+              v-model="walkUpGuest.existingAccount"
+              label="It is their account"
+              description="File the booking under the account this address already belongs to."
+              data-test="desk-walk-up-existing-account"
+            />
+
+            <p
+              class="text-lg font-semibold"
+              data-test="desk-walk-up-total"
+            >
+              Due now: {{ saysPrice(walkUpTotal) }}
+            </p>
+
+            <UAlert
+              v-if="walkUpFailure"
+              color="error"
+              variant="subtle"
+              :description="walkUpFailure"
+              data-test="desk-walk-up-failure"
+            />
+
+            <p
+              v-if="walkUpBlockedSays"
+              id="desk-walk-up-blocked"
+              class="text-sm text-muted"
+              data-test="desk-walk-up-blocked"
+            >
+              {{ walkUpBlockedSays }}
+            </p>
+
+            <UButton
+              :loading="selling"
+              :disabled="walkUpBlockedSays !== null"
+              :aria-describedby="walkUpBlockedSays === null ? undefined : 'desk-walk-up-blocked'"
+              data-test="desk-walk-up-sell"
+              @click="takeWalkUp"
+            >
+              Sell {{ saysPrice(walkUpTotal) }}
+            </UButton>
+          </div>
+        </UCard>
+
+        <UCard
+          v-if="summary"
+          data-test="desk-tonight"
+        >
+          <template #header>
+            <p class="font-medium">
+              {{ nightly ? saysDeskNight(nightly.night) : 'Tonight' }}
+            </p>
+          </template>
+          <dl class="space-y-3 text-sm">
+            <div class="flex items-baseline justify-between gap-2">
+              <dt class="text-muted">
+                Access bookings
+              </dt>
+              <dd data-test="desk-access-bookings">
+                {{ summary.accessBookings }}
+                <NuxtLink
+                  to="/tonight/door"
+                  class="text-xs text-muted underline"
+                >
+                  see the door screen
+                </NuxtLink>
+              </dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+              <dt class="text-muted">
+                Pass admissions
+              </dt>
+              <dd data-test="desk-pass-admissions">
+                {{ summary.passAdmissions }}
+              </dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+              <dt class="text-muted">
+                Reservations release
+              </dt>
+              <dd
+                class="font-mono"
+                data-test="desk-reservations-release"
+              >
+                {{ releaseTime }}
+              </dd>
+            </div>
+            <div class="flex items-baseline justify-between gap-2">
+              <dt class="text-muted">
+                On shift
+              </dt>
+              <dd data-test="desk-on-shift">
+                {{ summary.onShift.length > 0 ? summary.onShift.join(' · ') : 'Nobody confirmed yet' }}
+              </dd>
+            </div>
+          </dl>
+        </UCard>
+      </div>
     </div>
 
     <UModal
       v-model:open="open"
       :title="selected ? `Reference ${selected.reference}` : ''"
-      :description="selected ? `${selected.showTitle}, ${selected.bookerName}` : ''"
+      :description="selected ? `${selected.showTitle}, ${saysBooker(selected.bookerName)}` : ''"
     >
       <template #body>
         <div
@@ -921,7 +979,10 @@ const resultColumns: TableColumn<SearchRow>[] = [
             data-test="desk-door-wording"
           />
 
-          <ul class="space-y-1 text-sm">
+          <ul
+            v-if="selected.status !== 'COLLECTED'"
+            class="space-y-1 text-sm"
+          >
             <li
               v-for="ticket in selected.tickets"
               :key="ticket.ticketId"
@@ -1088,6 +1149,12 @@ const resultColumns: TableColumn<SearchRow>[] = [
             >
               Cancel booking
             </UButton>
+            <UAlert
+              v-if="cancelFailure && !cancelConfirming"
+              color="error"
+              variant="subtle"
+              :description="cancelFailure"
+            />
           </template>
           <template v-else>
             <p
@@ -1129,6 +1196,25 @@ const resultColumns: TableColumn<SearchRow>[] = [
               </UButton>
             </template>
           </template>
+
+          <div
+            v-if="selected.refundedTickets.length > 0"
+            data-test="desk-refunded"
+          >
+            <p class="text-sm font-medium text-muted">
+              Refunded
+            </p>
+            <ul class="mt-1 space-y-1 text-sm text-muted">
+              <li
+                v-for="ticket in selected.refundedTickets"
+                :key="ticket.ticketId"
+                class="flex justify-between"
+              >
+                <span class="line-through">{{ ticket.ticketTypeName }}</span>
+                <span class="line-through">{{ saysPrice(ticket.pricePaid) }}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </template>
     </UModal>
@@ -1138,7 +1224,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
       name="desk-refund"
       title="Refund this ticket"
       :verb="`Refund ${saysPrice(refunding?.pricePaid ?? 0)}`"
-      consequence="Hand the money back on the reader first. The seat goes back on sale."
+      :consequence="refundConsequence"
       :loading="refundingTicketId !== null"
       :failure="refundFailure"
       @update:open="value => { if (!value) refunding = null }"

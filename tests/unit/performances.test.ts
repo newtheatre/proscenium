@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { runningTimeRefusal, saleRefusal } from '#shared/utils/programme'
+import { capacityOverrideRefusal, performanceCancelForm, runningTimeRefusal, saleRefusal } from '#shared/utils/programme'
 import { showNightBounds } from '#shared/utils/show-night'
 import { effectiveCapacity, isOnSale, performanceNight } from '#server/utils/performances'
 import type { PerformanceSaleState } from '#shared/utils/programme'
@@ -131,6 +131,34 @@ describe('the programme utilities derive the night rather than restating it', ()
   })
 })
 
+// 0124: selling above the venue's house is deliberate oversell (D-105 criterion 4), never a slip.
+describe('a performance above its venue is confirmed, not typed (0124)', () => {
+  const house = { name: 'The Studio', capacity: 120 }
+
+  test('an override above the venue is refused, quoting both figures and the venue', () => {
+    const refusal = capacityOverrideRefusal(house, 10_000)
+    expect(refusal).toContain('120')
+    expect(refusal).toContain('10000')
+    expect(refusal).toContain('The Studio')
+  })
+
+  test('an override at or below the venue, a closed house of nought, and no override at all are taken', () => {
+    expect(capacityOverrideRefusal(house, 120)).toBeNull()
+    expect(capacityOverrideRefusal(house, 80)).toBeNull()
+    expect(capacityOverrideRefusal(house, 0)).toBeNull()
+    expect(capacityOverrideRefusal(house, null)).toBeNull()
+    expect(capacityOverrideRefusal(house, undefined)).toBeNull()
+  })
+
+  test('the officer\'s say-so lets a deliberate oversell through', () => {
+    expect(capacityOverrideRefusal(house, 130, true)).toBeNull()
+  })
+
+  test('a venue with no capacity set caps nothing', () => {
+    expect(capacityOverrideRefusal({ name: 'The Corn Exchange', capacity: null }, 400)).toBeNull()
+  })
+})
+
 // A shift's window ends from the running time, so a performance at a venue we run without one
 // strands every volunteer at curtain plus the offset (D-121 criterion 6, 0078).
 describe('a performance at a venue we run carries its running time (D-121 criterion 6)', () => {
@@ -150,5 +178,19 @@ describe('a performance at a venue we run carries its running time (D-121 criter
     expect(runningTimeRefusal(elsewhere, null)).toBeNull()
     expect(runningTimeRefusal(elsewhere, 90)).toBeNull()
     expect(runningTimeRefusal(house, null, 'CANCELLED')).toBeNull()
+  })
+})
+
+// D-121 criterion 5: the reason is optional, goes only to the holders, and an empty body still cancels.
+describe('cancelling a performance takes an optional reason', () => {
+  test('no body, an empty body and a blank reason all cancel with no reason', () => {
+    expect(performanceCancelForm.parse(undefined)).toEqual({ reason: null })
+    expect(performanceCancelForm.parse({})).toEqual({ reason: null })
+    expect(performanceCancelForm.parse({ reason: '   ' })).toEqual({ reason: null })
+  })
+
+  test('a reason is trimmed, and one too long to read in an email is refused', () => {
+    expect(performanceCancelForm.parse({ reason: '  The lead is unwell ' })).toEqual({ reason: 'The lead is unwell' })
+    expect(performanceCancelForm.safeParse({ reason: 'x'.repeat(501) }).success).toBe(false)
   })
 })

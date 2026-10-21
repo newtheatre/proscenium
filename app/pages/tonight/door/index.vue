@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, doorMissVerdict, doorNameTerm, lookUpOutcome, readScannedCode, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
+import { CAMERA_FALLBACK_SAYS, doorFailureVerdict, doorMissVerdict, doorNameTerm, doorTypedAction, lookUpOutcome, readScannedCode, saysDoorParty, verdictBuzz, verdictHoldMs } from '#shared/utils/door'
 import { doorStripLine, doorStripNumbers } from '#shared/utils/night-hub'
 import { openingHouseId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { HubHouse } from '#shared/utils/night-hub'
@@ -397,8 +397,8 @@ onBeforeUnmount(() => {
     <template #actions>
       <NightAction
         v-if="authorised"
-        label="Check"
-        icon="i-lucide-search"
+        :label="doorTypedAction(field)"
+        :icon="doorTypedAction(field) === 'Find' ? 'i-lucide-search' : 'i-lucide-user-check'"
         :loading="scanning"
         :disabled="!field.trim() || !performanceId"
         data-test="door-scan"
