@@ -13,7 +13,15 @@ export default defineEventHandler(async (event) => {
 
   const { position } = await readValidatedBodyOrThrow(event, categoryMoveForm)
 
-  const applied = await auditedWrite(
+  const entry = auditEntry({
+    actorId: resolved.account.id,
+    action: 'bar.category.moved',
+    target: `bar-category:${id}`,
+    detail: changes({ sort: [held.sort, position] }),
+  })
+  // Every category's row changes, so the audit is gated on the moved one being there rather than
+  // on auditedWrite's changes() = 1, which a move of more than one row never meets.
+  const [moved] = await db.batch([
     db.all<{ id: string }>(sql`
       UPDATE bar_categories SET sort = placed.position
       FROM (
@@ -25,13 +33,9 @@ export default defineEventHandler(async (event) => {
       WHERE placed.id = bar_categories.id
       RETURNING bar_categories.id
     `),
-    auditEntry({
-      actorId: resolved.account.id,
-      action: 'bar.category.moved',
-      target: `bar-category:${id}`,
-      detail: changes({ sort: [held.sort, position] }),
-    }),
-  )
+    db.all<{ id: string }>(auditIfRow(entry, 'bar_categories', id)),
+  ])
+  const applied = moved.length > 0
   if (!applied) throw noSuch('category')
 
   return { ok: true }
