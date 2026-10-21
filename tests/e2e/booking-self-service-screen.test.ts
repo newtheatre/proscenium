@@ -223,3 +223,48 @@ describe.skipIf(skip !== null)('the booking screen says which night and which wa
     }
   }, CASE_TIMEOUT_MS)
 })
+
+function lapse(reference: string): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.run('UPDATE reservations SET status = \'EXPIRED\', hold_expires_at = NULL WHERE reference = ?', [reference])
+  }
+  finally {
+    database.close()
+  }
+}
+
+// The process map of 21 October: a refused link must not read as working, and a booking that
+// admits nobody must not say to show it at the door.
+describe.skipIf(skip !== null)('the booking screen never reads as more than it is', () => {
+  test('a refused link opened after another booking warns above the one remembered', async () => {
+    const { qrToken, reference } = await twoNightBooking()
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${qrToken}`, '[data-test="booking-found"]')
+      await visit(view, `${app.baseURL}/qr/not-a-token`, '[data-test="booking-refused-link"]')
+      expect(await textOf(view, '[data-test="booking-refused-link"]')).toContain('That link is not valid')
+      expect(await textOf(view, '[data-test="booking-found"]')).toContain(reference)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('an unpaid booking names the day it is released; a lapsed one does not say to show it at the door', async () => {
+    const { qrToken, reference } = await twoNightBooking()
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${qrToken}`, '[data-test="booking-release"]')
+      expect(await textOf(view, '[data-test="booking-release"]')).toMatch(/released on \w+day \d+ \w+ at \d\d:\d\d/)
+      expect(await textOf(view, '[data-test="booking-found"]')).toContain('show this page at the door')
+
+      lapse(reference)
+      await visit(view, `${app.baseURL}/qr`, '[data-test="booking-qr"]')
+      expect(await textOf(view, '[data-test="booking-found"]')).not.toContain('show this page at the door')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})

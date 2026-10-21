@@ -99,10 +99,19 @@ onMounted(async () => {
   await own
 })
 
+// A refusal (the rate limit, chiefly) is said beside the form; swallowed, the button seemed dead.
+const resendFailure = ref<string | null>(null)
+
 async function resend(payload: FormSubmitEvent<z.output<typeof reservationResendForm>>): Promise<void> {
-  const result = await $fetch<{ message: string }>('/api/reservations/resend', { method: 'POST', body: payload.data })
-  notice.value = result.message
-  outcome.value = 'sent'
+  resendFailure.value = null
+  try {
+    const result = await $fetch<{ message: string }>('/api/reservations/resend', { method: 'POST', body: payload.data })
+    notice.value = result.message
+    outcome.value = 'sent'
+  }
+  catch (error) {
+    resendFailure.value = refusalText(error, 'That did not go through. Try again in a few minutes.')
+  }
 }
 
 const display = computed(() => booking.value
@@ -117,6 +126,10 @@ const where = computed(() => booking.value
   : '')
 
 const resendHeadline = computed(() => (route.query.refused ? 'That link isn\'t valid' : 'Open your booking from your email'))
+// A refused link landing on a booking this browser remembers must not read as the link working.
+const refusedAboveRemembered = computed(() => Boolean(route.query.refused))
+// A lapsed or cancelled booking admits nobody, so the page does not say to show it at the door.
+const admits = computed(() => booking.value !== null && !['EXPIRED', 'CANCELLED', 'NO_SHOW'].includes(booking.value.status))
 
 // D-110: editing and cancelling while unpaid, both against the same cookie the QR page already
 // reads with (criterion 5: the same page reflects whatever the edit or cancel leaves behind).
@@ -269,6 +282,15 @@ useSeoMeta({ title: 'Your booking' })
         data-test="booking-found"
         class="space-y-3"
       >
+        <UAlert
+          v-if="refusedAboveRemembered"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-link-2-off"
+          title="That link is not valid"
+          description="It may have expired or been mistyped. This is the booking this browser opened last, not the one the link was for. Open the link from your newest email."
+          data-test="booking-refused-link"
+        />
         <div
           v-if="justMade"
           class="space-y-1 border-b border-default pb-3"
@@ -345,7 +367,7 @@ useSeoMeta({ title: 'Your booking' })
           class="text-sm text-muted"
           data-test="booking-release"
         >
-          Unpaid, this booking is released at {{ booking.releasesAt }} and its seats go back on sale.
+          Unpaid, this booking is released on {{ booking.releasesAt }} and its seats go back on sale.
         </p>
 
         <div
@@ -375,7 +397,10 @@ useSeoMeta({ title: 'Your booking' })
             height="200"
             data-test="booking-qr"
           >
-          <p class="text-xs text-muted">
+          <p
+            v-if="admits"
+            class="text-xs text-muted"
+          >
             Save this image to keep the code, or show this page at the door.
           </p>
         </template>
@@ -642,7 +667,18 @@ useSeoMeta({ title: 'Your booking' })
             Enter your booking reference and the email address you booked with, and a fresh copy of
             your confirmation, with the same QR, is on its way.
           </p>
+          <p class="text-sm text-muted">
+            Only an unpaid booking is sent again. Once paid, give your reference at the box office or
+            the door; it is all they need to find you.
+          </p>
         </div>
+        <UAlert
+          v-if="resendFailure"
+          color="error"
+          variant="subtle"
+          :description="resendFailure"
+          data-test="qr-resend-failure"
+        />
 
         <UAuthForm
           :schema="reservationResendForm"

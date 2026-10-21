@@ -1,6 +1,6 @@
 import { formatLondon } from '#shared/utils/london'
 import { saysTotalDue } from '#shared/utils/reservations'
-import { saysClock } from '#shared/utils/when'
+import { saysClock, saysWhenLong } from '#shared/utils/when'
 
 // The booking the exchanged cookie names, read live (D-108 criteria 1, 4). The cookie is the
 // only credential this route asks for; no account session is required.
@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     // said them (D-106 criterion 1, 0122).
     venue: { name: reservation.venueName, address: reservation.venueAddress },
     doors: reservation.doorsAt ? saysClock(reservation.doorsAt) : null,
-    releasesAt: coming && reservation.holdExpiresAt ? saysClock(reservation.holdExpiresAt) : null,
+    releasesAt: coming && reservation.holdExpiresAt ? saysWhenLong(reservation.holdExpiresAt) : null,
     // A booking that ended without a replacement points back at the show, never a dead end (0122).
     bookAgainUrl: ['CANCELLED', 'EXPIRED'].includes(reservation.status) && !reservation.exchangedToReference && shown?.slug ? `/shows/${shown.slug}` : null,
     exchangedTo: reservation.exchangedToShowTitle && reservation.exchangedToStartsAt
