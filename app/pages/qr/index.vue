@@ -2,7 +2,7 @@
 import type * as z from 'zod'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
 import { SAYS_BEFORE_YOU_COME } from '#shared/utils/content-warnings'
-import { qrStatusDisplay, reservationResendForm, saysExchangeNight } from '#shared/utils/reservations'
+import { belowMinimumTicketsReason, qrStatusDisplay, qrStatusTone, reservationResendForm, saysExchangeNight, stepperMax } from '#shared/utils/reservations'
 import type { OwnBookingListing } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
@@ -13,6 +13,7 @@ interface NamedLine {
   ticketTypeId: string
   ticketTypeName: string
   quantity: number
+  totalPence: number
 }
 
 interface Booking {
@@ -27,7 +28,11 @@ interface Booking {
   totalDue: string | null
   qrSvg: string
   lines: NamedLine[]
-  exchangedTo: { showTitle: string, when: string } | null
+  venue: { name: string, address: string | null }
+  doors: string | null
+  releasesAt: string | null
+  bookAgainUrl: string | null
+  exchangedTo: { showTitle: string, when: string, reference?: string } | null
 }
 
 interface BookableType {
@@ -42,6 +47,7 @@ interface ExchangeOption {
   venueName: string
   availability: string
   says: string
+  totalPence: number | null
 }
 
 const SOLD_OUT_OR_CLOSED = ['SOLD_OUT', 'BOOKING_CLOSED']
@@ -102,6 +108,14 @@ async function resend(payload: FormSubmitEvent<z.output<typeof reservationResend
 const display = computed(() => booking.value
   ? qrStatusDisplay(booking.value.status, booking.value.cancelledBy, booking.value.totalDue, booking.value.exchangedTo)
   : null)
+const tone = computed(() => booking.value
+  ? qrStatusTone(booking.value.status, booking.value.totalDue, booking.value.exchangedTo !== null)
+  : 'neutral')
+
+const where = computed(() => booking.value
+  ? [booking.value.venue.name, booking.value.venue.address].filter(Boolean).join(', ')
+  : '')
+
 const resendHeadline = computed(() => (route.query.refused ? 'That link isn\'t valid' : 'Open your booking from your email'))
 
 // D-110: editing and cancelling while unpaid, both against the same cookie the QR page already
@@ -135,6 +149,12 @@ async function startEdit(): Promise<void> {
 }
 
 const editSaving = ref(false)
+
+// The form's own running figures, so a change is priced before it is saved and an empty booking is
+// pointed at Cancel rather than refused after Save (D-110 criteria 2, 6).
+const editSeats = computed(() => Object.values(quantities.value).reduce((total, quantity) => total + quantity, 0))
+const editTotalPence = computed(() => bookableTypes.value.reduce((total, type) => total + type.price * (quantities.value[type.id] ?? 0), 0))
+const editZero = computed(() => belowMinimumTicketsReason(editSeats.value))
 
 async function saveEdit(): Promise<void> {
   editSaving.value = true
@@ -184,13 +204,18 @@ const exchangeSubmitting = ref(false)
 const exchangeFailure = ref<string | null>(null)
 const exchangeOptions = ref<ExchangeOption[]>([])
 const exchangeChoice = ref<string | undefined>(undefined)
+const exchangeCurrentTotal = ref(0)
+const exchangeChosen = computed(() => exchangeOptions.value.find(option => option.id === exchangeChoice.value) ?? null)
+// Said once the exchange lands, because the booking the page now shows has a new reference (D-111 criterion 4).
+const exchangedFrom = ref<string | null>(null)
 
 async function startExchange(): Promise<void> {
   exchangeFailure.value = null
   exchangeLoading.value = true
   try {
-    const options = await $fetch<{ performances: ExchangeOption[] }>('/api/qr/exchange-options', { query: { reference: booking.value?.reference } })
+    const options = await $fetch<{ performances: ExchangeOption[], currentTotalPence: number }>('/api/qr/exchange-options', { query: { reference: booking.value?.reference } })
     exchangeOptions.value = options.performances
+    exchangeCurrentTotal.value = options.currentTotalPence
     exchangeChoice.value = undefined
     exchanging.value = true
   }
@@ -207,7 +232,9 @@ async function submitExchange(): Promise<void> {
   exchangeSubmitting.value = true
   exchangeFailure.value = null
   try {
+    const old = booking.value?.reference ?? null
     await $fetch('/api/qr/exchange', { method: 'POST', body: { performanceId: exchangeChoice.value, reference: booking.value?.reference } })
+    exchangedFrom.value = old
     exchanging.value = false
     justMade.value = null
     await Promise.all([loadBooking(), loadOwnBookings()])
@@ -264,12 +291,30 @@ useSeoMeta({ title: 'Your booking' })
         <p class="text-muted">
           {{ booking.when }}
         </p>
+        <p
+          class="text-sm text-muted"
+          data-test="booking-where"
+        >
+          {{ where }}<template v-if="booking.doors">
+            · Doors {{ booking.doors }}
+          </template>
+        </p>
         <p class="text-sm text-muted">
           Reference {{ booking.reference }}
         </p>
+        <UAlert
+          v-if="exchangedFrom"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-arrow-right-left"
+          :description="`Exchanged. This booking has a new reference, ${booking.reference}; the old one, ${exchangedFrom}, no longer admits anybody. We have emailed the new code.`"
+          data-test="booking-exchanged-notice"
+        />
         <UBadge
           data-test="booking-status"
           size="lg"
+          :color="tone"
+          variant="subtle"
         >
           {{ display.headline }}
         </UBadge>
@@ -290,10 +335,35 @@ useSeoMeta({ title: 'Your booking' })
             :key="line.ticketTypeId"
             class="flex justify-between"
           >
-            <span>{{ line.ticketTypeName }}</span>
-            <span>&times;{{ line.quantity }}</span>
+            <span>{{ line.ticketTypeName }} &times; {{ line.quantity }}</span>
+            <span class="font-mono">{{ saysPrice(line.totalPence) }}</span>
           </li>
         </ul>
+
+        <p
+          v-if="booking.releasesAt && booking.totalDue"
+          class="text-sm text-muted"
+          data-test="booking-release"
+        >
+          Unpaid, this booking is released at {{ booking.releasesAt }} and its seats go back on sale.
+        </p>
+
+        <div
+          v-if="booking.bookAgainUrl"
+          class="flex flex-wrap gap-2"
+          data-test="booking-book-again"
+        >
+          <UButton :to="booking.bookAgainUrl">
+            Book again
+          </UButton>
+          <UButton
+            to="/whats-on"
+            color="neutral"
+            variant="subtle"
+          >
+            See what's on
+          </UButton>
+        </div>
 
         <!-- A cancelled booking admits nobody, so its code is not offered to be saved (issue
              1329); the door still answers a scan of an old copy with the reason (D-108). -->
@@ -388,17 +458,30 @@ useSeoMeta({ title: 'Your booking' })
           data-test="booking-exchange-form"
         >
           <p class="text-sm text-muted">
-            Same tickets, another night of this show. Prices reflect that performance and may differ.
+            Same tickets, another night of this show, at that night's prices.
+            The booking gets a new reference and a new code, and the old ones stop working.
           </p>
           <URadioGroup
             v-model="exchangeChoice"
-            :items="exchangeOptions.map(option => ({
-              ...saysExchangeNight(option),
-              value: option.id,
-              disabled: SOLD_OUT_OR_CLOSED.includes(option.availability),
-            }))"
+            :items="exchangeOptions.map(option => {
+              const night = saysExchangeNight(option)
+              return {
+                label: night.label,
+                description: option.totalPence === null ? `${night.description} · not every ticket type is offered` : `${night.description} · ${saysPrice(option.totalPence)}`,
+                value: option.id,
+                disabled: SOLD_OUT_OR_CLOSED.includes(option.availability) || option.totalPence === null,
+              }
+            })"
             data-test="booking-exchange-options"
           />
+          <p
+            v-if="exchangeChosen && exchangeChosen.totalPence !== null"
+            class="text-sm"
+            data-test="booking-exchange-total"
+          >
+            New total {{ saysPrice(exchangeChosen.totalPence) }}, was {{ saysPrice(exchangeCurrentTotal) }}.
+            Still paid at the box office on the night.
+          </p>
           <p
             v-if="exchangeOptions.length === 0"
             class="text-sm text-muted"
@@ -440,15 +523,39 @@ useSeoMeta({ title: 'Your booking' })
               v-bind="TOUCH_STEPPER"
               class="shrink-0"
               :min="0"
-              :max="editCap"
+              :max="stepperMax(quantities, type.id, editCap)"
               :aria-label="`${type.name} tickets`"
               :data-test="`booking-edit-quantity-${type.id}`"
             />
+          </div>
+          <p
+            class="flex justify-between text-sm"
+            data-test="booking-edit-total"
+          >
+            <span>New total, to pay at the theatre</span>
+            <span class="font-mono">{{ saysPrice(editTotalPence) }}</span>
+          </p>
+          <div
+            v-if="editZero"
+            class="space-y-2"
+            data-test="booking-edit-zero"
+          >
+            <p class="text-sm text-muted">
+              {{ editZero }}
+            </p>
+            <UButton
+              color="error"
+              variant="subtle"
+              @click="editing = false; cancelConfirming = true"
+            >
+              Cancel booking
+            </UButton>
           </div>
           <div class="flex gap-2">
             <UButton
               data-test="booking-edit-save"
               :loading="editSaving"
+              :disabled="editZero !== null"
               @click="saveEdit"
             >
               Save changes

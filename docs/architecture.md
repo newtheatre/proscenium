@@ -221,7 +221,7 @@ query string. Every link to them carries the `next` its request was sent with, a
 | Route | Consumes |
 | --- | --- |
 | `/verify?token=` | `POST /api/auth/verify`, offering a sign-in link on a 410. A token issued by an address change is bound to that address and confirms no other (A-115). In the browser that registered, which holds the address sealed in the `nnt-registered` cookie (`server/utils/registered-here.ts`), it signs in as well (0103) |
-| `/reset?token=` | `POST /api/auth/password/reset`, which signs in once the password is set, or answers with an MFA attempt |
+| `/reset?token=` | `GET /api/auth/password/check` on arrival, which answers `{ usable }` and spends nothing, so a dead link is said before the form (0121); then `POST /api/auth/password/reset`, which signs in once the password is set, or answers with an MFA attempt |
 | `/magic?token=` | `POST /api/auth/magic-link/consume`, which may answer with an MFA attempt |
 
 Who is signed in is read once during rendering by `app/plugins/account.server.ts` into the

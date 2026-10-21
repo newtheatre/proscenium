@@ -240,7 +240,8 @@ export function saysShowGuidance(guidance: ShowGuidance): string[] {
     return [age, `${saysAssessment('NOT_ASSESSED')}. Ask the box office if it matters to you.`]
   }
   const named = groupContentWarnings(guidance.warnings).flatMap(group => group.warnings).map((warning) => {
-    const level = saysWarningLevel(warning.level)
+    // A staging warning names its group where a content warning names its level, so none reads bare.
+    const level = warning.kind === 'TECHNICAL' ? CONTENT_WARNING_STAGING_GROUP.label : saysWarningLevel(warning.level)
     return level ? `${warning.title}: ${level.toLowerCase()}` : warning.title
   })
   return [age, `Content warnings: ${named.join('; ')}`]

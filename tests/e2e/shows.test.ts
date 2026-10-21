@@ -1097,6 +1097,6 @@ describe.skipIf(skip !== null)('the booking form is told what it is booking (J-1
     }
 
     expect(Object.keys(payload.show).sort()).toEqual(['slug', 'title'])
-    expect(Object.keys(payload.performance).sort()).toEqual(['startsAt', 'venueName'])
+    expect(Object.keys(payload.performance).sort()).toEqual(['doorsAt', 'startsAt', 'venueAddress', 'venueName'])
   }, 120_000)
 })

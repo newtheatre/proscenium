@@ -81,6 +81,7 @@ interface PerformanceRow {
   intervalCount: number
   intervalMinutes: number | null
   venueName: string
+  venueAddress: string | null
   externalBookingUrl: string | null
   status: 'DRAFT' | 'ON_SALE' | 'CANCELLED'
   showStatus: 'DRAFT' | 'PUBLISHED'
@@ -103,6 +104,7 @@ export function listedPerformancesQuery(scope: SQL, at: number): SQL {
            p.interval_count AS intervalCount,
            p.interval_minutes AS intervalMinutes,
            v.name AS venueName,
+           v.address AS venueAddress,
            p.external_booking_url AS externalBookingUrl,
            p.status AS status,
            s.status AS showStatus,

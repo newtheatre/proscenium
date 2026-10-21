@@ -31,13 +31,14 @@ const COLUMNS = { left: 'lg:col-span-3', center: 'lg:col-span-7' }
         :ui="MEMBER_PAGE_HEADER"
       />
 
-      <!-- Scrolls sideways rather than shrinking, so each label is read whole on a phone. -->
-      <div class="mt-4 overflow-x-auto lg:hidden">
+      <!-- Wraps rather than scrolling sideways, so every label is read whole on a phone and none
+           sits out of sight past the edge. -->
+      <div class="mt-4 lg:hidden">
         <UNavigationMenu
           :items="links"
           variant="link"
           highlight
-          class="w-max min-w-full"
+          :ui="{ list: 'flex-wrap' }"
         />
       </div>
 

@@ -79,9 +79,10 @@ const items = computed<DropdownMenuItem[][]>(() => [
         icon="i-lucide-circle-user"
         trailing-icon="i-lucide-chevron-down"
         :block="stacked"
-        :class="stacked ? 'justify-start truncate' : ''"
+        :class="stacked ? 'justify-start truncate' : 'max-w-40'"
       >
-        {{ account.user?.name }}
+        <!-- One line at any width: a long name is cut rather than wrapping the header. -->
+        <span class="truncate">{{ account.user?.name }}</span>
       </UButton>
     </UDropdownMenu>
     <UButton

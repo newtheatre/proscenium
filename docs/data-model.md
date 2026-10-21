@@ -934,7 +934,9 @@ having been written, since the first line to move changes what the guard read. S
 asked for the shape the booking ends up in, a short house refuses the whole edit, decreases
 included, not just the increase that would not fit (criterion 2), and a double-submitted or stale
 edit changes nothing and is refused 409 "This booking changed while you were editing it…". A desired total under one ticket is refused before anything is
-written; cancel is the route for emptying a booking. Cancelling reuses `cancelled_by = 'CUSTOMER'`,
+written, in the same words the form shows at zero beside its Cancel booking button; cancel is the
+route for emptying a booking. A saved edit re-sends the confirmation, same QR, headed as a change
+with the new total (0122); a failed send is logged and never undoes the edit. Cancelling reuses `cancelled_by = 'CUSTOMER'`,
 the same column D-114's desk flow already checks, sets `hold_expires_at` to `NULL` and is refused
 once the performance has started (criterion 3) or once anything but `PENDING` has been reached
 (criterion 4: a collected booking's `/qr` page offers only a refund note, since D-116 owns the
@@ -944,7 +946,10 @@ none of it did.
 
 **Exchange to another performance of the same show, while unpaid (D-111).** `GET
 /api/qr/exchange-options` lists the show's other on-sale performances, the same honest
-availability `publicShowBySlug()` gives the public listing. `POST /api/qr/exchange` (body:
+availability `publicShowBySlug()` gives the public listing, each with `totalPence`, this booking's
+lines at that night's bookable prices (`exchangeTotalPence()`, null when the night does not offer one
+of its types), beside `currentTotalPence`, so the form shows the new total before it is confirmed
+(criterion 2, 0122). `POST /api/qr/exchange` (body:
 `{ performanceId, reference }`) refuses a different show (criterion 5, `differentShowReason()`) and
 a booking carrying an access or companion ticket type, since D-128's entitlement is checked once,
 against the performance it was granted for, and re-running it against a different one is a box
@@ -968,7 +973,16 @@ signature is over the id alone) but no longer names a live booking, and the `/qr
 moves to the new reservation's token so the booker is looking at the booking that is now real.
 The vacated seats go to that night's waiting list through D-113's `offerWaitingList()` as soon as
 the exchange commits, ahead of the new confirmation, so a send that fails never leaves them
-unoffered until the next sweep (issue 1328).
+unoffered until the next sweep (issue 1328). The new confirmation is headed "has moved", names the
+new reference and the one it replaces, and the old booking's `/qr` names the new reference
+(`exchangedTo.reference`, 0122).
+
+**What every copy of a booking says (0122).** `GET /api/qr/current` answers, beside the lines (each
+with its snapshotted `totalPence`), the venue's name and stored `address`, the doors time and, while
+the booking is still coming, the clock time an unpaid hold is released; a cancelled or lapsed booking
+with no replacement answers `bookAgainUrl`, the show page while it is public. The confirmation email
+reads the same facts from the booking (`arrivalContext()`), and the cancellation email links the show
+page and What's on. `PublicPerformance` and the booking read carry `venueAddress` (`venues.address`).
 
 ### tickets
 `id` PK · `reservation_id` → reservations restrict · `performance_id` → performances
@@ -1019,9 +1033,10 @@ again at that exact moment. A failed write (capacity gone in the interim) reopen
 **Tokens and routes.** `waitingListTokenFor()`/`verifyWaitingListToken()`
 (`server/utils/waiting-list-tokens.ts`) are D-108's QR scheme again, HMAC over the entry id alone
 (`NUXT_WAITING_LIST_TOKEN_SECRET`). `POST /api/performances/[id]/waiting-list` joins, refused
-past the online cut-off since nothing could be offered from it; `GET
-/api/waiting-list/[token]` shows the entry's state and, while an offer stands, the ticket types it
-may be claimed against; `POST /api/waiting-list/[token]/claim` claims; `POST
+past the online cut-off since nothing could be offered from it, and refused 409 with `bookUrl`
+while the performance is on sale with room for the whole party (`waitingListJoinRefusal()`, 0120);
+`GET /api/waiting-list/[token]` shows the entry's state, `bookable` when no offer stands and the
+whole party could book now, and, while an offer stands, the ticket types it may be claimed against; `POST /api/waiting-list/[token]/claim` claims; `POST
 /api/waiting-list/[token]/remove` leaves the list, accepted at any time except once claimed, from
 the entry page `/waiting-list/entry/[token]` that every waiting-list email links to (issue 1340);
 `/waiting-list/leave/[token]`, which older emails carry, redirects there with a 301. The desk's

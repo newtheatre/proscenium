@@ -52,7 +52,8 @@ export default defineEventHandler(async (event) => {
     performanceId: id,
     showId: performance.showId,
     show: { slug: performance.showSlug, title: performance.showTitle },
-    performance: { startsAt: performance.startsAt, venueName: performance.venueName },
+    // Where and when to arrive, from the venue's own row rather than a guess (0122).
+    performance: { startsAt: performance.startsAt, doorsAt: performance.doorsAt, venueName: performance.venueName, venueAddress: performance.venueAddress },
     refusal: refusal && {
       reason: refusal.reason,
       says: refusal.says,

@@ -98,6 +98,38 @@ function guidanceBlock(context: TemplateContext): { html: string, text: string }
   }
 }
 
+interface ConfirmationLine { name: string, quantity: number, total: string }
+
+// Where to go, when the doors open, when an unpaid hold is let go, and what each line costs: what
+// a booker needs on the night, read from the booking rather than retyped (D-106 criterion 1, 0122).
+function arrivalBlock(context: TemplateContext): { html: string, text: string } {
+  const venue = typeof context.venue === 'string' ? context.venue : null
+  const address = typeof context.venueAddress === 'string' ? context.venueAddress : null
+  const doors = typeof context.doors === 'string' ? context.doors : null
+  const releasesAt = typeof context.releasesAt === 'string' && context.nothingDue !== true ? context.releasesAt : null
+  const lines = Array.isArray(context.lines) ? context.lines as ConfirmationLine[] : []
+  const where = venue ? [venue, address].filter(Boolean).join(', ') : null
+  const facts = [
+    where ? `Where: ${where}.` : null,
+    doors ? `Doors open at ${doors}.` : null,
+    releasesAt ? `An unpaid booking is released at ${releasesAt}, and its seats go back on sale.` : null,
+  ].filter((fact): fact is string => fact !== null)
+  const priced = lines.map(line => `${line.name} × ${line.quantity}: ${line.total}`)
+  return {
+    html: (facts.length ? `\n<p>${facts.join('<br>')}</p>` : '') + (priced.length ? `\n<p>${priced.join('<br>')}</p>` : ''),
+    text: (facts.length ? `\n\n${facts.join('\n')}` : '') + (priced.length ? `\n\n${priced.join('\n')}` : ''),
+  }
+}
+
+// A plain-text part is read in whatever width the client has, so a line the source broke mid-
+// sentence is joined back up; a list, a link, a heading or a paragraph keeps its break.
+export function unwrapPlainText(text: string): string {
+  return text.replace(/([\p{L}\d,;])\n(?=[\p{Ll}(])/gu, (match, last: string, offset: number) => {
+    const lineStart = text.lastIndexOf('\n', offset) + 1
+    return text.slice(lineStart, offset).includes('://') ? match : `${last} `
+  })
+}
+
 const TEMPLATES = {
   'account-verify': (context: TemplateContext): Rendered => {
     const url = String(context.url)
@@ -1278,8 +1310,8 @@ The Nottingham New Theatre`,
   'request-unlisted': (context: TemplateContext): Rendered => ({
     subject: `Now being asked for elsewhere: ${String(context.when)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>Your request for <strong>${context.room}</strong>, ${context.when}, is being asked for as a room
-we do not manage instead.</p>
+<p>Your request for <strong>${context.room}</strong>, ${context.when}, is being asked for as a
+Students' Union room instead.</p>
 <p>Why: ${context.why}</p>
 <p><strong>${context.room} is free again</strong>, so somebody else may take it. Nothing is held
 for you until whoever manages the new room answers, and the form goes in by
@@ -1287,8 +1319,8 @@ ${String(context.dueBy)}.</p>
 <p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
-Your request for ${String(context.room)}, ${String(context.when)}, is being asked for as a room we
-do not manage instead.
+Your request for ${String(context.room)}, ${String(context.when)}, is being asked for
+as a Students' Union room instead.
 
 Why: ${String(context.why)}
 
@@ -1605,20 +1637,33 @@ The Nottingham New Theatre`,
     const imageUrl = String(context.imageUrl)
     const qrWidth = String(context.qrWidth)
     const guidance = guidanceBlock(context)
+    const arrival = arrivalBlock(context)
+    const nothingDue = context.nothingDue === true
     // A pass booking owes nothing and holds nothing (issue 1390); every other booking is a hold.
-    const owed = context.nothingDue === true
+    const owed = nothingDue
       ? 'Nothing to pay: this booking was made with your pass.'
       : `Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and is not a purchase until then.`
+    // A change or an exchange is a fresh copy of the same e-ticket, said so up front (0122).
+    const change = context.change === 'CHANGED' || context.change === 'EXCHANGED' ? context.change : null
+    const replaces = typeof context.replaces === 'string' ? context.replaces : null
+    const opening = change === 'EXCHANGED'
+      ? `Your booking has moved to ${show}, ${when}, with new reference ${reference}.${replaces ? ` This replaces booking ${replaces}, which no longer admits anybody.` : ''}`
+      : change === 'CHANGED'
+        ? `Your booking ${reference} for ${show}, ${when}, has changed${nothingDue ? '' : `, and is now ${totalDue}`}.`
+        : `Reference ${reference} for ${show}, ${when}.`
+    const subject = change === 'EXCHANGED'
+      ? `Your booking for ${show} has moved`
+      : change === 'CHANGED' ? `Your booking for ${show} has changed` : `Your booking for ${show}`
     return {
-      subject: `Your booking for ${show}`,
+      subject,
       html: layout(`<p>Hello ${context.name},</p>
-<p>Reference <strong>${reference}</strong> for ${show}, ${when}.</p>
+<p>${change === null ? `Reference <strong>${reference}</strong> for ${show}, ${when}.` : opening}</p>${arrival.html}
 <p>${owed}</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>${guidance.html}`),
       text: `Hello ${context.name},
 
-Reference ${reference} for ${show}, ${when}.
+${opening}${arrival.text}
 
 ${owed}
 
@@ -1659,18 +1704,27 @@ The Nottingham New Theatre`,
     const reference = String(context.reference)
     const show = String(context.show)
     const when = String(context.when)
+    // Linked rather than named, so changing your mind is one click from the email (0122).
+    const showUrl = typeof context.showUrl === 'string' ? context.showUrl : null
+    const whatsOnUrl = typeof context.whatsOnUrl === 'string' ? context.whatsOnUrl : null
+    const again = showUrl
+      ? { html: `<p>Changed your mind? <a href="${showUrl}">Book again from the show's page</a> while seats remain.</p>`, text: `Changed your mind? Book again from the show's page while seats remain: ${showUrl}` }
+      : { html: '<p>Changed your mind? Book again from the show\'s page while seats remain.</p>', text: 'Changed your mind? Book again from the show\'s page while seats remain.' }
+    const elsewhere = whatsOnUrl
+      ? { html: `\n<p><a href="${whatsOnUrl}">See what else is on</a></p>`, text: `\n\nSee what else is on: ${whatsOnUrl}` }
+      : { html: '', text: '' }
     return {
       subject: `Your booking for ${show} is cancelled`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Reference <strong>${reference}</strong> for ${show}, ${when}, is now cancelled at your request.
 Nothing was charged: the booking was still unpaid.</p>
-<p>Changed your mind? Book again from the show's page while seats remain.</p>`),
+${again.html}${elsewhere.html}`),
       text: `Hello ${context.name},
 
 Reference ${reference} for ${show}, ${when}, is now cancelled at your request. Nothing was
 charged: the booking was still unpaid.
 
-Changed your mind? Book again from the show's page while seats remain.
+${again.text}${elsewhere.text}
 
 The Nottingham New Theatre`,
     }
@@ -1933,7 +1987,7 @@ export function render(name: string, context: TemplateContext): Rendered {
   // The HTML part is built from an escaped copy, so no template escapes for itself or can forget
   // to; the subject and the text part keep the words as typed (issue 1391).
   const plain = template(context)
-  const rendered: Rendered = { ...plain, html: template(escaped(context) as TemplateContext).html }
+  const rendered: Rendered = { ...plain, text: unwrapPlainText(plain.text), html: template(escaped(context) as TemplateContext).html }
   for (const [part, value] of Object.entries(rendered)) {
     if (value.includes('undefined') || value.includes('[object Object]')) {
       throw new Error(`template \`${name}\` rendered ${part} with a missing field`)

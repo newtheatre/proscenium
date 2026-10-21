@@ -292,6 +292,10 @@ export interface ReservationCurrentState {
   passBooking: number
   exchangedToShowTitle: string | null
   exchangedToStartsAt: number | null
+  exchangedToReference: string | null
+  venueName: string
+  venueAddress: string | null
+  doorsAt: number | null
 }
 
 // What the QR answers when it is presented: live, from this row, never from anything saved
@@ -302,9 +306,11 @@ export function reservationCurrentStateQuery(id: string): SQL {
            s.title AS showTitle, p.starts_at AS startsAt,
            (SELECT coalesce(sum(t.price_paid), 0) FROM tickets t WHERE t.reservation_id = r.id) AS totalPence,
            r.hold_expires_at AS holdExpiresAt, ${passBookingColumn('r')} AS passBooking,
-           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt
+           xs.title AS exchangedToShowTitle, xp.starts_at AS exchangedToStartsAt, x.reference AS exchangedToReference,
+           v.name AS venueName, v.address AS venueAddress, p.doors_at AS doorsAt
     FROM reservations r
     JOIN performances p ON p.id = r.performance_id
+    JOIN venues v ON v.id = p.venue_id
     JOIN shows s ON s.id = p.show_id
     LEFT JOIN reservations x ON x.id = r.exchanged_to_reservation_id
     LEFT JOIN performances xp ON xp.id = x.performance_id
@@ -316,6 +322,11 @@ export function reservationCurrentStateQuery(id: string): SQL {
 export async function reservationCurrentState(id: string): Promise<ReservationCurrentState | undefined> {
   const [row] = await db.all<ReservationCurrentState>(reservationCurrentStateQuery(id))
   return row
+}
+
+export async function reservationIdByReference(reference: string): Promise<string | null> {
+  const [row] = await db.all<{ id: string }>(sql`SELECT id FROM reservations WHERE reference = ${reference}`)
+  return row?.id ?? null
 }
 
 // Read by the confirmation sender, so every path that sends one words a pass booking alike.
@@ -464,12 +475,15 @@ export async function exchangeableTicketLines(reservationId: string): Promise<Ex
 
 export interface NamedTicketLine extends TicketTypeCount {
   ticketTypeName: string
+  // What the line costs as snapshotted, so the booking and its email quote each line (0122).
+  totalPence: number
 }
 
 // The same grouping, named for a screen rather than a write path.
 export function namedTicketLinesQuery(reservationId: string): SQL {
   return sql`
-    SELECT t.ticket_type_id AS ticketTypeId, tt.name AS ticketTypeName, count(*) AS quantity
+    SELECT t.ticket_type_id AS ticketTypeId, tt.name AS ticketTypeName, count(*) AS quantity,
+           sum(t.price_paid) AS totalPence
     FROM tickets t
     JOIN ticket_types tt ON tt.id = t.ticket_type_id
     WHERE t.reservation_id = ${reservationId} AND t.refunded_at IS NULL
