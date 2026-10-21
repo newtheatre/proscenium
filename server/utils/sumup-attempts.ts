@@ -329,7 +329,7 @@ async function commitClaimed(row: AttemptRow, commit: ClaimedCommit): Promise<Co
         event: commit.event,
         ...commit.late,
       },
-      { tickets: basket.sale.tickets, walkUps: basket.sale.walkUps, walkUpGuest: basket.sale.walkUpGuest },
+      { tickets: basket.sale.tickets, walkUps: basket.sale.walkUps, walkUpGuest: basket.sale.walkUpGuest, pass: basket.sale.pass ?? null },
     )
   }
   catch (error) {

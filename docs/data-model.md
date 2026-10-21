@@ -1118,6 +1118,16 @@ request. `passOffersQuery()` binds the same parameters for a guest as for a sign
 already has a pass to redeem there. The page asks through the same request route; a guest is sent
 to register or sign in first, since a pass always needs an account.
 
+**Sold on the till (D-134, 0138).** The till's basket carries an optional `pass` (pass type, price
+point, the buyer's account email). `resolveTillPass()` (`server/utils/till-pass.ts`) refuses an
+email with no confirmed account that can sign in, a pass already held, or one off sale, before the
+reader is asked; `GET /api/till/passes` lists what may be sold for a house under the till's own
+`BAR` authority, and never lists accounts. The sale's batch posts a `PASS_SALE` line in the same
+entry as the rest of the basket, inserts the pass gated on that entry, fulfils the buyer's open
+request, and asserts the cap with 0035's re-insert of the pass id. Afterwards, an unpaid one-seat
+booking of the buyer's tonight that the pass covers is cancelled with `exchanged_to_reservation_id`
+pointing at a new zero-value pass booking, in one batch closed by the same kind of assertion.
+
 **The holder's own QR (criterion 5).** `passQrTokenFor()`/`verifyPassQrToken()`
 (`server/utils/pass-qr-tokens.ts`) reuse D-108's HMAC scheme over `"pass:" + passId` rather than a
 second secret: the prefix domain-separates a pass token from a reservation token, so neither
