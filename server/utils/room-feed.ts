@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { calendarFor } from '#shared/utils/ics'
 import type { CalendarEvent } from '#shared/utils/ics'
 import type { Attachment } from '#server/utils/notify'
@@ -65,4 +65,38 @@ export function bookingAttachment(event: H3Event | undefined, booking: CalendarE
     contentType: 'text/calendar; charset=utf-8',
     content: calendarFor([booking], { name: booking.title, host: new URL(base).hostname }),
   }
+}
+
+// The same events withdrawn, so a calendar that imported the booking's file takes them away again.
+// Stamped now, which outranks the SEQUENCE of every file sent before (C-104 criterion 5).
+export function cancellationAttachment(event: H3Event | undefined, bookings: Omit<CalendarEvent, 'status' | 'updatedAt'>[]): Attachment {
+  const base = useRuntimeConfig(event).public.baseURL
+  const now = Math.floor(Date.now() / 1000)
+  return {
+    filename: 'cancelled.ics',
+    contentType: 'text/calendar; charset=utf-8; method=CANCEL',
+    content: calendarFor(
+      bookings.map(booking => ({ ...booking, status: 'CANCELLED', updatedAt: now })),
+      { name: bookings[0]?.title ?? 'Cancelled', host: new URL(base).hostname, method: 'CANCEL' },
+    ),
+  }
+}
+
+// Several bookings in one file, for a message that confirms more than one at once.
+export function bookingsAttachment(event: H3Event | undefined, bookings: CalendarEvent[]): Attachment {
+  const base = useRuntimeConfig(event).public.baseURL
+  return {
+    filename: 'booking.ics',
+    contentType: 'text/calendar; charset=utf-8',
+    content: calendarFor(bookings, { name: bookings.length === 1 ? bookings[0]!.title : 'Room bookings', host: new URL(base).hostname }),
+  }
+}
+
+// A series' occurrences as calendar events, read back after the write because the ids are made there.
+export async function seriesEvents(seriesId: string, title: string, room: string): Promise<CalendarEvent[]> {
+  const rows = await db.select({ id: schema.roomBookings.id, startsAt: schema.roomBookings.startsAt, endsAt: schema.roomBookings.endsAt, status: schema.roomBookings.status, updatedAt: schema.roomBookings.updatedAt })
+    .from(schema.roomBookings)
+    .where(eq(schema.roomBookings.seriesId, seriesId))
+    .orderBy(asc(schema.roomBookings.startsAt))
+  return rows.map(row => ({ ...row, title, room }))
 }

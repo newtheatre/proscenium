@@ -1,4 +1,4 @@
-import { bookingForm, bookingTier, maskConflicts } from '#shared/utils/bookings'
+import { bookingForm, bookingTier, maskConflicts, saysClash } from '#shared/utils/bookings'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { formatLondon } from '#shared/utils/london'
 
@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
   }))
 
   if (!claimed.won && claimed.why === 'closed') {
-    throw (await closedOver(event, room.id, from, to)) ?? createError({ statusCode: 409, statusMessage: 'Somebody booked that slot first' })
+    throw (await closedOver(event, room.id, from, to)) ?? createError({ statusCode: 409, statusMessage: 'That slot could not be held. Try again.' })
   }
   if (!claimed.won && claimed.why === 'gone') {
     throw createError({ statusCode: 410, statusMessage: 'That room is no longer bookable' })
@@ -86,7 +86,7 @@ export default defineEventHandler(async (event) => {
   if (!claimed.won) {
     throw createError({
       statusCode: 409,
-      statusMessage: 'Somebody booked that slot first',
+      statusMessage: saysClash(claimed.conflicts, account.id),
       // Masked unless the reader may see whose it is (C-103 criteria 4 and 5).
       data: { conflicts: maskConflicts(claimed.conflicts, permissions.has('rooms.read')) },
     })

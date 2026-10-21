@@ -61,7 +61,8 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-interface Cancelled { id: string, startsAt: number }
+// `endsAt` comes back only for a room we manage: those are the ones a calendar file was sent for.
+interface Cancelled { id: string, startsAt: number, endsAt?: number }
 
 // A status change, never a deletion, and guarded on the status it read: two cancels racing must
 // not both count as the one that freed the slot (0006, C-112 criterion 2).
@@ -73,7 +74,7 @@ async function cancelOne(id: string, userId: string, seriesId: string | null, no
       eq(schema.roomBookings.userId, userId),
       inArray(schema.roomBookings.status, [...CANCELLABLE]),
     ))
-    .returning({ id: schema.roomBookings.id, startsAt: schema.roomBookings.startsAt })
+    .returning({ id: schema.roomBookings.id, startsAt: schema.roomBookings.startsAt, endsAt: schema.roomBookings.endsAt })
 
   // Cancelling the first week moves the head, and it moves in the same batch: a series read
   // between the two would name a week that is already gone (C-111 criterion 3).
@@ -108,6 +109,11 @@ async function tell(
   cancelled: Cancelled[],
 ): Promise<void> {
   const base = useRuntimeConfig(event).public.baseURL
+  // The calendar file every confirmation carried is taken back by one that cancels it (C-104).
+  const ours = cancelled.filter(one => one.endsAt !== undefined)
+  const attachments = ours.length
+    ? [cancellationAttachment(event, ours.map(one => ({ id: one.id, title: booking.title, room: booking.room, startsAt: one.startsAt, endsAt: one.endsAt! })))]
+    : []
 
   if (cancelled.length === 1) {
     await notify(event, {
@@ -120,6 +126,7 @@ async function tell(
         title: booking.title,
         roomsUrl: `${base}/rooms`,
       },
+      attachments,
     })
     return
   }
@@ -135,5 +142,6 @@ async function tell(
         .map(one => formatLondon(new Date(one.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })),
       roomsUrl: `${base}/rooms`,
     },
+    attachments,
   })
 }

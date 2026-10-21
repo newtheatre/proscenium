@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { decisionForm } from '#shared/utils/approvals'
 import { formatLondon } from '#shared/utils/london'
 import type { DecisionOutcome, PendingRow } from '#server/utils/approvals'
+import type { CalendarEvent } from '#shared/utils/ics'
 import type { H3Event } from 'h3'
 
 // Approve or reject requests, one or a batch.
@@ -69,20 +70,24 @@ async function tellRequesters(
 ): Promise<void> {
   const movedTo = intoRoom ? await roomName(intoRoom) : null
 
-  const byMember = new Map<string, { room: string, title: string, when: string }[]>()
+  const now = Math.floor(Date.now() / 1000)
+  const byMember = new Map<string, { room: string, title: string, when: string, event: CalendarEvent }[]>()
   for (const outcome of decided) {
     const row = before.get(outcome.id)
     if (!row) continue
     const lines = byMember.get(row.userId) ?? []
+    const room = movedTo ?? row.room
     lines.push({
-      room: movedTo ?? row.room,
+      room,
       title: row.title,
       when: formatLondon(new Date(row.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      event: { id: row.id, title: row.title, room, startsAt: row.startsAt, endsAt: row.endsAt, status: 'CONFIRMED', updatedAt: now },
     })
     byMember.set(row.userId, lines)
   }
 
-  for (const [userId, bookings] of byMember) {
+  for (const [userId, decisions] of byMember) {
+    const bookings = decisions.map(({ event: _event, ...line }) => line)
     await notify(event, {
       type: action === 'APPROVE' ? 'room.request.approved' : 'room.request.rejected',
       userId,
@@ -93,6 +98,8 @@ async function tellRequesters(
         moved: movedTo,
         roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
       },
+      // An approval is the booking's confirmation, so it carries the calendar file one does (C-104).
+      ...(action === 'APPROVE' ? { attachments: [bookingsAttachment(event, decisions.map(one => one.event))] } : {}),
     })
   }
 }

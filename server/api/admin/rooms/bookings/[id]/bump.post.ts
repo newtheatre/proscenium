@@ -73,6 +73,13 @@ export default defineEventHandler(async (event) => {
         : null,
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
+    // The bumped booking leaves their calendar and the one held for them arrives in it (C-104).
+    attachments: [
+      cancellationAttachment(event, [{ id, title: displaced.title, room: displaced.room, startsAt: displaced.startsAt, endsAt: displaced.endsAt }]),
+      ...(outcome.offeredId && offer
+        ? [bookingAttachment(event, { id: outcome.offeredId, title: displaced.title, room: offer.room, startsAt: offer.startsAt, endsAt: offer.endsAt, status: 'CONFIRMED', updatedAt: now })]
+        : []),
+    ],
   })
 
   return {

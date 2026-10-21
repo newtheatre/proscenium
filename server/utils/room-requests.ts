@@ -74,7 +74,7 @@ export async function sweepExternalRequests(event: H3Event | undefined, at = new
           when: whenOf(request),
           // Which half of the wait it is stuck in, because the two need different action.
           formIsIn: request.status === 'AWAITING_EXTERNAL',
-          queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests?kind=unlisted`,
+          queueUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/manage/requests?kind=unlisted`,
         },
       })
     }
@@ -156,7 +156,7 @@ async function escalate(event: H3Event | undefined, request: Waiting, now: numbe
         room: request.room,
         title: chased.title,
         when: whenOf(chased),
-        queueUrl: `${useRuntimeConfig(event).public.baseURL}/admin/requests`,
+        queueUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/manage/requests`,
       },
     })
   }
