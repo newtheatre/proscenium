@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { saysQuantity } from '#shared/utils/bar'
+import { saysToOrder } from '#shared/utils/ordering'
 import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -38,7 +39,7 @@ const columns: TableColumn<OrderListRow>[] = [
       h('div', {}, row.original.name),
       // Below sm the on hand and par columns are hidden: shown here instead, so a phone keeps the
       // shortfall in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysQuantity(row.original.onHand, row.original.unit)} on hand, par ${saysQuantity(row.original.parQty, row.original.unit)}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${saysQuantity(row.original.onHand, row.original.unit)} on hand, par ${saysQuantity(row.original.parQty, row.original.unit)}, short ${saysQuantity(row.original.shortfall, row.original.unit)}`),
     ]),
   },
   {
@@ -56,9 +57,15 @@ const columns: TableColumn<OrderListRow>[] = [
   {
     id: 'shortfall',
     header: 'Shortfall',
-    // The one figure a supplier order actually needs, weighted against On hand and Par beside it.
+    meta: RIGHT_ALIGNED_HIDE_BELOW_SM,
+    cell: ({ row }) => saysQuantity(row.original.shortfall, row.original.unit),
+  },
+  {
+    id: 'toOrder',
+    header: 'To order',
+    // The one figure a supplier order needs: whole containers, rounded up (0140).
     meta: RIGHT_ALIGNED,
-    cell: ({ row }) => h('span', { class: 'font-medium' }, saysQuantity(row.original.shortfall, row.original.unit)),
+    cell: ({ row }) => h('span', { 'class': 'font-medium', 'data-test': `to-order-${row.original.id}` }, saysToOrder(row.original)),
   },
 ]
 </script>

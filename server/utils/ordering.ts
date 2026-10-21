@@ -11,9 +11,9 @@ import type { OrderListRow, UnconfiguredRow } from '#shared/utils/ordering'
 // stock_movements is otherwise expensive to repeat per row across the select list and the filter.
 function shortfallQuery(): SQL {
   return sql`
-    SELECT id, name, unit, category, onHand, parQty, parQty - onHand AS shortfall
+    SELECT id, name, unit, containerMl, category, onHand, parQty, parQty - onHand AS shortfall
     FROM (
-      SELECT i.id AS id, i.name AS name, i.unit AS unit, i.category AS category,
+      SELECT i.id AS id, i.name AS name, i.unit AS unit, i.container_ml AS containerMl, i.category AS category,
              i.par_qty AS parQty, ${onHandColumn('i')} AS onHand
       FROM bar_items i
       WHERE i.status = 'ACTIVE' AND i.par_qty IS NOT NULL

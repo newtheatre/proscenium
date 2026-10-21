@@ -35,6 +35,7 @@ import {
   variantForm,
   writeOffSizes,
 } from '#shared/utils/bar'
+import { saysToOrder, toOrder } from '#shared/utils/ordering'
 import type { AllergenState } from '#shared/utils/bar'
 
 // F-111 and F-114's write-path rules, which the database CHECKs mirror rather than replace: a
@@ -571,5 +572,20 @@ describe('a stocked item carries the allergen answer (issue 1348)', () => {
   test('recorded needs its note, and a note is not filed as unknown', () => {
     expect(stockItemForm.safeParse({ name: 'House red', unit: 'ML', allergenState: 'RECORDED' }).success).toBe(false)
     expect(stockItemForm.safeParse({ name: 'House red', unit: 'ML', allergenState: 'UNKNOWN', allergenNotes: 'Sulphites' }).success).toBe(false)
+  })
+})
+
+// 0140: the order list asks for what a supplier sells, whole items or whole containers.
+describe('what the order list asks a supplier for', () => {
+  test('whole items as they are, a measured shortfall in containers rounded up', () => {
+    expect(toOrder({ unit: 'ITEM', containerMl: null, shortfall: 31 })).toBe(31)
+    expect(toOrder({ unit: 'ML', containerMl: 750, shortfall: 1275 })).toBe(2)
+    expect(toOrder({ unit: 'ML', containerMl: 700, shortfall: 1400 })).toBe(2)
+    expect(saysToOrder({ unit: 'ML', containerMl: 750, shortfall: 1275 })).toBe('2 × 750 ml')
+  })
+
+  test('a measured item with no container size is left in millilitres', () => {
+    expect(toOrder({ unit: 'ML', containerMl: null, shortfall: 500 })).toBeNull()
+    expect(saysToOrder({ unit: 'ML', containerMl: null, shortfall: 500 })).toBe('500 ml')
   })
 })
