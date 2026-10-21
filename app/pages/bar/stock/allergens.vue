@@ -69,15 +69,11 @@ const listingFailure = useListFailure(error, 'The stocked items could not be rea
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <p class="text-sm text-muted">
       Answer each stocked item once, and every product that pours it gives that answer at the till,
       with anything the bar adds, such as a garnish, set on the product itself.
@@ -151,5 +147,5 @@ const listingFailure = useListFailure(error, 'The stocked items could not be rea
         </UButton>
       </li>
     </ul>
-  </div>
+  </ReadGate>
 </template>

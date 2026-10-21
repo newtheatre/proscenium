@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { formatLondon, fromLondonWallClock, londonClock } from '#shared/utils/london'
+import { fromLondonWallClock, londonClock } from '#shared/utils/london'
+import { saysClock, saysWhenLong } from '#shared/utils/when'
 import { SERIES_EDIT_REFUSAL, nameOrPurpose, saysBookingState } from '#shared/utils/bookings'
 import { SU_ROOMS, saysExternalState } from '#shared/utils/external-requests'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
@@ -159,9 +160,7 @@ const stateOf = (booking: { status: string, convertedToRequestId?: string | null
 }
 
 function spanOf(booking: Booking): string {
-  const from = formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
-  const to = formatLondon(new Date(booking.endsAt * 1000), { timeStyle: 'short' })
-  return `${from} to ${to}`
+  return `${saysWhenLong(booking.startsAt)} to ${saysClock(booking.endsAt)}`
 }
 
 // Which of the two, chosen explicitly. Nothing is preselected: a member cancelling one week must
@@ -497,8 +496,7 @@ useSeoMeta({ title: 'My bookings' })
               </UBadge>
             </p>
             <p class="text-sm text-muted">
-              {{ formatLondon(new Date(one.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }}
-              to {{ formatLondon(new Date(one.endsAt * 1000), { timeStyle: 'short' }) }}
+              {{ saysWhenLong(one.startsAt) }} to {{ saysClock(one.endsAt) }}
             </p>
             <p class="text-sm">
               {{ one.title }}

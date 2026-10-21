@@ -25,13 +25,13 @@ const { search, conditions, sort, page, query, active, set, setSort, clear } = u
 
 const empty = (): Page<LedgerEntryRow> => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 })
 
-const { data, status: loading, error } = await useAsyncData(
+const { data, status: loading, error, refresh } = await useAsyncData(
   'ledger-entries',
   () => request<Page<LedgerEntryRow>>('/api/admin/finance/season/entries', { query: query.value }),
   { watch: [query], default: empty },
 )
 
-const entriesFailure = computed(() => (error.value ? refusalText(error.value, 'The entries could not be read.') : null))
+const entriesFailure = useListFailure(error, 'The entries could not be read.')
 
 // One entry, opened in a drawer: who took it, who approved it, whose tab and every line (issue 1361).
 const opened = ref<LedgerEntryOpened | null>(null)
@@ -154,15 +154,11 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="entriesFailure"
-      data-test="entries-failure"
-      color="error"
-      variant="subtle"
-      :description="entriesFailure"
-    />
-
+  <ReadGate
+    :failure="entriesFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       v-model:search="search"
       :placeholder="ledgerEntriesList.search.placeholder"
@@ -261,5 +257,5 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
         </div>
       </template>
     </USlideover>
-  </div>
+  </ReadGate>
 </template>

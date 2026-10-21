@@ -40,6 +40,8 @@ const { search, conditions, sort, page, query, active, set, setSort, clear } = u
 const listing = ref<Listing | null>(null)
 const loading = ref(false)
 const failure = ref<ListFailure | null>(null)
+// The screen's own read, apart from a write's refusal, so a failed write never hides the list.
+const readFailure = ref<ListFailure | null>(null)
 
 // A wide diff wrapped one row to several times its neighbours' height (issue 935); past this many
 // badges the rest sit in the row's own expanded detail instead.
@@ -60,12 +62,12 @@ const startOf = (day: string): number | undefined =>
 
 async function load(): Promise<void> {
   loading.value = true
-  failure.value = null
+  readFailure.value = null
   try {
     listing.value = await $fetch<Listing>('/api/admin/audit', { query: query.value })
   }
   catch (error) {
-    failure.value = listFailureFrom(error)
+    readFailure.value = listFailureFrom(error)
   }
   finally {
     loading.value = false
@@ -240,7 +242,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="load"
+  >
     <UAlert
       v-if="failure"
       color="error"
@@ -482,5 +488,5 @@ onMounted(load)
       v-model:open="reauthenticating"
       @reauthenticated="retryAfterReauthentication"
     />
-  </div>
+  </ReadGate>
 </template>

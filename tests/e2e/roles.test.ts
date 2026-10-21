@@ -111,6 +111,8 @@ describe.skipIf(skip !== null)('roles and the guards over them (A-118, A-120, 00
     expect(granted.status).toBe(200)
     const body = await granted.json()
     expect(body.expiresAt).toBe(defaultRoleExpiry(new Date()))
+    // The subject holds a password and no authenticator, so the grant says it waits on one (A-112).
+    expect(body.waitsOnFactor).toBe(true)
 
     const read = await fetch(`${app.baseURL}/api/admin/roles?userId=${subjectId}`, { headers: { cookie } })
     expect(await read.json()).toMatchObject({ roles: [{ role: 'THEATRE_MANAGER' }] })

@@ -129,7 +129,12 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
         </UDashboardNavbar>
       </template>
       <template #body>
-        <slot />
+        <main
+          id="main"
+          class="flex flex-col gap-4 sm:gap-6"
+        >
+          <slot />
+        </main>
       </template>
     </UDashboardPanel>
   </UDashboardGroup>

@@ -4,7 +4,7 @@ import { NIGHT_AUDIENCES, NIGHT_AUDIENCE_LABELS, saysNightMessageSent } from '#s
 import type { NightAudience, NightMessageOutcome } from '#shared/utils/night-message'
 import { openingHouseId } from '#shared/utils/tonight'
 
-definePageMeta({ layout: 'tonight', docs: '/docs/tonight/message-tonight-s-audience' })
+definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight/message-tonight-s-audience' })
 useSeoMeta({ title: 'Message tonight\'s audience' })
 
 interface House { id: string, showTitle: string, startsAt: number, active: boolean }

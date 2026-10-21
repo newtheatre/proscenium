@@ -42,6 +42,8 @@ const status = ref<Status | null>(null)
 const listing = ref<Listing | null>(null)
 const loading = ref(false)
 const failure = ref<ListFailure | null>(null)
+// The screen's own read, apart from a write's refusal, so a failed write never hides the list.
+const readFailure = ref<ListFailure | null>(null)
 const recording = ref(false)
 
 const toast = useToast()
@@ -50,7 +52,7 @@ const drill = reactive<Partial<RestoreDrillForm>>({})
 
 async function load(): Promise<void> {
   loading.value = true
-  failure.value = null
+  readFailure.value = null
   try {
     const [statusResult, listingResult] = await Promise.all([
       $fetch<Status>('/api/admin/backups'),
@@ -60,7 +62,7 @@ async function load(): Promise<void> {
     listing.value = listingResult
   }
   catch (error) {
-    failure.value = listFailureFrom(error)
+    readFailure.value = listFailureFrom(error)
   }
   finally {
     loading.value = false
@@ -127,7 +129,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="load"
+  >
     <UAlert
       v-if="failure"
       data-test="failure"
@@ -372,5 +378,5 @@ onMounted(load)
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

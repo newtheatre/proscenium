@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { clearConfigOverride, overrideConfig } from '#tests/helpers/config'
 import { generatePassword } from '#tests/helpers/seed'
-import { saysDay } from '#shared/utils/when'
+import { saysDay, saysDayRange } from '#shared/utils/when'
 import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -217,7 +217,7 @@ describe.skipIf(skip !== null)('/money: the dashboard over a defined term (I-105
     await waitFor(view, `document.body.innerText.includes(${JSON.stringify(range)})`)
 
     await visit(view, `${app.baseURL}/money/periods`, '[data-test="defined-terms"]')
-    expect(await textOf(view, '[data-test="defined-terms"]')).toContain(`Spring 2020: ${saysDay('2020-01-13')} to ${saysDay('2020-03-27')}`)
+    expect(await textOf(view, '[data-test="defined-terms"]')).toContain(`Spring 2020: ${saysDayRange('2020-01-13', '2020-03-27')}`)
     view.close()
   }, 120_000)
 })

@@ -213,18 +213,11 @@ const columns: TableColumn<Room>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="failure"
-      data-test="load-failed"
-      color="error"
-      variant="subtle"
-      icon="i-lucide-unplug"
-      :title="failure.message"
-      :description="READ_AGAIN"
-      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="failure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <p class="text-sm text-muted">
       The rooms we control, their hours and their own rules.
     </p>
@@ -276,7 +269,7 @@ const columns: TableColumn<Room>[] = [
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ failure ? 'The rooms could not be read.' : filtered ? 'No room matches that.' : 'No rooms yet. Add the first one and it appears on the calendar.' }}
+          {{ filtered ? 'No room matches that.' : 'No rooms yet. Add the first one and it appears on the calendar.' }}
         </p>
       </template>
 
@@ -659,5 +652,5 @@ const columns: TableColumn<Room>[] = [
       @update:open="value => { if (!value) retiring = null }"
       @confirm="retire"
     />
-  </div>
+  </ReadGate>
 </template>

@@ -45,7 +45,6 @@ interface Alternatives { nearest: Offer | null, total: number }
 interface StandingAnswer { count: number, standing: Standing }
 
 const request = useRequestFetch()
-const failure = ref<ListFailure | null>(null)
 const rooms = ref<{ id: string, name: string }[]>([])
 const purposes = ref<string[]>([])
 const toast = useToast()
@@ -67,9 +66,7 @@ const { data: listing, status, refresh, error } = await useAsyncData(
   { watch: [query], default: empty },
 )
 
-watch(error, (raised) => {
-  if (raised) failure.value = listFailureFrom(raised, 'The bookings could not be read.')
-})
+const failure = useListFailure(error, 'The bookings could not be read.')
 
 async function loadRooms(): Promise<void> {
   rooms.value = (await $fetch<{ items: typeof rooms.value }>('/api/admin/rooms')).items
@@ -264,16 +261,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="failure"
-      data-test="failure"
-      color="error"
-      variant="subtle"
-      :description="failure.message"
-      :actions="failure.enrolPath ? [{ label: 'Set up an authenticator app', to: failure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="failure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <p class="text-sm text-muted">
       Every member's room bookings, still to come unless you ask for past ones.
     </p>
@@ -305,7 +297,7 @@ onMounted(() => {
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ failure ? failure.message : filtered ? 'No booking matches that.' : 'Nothing is booked from now on.' }}
+          {{ filtered ? 'No booking matches that.' : 'Nothing is booked from now on.' }}
         </p>
       </template>
     </UTable>
@@ -486,5 +478,5 @@ onMounted(() => {
         </UFormField>
       </template>
     </ConfirmModal>
-  </div>
+  </ReadGate>
 </template>

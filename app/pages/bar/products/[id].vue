@@ -558,16 +558,11 @@ const priceColumns: TableColumn<VariantPrice>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !open && pouring === null && pricing === null && removing === null && choosing === null && !creatingGroup"
       data-test="failure"
@@ -1219,5 +1214,5 @@ const priceColumns: TableColumn<VariantPrice>[] = [
       @update:open="value => { if (!value) clearing = null }"
       @confirm="clearChoice"
     />
-  </div>
+  </ReadGate>
 </template>
