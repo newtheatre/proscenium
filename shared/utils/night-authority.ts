@@ -96,6 +96,22 @@ export function nightAuthorityRefusal(role: NightRole, dutyManager: DoorHelp | n
   }
 }
 
+const ANY_ROLE_WORDS: Record<NightRole, string> = { DOOR: 'door', BAR: 'bar', DUTY_MANAGER: 'duty manager' }
+
+// A screen several shifts open names every one of them, in the order a night meets them, rather
+// than whichever role the guard happened to try first (0232).
+export function nightAnyRoleRefusal(roles: readonly NightRole[]): { statusCode: 403, statusMessage: string } {
+  const asked = (['DOOR', 'BAR', 'DUTY_MANAGER'] as const).filter(role => roles.includes(role))
+  if (asked.length === 1) return nightAuthorityRefusal(asked[0]!)
+  const words = asked.map(role => ANY_ROLE_WORDS[role])
+  const joined = `${words.slice(0, -1).join(', ')} or ${words[words.length - 1]}`
+  const officers = [...new Set(asked.map(role => NIGHT_ROLE_OFFICER[role].words))].join(' or ')
+  return { statusCode: 403, statusMessage: `This needs a confirmed ${joined} shift on one of tonight's performances, or ${officers}` }
+}
+
+// Every no-shift refusal opens with this, one role or several, so the hub can tell it from a more specific one.
+export const NO_SHIFT_REFUSAL_OPENING = 'This needs a confirmed '
+
 // Whoever confirms a queued claim (E-105): a unit test fails when this role stops holding
 // `rota.write`, so the refusal below cannot send a volunteer to somebody who cannot help.
 export const CLAIM_CONFIRMER: Role = 'FOH_MANAGER'

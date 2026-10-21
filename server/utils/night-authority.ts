@@ -365,7 +365,10 @@ export async function requireAnyNightAuthority(
   // The refusal about the caller's own position, never merely the last role asked (issue 1303).
   const { short, refusals } = found
   for (const { role, held } of short) refusals.push(await shiftRefusal(caller, role, caller.scope, held))
-  throw mostSpecificRefusal(refusals)?.error ?? createError(nightAuthorityRefusal('DUTY_MANAGER'))
+  const best = mostSpecificRefusal(refusals)
+  // No shift of any of them: one refusal naming every shift that opens the screen (0232).
+  if (!best || (best.kind === 'NO_SHIFT' && short.length > 1)) throw createError(nightAnyRoleRefusal(roles))
+  throw best.error
 }
 
 // The same steps for a screen anyone signed in may read, which only adds what tonight's team may

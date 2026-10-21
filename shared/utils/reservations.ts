@@ -389,9 +389,9 @@ export interface DoorTicketOutcome {
   admit: boolean
 }
 
-// Who the door sends a question it cannot answer to; the duty manager once 0095 lets that shift
-// cover the door (issue 1306).
-export const DOOR_REFERRAL = `the ${saysRole('FOH_MANAGER')}`
+// Who the door sends a question it cannot answer to: the duty manager, who can cover the door
+// (0095), or the officer on a night with none (0232).
+export const DOOR_REFERRAL = `tonight's duty manager or the ${saysRole('FOH_MANAGER')}`
 
 // The door's own words for a booking that cannot come in, each ending in what to do next; the
 // booker's own QR page keeps `qrStatusDisplay()` (issue 1301).
