@@ -3,10 +3,10 @@ import { h, resolveComponent } from 'vue'
 import {
   ALLERGEN_STATES,
   REASONS_BY_KIND,
+  SAYS_NOT_POUNDS,
   STOCK_ITEM_AGE_RESTRICTED_DEFAULT,
   DELIVERY_COST_QUESTION,
   STOCK_UNITS,
-  asPence,
   deliveryCostBasis,
   movementEntryForm,
   says,
@@ -84,7 +84,7 @@ type HandEnteredKind = Exclude<StockMovementKind, 'SALE' | 'COMP' | 'STOCKTAKE' 
 
 interface MovementState {
   kind: HandEnteredKind
-  qty: number
+  qty?: number
   reason?: MovementReason
   // An adjustment goes either way: stock is found as often as it is lost.
   adds: boolean
@@ -100,7 +100,7 @@ const reasonOptions = computed(() => (REASONS_BY_KIND[movement.kind] ?? []).map(
 const sizeChips = computed(() => (moving.value ? writeOffSizes(moving.value) : []))
 const directionOptions = [{ label: 'Add to stock', value: true }, { label: 'Take off stock', value: false }]
 
-const costPounds = ref<number>()
+const costPence = ref<number>()
 
 // Asked the way the item is bought, never per millilitre (F-114 criterion 6); the route keeps it
 // that way and a report divides it only when read (0100).
@@ -129,8 +129,8 @@ function edit(item: StockItem | null): void {
 // Each action opens on its own kind, so no default can write a movement nobody meant (issue 1350).
 function moveStock(item: StockItem, kind: HandEnteredKind): void {
   moving.value = item
-  Object.assign(movement, { kind, qty: 0, reason: undefined, adds: true })
-  costPounds.value = undefined
+  Object.assign(movement, { kind, qty: undefined, reason: undefined, adds: true })
+  costPence.value = undefined
 }
 
 const MOVEMENT_TITLES: Record<HandEnteredKind, string> = {
@@ -139,11 +139,11 @@ const MOVEMENT_TITLES: Record<HandEnteredKind, string> = {
   ADJUST: 'Adjust the count of',
 }
 
-// A cleared number field leaves the model undefined, which is no amount either.
-const hasAmount = computed(() => movement.qty > 0)
+// An empty or unreadable field is no amount: NaN is not above nothing either.
+const hasAmount = computed(() => (movement.qty ?? 0) > 0)
 
 const submitLabel = computed(() => (moving.value && hasAmount.value
-  ? saysMovementAction({ kind: movement.kind, qty: movement.qty, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds })
+  ? saysMovementAction({ kind: movement.kind, qty: movement.qty ?? 0, unit: moving.value.unit, itemName: moving.value.name, adds: movement.adds })
   : 'Say how much first'))
 
 async function save(): Promise<void> {
@@ -182,11 +182,15 @@ async function save(): Promise<void> {
 // The screen states the sign rather than leaving somebody to type a minus. A delivery only adds,
 // wastage only takes away, and an adjustment is whichever the manager chose.
 const adding = computed(() => movement.kind === 'DELIVERY' || (movement.kind === 'ADJUST' && movement.adds))
-const signedQty = computed(() => (adding.value ? Math.abs(movement.qty) : -Math.abs(movement.qty)))
+const signedQty = computed(() => (adding.value ? Math.abs(movement.qty ?? 0) : -Math.abs(movement.qty ?? 0)))
 
 async function record(): Promise<void> {
   const item = moving.value
   if (!item) return
+  if (movement.kind === 'DELIVERY' && costPence.value !== undefined && Number.isNaN(costPence.value)) {
+    failure.value = `${costQuestion.value?.label ?? 'The cost'}: ${SAYS_NOT_POUNDS}. Leave it empty if the cost is not known.`
+    return
+  }
 
   saving.value = true
   failure.value = null
@@ -198,7 +202,7 @@ async function record(): Promise<void> {
         kind: movement.kind,
         qty: signedQty.value,
         reason: movement.reason ?? null,
-        costPence: movement.kind === 'DELIVERY' ? asPence(costPounds.value) : null,
+        costPence: movement.kind === 'DELIVERY' ? costPence.value ?? null : null,
       },
     })
     toast.add({
@@ -375,9 +379,9 @@ const columns: TableColumn<StockItem>[] = [
     id: 'act',
     header: ACTIONS_HEADER,
     meta: ACTIONS_COLUMN,
-    // The two movements a bar records by hand sit on the row; an adjustment, a retirement and a
-    // deletion are rarer and go behind More actions (issue 1350, K-123 criterion 10).
-    cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
+    // The two hand movements sit on the row, the rarer actions behind More actions (issue 1350,
+    // K-123 criterion 10); on a phone they wrap rather than run off the card.
+    cell: ({ row }) => h('div', { class: 'flex flex-wrap justify-end gap-1' }, [
       ...(row.original.status === 'ACTIVE'
         ? [
             h(UButton, {
@@ -573,9 +577,8 @@ const columns: TableColumn<StockItem>[] = [
             hint="Optional"
             description="Millilitres in one bottle or keg, so a delivery can be counted in containers."
           >
-            <UInputNumber
+            <WholeField
               v-model="state.containerMl"
-              :min="1"
               :disabled="editing?.hasMovements"
               class="w-full"
               data-test="item-container"
@@ -588,9 +591,8 @@ const columns: TableColumn<StockItem>[] = [
             hint="Optional"
             description="What the bar wants on hand before a show week. An item without one is left out of the order list."
           >
-            <UInputNumber
+            <WholeField
               v-model="state.parQty"
-              :min="0"
               class="w-full"
               data-test="item-par"
             />
@@ -728,9 +730,8 @@ const columns: TableColumn<StockItem>[] = [
             required
             :description="`In ${moving ? says(moving.unit).toLowerCase() : 'the item\'s own unit'}. This ${adding ? 'adds to' : 'comes off'} what is on hand.`"
           >
-            <UInputNumber
+            <WholeField
               v-model="movement.qty"
-              :min="0"
               class="w-full"
               data-test="movement-qty"
             />
@@ -741,11 +742,8 @@ const columns: TableColumn<StockItem>[] = [
             :label="costQuestion.label"
             :description="costQuestion.description"
           >
-            <UInputNumber
-              v-model="costPounds"
-              :min="0"
-              :step="0.01"
-              :format-options="{ style: 'currency', currency: 'GBP' }"
+            <PoundsField
+              v-model="costPence"
               class="w-full"
               data-test="movement-cost"
             />

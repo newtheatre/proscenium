@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { countStatements, stocktakeLinesQuery, stocktakeByIdQuery, openStocktakeQuery } from '#server/utils/stocktakes'
+import { applyStatements, countStatements, stocktakeLinesQuery, stocktakeByIdQuery, stocktakeShortfallsQuery, openStocktakeQuery } from '#server/utils/stocktakes'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { Stocktake, StocktakeLine } from '#shared/utils/stocktakes'
 
@@ -266,6 +266,76 @@ describe('a frozen stocktake is read as such (F-115 criterion 5)', () => {
       const held = readOne<Stocktake>(database, stocktakeByIdQuery('st-1'))
       expect(held?.status).toBe('APPLIED')
       expect(held?.appliedAt).toBe(5)
+    })
+  })
+})
+
+// Decision 0126: a count is what was on the shelf when it was entered, so the figure it is
+// compared with is on-hand at that moment; a stale opening figure drove stock below zero.
+describe('a count is compared with on-hand when it was entered, and never applies below zero (0126)', () => {
+  function stocked(database: TestDatabase, itemId: string, qty: number, id = `d-${itemId}`): void {
+    insert(database, 'stock_movements', { id, item_id: itemId, qty, kind: qty > 0 ? 'DELIVERY' : 'ADJUST' })
+  }
+
+  const onHand = (database: TestDatabase, itemId: string): number =>
+    rows<{ total: number }>(database, `SELECT coalesce(sum(qty), 0) AS total FROM stock_movements WHERE item_id = ?`, itemId)[0]!.total
+
+  const apply = (database: TestDatabase, opener: string, auditId = 'au-1'): void => {
+    const entry = { id: auditId, actorId: opener, action: 'bar.stocktake.applied', target: 'bar-stocktake:st-1', detail: {} }
+    database.batch(applyStatements('st-1', opener, entry).map(statement => boundStatement(database, statement)))
+  }
+
+  test('sales between opening and counting are not counted as a loss on top of themselves', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const itemId = bottle(database)
+      stocked(database, itemId, 50)
+      insert(database, 'stocktakes', { id: 'st-1', status: 'OPEN', opened_by: opener })
+      insert(database, 'stocktake_lines', { id: 'l-1', stocktake_id: 'st-1', item_id: itemId, expected_qty: 50 })
+      // Forty sold after the stocktake opened, and the ten left on the shelf are counted.
+      stocked(database, itemId, -40, 'sale-1')
+
+      database.batch(countStatements('st-1', [{ itemId, counted: 10 }], opener).map(one => boundStatement(database, one)))
+      const [statement, ...parameters] = boundStatement(database, stocktakeLinesQuery('st-1'))
+      expect(rows<StocktakeLine>(database, statement, ...parameters)[0]).toMatchObject({ expectedQty: 10, countedQty: 10, variance: 0 })
+
+      apply(database, opener)
+      expect(onHand(database, itemId)).toBe(10)
+    })
+  })
+
+  test('a count that would leave stock below zero is refused, naming the item, and nothing is applied', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const itemId = bottle(database)
+      stocked(database, itemId, 50)
+      insert(database, 'stocktakes', { id: 'st-1', status: 'OPEN', opened_by: opener })
+      // A count of 2 against an expected 50, with 45 sold since, would leave on-hand at -43.
+      insert(database, 'stocktake_lines', { id: 'l-1', stocktake_id: 'st-1', item_id: itemId, expected_qty: 50, counted_qty: 2 })
+      stocked(database, itemId, -45, 'sale-1')
+
+      const [statement, ...parameters] = boundStatement(database, stocktakeShortfallsQuery('st-1'))
+      expect(rows(database, statement, ...parameters)).toEqual([{ itemName: 'Gin 1', unit: 'ML', after: -43 }])
+
+      apply(database, opener)
+      expect(rows<{ status: string }>(database, `SELECT status FROM stocktakes WHERE id = 'st-1'`)[0]?.status).toBe('OPEN')
+      expect(rows(database, `SELECT id FROM audit_log`)).toEqual([])
+      expect(onHand(database, itemId)).toBe(5)
+    })
+  })
+
+  test('the apply the route runs posts the difference and freezes the stocktake', async () => {
+    await withDatabase((database) => {
+      const opener = person(database)
+      const itemId = bottle(database)
+      stocked(database, itemId, 10)
+      insert(database, 'stocktakes', { id: 'st-1', status: 'OPEN', opened_by: opener })
+      insert(database, 'stocktake_lines', { id: 'l-1', stocktake_id: 'st-1', item_id: itemId, expected_qty: 10, counted_qty: 7 })
+
+      apply(database, opener)
+      apply(database, opener, 'au-2')
+      expect(onHand(database, itemId)).toBe(7)
+      expect(rows(database, `SELECT id FROM audit_log`)).toEqual([{ id: 'au-1' }])
     })
   })
 })

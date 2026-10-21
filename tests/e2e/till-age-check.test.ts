@@ -455,6 +455,8 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     await click(view, `[data-test="product-${restrictedProductId}"]`)
     await waitFor(view, `document.querySelector('[data-test="age-check-id-PASSPORT"]')`)
     expect(await textOf(view, '[data-test="age-check-product"]')).toContain(restrictedProductName)
+    // Said once on screen: the dialog's own description is kept for a screen reader only.
+    expect(await view.evaluate<boolean>(`document.querySelector('[role="dialog"] [data-slot="description"]')?.classList.contains('sr-only') === true`)).toBe(true)
 
     await click(view, '[data-test="age-check-id-PASSPORT"]')
     await waitFor(view, `document.querySelector('[data-test="basket-total-amount"]') && document.querySelector('[data-test="basket-total-amount"]').textContent.includes('£2.50')`)

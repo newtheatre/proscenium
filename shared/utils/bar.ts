@@ -292,7 +292,16 @@ export const MAX_MOVEMENT_QTY = 1_000_000
 // A delivery costs pounds or hundreds of pounds, so this catches a figure typed ten times over.
 export const MAX_DELIVERY_COST_PENCE = 1_000_000
 
-const deliveryCostField = z.number().int().nonnegative().max(MAX_DELIVERY_COST_PENCE).nullish()
+// A screen sends NaN for text that is not a sum of money, and these messages are what it shows (0127).
+export const SAYS_NOT_POUNDS = 'Type pounds and pence with a full stop, such as 2.50'
+export const SAYS_NOT_WHOLE = 'Type a whole number, such as 12'
+const deliveryCostField = z.number({ error: SAYS_NOT_POUNDS }).int().nonnegative('A cost cannot be below nothing')
+  .max(MAX_DELIVERY_COST_PENCE).nullish()
+
+// A bar price is at least a penny: a drink given away is a comp, asked for and approved (F-110, 0127).
+const barPricePence = z.number({ error: SAYS_NOT_POUNDS }).int(SAYS_NOT_POUNDS)
+  .positive('A price is at least 1p. A drink given away is a comp, asked for at the till.')
+  .max(MAX_VARIANT_PRICE_PENCE, 'That is more than any bar price: check the figure')
 
 const label = (what: string) => z.string().trim().min(1, `A ${what} needs a name`).max(MAX_BAR_NAME)
   // A name is a label, so it holds no address: the audit detail carries both names (0011).
@@ -334,8 +343,8 @@ export const productStatusForm = z.object({ status: z.enum(PRODUCT_STATUSES) })
 export const stockItemForm = z.object({
   name: label('stocked item'),
   unit: z.enum(STOCK_UNITS),
-  containerMl: z.number().int().positive().max(100_000).nullish(),
-  parQty: z.number().int().nonnegative().max(MAX_MOVEMENT_QTY).nullish(),
+  containerMl: z.number({ error: SAYS_NOT_WHOLE }).int(SAYS_NOT_WHOLE).positive('A container holds something').max(100_000).nullish(),
+  parQty: z.number({ error: SAYS_NOT_WHOLE }).int(SAYS_NOT_WHOLE).nonnegative(SAYS_NOT_WHOLE).max(MAX_MOVEMENT_QTY).nullish(),
   category: z.string().trim().max(MAX_BAR_NAME).nullish(),
   ageRestricted: z.boolean().default(STOCK_ITEM_AGE_RESTRICTED_DEFAULT),
   allergenState: z.enum(ALLERGEN_STATES).nullish(),
@@ -366,7 +375,7 @@ export const stockItemStatusForm = z.object({
 const movementFields = z.object({
   itemId: z.string().trim().min(1, 'A movement is about a stocked item'),
   kind: z.enum(STOCK_MOVEMENT_KINDS),
-  qty: z.number().int().refine(value => value !== 0, 'A movement of nothing is not a movement')
+  qty: z.number({ error: SAYS_NOT_WHOLE }).int(SAYS_NOT_WHOLE).refine(value => value !== 0, 'A movement of nothing is not a movement')
     .refine(value => Math.abs(value) <= MAX_MOVEMENT_QTY, 'That quantity is larger than the bar holds'),
   reason: z.enum(MOVEMENT_REASONS).nullish(),
   // What the delivery was bought at, the way the screen asked for it; the route decides how it is
@@ -456,7 +465,7 @@ export const variantChoiceForm = z.object({
 const civilDate = z.string().trim().pipe(londonDayField)
 
 export const priceForm = z.object({
-  pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE),
+  pricePence: barPricePence,
   effectiveFrom: civilDate,
 })
 
@@ -464,7 +473,7 @@ export const priceForm = z.object({
 // criterion 1). Resolution reads it only when the variant has no price row of its own.
 export const categoryPriceForm = z.object({
   servingKind: z.enum(SERVING_KINDS),
-  pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE),
+  pricePence: barPricePence,
   effectiveFrom: civilDate,
 })
 
@@ -473,7 +482,7 @@ export const categoryPriceForm = z.object({
 const setupServingForm = z.object({
   servingKind: z.enum(SERVING_KINDS),
   label: z.string().trim().min(1, 'A serving size needs a label').max(MAX_BAR_NAME),
-  pricePence: z.number().int().nonnegative().max(MAX_VARIANT_PRICE_PENCE).nullish(),
+  pricePence: barPricePence.nullish(),
 })
 
 const setupSizeForm = setupServingForm.extend({
@@ -491,7 +500,7 @@ const setupItemForm = z.discriminatedUnion('mode', [
 ])
 
 const setupDeliveryForm = z.strictObject({
-  qty: z.number().int().positive('A delivery is a quantity of something').max(MAX_MOVEMENT_QTY),
+  qty: z.number({ error: SAYS_NOT_WHOLE }).int(SAYS_NOT_WHOLE).positive('A delivery is a quantity of something').max(MAX_MOVEMENT_QTY),
   costPence: deliveryCostField,
 })
 
@@ -596,6 +605,8 @@ export interface BarProduct {
   // What the till says: read from every item its live sizes pour, plus the addition (issue 1348).
   allergens: AllergenAnswer
   everSold: boolean
+  // Any size has a price row, which is append-only: such a product is retired, never deleted.
+  everPriced: boolean
   // The age-restricted stocked items its live sizes pour, choices included, derived rather than
   // stored; switched off with any here is a product on the tidy-up list (issue 1299).
   restrictedPours: string[]
@@ -825,6 +836,32 @@ export function presetForCategory(name: string): MeasurePresetId | null {
   return found?.id ?? null
 }
 
+const categoryWords = (name: string): string[] =>
+  name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z]+/).filter(Boolean)
+const hasWord = (name: string, list: readonly string[]): boolean =>
+  categoryWords(name).some(word => list.some(match => word === match || word === `${match}s`))
+
+const ALCOHOL_WORDS = ['beer', 'cider', 'lager', 'ale', 'stout', 'alcohol', 'cocktail'] as const
+const NOT_ALCOHOL_WORDS = ['snack', 'crisp', 'sweet', 'confectionery', 'food', 'chocolate', 'soft', 'juice', 'water', 'mixer', 'tea', 'coffee'] as const
+
+// The stated default still decides an unknown category; a named one starts the switch from what it
+// is, so a packet of crisps is not asked for Check ID (F-111 criterion 6 as amended 14 October 2026).
+export function stockItemAgeRestrictedFor(categoryName: string): boolean {
+  if (hasWord(categoryName, NOT_ALCOHOL_WORDS)) return false
+  const preset = presetForCategory(categoryName)
+  if ((preset && preset !== 'PACKAGED') || hasWord(categoryName, ALCOHOL_WORDS)) return true
+  return STOCK_ITEM_AGE_RESTRICTED_DEFAULT
+}
+
+// The packaged kind a thing sold as itself starts as: a drink comes in a can or a bottle, anything
+// else is sold "each" (F-127 criterion 2).
+export function packagedKindFor(categoryName: string): ServingKind {
+  if (hasWord(categoryName, ['can'])) return 'can'
+  if (categoryWords(categoryName).some(word => word.startsWith('bottle'))) return 'bottle'
+  if (presetForCategory(categoryName) || hasWord(categoryName, ALCOHOL_WORDS)) return 'can'
+  return 'item'
+}
+
 // The shape a category's drinks are usually sold in, which the set-up marks once the category is
 // chosen (issue 1349): packaged things are sold as themselves, the rest by measure.
 export function suggestedShape(categoryName: string): 'SIMPLE' | 'MEASURED' | null {
@@ -848,6 +885,24 @@ export function defaultItemName(input: {
     return `${name} ${says(input.servingKind).toLowerCase()}`
   }
   return name
+}
+
+// What a form with no schema of its own says before it submits: the first price or quantity the
+// person typed that cannot be read, named by its label, rather than a figure quietly changed (0127).
+export function firstUnreadable(fields: {
+  prices?: { label: string, pence?: number | null }[]
+  quantities?: { label: string, qty?: number | null }[]
+}): string | null {
+  for (const price of fields.prices ?? []) {
+    if (price.pence === null || price.pence === undefined) continue
+    if (Number.isNaN(price.pence)) return `${price.label}: ${SAYS_NOT_POUNDS}.`
+    if (price.pence < 1) return `${price.label}: a price is at least 1p. A drink given away is a comp, asked for at the till.`
+  }
+  for (const quantity of fields.quantities ?? []) {
+    if (quantity.qty === null || quantity.qty === undefined || Number.isNaN(quantity.qty)) return `${quantity.label}: ${SAYS_NOT_WHOLE}.`
+    if (quantity.qty < 1) return `${quantity.label}: it has to be at least 1.`
+  }
+  return null
 }
 
 // Opening stock is counted the way it stands on the shelf: whole containers of anything with a

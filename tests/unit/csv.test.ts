@@ -63,6 +63,12 @@ describe('toCsv builds one quoted, guarded row per record', () => {
     expect(csv).toContain('"\'=HYPERLINK(""http://evil.invalid"")"')
   })
 
+  // An empty night downloaded a 0-byte bar CSV (0128): declared columns head even an empty file.
+  test('declared columns head the file whether or not any row follows, in their own order', () => {
+    expect(toCsv([], ['Item', 'Cost (£)'])).toBe('"Item","Cost (£)"\r\n')
+    expect(toCsv([{ 'Cost (£)': '1.00', 'Item': 'Gin' }], ['Item', 'Cost (£)'])).toBe('"Item","Cost (£)"\r\n"Gin","1.00"\r\n')
+  })
+
   test('rows are joined with CRLF, the line ending RFC 4180 asks for', () => {
     expect(toCsv([{ a: '1' }])).toBe('"a"\r\n"1"\r\n')
   })

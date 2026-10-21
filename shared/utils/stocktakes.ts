@@ -79,6 +79,14 @@ export function saysCount(qty: number, unit: StockUnit, containerMl: number | nu
   return `${full} full${part ? ` and ${part} ml open` : ''}, ${saysQuantity(qty, unit)}`
 }
 
+// Under half or over double what was expected reads as a slip (ml typed as bottles), so Apply
+// lists it to check first; it is a question, never a refusal (0126).
+export function countToCheck(line: Pick<StocktakeLine, 'expectedQty' | 'countedQty'>): boolean {
+  const { expectedQty: expected, countedQty: counted } = line
+  if (expected === null || counted === null) return false
+  return counted * 2 < expected || counted > expected * 2
+}
+
 export const NO_STOCK_GROUP = 'No stock group'
 
 export interface StocktakeGroup {

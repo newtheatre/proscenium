@@ -75,6 +75,12 @@ const mayRecordLate = computed(() => can(useViewer().value, recordLateCharges))
         · {{ saysAttemptStatus(attempt.status, attempt.kind) }}
       </p>
       <p
+        v-if="attempt.basketSays"
+        class="text-xs text-muted"
+      >
+        {{ attempt.basketSays }}
+      </p>
+      <p
         v-if="attempt.error"
         class="text-xs text-muted"
       >

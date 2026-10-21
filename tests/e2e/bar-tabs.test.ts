@@ -158,3 +158,27 @@ describe.skipIf(skip !== null)('who may read and change the register (F-111 crit
     expect([401, 403]).toContain((await send('GET', '/api/admin/bar/tabs', undefined, '')).status)
   })
 })
+
+describe.skipIf(skip !== null)('the register says who may run a tab, so an empty one is not a dead end', () => {
+  test('with nobody named it says so and points at the settings, and naming one is counted', async () => {
+    await authorise([])
+    await send('PUT', '/api/admin/config/BAR_AUTHORISED_TAB_ROLES', { value: [] })
+    const none = await (await send('GET', '/api/admin/bar/tabs')).json() as { authorisedCount: number }
+    expect(none.authorisedCount).toBe(0)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barManagerPassword)
+    await click(view, 'form button[type="submit"]')
+    await finishSignIn(app, view, barManager.email)
+    await visit(view, `${app.baseURL}/bar/tabs`, '[data-test="no-tab-holders"]')
+    expect(await textOf(view, '[data-test="no-tab-holders"]')).toContain('People who may run a tab')
+    view.close()
+
+    const holder = await registerMember(app, 'tabs-console-named', generatePassword())
+    await authorise([holder.id])
+    const one = await (await send('GET', '/api/admin/bar/tabs')).json() as { authorisedCount: number }
+    expect(one.authorisedCount).toBe(1)
+  }, 120_000)
+})
