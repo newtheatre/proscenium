@@ -43,6 +43,8 @@ export interface ZReading {
   supersedesId: string | null
   writtenOff: boolean
   createdAt: number
+  // The bar whose till close recorded it; null when it was recorded on the reconciliation screen.
+  venueName: string | null
 }
 
 // The reader keys in what it shows; the expected figure is recomputed server-side and never
@@ -113,14 +115,35 @@ export function expectedSheet(expected: NightExpected): ExpectedRow[] {
   ]
 }
 
-export interface NightNeedingYou { night: string, says: 'No reading' | 'Open variance' }
+export interface NightNeedingYou { night: string, says: 'No reading' | 'Open variance' | 'Reading replaced' }
 
-// One list, oldest first: a night has either no reading or a live one with a variance, never both.
-export function nightsNeedingYou(outstanding: { missing: OutstandingNight[], openVariance: OutstandingNight[] }): NightNeedingYou[] {
+export interface Outstanding { missing: OutstandingNight[], openVariance: OutstandingNight[], replaced?: OutstandingNight[] }
+
+// One list, oldest first, one entry a night: an open variance outranks a replaced reading.
+export function nightsNeedingYou(outstanding: Outstanding): NightNeedingYou[] {
+  const variance = new Set(outstanding.openVariance.map(({ night }) => night))
   return [
     ...outstanding.missing.map(({ night }) => ({ night, says: 'No reading' as const })),
     ...outstanding.openVariance.map(({ night }) => ({ night, says: 'Open variance' as const })),
+    ...(outstanding.replaced ?? []).filter(({ night }) => !variance.has(night)).map(({ night }) => ({ night, says: 'Reading replaced' as const })),
   ].sort((a, b) => a.night.localeCompare(b.night))
+}
+
+// What became of a reading: the next row in the chain names it, a bar's close or a reading recorded here.
+export function saysReplacedBy(reading: ZReading, history: readonly ZReading[], clock: (at: number) => string): string | null {
+  const next = history.find(row => row.supersedesId === reading.id)
+  if (!next) return null
+  if (next.venueName) return `Replaced by the closing of the ${next.venueName} till at ${clock(next.createdAt)}`
+  if (next.writtenOff) return `Written off by ${next.enteredByName} at ${clock(next.createdAt)}`
+  return `Replaced by ${next.enteredByName}'s reading at ${clock(next.createdAt)}`
+}
+
+// The live reading came from one bar's close over a different figure from another bar's.
+export function replacedAnotherBar(current: ZReading | null, history: readonly ZReading[]): ZReading | null {
+  if (!current?.venueName || !current.supersedesId) return null
+  const earlier = history.find(row => row.id === current.supersedesId)
+  if (!earlier?.venueName || earlier.venueName === current.venueName || earlier.readerPence === current.readerPence) return null
+  return earlier
 }
 
 export interface OutstandingNight { night: string }

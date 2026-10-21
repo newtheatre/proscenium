@@ -3,7 +3,7 @@ import { h } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { penceFromPounds } from '#shared/utils/admin-forms'
 import { can, recordLateCharges, recordZReadings } from '#shared/utils/abilities'
-import { expectedSheet, liveVariance, nightFromQuery, saysVariance } from '#shared/utils/night-reconciliation'
+import { expectedSheet, liveVariance, nightFromQuery, replacedAnotherBar, saysReplacedBy, saysVariance } from '#shared/utils/night-reconciliation'
 import { currentShowNight } from '#shared/utils/show-night'
 import { saysAttemptStatus } from '#shared/utils/sumup'
 import { saysClock, saysDay, saysDayLong, saysWhen } from '#shared/utils/when'
@@ -49,6 +49,7 @@ interface ReconciliationResponse {
   late: LateAddition[]
   // The night's own day is closed, so nothing a resolution needs can post into it (I-107).
   closed: boolean
+  openTills: string[]
 }
 
 const { data, status, error, refresh } = await useAsyncData(
@@ -93,6 +94,10 @@ const noteMissing = computed(() => variance.value !== null && variance.value !==
 // The live reading's own figure against what we expect now: a sale found since may have closed it.
 const current = computed(() => data.value?.current ?? null)
 const open = computed(() => current.value !== null && current.value.variancePence !== 0 && !current.value.writtenOff)
+const replaced = computed(() => (data.value ? replacedAnotherBar(current.value, data.value.history) : null))
+const figureError = computed(() => (readerFigure.value.includes(',')
+  ? 'Use a point for pence, such as 1.50: a comma is read as a thousands separator.'
+  : 'Give the figure as pounds and pence, such as 123.45.'))
 const varianceNow = computed(() => (current.value && data.value ? liveVariance(current.value.readerPence, data.value.expected.expectedPence) : null))
 
 // The expected sheet is a list of amounts, its totals rows of the same table: a total read
@@ -122,6 +127,15 @@ const historyColumns: TableColumn<ZReading>[] = [
     header: 'When',
     meta: { class: { td: 'whitespace-nowrap' } },
     cell: ({ row }) => saysWhen(row.original.createdAt),
+  },
+  {
+    id: 'from',
+    header: 'From',
+    cell: ({ row }) => h('div', {}, [
+      h('div', {}, row.original.venueName ? `${row.original.venueName} till close` : 'Recorded here'),
+      h('div', { 'class': 'text-xs text-muted', 'data-test': `replaced-by-${row.original.id}` },
+        saysReplacedBy(row.original, data.value?.history ?? [], saysClock) ?? ''),
+    ]),
   },
   {
     id: 'reader',
@@ -221,6 +235,24 @@ function writeOff(): Promise<void> {
         description="A reading can still be recorded here, but no sale or refund can post into a closed period, so a missing one goes in the open period instead. Only the IT Manager can reopen the period."
       />
 
+      <UAlert
+        v-if="data.openTills.length"
+        data-test="tills-still-open"
+        color="warning"
+        variant="subtle"
+        :title="data.openTills.length === 1 ? 'A till is still open for this night' : 'Tills are still open for this night'"
+        :description="`Still open: ${data.openTills.join(', ')}. A reading recorded here stands, so the closing Z of a till still open will not be recorded on this night. Wait for the last till to close before recording or correcting.`"
+      />
+
+      <UAlert
+        v-if="replaced && current"
+        data-test="reading-replaced"
+        color="warning"
+        variant="subtle"
+        title="One bar's close replaced another bar's reading"
+        :description="`The closing of the ${current.venueName} till at ${saysClock(current.createdAt)} (${saysMoney(current.readerPence)}) replaced the ${replaced.venueName} till's ${saysMoney(replaced.readerPence)}. Check the night's Z on the reader and record it under Correct the reading, even if it is the same figure, to confirm it.`"
+      />
+
       <section
         class="space-y-2"
         data-test="section-expected"
@@ -262,7 +294,7 @@ function writeOff(): Promise<void> {
         <template v-else>
           <p data-test="current-reading">
             Reader {{ saysMoney(current.readerPence) }}, variance {{ saysVariance(current.variancePence) }},
-            entered by {{ current.enteredByName }}
+            entered by {{ current.enteredByName }}<span v-if="current.venueName"> at the {{ current.venueName }} till close</span>
             <span v-if="current.writtenOff">(written off)</span>
           </p>
           <p
@@ -420,7 +452,7 @@ function writeOff(): Promise<void> {
             :class="readerPence === null ? 'text-error' : 'text-muted'"
             data-test="reader-parsed"
           >
-            {{ readerPence === null ? 'Give the figure as pounds and pence, such as 123.45.' : `Recording ${saysMoney(readerPence)}.` }}
+            {{ readerPence === null ? figureError : `Recording ${saysMoney(readerPence)}.` }}
           </p>
           <p
             v-if="variance !== null"

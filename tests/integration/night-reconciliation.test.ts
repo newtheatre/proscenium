@@ -4,7 +4,9 @@ import {
   deskByKindQuery,
   deskForegoneQuery,
   nightsWithOpenVarianceQuery,
+  nightsWithReplacedReadingQuery,
   nightsWithTakings,
+  openTillsQuery,
   outstandingNights,
   readingHistoryQuery,
   takingsDaysQuery,
@@ -14,6 +16,7 @@ import { londonDayOf } from '#shared/utils/ledger'
 import { fromLondonWallClock } from '#shared/utils/london'
 import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { testVenue } from '#tests/helpers/programme'
 import type { TakingsDay } from '#server/utils/night-reconciliation'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
@@ -283,6 +286,45 @@ describe('append-only, and the database is what says so (0010)', () => {
     await withDatabase(async (database) => {
       const id = record(database, NIGHT, 0, 0)
       expect(() => database.batch([['DELETE FROM z_readings WHERE id = ?', id]])).toThrow()
+    })
+  })
+})
+
+// The 21 Oct process map: one bar's close replaced another bar's different reading, silently.
+describe('a till close that replaces another bar\'s reading', () => {
+  function tillReading(database: TestDatabase, id: string, venueId: string, readerPence: number, supersedesId: string | null, open = false): void {
+    database.batch([
+      ['INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at, closed_by, closed_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        `session-${id}`, venueId, NIGHT, 'treasurer', 1, open ? null : 'treasurer', open ? null : 2],
+      ['INSERT INTO z_readings (id, night, reader_pence, expected_pence, variance_pence, entered_by, note, supersedes_id, till_session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        id, NIGHT, readerPence, 24735, readerPence - 24735, 'treasurer', 'Closed at the bar', supersedesId, `session-${id}`],
+    ])
+  }
+
+  test('is listed once every till is closed, names its bar, and clears on a reading recorded here', async () => {
+    await withDatabase((database) => {
+      const main = testVenue(database, { suffix: 'main', name: 'New Theatre' })
+      const hall = testVenue(database, { suffix: 'hall', name: 'Union Hall' })
+      tillReading(database, 'z-main', main.id, 150, null)
+      tillReading(database, 'z-hall', hall.id, 24735, 'z-main')
+      expect(read(database, nightsWithReplacedReadingQuery())).toEqual([{ night: NIGHT }])
+      expect(read<ZReading>(database, readingHistoryQuery(NIGHT)).map(row => row.venueName)).toEqual(['New Theatre', 'Union Hall'])
+
+      record(database, NIGHT, 24735, 24735, { supersedesId: 'z-hall' })
+      expect(read(database, nightsWithReplacedReadingQuery())).toEqual([])
+    })
+  })
+
+  test('waits while any till that night is still open, and the open till is named', async () => {
+    await withDatabase((database) => {
+      const main = testVenue(database, { suffix: 'main', name: 'New Theatre' })
+      const hall = testVenue(database, { suffix: 'hall', name: 'Union Hall' })
+      tillReading(database, 'z-main', main.id, 150, null)
+      tillReading(database, 'z-hall', hall.id, 24735, 'z-main')
+      database.batch([['INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at) VALUES (?, ?, ?, ?, ?)',
+        'session-reopened', main.id, NIGHT, 'treasurer', 3]])
+      expect(read(database, nightsWithReplacedReadingQuery())).toEqual([])
+      expect(read(database, openTillsQuery(NIGHT))).toEqual([{ venueName: 'New Theatre' }])
     })
   })
 })
