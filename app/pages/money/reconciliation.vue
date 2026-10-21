@@ -57,7 +57,7 @@ const { data, status, error, refresh } = await useAsyncData(
   { watch: [night] },
 )
 
-const reconciliationFailure = computed(() => (error.value ? refusalText(error.value, 'The reconciliation could not be read.') : null))
+const reconciliationFailure = useListFailure(error, 'The reconciliation could not be read.')
 
 const mayRecord = computed(() => can(useViewer().value, recordZReadings))
 const mayRecordLate = computed(() => can(useViewer().value, recordLateCharges))
@@ -192,7 +192,11 @@ function writeOff(): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="reconciliationFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       :filterable="false"
       :searchable="false"
@@ -207,15 +211,7 @@ function writeOff(): Promise<void> {
 
     <MoneyNightsNeedingYou />
 
-    <UAlert
-      v-if="reconciliationFailure"
-      data-test="reconciliation-failure"
-      color="error"
-      variant="subtle"
-      :description="reconciliationFailure"
-    />
-
-    <template v-else-if="status !== 'pending' && data">
+    <template v-if="status !== 'pending' && data">
       <UAlert
         v-if="data.closed"
         data-test="night-closed"
@@ -491,5 +487,5 @@ function writeOff(): Promise<void> {
         </UTable>
       </section>
     </template>
-  </div>
+  </ReadGate>
 </template>

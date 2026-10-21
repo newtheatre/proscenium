@@ -8,7 +8,7 @@ definePageMeta({ layout: 'console', title: 'Order list', middleware: 'console', 
 
 const request = useRequestFetch()
 
-const { data, status, error } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'bar-order-list',
   () => request<{ shortfalls: OrderListRow[], unconfigured: UnconfiguredRow[] }>('/api/admin/bar/order-list'),
   { default: () => ({ shortfalls: [], unconfigured: [] }) },
@@ -64,16 +64,11 @@ const columns: TableColumn<OrderListRow>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <div class="flex items-center justify-between gap-3">
       <p class="text-sm text-muted">
         What is short against its par level, grouped for a supplier.
@@ -148,5 +143,5 @@ const columns: TableColumn<OrderListRow>[] = [
         </li>
       </ul>
     </div>
-  </div>
+  </ReadGate>
 </template>

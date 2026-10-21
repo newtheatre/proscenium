@@ -6,8 +6,11 @@ import type { ListFailure } from '~/composables/useListFailure'
 const props = defineProps<{ failure: ListFailure }>()
 const emit = defineEmits<{ retry: [] }>()
 
+// A refusal is not mended by asking again, so it offers only the way through when there is one.
 const actions = computed(() => [
-  { label: 'Try again', color: 'error' as const, variant: 'subtle' as const, onClick: () => emit('retry') },
+  ...(props.failure.status !== 403
+    ? [{ label: 'Try again', color: 'error' as const, variant: 'subtle' as const, onClick: () => emit('retry') }]
+    : []),
   ...(props.failure.enrolPath
     ? [{ label: 'Set up an authenticator app', to: props.failure.enrolPath, color: 'error' as const, variant: 'subtle' as const }]
     : []),

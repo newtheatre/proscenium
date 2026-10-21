@@ -116,19 +116,15 @@ async function deleteShow(): Promise<void> {
   }
 }
 
-const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The show could not be read.') : null))
+const loadFailure = useListFailure(error, 'The show could not be read.')
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="loadFailure"
-      data-test="load-failure"
-      color="error"
-      variant="subtle"
-      :description="loadFailure"
-    />
-
+  <ReadGate
+    :failure="loadFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure"
       data-test="failure"
@@ -327,5 +323,5 @@ const loadFailure = computed(() => (error.value ? refusalText(error.value, 'The 
       consequence="The details you have typed are not saved yet. Going back leaves them where they are."
       @confirm="details.discard()"
     />
-  </div>
+  </ReadGate>
 </template>

@@ -84,6 +84,8 @@ const claims = ref<ClaimListing | null>(null)
 const waiting = ref<number | null>(null)
 const loading = ref(false)
 const failure = ref<ListFailure | null>(null)
+// The list's own read, apart from a write's refusal, so a failed record never hides the list.
+const readFailure = ref<ListFailure | null>(null)
 const toast = useToast()
 const writes = computed(() => can(useViewer().value, manageMembers))
 const grantForm = useTemplateRef('grantForm')
@@ -136,7 +138,7 @@ watch(waiting, (count) => {
 
 async function load(): Promise<void> {
   loading.value = true
-  failure.value = null
+  readFailure.value = null
   try {
     if (onQueue.value) {
       claims.value = await $fetch<ClaimListing>('/api/admin/memberships/claims', { query: queue.query.value })
@@ -148,7 +150,7 @@ async function load(): Promise<void> {
     }
   }
   catch (error) {
-    failure.value = listFailureFrom(error)
+    readFailure.value = listFailureFrom(error)
   }
   finally {
     loading.value = false
@@ -427,7 +429,11 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="load"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -525,11 +531,9 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ failure
-            ? failure.message
-            : search || filter !== 'current'
-              ? 'No membership matches that.'
-              : 'No current memberships. One appears here as soon as it is recorded.' }}
+          {{ search || filter !== 'current'
+            ? 'No membership matches that.'
+            : 'No current memberships. One appears here as soon as it is recorded.' }}
         </p>
       </template>
     </UTable>
@@ -701,5 +705,5 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

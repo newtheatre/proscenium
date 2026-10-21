@@ -158,14 +158,16 @@ export async function seedShowNight(
     }))
   }
 
-  // A severity table with follow-up switched on for the two that matter (E-116).
+  // A severity table with follow-up switched on for the two that matter (E-116). The migration
+  // already wrote every row switched off, so a row nobody has touched since is updated.
   for (const [severity, followUp] of [['NOTE', 0], ['NEAR_MISS', 0], ['INCIDENT', 1], ['SERIOUS', 1]] as [string, number][]) {
     statements.push(insert('incident_severity_config', {
       severity,
       requires_follow_up: followUp,
       updated_by: officer,
       updated_at: now - 200 * DAY,
-    }))
+    }, `(severity) DO UPDATE SET requires_follow_up = excluded.requires_follow_up, updated_by = excluded.updated_by,
+      updated_at = excluded.updated_at WHERE incident_severity_config.updated_by IS NULL`))
   }
 
   target.batch(statements)

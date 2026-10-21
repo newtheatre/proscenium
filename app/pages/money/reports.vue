@@ -35,7 +35,7 @@ const query = computed<Record<string, string>>(() => (scopeKind.value === 'SHOW'
   ? { scope: 'SHOW', showId: showId.value ?? '' }
   : periodForm.query.value))
 
-const { data, status, error } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'finance-foregone',
   () => (ready.value
     ? request<{ report: FinanceForegoneReport }>('/api/admin/finance/foregone', { query: query.value }).then(response => response.report)
@@ -43,7 +43,7 @@ const { data, status, error } = await useAsyncData(
   { watch: [query] },
 )
 
-const reportFailure = computed(() => (error.value ? refusalText(error.value, 'The report could not be read.') : null))
+const reportFailure = useListFailure(error, 'The report could not be read.')
 
 interface ForegoneRow { label: string, test: string, count: number, pence: number }
 
@@ -78,7 +78,11 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="reportFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       :filterable="false"
       :searchable="false"
@@ -107,15 +111,7 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
       </template>
     </AdminToolbar>
 
-    <UAlert
-      v-if="reportFailure"
-      data-test="report-failure"
-      color="error"
-      variant="subtle"
-      :description="reportFailure"
-    />
-
-    <template v-else-if="status !== 'pending' && data">
+    <template v-if="status !== 'pending' && data">
       <section
         class="space-y-2"
         data-test="section-foregone"
@@ -164,5 +160,5 @@ const accessColumns: TableColumn<AccessAdmissionRow>[] = [
     >
       Choose a show to see its figures.
     </p>
-  </div>
+  </ReadGate>
 </template>

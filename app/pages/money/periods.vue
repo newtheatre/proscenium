@@ -2,7 +2,7 @@
 import { can, closeFinancePeriods, reopenFinancePeriods } from '#shared/utils/abilities'
 import { hasBlockingConditions, saysClosedOverlap, saysLockStanding } from '#shared/utils/period-locks'
 import { reconciliationHref } from '#shared/utils/night-reconciliation'
-import { saysDay, saysWhen } from '#shared/utils/when'
+import { saysDay, saysDayRange, saysWhen } from '#shared/utils/when'
 import type { TableColumn } from '@nuxt/ui'
 import type { BlockingConditions, LockStanding, Period, PeriodLock } from '#shared/utils/period-locks'
 
@@ -25,7 +25,7 @@ const { data: locks, status: loading, error, refresh } = await useAsyncData(
   { default: (): PeriodLock[] => [] },
 )
 
-const locksFailure = computed(() => (error.value ? refusalText(error.value, 'The close history could not be read.') : null))
+const locksFailure = useListFailure(error, 'The close history could not be read.')
 
 // A term is named here and read by the money dashboard's own TERM selector (I-105 criterion 4);
 // naming one neither closes it nor is required before closing it.
@@ -91,7 +91,7 @@ async function confirmClose(): Promise<void> {
       method: 'POST',
       body: { fromDay: fromDay.value, toDay: toDay.value, label: label.value.trim() || undefined },
     })
-    toast.add({ title: 'Period closed', description: `${saysDay(fromDay.value)} to ${saysDay(toDay.value)} is now closed.`, icon: 'i-lucide-lock', color: 'success' })
+    toast.add({ title: 'Period closed', description: `${saysDayRange(fromDay.value, toDay.value)} is now closed.`, icon: 'i-lucide-lock', color: 'success' })
     closeOpen.value = false
     await refresh()
   }
@@ -190,7 +190,7 @@ async function confirmReopen(): Promise<void> {
       method: 'POST',
       body: { confirmFromDay: confirmFromDay.value, confirmToDay: confirmToDay.value },
     })
-    toast.add({ title: 'Period reopened', description: `${saysDay(reopenTarget.value.fromDay)} to ${saysDay(reopenTarget.value.toDay)} is open again.`, icon: 'i-lucide-lock-open', color: 'success' })
+    toast.add({ title: 'Period reopened', description: `${saysDayRange(reopenTarget.value.fromDay, reopenTarget.value.toDay)} is open again.`, icon: 'i-lucide-lock-open', color: 'success' })
     reopenTarget.value = null
     await refresh()
   }
@@ -204,15 +204,11 @@ async function confirmReopen(): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="locksFailure"
-      data-test="locks-failure"
-      color="error"
-      variant="subtle"
-      :description="locksFailure"
-    />
-
+  <ReadGate
+    :failure="locksFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       :filterable="false"
       :searchable="false"
@@ -261,7 +257,7 @@ async function confirmReopen(): Promise<void> {
         class="flex flex-wrap items-center justify-between gap-2"
       >
         <p class="text-sm text-muted">
-          {{ one.label }}: {{ saysDay(one.fromDay, { year: true }) }} to {{ saysDay(one.toDay, { year: true }) }}, named by {{ one.createdByName }}
+          {{ one.label }}: {{ saysDayRange(one.fromDay, one.toDay) }}, named by {{ one.createdByName }}
         </p>
         <UButton
           v-if="mayClose"
@@ -297,7 +293,7 @@ async function confirmReopen(): Promise<void> {
     >
       <template #range-cell="{ row }">
         <div>
-          {{ saysDay(row.original.fromDay) }} to {{ saysDay(row.original.toDay) }}
+          {{ saysDayRange(row.original.fromDay, row.original.toDay) }}
           <!-- Below sm the label and who acted are hidden: shown here instead, so a phone keeps
             what happened and Reopen in view without losing what they said (issue 922). -->
           <div class="text-xs text-muted sm:hidden">
@@ -531,7 +527,7 @@ async function confirmReopen(): Promise<void> {
             :description="reopenFailure"
           />
           <p class="text-sm">
-            Reopening <span class="font-medium">{{ saysDay(reopenTarget.fromDay) }} to {{ saysDay(reopenTarget.toDay) }}</span>.
+            Reopening <span class="font-medium">{{ saysDayRange(reopenTarget.fromDay, reopenTarget.toDay) }}</span>.
             Nothing else here is undone.
           </p>
           <UFormField :label="`Enter the start date, ${saysDay(reopenTarget.fromDay, { year: true })}`">
@@ -567,5 +563,5 @@ async function confirmReopen(): Promise<void> {
         </div>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>

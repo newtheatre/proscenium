@@ -37,6 +37,8 @@ const { search, conditions, sort, page, query, active, set, setSort, clear } = u
 const listing = ref<Listing | null>(null)
 const loading = ref(false)
 const failure = ref<ListFailure | null>(null)
+// The roll's own read, apart from a write's refusal, so a failed award never hides the roll.
+const readFailure = ref<ListFailure | null>(null)
 const writes = computed(() => can(useViewer().value, manageFellows))
 
 const toast = useToast()
@@ -50,12 +52,12 @@ const revocation = reactive<{ reason?: string }>({})
 
 async function load(): Promise<void> {
   loading.value = true
-  failure.value = null
+  readFailure.value = null
   try {
     listing.value = await $fetch<Listing>('/api/admin/fellowships', { query: query.value })
   }
   catch (error) {
-    failure.value = listFailureFrom(error)
+    readFailure.value = listFailureFrom(error)
   }
   finally {
     loading.value = false
@@ -168,7 +170,11 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="load"
+  >
     <UAlert
       v-if="failure && revoking === null"
       data-test="failure"
@@ -219,11 +225,9 @@ onMounted(load)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ failure
-            ? failure.message
-            : active.length
-              ? 'Nobody on the roll matches that.'
-              : 'The roll is empty. The committee assembles it, and it is entered here by hand.' }}
+          {{ active.length
+            ? 'Nobody on the roll matches that.'
+            : 'The roll is empty. The committee assembles it, and it is entered here by hand.' }}
         </p>
       </template>
     </UTable>
@@ -365,5 +369,5 @@ onMounted(load)
         </UForm>
       </template>
     </ConfirmModal>
-  </div>
+  </ReadGate>
 </template>

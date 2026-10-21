@@ -13,13 +13,13 @@ const request = useRequestFetch()
 const periodForm = await useFinancePeriodForm('revenue-by-show-period-choices')
 const query = periodForm.query
 
-const { data, status, error } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'revenue-by-show',
   () => request<{ report: RevenueByShowReport }>('/api/admin/finance/revenue-by-show', { query: query.value }).then(response => response.report),
   { watch: [query] },
 )
 
-const reportFailure = computed(() => (error.value ? refusalText(error.value, 'The report could not be read.') : null))
+const reportFailure = useListFailure(error, 'The report could not be read.')
 
 // Money with no performance link is still money, so it reads as a row of the same table rather
 // than as a note beside it. Its walk-up split is not knowable, so those cells stay empty.
@@ -96,7 +96,11 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="reportFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       :filterable="false"
       :searchable="false"
@@ -106,15 +110,7 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
       </template>
     </AdminToolbar>
 
-    <UAlert
-      v-if="reportFailure"
-      data-test="report-failure"
-      color="error"
-      variant="subtle"
-      :description="reportFailure"
-    />
-
-    <template v-else-if="status !== 'pending' && data">
+    <template v-if="status !== 'pending' && data">
       <p class="text-sm text-muted">
         {{ saysDay(data.fromDay, { year: true }) }} to {{ saysDay(data.toDay, { year: true }) }}
       </p>
@@ -152,5 +148,5 @@ const passColumns: TableColumn<PassUtilisationRow>[] = [
         </UTable>
       </section>
     </template>
-  </div>
+  </ReadGate>
 </template>

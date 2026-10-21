@@ -194,6 +194,69 @@ describe('the seed fills the screens', () => {
     expect(counts(`comp_requests WHERE status = 'DECLINED'`)).toBeGreaterThan(0)
   })
 
+  // The hands-on review of 13 October 2026 found the seed contradicting itself in six places: each
+  // is pinned here so a developer's first look at a screen is a believable one (K-120).
+  describe('the seed agrees with itself', () => {
+    test('a stocktake expects what was on hand when it was opened', () => {
+      const wrong = rows<{ item: string, expected: number, onHand: number }>(database, `
+        SELECT l.item_id AS item, l.expected_qty AS expected,
+          (SELECT coalesce(sum(m.qty), 0) FROM stock_movements m WHERE m.item_id = l.item_id AND m.created_at <= s.opened_at) AS onHand
+        FROM stocktake_lines l JOIN stocktakes s ON s.id = l.stocktake_id
+      `).filter(line => line.expected !== line.onHand)
+      expect(wrong).toEqual([])
+    })
+
+    test('every bar line that sold or gave something away moved its stock', () => {
+      const unmoved = rows<{ id: string }>(database, `
+        SELECT l.id FROM ledger_lines l
+        JOIN ledger_entries e ON e.id = l.entry_id
+        JOIN variant_components c ON c.variant_id = l.product_variant_id AND c.item_id IS NOT NULL
+        WHERE l.kind = 'BAR_ITEM' AND l.amount_pence >= 0 AND e.void_of_entry_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM stock_movements m WHERE m.ref_table = 'ledger_lines' AND m.ref_id = l.id AND m.kind IN ('SALE', 'COMP'))
+      `)
+      expect(unmoved).toEqual([])
+    })
+
+    test('a voided tab charge put its stock back', () => {
+      expect(counts(`stock_movements WHERE kind = 'REVERSAL' AND reverses_id IN (SELECT id FROM stock_movements WHERE ref_table = 'ledger_lines')`)).toBeGreaterThan(0)
+    })
+
+    test('nobody runs a tab who is not authorised to', () => {
+      const named = JSON.parse(rows<{ value: string }>(database, `SELECT value FROM config WHERE key = 'BAR_AUTHORISED_TAB_HOLDERS'`)[0]?.value ?? '[]') as string[]
+      const debtors = rows<{ id: string }>(database, `SELECT DISTINCT tab_debtor_id AS id FROM ledger_entries WHERE tab_debtor_id IS NOT NULL`).map(row => row.id)
+      expect(debtors.length).toBeGreaterThan(0)
+      expect(debtors.filter(id => !named.includes(id))).toEqual([])
+    })
+
+    test('a serious incident is routed to follow-up', () => {
+      expect(rows<{ severity: string }>(database, `SELECT severity FROM incident_severity_config WHERE requires_follow_up = 1 ORDER BY severity`).map(row => row.severity))
+        .toEqual(['INCIDENT', 'SERIOUS'])
+    })
+
+    test('a concession is never dearer than the standard price of the same show', () => {
+      const prices = rows<{ show: string, standard: number, concession: number }>(database, `
+        SELECT s.slug AS show,
+          coalesce((SELECT o.price FROM show_ticket_overrides o JOIN ticket_types t ON t.id = o.ticket_type_id WHERE o.show_id = s.id AND t.name = 'Standard' AND o.active = 1),
+            (SELECT price FROM ticket_types WHERE name = 'Standard')) AS standard,
+          coalesce((SELECT o.price FROM show_ticket_overrides o JOIN ticket_types t ON t.id = o.ticket_type_id WHERE o.show_id = s.id AND t.name = 'Concession' AND o.active = 1),
+            (SELECT price FROM ticket_types WHERE name = 'Concession')) AS concession
+        FROM shows s
+      `)
+      expect(prices.filter(price => price.concession > price.standard)).toEqual([])
+    })
+
+    test('no performance on another night begins in the small hours', () => {
+      const late = rows<{ id: string, startsAt: number }>(database, `SELECT id, starts_at AS startsAt FROM performances`)
+        .filter(one => Math.abs(one.startsAt - Math.floor(Date.now() / 1000)) > 86_400)
+        .filter(one => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', hourCycle: 'h23' }).format(new Date(one.startsAt * 1000))) < 10)
+      expect(late).toEqual([])
+    })
+
+    test('every full persona has the shared authenticator confirmed', () => {
+      expect(counts(`totp_secrets t JOIN users u ON u.id = t.user_id WHERE u.email LIKE 'dev-%' AND t.confirmed_at IS NOT NULL`)).toBeGreaterThan(5)
+    })
+  })
+
   // A seeded movement is one the write path would have accepted, or the movements screen shows
   // developers a reason no operator can record (F-204).
   test('every seeded movement gives a reason its kind accepts', () => {

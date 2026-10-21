@@ -238,16 +238,11 @@ const columns: TableColumn<BarCategory>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure.message"
-      :actions="listingFailure.enrolPath ? [{ label: 'Set up an authenticator app', to: listingFailure.enrolPath, color: 'error' }] : []"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <p class="text-sm text-muted">
       The groups the till shows, in the order it shows them.
     </p>
@@ -497,5 +492,5 @@ const columns: TableColumn<BarCategory>[] = [
       @update:open="removing = null; failure = null"
       @confirm="remove"
     />
-  </div>
+  </ReadGate>
 </template>

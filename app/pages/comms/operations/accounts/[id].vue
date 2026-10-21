@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ListFailure } from '~/composables/useListFailure'
 import { h, resolveComponent } from 'vue'
 import { saysNotificationStatus } from '#shared/utils/notifications'
 import { saysWhen } from '#shared/utils/when'
@@ -22,7 +23,7 @@ const page = ref(1)
 const type = ref('')
 const listing = ref<History | null>(null)
 const loading = ref(false)
-const failure = ref<string | null>(null)
+const failure = ref<ListFailure | null>(null)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -33,7 +34,7 @@ async function load(): Promise<void> {
     })
   }
   catch (error) {
-    failure.value = refusalText(error)
+    failure.value = listFailureFrom(error)
   }
   finally {
     loading.value = false
@@ -96,60 +97,59 @@ onMounted(load)
       Back to the send log
     </UButton>
 
-    <UAlert
-      v-if="failure"
-      color="error"
-      variant="subtle"
-      :description="failure"
-    />
-
-    <h1
-      v-if="listing"
-      class="text-lg font-semibold"
-      data-test="history-name"
+    <ReadGate
+      :failure="failure"
+      class="space-y-6"
+      @retry="load"
     >
-      {{ listing.account.name }}
-    </h1>
-
-    <p class="text-sm text-muted">
-      Types, dates and outcomes only, never a message body.
-    </p>
-
-    <AdminToolbar
-      v-model:search="type"
-      placeholder="A message type, such as shift.reminder"
-      :active="activeFilters"
-      :filterable="false"
-      :loading="loading"
-      @clear="clearType"
-    />
-
-    <UTable
-      :data="listing?.history.items ?? []"
-      :columns="columns"
-      :loading="loading"
-      data-test="history-table"
-    >
-      <template #empty>
-        <p class="py-6 text-center text-sm text-muted">
-          Nothing sent to this account yet.
-        </p>
-      </template>
-    </UTable>
-
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <p
-        data-test="history-total"
-        class="text-sm text-muted"
+      <h1
+        v-if="listing"
+        class="text-lg font-semibold"
+        data-test="history-name"
       >
-        {{ plural(listing?.history.total ?? 0, 'send') }}
+        {{ listing.account.name }}
+      </h1>
+
+      <p class="text-sm text-muted">
+        Types, dates and outcomes only, never a message body.
       </p>
-      <UPagination
-        v-if="listing && listing.history.pages > 1"
-        v-model:page="page"
-        :total="listing.history.total"
-        :items-per-page="listing.history.pageSize"
+
+      <AdminToolbar
+        v-model:search="type"
+        placeholder="A message type, such as shift.reminder"
+        :active="activeFilters"
+        :filterable="false"
+        :loading="loading"
+        @clear="clearType"
       />
-    </div>
+
+      <UTable
+        :data="listing?.history.items ?? []"
+        :columns="columns"
+        :loading="loading"
+        data-test="history-table"
+      >
+        <template #empty>
+          <p class="py-6 text-center text-sm text-muted">
+            Nothing sent to this account yet.
+          </p>
+        </template>
+      </UTable>
+
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <p
+          data-test="history-total"
+          class="text-sm text-muted"
+        >
+          {{ plural(listing?.history.total ?? 0, 'send') }}
+        </p>
+        <UPagination
+          v-if="listing && listing.history.pages > 1"
+          v-model:page="page"
+          :total="listing.history.total"
+          :items-per-page="listing.history.pageSize"
+        />
+      </div>
+    </ReadGate>
   </div>
 </template>

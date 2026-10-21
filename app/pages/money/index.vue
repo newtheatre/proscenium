@@ -17,13 +17,13 @@ const request = useRequestFetch()
 const periodForm = await useFinancePeriodForm('finance-period-choices')
 const query = periodForm.query
 
-const { data, status, error } = await useAsyncData(
+const { data, status, error, refresh } = await useAsyncData(
   'season-summary',
   () => request<{ summary: SeasonSummary }>('/api/admin/finance/season', { query: query.value }).then(response => response.summary),
   { watch: [query] },
 )
 
-const summaryFailure = computed(() => (error.value ? refusalText(error.value, 'The dashboard could not be read.') : null))
+const summaryFailure = useListFailure(error, 'The dashboard could not be read.')
 
 const mayDrillDown = computed(() => can(useViewer().value, viewFinanceReports))
 
@@ -77,7 +77,11 @@ const figures = computed<Figure[]>(() => (data.value
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="summaryFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <AdminToolbar
       :filterable="false"
       :searchable="false"
@@ -89,15 +93,7 @@ const figures = computed<Figure[]>(() => (data.value
 
     <MoneyNightsNeedingYou />
 
-    <UAlert
-      v-if="summaryFailure"
-      data-test="summary-failure"
-      color="error"
-      variant="subtle"
-      :description="summaryFailure"
-    />
-
-    <template v-else-if="status !== 'pending' && data">
+    <template v-if="status !== 'pending' && data">
       <p class="text-sm text-muted">
         {{ saysDay(data.fromDay, { year: true }) }} to {{ saysDay(data.toDay, { year: true }) }}
       </p>
@@ -169,5 +165,5 @@ const figures = computed<Figure[]>(() => (data.value
         </p>
       </section>
     </template>
-  </div>
+  </ReadGate>
 </template>

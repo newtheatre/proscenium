@@ -31,14 +31,15 @@ const { search, conditions, sort, page, query, active, set, setSort, clear } = u
 
 const empty = (): Page<LedgerEntryRow> => ({ items: [], page: 1, pageSize: 25, total: 0, pages: 1 })
 
-const { data, status: loading, error } = await useAsyncData(
+const { data, status: loading, error, refresh } = await useAsyncData(
   'ledger-entries',
   () => request<Page<LedgerEntryRow>>('/api/admin/finance/season/entries', { query: query.value }),
   { watch: [query], default: empty },
 )
 
 const unknownKeys = computed(() => unknownEntriesKeys(route.query))
-const entriesFailure = computed(() => (error.value && unknownKeys.value.length === 0 ? refusalText(error.value, 'The entries could not be read.') : null))
+const listFailure = useListFailure(error, 'The entries could not be read.')
+const entriesFailure = computed(() => (unknownKeys.value.length === 0 ? listFailure.value : null))
 function removeUnknownKeys(): void {
   const kept = Object.fromEntries(Object.entries(route.query).filter(([key]) => !unknownKeys.value.includes(key)))
   void navigateTo({ query: kept }, { replace: true })
@@ -165,7 +166,11 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="entriesFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="unknownKeys.length > 0"
       data-test="entries-unknown-keys"
@@ -173,13 +178,6 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
       variant="subtle"
       :description="saysUnknownEntriesKeys(unknownKeys)"
       :actions="[{ label: 'Remove from the address', color: 'neutral', variant: 'outline', onClick: removeUnknownKeys }]"
-    />
-    <UAlert
-      v-if="entriesFailure"
-      data-test="entries-failure"
-      color="error"
-      variant="subtle"
-      :description="entriesFailure"
     />
 
     <AdminToolbar
@@ -280,5 +278,5 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
         </div>
       </template>
     </USlideover>
-  </div>
+  </ReadGate>
 </template>

@@ -62,9 +62,8 @@ const { data: listing, status, refresh, error } = await useAsyncData(
   { watch: [query], default: (): Listing => ({ items: [], total: 0 }) },
 )
 
-watch(error, (raised) => {
-  if (raised) failure.value = listFailureFrom(raised, 'The closures could not be read.')
-})
+// The list's own read, apart from a write's refusal, which leaves the list in view.
+const readFailure = useListFailure(error, 'The closures could not be read.')
 
 // Derived from the programme rather than set here, so it is listed and never reopened (issue 1347).
 const { data: performed, error: performedError, refresh: refreshPerformed } = await useAsyncData(
@@ -246,7 +245,11 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <ReadGate
+    :failure="readFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"
@@ -297,7 +300,7 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
     >
       <template #empty>
         <p class="py-6 text-center text-sm text-muted">
-          {{ failure ? failure.message : filtered ? 'No closure matches that.' : 'No rooms are closed.' }}
+          {{ filtered ? 'No closure matches that.' : 'No rooms are closed.' }}
         </p>
       </template>
     </UTable>
@@ -524,5 +527,5 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
         </p>
       </template>
     </ConfirmModal>
-  </div>
+  </ReadGate>
 </template>

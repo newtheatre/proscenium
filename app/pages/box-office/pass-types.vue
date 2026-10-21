@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { endOfLondonDay, londonParts, startOfLondonDay } from '#shared/utils/london'
-import { saysDay } from '#shared/utils/when'
+import { saysDayRange } from '#shared/utils/when'
 import {
   PASS_TYPE_STATUSES,
   newPassTypeScreenForm,
@@ -214,7 +214,7 @@ async function saveShows(): Promise<void> {
   }
 }
 
-const listingFailure = computed(() => (error.value ? refusalText(error.value, 'The passes could not be read.') : null))
+const listingFailure = useListFailure(error, 'The passes could not be read.')
 
 const columns: TableColumn<PassType>[] = [
   {
@@ -228,7 +228,7 @@ const columns: TableColumn<PassType>[] = [
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Issued')
           : null,
       ]),
-      h('div', { class: 'text-xs text-muted' }, `${saysDay(row.original.validFrom)} to ${saysDay(row.original.validUntil)}`),
+      h('div', { class: 'text-xs text-muted' }, `${saysDayRange(row.original.validFrom, row.original.validUntil)}`),
       // Below sm the prices, the cap and what it covers are hidden: shown here instead, so a
       // phone keeps the row actions in view without losing what they said (issue 922).
       h('div', { class: 'sm:hidden text-xs text-muted' }, [
@@ -293,15 +293,11 @@ const columns: TableColumn<PassType>[] = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <UAlert
-      v-if="listingFailure"
-      data-test="listing-failure"
-      color="error"
-      variant="subtle"
-      :description="listingFailure"
-    />
-
+  <ReadGate
+    :failure="listingFailure"
+    class="space-y-6"
+    @retry="refresh"
+  >
     <UAlert
       v-if="failure && !open && removing === null"
       data-test="failure"
@@ -662,5 +658,5 @@ const columns: TableColumn<PassType>[] = [
         </UButton>
       </template>
     </UModal>
-  </div>
+  </ReadGate>
 </template>
