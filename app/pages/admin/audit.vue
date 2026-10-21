@@ -3,7 +3,9 @@ import { h, resolveComponent } from 'vue'
 import { AUDIT_ACTIONS, MANUAL_ACTION_NAMES, describeAction } from '#shared/utils/audit-actions'
 import { auditList } from '#shared/utils/audit-list'
 import { saysDay, saysWhen } from '#shared/utils/when'
-import { manualEntryForm } from '#shared/utils/admin-forms'
+import { MANUAL_ROLE_ACTIONS, manualEntryForm } from '#shared/utils/admin-forms'
+import { configHeading } from '#shared/utils/config-wording'
+import { ROLES, saysRole } from '#shared/utils/roles'
 import type { ManualEntryForm } from '#shared/utils/admin-forms'
 import type { AuditActionName } from '#shared/utils/audit-actions'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -23,6 +25,7 @@ interface Entry {
   targetAt: number | null
   targetNight: string | null
   detail: Record<string, unknown> | null
+  onBehalfOfName: string | null
   createdAt: number
 }
 
@@ -92,7 +95,13 @@ async function record(event: FormSubmitEvent<ManualEntryForm>): Promise<void> {
   try {
     await $fetch('/api/admin/audit', {
       method: 'POST',
-      body: { ...event.data, occurredAt: startOf(event.data.occurredOn) },
+      body: {
+        action: event.data.action,
+        target: event.data.target,
+        onBehalfOf: event.data.onBehalfOf,
+        occurredAt: startOf(event.data.occurredOn),
+        detail: event.data.role ? { role: event.data.role } : {},
+      },
     })
     toast.add({
       title: `${describeAction(entry.action ?? '').label} is on the trail`,
@@ -104,6 +113,7 @@ async function record(event: FormSubmitEvent<ManualEntryForm>): Promise<void> {
     entry.target = undefined
     entry.onBehalfOf = undefined
     entry.occurredOn = undefined
+    entry.role = undefined
     await load()
   }
   catch (error) {
@@ -132,7 +142,7 @@ watch(query, load)
 
 // Raw JSON ran off the edge of the table and told nobody anything. A diff has a shape (0027), so
 // it reads as one; everything else reads as its own keys and values.
-function describeDetail(detail: Record<string, unknown> | null): string[] {
+function describeDetail(detail: Record<string, unknown> | null, onBehalfOfName: string | null = null): string[] {
   if (!detail) return []
   const parts: string[] = []
   const changes = detail.changes as Record<string, { from: unknown, to: unknown }> | undefined
@@ -141,7 +151,9 @@ function describeDetail(detail: Record<string, unknown> | null): string[] {
   }
   for (const [key, value] of Object.entries(detail)) {
     if (key === 'changes') continue
-    parts.push(`${key}: ${readable(key, value)}`)
+    if (key === 'onBehalfOf') parts.push(`decided by: ${onBehalfOfName ?? readable(key, value)}`)
+    else if (key === 'role' && typeof value === 'string' && (ROLES as readonly string[]).includes(value)) parts.push(`role: ${saysRole(value as typeof ROLES[number])}`)
+    else parts.push(`${key}: ${readable(key, value)}`)
   }
   return parts
 }
@@ -158,6 +170,7 @@ function readable(key: string, value: unknown): string {
 // The subject by its name, with when it starts or the night it belongs to where one name covers
 // many; null where nothing readable names it, and the raw target is shown instead (J-103).
 function subjectOf(entry: Entry): string | null {
+  if (entry.target?.startsWith('config:')) return configHeading(entry.target.slice('config:'.length))
   if (entry.targetName === null) return null
   if (entry.targetAt !== null) return `${entry.targetName} (${saysWhen(entry.targetAt)})`
   if (entry.targetNight !== null) return `${entry.targetName} (${saysDay(entry.targetNight)})`
@@ -167,7 +180,7 @@ function subjectOf(entry: Entry): string | null {
 const columns: TableColumn<Entry>[] = [
   {
     id: 'expand',
-    cell: ({ row }) => describeDetail(row.original.detail).length <= SUMMARY_BADGE_LIMIT
+    cell: ({ row }) => describeDetail(row.original.detail, row.original.onBehalfOfName).length <= SUMMARY_BADGE_LIMIT
       ? null
       : h(UButton, {
           'color': 'neutral',
@@ -227,7 +240,7 @@ const columns: TableColumn<Entry>[] = [
     id: 'detail',
     header: 'Detail',
     cell: ({ row }) => {
-      const parts = describeDetail(row.original.detail)
+      const parts = describeDetail(row.original.detail, row.original.onBehalfOfName)
       const shown = parts.slice(0, SUMMARY_BADGE_LIMIT)
       const remaining = parts.length - shown.length
       return h('div', { class: 'flex flex-wrap gap-1' }, [
@@ -318,7 +331,7 @@ onMounted(load)
           data-test="audit-detail-full"
         >
           <UBadge
-            v-for="part in describeDetail(row.original.detail)"
+            v-for="part in describeDetail(row.original.detail, row.original.onBehalfOfName)"
             :key="part"
             color="neutral"
             variant="subtle"
@@ -371,11 +384,11 @@ onMounted(load)
           {{ subjectOf(logEntry) ?? logEntry.target }}
         </p>
         <div
-          v-if="describeDetail(logEntry.detail).length"
+          v-if="describeDetail(logEntry.detail, logEntry.onBehalfOfName).length"
           class="mt-1 flex flex-wrap gap-1"
         >
           <UBadge
-            v-for="part in describeDetail(logEntry.detail)"
+            v-for="part in describeDetail(logEntry.detail, logEntry.onBehalfOfName)"
             :key="part"
             color="neutral"
             variant="subtle"
@@ -426,6 +439,20 @@ onMounted(load)
               v-model="entry.action"
               data-test="audit-entry-action"
               :items="MANUAL_ACTION_NAMES.map(name => ({ label: AUDIT_ACTIONS[name].label, value: name }))"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            v-if="MANUAL_ROLE_ACTIONS.includes(entry.action ?? '')"
+            name="role"
+            label="Which role"
+            required
+          >
+            <USelect
+              v-model="entry.role"
+              data-test="audit-entry-role"
+              :items="ROLES.map(role => ({ label: saysRole(role), value: role }))"
               value-key="value"
               class="w-full"
             />

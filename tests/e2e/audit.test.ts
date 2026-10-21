@@ -207,7 +207,16 @@ describe.skipIf(skip !== null)('recording something that happened outside the sy
   test('a date in the future is refused', async () => {
     const member = await registerMember(app, 'future', password, { signIn: false })
     const ahead = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60
-    expect((await manual({ action: 'manual.role.granted', target: member.id, onBehalfOf: officerId, occurredAt: ahead })).status).toBe(400)
+    expect((await manual({ action: 'manual.role.granted', target: member.id, onBehalfOf: officerId, occurredAt: ahead, detail: { role: 'COMMITTEE' } })).status).toBe(400)
+  })
+
+  // The 21 Oct process map: a role grant recorded by hand could not say which role.
+  test('a role granted or revoked by hand has to say which role', async () => {
+    const member = await registerMember(app, 'unnamed-role', password, { signIn: false })
+    const body = { action: 'manual.role.granted', target: member.id, onBehalfOf: officerId, occurredAt: YESTERDAY }
+    expect((await manual(body)).status).toBe(400)
+    expect((await manual({ ...body, detail: { role: 'NOT_A_ROLE' } })).status).toBe(400)
+    expect((await manual({ ...body, detail: { role: 'TREASURER' } })).status).toBe(200)
   })
 
   // Signing is a property of the entry, not of the role: A-112 already stops a privileged role
@@ -226,6 +235,7 @@ describe.skipIf(skip !== null)('recording something that happened outside the sy
         target: deputy.id,
         onBehalfOf: officerId,
         occurredAt: YESTERDAY,
+        detail: { role: 'PRESIDENT' },
       }, deputy.cookie)
       expect(refused.status).toBe(403)
       expect((await refused.json() as { statusMessage: string }).statusMessage).toMatch(/authenticator/i)
