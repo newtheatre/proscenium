@@ -94,6 +94,16 @@ export function holdExpiresAt(startsAt: number, minutesBefore: number): number {
   return startsAt - minutesBefore * 60
 }
 
+// A hold reinstated after its release would be born expired and lapse at the next sweep, so past
+// the release it runs to curtain, and never less than this long from the reinstatement.
+export const REINSTATED_HOLD_MINUTES = 15
+
+export function reinstatedHoldExpiresAt(startsAt: number, minutesBefore: number, now: number): number {
+  const release = holdExpiresAt(startsAt, minutesBefore)
+  if (release > now) return release
+  return Math.max(startsAt, now + REINSTATED_HOLD_MINUTES * 60)
+}
+
 // D-107 criterion 2: keyed on the expiry it warns about, not the reservation alone, so a hold
 // whose expiry moves re-arms the reminder instead of finding the old claim already taken.
 export function holdReminderClaim(reservationId: string, expiresAt: number): string {

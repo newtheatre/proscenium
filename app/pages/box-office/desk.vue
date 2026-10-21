@@ -290,11 +290,11 @@ async function reinstate(): Promise<void> {
   reinstating.value = true
   reinstateFailure.value = null
   try {
-    await $fetch(`/api/box-office/desk/reservations/${selected.value.id}/reinstate`, {
+    const reinstated = await $fetch<{ holdExpiresAt: number }>(`/api/box-office/desk/reservations/${selected.value.id}/reinstate`, {
       method: 'POST',
       body: { reason: reinstateReason.value.trim() },
     })
-    toast.add({ title: 'Booking reinstated', description: 'It holds again until the release time.', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'Booking reinstated', description: `It holds until ${saysClock(reinstated.holdExpiresAt)}. Collect it before then.`, icon: 'i-lucide-check', color: 'success' })
     reinstateReason.value = ''
     selected.value = await $fetch<ReservationDetail>(`/api/box-office/desk/reservations/${selected.value.id}`)
     await search()
