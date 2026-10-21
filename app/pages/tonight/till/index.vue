@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { can, takeStocktakes } from '#shared/utils/abilities'
 import { saysMoney } from '#shared/utils/bar'
+import { passPromptFor } from '#shared/utils/passes'
 import { EXISTING_ACCOUNT_SAYS, needsTheReader, saleJustCompleted, uncountedProducts } from '#shared/utils/sale'
 import { chargePaths, saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
 import { saysClock } from '#shared/utils/when'
@@ -525,6 +526,14 @@ async function refuseAtTheCharge(outcome: InlineAgeCheckInput, via: 'reader' | '
   if (!basketEmpty.value) await (via === 'sumup' ? chargeOnSumUp(null) : charge(null))
 }
 
+// One line after a sale, never a step the sale passes through; hidden for the night in one tap (D-136).
+const passPromptHidden = ref(false)
+const passPrompt = computed(() => passPromptHidden.value ? null : passPromptFor(passOffers.value, Boolean(charged.value?.pass)))
+function sellPassFromPrompt(): void {
+  nextSale()
+  pane.value = 'pass'
+}
+
 function nextSale(): void {
   resetBasket()
   resetTickets()
@@ -907,6 +916,33 @@ const basketBindings = computed(() => ({
             v-if="charged?.pass"
             :receipt="charged.pass"
           />
+          <UAlert
+            v-if="passPrompt"
+            data-test="pass-prompt"
+            color="primary"
+            variant="subtle"
+            icon="i-lucide-ticket"
+            :description="passPrompt.says"
+          >
+            <template #actions>
+              <UButton
+                class="min-h-12"
+                data-test="pass-prompt-sell"
+                @click="sellPassFromPrompt"
+              >
+                Sell a pass
+              </UButton>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                class="min-h-12"
+                data-test="pass-prompt-hide"
+                @click="passPromptHidden = true"
+              >
+                Not tonight
+              </UButton>
+            </template>
+          </UAlert>
           <UAlert
             v-if="charged && charged.tickets.length"
             data-test="tickets-paid-note"

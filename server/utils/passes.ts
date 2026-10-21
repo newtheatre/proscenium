@@ -220,6 +220,30 @@ export async function passCurrentState(id: string): Promise<PassCurrentState | u
   return row
 }
 
+export interface PassCoveredShow {
+  title: string
+  slug: string
+}
+
+// D-135: what a holder can book ahead with the pass, soonest first. Shows with nothing still to
+// come drop out, so the list never offers a run that has finished.
+export function passCoveredShowsQuery(passId: string, now: number): SQL {
+  const upcoming = sql`FROM performances pf WHERE pf.show_id = s.id AND pf.starts_at >= ${now} AND pf.status != 'CANCELLED'`
+  return sql`
+    SELECT s.title AS title, s.slug AS slug
+    FROM passes p
+    JOIN pass_type_shows c ON c.pass_type_id = p.pass_type_id
+    JOIN shows s ON s.id = c.show_id
+    WHERE p.id = ${passId} AND s.status = 'PUBLISHED' AND EXISTS (SELECT 1 ${upcoming})
+    ORDER BY (SELECT min(pf.starts_at) ${upcoming})
+    LIMIT 20
+  `
+}
+
+export async function passCoveredShows(passId: string, now: number): Promise<PassCoveredShow[]> {
+  return db.all<PassCoveredShow>(passCoveredShowsQuery(passId, now))
+}
+
 export interface PassBuyer {
   id: string
   name: string

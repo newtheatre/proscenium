@@ -1,3 +1,4 @@
+import { PASS_TERMS_PATH } from '#shared/utils/passes'
 import { notify } from './notify'
 import { passQrTokenFor } from './pass-qr-tokens'
 import { qrPng } from './qr'
@@ -17,7 +18,8 @@ export interface PassConfirmationContext {
 // pass id rather than a reservation id (server/utils/pass-qr-tokens.ts).
 export async function sendPassIssued(event: H3Event | undefined, context: PassConfirmationContext, passId: string): Promise<void> {
   const token = await passQrTokenFor(passId)
-  const url = `${useRuntimeConfig(event).public.baseURL}/passes/${token}`
+  const baseURL = useRuntimeConfig(event).public.baseURL
+  const url = `${baseURL}/passes/${token}`
   const { width } = qrPng(url)
   await notify(event, {
     userId: context.userId,
@@ -30,6 +32,7 @@ export async function sendPassIssued(event: H3Event | undefined, context: PassCo
       url,
       imageUrl: `${url}/image.png`,
       qrWidth: width,
+      termsUrl: `${baseURL}${PASS_TERMS_PATH}`,
     },
   })
 }

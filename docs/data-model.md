@@ -1128,6 +1128,18 @@ request, and asserts the cap with 0035's re-insert of the pass id. Afterwards, a
 booking of the buyer's tonight that the pass covers is cancelled with `exchanged_to_reservation_id`
 pointing at a new zero-value pass booking, in one batch closed by the same kind of assertion.
 
+**Booking ahead from the pass page (D-135).** `GET /api/passes/current` also returns
+`coveredShows`: the published shows the pass covers that still have a performance to come, soonest
+first, from `passCoveredShowsQuery()`. `/passes` lists them for an `ACTIVE` pass, says that turning
+up without booking is subject to space, and offers a signed-out holder "Create an account" or
+"sign in", returning to `/passes`, since booking ahead with a pass needs the account it was issued to.
+
+**Prompted at the bar, and the terms linked (D-136, D-137).** After a till sale that did not sell
+a pass, `passPromptFor()` turns the till's own pass offers into one dismissable line on the
+confirmation screen; it is never a step of the sale. `PASS_TERMS_PATH` (`/policies/season-passes`)
+is linked from the booking offer, the pass page and the `pass-issued` email (`termsUrl`); the page
+is `placeholder: true` until the committee's terms land (0051).
+
 **The holder's own QR (criterion 5).** `passQrTokenFor()`/`verifyPassQrToken()`
 (`server/utils/pass-qr-tokens.ts`) reuse D-108's HMAC scheme over `"pass:" + passId` rather than a
 second secret: the prefix domain-separates a pass token from a reservation token, so neither

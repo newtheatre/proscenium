@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysPassOffer, saysPayAtDesk } from '#shared/utils/passes'
+import { PASS_TERMS_PATH, saysPassOffer, saysPayAtDesk } from '#shared/utils/passes'
 import { withNext } from '#shared/utils/sign-in'
 import type { PassOffer } from '#shared/utils/passes'
 
@@ -114,5 +114,14 @@ async function ask(offer: PassOffer): Promise<void> {
         </div>
       </li>
     </ul>
+    <p class="mt-4 text-xs text-muted">
+      <NuxtLink
+        class="underline"
+        :to="PASS_TERMS_PATH"
+        data-test="pass-offer-terms"
+      >
+        The season pass terms
+      </NuxtLink>
+    </p>
   </UCard>
 </template>
