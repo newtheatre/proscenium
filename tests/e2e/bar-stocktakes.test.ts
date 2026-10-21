@@ -990,7 +990,7 @@ describe.skipIf(skip !== null)('the suggested order list compares live on-hand t
 
     const csv = await (await send('GET', '/api/admin/bar/order-list/export')).text()
     expect(csv.split('\n')[0]).toContain('toOrder')
-    expect(csv.split('\n').find(line => line.includes(item.name))).toContain(',2,750')
+    expect(csv.split('\n').find(line => line.includes(item.name))).toContain('"1275","2","750"')
   })
 
   test('an item at or above par is not listed', async () => {
