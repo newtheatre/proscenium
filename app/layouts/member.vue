@@ -22,9 +22,20 @@ const links = computed(() => MY_NAV
         <template #title>
           <SiteWordmark />
         </template>
+        <!-- The public header's way to the programme stays when signed in, so a member's pages never
+             take What's on and booking out of reach. -->
         <template #right>
           <DocsLink />
           <AuthStatus />
+          <UButton
+            size="sm"
+            variant="poster"
+            to="/whats-on"
+            class="hidden sm:inline-flex"
+            data-test="header-book"
+          >
+            Book tickets
+          </UButton>
         </template>
         <template #body>
           <UNavigationMenu
@@ -33,6 +44,14 @@ const links = computed(() => MY_NAV
             aria-label="My NNT"
             highlight
           />
+          <UButton
+            class="mt-6"
+            variant="poster"
+            to="/whats-on"
+            block
+          >
+            What's on and book tickets
+          </UButton>
         </template>
       </UHeader>
     </div>

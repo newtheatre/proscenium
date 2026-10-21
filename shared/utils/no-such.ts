@@ -7,3 +7,9 @@ const BACK_TO_THE_LIST = 'Go back to the list and open it again'
 export function saysNoSuch(noun: string, next: string = BACK_TO_THE_LIST): string {
   return `That ${noun} is no longer here. ${next}.`
 }
+
+// Whether a message is one of these sentences, so the error page shows it in place of its generic
+// words; the router's own "Page not found: /x" is not one (0121).
+export function isNoSuchMessage(message: unknown): message is string {
+  return typeof message === 'string' && /^That [^.]+ is no longer here\. .+\.$/.test(message)
+}

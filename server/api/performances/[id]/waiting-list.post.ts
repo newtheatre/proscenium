@@ -1,8 +1,9 @@
-import { saleRefusal } from '#shared/utils/programme'
-import { joinWaitingListForm } from '#shared/utils/waiting-list'
+import { db } from '@nuxthub/db'
+import { remainingSeats, saleRefusal } from '#shared/utils/programme'
+import { joinWaitingListForm, waitingListJoinRefusal } from '#shared/utils/waiting-list'
 
-// Join the waiting list for a sold-out (or any) performance (D-113 criterion 1). Guest checkout
-// works exactly as D-104's does: an existing address is reused, a new one becomes a guest account.
+// Join the waiting list for a performance that cannot seat the party (D-113 criterion 1, 0120).
+// Guest checkout works exactly as D-104's does: an existing address is reused, a new one a guest.
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const input = await readValidatedBodyOrThrow(event, joinWaitingListForm)
@@ -15,6 +16,14 @@ export default defineEventHandler(async (event) => {
   // sells what frees after it (D-113 criterion 2, issue 1328).
   const refusal = saleRefusal(performance, new Date(), 'CUSTOMER', await holdReleaseMinutesFor(event, performance))
   if (refusal?.reason === 'WINDOW_CLOSED') throw createError({ statusCode: 409, statusMessage: refusal.says })
+
+  // On sale with room for the whole party: booking is the answer, and the refusal carries where.
+  if (!refusal) {
+    const [house] = await db.all<{ held: number }>(heldSeatsQuery(id))
+    const remaining = remainingSeats({ capacity: effectiveCapacity(performance), sold: Number(house?.held ?? 0) })
+    const bookInstead = waitingListJoinRefusal(remaining, input.partySize)
+    if (bookInstead) throw createError({ statusCode: 409, statusMessage: bookInstead, data: { bookUrl: `/book/${id}` } })
+  }
 
   const account = await currentAccount(event)
   const email = account?.email ?? input.guest?.email

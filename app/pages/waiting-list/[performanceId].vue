@@ -6,7 +6,7 @@ import type { SaleRefusalReason } from '#shared/utils/programme'
 import type { FormSubmitEvent } from '@nuxt/ui'
 
 // Join the waiting list for a performance (D-113 criteria 1 and 6). A full house never refuses a
-// join; online booking having closed does, since nothing is offered after it (issue 1328).
+// join; online booking having closed does (issue 1328), and seats on sale send the reader to book (0120).
 
 interface BookingInfo {
   show: { slug: string, title: string }
@@ -30,17 +30,24 @@ const when = computed(() => saysWhenLong(data.value!.performance.startsAt))
 
 const closed = computed(() => (data.value?.refusal?.reason === 'WINDOW_CLOSED' ? data.value.refusal.says : null))
 
+// No refusal at all is a house still selling: the list is only for a party bigger than what is left,
+// so the form waits behind a choice and the server refuses a party the seats would hold (0120).
+const onSale = computed(() => data.value?.refusal === null)
+const biggerParty = ref(false)
+
 const schema = computed(() => (account.value.signedIn ? waitingListPartyForm : waitingListGuestJoinForm))
 
 const state = reactive({ partySize: 1, name: '', email: '' })
 
 const submitting = ref(false)
 const notice = ref<string | null>(null)
+const bookUrl = ref<string | null>(null)
 const joined = ref(false)
 const emailed = ref(true)
 
 async function join(event: FormSubmitEvent<{ partySize: number, name?: string, email?: string }>): Promise<void> {
   notice.value = null
+  bookUrl.value = null
   submitting.value = true
   try {
     const body: { performanceId: string, partySize: number, guest?: { name: string, email: string } } = {
@@ -55,6 +62,7 @@ async function join(event: FormSubmitEvent<{ partySize: number, name?: string, e
   }
   catch (error) {
     notice.value = refusalText(error, 'Could not join the waiting list')
+    bookUrl.value = refusalData<{ bookUrl?: string }>(error)?.bookUrl ?? null
   }
   finally {
     submitting.value = false
@@ -140,6 +148,37 @@ useSeoMeta({
       </UButton>
     </div>
 
+    <div
+      v-else-if="onSale && !biggerParty"
+      class="mt-8 space-y-4"
+      data-test="waiting-list-on-sale"
+    >
+      <UAlert
+        color="info"
+        variant="subtle"
+        icon="i-lucide-ticket"
+        title="Seats are still on sale"
+        description="There is no need to wait: book the seats you want now. The waiting list is for a party bigger than the seats that are left."
+      />
+      <div class="flex flex-wrap items-center gap-3">
+        <UButton
+          :to="`/book/${performanceId}`"
+          variant="marquee"
+          data-test="waiting-list-book"
+        >
+          Book tickets
+        </UButton>
+        <UButton
+          variant="link"
+          color="neutral"
+          data-test="waiting-list-bigger-party"
+          @click="biggerParty = true"
+        >
+          My party needs more seats than are left
+        </UButton>
+      </div>
+    </div>
+
     <!-- novalidate: the browser's own check on the address field would stop the submit before
          the form's messages, so a blank name would never be named beside it (D-113 criterion 6). -->
     <UForm
@@ -157,6 +196,13 @@ useSeoMeta({
         :description="notice"
         data-test="waiting-list-notice"
       />
+      <UButton
+        v-if="bookUrl"
+        :to="bookUrl"
+        variant="marquee"
+      >
+        Book tickets
+      </UButton>
 
       <UFormField
         label="Party size"

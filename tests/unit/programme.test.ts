@@ -112,8 +112,12 @@ describe('a show is draft until it is published, and a draft is invisible (D-121
     expect(projected?.bookingClosesAt).toBe(seconds(CURTAIN) - 7200)
     expect(Object.keys(projected ?? {}).sort()).toEqual([
       'bookingClosesAt', 'cancelled', 'doorsAt', 'durationMinutes', 'externalBookingUrl',
-      'id', 'intervalCount', 'intervalMinutes', 'startsAt', 'venueName',
+      'id', 'intervalCount', 'intervalMinutes', 'startsAt', 'venueAddress', 'venueName',
     ])
+    // The venue's stored address travels with the night, so the journey can say where to go.
+    expect(publicPerformance({ ...performance, venueAddress: 'University Park, Nottingham' }, 15)?.venueAddress)
+      .toBe('University Park, Nottingham')
+    expect(projected?.venueAddress).toBeNull()
 
     expect(publicPerformance({ ...performance, status: 'DRAFT' }, 15)).toBeNull()
     expect(publicPerformance({ ...performance, status: 'CANCELLED' }, 15)?.cancelled).toBe(true)

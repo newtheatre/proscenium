@@ -357,6 +357,7 @@ const PERFORMANCE_COLUMNS = sql`
   p.show_id AS showId,
   p.venue_id AS venueId,
   v.name AS venueName,
+  v.address AS venueAddress,
   p.starts_at AS startsAt,
   p.doors_at AS doorsAt,
   p.duration_minutes AS durationMinutes,

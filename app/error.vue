@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isNoSuchMessage } from '#shared/utils/no-such'
 import { saysScreenIsFor } from '#shared/utils/refusals'
 import type { NuxtError } from '#app'
 import type { Role } from '#shared/utils/roles'
@@ -33,6 +34,11 @@ const shown = computed(() => {
   if (props.error.statusCode === 403) {
     const says = forRoles.value ? `${saysScreenIsFor(forRoles.value)} Ask them if you need something from it.` : saysScreenIsFor([])
     return { title: 'That is not yours to open', says }
+  }
+  // A page that knows what was missing says so, as /qr does for a bad link (0121); the router's
+  // own unknown-address 404 keeps the generic words.
+  if (props.error.statusCode === 404 && isNoSuchMessage(props.error.statusMessage)) {
+    return { title: 'That link does not lead anywhere now', says: props.error.statusMessage }
   }
   return SAYS[props.error.statusCode ?? 0] ?? {
     title: 'Something went wrong',
