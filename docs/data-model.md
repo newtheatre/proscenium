@@ -1136,9 +1136,9 @@ up without booking is subject to space, and offers a signed-out holder "Create a
 
 **Prompted at the bar, and the terms linked (D-136, D-137).** After a till sale that did not sell
 a pass, `passPromptFor()` turns the till's own pass offers into one dismissable line on the
-confirmation screen; it is never a step of the sale. `PASS_TERMS_PATH` (`/policies/terms`)
-is linked from the booking offer, the pass page and the `pass-issued` email (`termsUrl`); the page
-is `placeholder: true` until the committee's terms land (0051).
+confirmation screen; it is never a step of the sale. `PASS_TERMS_PATH` (`/policies/booking`)
+is linked from the booking offer, the pass page and the `pass-issued` email (`termsUrl`); that page
+carries the full ticket and pass terms, quoting the live settings for every number it enforces (0012).
 
 **The holder's own QR (criterion 5).** `passQrTokenFor()`/`verifyPassQrToken()`
 (`server/utils/pass-qr-tokens.ts`) reuse D-108's HMAC scheme over `"pass:" + passId` rather than a

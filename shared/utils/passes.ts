@@ -142,8 +142,8 @@ export function saysPayAtDesk(prices: readonly { price: number }[]): string {
   return `Pay ${figures.join(' or ')} at the box office desk`
 }
 
-// The ticket and pass terms (D-137); marked placeholder until the committee approves them (0051).
-export const PASS_TERMS_PATH = '/policies/terms'
+// The ticket and pass terms (D-137); on the booking policy page, which quotes the live settings (0012).
+export const PASS_TERMS_PATH = '/policies/booking'
 
 export interface PassOffer {
   id: string
