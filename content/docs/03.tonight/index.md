@@ -87,7 +87,9 @@ hub shows the choice and **Emergency**, and nothing else, since the tiles would 
 Once you have chosen, the venues stay at the top of the hub with yours highlighted, so changing is
 one press. The phone remembers the choice until 04:00, and every screen, the door and backstage
 included, works that venue. The choice never opens anything your shift or role would not: a door
-shift at one venue is still refused at the other. The till keeps its own choice of bar.
+shift at one venue is still refused at the other. The choice belongs to the phone, not to you, so
+somebody signing in on it afterwards who is not working the venue chosen is not held to it: their
+screens open on their own shift as if nothing were chosen. The till keeps its own choice of bar.
 
 ![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), your own job's tile (4) and the Emergency tile (5)](/images/docs/show-night/hub.png)
 

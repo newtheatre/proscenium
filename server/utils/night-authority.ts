@@ -162,19 +162,28 @@ async function callerTonight(event: H3Event, scope: NightScope, roles: NightRole
   if (scope.night !== undefined && scope.night !== tonight) {
     throw createError({ statusCode: 403, statusMessage: 'Show-night tools open for tonight only, and that night has ended' })
   }
-  return { resolved, tonight, scope: await withChosenVenue(event, tonight, scope, roles) }
+  return { resolved, tonight, scope: await withChosenVenue(event, resolved, tonight, scope, roles) }
 }
 
 // The venue the hub chose on this phone narrows a request that names none, and only one: it never
 // widens, and the till keeps its own remembered bar, so a BAR-only request ignores it (0230).
-async function withChosenVenue(event: H3Event, tonight: string, scope: NightScope, roles: NightRole[]): Promise<NightScope> {
+async function withChosenVenue(event: H3Event, resolved: Authority, tonight: string, scope: NightScope, roles: NightRole[]): Promise<NightScope> {
   if (scope.venueId || scope.performanceId) return scope
   if (roles.length === 1 && roles[0] === 'BAR') return scope
   const venueId = heldNightVenueFromCookie(getCookie(event, NIGHT_VENUE_COOKIE), tonight)
-  if (!venueId) return scope
+  if (!venueId || !(await mayChooseVenue(resolved, tonight, venueId))) return scope
   // A venue with nothing on tonight is a stale choice, not a reason to refuse the whole night.
   const running = (await performancesOnNight(tonight, venueId)).some(one => one.status !== 'CANCELLED')
   return running ? { ...scope, venueId } : scope
+}
+
+// The cookie belongs to the phone and outlives a sign-out, so it narrows only an officer or someone
+// with a shift at that venue tonight; anyone else is answered as if nothing were chosen (0230).
+async function mayChooseVenue(resolved: Authority, tonight: string, venueId: string): Promise<boolean> {
+  if (NIGHT_ROLES.some(role => resolved.permissions.has(NIGHT_ROLE_PERMISSION[role]))) return true
+  const { from, to } = showNightBounds(tonight)
+  const mine = await tonightShiftVenues(resolved.account.id, Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000))
+  return mine.includes(venueId)
 }
 
 // Tonight's confirmed duty manager opens the door for their own performance and window, after

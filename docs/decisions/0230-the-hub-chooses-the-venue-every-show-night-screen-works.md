@@ -38,6 +38,10 @@ that every show-night guard reads.**
   request names neither a venue nor a performance. It **only narrows**: a named venue or
   performance wins, a choice for another night or for a venue running nothing tonight is ignored,
   and a choice never opens a venue the caller's shift or role would not.
+- It narrows only a caller who could have made it: one holding a night permission, or a confirmed
+  shift at that venue tonight. The cookie is the phone's and outlives a sign-out, so a door
+  volunteer signing in on a phone the Front of House Manager pointed at the Studio is answered for
+  their own Main House shift, not refused until 04:00.
 - A request for the bar alone ignores it. The till keeps its own remembered bar (issue 1257), and
   the SumUp app's return on a bare link must land at the bar that took the payment.
 - The 400 now says where to answer it: "choose the one you are working on the Tonight hub". The

@@ -122,12 +122,20 @@ describe.skipIf(skip !== null)('the chosen venue narrows every show-night guard 
     expect((await ask('role=BAR', as(foh, choosing(studio.venueId)))).status).toBe(400)
   })
 
-  test('a choice never widens: a door shift at one venue is refused at the other', async () => {
+  // The cookie is the phone's, not the person's: an officer's choice outlives their sign-out.
+  test('a choice of a venue the caller has no shift at is ignored, so a shared phone locks nobody out', async () => {
     const holder = await registerMember(app, 'venue-door', generatePassword())
     shiftFor(house.performanceId, 'DOOR', holder.id)
 
     expect((await ask('role=DOOR', as(holder))).status).toBe(200)
-    expect((await ask('role=DOOR', as(holder, choosing(studio.venueId)))).status).toBe(403)
+    const resolved = await (await ask('role=DOOR', as(holder, choosing(studio.venueId)))).json() as Resolved
+    expect(resolved).toMatchObject({ venueId: house.venueId, via: 'SHIFT' })
+  })
+
+  test('a choice never widens: a door shift at one venue is refused at the other when it is named', async () => {
+    const holder = await registerMember(app, 'venue-door-named', generatePassword())
+    shiftFor(house.performanceId, 'DOOR', holder.id)
+    expect((await ask(`role=DOOR&venueId=${studio.venueId}`, as(holder, choosing(studio.venueId)))).status).toBe(403)
   })
 
   test('a bar shift at one venue and a door shift at another resolve one venue each, as chosen', async () => {

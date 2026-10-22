@@ -1457,7 +1457,9 @@ On a night more than one venue runs, `GET /api/tonight/venues` lists them for th
 where the phone is working, and the choice is a night-scoped `nnt-night-venue` cookie that
 `server/utils/night-authority.ts` reads when a request names no venue or performance, so every
 show-night route narrows to the same venue without carrying it; it only ever narrows, and a
-bar-only request ignores it because the till keeps its own (0230).
+bar-only request ignores it because the till keeps its own (0230). The cookie outlives a sign-out,
+so it narrows only a caller holding a night permission or a confirmed shift at that venue tonight
+(`mayChooseVenue`); anyone else on the same phone resolves as if nothing were chosen.
 
 `GET /api/tonight/house` (issue 1307) is the same performance view for any of tonight's three
 roles, through `requireAnyNightAuthority()` and `tonightView()` in `server/utils/tonight-house.ts`,
