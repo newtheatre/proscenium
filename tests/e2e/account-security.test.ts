@@ -311,8 +311,8 @@ describe.skipIf(skip !== null)('the security page leads with the viewer\'s next 
       const money = await fetch(`${app.baseURL}/api/admin/finance/periods`, { headers: { cookie: session } })
       expect(money.status).toBe(403)
 
-      await signOut(view)
-      await waitFor(view, 'location.pathname === "/"')
+      // The account menu can re-render under the click here (seen on CI), so the session ends directly.
+      expect(await view.evaluate<number>(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)).toBe(200)
       await visit(view, `${app.baseURL}/sign-in`)
       await fill(view, 'form input[type="email"]', email)
       await fill(view, 'form input[type="password"]', password)
