@@ -59,6 +59,16 @@ export function openFollowUpsQuery(): SQL {
   `
 }
 
+// What switching a severity on pulls into the open list at once: earlier entries at it with no
+// closure, which were never emailed about and are told to the switcher instead (0235).
+export function waitingAtSeverityQuery(severity: string): SQL {
+  return sql`
+    SELECT count(*) AS waiting FROM incidents i
+    WHERE i.severity = ${severity}
+      AND NOT EXISTS (SELECT 1 FROM incident_followup_closures f WHERE f.incident_id = i.id)
+  `
+}
+
 export async function openFollowUps(): Promise<OpenFollowUp[]> {
   return db.all<OpenFollowUp>(openFollowUpsQuery())
 }

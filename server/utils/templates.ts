@@ -825,23 +825,27 @@ The Nottingham New Theatre`,
   }),
 
   // No description or detail: audit detail carries no personal free text, and this is the same
-  // wording whichever incident it is (0011, E-116 criterion 2).
-  'incident-follow-up-required': (context: TemplateContext): Rendered => ({
-    subject: `Follow-up required: a ${context.severity} incident`,
-    html: layout(`<p>Hello ${context.name},</p>
-<p>A ${context.category} incident logged at ${context.severity} severity needs your
-follow-up.</p>
+  // wording whichever incident it is (0011, E-116 criterion 2). Where and when are not free text.
+  'incident-follow-up-required': (context: TemplateContext): Rendered => {
+    const where = context.venue ? ` at ${String(context.venue)}` : ''
+    const when = context.when ? ` on ${String(context.when)}` : ''
+    const said = `An incident logged as ${context.severity} (${context.category})${where}${when} needs your follow-up.`
+    return {
+      subject: `Follow-up required: an incident logged as ${context.severity}${where}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${said}</p>
 <p>Read it and close it on the safety list.</p>
 <p><a href="${String(context.safetyUrl)}">Open the safety list</a></p>`),
-    text: `Hello ${context.name},
+      text: `Hello ${context.name},
 
-A ${context.category} incident logged at ${context.severity} severity needs your follow-up.
+${said}
 
 Read it and close it on the safety list:
 ${String(context.safetyUrl)}
 
 The Nottingham New Theatre`,
-  }),
+    }
+  },
 
   // The reader's optional word on what is wrong; the page and who reported it is enough without (J-109 c4).
   'docs-drift-reported': (context: TemplateContext): Rendered => ({

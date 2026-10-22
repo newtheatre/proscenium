@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { closeFollowUpForm, severityConfigForm } from '#shared/utils/incident-safety'
+import { closeFollowUpForm, severityConfigForm, saysEarlierFollowUps } from '#shared/utils/incident-safety'
 
 // E-116's pure validation. What the database holds is proved against the real migrations in
 // `tests/integration/incident-safety.test.ts`.
@@ -27,5 +27,17 @@ describe('closing a follow-up names a resolution (criterion 3)', () => {
 
   test('an overlong note is refused', () => {
     expect(closeFollowUpForm.safeParse({ resolutionNote: 'x'.repeat(2001) }).success).toBe(false)
+  })
+})
+
+// Switching a severity on lists earlier entries without emailing anyone about them (0235).
+describe('saysEarlierFollowUps', () => {
+  test('says nothing when nothing joined', () => {
+    expect(saysEarlierFollowUps(0)).toBeUndefined()
+  })
+
+  test('counts what joined, with plural()', () => {
+    expect(saysEarlierFollowUps(1)).toBe('1 earlier incident now on the open follow-ups below, with no email sent: read the list.')
+    expect(saysEarlierFollowUps(3)).toStartWith('3 earlier incidents now on')
   })
 })

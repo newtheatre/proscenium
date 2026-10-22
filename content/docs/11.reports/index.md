@@ -49,7 +49,8 @@ A performance belongs to the period its curtain time falls in, on the London cal
 ## The Incidents tab
 
 One row for each venue, category and severity that had at least one entry in the period, with
-how many there were. Every severity is counted, notes and near misses included. Nobody is named:
+how many there were. Every severity is counted, notes and near misses included. An entry corrected on the night is
+counted once, as its correction, under the category and severity the correction gives it. Nobody is named:
 the tab counts entries and never shows what was written in them.
 
 ## The Performances tab
