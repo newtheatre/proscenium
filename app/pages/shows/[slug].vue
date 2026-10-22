@@ -3,7 +3,7 @@ import { saysNotFoundYet } from '#shared/utils/no-such'
 import { groupContentWarnings, saysAssessment } from '#shared/utils/content-warnings'
 import { saysClock, saysDay, saysWhenLong } from '#shared/utils/when'
 import { SAYS_BOOKING_HOLDS, SAYS_PAYMENT, TO_BE_CONFIRMED, saysHowToPay, saysLatecomers } from '#shared/utils/programme'
-import { pounds, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
+import { pounds, saysFromPrice, saysPrice, saysRestriction } from '#shared/utils/ticket-types'
 import { DEFAULT_OG_IMAGE, SITE_ADDRESS } from '#shared/utils/seo'
 import { saysRunningTime } from '#shared/utils/night-hub'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
@@ -14,7 +14,7 @@ import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/
 const route = useRoute()
 const slug = computed(() => String(route.params.slug))
 
-const { data } = await useFetch<ListedShow>(() => `/api/shows/${slug.value}`)
+const { data } = await useFetch<ListedShow & { offSaleToCome: boolean }>(() => `/api/shows/${slug.value}`)
 
 if (!data.value) {
   throw createError({ statusCode: 404, statusMessage: saysNotFoundYet('show', 'Go back to what is on and choose another'), fatal: true })
@@ -111,10 +111,7 @@ const runs = computed(() => {
 
 const venues = computed(() => [...new Set(onOffer.value.map(one => one.venueName))])
 
-const from = computed(() => {
-  const prices = onOffer.value.flatMap(one => one.prices.map(price => price.price)).sort((a, b) => a - b)
-  return prices[0] === undefined ? null : saysPrice(prices[0])
-})
+const from = computed(() => saysFromPrice(onOffer.value.flatMap(one => one.prices)))
 
 // The run's distinct prices as one line, dearest first, each named and carrying its restriction,
 // so two equal figures never read as a duplicate (show-page.png).
@@ -420,7 +417,7 @@ function saysInterval(performance: ListedPerformance): string {
           class="text-muted"
           data-test="no-performances"
         >
-          Nothing left to come. This show has finished its run.
+          {{ data.offSaleToCome ? 'No performances are on sale yet. Check back soon.' : 'Nothing left to come. This show has finished its run.' }}
         </p>
 
         <ul
@@ -518,7 +515,7 @@ function saysInterval(performance: ListedPerformance): string {
 
         <template #footer>
           <div class="flex items-center justify-between font-mono">
-            <span class="text-sm text-muted">From</span>
+            <span class="text-sm text-muted">Tickets</span>
             <span>{{ from ?? TO_BE_CONFIRMED }}</span>
           </div>
           <p class="mt-2 text-sm text-muted">

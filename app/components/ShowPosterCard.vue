@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysDay } from '#shared/utils/when'
 import { soldOutNightsSays } from '#shared/utils/listing'
-import { saysPrice } from '#shared/utils/ticket-types'
+import { saysFromPrice } from '#shared/utils/ticket-types'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
 
 // One show as a printed poster: the listing's card, on the home page and on what's on. The
@@ -45,10 +45,7 @@ const venue = computed(() => {
 
 // The cheapest seat anywhere in the run, which is what a listing quotes; the whole chain is on
 // the show page (D-101 criterion 4).
-const from = computed(() => {
-  const prices = onOffer.value.flatMap(one => one.prices.map(price => price.price)).sort((a, b) => a - b)
-  return prices[0] === undefined ? null : saysPrice(prices[0])
-})
+const from = computed(() => saysFromPrice(onOffer.value.flatMap(one => one.prices)))
 </script>
 
 <template>
@@ -129,7 +126,7 @@ const from = computed(() => {
         <span
           v-if="from"
           class="font-mono text-sm"
-        >From {{ from }}</span>
+        >{{ from }}</span>
         <span v-else />
 
         <UButton

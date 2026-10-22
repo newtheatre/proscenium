@@ -372,6 +372,25 @@ describe.skipIf(skip !== null)('a draft show\'s performance answers as a missing
   })
 })
 
+// A published show whose nights were all off sale said it had finished its run (process map, 21 October).
+describe.skipIf(skip !== null)('a show page says whether nights are still to come', () => {
+  test('off-sale nights still to come are flagged, and putting one on sale lists it', async () => {
+    const title = named('Small Hours')
+    const id = await newShow({ title })
+    const performance = await addPerformance(id)
+    expect((await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: false })).status).toBe(200)
+
+    const before = await (await send('GET', `/api/shows/${slugged(title)}`, undefined, '')).json() as { performances: unknown[], offSaleToCome: boolean }
+    expect(before.performances).toEqual([])
+    expect(before.offSaleToCome).toBe(true)
+
+    expect((await send('POST', `/api/admin/performances/${performance}/sale`, { onSale: true })).status).toBe(200)
+    const after = await (await send('GET', `/api/shows/${slugged(title)}`, undefined, '')).json() as { performances: unknown[], offSaleToCome: boolean }
+    expect(after.performances).toHaveLength(1)
+    expect(after.offSaleToCome).toBe(false)
+  })
+})
+
 describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once it has sold (criterion 5)', () => {
   test('cancelling says how many tickets are owed a refund', async () => {
     const id = await newShow()
@@ -925,7 +944,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
     expect(await textOf(view, '[data-test="show-status"]')).toContain('Draft')
-    expect(await textOf(view, '[data-test="performances-table"]')).toContain('Closes at curtain-up')
+    expect(await textOf(view, '[data-test="performances-table"]')).toContain('before curtain, when unpaid holds release')
     view.close()
   }, 120_000)
 

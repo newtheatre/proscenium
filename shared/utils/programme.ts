@@ -61,8 +61,9 @@ export function venueForFilter(value: string, names: string[]): string | null {
   return names.find(name => toSlug(name) === value) ?? null
 }
 
+// An apostrophe joins its word rather than splitting it: "the-winters-tale", not "the-winter-s-tale".
 export function toSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_SHOW_SLUG)
+  return title.toLowerCase().replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_SHOW_SLUG)
 }
 
 const hoursBefore = z.number().int().nonnegative().max(MAX_BOOKING_CLOSES_HOURS)
@@ -389,6 +390,8 @@ export interface AdminPerformance {
   venueCapacity: number | null
   bookingClosesHoursBefore: number | null
   holdReleaseMinutesBefore: number | null
+  // The release in force, house default included; only the show's performance list resolves it.
+  holdReleaseMinutes?: number
   externalBookingUrl: string | null
   status: PerformanceStatus
   notes: string | null
@@ -567,6 +570,16 @@ export function bookingWindowSource(
 export function saysBookingWindow(hours: number): string {
   if (hours === 0) return 'Closes at curtain-up'
   return `Closes ${hours === 1 ? '1 hour' : `${hours} hours`} before curtain`
+}
+
+// Online booking closes at the earlier of the window and the hold release, so the line names
+// whichever governs rather than a window a booker never reaches (D-112 criterion 1).
+export function saysOnlineCutoff(hours: number, releaseMinutes: number | undefined): string {
+  if (releaseMinutes === undefined || releaseMinutes <= hours * 60) return saysBookingWindow(hours)
+  const said = releaseMinutes % 60 === 0
+    ? (releaseMinutes === 60 ? '1 hour' : `${releaseMinutes / 60} hours`)
+    : `${releaseMinutes} minutes`
+  return `Closes ${said} before curtain, when unpaid holds release`
 }
 
 // The moment online booking closes, in integer seconds UTC. An hour is 3600 seconds whatever the

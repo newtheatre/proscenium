@@ -563,7 +563,7 @@ two routes that take no session at all:
 | Route | What it does |
 | --- | --- |
 | `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. `?venue=<name>` narrows it to the shows playing that venue; the page and its count share one predicate, so they cannot disagree (J-111). It also carries `season`, the name the heading shows, or `null` (0087). |
-| `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. |
+| `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. `offSaleToCome` says a night still to come is not on sale yet, so an empty list is not read as a finished run. |
 
 Both build every field through `publicShow()` and `publicPerformance()` in
 `shared/utils/programme.ts`, which are the allow-lists; a column absent from those interfaces is

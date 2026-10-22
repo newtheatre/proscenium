@@ -10,6 +10,7 @@ import {
   publicTicketTypes,
   saysAccessKind,
   saysAccessKindsMissing,
+  saysFromPrice,
   saysPrice,
   saysRestriction,
   systemTicketTypeRefusal,
@@ -213,5 +214,24 @@ describe('the warning when an access kind has no ticket type', () => {
     expect(saysAccessKindsMissing({ access: false, companion: true })).toStartWith('There is no Access ticket type,')
     expect(saysAccessKindsMissing({ access: true, companion: false })).toStartWith('There is no Companion ticket type,')
     expect(saysAccessKindsMissing({ access: false, companion: false })).toStartWith('There is no Access or Companion ticket type,')
+  })
+})
+
+// The listing quoted a members-only £5.00 as "From" while a guest could book nothing under £6.00.
+describe('the From price is what anybody may book', () => {
+  const open = (price: number) => ({ price, restrictedTo: null })
+  const members = (price: number) => ({ price, restrictedTo: 'MEMBER' })
+
+  test('a cheaper members price is said apart, never as the floor', () => {
+    expect(saysFromPrice([open(800), open(600), members(500)])).toBe('From £6.00, members £5.00')
+  })
+
+  test('a members price no cheaper than the open floor is not mentioned', () => {
+    expect(saysFromPrice([open(600), members(600)])).toBe('From £6.00')
+  })
+
+  test('only members prices say so, and nothing at all says nothing', () => {
+    expect(saysFromPrice([members(500)])).toBe('Members from £5.00')
+    expect(saysFromPrice([])).toBeNull()
   })
 })

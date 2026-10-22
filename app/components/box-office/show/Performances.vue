@@ -13,7 +13,7 @@ import {
   resolveBookingClosesHours,
   runScreenForm,
   runningTimeRefusal,
-  saysBookingWindow,
+  saysOnlineCutoff,
   saysPerformanceStatus,
   saysVenueOption,
 } from '#shared/utils/programme'
@@ -308,7 +308,8 @@ function windowOf(one: AdminPerformance): string {
   const inherited = { bookingClosesHoursBefore: props.show.bookingClosesHoursBefore }
   const hours = resolveBookingClosesHours(one, inherited)
   const source = bookingWindowSource(one, inherited)
-  return `${saysBookingWindow(hours)}${source === 'show' ? ', from the show' : ''}`
+  const releases = one.holdReleaseMinutes !== undefined && one.holdReleaseMinutes > hours * 60
+  return `${saysOnlineCutoff(hours, one.holdReleaseMinutes)}${source === 'show' && !releases ? ', from the show' : ''}`
 }
 
 const columns: TableColumn<AdminPerformance>[] = [
