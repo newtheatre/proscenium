@@ -23,6 +23,7 @@ interface Session {
   capacity: number
   opensAt: number | null
   status: string
+  registerOpenedAt: number | null
   trainerName: string
   modules: { id: string, name: string }[]
 }
@@ -408,10 +409,10 @@ const columns: TableColumn<Session>[] = [
     id: 'status',
     header: 'Status',
     cell: ({ row }) => h(UBadge, {
-      color: row.original.status === 'OPEN' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
+      color: row.original.registerOpenedAt === null && row.original.status === 'OPEN' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
       variant: 'subtle',
       size: 'sm',
-    }, () => saysSessionStatus(row.original.status)),
+    }, () => saysSessionStatus(row.original.status, row.original.registerOpenedAt)),
   },
   {
     id: 'open',

@@ -483,6 +483,20 @@ export const MESSAGE_TYPES = {
     template: 'training-session-absent',
   },
 
+  // A correction took a record away, which they would otherwise find only on their page (0241).
+  'training.session.withdrawn': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-session-withdrawn',
+  },
+
+  // A correction gave them the record after all, often after an email saying they were missed.
+  'training.session.added': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-session-added',
+  },
+
   // Blunt, because it is to an officer about a system failure rather than to a member about
   // themselves: until the register is marked, the training did not happen (G-119).
   'training.register.unmarked': {

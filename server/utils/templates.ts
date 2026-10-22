@@ -835,17 +835,17 @@ The Nottingham New Theatre`,
   }),
 
   'training-session-absent': (context: TemplateContext): Rendered => ({
-    subject: `The session on ${String(context.heldOn)}: no record yet`,
+    subject: `${String(context.taught)} on ${String(context.heldOn)}: no record yet`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>You were signed up for the session on ${context.heldOn} and we did not see you there, so there is
-nothing on your training record for it.</p>
+<p>You had a place on ${context.taught} on ${context.heldOn} and we did not see you there, so there
+is nothing on your training record for it.</p>
 <p>Nothing on your record has changed; the module is still outstanding.</p>
 <p><a href="${String(context.trainingUrl)}">Your training</a> has the rest, and if there is no date
 that suits you, ask for the module to be taught again and we will know there is demand for it.</p>
 <p>If you did come and this is wrong, tell whoever ran the session and they can put it right.</p>`),
     text: `Hello ${context.name},
 
-You were signed up for the session on ${context.heldOn} and we did not see you there, so there is
+You had a place on ${context.taught} on ${context.heldOn} and we did not see you there, so there is
 nothing on your training record for it.
 
 Nothing on your record has changed; the module is still outstanding.
@@ -854,6 +854,43 @@ Your training, and asking for a module to be taught again:
 ${String(context.trainingUrl)}
 
 If you did come and this is wrong, tell whoever ran the session and they can put it right.
+
+The Nottingham New Theatre`,
+  }),
+
+  'training-session-withdrawn': (context: TemplateContext): Rendered => ({
+    subject: `Your record for ${String(context.taught)} has been withdrawn`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Whoever ran ${context.taught} on ${context.heldOn} has corrected the register, and it no longer
+shows you there. The record it gave you has been withdrawn.</p>
+<p>If you did come and this is wrong, tell them and they can put it right.
+<a href="${String(context.trainingUrl)}">Your training</a> shows what you hold now.</p>`),
+    text: `Hello ${context.name},
+
+Whoever ran ${context.taught} on ${context.heldOn} has corrected the register, and it no longer shows
+you there. The record it gave you has been withdrawn.
+
+If you did come and this is wrong, tell them and they can put it right. Your training shows what you
+hold now:
+${String(context.trainingUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  'training-session-added': (context: TemplateContext): Rendered => ({
+    subject: `Your record for ${String(context.taught)} has been added`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Whoever ran ${context.taught} on ${context.heldOn} has corrected the register: you were there
+after all, and the record is now on your training, dated to the day of the session.</p>
+<p>If we told you before that you were missed, this replaces that.
+<a href="${String(context.trainingUrl)}">Your training</a> shows it.</p>`),
+    text: `Hello ${context.name},
+
+Whoever ran ${context.taught} on ${context.heldOn} has corrected the register: you were there after
+all, and the record is now on your training, dated to the day of the session.
+
+If we told you before that you were missed, this replaces that. Your training shows it:
+${String(context.trainingUrl)}
 
 The Nottingham New Theatre`,
   }),

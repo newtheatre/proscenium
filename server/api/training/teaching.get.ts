@@ -5,6 +5,7 @@ export default defineEventHandler(async (event) => {
   const sessions = await listSessions({ trainerId: account.id, stillToRun: londonToday() })
 
   return {
-    items: sessions.map(({ id, heldOn, startsAt, endsAt, place, status, modules }) => ({ id, heldOn, startsAt, endsAt, place, status, modules })),
+    items: sessions.map(({ id, heldOn, startsAt, endsAt, place, status, registerOpenedAt, modules }) =>
+      ({ id, heldOn, startsAt, endsAt, place, status, registerOpenedAt, modules })),
   }
 })

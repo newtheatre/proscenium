@@ -19,6 +19,7 @@ const flat = (part: string): string => part.replace(/\s+/g, ' ')
 // `render` refuses any part that came out holding `undefined`.
 const EVERYTHING: TemplateContext = {
   name: 'Ada',
+  taught: 'Working at height',
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
   securityUrl: 'https://newtheatre.org.uk/account/access',
@@ -377,9 +378,15 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   })
 
   test('a missed session says what it is, and reassures once', () => {
-    const { subject, html } = render('training-session-absent', EVERYTHING)
-    expect(subject).toBe('The session on Friday 2 October 2026: no record yet')
+    const { subject, html } = render('training-session-absent', { ...EVERYTHING, taught: 'Sound basics' })
+    expect(subject).toBe('Sound basics on Friday 2 October 2026: no record yet')
     expect(html).toContain('Nothing on your record has changed; the module is still outstanding.')
+  })
+
+  test('a correction says which way it moved somebody\'s record (0241)', () => {
+    const context = { ...EVERYTHING, taught: 'Sound basics' }
+    expect(render('training-session-withdrawn', context).subject).toBe('Your record for Sound basics has been withdrawn')
+    expect(flat(render('training-session-added', context).html)).toContain('If we told you before that you were missed, this replaces that.')
   })
 
   test('the expiry window subject says what it is, and the splice is gone', () => {

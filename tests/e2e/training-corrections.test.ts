@@ -237,7 +237,7 @@ describe.skipIf(skip !== null)('correcting a marked register (G-114)', () => {
     return { session, module, stayed, dropped }
   }
 
-  test('an edit revokes what was issued and re-issues the corrected set', async () => {
+  test('an edit revokes only what the dropped attendee was issued (0241)', async () => {
     const { session, module, stayed, dropped } = await delivered()
 
     expect((await correct(session, {
@@ -254,13 +254,37 @@ describe.skipIf(skip !== null)('correcting a marked register (G-114)', () => {
     ).map(row => row.userId)
     expect(live).toEqual([stayed.id])
 
-    // Nothing is deleted: what was awarded before is still there, revoked with a reason.
+    // Nothing is deleted, and the one whose mark stood keeps their single record, untouched.
     const every = all<{ userId: string, revoked: number | null, reason: string | null }>(
       `SELECT user_id userId, revoked_at revoked, revoke_reason reason FROM training_records
        WHERE session_id = ? ORDER BY user_id`, session,
     )
-    expect(every.filter(row => row.revoked !== null)).toHaveLength(2)
+    expect(every).toHaveLength(2)
+    expect(every.filter(row => row.revoked !== null).map(row => row.userId)).toEqual([dropped.id])
     expect(every.every(row => row.revoked === null || row.reason !== null)).toBe(true)
+  }, CASE_TIMEOUT_MS)
+
+  test('whoever a correction moves is told which way, and nobody else (0241)', async () => {
+    const { session, stayed, dropped } = await delivered()
+    const late = await member()
+    signUp(session, late.id, Math.floor(Date.now() / 1000) + 10)
+    write(`UPDATE session_attendees SET status = 'ABSENT' WHERE session_id = ? AND user_id = ?`, session, late.id)
+
+    expect((await correct(session, {
+      marks: [
+        { userId: stayed.id, mark: 'ATTENDED' },
+        { userId: dropped.id, mark: 'ABSENT' },
+        { userId: late.id, mark: 'ATTENDED' },
+      ],
+    })).status).toBe(200)
+
+    const told = all<{ userId: string, type: string }>(
+      `SELECT user_id userId, type FROM notification_log WHERE session_id = ? AND type LIKE 'training.session.%' ORDER BY type`, session,
+    )
+    expect(told).toEqual([
+      { userId: late.id, type: 'training.session.added' },
+      { userId: dropped.id, type: 'training.session.withdrawn' },
+    ])
   }, CASE_TIMEOUT_MS)
 
   test('somebody dropped keeps their absence as evidence', async () => {

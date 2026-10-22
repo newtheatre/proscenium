@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysKind, saysRequestStatus, saysSource, saysState } from '#shared/utils/training'
 import { saysDay } from '#shared/utils/when'
+import { londonDay } from '#shared/utils/membership'
 import type { RecordState } from '#shared/utils/training'
 import type { TrainingAction } from '#shared/utils/training-action'
 
@@ -43,7 +44,7 @@ const recordsFailure = useListFailure(recordsError, 'Your training records could
 
 // The sessions this member teaches that still need them, each a tap from its register (issue
 // 1336). Empty for everybody who teaches nothing, so the section simply does not show.
-interface Taught { id: string, heldOn: string, startsAt: string, place: string | null, modules: { id: string, name: string }[] }
+interface Taught { id: string, heldOn: string, startsAt: string, place: string | null, registerOpenedAt: number | null, modules: { id: string, name: string }[] }
 const { data: teaching, error: teachingError, refresh: refreshTeaching } = await useAsyncData(
   'training-teaching',
   () => request<{ items: Taught[] }>('/api/training/teaching'),
@@ -370,7 +371,9 @@ const SECOND_PAGE = [{ label: 'Training sessions', to: '/training/sessions', ico
             :to="`/training/sessions/${session.id}/register`"
             :data-test="`open-register-${session.id}`"
           >
-            Open the register
+            {{ session.registerOpenedAt === null && session.heldOn > londonDay(new Date())
+              ? `See the register (opens ${saysDay(session.heldOn)})`
+              : 'Open the register' }}
           </UButton>
         </li>
       </ul>

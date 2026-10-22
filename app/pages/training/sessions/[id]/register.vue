@@ -83,6 +83,15 @@ function beginAdding(): void {
 
 const addable = computed(() => Boolean(picked.value) || address.value.trim().length > 0)
 
+// A check answers for the person it was run on, so a new address or pick asks again (0241).
+watch([address, picked], () => owning.value = [])
+
+function stopAdding(): void {
+  adding.value = false
+  failure.value = null
+  owning.value = []
+}
+
 // An address with no account yet mints the claimable guest A-116 describes, so a first-week
 // fresher who turned up still leaves with a record (G-117 criterion 2).
 async function whoToAdd(): Promise<string | null> {
@@ -165,6 +174,9 @@ async function openRegister(): Promise<void> {
 }
 
 async function submit(): Promise<void> {
+  adding.value = false
+  owning.value = []
+  failure.value = null
   if (presentCount.value === 0 && !correcting.value && !confirmingAllAbsent.value) {
     confirmingAllAbsent.value = true
     return
@@ -188,7 +200,7 @@ async function submit(): Promise<void> {
     toast.add({
       title: `${plural(answered.awarded, 'record')} awarded`,
       description: correcting.value
-        ? 'What was issued before has been revoked, and this is what stands now.'
+        ? 'Only the people whose mark changed were moved, and each was emailed to say which way.'
         : 'Dated to the day of the session.',
       icon: 'i-lucide-check',
       color: 'success',
@@ -290,6 +302,16 @@ async function submit(): Promise<void> {
         again.
       </p>
 
+      <UAlert
+        v-else-if="data.status === 'CANCELLED'"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-calendar-x"
+        data-test="register-cancelled"
+        title="This session was cancelled"
+        description="Its register can never be opened, and nobody gets a record from it."
+      />
+
       <template v-else-if="!open">
         <UAlert
           color="neutral"
@@ -318,8 +340,8 @@ async function submit(): Promise<void> {
           data-test="marking-help"
         >
           <template v-if="correcting">
-            This is how the register was left. Change what is wrong: what was awarded before is
-            revoked and the corrected set is issued in its place.
+            This is how the register was left. Change what is wrong: somebody unmarked loses the
+            record it gave them, somebody marked gains one, and each is emailed. Nobody else moves.
           </template>
           <template v-else>
             Everybody starts absent. Tap somebody to mark them present. Marking is what creates the
@@ -444,9 +466,9 @@ async function submit(): Promise<void> {
             variant="subtle"
             icon="i-lucide-triangle-alert"
             data-test="walk-in-gaps"
-            title="They do not hold everything this teaches"
-            :description="`${owning.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')}. `
-              + 'You can add them if you know why.'"
+            title="Not added yet: they do not hold everything this teaches"
+            :description="`They lack ${owning.map(gap => `${gap.requiresId} ${gap.requiresName}`).join(', ')}. `
+              + 'Press Add them anyway if you know why, or Back to leave them off.'"
           />
 
           <div class="flex flex-wrap gap-2">
@@ -462,7 +484,7 @@ async function submit(): Promise<void> {
             <UButton
               color="neutral"
               variant="ghost"
-              @click="adding = false"
+              @click="stopAdding"
             >
               Back
             </UButton>
@@ -476,7 +498,7 @@ async function submit(): Promise<void> {
           icon="i-lucide-mail"
           data-test="absentee-warning"
           :title="`${plural(absentCount, 'person', 'people')} not marked present`"
-          description="Everybody left unmarked is emailed to say we missed them, and gets no record for this session."
+          description="Nobody left unmarked gets a record for this session. Those who had a place are emailed to say we missed them; nobody only on the waiting list is."
         />
 
         <UAlert
@@ -486,7 +508,9 @@ async function submit(): Promise<void> {
           icon="i-lucide-triangle-alert"
           data-test="all-absent-warning"
           title="Nobody is marked present"
-          description="Submitting now awards nothing at all, and everybody on the register is emailed to say we missed them. Submit again if that is right."
+          :description="attendees.length === 0
+            ? 'Submitting now closes the register with nobody present, and awards nothing. Submit again if that is right.'
+            : 'Submitting now awards nothing at all, and everybody who had a place is emailed to say we missed them. Submit again if that is right.'"
         />
 
         <div class="sticky bottom-4 space-y-2">
