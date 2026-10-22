@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { DESK_STATUS_FILTERS, DESK_STATUS_LABELS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, deskFigures, reinstateRefusal, saysDeskStatus, saysDeskNight, saysBooker, uncollectableReason, walkUpLineMax, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
+import { DESK_CASH_SAYS, DESK_STATUS_FILTERS, DESK_STATUS_LABELS, DESK_TENDERS, REINSTATE_REASON_LIMIT, compBlockedSays, deskEmptySays, deskFigures, deskOpeningPerformanceId, otherPerformanceSays, reinstateRefusal, saysDeskStatus, saysDeskNight, saysBooker, uncollectableReason, unpaidReleaseSays, walkUpLineMax, walkUpRefusal, walkUpTotalPence } from '#shared/utils/desk'
 import { CAMERA_FALLBACK_SAYS } from '#shared/utils/door'
 import { nothingToCollect, passCollectReason } from '#shared/utils/reservations'
 import { isShowNight } from '#shared/utils/show-night'
-import { saysClock } from '#shared/utils/when'
+import { saysClock, saysWhen } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { DeskHouse, DeskStatusFilter, DeskTender } from '#shared/utils/desk'
 import { EXISTING_ACCOUNT_SAYS } from '#shared/utils/sale'
@@ -66,6 +66,7 @@ interface ReservationDetail {
   // that is what decides whether this screen may offer to bring the hold back (D-118).
   cancelledBy: string | null
   holdExpiresAt: number | null
+  performanceId: string
   showTitle: string
   startsAt: number
   bookerName: string | null
@@ -119,6 +120,14 @@ async function loadSummary(): Promise<void> {
 }
 
 const releaseTime = computed(() => (summary.value ? saysClock(summary.value.reservationsReleaseAt) : null))
+// Ticks so the unpaid notice turns over at the release without a reload.
+const nowSeconds = ref(Math.floor(Date.now() / 1000))
+let ticking: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  ticking = setInterval(() => (nowSeconds.value = Math.floor(Date.now() / 1000)), 30_000)
+})
+onBeforeUnmount(() => clearInterval(ticking))
+const unpaidSays = computed(() => (summary.value ? unpaidReleaseSays(summary.value.reservationsReleaseAt, nowSeconds.value) : ''))
 
 const summaryTiles = computed(() => (summary.value ? deskFigures(summary.value) : []))
 
@@ -134,7 +143,9 @@ const nightlyFailure = useListFailure(nightlyError, 'Tonight could not be read.'
 
 watch(nightly, (value) => {
   if (!value) return
-  if (!performanceId.value || !value.performances.some(one => one.id === performanceId.value)) performanceId.value = value.performances[0]?.id
+  if (!performanceId.value || !value.performances.some(one => one.id === performanceId.value)) {
+    performanceId.value = deskOpeningPerformanceId(value.performances, value.night === value.tonight, Math.floor(Date.now() / 1000))
+  }
 }, { immediate: true })
 
 function goTo(target: string | null): void {
@@ -225,6 +236,13 @@ const results = ref<SearchRow[]>([])
 const searching = ref(false)
 const searched = ref(false)
 const narrowed = ref(false)
+// What the last search was for, said beside the pills, which filter within it (process map, 21 Oct).
+const searchedFor = ref('')
+
+function clearSearch(): void {
+  q.value = ''
+  void search()
+}
 
 // What the empty card says depends on whether a search has run and whether anything narrowed it:
 // the card searches on its own, so "no results yet" was said about a search that had happened.
@@ -240,6 +258,7 @@ async function search(): Promise<void> {
       query: { performanceId: performanceId.value, q: asked || undefined, status: statusFilter.value },
     })
     results.value = page.items
+    searchedFor.value = asked
     narrowed.value = asked.length > 0 || statusFilter.value !== 'ALL'
     searched.value = true
   }
@@ -258,6 +277,7 @@ watch(performanceId, () => {
   searched.value = false
   narrowed.value = false
   q.value = ''
+  searchedFor.value = ''
   statusFilter.value = 'ALL'
   void search()
   void loadSummary()
@@ -675,7 +695,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
       variant="subtle"
       icon="i-lucide-clock-alert"
       :title="`${plural(summary.unpaidCount, 'unpaid ticket')} · ${saysPrice(summary.unpaidOwedPence)} owed`"
-      :description="`Unpaid bookings release at ${releaseTime}, and their seats go back on sale.`"
+      :description="unpaidSays"
       data-test="desk-unpaid-alert"
     />
 
@@ -720,8 +740,8 @@ const resultColumns: TableColumn<SearchRow>[] = [
             </UButton>
             <UInput
               v-model="q"
-              placeholder="Reference or name"
-              aria-label="Reference or name"
+              placeholder="Reference, name or email"
+              aria-label="Reference, name or email"
               class="w-64"
               data-test="desk-search"
               @keyup.enter="search"
@@ -762,6 +782,22 @@ const resultColumns: TableColumn<SearchRow>[] = [
               {{ DESK_STATUS_LABELS[pill] }}
             </UButton>
           </div>
+          <p
+            v-if="searchedFor"
+            class="mt-2 text-sm text-muted"
+            data-test="desk-searched-for"
+          >
+            Showing matches for "{{ searchedFor }}" only.
+            <UButton
+              variant="link"
+              size="sm"
+              class="p-0"
+              data-test="desk-search-clear"
+              @click="clearSearch"
+            >
+              Clear the search
+            </UButton>
+          </p>
         </template>
 
         <UAlert
@@ -956,7 +992,7 @@ const resultColumns: TableColumn<SearchRow>[] = [
     <UModal
       v-model:open="open"
       :title="selected ? `Reference ${selected.reference}` : ''"
-      :description="selected ? `${selected.showTitle}, ${saysBooker(selected.bookerName)}` : ''"
+      :description="selected ? `${selected.showTitle}, ${saysWhen(selected.startsAt)}, ${saysBooker(selected.bookerName)}` : ''"
     >
       <template #body>
         <div
@@ -968,6 +1004,15 @@ const resultColumns: TableColumn<SearchRow>[] = [
             color="error"
             variant="subtle"
             :description="collectFailure"
+          />
+
+          <UAlert
+            v-if="otherPerformanceSays(selected, performanceId)"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-calendar-x"
+            :description="otherPerformanceSays(selected, performanceId) ?? ''"
+            data-test="desk-other-performance"
           />
 
           <UAlert
@@ -1012,7 +1057,10 @@ const resultColumns: TableColumn<SearchRow>[] = [
             data-test="desk-pass-booking"
           />
           <template v-else-if="selected.status === 'PENDING'">
-            <UFormField label="Tender">
+            <UFormField
+              label="Tender"
+              :help="DESK_CASH_SAYS"
+            >
               <!-- A URadioGroup, not USelect: choosing a value inside a select nested in this modal
                    left its own backdrop swallowing clicks after close (a Nuxt UI defect). -->
               <URadioGroup

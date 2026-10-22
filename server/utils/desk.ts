@@ -5,7 +5,8 @@ import { admittedSeatsSubquery, heldAccessSeatsSubquery, heldSeatsOfKindSubquery
 import { configValue } from './configuration'
 import { pendingTicketCompRequestForReservation } from './ticket-comps'
 import { holdReleaseMinutesFor } from './reservations'
-import { holdExpiresAt, looksLikeReference } from '#shared/utils/reservations'
+import { normaliseEmail } from '#shared/utils/auth'
+import { holdExpiresAt, looksLikeReference, looksLikeReferencePrefix } from '#shared/utils/reservations'
 import type { DeskHouse, DeskStatusFilter } from '#shared/utils/desk'
 import type { TicketTypeAccessKind } from '#shared/utils/ticket-types'
 import type { TicketCompRequest } from '#shared/utils/ticket-comps'
@@ -69,16 +70,27 @@ export interface DeskSearchRow {
   holdExpiresAt: number | null
 }
 
-// Reference, an exact match on the no-look-alike code, or a name, a partial one on the booker's
-// account: never both at once, because a reference is unambiguous and a name never is.
+// "Walk-up" first (WALKUP is reference-shaped), then a whole reference, an email address, the start
+// of a reference or a name it might be, else part of a name: what a booker offers at the counter.
 function searchPredicate(q: string | undefined): SQL {
   if (!q) return sql``
   const trimmed = q.trim()
+  if (WALK_UP_WORDS.test(trimmed)) {
+    return sql` AND r.user_id IS NULL`
+  }
   if (looksLikeReference(trimmed)) {
     return sql` AND r.reference = ${trimmed.toUpperCase()}`
   }
+  if (trimmed.includes('@')) {
+    return sql` AND u.email = ${normaliseEmail(trimmed)}`
+  }
+  if (looksLikeReferencePrefix(trimmed)) {
+    return sql` AND (r.reference LIKE ${`${trimmed.toUpperCase()}%`} OR u.name LIKE ${contains(trimmed)} ESCAPE '\\')`
+  }
   return sql` AND u.name LIKE ${contains(trimmed)} ESCAPE '\\'`
 }
+
+const WALK_UP_WORDS = /^walk[\s-]?ups?$/i
 
 // One stored state per pill (D-114 criterion 7): unpaid, paid and not yet in, and in, a walk-up included.
 // Unpaid is never a pass booking, which owes nothing (issue 1390).

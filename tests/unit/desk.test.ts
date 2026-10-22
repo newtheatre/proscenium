@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  DESK_CASH_SAYS,
   DESK_SALE_LINE_QUANTITY_CAP,
   DESK_SCAN_PASS_REFUSAL,
   DESK_SCAN_UNKNOWN_REFUSAL,
@@ -10,6 +11,9 @@ import {
   collectForm,
   compBlockedSays,
   deskEmptySays,
+  deskOpeningPerformanceId,
+  otherPerformanceSays,
+  unpaidReleaseSays,
   deskFigures,
   deskSaleForm,
   deskSearchForm,
@@ -525,5 +529,39 @@ describe('every result row keeps Open in view, beside the Tonight card or on a p
 
   test('Open keeps to one line at the end of every row', async () => {
     expect(await resultColumn('act')).toContain('meta: ACTIONS_COLUMN,')
+  })
+})
+
+// The process map of 21 October: the desk opened on a matinee long over, opened another night's
+// booking without saying so, and kept quoting a release time already past.
+describe('the desk opens on what is running and says what is not', () => {
+  const matinee = { id: 'matinee', startsAt: 1_800_000_000 }
+  const evening = { id: 'evening', startsAt: 1_800_000_000 + 4.5 * 3600 }
+  const late = { id: 'late', startsAt: 1_800_000_000 + 7 * 3600 }
+
+  test('tonight opens on the latest performance already started, or the first still to come', () => {
+    expect(deskOpeningPerformanceId([matinee, evening, late], true, evening.startsAt + 1800)).toBe('evening')
+    expect(deskOpeningPerformanceId([matinee, evening, late], true, matinee.startsAt - 3600)).toBe('matinee')
+    expect(deskOpeningPerformanceId([matinee, evening, late], true, late.startsAt + 60)).toBe('late')
+  })
+
+  test('another night opens on its first, and an empty night on nothing', () => {
+    expect(deskOpeningPerformanceId([matinee, evening], false, evening.startsAt)).toBe('matinee')
+    expect(deskOpeningPerformanceId([], true, evening.startsAt)).toBeUndefined()
+  })
+
+  test('a booking for another performance is named with its night; one for this one says nothing', () => {
+    const booking = { performanceId: 'late', showTitle: 'Small Hours', startsAt: late.startsAt }
+    expect(otherPerformanceSays(booking, 'evening')).toContain('This booking is for Small Hours,')
+    expect(otherPerformanceSays(booking, 'late')).toBeNull()
+  })
+
+  test('the release is quoted until it passes, then said to be under way', () => {
+    expect(unpaidReleaseSays(evening.startsAt, evening.startsAt - 60)).toStartWith('Unpaid bookings release at')
+    expect(unpaidReleaseSays(evening.startsAt, evening.startsAt + 60)).toContain('passed their')
+  })
+
+  test('the tender says there is no cash', () => {
+    expect(DESK_CASH_SAYS).toContain('does not take cash')
   })
 })
