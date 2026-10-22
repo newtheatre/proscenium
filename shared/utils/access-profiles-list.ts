@@ -13,6 +13,7 @@ export const accessProfilesList = {
       kind: 'list',
       operators: ['is'],
       icon: 'i-lucide-list-filter',
+      unset: 'Pending',
       options: [
         { value: 'ALL', label: 'Everyone' },
         ...ACCESS_PROFILE_STATUSES.map(value => ({ value, label: saysAccessProfileStatus(value) })),

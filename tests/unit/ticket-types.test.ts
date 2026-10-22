@@ -32,6 +32,7 @@ function type(over: Partial<TicketType> = {}): TicketType {
     restrictedTo: null,
     archived: false,
     activeByDefault: true,
+    sort: 0,
     everSold: false,
     ...over,
   }
@@ -111,6 +112,15 @@ describe('kind and access kind are set once (criterion 2)', () => {
   test('the archive form takes a state, not a wish', () => {
     expect(archiveTicketTypeForm.safeParse({}).success).toBe(false)
     expect(archiveTicketTypeForm.parse({ archived: true }).archived).toBe(true)
+  })
+})
+
+describe('a ticket type keeps its own order (0193)', () => {
+  test('an order is a whole number, nought or more, and nought when left out', () => {
+    expect(ticketTypeForm.parse({ name: 'Standard', price: 700 }).sort).toBe(0)
+    expect(ticketTypeForm.parse({ name: 'Standard', price: 700, sort: 3 }).sort).toBe(3)
+    expect(ticketTypeForm.safeParse({ name: 'Standard', price: 700, sort: -1 }).error?.issues[0]?.message)
+      .toBe('An order is nought or more')
   })
 })
 

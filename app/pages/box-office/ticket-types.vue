@@ -64,6 +64,7 @@ interface FormState {
   accessKind: TicketTypeAccessKind | null
   restrictedTo: TicketTypeRestriction | null
   activeByDefault: boolean
+  sort: number
 }
 
 const state = reactive<FormState>({
@@ -72,6 +73,7 @@ const state = reactive<FormState>({
   accessKind: null,
   restrictedTo: null,
   activeByDefault: true,
+  sort: 0,
 })
 
 // A companion ticket is always free (D-128 criterion 3); the field is forced rather than left to
@@ -105,6 +107,7 @@ function edit(type: TicketType | null): void {
     accessKind: type?.accessKind ?? null,
     restrictedTo: type?.restrictedTo ?? null,
     activeByDefault: type?.activeByDefault ?? true,
+    sort: type?.sort ?? 0,
   })
   open.value = true
 }
@@ -119,6 +122,7 @@ async function save(): Promise<void> {
     description: state.description?.trim() || null,
     price: state.price,
     activeByDefault: state.activeByDefault,
+    sort: state.sort,
   }
   try {
     if (editing.value) {
@@ -132,7 +136,7 @@ async function save(): Promise<void> {
       })
     }
     toast.add({
-      title: editing.value ? 'Ticket type changed' : 'Ticket type added',
+      title: editing.value ? 'Ticket type saved' : 'Ticket type added',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -213,6 +217,12 @@ const columns: TableColumn<TicketType>[] = [
       // price and the row actions in view without losing what it said (issue 922).
       h('div', { class: 'sm:hidden text-xs text-muted' }, row.original.everSold ? 'Has been sold' : 'Never sold'),
     ]),
+  },
+  {
+    id: 'sort',
+    header: 'Order',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} tabular-nums` } },
+    cell: ({ row }) => String(row.original.sort),
   },
   {
     id: 'price',
@@ -383,14 +393,27 @@ const columns: TableColumn<TicketType>[] = [
           </UFormField>
 
           <UFormField
+            v-if="state.accessKind === 'COMPANION'"
+            label="Base price"
+            name="price"
+            description="The seat beside an access booker, so it is never charged."
+          >
+            <p
+              class="text-sm"
+              data-test="ticket-type-always-free"
+            >
+              Always free
+            </p>
+          </UFormField>
+          <UFormField
+            v-else
             label="Base price"
             name="price"
             required
-            :description="state.accessKind === 'COMPANION' ? 'A companion ticket is always free.' : 'In pounds. A show or a performance can override it later.'"
+            description="In pounds. A show or a performance can override it later."
           >
             <PoundsField
               v-model="state.price"
-              :disabled="state.accessKind === 'COMPANION'"
               class="w-full"
               data-test="ticket-type-price"
             />
@@ -469,6 +492,19 @@ const columns: TableColumn<TicketType>[] = [
             description="A free type open to anyone appears on the public booking page wherever it is on sale. For a comp, choose Box office only."
             data-test="ticket-type-free-warning"
           />
+
+          <UFormField
+            label="Order"
+            name="sort"
+            description="Where it sits on a show's prices and the booking page. Lower comes first; a tie goes to the cheaper."
+          >
+            <UInputNumber
+              v-model="state.sort"
+              :min="0"
+              class="w-full"
+              data-test="ticket-type-sort"
+            />
+          </UFormField>
 
           <USwitch
             v-model="state.activeByDefault"

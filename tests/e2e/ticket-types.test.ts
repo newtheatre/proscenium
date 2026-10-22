@@ -59,6 +59,7 @@ interface Listed {
   accessKind: string | null
   archived: boolean
   everSold: boolean
+  sort: number
 }
 
 const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice(0, 8)}`
@@ -209,6 +210,14 @@ describe.skipIf(skip !== null)('creation, archive and price changes are audited 
 
     expect(trail('ticket-type.price.changed', `ticket-type:${id}`)).toBeUndefined()
     expect(trail('ticket-type.updated', `ticket-type:${id}`)).toBeDefined()
+  })
+
+  test('an edit that leaves the order out keeps the order it had', async () => {
+    const name = named('Ordered')
+    const { id } = await (await add({ name, price: 700, sort: 4 })).json() as { id: string }
+    expect((await send('PUT', `/api/admin/ticket-types/${id}`, { name, price: 750 })).status).toBe(200)
+
+    expect((await listing()).find(type => type.id === id)?.sort).toBe(4)
   })
 
   test('archiving records the state it moved between', async () => {

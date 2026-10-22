@@ -1,0 +1,1 @@
+ALTER TABLE `ticket_types` ADD `sort` integer DEFAULT 0 NOT NULL;

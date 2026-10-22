@@ -97,6 +97,11 @@ const state = reactive({
   showIds: [] as string[],
 })
 
+// The address writes itself from the name on Add, as a show's and a warning's do.
+watch(() => state.name, (name) => {
+  if (!editing.value) state.slug = toSlug(name)
+})
+
 const priceRows = ref<PriceRow[]>([{ label: '', pounds: 0 }])
 // The hint every price row's inputs are described by, as the field's description once was.
 const pricesHint = useId()
@@ -152,9 +157,16 @@ async function save(): Promise<void> {
       await $fetch(`/api/admin/pass-types/${editing.value.id}`, { method: 'PUT', body: { ...body, status: state.status } })
     }
     else {
-      await $fetch('/api/admin/pass-types', { method: 'POST', body: { ...body, showIds: state.showIds } })
+      const added = await $fetch<{ id: string }>('/api/admin/pass-types', { method: 'POST', body: { ...body, showIds: state.showIds } })
+      // Born a draft by design; the toast offers the one step most adds are followed by.
+      toast.add({
+        title: `${body.name} added as a draft`,
+        icon: 'i-lucide-check',
+        color: 'success',
+        actions: [{ label: 'Put on sale now', color: 'neutral', variant: 'outline', onClick: () => { void putOnSale(added.id, body) } }],
+      })
     }
-    toast.add({ title: editing.value ? 'Pass changed' : 'Pass added', icon: 'i-lucide-check', color: 'success' })
+    if (editing.value) toast.add({ title: 'Pass saved', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await reload()
   }
@@ -163,6 +175,18 @@ async function save(): Promise<void> {
   }
   finally {
     saving.value = false
+  }
+}
+
+async function putOnSale(id: string, body: Record<string, unknown>): Promise<void> {
+  failure.value = null
+  try {
+    await $fetch(`/api/admin/pass-types/${id}`, { method: 'PUT', body: { ...body, status: 'ON_SALE' } })
+    toast.add({ title: `${body.name} on sale`, icon: 'i-lucide-check', color: 'success' })
+    await reload()
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
   }
 }
 
@@ -202,7 +226,7 @@ async function saveShows(): Promise<void> {
   showsFailure.value = null
   try {
     await $fetch(`/api/admin/pass-types/${passType.id}/shows`, { method: 'PUT', body: { showIds: chosenShowIds.value } })
-    toast.add({ title: 'Covered shows changed', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'Covered shows saved', icon: 'i-lucide-check', color: 'success' })
     managingShows.value = null
     await reload()
   }
@@ -404,7 +428,7 @@ const columns: TableColumn<PassType>[] = [
             label="Web address"
             name="slug"
             required
-            description="Lowercase words joined by hyphens."
+            description="Lowercase words joined by hyphens. Filled in from the name."
           >
             <UInput
               v-model="state.slug"
@@ -453,15 +477,23 @@ const columns: TableColumn<PassType>[] = [
               label="Sales open"
               name="salesOpenAt"
               hint="Optional"
+              description="Empty: on sale from now."
             >
-              <DateField v-model="state.salesOpenAt" />
+              <DateField
+                v-model="state.salesOpenAt"
+                data-test="pass-type-sales-open"
+              />
             </UFormField>
             <UFormField
               label="Sales close"
               name="salesCloseAt"
               hint="Optional"
+              description="Empty: until it expires."
             >
-              <DateField v-model="state.salesCloseAt" />
+              <DateField
+                v-model="state.salesCloseAt"
+                data-test="pass-type-sales-close"
+              />
             </UFormField>
           </div>
 
@@ -502,7 +534,8 @@ const columns: TableColumn<PassType>[] = [
               :id="pricesHint"
               class="mb-1 text-sm text-muted"
             >
-              At least one, each with its own label.
+              At least one, each with its own label. A label is only a name: anyone may buy any
+              price point, so one called Member does not check membership.
             </p>
             <div class="space-y-2">
               <div
@@ -618,7 +651,7 @@ const columns: TableColumn<PassType>[] = [
     <UModal
       :open="managingShows !== null"
       :title="managingShows ? `What ${managingShows.name} covers` : ''"
-      description="Adding a show takes effect at once. Removing one with a live pass against it needs a manager."
+      description="Adding a show takes effect at once. Removing one with a live pass against it needs the IT Manager."
       @update:open="managingShows = null"
     >
       <template #body>
