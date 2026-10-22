@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { EXISTING_ACCOUNT_SAYS, MAX_BASKET_LINES, saysTillParty, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, sameBookerName, saysNoChoice, saysPouredLine, saysPouredLines, walkUpGuestForm } from '#shared/utils/sale'
+import { basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, sameBookerName, saysBasketLine, saysNoChoice, saysPouredLine, saysPouredLines, saysTillParty, walkUpGuestForm, EXISTING_ACCOUNT_SAYS, MAX_BASKET_LINES, MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
@@ -289,5 +289,16 @@ describe('a season pass on the till', () => {
 
   test('the buyer is named by a real email address', () => {
     expect(saleForm.safeParse({ lines: [], expectedTotalPence: 4500, pass: { ...pass, email: 'not an address' } }).success).toBe(false)
+  })
+})
+
+describe('a basket line names its size only where there is one (bar review, C2)', () => {
+  test('a lone Each is left out, and a choice reads with it', () => {
+    expect(saysBasketLine({ productName: 'Rum and mixer', variantLabel: 'Each', choiceItemName: 'Coke' })).toBe('Rum and mixer with Coke')
+    expect(saysBasketLine({ productName: 'Crisps', variantLabel: 'Each', choiceItemName: null })).toBe('Crisps')
+  })
+
+  test('a real size stays', () => {
+    expect(saysBasketLine({ productName: 'Gin', variantLabel: 'Double', choiceItemName: 'Tonic' })).toBe('Gin, Double with Tonic')
   })
 })

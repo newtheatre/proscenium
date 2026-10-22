@@ -228,10 +228,12 @@ export function curtainIsDown(performance: PerformanceTimes, at: number): boolea
   return at >= performanceEnd(performance)
 }
 
-// Who a refused volunteer turns to: tonight's duty manager, by first name where the rota has one.
+// Who a refused volunteer turns to: tonight's duty manager by first name where the rota has one,
+// and the Front of House Manager on a night with none, who can open any screen.
 export function whoCanHelpTonight(team: readonly { role: string, filled: boolean, name: string | null }[] | null): string {
   const first = firstNameOf(team?.find(member => member.role === 'DUTY_MANAGER' && member.filled)?.name)
-  return first ? `Ask ${first}, tonight's duty manager.` : 'Ask tonight\'s duty manager.'
+  if (first) return `Ask ${first}, tonight's duty manager.`
+  return team === null ? 'Ask tonight\'s duty manager, or the Front of House Manager.' : 'Nobody is on as duty manager tonight: ask the Front of House Manager.'
 }
 
 /** Two groups of three, so the backstage code can be read out over a headset. */

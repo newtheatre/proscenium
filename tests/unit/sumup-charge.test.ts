@@ -26,6 +26,7 @@ interface SetupOptions {
   receipt?: SaleReceipt
   sumupEnabled?: boolean
   venueId?: string | null
+  listed?: SumupAttemptView[]
 }
 
 // One till tab. Every tab in a test shares the device store, as tabs on one phone share storage.
@@ -40,7 +41,7 @@ function setup(status: Outcome, visible = ref(true), options: SetupOptions = {})
     request: async <T>(path: string) => {
       asked.push(path)
       if (path.endsWith('/resolve')) return { status, error: null, receipt: options.receipt ?? null } as T
-      if (path === '/api/till/payments') return { attempts: [] } as T
+      if (path === '/api/till/payments') return { attempts: options.listed ?? [] } as T
       return { attempt: aView(path.split('/').pop()!, status) } as T
     },
     venueId: ref<string | null>(options.venueId ?? null),
@@ -259,6 +260,16 @@ describe('a typed charge waits for the person at the reader (0096)', () => {
     await tab.charge.resolveAttempt('elsewhere', 'declined')
 
     expect(tab.asked).toContain('/api/till/payments')
+    tab.scope.stop()
+  })
+
+  test('a listed charge answered from here says what became of it, rather than simply vanishing', async () => {
+    const tab = setup('FAILED', ref(true), { sumupEnabled: false, venueId: 'venue-1', listed: [{ ...aView('elsewhere', 'FAILED'), kind: 'TYPED', status: 'STARTED' }] })
+    await tab.charge.refreshOpenAttempts()
+
+    await tab.charge.resolveAttempt('elsewhere', 'declined')
+
+    expect(tab.charge.answeredNotice.value).toBe('The £10.00 charge was declined, so nothing was recorded.')
     tab.scope.stop()
   })
 })

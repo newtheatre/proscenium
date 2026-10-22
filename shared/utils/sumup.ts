@@ -201,6 +201,18 @@ export function saysAttemptBasket(counts: AttemptBasketCounts): string | null {
   return parts.length > 0 ? parts.join(', ') : null
 }
 
+// A listed charge once answered, said back in place of the row it removes (bar review, T7).
+export function saysAnswered(status: SumupAttemptStatus, pence: number): string {
+  const figure = saysMoney(pence)
+  switch (status) {
+    case 'SUCCEEDED': return `The ${figure} charge is recorded.`
+    case 'FAILED': return `The ${figure} charge was declined, so nothing was recorded.`
+    case 'ABANDONED': return `The ${figure} charge was given up on, so nothing was recorded.`
+    case 'MISMATCH': return `The reader took ${figure} and it could not be recorded.`
+    default: return `The ${figure} charge is ${saysAttemptStatus(status, 'TYPED').toLowerCase()}.`
+  }
+}
+
 // A typed charge still waiting is answered as the reader answered it (0096).
 export const typedAndWaiting = (attempt: Pick<SumupAttemptView, 'kind' | 'status'>): boolean => attempt.kind === 'TYPED' && attempt.status === 'STARTED'
 
