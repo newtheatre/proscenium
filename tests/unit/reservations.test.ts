@@ -220,6 +220,8 @@ describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', (
   test('a cancellation names who cancelled', () => {
     expect(qrStatusDisplay('CANCELLED', 'CUSTOMER', null).detail).toContain('booker')
     expect(qrStatusDisplay('CANCELLED', 'STAFF', null).detail).toContain('box office')
+    expect(qrStatusDisplay('CANCELLED', 'STAFF', null, null, '£22.00').detail).toBe('Cancelled by the box office. £22.00 was refunded.')
+    expect(qrStatusDisplay('COLLECTED', null, null, null, '£6.00').detail).toContain('£6.00 of it was refunded')
   })
 
   test('a lapsed hold reads distinctly from a cancellation', () => {

@@ -83,6 +83,7 @@ const EVERYTHING: TemplateContext = {
   reference: 'K7M4PQ',
   totalDue: '£9.00',
   paid: '£9.00',
+  refunded: '£9.00',
   passType: 'Season pass',
   priceLabel: '£25.00',
   qrWidth: 165,
@@ -279,6 +280,19 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   test('a walk-up paid at the desk says the box office, and one at the bar says the bar', () => {
     expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'DESK' }).text)).toContain('paid at the box office')
     expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'BAR' }).text)).toContain('paid at the bar')
+  })
+
+  test('a comp collected at the desk says it was given, not paid', () => {
+    const text = flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'DESK', comp: true }).text)
+    expect(text).toContain('complimentary, given at the box office')
+    expect(text).not.toContain('paid at')
+  })
+
+  test('a refund names the amount and whether the booking still stands', () => {
+    const part = render('reservation-refunded', { ...EVERYTHING, refunded: '£6.00', cancelled: false })
+    expect(part.subject).toBe('£6.00 refunded on your booking for The Tempest')
+    expect(flat(part.text)).toContain('The rest of the booking stands')
+    expect(flat(render('reservation-refunded', { ...EVERYTHING, refunded: '£6.00', cancelled: true }).text)).toContain('it is cancelled')
   })
 
   // D-121 criterion 5: every holder is told, and a paid one where the money comes back (D-116).

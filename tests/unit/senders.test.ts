@@ -50,6 +50,7 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'reservation.hold-expiring': 'BOX_OFFICE',
   'reservation.confirmed': 'BOX_OFFICE',
   'reservation.walk-up-paid': 'BOX_OFFICE',
+  'reservation.refunded': 'BOX_OFFICE',
   'reservation.cancelled': 'BOX_OFFICE',
   'reservation.performance-cancelled': 'BOX_OFFICE',
   'pass.issued': 'BOX_OFFICE',

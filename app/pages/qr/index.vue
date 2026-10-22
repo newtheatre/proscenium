@@ -26,6 +26,7 @@ interface Booking {
   passBooking: boolean
   when: string
   totalDue: string | null
+  refunded: string | null
   qrSvg: string
   lines: NamedLine[]
   venue: { name: string, address: string | null }
@@ -115,7 +116,7 @@ async function resend(payload: FormSubmitEvent<z.output<typeof reservationResend
 }
 
 const display = computed(() => booking.value
-  ? qrStatusDisplay(booking.value.status, booking.value.cancelledBy, booking.value.totalDue, booking.value.exchangedTo)
+  ? qrStatusDisplay(booking.value.status, booking.value.cancelledBy, booking.value.totalDue, booking.value.exchangedTo, booking.value.refunded)
   : null)
 const tone = computed(() => booking.value
   ? qrStatusTone(booking.value.status, booking.value.totalDue, booking.value.exchangedTo !== null)

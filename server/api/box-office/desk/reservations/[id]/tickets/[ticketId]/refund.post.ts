@@ -41,6 +41,22 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This ticket has already been refunded' })
   }
 
+  // The last ticket refunded leaves nothing owed, and the desk cancels the booking straight after.
+  const bookerId = await reservationBookerId(id)
+  if (bookerId) {
+    try {
+      await sendReservationRefunded(event, {
+        userId: bookerId,
+        reservationId: id,
+        refundedPence: ticket.pricePaid,
+        cancelled: reservation.tickets.length === 1,
+      })
+    }
+    catch (error) {
+      console.error('[desk] ticket refunded but the booker could not be told', error)
+    }
+  }
+
   // Frees a seat (D-113 criterion 2): offer it on, the same as an expiry or a self-cancel.
   const cap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
   const run = await offerWaitingList(event, reservation.performanceId, new Date(), cap)

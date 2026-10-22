@@ -95,6 +95,20 @@ export async function refundTicket(input: RefundTicketWriteInput, at = new Date(
   return { applied, entryId: applied ? posted.id : undefined }
 }
 
+// Whose booking it is, for the email a desk action sends: null for a nameless walk-up.
+export async function reservationBookerId(reservationId: string): Promise<string | null> {
+  const [row] = await db.all<{ userId: string | null }>(sql`SELECT user_id AS userId FROM reservations WHERE id = ${reservationId}`)
+  return row?.userId ?? null
+}
+
+// What has been handed back on a booking, for the booker's own page and email; one row, any size.
+export async function refundedPenceFor(reservationId: string): Promise<number> {
+  const [row] = await db.all<{ refunded: number }>(sql`
+    SELECT coalesce(sum(price_paid), 0) AS refunded FROM tickets WHERE reservation_id = ${reservationId} AND refunded_at IS NOT NULL
+  `)
+  return Number(row?.refunded ?? 0)
+}
+
 // Criterion 6: refused while any ticket still holds money nobody handed back; the caller (the
 // route) sums what `deskReservation`'s own unrefunded-only ticket list already answers.
 export async function cancelCollectedReservation(reservationId: string, actorId: string): Promise<boolean> {
