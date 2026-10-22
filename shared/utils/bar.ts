@@ -854,6 +854,8 @@ export interface StockMovement extends DeliveryCost {
   refTable: string | null
   refId: string | null
   reversesId: string | null
+  // What a reversal undid: a sale's stock comes back only through a tab charge's void.
+  reversesKind: StockMovementKind | null
   actorId: string | null
   createdAt: number
   // Whether a later movement cancels this one, so a screen does not offer to reverse it twice.
@@ -1040,6 +1042,12 @@ export const MOVEMENT_SOURCE_TABLES = ['ledger_lines', 'stocktake_lines'] as con
 const MOVEMENT_SOURCE_WORDING: Record<string, string> = {
   ledger_lines: 'a sale',
   stocktake_lines: 'a stock count',
+}
+
+// A void's stock return reads as what it is, not as the count correction its reason column holds.
+export function saysMovementReason(movement: Pick<StockMovement, 'kind' | 'reason' | 'reversesKind'>): string | null {
+  if (movement.kind === 'REVERSAL' && movement.reversesKind === 'SALE') return 'Tab charge voided'
+  return movement.reason ? says(movement.reason) : null
 }
 
 export function saysMovementSource(table: string): string {
