@@ -5,7 +5,7 @@ import { accessProfilesList } from '#shared/utils/access-profiles-list'
 import type { AccessProfileStatus, DeclineAccessProfileInput, OfficerAccessProfile } from '#shared/utils/access-profiles'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 
-definePageMeta({ layout: 'console', title: 'Access profiles', middleware: 'console', docs: '/docs/box-office/access-profiles' })
+definePageMeta({ layout: 'console', title: 'Access declarations', middleware: 'console', docs: '/docs/people/access-declarations' })
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')

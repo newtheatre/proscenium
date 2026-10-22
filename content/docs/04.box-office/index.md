@@ -1,6 +1,6 @@
 ---
 title: Box office
-description: The desk, passes, the programme and its reference data, and access profile verification.
+description: The desk, passes, the programme and its reference data.
 module: Ticketing
 audience: committee
 updatedOn: 2026-10-21
@@ -23,9 +23,9 @@ initiates a charge.
 ## Who holds what
 
 The **Front of House Manager** reads, changes and exports every screen below except one. Narrowing
-what a pass covers once passes are live is the IT Manager's. Verifying an access profile is the
-Secretary and Welfare Officer's alone: general box office cannot open that screen or see what it
-holds. Approving a comp derives from tonight's confirmed duty manager shift; the IT Manager can
+what a pass covers once passes are live is the IT Manager's. Verifying an access declaration is the
+Secretary and Welfare Officer's alone, under [People](/docs/people/access-declarations): general
+box office cannot open that screen or see what it holds. Approving a comp derives from tonight's confirmed duty manager shift; the IT Manager can
 approve one on any day.
 Refunding a paid ticket is the Front of House Manager's own, on any day and for any performance;
 no shift approves one.
@@ -64,14 +64,6 @@ no shift approves one.
   ::
   ::card{icon="i-lucide-triangle-alert" title="Content warnings" to="/docs/box-office/content-warnings"}
   The vocabulary every show warns from.
-  ::
-::
-
-## Access
-
-::card-group
-  ::card{icon="i-lucide-accessibility" title="Access profiles" to="/docs/box-office/access-profiles"}
-  Sight the evidence behind a declaration and agree the wording the door reads out.
   ::
 ::
 

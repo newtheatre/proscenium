@@ -1834,6 +1834,29 @@ The Nottingham New Theatre`,
     }
   },
 
+  'access-profiles-waiting': (context: TemplateContext): Rendered => {
+    const count = Number(context.count)
+    const url = String(context.queueUrl)
+    const waiting = count === 1 ? '1 access declaration is waiting' : `${count} access declarations are waiting`
+    return {
+      subject: `${waiting} to be verified`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${waiting} to be verified, the oldest since ${context.since}.</p>
+<p>Each is somebody who is offered no access or companion tickets until it is verified. Verify
+or decline each one from the queue.</p>
+<p><a href="${url}">Open the queue</a></p>`),
+      text: `Hello ${context.name},
+
+${waiting} to be verified, the oldest since ${String(context.since)}.
+
+Each is somebody who is offered no access or companion tickets until it is verified. Verify or
+decline each one from the queue:
+${url}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   // Says plainly that a lapsing grant is not a lapsing shift: authority on the night derives from
   // tonight's confirmed shift, never from a standing grant (0009, A-119 criterion 1).
   'role-expiring': (context: TemplateContext): Rendered => {

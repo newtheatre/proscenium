@@ -424,6 +424,16 @@ describe('the rewritten bodies and subjects (item 7)', () => {
       .toBe('1 membership claim is waiting to be recorded')
   })
 
+  test('the waiting declarations notice counts them, says since when and links the queue (0156)', () => {
+    const queue = 'https://newtheatre.org.uk/people/access'
+    const many = render('access-profiles-waiting', { ...EVERYTHING, count: 2, queueUrl: queue })
+    expect(many.subject).toBe('2 access declarations are waiting to be verified')
+    expect(flat(many.html)).toContain('since Friday 2 October 2026 at 06:00')
+    expect(many.text).toContain(queue)
+    expect(render('access-profiles-waiting', { ...EVERYTHING, count: 1, queueUrl: queue }).subject)
+      .toBe('1 access declaration is waiting to be verified')
+  })
+
   // A-202, issue 1005: the SU's page where it is configured, and a clean sentence where it is not.
   test('the expiring and declined emails link the SU\'s purchase page only when there is one', () => {
     const buy = 'https://su.example.invalid/buy/new-theatre'

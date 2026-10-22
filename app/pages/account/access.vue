@@ -214,7 +214,7 @@ useSeoMeta({ title: 'Access requirements' })
         <UFormField
           v-if="standing"
           label="Show my agreed wording to the people on the door"
-          description="Changes at once, and never sends your requirements back to be checked. While it is off, the door is shown nothing and access tickets are not offered."
+          description="This switch saves the moment you flip it, on its own, and never sends your requirements back to be checked. While it is off, the door is shown nothing and access tickets are not offered. Save changes, below, is for your needs, companions, note and card."
         >
           <USwitch
             :model-value="state.consent"

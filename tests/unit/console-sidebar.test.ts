@@ -38,8 +38,8 @@ describe('a group with one visible entry is drawn as that entry (0105)', () => {
     expect(reports?.kind === 'entry' && reports.entry.to).toBe('/reports')
   })
 
-  test('the Secretary\'s Box office, narrowed to one by abilities, is Access profiles', () => {
-    expect(drawn('SECRETARY')).toEqual(['entry /box-office/access-profiles', 'entry /people/fellows', 'entry /money', 'entry /reports'])
+  test('the Secretary\'s People holds Fellows and Access declarations, and no Box office at all', () => {
+    expect(drawn('SECRETARY')).toEqual(['group people', 'entry /money', 'entry /reports'])
   })
 
   test('the Committee sees links only, and the Treasurer and the President one group beside links', () => {

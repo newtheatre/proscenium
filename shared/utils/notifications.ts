@@ -157,6 +157,14 @@ export const MESSAGE_TYPES = {
     template: 'membership-claims-waiting',
   },
 
+  // A member waits for their access tickets until somebody sights the declaration, so the
+  // Secretary is told daily rather than left to think to open the queue (0156).
+  'access-profiles.waiting': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'access-profiles-waiting',
+  },
+
   // A handover is planned rather than discovered, so this is transactional: no topic may
   // suppress the notice that somebody's standing authority is about to end (A-119 criterion 1).
   'role.expiring': {

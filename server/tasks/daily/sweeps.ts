@@ -1,5 +1,5 @@
 // Nightly tidy of rows that have expired unused, of the accounts whose address was never proved,
-// and of the grants that lapsed; the membership notices (0026, A-119, A-130, docs/architecture.md).
+// and of the grants that lapsed; the membership and access notices (0026, A-130, 0156, docs/architecture.md).
 export default defineTask({
   meta: {
     name: 'daily:sweeps',
@@ -15,6 +15,7 @@ export default defineTask({
       unverified: () => expireUnverifiedAccounts(before),
       renewals: () => remindExpiringMemberships(undefined, before),
       waitingClaims: () => remindWaitingClaims(undefined, before),
+      waitingDeclarations: () => remindWaitingDeclarations(undefined, before),
       withdrawnAccessProfiles: () => sweepWithdrawnAccessProfiles(before),
       backstage: () => purgeStaleMessages(before),
       roleLapses: () => sweepRoleLapses(undefined, before),
