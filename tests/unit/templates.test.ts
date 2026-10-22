@@ -837,6 +837,14 @@ describe('the pass email follows the ticket terms (D-137)', () => {
     for (const part of [html, text]) expect(flat(part)).toContain('It is valid 21 Oct to 18 Apr. It covers The Seagull, Small Hours.')
   })
 
+  test('a pass whose dates could not be read says nothing about them, rather than a half sentence', () => {
+    const bare = render('pass-issued', { ...EVERYTHING, valid: '', shows: '' })
+    for (const part of [bare.html, bare.text]) {
+      expect(part).not.toContain('It is valid')
+      expect(part).not.toContain('It covers')
+    }
+  })
+
   test('it links the ticket and pass terms in both parts', () => {
     expect(html).toContain('<a href="https://newtheatre.org.uk/policies/booking">The ticket and pass terms</a>')
     expect(text).toContain('The ticket and pass terms: https://newtheatre.org.uk/policies/booking')

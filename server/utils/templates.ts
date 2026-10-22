@@ -2077,13 +2077,12 @@ The Nottingham New Theatre`,
     // Both say what the pass is for; a pass type covering no show still to come names none.
     const valid = String(context.valid)
     const shows = String(context.shows)
-    const covers = `It is valid ${valid}.${shows ? ` It covers ${shows}.` : ''}`
+    const covers = [valid ? `It is valid ${valid}.` : '', shows ? `It covers ${shows}.` : ''].filter(Boolean).join(' ')
     return {
       subject: `Your ${passType}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Reference <strong>${reference}</strong>: ${passType} (${priceLabel}), issued and paid for in
-person.</p>
-<p>${covers}</p>
+person.</p>${covers ? `\n<p>${covers}</p>` : ''}
 <p><a href="${url}"><img src="${imageUrl}" alt="Pass QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>
 <p>To book ahead, sign in with this email address and choose "Use my pass" when you book.
@@ -2091,9 +2090,7 @@ You can also just turn up, subject to space on the night.</p>
 <p><a href="${termsUrl}">The ticket and pass terms</a></p>`),
       text: `Hello ${context.name},
 
-Reference ${reference}: ${passType} (${priceLabel}), issued and paid for in person.
-
-${covers}
+Reference ${reference}: ${passType} (${priceLabel}), issued and paid for in person.${covers ? `\n\n${covers}` : ''}
 
 Open your pass: ${url}
 

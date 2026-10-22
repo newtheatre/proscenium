@@ -890,6 +890,10 @@ own ticket list immediately (criterion 5), the same filter that already frees ca
 to its `refundedTickets`, which the desk shows struck through and no route reads. The desk sends
 the cancel itself straight after the last ticket's refund, so a fully refunded booking never sits
 as "Paid, £0.00"; the cancel is still its own request, refused while anything is unrefunded.
+A refund also needs a fresh sign-in (0171): the route calls `requireFreshSession()` and answers 401
+with `reauthenticate` set when the last one is older than `REAUTH_WINDOW_MINUTES`, and the desk asks
+`GET /api/box-office/desk/refunds/ready` before it opens the refund, so the person signs in again
+before typing anything rather than after.
 
 **Walk-ups at the desk (D-115).** `POST /api/box-office/desk/reservations` creates a `DOOR`-source
 booking and collects it in the same flow (`sellWalkUp()` in `server/utils/desk-sale.ts`), with
@@ -961,7 +965,9 @@ none of it did.
 availability `publicShowBySlug()` gives the public listing, each with `totalPence`, this booking's
 lines at that night's bookable prices (`exchangeTotalPence()`, null when the night does not offer one
 of its types), beside `currentTotalPence`, so the form shows the new total before it is confirmed
-(criterion 2, 0122). `POST /api/qr/exchange` (body:
+(criterion 2, 0122), and `holdExpiresAt`, the release an exchanged hold there would actually get
+(that night's own `holdReleaseMinutesBefore` or the configured default), which the form's too-soon
+check reads rather than the start time. `POST /api/qr/exchange` (body:
 `{ performanceId, reference }`) refuses a different show (criterion 5, `differentShowReason()`) and
 a booking carrying an access or companion ticket type, since D-128's entitlement is checked once,
 against the performance it was granted for, and re-running it against a different one is a box
@@ -1021,7 +1027,8 @@ race-safe statement first, and only learns the reservation id afterward from a s
 
 **Offering (D-113 criterion 2).** `offerWaitingList()` in `server/utils/waiting-list.ts` walks
 `WAITING` entries oldest first, budgeted against `capacity` minus what `heldSeatsQuery()` already
-reports held, and stops the moment the next entry's party does not fit rather than skipping ahead
+reports held and the parties standing offers already cover (`standingOfferSeatsQuery()`, so a second
+run never offers the same seats again while the first offer can still be claimed), and stops the moment the next entry's party does not fit rather than skipping ahead
 to a smaller one further down the queue. Each offer's window is
 `WAITING_LIST_OFFER_WINDOW_MINUTES`, capped at the online cut-off (`onlineClosesAt()`, issue 1328)
 so an offer never promises what the claim would refuse, and an offer that would stand for no time
