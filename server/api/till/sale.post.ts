@@ -22,6 +22,10 @@ export default defineEventHandler(async (event) => {
   // hand (F-124 criterion 7).
   await refuseBookingsInOpenAttempts(resolved.night, input.tickets.map(ticket => ticket.reservationId))
 
+  // Somebody else's tab is charged only with its holder there to show their code (0164).
+  const holder = input.tabHolderId ? await authorisedTabHolder(event, input.tabHolderId) : null
+  if (holder) await requireHolderPresent(holder, resolved.account.id, resolved.night, input.tabCode)
+
   // 0123: the same question the card charge asks before the reader does.
   const bookerRefusal = await walkUpBookerRefusal(input.walkUpGuest)
   if (bookerRefusal) throw createError({ statusCode: 409, statusMessage: bookerRefusal })

@@ -692,7 +692,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['bar.tab.settled'],
     via: ['server/utils/tab-settlement.ts'],
   },
-  { route: 'server/api/account/tab.get.ts', exempt: 'reads your own tab' },
+  { route: 'server/api/account/tab/index.get.ts', exempt: 'reads your own tab' },
+  { route: 'server/api/account/tab/code.get.ts', exempt: 'reads your own code for tonight' },
 
   // Module G: training
 

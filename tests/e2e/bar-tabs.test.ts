@@ -6,7 +6,7 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
-import { putOnTheTill } from '#tests/helpers/bar'
+import { putOnTheTill, tabCodeOf } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-109: the console register every holder still carrying a tab balance, itemised, with void
@@ -75,8 +75,8 @@ async function aSellableProduct(pricePence: number): Promise<{ variantId: string
   return { variantId }
 }
 
-const charge = (venueId: string, variantId: string, pricePence: number, tabHolderId: string): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId }, barManager.cookie)
+const charge = async (venueId: string, variantId: string, pricePence: number, holder: TestMember): Promise<Response> =>
+  send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId: holder.id, tabCode: await tabCodeOf(app.baseURL, holder.cookie) }, barManager.cookie)
 
 describe.skipIf(skip !== null)('the tab register lists every holder still carrying a balance (F-109 criterion 6)', () => {
   test('a charge appears in the register, and the itemised tab shows what it was for', async () => {
@@ -87,7 +87,7 @@ describe.skipIf(skip !== null)('the tab register lists every holder still carryi
     await authorise([holder.id])
     await setCap(2000)
 
-    expect((await charge(venueId, variantId, 500, holder.id)).status).toBe(200)
+    expect((await charge(venueId, variantId, 500, holder)).status).toBe(200)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -113,7 +113,7 @@ describe.skipIf(skip !== null)('the tab register lists every holder still carryi
     await authorise([holder.id])
     await setCap(2000)
 
-    expect((await charge(venueId, variantId, 700, holder.id)).status).toBe(200)
+    expect((await charge(venueId, variantId, 700, holder)).status).toBe(200)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)

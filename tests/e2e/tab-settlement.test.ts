@@ -5,7 +5,7 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
-import { putOnTheTill } from '#tests/helpers/bar'
+import { putOnTheTill, tabCodeOf } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-109: a tab holder's account is itemised and live; settlement is bounded to exactly the
@@ -97,8 +97,8 @@ async function aSellableProduct(pricePence = 500): Promise<{ variantId: string, 
   return { variantId, productId }
 }
 
-const chargeToTab = (venueId: string, variantId: string, tabHolderId: string, pricePence: number, as = barStaff.cookie): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId }, as)
+const chargeToTab = async (venueId: string, variantId: string, holder: TestMember, pricePence: number, as = barStaff.cookie): Promise<Response> =>
+  send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId: holder.id, tabCode: await tabCodeOf(app.baseURL, holder.cookie) }, as)
 
 interface OutstandingCharge { entryId: string, totalPence: number }
 
@@ -141,8 +141,8 @@ describe.skipIf(skip !== null)('a holder\'s account is itemised with a live bala
     const member = await aMember()
     await authorise([member.id])
 
-    expect((await chargeToTab(venueId, variantId, member.id, 500)).status).toBe(200)
-    expect((await chargeToTab(venueId, variantId, member.id, 500)).status).toBe(200)
+    expect((await chargeToTab(venueId, variantId, member, 500)).status).toBe(200)
+    expect((await chargeToTab(venueId, variantId, member, 500)).status).toBe(200)
 
     const answered = await send('GET', '/api/account/tab', undefined, member.cookie)
     expect(answered.status).toBe(200)
@@ -161,8 +161,8 @@ describe.skipIf(skip !== null)('settlement is cross-checked and posts a bounded 
     const member = await aMember()
     await authorise([member.id])
 
-    await chargeToTab(venueId, variantId, member.id, 500)
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -183,7 +183,7 @@ describe.skipIf(skip !== null)('settlement is cross-checked and posts a bounded 
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -208,7 +208,7 @@ describe.skipIf(skip !== null)('settlement is bounded to the charges it covers (
     const member = await aMember()
     await authorise([member.id])
 
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
     expect(charges).toHaveLength(1)
@@ -217,7 +217,7 @@ describe.skipIf(skip !== null)('settlement is bounded to the charges it covers (
     // it read before either request left the till, so the race has only one honest outcome.
     const [settled, secondCharge] = await Promise.all([
       settle(venueId, member.id, [charges[0]!.entryId], 500),
-      chargeToTab(venueId, variantId, member.id, 500),
+      chargeToTab(venueId, variantId, member, 500),
     ])
 
     expect(settled.status).toBe(200)
@@ -237,7 +237,7 @@ describe.skipIf(skip !== null)('settlement is bounded to the charges it covers (
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -256,7 +256,7 @@ describe.skipIf(skip !== null)('only an unsettled charge may be voided, by the F
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -271,7 +271,7 @@ describe.skipIf(skip !== null)('only an unsettled charge may be voided, by the F
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -286,7 +286,7 @@ describe.skipIf(skip !== null)('only an unsettled charge may be voided, by the F
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -318,7 +318,7 @@ describe.skipIf(skip !== null)('a void credits stock exactly once (criterion 5)'
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -354,7 +354,7 @@ describe.skipIf(skip !== null)('a voided charge leaves the balance, the cap and 
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -372,7 +372,7 @@ describe.skipIf(skip !== null)('a voided charge leaves the balance, the cap and 
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
@@ -393,7 +393,7 @@ describe.skipIf(skip !== null)('a voided charge leaves the balance, the cap and 
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
 
     const listed = await send('GET', '/api/admin/bar/tabs')
     const before = await listed.json() as { holders: { holderId: string }[] }
@@ -416,12 +416,12 @@ describe.skipIf(skip !== null)('a voided charge leaves the balance, the cap and 
     await authorise([member.id])
     await setCap(2000)
 
-    expect((await chargeToTab(venueId, variantId, member.id, 2000)).status).toBe(200)
+    expect((await chargeToTab(venueId, variantId, member, 2000)).status).toBe(200)
     const candidates = await settleCandidates(venueId, member.id)
     const { charges } = await candidates.json() as { charges: OutstandingCharge[] }
     await voidCharge(charges[0]!.entryId, 'Charged in error', barManager.cookie)
 
-    const answered = await chargeToTab(venueId, variantId, member.id, 2000)
+    const answered = await chargeToTab(venueId, variantId, member, 2000)
     expect(answered.status).toBe(200)
     const body = await answered.json() as { tab: { outstandingPence: number } }
     expect(body.tab.outstandingPence).toBe(2000)
