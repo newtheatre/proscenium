@@ -629,9 +629,11 @@ Three things worth knowing before doing it:
 Anybody signed in to a console or show-night screen can report a problem or an idea from the
 megaphone button beside the help link. Each report is one `feedback_reports` row: the kind, the
 words, the screen, the shell, the browser and the last few requests that browser saw fail, ray
-ids included. The application does nothing further with it. There is no notification and no
-admin screen; a defect that takes the theatre down is `health:watch`'s job, and everything else
-waits for the daily run.
+ids included. The application sends no notification; a defect that takes the theatre down is
+`health:watch`'s job, and everything else waits for the daily run. The IT Manager can read every
+report, newest first, at **Console → System → Problem reports** (`/admin/feedback`, the
+`feedback.read` permission, which only `ADMIN` holds). A report's page must be a path on this site:
+the screen links it, so the form refuses anything else.
 
 **The daily triage run** is a scheduled assistant session started from the IT Manager's own
 account, not a workflow in this repository and not a task in the worker. Its instructions are

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { londonParts } from '#shared/utils/london'
 import { promotionClaimFor } from '#shared/utils/training-signup'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import type { TestMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
@@ -70,11 +70,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
   })
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 async function addModule(over: Record<string, unknown> = {}): Promise<string> {
   const id = `SGN-${suffix()}`

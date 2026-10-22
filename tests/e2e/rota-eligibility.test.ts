@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { sqliteTarget } from '#tests/helpers/database'
-import { londonParts } from '#shared/utils/london'
 import { showNightOf } from '#shared/utils/show-night'
 import { adminSession, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -40,11 +40,6 @@ const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().repla
 
 const send = (method: string, path: string, body?: unknown, as = admin.cookie): Promise<Response> =>
   request(app, method, path, body, as)
-
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 async function addModule(status: 'ACTIVE' | 'DRAFT' = 'ACTIVE'): Promise<string> {
   const id = `${department}-${suffix()}`

@@ -257,7 +257,7 @@ async function confirmReopen(): Promise<void> {
         class="flex flex-wrap items-center justify-between gap-2"
       >
         <p class="text-sm text-muted">
-          {{ one.label }}: {{ saysDayRange(one.fromDay, one.toDay) }}, named by {{ one.createdByName }}
+          {{ one.label }}: {{ saysDayRange(one.fromDay, one.toDay, { year: true }) }}, named by {{ one.createdByName }}
         </p>
         <UButton
           v-if="mayClose"
@@ -293,7 +293,7 @@ async function confirmReopen(): Promise<void> {
     >
       <template #range-cell="{ row }">
         <div>
-          {{ saysDayRange(row.original.fromDay, row.original.toDay) }}
+          {{ saysDayRange(row.original.fromDay, row.original.toDay, { year: true }) }}
           <!-- Below sm the label and who acted are hidden: shown here instead, so a phone keeps
             what happened and Reopen in view without losing what they said (issue 922). -->
           <div class="text-xs text-muted sm:hidden">

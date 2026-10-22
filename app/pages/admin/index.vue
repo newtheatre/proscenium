@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { can, viewAuditTrail, viewBackups, viewCommsOperations } from '#shared/utils/abilities'
+import { can, viewAuditTrail, viewBackups, viewCommsOperations, viewSeasonSummary } from '#shared/utils/abilities'
+import { nightsNeedingYou } from '#shared/utils/night-reconciliation'
+import type { Outstanding } from '#shared/utils/night-reconciliation'
 import { queuesFor, saysSetUp, setUpHref } from '#shared/utils/console-overview'
 import { saysNotificationStatus } from '#shared/utils/notifications'
 import { currentShowNight } from '#shared/utils/show-night'
@@ -98,14 +100,22 @@ const seesTrouble = computed(() => can(viewer.value, viewAuditTrail))
 // A person's send history is the send log's, and opening one is audited there (H-106 criterion 5).
 const seesSendLog = computed(() => can(viewer.value, viewCommsOperations))
 
-onMounted(() => {
+// A post with nothing to decide today is told so, rather than left on a page that only says who they are.
+const { data: outstanding } = useNuxtData<Outstanding>('nights-needing-you')
+const settled = ref(false)
+const quiet = computed(() => settled.value && waiting.value.length === 0 && !waitingOwn.value && !wall.value
+  && (overview.value.tonight === null || overview.value.tonight.length === 0) && overview.value.setUp.length === 0
+  && !seesTrouble.value && unassessed.value.total === 0 && !(seesDrill.value && drill.value?.overdue)
+  && (outstanding.value ? nightsNeedingYou(outstanding.value).length === 0 : true))
+const seesMoney = computed(() => can(viewer.value, viewSeasonSummary))
+
+onMounted(async () => {
   if (!account.value.signedIn) return
-  void refreshNuxtData('console-overview')
-  if (seesDrill.value) void refreshNuxtData('drill-status')
-  if (seesTrouble.value) void refreshNuxtData('delivery-trouble')
   // Silently empty when the reader holds no ticketing permission, which is the same answer the
   // route gives: the card renders nothing rather than a refusal they cannot act on.
-  void refreshNuxtData('unassessed-shows')
+  const keys = ['console-overview', 'unassessed-shows', ...(seesDrill.value ? ['drill-status'] : []), ...(seesTrouble.value ? ['delivery-trouble'] : [])]
+  await Promise.allSettled(keys.map(key => refreshNuxtData(key)))
+  settled.value = true
 })
 </script>
 
@@ -116,6 +126,18 @@ onMounted(() => {
   >
     <p class="text-muted">
       Signed in as {{ account.user?.name }}.
+    </p>
+
+    <p
+      v-if="quiet"
+      data-test="nothing-waiting"
+    >
+      Nothing is waiting for you.
+      <ULink
+        v-if="seesMoney"
+        to="/money"
+        class="underline"
+      >Open the money dashboard</ULink>
     </p>
 
     <ReadFailure

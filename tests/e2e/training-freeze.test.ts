@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonDaysFrom, londonToday as today } from '#tests/helpers/london-day'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { londonParts } from '#shared/utils/london'
 import { skipReason, startApp } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
@@ -50,17 +50,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
   })
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-// A London day, because that is what an award date is (0014).
-function today(): string {
-  const { year, month, day } = londonParts(new Date())
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
-
-function yesterday(): string {
-  const { year, month, day } = londonParts(new Date())
-  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10)
-}
 
 const said = async (answered: Response): Promise<string> =>
   (await answered.json() as { statusMessage?: string }).statusMessage ?? ''
@@ -197,7 +186,7 @@ describe.skipIf(skip !== null)('revoking every record thaws the module (G-109 cr
   test('the fields are editable again once nothing unrevoked is left', async () => {
     const module = await addModule({ kind: 'CERTIFICATION' })
     // A day apart: one day takes one award of a module (0240).
-    const first = await award(module, yesterday())
+    const first = await award(module, londonDaysFrom(-1))
     const second = await award(module)
 
     expect((await edit(module, { kind: 'CERTIFICATION', grantsTrainer: true })).status).toBe(409)

@@ -89,9 +89,16 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
 
   test('a password under the configured minimum is refused, quoting the rule', async () => {
     const other = syntheticPerson(888_888)
-    const response = await post('/api/auth/register', { email: other.email, name: other.name, password: 'short' })
+    const response = await post('/api/auth/register', { email: registrableAddress('short'), name: other.name, password: 'short' })
     expect(response.status).toBe(400)
     expect((await response.json()).statusMessage ?? '').toMatch(/at least \d+ characters/)
+  })
+
+  test('an address on a reserved domain is refused, saying so, and no account is made (0181)', async () => {
+    const other = syntheticPerson(888_889)
+    const response = await post('/api/auth/register', { email: other.email, name: other.name, password: generatePassword() })
+    expect(response.status).toBe(400)
+    expect(JSON.stringify(await response.json())).toContain('cannot receive email')
   })
 
   // K-128 criterion 2: no validation-library wording reaches a person.

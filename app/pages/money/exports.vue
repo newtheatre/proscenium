@@ -45,6 +45,11 @@ function edit(mapping: NominalMapping): void {
 
 async function save(): Promise<void> {
   if (!editing.value) return
+  if ((draftCode.value.trim() || null) === editing.value.nominalCode) {
+    toast.add({ title: 'Nothing changed', description: `It is still ${editing.value.nominalCode ?? 'unmapped'}.`, icon: 'i-lucide-info' })
+    editing.value = null
+    return
+  }
   saving.value = true
   saveFailure.value = null
   try {
@@ -253,6 +258,7 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
           <UFormField
             label="SU nominal code"
             description="Left blank, this pair exports on the explicit unmapped line."
+            :hint="`${draftCode.length} of 50`"
           >
             <UInput
               v-model="draftCode"

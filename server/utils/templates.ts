@@ -696,16 +696,16 @@ ${String(context.safetyUrl)}
 The Nottingham New Theatre`,
   }),
 
-  // No note field yet: the page and who reported it is enough to go and look (J-109 criterion 4).
+  // The reader's optional word on what is wrong; the page and who reported it is enough without (J-109 c4).
   'docs-drift-reported': (context: TemplateContext): Rendered => ({
     subject: `Documentation flagged: ${context.path}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>${context.reportedByName} flagged the documentation page ${context.path} as out of date.</p>
-<p><a href="${String(context.pageUrl)}">Open the page</a></p>`),
+${context.note ? `<p>What they said is out of date: ${context.note}</p>\n` : ''}<p><a href="${String(context.pageUrl)}">Open the page</a></p>`),
     text: `Hello ${context.name},
 
 ${context.reportedByName} flagged the documentation page ${context.path} as out of date.
-
+${context.note ? `\nWhat they said is out of date: ${context.note}\n` : ''}
 Open the page:
 ${String(context.pageUrl)}
 

@@ -392,6 +392,14 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).not.toContain('<code>')
   })
 
+  // The 21 Oct process map: one click told the IT Manager a page was stale, and nothing about how.
+  test('a drift report carries what the reader said is wrong, escaped, and reads whole without it', () => {
+    const noted = render('docs-drift-reported', { ...EVERYTHING, note: 'The <b>Week</b> label changed' })
+    expect(noted.text).toContain('What they said is out of date: The <b>Week</b> label changed')
+    expect(noted.html).toContain('The &lt;b&gt;Week&lt;/b&gt; label changed')
+    expect(render('docs-drift-reported', { ...EVERYTHING, note: '' }).text).not.toContain('What they said')
+  })
+
   test('an unsigned night report says so in words', () => {
     expect(render('night-report-auto-closed', EVERYTHING).subject)
       .toBe('Nobody signed off the night report: The Nottingham New Theatre, Friday 2 October 2026')

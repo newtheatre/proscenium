@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isWorkspaceEmail } from './auth'
+import { RESERVED_DOMAIN_REFUSAL, hasReservedDomain } from './deliverability'
 import { HOUSE_ERROR } from './house-errors'
 import { localPath } from './local-path'
 
@@ -25,6 +26,7 @@ export const nextField = z.string().max(2048).optional().catch(undefined)
 // field's words, and a malformed address is called that rather than missing (A-101).
 export const registerForm = z.object({
   name: z.string({ error: 'Enter your name' }).trim().min(1, 'Enter your name').max(200, 'That name is too long'),
-  email: z.string({ error: 'Enter your email address' }).trim().min(1, 'Enter your email address').email(HOUSE_ERROR.email),
+  email: z.string({ error: 'Enter your email address' }).trim().min(1, 'Enter your email address').email(HOUSE_ERROR.email)
+    .refine(email => !hasReservedDomain(email), RESERVED_DOMAIN_REFUSAL),
   password: z.string({ error: 'Choose a password' }).min(1, 'Choose a password'),
 })

@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'finance.exported',
     target: null,
-    detail: { kind: period.kind, fromDay, toDay, rows: rows.length, closed },
+    detail: { kind: period.kind === 'TERM' ? 'CUSTOM' : period.kind, fromDay, toDay, rows: rows.length, closed },
   }))
 
   setResponseHeader(event, 'content-type', 'text/csv; charset=utf-8')

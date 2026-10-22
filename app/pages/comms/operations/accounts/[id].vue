@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ListFailure } from '~/composables/useListFailure'
 import { h, resolveComponent } from 'vue'
-import { saysNotificationStatus } from '#shared/utils/notifications'
+import { DIGEST_TOPIC_NOUN, saysNotificationStatus } from '#shared/utils/notifications'
 import { saysWhen } from '#shared/utils/when'
+import type { NotificationTopic } from '#shared/utils/senders'
 import type { PersonHistoryRow } from '#shared/utils/notification-log'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { TableColumn } from '@nuxt/ui'
@@ -17,6 +18,7 @@ const id = route.params.id as string
 interface History {
   account: { id: string, name: string }
   history: { items: PersonHistoryRow[], page: number, pageSize: number, total: number, pages: number }
+  waiting: { topic: NotificationTopic, messages: number, dueAt: number }[]
 }
 
 const page = ref(1)
@@ -113,6 +115,15 @@ onMounted(load)
       <p class="text-sm text-muted">
         Types, dates and outcomes only, never a message body.
       </p>
+
+      <UAlert
+        v-if="listing?.waiting.length"
+        data-test="history-waiting"
+        color="info"
+        variant="subtle"
+        title="Waiting for a digest"
+        :description="listing.waiting.map(one => `${plural(one.messages, DIGEST_TOPIC_NOUN[one.topic])}, going with the digest at about ${saysWhen(one.dueAt)}`).join('; ') + '. It joins the log below once the digest goes.'"
+      />
 
       <AdminToolbar
         v-model:search="type"

@@ -55,6 +55,22 @@ async function windowMinutes(event: H3Event | undefined): Promise<Record<Notific
   return { BOOKINGS, SHIFTS, TRAINING, ROOMS, ANNOUNCEMENTS }
 }
 
+export interface WaitingDigest { topic: NotificationTopic, messages: number, dueAt: number }
+
+// What one person has held for a digest, by topic and count only, never a subject or a body
+// (H-106 criterion 3): the send log has no row for it until the digest goes.
+export async function waitingForDigest(event: H3Event | undefined, userId: string): Promise<WaitingDigest[]> {
+  const [rows, windows] = await Promise.all([
+    db.all<{ topic: NotificationTopic, messages: number, firstAt: number }>(sql`
+      SELECT topic, count(*) AS messages, min(created_at) AS firstAt FROM notification_digest_entries
+      WHERE user_id = ${userId} AND digest_log_id IS NULL
+      GROUP BY topic ORDER BY firstAt
+    `),
+    windowMinutes(event),
+  ])
+  return rows.map(row => ({ topic: row.topic, messages: row.messages, dueAt: row.firstAt + windows[row.topic] * 60 }))
+}
+
 export async function sendDueDigests(event: H3Event | undefined, now = new Date()): Promise<number> {
   const nowEpoch = Math.floor(now.getTime() / 1000)
   const windows = await windowMinutes(event)

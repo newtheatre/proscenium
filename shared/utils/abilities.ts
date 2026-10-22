@@ -163,6 +163,7 @@ export const sendAnnouncements = defineAbility((viewer: Viewer) => holds(viewer,
 
 // The send log, its daily counts and one person's history within it (H-106).
 export const viewCommsOperations = defineAbility((viewer: Viewer) => holds(viewer, 'comms.operations'))
+export const viewFeedback = defineAbility((viewer: Viewer) => holds(viewer, 'feedback.read'))
 
 // A confirmed shift in its window, read from the request and never held, or a night permission
 // (0044): the one fact every Tonight link is offered by (0094).
@@ -242,4 +243,5 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   manageTonight: 'night.manage',
   sendAnnouncements: 'comms.announce',
   viewCommsOperations: 'comms.operations',
+  viewFeedback: 'feedback.read',
 }

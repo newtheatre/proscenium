@@ -11,6 +11,7 @@ import {
   feedbackForm,
   rememberFailure,
 } from '#shared/utils/feedback'
+import { linkableIssue, linkablePage } from '#shared/utils/feedback-list'
 import { PERSONAL_TABLES } from '#shared/utils/personal-data'
 import type { RecentFailure } from '#shared/utils/feedback'
 
@@ -48,6 +49,24 @@ describe('the form asks two things and attaches the rest (criterion 2)', () => {
     expect(feedbackForm.safeParse({ ...valid, recentFailures: Array.from({ length: RECENT_FAILURES_CAP }, () => failure) }).success).toBe(true)
     expect(feedbackForm.safeParse({ ...valid, recentFailures: Array.from({ length: RECENT_FAILURES_CAP + 1 }, () => failure) }).success).toBe(false)
     expect(feedbackForm.safeParse({ ...valid, recentFailures: [{ ...failure, message: 'x'.repeat(201) }] }).success).toBe(false)
+  })
+})
+
+// The IT Manager's screen links the page, so it must never become a script or another site.
+describe('the page a report names is a path on this site, and only that is linked', () => {
+  test('a script, another site or a bare word is refused at the form', () => {
+    for (const path of ['javascript:alert(1)', '//evil.example/x', 'https://evil.example', '/\\evil.example', 'tonight']) {
+      expect(feedbackForm.safeParse({ ...valid, path }).success).toBe(false)
+    }
+    expect(feedbackForm.safeParse({ ...valid, path: '/admin/settings?tab=money#rules' }).success).toBe(true)
+  })
+
+  test('an old row holding anything else is shown as words, not a link', () => {
+    expect(linkablePage('javascript:alert(1)')).toBeNull()
+    expect(linkablePage('/tonight/till')).toBe('/tonight/till')
+    expect(linkableIssue('javascript:alert(1)')).toBeNull()
+    expect(linkableIssue(null)).toBeNull()
+    expect(linkableIssue('https://github.com/newtheatre/proscenium/issues/1')).toBe('https://github.com/newtheatre/proscenium/issues/1')
   })
 })
 

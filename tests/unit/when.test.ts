@@ -167,4 +167,9 @@ describe('a span of days names its year when an end leaves this calendar year', 
   test('a span wholly in another year names it once, at the end', () => {
     expect(saysDayRange('2027-01-01', '2027-02-12', { now: OCTOBER })).toBe('Fri 1 Jan to Fri 12 Feb 2027')
   })
+
+  // The 21 Oct process map: a closed period read "Sat 1 Aug to Mon 31 Aug" with no year to it.
+  test('asked to, a span inside this year names it too', () => {
+    expect(saysDayRange('2026-08-01', '2026-08-31', { now: OCTOBER, year: true })).toBe('Sat 1 Aug to Mon 31 Aug 2026')
+  })
 })

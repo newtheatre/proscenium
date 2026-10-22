@@ -21,6 +21,7 @@ import {
   viewChecklist,
   viewCommsOperations,
   viewEmergencyCard,
+  viewFeedback,
   viewFellows,
   viewFinanceReports,
   viewMembers,
@@ -274,6 +275,7 @@ export const CONSOLE_NAV: NavGroup[] = [
 
       // Module K: platform
       { label: 'Backups', icon: 'i-lucide-database-backup', to: '/admin/backups', ability: viewBackups },
+      { label: 'Problem reports', icon: 'i-lucide-message-square-warning', to: '/admin/feedback', ability: viewFeedback },
 
     ],
   },

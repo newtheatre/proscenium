@@ -89,7 +89,7 @@ export type SendTiming = 'NOW' | 'WITH_DIGEST'
 // digest window is the plain type's own, read live rather than written into the sentence (0012).
 export function sendTimingOptions(ticketHolders: boolean, digestMinutes: number | null): { value: SendTiming, label: string, description: string }[] {
   // The digest waits from the person's first held message and runs every ten minutes, so "about".
-  const within = digestMinutes === null ? 'in the next digest' : `in the next digest, about ${plural(digestMinutes, 'minute')} from now`
+  const within = digestMinutes === null ? 'in their next digest' : `in their next digest, within about ${plural(digestMinutes, 'minute')}`
   return ticketHolders
     ? [
         { value: 'NOW', label: 'Send now to everyone holding a ticket', description: 'Reaches every ticket holder at once, whatever their bookings preference.' },

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { requireBlastRadiusConfirmation } from '#server/utils/blast-radius'
-import { writeConfigValue } from '#server/utils/config-write'
+import { isUnchanged, refuseSynced, writeConfigValue } from '#server/utils/config-write'
 import { isConfigKey } from '#shared/utils/config'
 
 const body = z.object({ value: z.unknown(), confirmation: z.string().trim().optional() })
@@ -15,6 +15,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const input = await readValidatedBodyOrThrow(event, body)
+  refuseSynced(key)
+  if (await isUnchanged(event, key, input.value)) return { ok: true, key, value: input.value, unchanged: true }
   await requireBlastRadiusConfirmation(event, key, input.confirmation, input.value)
 
   await writeConfigValue(event, resolved.account.id, key, input.value)

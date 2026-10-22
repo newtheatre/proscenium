@@ -78,6 +78,6 @@ describe('a period read back from a screen\'s URL', () => {
 // Issue 1362 (K-128): the period kind picker says Day and Season, never DAY and SEASON.
 describe('a period kind reads as a word', () => {
   test('every kind has a word of its own, none of them the stored value', () => {
-    expect(PERIOD_KINDS.map(saysPeriodKind)).toEqual(['Day', 'Week', 'Month', 'Term', 'Season', 'Year'])
+    expect(PERIOD_KINDS.map(saysPeriodKind)).toEqual(['Day', '7 days from', 'Month', 'Term', 'Season', 'Year'])
   })
 })

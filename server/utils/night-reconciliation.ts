@@ -68,9 +68,12 @@ export function currentReadingQuery(night: string): SQL {
   return sql`
     SELECT z.id AS id, z.night AS night, z.reader_pence AS readerPence, z.expected_pence AS expectedPence,
            z.variance_pence AS variancePence, z.entered_by AS enteredBy, u.name AS enteredByName, z.note AS note,
-           z.supersedes_id AS supersedesId, z.written_off AS writtenOff, z.created_at AS createdAt
+           z.supersedes_id AS supersedesId, z.written_off AS writtenOff, z.created_at AS createdAt,
+           v.name AS venueName
     FROM z_readings z
     JOIN users u ON u.id = z.entered_by
+    LEFT JOIN till_sessions ts ON ts.id = z.till_session_id
+    LEFT JOIN venues v ON v.id = ts.venue_id
     WHERE z.night = ${night}
       AND z.id NOT IN (SELECT supersedes_id FROM z_readings WHERE supersedes_id IS NOT NULL)
     ORDER BY z.created_at DESC
@@ -91,9 +94,12 @@ export function readingHistoryQuery(night: string): SQL {
   return sql`
     SELECT z.id AS id, z.night AS night, z.reader_pence AS readerPence, z.expected_pence AS expectedPence,
            z.variance_pence AS variancePence, z.entered_by AS enteredBy, u.name AS enteredByName, z.note AS note,
-           z.supersedes_id AS supersedesId, z.written_off AS writtenOff, z.created_at AS createdAt
+           z.supersedes_id AS supersedesId, z.written_off AS writtenOff, z.created_at AS createdAt,
+           v.name AS venueName
     FROM z_readings z
     JOIN users u ON u.id = z.entered_by
+    LEFT JOIN till_sessions ts ON ts.id = z.till_session_id
+    LEFT JOIN venues v ON v.id = ts.venue_id
     WHERE z.night = ${night}
     ORDER BY z.created_at ASC
   `
@@ -164,6 +170,41 @@ export function nightsWithOpenVarianceQuery(): SQL {
 
 export async function nightsWithOpenVariance(): Promise<OutstandingNight[]> {
   return db.all<OutstandingNight>(nightsWithOpenVarianceQuery())
+}
+
+// One bar's close replaced another bar's different figure, and every till that night is closed:
+// the night may match by chance, so the Treasurer confirms it by recording a reading of their own.
+export function nightsWithReplacedReadingQuery(): SQL {
+  return sql`
+    SELECT DISTINCT z.night AS night
+    FROM z_readings z
+    JOIN till_sessions zs ON zs.id = z.till_session_id
+    JOIN z_readings p ON p.id = z.supersedes_id
+    JOIN till_sessions ps ON ps.id = p.till_session_id
+    WHERE zs.venue_id <> ps.venue_id AND z.reader_pence <> p.reader_pence
+      AND z.id NOT IN (SELECT supersedes_id FROM z_readings WHERE supersedes_id IS NOT NULL)
+      AND NOT EXISTS (SELECT 1 FROM till_sessions o WHERE o.night = z.night AND o.closed_at IS NULL)
+    ORDER BY z.night
+  `
+}
+
+export async function nightsWithReplacedReading(): Promise<OutstandingNight[]> {
+  return db.all<OutstandingNight>(nightsWithReplacedReadingQuery())
+}
+
+// The bars whose till is still open on the night: a reading recorded now stands over their close.
+export function openTillsQuery(night: string): SQL {
+  return sql`
+    SELECT v.name AS venueName
+    FROM till_sessions ts JOIN venues v ON v.id = ts.venue_id
+    WHERE ts.night = ${night} AND ts.closed_at IS NULL
+    ORDER BY v.name
+  `
+}
+
+export async function openTills(night: string): Promise<string[]> {
+  const rows = await db.all<{ venueName: string }>(openTillsQuery(night))
+  return rows.map(row => row.venueName)
 }
 
 export interface PreparedZReading {

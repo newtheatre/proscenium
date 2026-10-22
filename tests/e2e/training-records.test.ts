@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonDaysFrom as todayPlus } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -253,11 +254,5 @@ describe.skipIf(skip !== null)('the screen (G-101)', () => {
     }
   }, CASE_TIMEOUT_MS)
 })
-
-// A London day offset, which is what an expiry is measured in (0014).
-function todayPlus(days: number): string {
-  const at = new Date(Date.now() + days * 86_400_000)
-  return at.toISOString().slice(0, 10)
-}
 
 if (skip) console.warn(`[e2e] skipped: ${skip}`)

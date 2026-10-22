@@ -49,8 +49,10 @@ interface ForegoneRow { label: string, test: string, count: number, pence: numbe
 
 const foregoneRows = computed<ForegoneRow[]>(() => (data.value
   ? [
-      { label: 'Comps', test: 'comps', count: data.value.foregone.compCount, pence: data.value.foregone.compsPence },
-      { label: 'Discounts', test: 'discounts', count: data.value.foregone.discountCount, pence: data.value.foregone.discountsPence },
+      { label: 'Comps elsewhere', test: 'comps', count: data.value.foregone.compCount - data.value.foregone.barCompCount, pence: data.value.foregone.compsPence - data.value.foregone.barCompsPence },
+      { label: 'Comps on a till', test: 'bar-comps', count: data.value.foregone.barCompCount, pence: data.value.foregone.barCompsPence },
+      { label: 'Discounts elsewhere', test: 'discounts', count: data.value.foregone.discountCount - data.value.foregone.barDiscountCount, pence: data.value.foregone.discountsPence - data.value.foregone.barDiscountsPence },
+      { label: 'Discounts on a till', test: 'bar-discounts', count: data.value.foregone.barDiscountCount, pence: data.value.foregone.barDiscountsPence },
     ]
   : []))
 

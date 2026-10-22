@@ -524,6 +524,13 @@ own session's figure; the night report and I-104's whole-night figure pass no sc
 read the estate's whole night. An entry naming no session, the desk's own money included, is
 outside every scope and counts only in the unscoped figure.
 
+Each Z reading answers with the venue of the till session that closed it (`venueName`, null for a
+finance reading). `GET /api/admin/finance/reconciliation` also answers `openTills`, the sessions
+still open on the night, and `GET .../outstanding` answers `replaced` beside the missing and
+variance nights: nights where one bar's close superseded another bar's reading with a different
+reader total, once every till is closed. Nights needing you lists one until a later reading, such
+as the Treasurer's, stands over it (0180).
+
 The expected figure is shown in its parts, never as one bar line: drinks on card, tickets sold on
 the till (`ticketsAtTheBarQuery`), tab settlements and the desk (`expectedSheet()` in
 `shared/utils/night-reconciliation.ts`, `readerExpectation()` in `shared/utils/reconciliation.ts`).
@@ -787,6 +794,9 @@ its topic instead: `notify()` writes a `notification_digest_entries` row and ret
 The inbox entry above already went out, so nothing about criterion 4 depends on this branch. A
 claimed call (already its own batch, 0048) and a message carrying an attachment (nothing to
 reattach later, the same reasoning 0056 gives for a retry) bypass the hold and send as before.
+What a person has waiting is read by `waitingForDigest()` (`server/utils/notification-digests.ts`):
+`GET /api/admin/comms/accounts/[id]/history` answers it as `waiting`, each topic with its message
+count and when the next run will send it, and the account page shows it above the send log.
 `joinsDigest()` in `shared/utils/notifications.ts` is where those three conditions live, so a new
 call site never has to re-derive them: transactional (`topic: null`) never coalesces at all,
 because that is what marks a deadline a digest interval would consume, such as a hold expiring or
@@ -877,7 +887,9 @@ criterion 3 asks of an in-app edit, being audited, has nothing to audit until th
 **Reporting drift is real.** Every page carries the action, `POST /api/docs/report-drift`
 (`server/api/docs/report-drift.post.ts`): a `docs.drift-reported` audit entry naming the page, and
 a transactional notification to every live `ADMIN` (`liveAdmins()`, the same audience
-`health:watch` already reaches) through the same `notify()` every other message goes through. There
+`health:watch` already reaches) through the same `notify()` every other message goes through. The
+page asks before it sends and takes an optional `note` (up to 500 characters), which goes in the
+email only and never in the audit detail, since it is free text (0011). There
 is no open-items list yet; today "visible to the IT Manager" means an immediate notification and a
 permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
 
@@ -890,7 +902,11 @@ requests it saw fail (`app/plugins/recent-failures.client.ts`), ray ids included
 be found in the worker's logs. The worker never talks to the tracker: a daily triage run outside
 it reads `NEW` rows through the database connector, opens one issue per report and writes the
 outcome back conditionally (`docs/operations.md`, Feedback reports). The drift report above stays
-its own path.
+its own path. The IT Manager reads the queue at `/admin/feedback` through `GET /api/admin/feedback`
+under `feedback.read`, which only `ADMIN` holds: paged in SQL with the `Paginated<T>` envelope
+(0005), searchable and filterable by kind and status. `feedbackForm` refuses a `path` that
+`localPath()` does not accept, because that screen links it, and the screen links only a local
+path or a GitHub issue URL, so a row written before the check cannot become a script link.
 
 ## Settings, and a wide-blast-radius save (J-104, J-105)
 
@@ -942,7 +958,9 @@ tie, the way `bar.ts`'s own effective-price lookups already do. A sensitive key'
 a hash pair (0024), which cannot be reverted to, and priorConfigValue says so (409) rather than
 guessing. A save and a revert are one write path, `writeConfigValue()`
 (`server/utils/config-write.ts`): both run the digest gate and the pair rules, so a revert cannot
-bypass what a save must satisfy.
+bypass what a save must satisfy. A `PUT` of the value a key already holds (`isUnchanged()`) writes
+nothing and audits nothing and answers `{ unchanged: true }`, after the synced-key refusal, so the
+screen can say nothing changed.
 
 **A synced key is never written by a person** (0092). `synced: true` on its `CONFIG_KEYS` entry
 (today only `BANK_HOLIDAYS`) makes `refuseSynced()` 409 both a save and a revert before anything is

@@ -380,3 +380,22 @@ describe('the yearly return, re-runnable identically (criterion 4)', () => {
     })
   })
 })
+
+// The 21 Oct process map: a £30 pass sale exported with a blank reference, so the SU could not trace it.
+describe('a pass sale exports with the pass\'s own reference', () => {
+  test('the reference column carries the pass a sale issued', () => {
+    return withDatabase((database) => {
+      seedActor(database)
+      database.batch([
+        ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)', 'pt-1', 'season', 'Season pass', 1_000, 2_000],
+        ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 3000)', 'price-1', 'pt-1', 'Standard'],
+        ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, issued_by) VALUES (?, ?, ?, ?, ?, 3000, ?)',
+          'pass-1', 'KWPUSP', 'pt-1', 'price-1', ACTOR, ACTOR],
+        ['INSERT INTO ledger_lines (id, entry_id, kind, amount_pence, price_ref) VALUES (?, ?, ?, ?, ?)',
+          'l-pass', entry(database, '2026-09-05'), 'PASS_SALE', 3000, 'pass-1'],
+      ])
+      const [row] = read<SuExportRow>(database, suExportQuery('2026-09-01', '2026-09-30'))
+      expect(row?.reference).toBe('KWPUSP')
+    })
+  })
+})

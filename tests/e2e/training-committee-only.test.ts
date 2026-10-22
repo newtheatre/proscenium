@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { londonParts } from '#shared/utils/london'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, grantCommitteeRole, registerMember, request } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -35,11 +35,6 @@ const send = (method: string, path: string, body?: unknown, as = admin.cookie): 
   request(app, method, path, body, as)
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   const database = new Database(app.databaseFile, { readonly: true })

@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { formatLondon, londonParts, startOfLondonDay } from '#shared/utils/london'
+import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillDate, fillNumber, fillPin, fillTime, menuOptions, openSignedOutView, pickOptions, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -101,12 +102,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
   })
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-// London days: a session date is a wall-clock day, not an offset from a UTC instant (0014).
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 // What a screen shows for a session's day: the short London form the member pages already use.
 const shortDay = (heldOn: string): string =>

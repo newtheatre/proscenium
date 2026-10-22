@@ -87,14 +87,14 @@ describe('the announce composer says when a message goes (issue 1327)', () => {
   test('to ticket holders: now, or with their booking messages in the next digest', () => {
     expect(sendTimingOptions(true, 60)).toEqual([
       { value: 'NOW', label: 'Send now to everyone holding a ticket', description: 'Reaches every ticket holder at once, whatever their bookings preference.' },
-      { value: 'WITH_DIGEST', label: 'Send with their booking messages, in the next digest, about 60 minutes from now', description: 'Honours each ticket holder\'s bookings preference.' },
+      { value: 'WITH_DIGEST', label: 'Send with their booking messages, in their next digest, within about 60 minutes', description: 'Honours each ticket holder\'s bookings preference.' },
     ])
   })
 
   test('to members: now, or with their committee announcements', () => {
     expect(sendTimingOptions(false, 45).map(option => option.label)).toEqual([
       'Send now to everyone in this audience',
-      'Send with their committee announcements, in the next digest, about 45 minutes from now',
+      'Send with their committee announcements, in their next digest, within about 45 minutes',
     ])
   })
 
@@ -122,7 +122,7 @@ describe('the announce composer says when a message goes (issue 1327)', () => {
   })
 
   test('before the window is known the choice still stands, naming the digest instead', () => {
-    expect(sendTimingOptions(true, null)[1]!.label).toBe('Send with their booking messages, in the next digest')
+    expect(sendTimingOptions(true, null)[1]!.label).toBe('Send with their booking messages, in their next digest')
   })
 
   test('the composer offers the choice in those words, where the tick box was', async () => {

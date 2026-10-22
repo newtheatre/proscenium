@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { localPath } from './local-path'
 
 // A report from a signed-in screen: the words, the screen it came from and what the browser saw
 // go wrong (K-134). The application records; the daily triage run reads (0086).
@@ -40,7 +41,8 @@ export type RecentFailure = z.infer<typeof recentFailure>
 export const feedbackForm = z.object({
   kind: z.enum(FEEDBACK_KINDS),
   body: z.string().trim().min(FEEDBACK_BODY_MIN).max(FEEDBACK_BODY_MAX),
-  path: z.string().trim().min(1).max(200),
+  // The IT Manager's screen links it, so anything but a path on this site is refused.
+  path: z.string().trim().min(1).max(200).refine(path => localPath(path) !== null, 'Give the page as a path on this site'),
   shell: z.enum(FEEDBACK_SHELLS),
   userAgent: z.string().trim().max(300).optional(),
   recentFailures: z.array(recentFailure).max(RECENT_FAILURES_CAP).default([]),
