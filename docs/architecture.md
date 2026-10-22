@@ -1635,7 +1635,9 @@ officer on a shift resolves as that shift and records no bypass (0044, 0098), an
 as the single-role guard does. A signed-out caller is told that once, before any role is tried.
 When every role refuses, the most specific refusal wins (`mostSpecificRefusal`): the hours of a
 shift held, then a refusal about the request or an officer's own standing, then a claim waiting,
-then no shift, and among equals the first role asked.
+then no shift, and among equals the first role asked. A body naming a `venueId` (the till's own
+refusal, 0161) is asked of the BAR guard for that venue instead, so an officer on a night running
+two houses is placed rather than refused.
 
 The officer bypass still resolves against `coverage()`, which needs a venue running something
 tonight; an age check's own `performance_id` may be null regardless of what authority resolved
