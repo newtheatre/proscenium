@@ -21,7 +21,16 @@ export const REFUSALS = [
 export type Refusal = (typeof REFUSALS)[number]
 
 // The policy's own words, which the form also shows before it is filled in (A-129 c2, issue 1338).
-export const BOOKING_NO_MEMBERSHIP = 'Booking a room needs a current membership. Renew it at the Students\' Union.'
+// Renewing is only said to somebody who has had a membership to renew.
+export const BOOKING_NO_MEMBERSHIP = 'Booking a room needs a current membership. Buy one at the Students\' Union.'
+export const BOOKING_LAPSED_MEMBERSHIP = 'Booking a room needs a current membership. Renew it at the Students\' Union.'
+
+export function saysBookingNoMembership(hasEverBeenMember: boolean): string {
+  return hasEverBeenMember ? BOOKING_LAPSED_MEMBERSHIP : BOOKING_NO_MEMBERSHIP
+}
+
+// Said where no purchase link is configured, so nobody refused is left without a route (A-202).
+export const MEMBERSHIP_SOLD_WHERE = 'Memberships are sold on the Students\' Union website, not here.'
 
 // A lapsed membership is not something an approver can wave through, so it alone is not divertible
 // into a request (C-105 criterion 4, C-108).
@@ -74,6 +83,8 @@ export interface Context {
   now: Date
   isAdmin: boolean
   hasMembership: boolean
+  // Only words: a lapsed member is told to renew, and somebody never a member to buy one.
+  hasEverBeenMember?: boolean
   activeBookings: number
   // Repeated no-shows send every booking to the queue, however compliant it is (C-116).
   underPreApproval?: boolean
@@ -125,7 +136,7 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   const weekday = londonWeekday(proposal.startsAt)
 
   if (!context.hasMembership) {
-    fail('NO_MEMBERSHIP', BOOKING_NO_MEMBERSHIP)
+    fail('NO_MEMBERSHIP', saysBookingNoMembership(context.hasEverBeenMember === true))
   }
   if (proposal.endsAt.getTime() <= context.now.getTime()) {
     fail('IN_THE_PAST', 'That slot has already happened')

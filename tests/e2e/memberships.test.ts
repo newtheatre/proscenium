@@ -260,7 +260,7 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
       expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="booking-form"]\')')).toBe(false)
 
       expect(await textOf(view, '[data-test="booking-needs-membership"]'))
-        .toContain('Booking a room needs a current membership. Renew it at the Students\' Union.')
+        .toContain('Booking a room needs a current membership. Buy one at the Students\' Union.')
       const href = await view.evaluate<string>(
         `document.querySelector('[data-test="booking-membership-link"]').getAttribute('href')`,
       )

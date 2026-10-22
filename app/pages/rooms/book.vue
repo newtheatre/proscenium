@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
-import { BOOKING_NO_MEMBERSHIP, saysLimits } from '#shared/utils/booking-policy'
+import { MEMBERSHIP_SOLD_WHERE, saysBookingNoMembership, saysLimits } from '#shared/utils/booking-policy'
 import { TIERS, nameOrPurpose } from '#shared/utils/bookings'
 import { FREQUENCIES, saysRecurrence } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
@@ -272,6 +272,7 @@ const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.
 // Refused before the form rather than after it is filled in, in the policy's own words with the
 // fix beside them (A-129 criterion 2, issue 1338). An officer books without one (0200).
 const lapsed = computed(() => !can(useViewer().value, memberOrGrace) && !namesTier.value)
+const refusedFor = computed(() => saysBookingNoMembership(useViewer().value?.membershipState.kind === 'lapsed'))
 
 // The server refuses NO_MEMBERSHIP outright (0031), so the form's job is to say where to put it
 // right rather than to invent its own wording (A-129).
@@ -451,7 +452,12 @@ useSeoMeta({ title: 'Book a room' })
       data-test="booking-needs-membership"
     >
       <template #description>
-        <p>{{ BOOKING_NO_MEMBERSHIP }}</p>
+        <p>
+          {{ refusedFor }}
+          <template v-if="!purchaseUrl">
+            {{ MEMBERSHIP_SOLD_WHERE }}
+          </template>
+        </p>
         <div class="mt-3 flex flex-wrap gap-2">
           <UButton
             to="/account/membership"
@@ -771,6 +777,12 @@ useSeoMeta({ title: 'Book a room' })
               class="mt-2"
             >
               Ask for it anyway, and the Theatre Manager will decide. The slot is held while they do.
+            </p>
+            <p
+              v-if="needsMembership && !purchaseUrl"
+              class="mt-2"
+            >
+              {{ MEMBERSHIP_SOLD_WHERE }}
             </p>
             <UButton
               v-if="needsMembership"

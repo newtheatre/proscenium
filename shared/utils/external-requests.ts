@@ -87,12 +87,25 @@ export interface ExternalFailure { reason: ExternalRefusal, says: string }
 export interface ExternalContext {
   now: Date
   hasMembership: boolean
+  hasEverBeenMember?: boolean
   noticeWorkingDays: number
   horizonWeeks: number
   holidays: readonly string[]
 }
 
-export const EXTERNAL_NO_MEMBERSHIP = 'Asking for a room needs a current membership.'
+// Worded as the booking refusal is: renew only what somebody has had (shared/utils/booking-policy.ts).
+export const EXTERNAL_NO_MEMBERSHIP = 'Asking for a room needs a current membership. Buy one at the Students\' Union.'
+export const EXTERNAL_LAPSED_MEMBERSHIP = 'Asking for a room needs a current membership. Renew it at the Students\' Union.'
+
+export function saysExternalNoMembership(hasEverBeenMember: boolean): string {
+  return hasEverBeenMember ? EXTERNAL_LAPSED_MEMBERSHIP : EXTERNAL_NO_MEMBERSHIP
+}
+
+// One sentence for the form and the route, so the screen refuses a day in the route's own words.
+export function saysShortNotice(noticeWorkingDays: number, earliest: string | null, now: Date): string {
+  return `This needs ${noticeWorkingDays} working days, because a person fills in a form and waits for an answer. Weekends and bank holidays do not count.`
+    + (earliest ? ` The earliest day you can ask for is ${saysDayLong(earliest, { now })}.` : '')
+}
 
 // The London date of the first day with enough notice (issue 1338, C-121, 0038); null past the
 // bank holidays' reach, where a request is refused HOLIDAYS_UNKNOWN rather than counted.
@@ -107,7 +120,7 @@ export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: E
   const failures: ExternalFailure[] = []
 
   if (!context.hasMembership) {
-    failures.push({ reason: 'NO_MEMBERSHIP', says: EXTERNAL_NO_MEMBERSHIP })
+    failures.push({ reason: 'NO_MEMBERSHIP', says: saysExternalNoMembership(context.hasEverBeenMember === true) })
   }
   if (span.endsAt.getTime() <= context.now.getTime()) {
     failures.push({ reason: 'IN_THE_PAST', says: 'That slot has already happened.' })
@@ -126,11 +139,7 @@ export function judgeExternal(span: { startsAt: Date, endsAt: Date }, context: E
   }
   else if (workingDaysBetween(context.now, span.startsAt, context.holidays) < context.noticeWorkingDays) {
     const earliest = earliestAskDay(context.now, context.noticeWorkingDays, context.holidays)
-    failures.push({
-      reason: 'SHORT_NOTICE',
-      says: `This needs ${context.noticeWorkingDays} working days, because a person fills in a form and waits for an answer. Weekends and bank holidays do not count.`
-        + (earliest ? ` The earliest day you can ask for is ${saysDayLong(earliest, { now: context.now })}.` : ''),
-    })
+    failures.push({ reason: 'SHORT_NOTICE', says: saysShortNotice(context.noticeWorkingDays, earliest, context.now) })
   }
 
   const days = londonDaysBetween(context.now, span.startsAt)

@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
     {
       now,
       isAdmin: false,
-      hasMembership: await hasCurrentMembership(event, request.userId, now),
+      ...await membershipFacts(event, request.userId, now),
       // Counted as the booking form counts it, or a move would be a way round the cap.
       activeBookings: await activeBookingsFor(request.userId, Math.floor(now.getTime() / 1000)),
       underPreApproval: await underPreApproval(event, request.userId, now),

@@ -282,10 +282,18 @@ export async function hasCurrentMembership(event: H3Event, userId: string, now: 
   return isCurrent(term, londonDay(now), await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
 }
 
+// Both facts the membership refusal is worded from, read off the one term (0031).
+export async function membershipFacts(event: H3Event, userId: string, now: Date): Promise<{ hasMembership: boolean, hasEverBeenMember: boolean }> {
+  const term = await longestTerm(userId)
+  if (!term) return { hasMembership: false, hasEverBeenMember: false }
+  return { hasMembership: isCurrent(term, londonDay(now), await configValue(event, 'MEMBERSHIP_GRACE_DAYS')), hasEverBeenMember: true }
+}
+
 // Whoever runs the estate books for productions rather than for themselves, so the permission
 // stands in for a personal membership (0200). Anybody else needs a current one.
-export async function mayBookRooms(event: H3Event, userId: string, permissions: Set<Permission>, now: Date): Promise<boolean> {
-  return permissions.has('rooms.write') || await hasCurrentMembership(event, userId, now)
+export async function mayBookRooms(event: H3Event, userId: string, permissions: Set<Permission>, now: Date): Promise<{ hasMembership: boolean, hasEverBeenMember: boolean }> {
+  const facts = await membershipFacts(event, userId, now)
+  return { ...facts, hasMembership: permissions.has('rooms.write') || facts.hasMembership }
 }
 
 // A claim its caller batched with other writes, and lost, disambiguated as claimSlot's own is (0003).
