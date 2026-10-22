@@ -2656,6 +2656,11 @@ than teaching it. A retired module, a draft, and a module carrying `signoff_requ
 refused: a certification is proved by experience gained outside a session, so it is signed off
 rather than taught (G-112 criteria 3 and 4).
 
+Changing a session's modules (`PUT /api/admin/training/sessions/:id/modules`) takes `tellLacking`.
+When it is set, everybody on the list who would lack a prerequisite the change adds is emailed
+once, `training.session.needs-first`, and the response's `told` counts them (G-115 criterion 7,
+0243). Nothing is stored for it beyond the notification ledger's claim.
+
 ### The register: opening it, and marking it
 
 A session carries two pieces of prose with different audiences. `description` is what to expect,
@@ -2804,6 +2809,8 @@ quizzes; `LEGACY` is vocabulary only, nothing writes it) · `session_id` NULL ·
 Validity is derived (`VALID|EXPIRING|EXPIRED`), never stored; expiring counts as held. Which
 record is current is derived the same way: a renewal is a newer award for the same person and
 module, and supersession is computed, not a column.
+The records list returns it as `superseded` and, on a superseded row, `supersededBy`: the award
+date of the current record for that module, so the screen can name the award that replaced it (0243).
 Partial UNIQUE (`session_id`, `user_id`, `module_id`) WHERE session NOT NULL AND revoked
 NULL.
 A merge cannot reassign `user_id` at all: see "Merging duplicate accounts" under `users` (A-123).
