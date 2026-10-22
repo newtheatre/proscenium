@@ -156,7 +156,7 @@ export function listedPricesQuery(scope: SQL, at: number): SQL {
     LEFT JOIN show_ticket_overrides so ON so.show_id = p.show_id AND so.ticket_type_id = t.id
     LEFT JOIN performance_ticket_overrides po ON po.performance_id = p.id AND po.ticket_type_id = t.id
     WHERE p.show_id IN (${scope}) AND ${listable(at)}
-    ORDER BY p.id, t.price, t.name COLLATE NOCASE
+    ORDER BY p.id, t.sort, t.price, t.name COLLATE NOCASE
   `
 }
 

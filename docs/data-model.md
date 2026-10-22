@@ -644,7 +644,8 @@ stateDiagram-v2
 `SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to`
 `MEMBER|DESK` NULL, enforced by Zod rather than a CHECK (D-109; `MEMBER` set once at creation,
 like `kind` and `access_kind`; NULL and `DESK` swap on edit, 0190) · `archived` bool ·
-`active_by_default` bool.
+`active_by_default` bool · `sort` int ≥ 0, default 0, the order every list shows types in
+before price (0193).
 Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
 the two override tables below; everything else in this module is unbuilt.
 
@@ -656,7 +657,7 @@ the two override tables below; everything else in this module is unbuilt.
 | `GET /api/admin/ticket-types` | The paged envelope, archived types included by default, each row carrying whether it has ever been sold. |
 | `GET /api/admin/ticket-types/access-kinds` | `{ access, companion }`: whether an unarchived type of each access kind exists, for the warning on Ticket types and Access profiles. Gated at `ticketing.read` or `access.verify`, since the Secretary holds only the second. |
 | `POST /api/admin/ticket-types` | Adds one. The name is refused if it is already held, compared without regard to capitals. |
-| `PUT /api/admin/ticket-types/[id]` | Changes the name, description, base price and default. It does not take `kind` or `access_kind`. |
+| `PUT /api/admin/ticket-types/[id]` | Changes the name, description, base price, default and order; an edit that leaves `sort` out keeps the order it had (0193). It does not take `kind` or `access_kind`. |
 | `POST /api/admin/ticket-types/[id]/archive` | Archives one, or takes it back out. Archiving an archived type is a 409. |
 | `DELETE /api/admin/ticket-types/[id]` | Deletes one nothing has ever been sold under, with its overrides. A sold type is a 409 naming archiving as the way. |
 

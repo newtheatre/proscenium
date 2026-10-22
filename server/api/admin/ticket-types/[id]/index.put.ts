@@ -21,12 +21,14 @@ export default defineEventHandler(async (event) => {
   const restrictionRefusal = restrictionChangeRefusal(held.restrictedTo, restrictedTo)
   if (restrictionRefusal) throw createError({ statusCode: 400, statusMessage: restrictionRefusal })
   const description = input.description ?? null
+  const sort = input.sort ?? held.sort
   const priceChanged = input.price !== held.price
   // The description is prose, so the trail records that it moved and never what it says (0011).
   const descriptionChanged = description !== held.description
   const otherwiseChanged = input.name !== held.name
     || descriptionChanged
     || input.activeByDefault !== held.activeByDefault
+    || sort !== held.sort
     || restrictedTo !== held.restrictedTo
 
   // The base price is a column and a ticket keeps the price it sold at (D-120 criterion 3), so
@@ -49,6 +51,7 @@ export default defineEventHandler(async (event) => {
             ...changes({
               name: [held.name, input.name],
               activeByDefault: [held.activeByDefault, input.activeByDefault],
+              sort: [held.sort, sort],
               restrictedTo: [held.restrictedTo, restrictedTo],
             }),
             descriptionChanged,
@@ -65,6 +68,7 @@ export default defineEventHandler(async (event) => {
         description = ${description},
         price = ${input.price},
         active_by_default = ${input.activeByDefault ? 1 : 0},
+        sort = ${sort},
         restricted_to = ${restrictedTo}
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM ticket_types WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})

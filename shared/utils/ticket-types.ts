@@ -37,6 +37,7 @@ export const ticketTypeForm = z.object({
   description: z.string().trim().max(500).nullish(),
   price: pence,
   activeByDefault: z.boolean().default(true),
+  sort: z.number().int('An order is a whole number').nonnegative('An order is nought or more').default(0),
 })
 
 export const newTicketTypeForm = ticketTypeForm.extend({
@@ -48,8 +49,10 @@ export const newTicketTypeForm = ticketTypeForm.extend({
 )
 
 // Members-only is fixed at creation (D-109); open and box office only swap either way (0190).
+// An edit that leaves the order out keeps it, so an older form never resets it to nought (0193).
 export const editTicketTypeForm = ticketTypeForm.extend({
   restrictedTo: z.enum(TICKET_TYPE_RESTRICTIONS).nullable().optional(),
+  sort: z.number().int('An order is a whole number').nonnegative('An order is nought or more').optional(),
 })
 
 export function restrictionChangeRefusal(held: TicketTypeRestriction | null, wanted: TicketTypeRestriction | null): string | null {
@@ -76,6 +79,7 @@ export interface TicketType {
   restrictedTo: TicketTypeRestriction | null
   archived: boolean
   activeByDefault: boolean
+  sort: number
   everSold: boolean
 }
 

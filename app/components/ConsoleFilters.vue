@@ -52,7 +52,7 @@ watch(() => props.conditions.map(encodeCondition).join('&'), () => {
 const capitalise = (words: string): string => words.charAt(0).toUpperCase() + words.slice(1)
 
 const operatorItems = computed(() => Object.fromEntries(props.spec.fields.map(field => [field.key, [
-  { label: 'Any', value: UNSET },
+  { label: field.unset ?? 'Any', value: UNSET },
   ...operatorsOf(field).map(operator => ({ label: capitalise(saysOperator(field.kind, operator)), value: operator })),
 ]])))
 

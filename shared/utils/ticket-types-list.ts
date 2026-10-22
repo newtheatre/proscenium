@@ -11,8 +11,9 @@ export const ticketTypesList = {
   ],
   sort: {
     fields: [
+      { key: 'sort', label: 'Order', column: 'sort' },
       { key: 'name', label: 'Name', column: 'name', collate: 'nocase' },
     ],
-    default: 'name',
+    default: 'sort',
   },
 } as const satisfies ListSpec

@@ -54,6 +54,8 @@ export interface FilterField {
   dateAs?: 'day' | 'unix' | 'night'
   // What a yes-or-no chip says when the answer is no, where "Not ..." would misread.
   negated?: string
+  // What no condition means, where the endpoint applies a default rather than showing everything.
+  unset?: string
 }
 
 export interface SortField {

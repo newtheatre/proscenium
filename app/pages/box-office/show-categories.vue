@@ -134,7 +134,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
   {
     id: 'sort',
     header: 'Order',
-    meta: { class: { th: 'w-20', td: 'tabular-nums' } },
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} tabular-nums` } },
     cell: ({ row }) => String(row.original.sort),
   },
   {

@@ -73,7 +73,8 @@ const COLUMNS = sql`
   t.access_kind AS accessKind,
   t.restricted_to AS restrictedTo,
   t.archived AS archived,
-  t.active_by_default AS activeByDefault
+  t.active_by_default AS activeByDefault,
+  t.sort AS sort
 `
 
 interface TicketTypeRow extends Omit<TicketType, 'archived' | 'activeByDefault' | 'everSold'> {
