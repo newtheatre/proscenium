@@ -124,7 +124,9 @@ waiting, with its value, who asked and **Approve** or **Decline**, the same queu
 where the duty manager already is.
 
 From house open (doors, or curtain where no doors time is set) the hub shows a warning naming any
-required pre-show checklist item that is still not done.
+required pre-show checklist item that is still not done. When nobody holds tonight's duty manager
+shift, every shift sees **Nobody is working the checklist** instead, and should tell the Front of
+House Manager.
 
 ## The screens
 

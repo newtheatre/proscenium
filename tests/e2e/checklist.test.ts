@@ -115,6 +115,20 @@ describe.skipIf(skip !== null)('committee configuration (E-114 criterion 1)', ()
     expect((await afterReinstate.json() as { items: Item[] }).items.find(item => item.id === id)?.label).toBe('Fire exits and extinguishers checked')
   })
 
+  // The 21 October process map: a change of phase and of how it ticks left no trace in the audit.
+  test('an edit records every field it changes', async () => {
+    const created = await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'PRE', label: 'Audited edit', sort: 1, required: true })
+    const { id } = await created.json() as { id: string }
+    await send('PUT', `/api/admin/checklist/items/${id}`, { venueId: house.venueId, phase: 'POST', label: 'Audited edit', sort: 2, required: true, systemCheck: 'NO_SHOW_HOLDS_RELEASED' })
+
+    const row = read<{ detail: string }>(`SELECT detail FROM audit_log WHERE action = 'checklist-item.updated' AND target = ?`, `checklist-item:${id}`)
+    expect(JSON.parse(row!.detail).changes).toMatchObject({
+      phase: { from: 'PRE', to: 'POST' },
+      sort: { from: 1, to: 2 },
+      systemCheck: { from: null, to: 'NO_SHOW_HOLDS_RELEASED' },
+    })
+  })
+
   test('an ordinary member cannot configure the checklist', async () => {
     const member = await registerMember(app, 'checklist-nobody', generatePassword())
     expect((await send('POST', '/api/admin/checklist/items', { venueId: house.venueId, phase: 'PRE', label: 'x', sort: 1, required: true }, member.cookie)).status).toBe(403)
@@ -479,13 +493,13 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
       return (await answered.json() as { till: { tonight: number, earlier: number, unanswered: number } }).till
     }
 
-    expect(await tillOf()).toEqual({ tonight: 0, earlier: 0, unanswered: 0 })
+    expect(await tillOf()).toMatchObject({ tonight: 0, earlier: 0, unanswered: 0 })
 
     const opened = await send('POST', '/api/till', { venueId }, barManager.cookie)
     expect(opened.status).toBe(200)
     write('INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at) VALUES (?, ?, ?, ?, 1000)',
       `checklist-stale-${venueId}`, venueId, '2020-01-05', barManager.id)
-    expect(await tillOf()).toEqual({ tonight: 1, earlier: 1, unanswered: 0 })
+    expect(await tillOf()).toMatchObject({ tonight: 1, earlier: 1, unanswered: 0 })
 
     const view = await openSignedOutView(app.baseURL)
     try {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { saysNightClosed, saysPhase } from '#shared/utils/checklist'
 import { holdsTheClose } from '#shared/utils/night-signoff'
-import { saysTillLeftOpen } from '#shared/utils/till'
+import { saysTillLeftOpen, showsTillLine } from '#shared/utils/till'
 import { openingHouseId } from '#shared/utils/tonight'
 import type { ChecklistClose, ChecklistEntry, Phase, TonightChecklist } from '#shared/utils/checklist'
 import type { TillLeftOpen } from '#shared/utils/till'
@@ -178,7 +178,7 @@ const reportLink = computed(() => performanceId.value ? `/tonight/report?perform
         <!-- Read from the bar's own sessions, never stamped: nothing to tick and no exception to
              take, since only the bar can close a till (F-102 criterion 5, issue 1316). -->
         <div
-          v-if="phase === 'POST' && till"
+          v-if="phase === 'POST' && till && showsTillLine(till)"
           class="mt-2 flex items-start justify-between gap-2 rounded-lg border border-default p-3"
           data-test="checklist-till"
         >

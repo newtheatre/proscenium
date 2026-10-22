@@ -17,6 +17,7 @@ interface Performance {
   intervalCount: number
   intervalMinutes: number | null
   house: HubHouse
+  dutyManagerOnShift: boolean
 }
 interface HouseTonight { night: string, venueId: string, performances: Performance[] }
 
@@ -181,6 +182,16 @@ onUnmounted(() => {
       variant="subtle"
       title="Pre-show checklist incomplete"
       :description="incompletePre.map(item => item.label).join(', ')"
+    />
+
+    <!-- Nobody else can work the checklist, so with the slot empty every shift is told (0236). -->
+    <UAlert
+      v-if="houseOpen && selected && !selected.dutyManagerOnShift && !dutyManager"
+      data-test="checklist-unworked"
+      color="warning"
+      variant="subtle"
+      title="Nobody is working the checklist"
+      description="Nobody holds tonight's duty manager shift, so nobody on tonight's rota can tick the pre-show checks. Tell the Front of House Manager."
     />
 
     <!-- A single performance has nothing to switch between, so this stays out of the way. -->

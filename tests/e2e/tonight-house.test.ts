@@ -122,6 +122,7 @@ interface House {
     latecomerPolicy: string | null
     intervalCount: number
     access: { firstName: string, wording: string }[] | null
+    dutyManagerOnShift: boolean
   }[]
 }
 
@@ -141,6 +142,14 @@ describe.skipIf(skip !== null)('tonight\'s house for every shift (issue 1307)', 
 
     const asked = await house(door, '?access=1')
     expect(asked.access?.map(one => one.wording)).toEqual([WORDING])
+  }, CASE_TIMEOUT_MS)
+
+  // The 21 October process map: with the slot empty nobody saw the checklist was unworked (0236).
+  test('every shift reads whether anybody holds the duty manager shift', async () => {
+    expect((await house(door)).dutyManagerOnShift).toBe(false)
+    const manager = await registerMember(app, 'house-dm', generatePassword())
+    write('INSERT INTO shifts (id, performance_id, role, slot, user_id, status) VALUES (?, ?, ?, 1, ?, ?)', 'house-dm-shift', performanceId, 'DUTY_MANAGER', manager.id, 'CONFIRMED')
+    expect((await house(bar)).dutyManagerOnShift).toBe(true)
   }, CASE_TIMEOUT_MS)
 
   test('a bar shift reads the same numbers, and never the access wording, even when it asks', async () => {

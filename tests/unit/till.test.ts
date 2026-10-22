@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
-import { TILL_VENUE_DEVICE_KEY, chargePaths, heldTillVenue, recallTillVenue, saysCloseTill, saysClosedFirst, saysReopenNeedsAsking, saysTillClosed, saysTillLeftOpen, tillRefusalStep, tillScopeForm, tillVenueExpires } from '#shared/utils/till'
+import { TILL_VENUE_DEVICE_KEY, chargePaths, heldTillVenue, recallTillVenue, saysCloseTill, saysClosedFirst, saysReopenNeedsAsking, saysTillClosed, saysTillLeftOpen, showsTillLine, tillRefusalStep, tillScopeForm, tillVenueExpires } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -179,16 +179,31 @@ describe('what the till does with the guard\'s refusal (F-125, issue 1257, issue
 // F-102 criterion 5, E-114 criterion 3, issue 1316: the close-night checklist says what the bar has
 // left open, tonight's till or an earlier night's, and who closes it.
 describe('the checklist line for the till', () => {
+  const bar = { hasBar: true, barStaffed: true }
+
   test('nothing left open is the line ticked, with nothing to say', () => {
-    expect(saysTillLeftOpen({ tonight: 0, earlier: 0, unanswered: 0 })).toBeNull()
+    expect(saysTillLeftOpen({ tonight: 0, earlier: 0, unanswered: 0, ...bar })).toBeNull()
   })
 
   test('tonight\'s till still open is the bar\'s to close', () => {
-    expect(saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0 })).toContain('Tonight\'s till is still open')
+    expect(saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0, ...bar })).toContain('whoever is on the bar closes it')
+  })
+
+  test('with nobody on tonight\'s bar, the Front of House Manager closes it (0236)', () => {
+    const said = saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0, hasBar: true, barStaffed: false })!
+    expect(said).toContain('nobody holds tonight\'s bar shift')
+    expect(said).toContain('Front of House Manager closes it')
+  })
+
+  test('a house with no bar shows the line only for what an earlier night left (0236)', () => {
+    const none = { tonight: 0, earlier: 0, unanswered: 0, hasBar: false, barStaffed: false }
+    expect(showsTillLine(none)).toBe(false)
+    expect(showsTillLine({ ...none, earlier: 1 })).toBe(true)
+    expect(showsTillLine({ ...none, hasBar: true })).toBe(true)
   })
 
   test('an earlier night\'s till or charge is the Front of House Manager\'s', () => {
-    const said = saysTillLeftOpen({ tonight: 0, earlier: 2, unanswered: 1 })!
+    const said = saysTillLeftOpen({ tonight: 0, earlier: 2, unanswered: 1, ...bar })!
     expect(said).toContain('2 tills from an earlier night')
     expect(said).toContain('1 card charge from an earlier night')
     expect(said).toContain('Front of House Manager')

@@ -17,7 +17,14 @@ export default defineEventHandler(async (event) => {
       actorId: resolved.account.id,
       action: 'checklist-item.updated',
       target: `checklist-item:${id}`,
-      detail: changes({ label: [before.label, input.label], required: [before.required, input.required] }),
+      // Every field the statement writes, since phase and how it ticks change what the night does.
+      detail: changes({
+        phase: [before.phase, input.phase],
+        label: [before.label, input.label],
+        sort: [before.sort, input.sort],
+        required: [before.required, input.required],
+        systemCheck: [before.systemCheck, input.systemCheck],
+      }),
     })),
   ])
 

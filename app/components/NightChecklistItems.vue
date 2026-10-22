@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { exemptForm } from '#shared/utils/checklist'
 import { REVIEWED_AT_SIGN_OFF } from '#shared/utils/night-signoff'
 import type { ChecklistEntry } from '#shared/utils/checklist'
 
@@ -36,6 +37,9 @@ const exempting = ref<Entry | null>(null)
 const exemptReason = ref('')
 const exemptFailure = ref<string | null>(null)
 const exemptSaving = ref(false)
+
+// Unavailable until there is a reason, as every other sheet's primary is until it can be sent.
+const exemptReady = computed(() => exemptForm.safeParse({ reason: exemptReason.value }).success)
 
 function openExempt(entry: Entry): void {
   exempting.value = entry
@@ -140,6 +144,7 @@ async function submitExempt(): Promise<void> {
     :title="exempting ? `Exception: ${exempting.label}` : ''"
     primary="Make the exception"
     primary-test-id="exempt-submit"
+    :primary-disabled="!exemptReady"
     :loading="exemptSaving"
     @update:open="exempting = null"
     @primary="submitExempt"
