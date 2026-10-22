@@ -117,6 +117,7 @@ useSeoMeta({
                 :module-id="module.id"
                 :module-name="module.name"
                 :action="module.action"
+                :lacking="module.prerequisites.filter(need => need.held === false).map(need => need.name)"
                 @changed="refresh"
               />
               <ULink
@@ -183,6 +184,7 @@ useSeoMeta({
           :module-id="module.id"
           :module-name="module.name"
           :action="module.action"
+          :lacking="module.prerequisites.filter(need => need.held === false).map(need => need.name)"
           large
           @changed="refresh"
         />

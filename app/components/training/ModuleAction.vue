@@ -12,6 +12,8 @@ const props = defineProps<{
   action: TrainingAction
   // A 48px target where a phone is the likely reader (docs/design-language.md).
   large?: boolean
+  // What the member does not yet hold, said in the ask dialog before they ask (0242).
+  lacking?: string[]
 }>()
 
 const emit = defineEmits<{ changed: [] }>()
@@ -88,6 +90,7 @@ async function signUp(): Promise<void> {
       :module-name="moduleName"
       :requested="action.kind === 'ASKED'"
       :large="large"
+      :lacking="lacking"
       @requested="emit('changed')"
     />
     <span

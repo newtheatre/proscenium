@@ -137,6 +137,7 @@ const nextSessionLine = computed(() => {
         :module-id="id"
         :module-name="name"
         :action="action"
+        :lacking="prerequisites.filter(need => need.held === false).map(need => need.name)"
         @changed="emit('changed')"
       />
       <ULink

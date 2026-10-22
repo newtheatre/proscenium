@@ -2935,8 +2935,12 @@ The reason never reaches audit detail, which carries identifiers and never words
 (0011).
 
 Opening a session for sign-up resolves every open ask for the modules it teaches and tells each
-requester once, the claim held by the notification ledger (criterion 4). A session created but not
-yet open resolves nothing, because there is nothing for a member to sign up to.
+requester once, the claim held by the notification ledger and keyed to the request and the session
+(criterion 4, 0242). A session created but not yet open resolves nothing, because there is nothing
+for a member to sign up to. Cancelling a session reopens what it scheduled: a SCHEDULED ask whose
+scheduled claim names the session goes back to OPEN, in the cancel's batch, unless another session
+open for sign-up teaches the module, the member has asked again, or the member now holds it. A decline is emailed
+once, `training.request.declined`.
 
 ## Platform (modules H, J, K)
 

@@ -1,3 +1,4 @@
+import { saysDayLong } from '#shared/utils/when'
 import { asc, eq, sql } from 'drizzle-orm'
 import {
   blockingGaps,
@@ -282,7 +283,7 @@ export async function committeeOnlyModulesFor(userId: string): Promise<ReadonlyS
 function placeMessageContext(event: H3Event | undefined, session: SignUpSession): TemplateContext {
   return {
     name: '',
-    heldOn: session.heldOn,
+    heldOn: saysDayLong(session.heldOn),
     startsAt: session.startsAt,
     modules: session.modules.map(module => ({ id: module.id, name: module.name })),
     sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,

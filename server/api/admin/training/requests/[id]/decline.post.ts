@@ -54,5 +54,27 @@ export default defineEventHandler(async (event) => {
     `),
   ])
 
+  // The words they will read, as stored: of two people answering at once, the one that landed.
+  // Claimed once per request, so a retry never tells them twice (0242).
+  const [answered] = await db.select({ reason: schema.moduleRequests.reason, name: schema.trainingModules.name })
+    .from(schema.moduleRequests)
+    .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.moduleRequests.moduleId))
+    .where(eq(schema.moduleRequests.id, id))
+    .limit(1)
+  const key = `training.request.declined:${id}`
+  if (answered?.reason && await claimNotification({ userId: held.userId, type: 'training.request.declined', key })) {
+    await notify(event, {
+      type: 'training.request.declined',
+      userId: held.userId,
+      claim: key,
+      context: {
+        name: '',
+        moduleName: answered.name,
+        reason: answered.reason,
+        trainingUrl: `${useRuntimeConfig(event).public.baseURL}/training`,
+      },
+    })
+  }
+
   return { ok: true }
 })
