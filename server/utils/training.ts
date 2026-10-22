@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, not, or, sql } from 'drizzle-orm'
 import { isMonthDay, londonParts } from '#shared/utils/london'
 import { saysRole } from '#shared/utils/roles'
+import { saysDayLong } from '#shared/utils/when'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, mayRecordByAddress, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
 import { demandScope } from './training-demand'
@@ -894,7 +895,9 @@ export interface DemandRow {
 }
 
 // The board a lead answers, busiest first, scoped as the overview's count is.
-export async function demandBoard(leadOf: string | undefined, limit = 20): Promise<DemandRow[]> {
+export const DEMAND_BOARD_LIMIT = 20
+
+export async function demandBoard(leadOf: string | undefined, limit = DEMAND_BOARD_LIMIT): Promise<DemandRow[]> {
   const scope = demandScope(leadOf)
 
   const modules = await db.all<{ moduleId: string, moduleName: string, department: string, waiting: number }>(sql`
@@ -952,6 +955,12 @@ export async function resolveRequestsFor(
   `)
   if (waiting.length === 0) return 0
 
+  const [session] = await db.select({
+    heldOn: schema.trainingSessions.heldOn,
+    startsAt: schema.trainingSessions.startsAt,
+    place: schema.trainingSessions.place,
+  }).from(schema.trainingSessions).where(eq(schema.trainingSessions.id, sessionId)).limit(1)
+
   await db.run(sql`
     update module_requests
     set status = 'SCHEDULED', decided_at = unixepoch()
@@ -961,7 +970,8 @@ export async function resolveRequestsFor(
 
   let told = 0
   for (const row of waiting) {
-    const key = `training.request.scheduled:${row.id}`
+    // Per session too: a request reopened by a cancellation hears about the next one (0242).
+    const key = `training.request.scheduled:${row.id}:${sessionId}`
     const took = await claimNotification({
       userId: row.userId,
       type: 'training.request.scheduled',
@@ -978,12 +988,34 @@ export async function resolveRequestsFor(
         name: '',
         moduleName: row.moduleName,
         moduleId: row.moduleId,
-        sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training`,
+        when: session ? `${saysDayLong(session.heldOn)} at ${session.startsAt}` : '',
+        where: session?.place ?? '',
+        sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
       },
     })
     told++
   }
   return told
+}
+
+// A cancelled session answers nothing, so an ask it marked scheduled is open again, unless another
+// session still open for sign-up teaches the module or the member has asked again since (0242).
+export async function reopenRequestsFor(sessionId: string): Promise<void> {
+  await db.run(sql`
+    update module_requests
+    set status = 'OPEN', decided_at = null
+    where status = 'SCHEDULED'
+      and module_id in (select module_id from session_modules where session_id = ${sessionId})
+      and decided_at >= (select created_at from training_sessions where id = ${sessionId})
+      and not exists (
+        select 1 from session_modules sm join training_sessions s on s.id = sm.session_id
+        where sm.module_id = module_requests.module_id and s.id <> ${sessionId}
+          and s.status in ('OPEN', 'FULL') and s.register_opened_at is null)
+      and not exists (
+        select 1 from module_requests again
+        where again.user_id = module_requests.user_id and again.module_id = module_requests.module_id
+          and again.status = 'OPEN')
+  `)
 }
 
 // The one thing that moves a session out of PLANNED. Conditional on the statement, so a second

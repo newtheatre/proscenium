@@ -519,6 +519,28 @@ export const MESSAGE_TYPES = {
     template: 'training-request-scheduled',
   },
 
+  // A sign-up gave no feedback beyond the screen, and a place is worth having in writing (0242).
+  'training.session.signed-up': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-session-signed-up',
+  },
+
+  // A trainer the Theatre Manager named is told they are teaching, rather than finding out (0242).
+  'training.session.assigned': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'training-session-assigned',
+    sender: 'TRAINING',
+  },
+
+  // The answer to something they asked, so it reaches them rather than waiting on a page (0242).
+  'training.request.declined': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-request-declined',
+  },
+
   // Nothing has been held against them and nothing has been taken away: the module is simply
   // still outstanding, and the schedule is the way out of that.
   'training.session.absent': {

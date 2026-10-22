@@ -22,8 +22,8 @@ const saving = ref(false)
 
 const { data, status, error, refresh } = await useAsyncData(
   'admin-training-requests',
-  () => request<{ items: Demand[] }>('/api/admin/training/requests'),
-  { default: () => ({ items: [] as Demand[] }) },
+  () => request<{ items: Demand[], truncated: boolean, maySchedule: boolean }>('/api/admin/training/requests'),
+  { default: () => ({ items: [] as Demand[], truncated: false, maySchedule: false }) },
 )
 // A failed read and an empty one look the same, and "nobody is asking for anything" is an
 // answer a lead would act on. So a failure says so rather than rendering as quiet.
@@ -43,7 +43,7 @@ async function answer(): Promise<void> {
     })
     toast.add({
       title: 'Declined',
-      description: 'They have been told why. To say yes, schedule a session for the module instead.',
+      description: 'They have been emailed what you wrote. To say yes, schedule a session for the module instead.',
       icon: 'i-lucide-message-circle',
       color: 'success',
     })
@@ -170,7 +170,14 @@ watch(modalOpen, (nowOpen) => {
             >
               {{ plural(demand.waiting, 'waiting', 'waiting') }}
             </UBadge>
+            <span
+              v-if="!data.maySchedule"
+              class="text-xs text-muted"
+            >
+              Ask a trainer or the Theatre Manager to schedule this
+            </span>
             <UButton
+              v-else
               size="xs"
               icon="i-lucide-calendar-plus"
               :to="`/training/manage/sessions?module=${demand.moduleId}`"
@@ -195,7 +202,10 @@ watch(modalOpen, (nowOpen) => {
         </UTable>
       </section>
 
-      <p class="text-sm text-muted">
+      <p
+        v-if="data.truncated"
+        class="text-sm text-muted"
+      >
         The busiest modules are shown first. Schedule or decline some of these to see the rest.
       </p>
     </div>
@@ -225,6 +235,7 @@ watch(modalOpen, (nowOpen) => {
         <UFormField
           label="What to tell them"
           hint="Say why: nothing sends until you do"
+          :help="reason.trim().length > 0 && reason.trim().length < 3 ? 'A reply needs a few words' : 'They are emailed what you write.'"
           required
         >
           <UTextarea

@@ -10,6 +10,7 @@ const props = defineProps<{
   requested: boolean
   // A 48px target where a phone is the likely reader (docs/design-language.md).
   large?: boolean
+  lacking?: string[]
 }>()
 
 const emit = defineEmits<{ requested: [] }>()
@@ -67,6 +68,15 @@ async function submit(): Promise<void> {
     description="It tells the department there is demand. It does not hold you a place, and it never expires on its own."
   >
     <template #body>
+      <UAlert
+        v-if="lacking?.length"
+        data-test="request-module-lacking"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-info"
+        :description="`It needs ${lacking.join(', ')} first, which you do not hold yet. You can still ask; you may want to ask for that too.`"
+        class="mb-4"
+      />
       <UAlert
         v-if="failure"
         data-test="request-module-failure"

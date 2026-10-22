@@ -20,6 +20,8 @@ const flat = (part: string): string => part.replace(/\s+/g, ' ')
 const EVERYTHING: TemplateContext = {
   name: 'Ada',
   taught: 'Working at height',
+  standing: 'You have a place.',
+  sessionUrl: 'https://newtheatre.org.uk/training/manage/sessions/1',
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
   securityUrl: 'https://newtheatre.org.uk/account/access',

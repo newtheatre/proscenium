@@ -829,13 +829,13 @@ The Nottingham New Theatre`,
     return {
       subject: 'A place has come up on a training session',
       html: layout(`<p>Hello ${context.name},</p>
-<p>Somebody has dropped out, so the place you were waiting for is yours.</p>
+<p>A place has come up, so the place you were waiting for is yours.</p>
 <p>${taught}, on ${context.heldOn} at ${context.startsAt}, at ${context.where}.</p>
 <p>Nothing to do if you are coming. If you cannot make it after all, please
 <a href="${String(context.sessionsUrl)}">withdraw</a> so the next person on the list gets it.</p>`),
       text: `Hello ${context.name},
 
-Somebody has dropped out, so the place you were waiting for is yours.
+A place has come up, so the place you were waiting for is yours.
 
 ${taught}, on ${context.heldOn} at ${context.startsAt}, at ${context.where}.
 
@@ -855,15 +855,15 @@ The Nottingham New Theatre`,
     return {
       subject: 'Your training session place is back on the waiting list',
       html: layout(`<p>Hello ${context.name},</p>
-<p>The trainer has reduced the number of places on ${taught}, on ${context.heldOn} at
-${context.startsAt}, so you no longer have a place. You are now number ${context.position} on the
+<p>The number of places on ${taught}, on ${context.heldOn} at ${context.startsAt}, has been
+reduced, so you no longer have a place. You are now number ${context.position} on the
 waiting list.</p>
 <p>You keep your turn: if somebody drops out or the places go back up, we will email you. If you
 would rather not wait, you can <a href="${String(context.sessionsUrl)}">withdraw</a>.</p>`),
       text: `Hello ${context.name},
 
-The trainer has reduced the number of places on ${taught}, on ${context.heldOn} at
-${context.startsAt}, so you no longer have a place. You are now number ${context.position} on the
+The number of places on ${taught}, on ${context.heldOn} at ${context.startsAt}, has been
+reduced, so you no longer have a place. You are now number ${context.position} on the
 waiting list.
 
 You keep your turn: if somebody drops out or the places go back up, we will email you. If you
@@ -880,12 +880,15 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>You asked for ${context.moduleName} to be taught, and a session is now in the diary. Thank you
 for asking.</p>
+<p>${context.when}${context.where ? `, ${context.where}` : ''}.</p>
 <p>A place is not held for you: <a href="${String(context.sessionsUrl)}">the schedule</a> is where you
 take one.</p>`),
     text: `Hello ${context.name},
 
 You asked for ${context.moduleName} to be taught, and a session is now in the diary. Thank you for
 asking.
+
+${context.when}${context.where ? `, ${context.where}` : ''}.
 
 A place is not held for you. The schedule is where you take one:
 ${String(context.sessionsUrl)}
@@ -894,24 +897,82 @@ The Nottingham New Theatre`,
   }),
 
   'training-session-cancelled': (context: TemplateContext): Rendered => ({
-    subject: `Cancelled: the session on ${String(context.heldOn)}`,
+    subject: `Cancelled: ${String(context.taught)} on ${String(context.heldOn)}`,
     html: layout(`<p>Hello ${context.name},</p>
-<p>The session on ${context.heldOn} you were signed up for has been cancelled, so please do not
-come to it.</p>
+<p>${context.taught} on ${context.heldOn}, which you were signed up for, has been cancelled, so
+please do not come to it.</p>
 <p><strong>Why:</strong> ${context.reason}</p>
-<p>Nothing has changed on your training record, and you keep your place in the queue for this
-module. <a href="${String(context.sessionsUrl)}">The schedule</a> is where the next date will
-appear, and if there is not one yet you can ask for the module to be taught again.</p>`),
+<p>Nothing has changed on your training record. <a href="${String(context.sessionsUrl)}">The
+schedule</a> is where the next date will appear, and if there is not one yet you can ask for the
+module to be taught again.</p>`),
     text: `Hello ${context.name},
 
-The session on ${context.heldOn} you were signed up for has been cancelled, so please do not come
-to it.
+${context.taught} on ${context.heldOn}, which you were signed up for, has been cancelled, so please
+do not come to it.
 
 Why: ${context.reason}
 
-Nothing has changed on your training record, and you keep your place in the queue for this module.
-The schedule is where the next date will appear:
+Nothing has changed on your training record. The schedule is where the next date will appear:
 ${String(context.sessionsUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  'training-session-signed-up': (context: TemplateContext): Rendered => ({
+    subject: `Signed up: ${String(context.taught)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>You are signed up for ${context.taught}, ${context.when}, at ${context.where}.</p>
+<p>${context.standing}</p>
+<p>If you cannot make it, please <a href="${String(context.sessionsUrl)}">withdraw</a> so the next
+person gets the place.</p>`),
+    text: `Hello ${context.name},
+
+You are signed up for ${context.taught}, ${context.when}, at ${context.where}.
+
+${context.standing}
+
+If you cannot make it, please withdraw so the next person gets the place:
+${String(context.sessionsUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  'training-session-assigned': (context: TemplateContext): Rendered => ({
+    subject: `You are teaching ${String(context.taught)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>The Theatre Manager has scheduled ${context.taught}, ${context.when}, at ${context.where}, and named
+you as its trainer.</p>
+<p>On the day you open its register and mark who came. <a href="${String(context.sessionUrl)}">The
+session</a> shows who has signed up.</p>`),
+    text: `Hello ${context.name},
+
+The Theatre Manager has scheduled ${context.taught}, ${context.when}, at ${context.where}, and named you
+as its trainer.
+
+On the day you open its register and mark who came. The session shows who has signed up:
+${String(context.sessionUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  // The words the lead wrote, which the member would otherwise find only by going back (0242).
+  'training-request-declined': (context: TemplateContext): Rendered => ({
+    subject: `Your request for ${String(context.moduleName)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>You asked for ${context.moduleName} to be taught. It is not being scheduled for now, and whoever
+looked after the request wrote:</p>
+<p>${context.reason}</p>
+<p><a href="${String(context.trainingUrl)}">Your training</a> shows your requests, and you can ask
+again whenever it suits you.</p>`),
+    text: `Hello ${context.name},
+
+You asked for ${context.moduleName} to be taught. It is not being scheduled for now, and whoever
+looked after the request wrote:
+
+${context.reason}
+
+Your training shows your requests, and you can ask again whenever it suits you:
+${String(context.trainingUrl)}
 
 The Nottingham New Theatre`,
   }),
