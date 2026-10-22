@@ -7,7 +7,8 @@ import { remainingSeats, saleRefusal } from '#shared/utils/programme'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const performance = await performanceById(id)
-  if (!performance) throw noSuch('performance')
+  // A draft show's night answers exactly as a missing one does, as its show page does (D-101 criterion 1).
+  if (!performance || performance.showStatus !== 'PUBLISHED') throw noSuch('performance')
 
   // The same cut-off the write path refuses at, so the form is refused up front (D-112 criterion 1).
   const holdReleaseMinutes = await holdReleaseMinutesFor(event, performance)

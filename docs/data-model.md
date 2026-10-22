@@ -683,6 +683,8 @@ drops archived types and every flagged one, and allow-lists `id`, `name`, `descr
 
 `GET /api/performances/[id]/booking` also names what is being booked, so the form need not fetch
 the show again: `show` is its slug and title, `performance` its curtain and venue, and no more.
+A performance of a show that is not `PUBLISHED` answers 404 there and on
+`POST /api/performances/[id]/waiting-list`, exactly as an unknown id does (D-101 criterion 1).
 
 **Entitlement (D-109).** `restricted_to = 'MEMBER'` drops a type from what
 `GET /api/performances/[id]/booking` and `POST /api/reservations` offer a caller who is not

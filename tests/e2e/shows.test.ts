@@ -354,6 +354,24 @@ describe.skipIf(skip !== null)('unpublishing closes sales and touches nothing so
   })
 })
 
+// D-101 criterion 1 reaches the booking form and the waiting list: a draft show's night is not there.
+describe.skipIf(skip !== null)('a draft show\'s performance answers as a missing one does', () => {
+  test('the booking form and the waiting list say 404, before publishing and after taking it off sale', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+    const join = { performanceId: performance, partySize: 1, guest: { name: 'Nina Zarechnaya', email: `nina-${crypto.randomUUID().slice(0, 8)}@nnt-trial.co.uk` } }
+
+    expect((await send('GET', `/api/performances/${performance}/booking`, undefined, '')).status).toBe(404)
+    expect((await send('POST', `/api/performances/${performance}/waiting-list`, join, '')).status).toBe(404)
+
+    await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: true })
+    expect((await send('GET', `/api/performances/${performance}/booking`, undefined, '')).status).toBe(200)
+
+    await send('POST', `/api/admin/shows/${id}/publish`, { published: false })
+    expect((await send('GET', `/api/performances/${performance}/booking`, undefined, '')).status).toBe(404)
+  })
+})
+
 describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once it has sold (criterion 5)', () => {
   test('cancelling says how many tickets are owed a refund', async () => {
     const id = await newShow()

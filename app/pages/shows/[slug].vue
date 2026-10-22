@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysNoSuch } from '#shared/utils/no-such'
+import { saysNotFoundYet } from '#shared/utils/no-such'
 import { groupContentWarnings, saysAssessment } from '#shared/utils/content-warnings'
 import { saysClock, saysDay, saysWhenLong } from '#shared/utils/when'
 import { SAYS_BOOKING_HOLDS, SAYS_PAYMENT, TO_BE_CONFIRMED, saysHowToPay, saysLatecomers } from '#shared/utils/programme'
@@ -17,7 +17,7 @@ const slug = computed(() => String(route.params.slug))
 const { data } = await useFetch<ListedShow>(() => `/api/shows/${slug.value}`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: saysNoSuch('show', 'Go back to what is on and choose another'), fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNotFoundYet('show', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const show = computed(() => data.value!.show)

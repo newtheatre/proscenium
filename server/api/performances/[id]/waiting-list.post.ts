@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   if (input.performanceId !== id) throw createError({ statusCode: 400, statusMessage: 'That waiting list is for a different performance. Open the performance again.' })
 
   const performance = await performanceById(id)
-  if (!performance) throw noSuch('performance')
+  if (!performance || performance.showStatus !== 'PUBLISHED') throw noSuch('performance')
 
   // Past the online cut-off no offer can ever be made, so a join would wait for nothing: the door
   // sells what frees after it (D-113 criterion 2, issue 1328).
