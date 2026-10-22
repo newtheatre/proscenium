@@ -144,7 +144,7 @@ async function savePlaces(): Promise<void> {
   }
 }
 
-interface Module { id: string, name: string, status: string, signoffRequired: boolean }
+interface Module { id: string, name: string, status: string, signoffRequired: boolean, kind: string }
 
 // Once marked, the records are made and the modules with them; before that, an open register
 // is a freeze released only on purpose (G-115 criterion 2).

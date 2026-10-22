@@ -154,6 +154,38 @@ describe.skipIf(skip !== null)('a lead signs off their own department (G-120)', 
   })
 })
 
+describe.skipIf(skip !== null)('only a published module is awarded, once a day (0240)', () => {
+  test('a draft is refused, and nothing is written', async () => {
+    const draft = await addModule({ status: 'DRAFT' })
+    const refused = await signOff({ userId: memberId, moduleId: draft, awardedOn: today() })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('draft')
+    expect(read<{ n: number }>('SELECT count(*) n FROM training_records WHERE module_id = ?', draft)?.n).toBe(0)
+  })
+
+  test('a second sign-off on the same day is refused, and one record stands', async () => {
+    const module = await addModule()
+    expect((await signOff({ userId: memberId, moduleId: module, awardedOn: today() })).status).toBe(200)
+    const again = await signOff({ userId: memberId, moduleId: module, awardedOn: today() })
+    expect(again.status).toBe(409)
+    expect(await said(again)).toContain('already hold this')
+    expect(read<{ n: number }>('SELECT count(*) n FROM training_records WHERE module_id = ?', module)?.n).toBe(1)
+  })
+
+  test('revoking says whether another current record still holds the module', async () => {
+    const module = await addModule()
+    const earlier = await signOff({ userId: memberId, moduleId: module, awardedOn: daysFrom(-3) })
+    const later = await signOff({ userId: memberId, moduleId: module, awardedOn: today() })
+    const laterId = (await later.json() as { id: string }).id
+    const earlierId = (await earlier.json() as { id: string }).id
+
+    const first = await send('POST', `/api/admin/training/records/${laterId}/revoke`, { reason: 'Recorded twice' })
+    expect(await first.json()).toMatchObject({ ok: true, stillHeld: true })
+    const last = await send('POST', `/api/admin/training/records/${earlierId}/revoke`, { reason: 'Not competent' })
+    expect(await last.json()).toMatchObject({ ok: true, stillHeld: false })
+  })
+})
+
 describe.skipIf(skip !== null)('a gap is named and never waved through (G-120 criterion 2)', () => {
   test('a missing prerequisite refuses and names what is missing', async () => {
     const gate = await addModule()

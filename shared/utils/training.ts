@@ -52,9 +52,10 @@ export function saysLifecycle(status: string): string {
 export interface PlannerOption { label: string, value: string, disabled: boolean }
 
 // What a session can teach (G-112 c3), with a draft listed but not offered, so the planner says
-// why the module just added is missing rather than seeming not to have it (issue 1354).
-export function plannerModuleOptions(modules: readonly { id: string, name: string, status: string, signoffRequired: boolean }[]): PlannerOption[] {
-  const listed = modules.filter(module => !module.signoffRequired && (module.status === 'ACTIVE' || module.status === 'DRAFT'))
+// why the module just added is missing (issue 1354). A certification is signed off instead (0240).
+export function plannerModuleOptions(modules: readonly { id: string, name: string, status: string, signoffRequired: boolean, kind?: string }[]): PlannerOption[] {
+  const listed = modules.filter(module => !module.signoffRequired && module.kind !== 'CERTIFICATION'
+    && (module.status === 'ACTIVE' || module.status === 'DRAFT'))
   return [
     ...listed.filter(module => module.status === 'ACTIVE')
       .map(module => ({ label: `${module.id} ${module.name}`, value: module.id, disabled: false })),

@@ -202,6 +202,19 @@ describe.skipIf(skip !== null)('prerequisites are direct edges (G-108)', () => {
     expect(read<{ kind: string }>('SELECT kind FROM modules WHERE id = ?', gate)?.kind).toBe('MODULE')
   })
 
+  // 0240: nobody can obtain a draft or a retired module, so nothing may wait on one.
+  test('a draft or a retired module cannot be required', async () => {
+    const draft = await addModule({ status: 'DRAFT' })
+    const retired = await addModule({ status: 'RETIRED' })
+    const advanced = await addModule()
+
+    const unpublished = await needs(advanced, draft)
+    expect(unpublished.status).toBe(409)
+    expect((await unpublished.json() as { statusMessage?: string }).statusMessage ?? '').toContain('still a draft')
+    expect((await needs(advanced, retired)).status).toBe(409)
+    expect(read<{ n: number }>('SELECT count(*) n FROM module_prerequisites WHERE module_id = ?', advanced)?.n).toBe(0)
+  })
+
   test('an edge is withdrawn without touching what was earned under it', async () => {
     const gate = await addModule()
     const advanced = await addModule()

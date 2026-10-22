@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
       // than a description (G-103 criterion 2).
       prerequisites: (prerequisites.get(module.id) ?? []).map(edge => ({
         moduleId: edge.requiresId,
-        name: edge.requiresName,
+        name: edge.requiresStatus === 'DRAFT' ? 'A module not yet published' : edge.requiresName,
         listed: edge.requiresStatus === 'ACTIVE',
         held: held.has(edge.requiresId),
       })),

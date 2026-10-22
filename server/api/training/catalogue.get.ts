@@ -46,7 +46,8 @@ export default defineEventHandler(async (event) => {
       committeeOnly: module.committeeOnly,
       prerequisites: (prerequisites.get(module.id) ?? []).map(edge => ({
         moduleId: edge.requiresId,
-        name: edge.requiresName,
+        // A draft is never public, its name included (0240).
+        name: edge.requiresStatus === 'DRAFT' ? 'A module not yet published' : edge.requiresName,
         listed: edge.requiresStatus === 'ACTIVE',
         held: held ? held.has(edge.requiresId) : null,
       })),
