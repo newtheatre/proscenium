@@ -389,10 +389,10 @@ describe('the rewritten bodies and subjects (item 7)', () => {
       .toContain(`is with the ${saysRole('THEATRE_MANAGER')}`)
   })
 
-  // 0212: the declined shift stays DECLINED, off the open list, until it is reassigned.
+  // 0212: the declined shift stays DECLINED, off the open list, until it is reassigned or dismissed.
   test('a declined shift says it stays off the open list', () => {
     const { text } = render('shift-declined', EVERYTHING)
-    expect(flat(text)).toContain(`That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it.`)
+    expect(flat(text)).toContain(`That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it or you dismiss the decline on your rota, which opens it again.`)
     expect(text).not.toContain('stays on the open list')
   })
 

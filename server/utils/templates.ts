@@ -627,8 +627,9 @@ The Nottingham New Theatre`,
 <p>Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
 ${context.when}, was declined.</p>
 <p>Why: ${context.reason}</p>
-<p>That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it. Every other
-shift you are welcome to take is still on your rota.</p>`),
+<p>That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it or you dismiss
+the decline on your rota, which opens it again. Every other shift you are welcome to take is still
+there.</p>`),
     text: `Hello ${context.name},
 
 Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
@@ -636,8 +637,9 @@ ${context.when}, was declined.
 
 Why: ${context.reason}
 
-That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it. Every other
-shift you are welcome to take is still on your rota.
+That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it or you dismiss
+the decline on your rota, which opens it again. Every other shift you are welcome to take is still
+there.
 
 The Nottingham New Theatre`,
   }),

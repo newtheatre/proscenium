@@ -21,7 +21,7 @@ told a claim was waiting until the next morning's digest.
 - **`shift.removed` says "reassigned" only when somebody replaced the holder.** A stand-down says
   they were taken off and the shift is open again. The caller says which with `replaced`.
 - **The decline email says the shift stays off the open list** until the Front of House Manager
-  fills it, as the officer's toast and the docs say.
+  fills it or the member dismisses the decline on their rota, as the officer's toast and the docs say.
 - **The release notice links the rota board**, and a waiting claim taken back is "withdrawn".
 - **A queued claim emails the rota's officers at once** (`shift.claim-waiting`, transactional),
   linking the board's waiting filter. The digest still lists it.

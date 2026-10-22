@@ -1,6 +1,7 @@
 import { changes } from '#shared/utils/audit'
 import { formatLondon, londonClock } from '#shared/utils/london'
 import { UNPUBLISHED_REFUSAL, clashRefusal, saysShiftRole } from '#shared/utils/rota'
+import { BOARD_WAITING_HREF } from '#shared/utils/rota-board'
 import { shiftClaimForm } from '#shared/utils/tonight'
 
 // Claim an open shift in one tap. Eligibility is re-checked live and availability rides the
@@ -66,7 +67,7 @@ export default defineEventHandler(async (event) => {
   }
   else {
     const officers = await rotaOfficers()
-    const url = `${useRuntimeConfig(event).public.baseURL}/rota/manage/shifts?waiting=true`
+    const url = `${useRuntimeConfig(event).public.baseURL}${BOARD_WAITING_HREF}`
     await Promise.all(officers.map(officer => notify(event, {
       userId: officer.id,
       type: 'shift.claim-waiting',
