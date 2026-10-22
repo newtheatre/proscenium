@@ -211,7 +211,8 @@ what it was awarded for) · `revoked_at` NULL · `revoked_by` NULL · `revocatio
 `created_at`. No `pass_id` column: D-130 finds the entitlement by `passes.user_id` and
 `pass_types.slug = 'fellowship'` rather than a direct foreign key, so awarding needs no migration
 on this already-shipped table and the fellowship and the pass can be read independently.
-UNIQUE (`user_id`): a person is a Fellow once. `restrict` rather than `cascade` on purpose, so
+UNIQUE (`user_id`) WHERE `revoked_at` IS NULL (`fellowships_one_standing`): one standing
+fellowship per person; a revoked row stays and a fresh award may follow it (0159). `restrict` rather than `cascade` on purpose, so
 deleting a user cannot silently remove an award from the theatre's own record; erasure
 anonymises the person and the award stands.
 A revoked fellowship stops future admissions and rewrites nothing (0023): awarding writes

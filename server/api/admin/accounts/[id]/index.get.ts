@@ -46,7 +46,8 @@ export default defineEventHandler(async (event) => {
     awardedBy: schema.fellowships.awardedBy,
     citation: schema.fellowships.citation,
     revokedAt: schema.fellowships.revokedAt,
-  }).from(schema.fellowships).where(eq(schema.fellowships.userId, id)).limit(1)
+  }).from(schema.fellowships).where(eq(schema.fellowships.userId, id))
+    .orderBy(sql`${schema.fellowships.revokedAt} IS NOT NULL`, desc(schema.fellowships.createdAt)).limit(1)
 
   // The trail for one person, which is what triage needs. Searching the whole of it is J-103.
   const history = resolved.permissions.has('audit.read')

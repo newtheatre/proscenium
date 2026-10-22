@@ -18,11 +18,8 @@ another look", and the pass recorded as issued by the Fellow rather than the off
 - **The first press of Record the award names the person**, with their address, and the button
   becomes **Award it to (name)**. Only the second press records it. Changing the person asks
   again.
-- **A second award's refusal says which kind of fellowship they hold.** A revoked one reads
-  "That person holds a revoked fellowship", and the docs say restoring one, or correcting an
-  award to the wrong person, is the committee's to take to the IT Manager. The one-per-person
-  constraint (A-127 criterion 2) is unchanged: whether a revoked fellowship may be followed by a
-  fresh award is a governance choice, left for the committee rather than made in code.
+- **A second award after a revocation** was first refused as "That person holds a revoked
+  fellowship". The IT Manager chose instead to allow a fresh award, so 0159 replaces that refusal.
 - **An award is dated today or earlier.**
 - **Each field says what it wants when left empty.**
 - **The pass is issued by the officer who recorded the award.** Passes issued before this keep

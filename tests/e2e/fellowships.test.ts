@@ -144,10 +144,13 @@ describe.skipIf(skip !== null)('recording the roll of Fellows (A-127)', () => {
     expect((await roll('?show=current')).items.some(fellow => fellow.id === id)).toBe(false)
     expect((await roll('?show=revoked')).items.some(fellow => fellow.id === id)).toBe(true)
 
-    // A second award is refused, saying the fellowship they hold is a revoked one (0158).
+    // A fresh award may follow a revoked one, and the revoked row stays as history (0159).
     const again = await record(alumna.id)
-    expect(again.status).toBe(409)
-    expect((await again.json() as { statusMessage: string }).statusMessage).toMatch(/holds a revoked fellowship/)
+    expect(again.status).toBe(200)
+    expect(read<{ rows: number, standing: number }>(
+      'SELECT count(*) AS rows, sum(revoked_at IS NULL) AS standing FROM fellowships WHERE user_id = ?', alumna.id))
+      .toEqual({ rows: 2, standing: 1 })
+    expect((await record(alumna.id)).status).toBe(409)
   })
 
   test('an award dated after today is refused, and each empty field says what it wants (0158)', async () => {

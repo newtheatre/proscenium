@@ -72,7 +72,7 @@ async function load(): Promise<void> {
 // server knows which field only for the person, so anything else stays a page-level failure.
 function blame(error: unknown, form: { setErrors: (errors: { name: string, message: string }[]) => void } | null, name: string): void {
   const message = refusalText(error)
-  if (form && /already holds|revoked fellowship|not an account|has been erased|no such account/i.test(message)) {
+  if (form && /already holds|not an account|has been erased|no such account/i.test(message)) {
     form.setErrors([{ name, message }])
     return
   }
