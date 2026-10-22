@@ -330,6 +330,24 @@ describe.skipIf(skip !== null)('a settlement is a card charge answered at the re
     expect((await answered.json() as { status: string }).status).toBe('SUCCEEDED')
   })
 
+  test('a Treasurer holding the tab cannot record its settlement as paid after the till closed', async () => {
+    const { venueId, performanceId } = programme(`settle-own-late-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const treasurer = await aMember()
+    await grantRole(app, treasurer, 'TREASURER', officer.cookie)
+    await authorise([treasurer.id])
+    expect((await chargeToTab(venueId, variantId, treasurer, 500)).status).toBe(200)
+    const { charges } = await (await settleCandidates(venueId, treasurer.id)).json() as { charges: OutstandingCharge[] }
+    const started = await startSettling(venueId, treasurer.id, charges.map(charge => charge.entryId), 500)
+    expect(started.status).toBe(200)
+    const { id } = await started.json() as { id: string }
+
+    const own = await send('POST', `/api/admin/finance/late-charges/${id}`, { expectedTotalPence: 500 }, treasurer.cookie)
+    expect(own.status).toBe(403)
+    expect(await message(own)).toContain('Nobody answers the reader for their own tab')
+  })
+
   // Both tills read no attempt and both would key the card: the guard has to ride the insert,
   // not a read before it, or the holder pays twice (0162).
   test('two tills keying the same tab at once leave one charge on the reader', async () => {

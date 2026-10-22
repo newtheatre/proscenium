@@ -605,8 +605,6 @@ const paths = computed(() => chargePaths(sumupAvailable.value, Boolean(selectedT
 const chargeOffered = computed(() => Boolean(session.value) && !charged.value && !basketEmpty.value
   && (grandTotalPence.value !== null || offline.value) && !sumup.pending.value && !compLocked.value)
 
-// A typed charge this screen holds, waiting for the person at the reader to answer it (0096).
-// A tab settlement is a typed charge like any other, answered with the same two buttons (0162).
 const settleOpen = ref(false)
 const toast = useToast()
 function settleStarted(started: { id: string, totalPence: number }): void {
@@ -618,6 +616,8 @@ function settleZero(): void {
   toast.add({ title: 'Nothing to take, so the tab is settled', color: 'success' })
 }
 
+// A typed charge this screen holds, waiting for the person at the reader to answer it (0096).
+// A tab settlement is a typed charge like any other, answered with the same two buttons (0162).
 const typedPending = computed(() => sumup.pending.value?.kind === 'TYPED' ? sumup.pending.value : null)
 
 function answerTyped(outcome: 'succeeded' | 'declined'): void {

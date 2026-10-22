@@ -33,7 +33,8 @@ Settling a tab is a typed card charge like any other (0096).
 - A settlement of nought takes nothing from the reader, so it is written at once.
 - Nobody answers the reader for their own tab, whatever the outcome (0116, Matt's call, 22 October
   2026): the holder may start it, and someone else on the till answers. The holder named in the
-  attempt never changes, so the route reads it once before resolving.
+  attempt never changes, so the route reads it once before resolving. The same holds for the
+  Treasurer's **Payment went through** on a charge a closed till left: not on their own tab.
 
 On the same screen, `/bar/tabs` no longer offers Void on your own tab, and says who voids it.
 

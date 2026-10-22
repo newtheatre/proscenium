@@ -1,3 +1,4 @@
+import { OWN_TAB_SETTLEMENT } from '#shared/utils/self-dealing'
 import { recordLateChargeForm } from '#shared/utils/sumup'
 
 // "Payment went through" on a charge whose night's till is closed: the Treasurer's, or ADMIN's, to
@@ -9,6 +10,7 @@ export default defineEventHandler(async (event) => {
 
   const row = await attemptById(id)
   if (!row) throw noSuch('card charge')
+  if (basketOf(row).settlement?.holderId === resolved.account.id) throw createError({ statusCode: 403, statusMessage: OWN_TAB_SETTLEMENT })
 
   const outcome = await recordLateCharge(row, input.expectedTotalPence, resolved.account.id, {
     baseURL: useRuntimeConfig(event).public.baseURL,
