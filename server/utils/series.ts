@@ -17,6 +17,8 @@ export interface OccurrenceRefusal {
   day: string
   failures: Failure[]
   conflicts: Conflict[]
+  // Every clash is the member's own, so the screen says so rather than blaming another member.
+  yours: boolean
 }
 
 export interface SeriesWrite extends SeriesClaim {
@@ -38,6 +40,7 @@ export async function conflictsAcross(roomId: string, occurrences: Occurrence[])
     endsAt: schema.roomBookings.endsAt,
     title: schema.roomBookings.title,
     bookedBy: schema.users.name,
+    heldBy: schema.roomBookings.userId,
   })
     .from(schema.roomBookings)
     .leftJoin(schema.users, eq(schema.users.id, schema.roomBookings.userId))
@@ -58,6 +61,7 @@ export async function conflictsAcross(roomId: string, occurrences: Occurrence[])
         endsAt: row.endsAt,
         title: row.title,
         bookedBy: row.bookedBy ?? undefined,
+        heldBy: row.heldBy,
       })))
     }
   }

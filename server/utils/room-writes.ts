@@ -101,6 +101,8 @@ export interface SeriesClaim {
   tier: string
   purpose: string
   notes: string | null
+  // The member's one reason for a series that waits on a decision, kept on every occurrence.
+  reason?: string | null
   status: 'CONFIRMED' | 'PENDING_APPROVAL'
   offsets: ShiftOffsets
 }
@@ -112,10 +114,10 @@ export function seriesClaimStatement(id: string, write: SeriesClaim, one: Occurr
   const endsAt = Math.floor(one.endsAt.getTime() / 1000)
   return sql`
     INSERT INTO room_bookings
-      (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, series_id, occurrence)
+      (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason, series_id, occurrence)
     SELECT ${id}, ${write.roomId}, ${write.userId}, ${write.title}, ${write.attendees},
            ${startsAt}, ${endsAt}, ${write.tier}, ${write.purpose}, ${write.status}, ${write.notes},
-           ${write.seriesId}, ${one.occurrence}
+           ${write.reason ?? null}, ${write.seriesId}, ${one.occurrence}
     WHERE EXISTS (SELECT 1 FROM rooms WHERE id = ${write.roomId} AND is_active = 1)
       AND ${clearOf(write.roomId, startsAt, endsAt)}
       AND ${roomOpenTerms(write.roomId, startsAt, endsAt, write.offsets)}
@@ -205,5 +207,17 @@ export function retireStatements(write: RetireWrite, entry: AuditRow): { audit: 
         `
       : null,
     retire: sql`UPDATE rooms SET is_active = 0, updated_at = ${write.now} WHERE id = ${write.roomId} AND is_active = 1`,
+  }
+}
+
+// Where a booking falls in its series, counted from the rows: a term written before skipped weeks
+// were renumbered stores "Week 4 of 3". Spelt out, as a select on one table leaves columns unqualified.
+export function seriesPlace(): { occurrence: SQL<number | null>, length: SQL<number | null> } {
+  return {
+    occurrence: sql<number | null>`CASE WHEN room_bookings.series_id IS NULL THEN NULL ELSE
+      (SELECT count(*) FROM room_bookings held WHERE held.series_id = room_bookings.series_id
+        AND held.starts_at <= room_bookings.starts_at) END`,
+    length: sql<number | null>`CASE WHEN room_bookings.series_id IS NULL THEN NULL ELSE
+      (SELECT count(*) FROM room_bookings held WHERE held.series_id = room_bookings.series_id) END`,
   }
 }

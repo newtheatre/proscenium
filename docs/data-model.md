@@ -2112,7 +2112,10 @@ purpose means a member who never looked at the field gets no suitability warning
 may carry it (`/rooms/book?purpose=REHEARSAL`), which is a stated intent rather than a silent
 default.
 `series_id` → room_series NULL and `occurrence` NULL carry an occurrence's place in its term
-(C-110). `bumped_to_booking_id` and `bumped_reason` carry a bump (C-115). Indexed on `series_id`,
+(C-110). `occurrence` numbers the dates written, after any left out with `skip`, so a term of
+four with one week skipped is 1 to 3. Rows written before that renumbering skip numbers, so My
+bookings (`GET /api/rooms/bookings`) counts the place from the series' own rows by start time
+(`seriesPlace()` in `server/utils/room-writes.ts`) rather than reading the stored number. `bumped_to_booking_id` and `bumped_reason` carry a bump (C-115). Indexed on `series_id`,
 which every series-scoped action reads. Adding a column is not a rebuild, and this table is not
 append-only.
 
@@ -2512,9 +2515,15 @@ Creation expands, then **policy- and conflict-checks every occurrence before any
 (criterion 2). Each occurrence counts against `ROOM_ACTIVE_BOOKINGS_PER_MEMBER` as the check walks
 the term, which is what the setting means by "a series counts each occurrence". If any occurrence
 fails, nothing is written and the refusal lists every failing occurrence with its day and reason,
-so a member resubmits with `skip` and keeps every other week where it was (criterion 3). The whole
-series confirms or the whole series queues; an occurrence is never a different kind of thing from
-its siblings (criterion 6). Occurrences carry `series_id` and `occurrence`, and are ordinary
+so a member resubmits with `skip` and keeps every other week where it was (criterion 3). A clash
+with the member's own booking or request is marked `yours` on its refusal, so the screen says "you
+already have this slot" rather than blaming another member. A closure is final, so a closed date
+lists the closure without the bendable rules beside it. The whole series confirms or the whole
+series queues; an occurrence is never a different kind of thing from its siblings (criterion 6).
+A series that would queue is refused with 422 until it carries a `reason`, and that refusal lists
+under `decisions` every date that breaks a bendable rule and which rules, so the member reads them
+and gives one reason before anything is held, as a one-off request does (C-108). The reason is
+written to every occurrence's `reason`, which the change form on My bookings opens filled in. Occurrences carry `series_id` and `occurrence`, and are ordinary
 bookings for every other rule in the module (criterion 5).
 
 The write is one `db.batch`: the series row, then a guarded claim per occurrence, then a statement

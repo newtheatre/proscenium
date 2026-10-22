@@ -32,6 +32,10 @@ export interface Failure {
   says: string
 }
 
+export function finalOnly(failures: Failure[]): Failure[] {
+  return failures.filter(failure => NOT_DIVERTIBLE.includes(failure.reason))
+}
+
 export interface Proposal {
   startsAt: Date
   endsAt: Date
@@ -148,7 +152,7 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   }
 
   if (hoursOfNotice(proposal.startsAt, context.now) < policy.noticeHours) {
-    fail('SHORT_NOTICE', `Booking needs ${policy.noticeHours} hours' notice. Ask, and somebody will decide.`)
+    fail('SHORT_NOTICE', `Booking needs ${policy.noticeHours} hours' notice. Ask, and the Theatre Manager will decide.`)
   }
 
   if (weeksAhead(proposal.startsAt, context.now) > policy.horizonWeeks) {
@@ -164,7 +168,8 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   // room is not here at all any more: it is a request of its own kind (C-120, 0036).
   const alwaysAsks = room.sensitive || context.underPreApproval === true
   return {
-    failures,
+    // A final refusal is the whole answer: a bendable rule beside it would invite an Ask nobody can make.
+    failures: refusedOutright ? finalOnly(failures) : failures,
     needsApproval: !refusedOutright && (alwaysAsks || failures.length > 0),
     refusedOutright,
   }

@@ -167,7 +167,7 @@ several ways each, and put each of them in one place.
 | A membership a member needs | "Tell us about your membership" | The refusal links to `/account/membership`, which is where telling us happens. Never "Sort out your membership". |
 | What we send | "Notification" | The inbox is "Notifications" and the My NNT tile says it too. The page that chooses what is emailed is "Email settings", because in-app always arrives. Never "message". |
 | Room bookings | "My bookings", only as the link on Rooms | `rooms/index.vue`. "Bookings" on its own is the reader's word for tickets (section 4), so it is never a nav label; on Rooms the page around it says which. The notification topic keeps "Bookings". |
-| The officer who decides | The role in Title Case where one role decides ("the Theatre Manager", "the Secretary and Welfare Officer", "the department lead"); "an officer" where the permission decides and no one role holds it | Never "somebody". A room request has no approver role: whoever holds `rooms.write` may decide it, so "an officer" is the true word there. |
+| The officer who decides | The role in Title Case where one role decides ("the Theatre Manager", "the Secretary and Welfare Officer", "the department lead"); "an officer" where the permission decides and no one role holds it | Never "somebody". A room request is decided by the Theatre Manager, the one post holding `rooms.write` (the IT Manager holds every permission as recovery, 0114), so the booking form, the policy's refusals and My bookings say "the Theatre Manager". |
 | A declined training request | "Declined" | `saysRequestStatus()` in `shared/utils/training.ts`. "Answered" hid a refusal behind a softer word. |
 | The people working the door | "the people on the door", "anybody working the door" | Never "the door" as a shorthand for them: a member choosing what is shown is choosing who sees it. |
 
@@ -254,7 +254,8 @@ builds its own options object. `formatLondon()` (`shared/utils/london.ts`) is th
 underneath, and a page, a component or a shared helper calls the shapes rather than it.
 
 A year is shown only when the date falls outside the committee year in hand (0009), or when the
-caller asks for it with `{ year: true }`. A span of days is said by `saysDayRange()`, which names
+caller asks for it with `{ year: true }`. A room booking, made months ahead, passes
+`{ calendarYear: true }` and names its year whenever it leaves the calendar year in hand (0202). A span of days is said by `saysDayRange()`, which names
 the year whenever an end leaves the calendar year in hand, once at the end or at both ends when
 they differ (0117). Every shape is built from numbers and fixed names, never from the locale's
 joined string, so the server and the browser render the same characters. An input keeps its

@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
   if (verdict.needsApproval) {
     throw createError({
       statusCode: 422,
-      statusMessage: 'That booking needs somebody to agree to it',
+      statusMessage: 'That booking needs the Theatre Manager to agree to it',
       data: { failures: verdict.failures, canRequest: true, sensitive: room.sensitive },
     })
   }

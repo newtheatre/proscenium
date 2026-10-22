@@ -384,6 +384,8 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
       to: '16:00',
       occurrences: 3,
       skip: skipDays,
+      // The last Wednesday can fall past the booking horizon, and a series that asks gives its reason.
+      reason: 'The term\'s rehearsals.',
     }, member.cookie)
 
     const refused = await ask([])

@@ -173,3 +173,20 @@ describe('a span of days names its year when an end leaves this calendar year', 
     expect(saysDayRange('2026-08-01', '2026-08-31', { now: OCTOBER, year: true })).toBe('Sat 1 Aug to Mon 31 Aug 2026')
   })
 })
+
+// A room booking is made months ahead, and "Monday 1 February" in October leaves the reader to
+// guess which February (0202).
+describe('a caller may test the calendar year instead', () => {
+  test('a date next calendar year names it, though the committee year is the same', () => {
+    expect(saysDayLong('2027-02-01', { now: NOW })).toBe('Monday 1 February')
+    expect(saysDayLong('2027-02-01', { now: NOW, calendarYear: true })).toBe('Monday 1 February 2027')
+  })
+
+  test('a date this calendar year does not, though the committee year differs', () => {
+    expect(saysDayLong('2026-06-01', { now: NOW, calendarYear: true })).toBe('Monday 1 June')
+  })
+
+  test('an explicit year still wins', () => {
+    expect(saysDayLong('2027-02-01', { now: NOW, calendarYear: true, year: false })).toBe('Monday 1 February')
+  })
+})
