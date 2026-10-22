@@ -97,6 +97,8 @@ export const AGE_CHECK_PRODUCT_MAX = 200
 
 export const ageCheckForm = shaped(z.object({
   performanceId: z.string().min(1, 'Say which performance you mean').nullish().transform(value => value ?? null),
+  // The till's bar, so an officer on a night running two houses is placed as a sale would be (0161).
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
   ...outcomeFields,
   product: z.string().trim().max(AGE_CHECK_PRODUCT_MAX).nullish().transform(value => (value ?? '').trim() || null),
 }))

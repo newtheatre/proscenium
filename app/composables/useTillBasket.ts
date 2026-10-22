@@ -55,7 +55,7 @@ export interface TillBasketDeps {
 
   // A refusal at the tap may never reach a sale, so it goes on the register on its own
   // (F-106 criterion 6).
-  recordAgeCheck: (body: { outcome: 'REFUSED', idType: null, reason: RefusalReason | null, description: string, notes: string | null, product: string | null, performanceId: null }) => Promise<unknown>
+  recordAgeCheck: (body: { outcome: 'REFUSED', idType: null, reason: RefusalReason | null, description: string, notes: string | null, product: string | null, performanceId: null, venueId: string | undefined }) => Promise<unknown>
 }
 
 export function useTillBasket(deps: TillBasketDeps) {
@@ -272,6 +272,7 @@ export function useTillBasket(deps: TillBasketDeps) {
         // above still names every line.
         product: names ? names.slice(0, AGE_CHECK_PRODUCT_MAX) : null,
         performanceId: null,
+        venueId: venueId.value ?? undefined,
       })
     }
     catch (failed) {

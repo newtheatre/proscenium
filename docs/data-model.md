@@ -1499,7 +1499,9 @@ refusal reason as two distinct pieces of information, not one column doing both 
 venue, via `/api/admin/age-checks/export` (E-119). A row can also come from `POST
 /api/till/sale`'s inline prompt (F-106): `performance_id` there is the till's own resolved
 authority, null when it spans more than one performance, and `product` names the basket's
-restricted lines rather than something staff types.
+restricted lines rather than something staff types. A refusal given on the till before the charge
+comes through `POST /api/tonight/age-checks` with the till's `venueId`, and is placed on the house a
+sale at that bar would be (`performanceForSale`, 0161).
 
 ### checklist_items
 `id` PK · `venue_id` → venues cascade · `phase` CHECK `PRE|POST` · `label` · `sort` · `required`

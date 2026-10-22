@@ -51,10 +51,10 @@ function aPriced(over: Partial<PricedBasket> = {}): PricedBasket {
 
 // The register write a refusal makes, captured rather than sent (F-106 criterion 6).
 function recorder() {
-  const recorded: { outcome: string, reason: string | null, description: string, product: string | null }[] = []
+  const recorded: { outcome: string, reason: string | null, description: string, product: string | null, venueId?: string }[] = []
   return {
     recorded,
-    record: (body: { outcome: string, reason: string | null, description: string, product: string | null }) => {
+    record: (body: { outcome: string, reason: string | null, description: string, product: string | null, venueId?: string }) => {
       recorded.push(body)
       return Promise.resolve()
     },
@@ -455,7 +455,7 @@ describe('a refusal at the tap takes the line back out and says so (F-106 criter
     const { basket, scope } = mixed({ recordAgeCheck: register.record })
     await basket.refuseAgeCheck(refused)
     expect(register.recorded).toHaveLength(1)
-    expect(register.recorded[0]).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN', description: 'Declined to show ID', product: 'Gin' })
+    expect(register.recorded[0]).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN', description: 'Declined to show ID', product: 'Gin', venueId: 'venue-1' })
     scope.stop()
   })
 
