@@ -932,7 +932,12 @@ one passes `--additional`; there is no such escape hatch against a real database
    did it.
 
 Anyone holding a privileged role must set up an authenticator app before the role works
-(`/account/security`), so step 3 is not finished until they have.
+(`/account/security`), so step 3 is not finished until they have. Signing in sends them there
+until they do (0152). The console overview then lists the rest of a new install's set-up in order,
+under **Setting up the theatre** (0221).
+
+Locally, `bun run dev` reads `NUXT_SESSION_PASSWORD` from `.env`; the secrets-store plugin's
+warning about a worker secret of that name applies to a deployment only, and is not logged in dev.
 
 ## Linking an incoming officer's Workspace address (A-104, A-121)
 

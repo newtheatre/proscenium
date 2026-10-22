@@ -91,6 +91,23 @@ The IT Manager holds every permission, so sees every line.
 | Stocked items with no allergen answer, counting any not retired | whoever reads the bar | [Allergens](/docs/bar/stock#allergens) |
 | No incident severity routes to follow-up, so a serious incident reaches nobody | whoever changes the routing: the Theatre Manager and the IT Manager | [Safety](/docs/rota/safety) |
 
+### Setting up the theatre
+
+On a new install the IT Manager sees **Setting up the theatre** at the top of the overview: the
+order the screens need each other in, each step opening the screen that does it.
+
+1. Add the venues the theatre performs in ([Venues](/docs/box-office/venues)).
+2. Open a season for the programme ([Seasons](/docs/box-office/seasons)).
+3. Set the ticket types and their prices ([Ticket types](/docs/box-office/ticket-types)).
+4. Add the first show and its performances ([Shows](/docs/box-office/shows)).
+5. Grant the rest of the committee their roles ([Roles](/docs/people/roles)).
+6. Give a venue the shifts its nights need ([Shift templates](/docs/rota/shift-templates)).
+7. Add the bar's products ([Products](/docs/bar/products)).
+
+A step ticks as soon as one of its things exists, and the card goes once every step has ticked. It
+does not come back if something is later removed: from then on **Set-up still to do** says what is
+missing.
+
 ### An overdue restore drill
 
 If the last restore drill failed, if none has ever passed, or if the interval between drills has

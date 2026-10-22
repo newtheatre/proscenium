@@ -1,6 +1,6 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { queuesFor, setUpLines, tonightLines } from '#shared/utils/console-overview'
+import { FIRST_RUN_STEPS, firstRunLines, queuesFor, setUpLines, tonightLines } from '#shared/utils/console-overview'
 import { OPEN_STATUSES } from '#shared/utils/external-requests'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { accessProfilesList } from '#shared/utils/access-profiles-list'
@@ -14,7 +14,7 @@ import { claimsClause } from './membership-claims'
 import { performancesOnNight } from './performances'
 import { qualifiedCounts, roleEligibilities } from './rota-readiness'
 import { demandScope } from './training-demand'
-import type { ConsoleOverview } from '#shared/utils/console-overview'
+import type { ConsoleOverview, FirstRunStep } from '#shared/utils/console-overview'
 import type { Permission } from '#shared/utils/roles'
 import type { NavCount } from '#shared/utils/site-nav'
 import type { SQL } from 'drizzle-orm'
@@ -71,17 +71,35 @@ export function safetyRoutingQuery(): SQL {
   return sql`SELECT EXISTS (SELECT 1 FROM incident_severity_config WHERE requires_follow_up = 1) AS anySeverityRoutes`
 }
 
+// One row, each step a constant EXISTS: started once is done, whatever has happened to it since.
+export function firstRunQuery(): SQL {
+  const started: Record<FirstRunStep, SQL> = {
+    VENUE: sql`EXISTS (SELECT 1 FROM venues)`,
+    SEASON: sql`EXISTS (SELECT 1 FROM seasons)`,
+    TICKET_TYPE: sql`EXISTS (SELECT 1 FROM ticket_types WHERE archived = 0)`,
+    SHOW: sql`EXISTS (SELECT 1 FROM shows)`,
+    ROLES: sql`EXISTS (SELECT 1 FROM role_grants WHERE role <> 'ADMIN' AND (expires_at IS NULL OR expires_at > unixepoch()))`,
+    ROTA_TEMPLATE: sql`EXISTS (SELECT 1 FROM shift_templates)`,
+    BAR_PRODUCT: sql`EXISTS (SELECT 1 FROM bar_products WHERE status <> 'RETIRED')`,
+  }
+  return sql`SELECT ${sql.join(FIRST_RUN_STEPS.map(step => sql`${started[step]} AS ${sql.identifier(step)}`), sql`, `)}`
+}
+
 // Each part is read only for a reader who could finish it: the rota's owner, the bar's, or whoever counts.
 export async function consoleOverview(event: H3Event, permissions: ReadonlySet<Permission>): Promise<ConsoleOverview> {
   const holds = (permission: Permission): boolean => permissions.has(permission)
   const bar = holds('bar.read')
   const stocktakes = bar || holds('bar.stocktake')
 
-  const [eligibility, facts, tonight, routing] = await Promise.all([
+  const [eligibility, facts, tonight, routing, firstRun] = await Promise.all([
     holds('rota.read') ? roleEligibilities(event) : undefined,
     stocktakes ? db.all<BarSetUp>(barSetUpQuery()).then(([row]) => row) : undefined,
     OPERATIONAL_PERMISSIONS.some(holds) ? performancesOnNight(currentShowNight()) : null,
     holds('safety.write') ? db.all<{ anySeverityRoutes: number }>(safetyRoutingQuery()).then(([row]) => Boolean(row?.anySeverityRoutes)) : undefined,
+    holds('roles.grant')
+      ? db.all<Record<FirstRunStep, number>>(firstRunQuery()).then(([row]) =>
+          firstRunLines(Object.fromEntries(FIRST_RUN_STEPS.map(step => [step, Boolean(row?.[step])])) as Record<FirstRunStep, boolean>))
+      : null,
   ])
 
   const qualified = eligibility ? await qualifiedCounts(eligibility) : undefined
@@ -96,5 +114,6 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
       anySeverityRoutes: routing,
     }),
     tonight: tonight === null ? null : tonightLines(tonight),
+    firstRun,
   }
 }
