@@ -281,9 +281,11 @@ const untimedShows = computed(() => data.value.items.filter(one => one.untimedPe
         Ticket sales export
       </h2>
       <p class="text-sm text-muted">
-        Every ticket sold between these two days, as a CSV: reference, performance, type, price,
-        source, whether it was collected and whether it was refunded. No names and no access
-        details are ever in it. Taking a copy is recorded in the audit trail.
+        Every ticket for performances between these two days, whatever its state, as a CSV:
+        reference, performance, type, price, source, the booking's state (the collected column) and
+        whether it was refunded. Unpaid, lapsed and cancelled bookings are included, so filter on the
+        collected column for what was sold. No names and no access details are ever in it. Taking a copy is
+        recorded in the audit trail.
       </p>
       <AdminToolbar :filterable="false">
         <template #actions>
