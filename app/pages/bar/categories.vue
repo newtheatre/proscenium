@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { h } from 'vue'
-import { SERVING_KINDS, categoryForm, categoryPriceForm, says, saysMoney } from '#shared/utils/bar'
+import { SERVING_KINDS, categoryForm, categoryPriceForm, says, saysMoney, saysPriceSet } from '#shared/utils/bar'
 import { barCategoriesList } from '#shared/utils/bar-categories-list'
 import { saysDay } from '#shared/utils/when'
-import type { BarCategory, CategoryPrice, ServingKind } from '#shared/utils/bar'
+import type { BarCategory, CategoryPrice, PriceStanding, ServingKind } from '#shared/utils/bar'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Product categories', middleware: 'console', docs: '/docs/bar/product-categories' })
@@ -128,17 +128,19 @@ async function savePrice(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    const answered = await $fetch<{ effectiveNow: boolean }>(`/api/admin/bar/categories/${category.id}/prices`, {
+    const answered = await $fetch<{ standing: PriceStanding, first: boolean }>(`/api/admin/bar/categories/${category.id}/prices`, {
       method: 'POST',
       body: { servingKind: price.servingKind, pricePence: price.pricePence, effectiveFrom: price.effectiveFrom },
     })
     toast.add({
-      title: answered.effectiveNow ? 'Default set, and in force now' : 'Default set, and waiting for its date',
-      description: 'The price before this one stays readable, dated as it was.',
+      ...saysPriceSet('Default', answered),
       icon: 'i-lucide-check',
       color: 'success',
     })
+    // The kind just priced stays chosen, so the next price is not put on Single by surprise.
+    const kept = price.servingKind
     await editPrices(category)
+    price.servingKind = kept
   }
   catch (refused) {
     failure.value = refusalText(refused)
@@ -372,7 +374,7 @@ const columns: TableColumn<BarCategory>[] = [
     <UModal
       :open="pricing !== null"
       :title="pricing ? `Default prices for ${pricing.name}` : ''"
-      description="A serving size with no price of its own falls back here, by serving kind. A size's own price always wins. A new price starts on its date and the one before it stays readable."
+      description="A serving size with no price of its own falls back here, by serving kind. A size's own price always wins. Setting up a product copies these in as each size's own price, so a change here reaches only sizes left without one. A new price starts on its date and the one before it stays readable."
       @update:open="pricing = null; failure = null"
     >
       <template #body>

@@ -932,6 +932,21 @@ export function effectivePriceRow<T extends { effectiveFrom: string, createdAt: 
   })
 }
 
+// Where a price just set stands today, read back from the series rather than from its date alone:
+// a backdated row behind a later one is history, not in force (process map, 21 October 2026).
+export type PriceStanding = 'NOW' | 'LATER' | 'BEHIND'
+
+export function priceStanding(history: { id: string, effective: boolean }[], id: string, effectiveFrom: string, on: string): { effectiveNow: boolean, standing: PriceStanding, first: boolean } {
+  const standing: PriceStanding = effectiveFrom > on ? 'LATER' : history.some(row => row.id === id && row.effective) ? 'NOW' : 'BEHIND'
+  return { effectiveNow: standing === 'NOW', standing, first: history.length === 1 }
+}
+
+export function saysPriceSet(what: 'Price' | 'Default', set: { standing: PriceStanding, first: boolean }): { title: string, description?: string } {
+  if (set.standing === 'BEHIND') return { title: `${what} recorded from its date`, description: 'A later price is in force today, so this one is kept in the history only.' }
+  const title = set.standing === 'NOW' ? `${what} set, and in force now` : `${what} set, and waiting for its date`
+  return set.first ? { title } : { title, description: 'The price before this one stays readable, dated as it was.' }
+}
+
 export function measurePreset(id: MeasurePresetId): MeasurePreset | null {
   return MEASURE_PRESETS.find(preset => preset.id === id) ?? null
 }

@@ -1,5 +1,5 @@
 import { londonDayOf } from '#shared/utils/ledger'
-import { categoryPriceForm } from '#shared/utils/bar'
+import { categoryPriceForm, priceStanding } from '#shared/utils/bar'
 
 // Set a category's default from a date, for one serving kind. Every change is a new row, so a
 // same-day mistake is fixed today rather than tomorrow (F-121 criterion 1, F-116's same rule).
@@ -31,5 +31,7 @@ export default defineEventHandler(async (event) => {
     }),
   )
 
-  return { ok: true, id: priceId, effectiveNow: input.effectiveFrom <= on }
+  // Read back, so a backdated row behind a later one is not called in force (process map, C3).
+  const history = (await categoryPriceHistory(id, on)).filter(row => row.servingKind === input.servingKind)
+  return { ok: true, id: priceId, ...priceStanding(history, priceId, input.effectiveFrom, on) }
 })
