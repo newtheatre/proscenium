@@ -61,15 +61,19 @@ const EVERY_ROOM = 'all'
 const roomId = ref(asked('room')?.slice(0, 64) || EVERY_ROOM)
 const everyRoom = computed(() => roomId.value === EVERY_ROOM)
 
+// Written straight to history, not through the router: a navigation per change raced the slot
+// click, and the booking form never opened.
+const router = useRouter()
 watch([view, roomId, anchor], () => {
-  void navigateTo({
+  const { href } = router.resolve({
     query: {
       ...route.query,
       view: view.value === 'day' ? 'day' : undefined,
       room: everyRoom.value ? undefined : roomId.value,
       day: anchor.value === todayInLondon() ? undefined : anchor.value,
     },
-  }, { replace: true })
+  })
+  window.history.replaceState(window.history.state, '', href)
 })
 
 function todayInLondon(): string {
