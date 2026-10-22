@@ -248,6 +248,19 @@ export function resolvedPriceColumns(categoryId: SQL, variantAlias: string, on: 
   }
 }
 
+// The live sizes nothing prices today, by label, when no live size is priced at all: such a product
+// on the till offers nothing to sell (process map, 21 October 2026).
+export async function unpricedBeforeActive(productId: string, on: string): Promise<string[]> {
+  const { pricePence } = resolvedPriceColumns(sql`p.category_id`, 'v', on)
+  const sizes = await db.all<{ label: string, pricePence: number | null }>(sql`
+    SELECT v.label AS label, ${pricePence} AS pricePence
+    FROM product_variants v JOIN bar_products p ON p.id = v.product_id
+    WHERE v.product_id = ${productId} AND v.status = 'ACTIVE'
+    ORDER BY v.sort, v.label COLLATE NOCASE
+  `)
+  return sizes.some(size => size.pricePence !== null) ? [] : sizes.map(size => size.label)
+}
+
 // How many stocked items still have no allergen answer, for the console overview (issue 1358):
 // the answer is the item's, and every product pouring it reads it (issue 1348).
 export function allergensUnansweredCount(): SQL {

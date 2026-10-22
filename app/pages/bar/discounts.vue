@@ -53,7 +53,9 @@ async function save(): Promise<void> {
 
     toast.add({
       title: editing.value ? 'Discount changed' : 'Discount added',
-      description: 'A sale already given this discount keeps the rate it was given: this only changes what applying it does from now on.',
+      description: editing.value
+        ? 'A sale already given this discount keeps the rate it was given: this only changes what applying it does from now on.'
+        : 'The till offers it from the next sale.',
       icon: 'i-lucide-check',
       color: 'success',
     })

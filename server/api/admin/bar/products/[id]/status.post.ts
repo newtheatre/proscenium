@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
+import { londonDayOf } from '#shared/utils/ledger'
 import { productStatusForm, says } from '#shared/utils/bar'
 
 // Put a product on the till, hide it, or retire it. Retirement is one way, because a retired
@@ -68,5 +69,7 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { ok: true, status }
+  // Allowed, as a price may follow, but said: the till cannot sell a size nothing prices.
+  const unpriced = status === 'ACTIVE' ? await unpricedBeforeActive(id, londonDayOf(new Date())) : []
+  return { ok: true, status, unpriced }
 })

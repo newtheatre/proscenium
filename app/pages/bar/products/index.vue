@@ -202,8 +202,10 @@ async function retire(): Promise<void> {
 async function setStatus(product: BarProduct, status: ProductStatus): Promise<void> {
   failure.value = null
   try {
-    await $fetch(`/api/admin/bar/products/${product.id}/status`, { method: 'POST', body: { status } })
-    toast.add({ title: `${product.name} is ${says(status).toLowerCase()}`, icon: 'i-lucide-check', color: 'success' })
+    const answered = await $fetch<{ unpriced: string[] }>(`/api/admin/bar/products/${product.id}/status`, { method: 'POST', body: { status } })
+    toast.add(answered.unpriced.length > 0
+      ? { title: `${product.name} is on the till, but cannot be sold yet`, description: `Nothing prices ${answered.unpriced.join(', ')} today. Set a price on its serving sizes, or a default on its category.`, icon: 'i-lucide-triangle-alert', color: 'warning' }
+      : { title: `${product.name} is ${says(status).toLowerCase()}`, icon: 'i-lucide-check', color: 'success' })
     await reload()
   }
   catch (refused) {
@@ -305,13 +307,16 @@ const columns: TableColumn<BarProduct>[] = [
         'data-test': `edit-${row.original.id}`,
         'onClick': () => edit(row.original),
       }, () => 'Edit'),
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'ghost',
-        'data-test': row.original.status === 'ACTIVE' ? `hide-${row.original.id}` : `activate-${row.original.id}`,
-        'onClick': () => setStatus(row.original, row.original.status === 'ACTIVE' ? 'HIDDEN' : 'ACTIVE'),
-      }, () => (row.original.status === 'ACTIVE' ? 'Hide' : 'Put on the till')),
+      // A sold product that is retired stays retired, so it is not offered a button that only refuses.
+      row.original.status === 'RETIRED' && row.original.everSold
+        ? h('span', { 'class': 'px-2 text-xs text-muted', 'data-test': `retired-for-good-${row.original.id}` }, 'Retired for good')
+        : h(UButton, {
+            'size': 'sm',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': row.original.status === 'ACTIVE' ? `hide-${row.original.id}` : `activate-${row.original.id}`,
+            'onClick': () => setStatus(row.original, row.original.status === 'ACTIVE' ? 'HIDDEN' : 'ACTIVE'),
+          }, () => (row.original.status === 'ACTIVE' ? 'Hide' : 'Put on the till')),
       rowOverflow(row.original.id, [
         ...(row.original.status === 'RETIRED'
           ? []
@@ -322,8 +327,9 @@ const columns: TableColumn<BarProduct>[] = [
                 retiring.value = row.original
               },
             }]),
+        // Shown, not left out, so nobody hunts for a Delete that a price history rules out.
         ...(row.original.everSold || row.original.everPriced
-          ? []
+          ? [{ label: row.original.everSold ? 'Delete: it has been sold, so retire it' : 'Delete: it has a price history, so retire it', disabled: true }]
           : [{
               label: 'Delete',
               color: 'error' as const,

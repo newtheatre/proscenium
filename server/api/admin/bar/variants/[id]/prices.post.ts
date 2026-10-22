@@ -1,5 +1,5 @@
 import { londonDayOf } from '#shared/utils/ledger'
-import { priceForm } from '#shared/utils/bar'
+import { priceForm, priceStanding } from '#shared/utils/bar'
 
 // Set a price from a date. Every change is a new row, including a correction, so a same-day
 // mistake is fixed today rather than tomorrow (F-116 criteria 2 and 3).
@@ -32,5 +32,7 @@ export default defineEventHandler(async (event) => {
     }),
   )
 
-  return { ok: true, id: priceId, effectiveNow: input.effectiveFrom <= on }
+  // Read back, so a backdated row behind a later one is not called in force (process map, C3).
+  const history = await priceHistory(id, on)
+  return { ok: true, id: priceId, ...priceStanding(history, priceId, input.effectiveFrom, on) }
 })

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  priceStanding,
+  saysPriceSet,
   HAND_ENTERED_KINDS,
   KINDS_NEEDING_A_REASON,
   MOVEMENT_WRITERS,
@@ -638,5 +640,26 @@ describe('what the order list asks a supplier for', () => {
   test('a measured item with no container size is left in millilitres', () => {
     expect(toOrder({ unit: 'ML', containerMl: null, shortfall: 500 })).toBeNull()
     expect(saysToOrder({ unit: 'ML', containerMl: null, shortfall: 500 })).toBe('500 ml')
+  })
+})
+
+// A price is in force when the series says it wins today, not when its date has passed.
+describe('a price set says where it stands', () => {
+  const history = [{ id: 'oct', effective: true }, { id: 'sep', effective: false }]
+
+  test('a backdated price behind a later one is history, not in force', () => {
+    const set = priceStanding(history, 'sep', '2026-09-01', '2026-10-21')
+    expect(set).toEqual({ effectiveNow: false, standing: 'BEHIND', first: false })
+    expect(saysPriceSet('Price', set).title).toBe('Price recorded from its date')
+  })
+
+  test('the winning row is in force now, and a future one waits', () => {
+    expect(priceStanding(history, 'oct', '2026-10-21', '2026-10-21').standing).toBe('NOW')
+    expect(priceStanding(history, 'nov', '2026-11-01', '2026-10-21').standing).toBe('LATER')
+  })
+
+  test('the first price ever set does not mention one before it', () => {
+    const set = priceStanding([{ id: 'only', effective: true }], 'only', '2026-10-21', '2026-10-21')
+    expect(saysPriceSet('Default', set)).toEqual({ title: 'Default set, and in force now' })
   })
 })

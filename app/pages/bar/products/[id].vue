@@ -8,6 +8,7 @@ import {
   says,
   saysAtTheTill,
   saysMoney,
+  saysPriceSet,
   saysQuantity,
   variantChoiceForm,
   variantEditForm,
@@ -16,6 +17,7 @@ import { saysDay } from '#shared/utils/when'
 import type {
   BarProduct,
   ChoiceGroup,
+  PriceStanding,
   ProductVariant,
   ServingKind,
   StockItem,
@@ -392,13 +394,12 @@ async function savePrice(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    const answered = await $fetch<{ effectiveNow: boolean }>(`/api/admin/bar/variants/${variant.id}/prices`, {
+    const answered = await $fetch<{ standing: PriceStanding, first: boolean }>(`/api/admin/bar/variants/${variant.id}/prices`, {
       method: 'POST',
       body: { pricePence: price.pricePence, effectiveFrom: price.effectiveFrom },
     })
     toast.add({
-      title: answered.effectiveNow ? 'Price set, and in force now' : 'Price set, and waiting for its date',
-      description: 'The price before this one stays readable, dated as it was.',
+      ...saysPriceSet('Price', answered),
       icon: 'i-lucide-check',
       color: 'success',
     })
