@@ -26,6 +26,8 @@ const PASS = {
   imageUrl: 'https://newtheatre.org.uk/passes/p-1.sig/image.png',
   qrWidth: 165,
   termsUrl: 'https://newtheatre.org.uk/policies/booking',
+  valid: '21 Oct to 18 Apr',
+  shows: 'The Seagull, Small Hours',
 }
 
 describe('the reservation confirmation carries a hosted QR image', () => {

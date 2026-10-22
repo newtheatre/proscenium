@@ -1,5 +1,7 @@
 import { PASS_TERMS_PATH } from '#shared/utils/passes'
+import { saysDayRange } from '#shared/utils/when'
 import { notify } from './notify'
+import { passCoveredShows, passCurrentState } from './passes'
 import { passQrTokenFor } from './pass-qr-tokens'
 import { qrPng } from './qr'
 import type { H3Event } from 'h3'
@@ -21,6 +23,8 @@ export async function sendPassIssued(event: H3Event | undefined, context: PassCo
   const baseURL = useRuntimeConfig(event).public.baseURL
   const url = `${baseURL}/passes/${token}`
   const { width } = qrPng(url)
+  const pass = await passCurrentState(passId)
+  const shows = (await passCoveredShows(passId, Math.floor(Date.now() / 1000))).map(show => show.title)
   await notify(event, {
     userId: context.userId,
     type: 'pass.issued',
@@ -33,6 +37,8 @@ export async function sendPassIssued(event: H3Event | undefined, context: PassCo
       imageUrl: `${url}/image.png`,
       qrWidth: width,
       termsUrl: `${baseURL}${PASS_TERMS_PATH}`,
+      valid: pass ? saysDayRange(pass.validFrom, pass.validUntil) : '',
+      shows: shows.join(', '),
     },
   })
 }

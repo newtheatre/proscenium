@@ -246,6 +246,12 @@ describe.skipIf(skip !== null)('using a pass lands on its booking, and signing o
         expect(await view.evaluate<boolean>(`document.querySelector('[data-test="${control}"]') === null`)).toBe(true)
       }
 
+      // Used, the card stays and names the booking, rather than vanishing from the page.
+      const reference = await view.evaluate<string>(`fetch('/api/qr/current').then(response => response.json()).then(body => body.reference)`)
+      await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="used-pass"]')
+      expect(await textOf(view, '[data-test="used-pass"]')).toContain(`already used for this performance: booking ${reference}`)
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="redeem-pass"]') === null`)).toBe(true)
+
       expect(await view.evaluate<number>(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)).toBe(200)
       expect(await view.evaluate<number>(`fetch('/api/qr/current').then(response => response.status)`)).toBe(401)
     }

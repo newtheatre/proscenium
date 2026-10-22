@@ -119,6 +119,32 @@ export async function redeemablePassFor(userId: string, performanceId: string, s
   return row
 }
 
+export interface UsedPass {
+  reference: string
+  passTypeName: string
+  bookingReference: string
+}
+
+// A pass already used for this performance, so the booking screen says so rather than going quiet.
+export function usedPassQuery(userId: string, performanceId: string): SQL {
+  return sql`
+    SELECT p.reference AS reference, ${DISPLAY_NAME} AS passTypeName, r.reference AS bookingReference
+    FROM pass_admissions a
+    JOIN passes p ON p.id = a.pass_id
+    JOIN pass_types t ON t.id = p.pass_type_id
+    JOIN tickets k ON k.id = a.ticket_id
+    JOIN reservations r ON r.id = k.reservation_id
+    WHERE p.user_id = ${userId} AND a.performance_id = ${performanceId}
+    ORDER BY a.admitted_at
+    LIMIT 1
+  `
+}
+
+export async function usedPassFor(userId: string, performanceId: string): Promise<UsedPass | undefined> {
+  const [row] = await db.all<UsedPass>(usedPassQuery(userId, performanceId))
+  return row
+}
+
 // What a lost race quotes (criterion 2): read after the write already decided.
 export interface ExistingAdmission {
   admittedAt: number

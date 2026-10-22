@@ -30,6 +30,12 @@ interface RedeemablePass {
   passTypeName: string
 }
 
+interface UsedPass {
+  reference: string
+  passTypeName: string
+  bookingReference: string
+}
+
 interface BookingInfo {
   performanceId: string
   showId: string
@@ -41,6 +47,7 @@ interface BookingInfo {
   ticketTypes: BookableTicketType[]
   accessEntitlement: AccessEntitlement | null
   redeemablePass: RedeemablePass | null
+  usedPass: UsedPass | null
   passOffers: PassOffer[]
 }
 
@@ -332,6 +339,24 @@ useSeoMeta({
             :description="redeemNotice"
             data-test="redeem-notice"
           />
+        </UCard>
+
+        <UCard
+          v-else-if="data!.usedPass"
+          data-test="used-pass"
+        >
+          <template #header>
+            <h2 class="font-semibold">
+              Your pass
+            </h2>
+          </template>
+          <p class="text-sm text-muted">
+            {{ data!.usedPass.passTypeName }} ({{ data!.usedPass.reference }}) is already used for this performance:
+            booking <NuxtLink
+              to="/qr"
+              class="text-primary underline"
+            >{{ data!.usedPass.bookingReference }}</NuxtLink>. A pass admits once to each performance.
+          </p>
         </UCard>
 
         <PassOffer
