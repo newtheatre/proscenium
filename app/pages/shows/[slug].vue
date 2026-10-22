@@ -374,13 +374,20 @@ function saysInterval(performance: ListedPerformance): string {
             </section>
           </div>
 
-          <p
+          <section
             v-if="data.contentNotes"
-            class="mt-4 whitespace-pre-line text-sm text-muted"
-            data-test="warnings-notes"
+            class="mt-4 border-t border-default pt-4"
           >
-            {{ data.contentNotes }}
-          </p>
+            <h3 class="text-sm font-semibold">
+              About these warnings
+            </h3>
+            <p
+              class="mt-1 whitespace-pre-line text-sm text-muted"
+              data-test="warnings-notes"
+            >
+              {{ data.contentNotes }}
+            </p>
+          </section>
         </UCard>
 
         <UAlert

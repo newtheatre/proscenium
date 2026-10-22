@@ -249,6 +249,25 @@ describe.skipIf(skip !== null)('a show is a draft nobody outside can see until i
     expect((await detail(id)).show).toMatchObject({ seasonId: null })
   })
 
+  // 0194: publishing named one retired reference at a time, after the button was pressed.
+  test('publishing onto a retired category and season names both at once', async () => {
+    const id = await newShow()
+    const title = (await detail(id)).show.title
+    const seasonName = named('Summer')
+    const seasonId = (await (await send('POST', '/api/admin/reference-data/seasons', { name: seasonName, startsOn: '2041-06-01', endsOn: '2041-08-01' })).json() as { id: string }).id
+    const categoryName = named('Opera')
+    const categoryId = (await (await send('POST', '/api/admin/reference-data/show-categories', { name: categoryName })).json() as { id: string }).id
+    expect((await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), seasonId, categoryId, loadedSeasonId: null })).status).toBe(200)
+    await send('POST', `/api/admin/reference-data/seasons/${seasonId}/archive`, { archived: true })
+    await send('POST', `/api/admin/reference-data/show-categories/${categoryId}/archive`, { archived: true })
+
+    const refused = await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: false })
+    expect(refused.status).toBe(409)
+    const says = await refused.text()
+    expect(says).toContain(`its category, ${categoryName}, has been retired`)
+    expect(says).toContain(`its season, ${seasonName}, has been retired`)
+  })
+
   test('a save that does not say which season it loaded is refused', async () => {
     const id = await newShow()
     expect((await send('PUT', `/api/admin/shows/${id}`, { title: 'Unsaid', slug: 'unsaid' })).status).toBe(400)

@@ -36,28 +36,39 @@ const emit = defineEmits<{ unpublish: [], remove: [] }>()
         </p>
       </div>
       <p
+        v-else-if="show.soldTickets > 0"
+        class="text-sm text-muted"
+        data-test="off-sale"
+      >
+        Off the public site: nothing is on sale. Every booking is kept; publish it again to reopen sales.
+      </p>
+      <p
         v-else
         class="text-sm text-muted"
       >
         This show is a draft, so there is nothing on sale to take away.
       </p>
 
-      <div
-        v-if="show.soldTickets === 0"
-        class="space-y-2 border-t border-default pt-4"
-      >
+      <div class="space-y-2 border-t border-default pt-4">
         <UButton
           color="error"
           variant="ghost"
           block
-          :disabled="busy"
+          :disabled="busy || show.soldTickets > 0"
           data-test="delete-show"
           @click="emit('remove')"
         >
           Delete this show
         </UButton>
-        <p class="text-sm text-muted">
-          Nothing has ever been sold under it, so there is no history to lose.
+        <p
+          class="text-sm text-muted"
+          data-test="delete-show-reason"
+        >
+          {{ show.soldTickets === 0
+            ? 'Nothing has ever been sold under it, so there is no history to lose.'
+            : show.status === 'PUBLISHED'
+              ? `${plural(show.soldTickets, 'ticket')} sold, so it can only be taken off sale.`
+              : `${plural(show.soldTickets, 'ticket')} sold, so it stays for its bookings and its history.` }}
         </p>
       </div>
     </div>

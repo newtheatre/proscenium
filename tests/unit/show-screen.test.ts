@@ -62,6 +62,8 @@ describe('the status strip states each figure in words (criterion 2)', () => {
     expect(saysOnSale(3, 5)).toBe('On sale')
     expect(saysOnSale(0, 5)).toBe('Nothing on sale')
     expect(saysOnSale(0, 0)).toBe('No performances')
+    expect(saysOnSale(3, 5, false)).toBe('Nothing on sale')
+    expect(saysOnSaleCount(3, 5, false)).toBe('Nothing sells while the show is unpublished')
     expect(saysOnSaleCount(3, 5)).toBe('3 of 5 performances')
     expect(saysOnSaleCount(1, 1)).toBe('1 of 1 performance')
     expect(saysOnSaleCount(0, 0)).toBe('None scheduled yet')

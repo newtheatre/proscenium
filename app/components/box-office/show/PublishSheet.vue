@@ -6,10 +6,11 @@ import type { CoveringPass } from '#shared/utils/pass-types'
 import type { AdminPerformance, AdminShow, ShowVenue } from '#shared/utils/programme'
 
 // Read back before a show goes on sale: each night's venue, running time and shifts, then what a
-// booker pays, the passes, the warnings and the poster. It gates nothing (D-132 criterion 7).
+// booker pays, the passes, the warnings and the poster. Only `blockers` gate it (D-132 criterion 7).
 
 const props = defineProps<{
   detail: { show: AdminShow, performances: AdminPerformance[], venues: ShowVenue[], coveringPasses: CoveringPass[] } | null | undefined
+  blockers?: string[]
 }>()
 
 const cascade = defineModel<boolean>('cascade', { required: true })
@@ -55,6 +56,26 @@ const saysWarnings = computed(() => {
     class="space-y-5"
     data-test="publish-sheet"
   >
+    <UAlert
+      v-if="blockers?.length"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-octagon-x"
+      title="Fix these before it can go on sale"
+      data-test="publish-blockers"
+    >
+      <template #description>
+        <ul class="list-disc space-y-1 pl-4">
+          <li
+            v-for="one in blockers"
+            :key="one"
+          >
+            {{ one }}
+          </li>
+        </ul>
+      </template>
+    </UAlert>
+
     <USwitch
       v-model="cascade"
       label="Put its performances on sale too"

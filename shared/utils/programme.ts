@@ -321,10 +321,14 @@ export interface PublishReadiness {
   untimedPerformanceCount: number
   uncoveredPassCount: number
   activePriceCount: number
+  warningCount: number
+  warningsConfirmedNone: boolean
+  // Uncancelled nights at a venue we run with no shift on them, counted from the rows the sheet reads.
+  unstampedPerformanceCount: number
 }
 
 export interface PublishCheck {
-  key: 'poster' | 'performances' | 'running-time' | 'passes' | 'pricing'
+  key: 'poster' | 'performances' | 'running-time' | 'passes' | 'pricing' | 'warnings' | 'shifts'
   says: string
   done: boolean
 }
@@ -338,6 +342,8 @@ export function publishChecklist(show: PublishReadiness): PublishCheck[] {
     { key: 'running-time', says: 'Running time set for every performance', done: show.untimedPerformanceCount === 0 },
     { key: 'passes', says: 'Covered by every pass on sale for its dates', done: show.uncoveredPassCount === 0 },
     { key: 'pricing', says: 'Pricing set', done: show.activePriceCount > 0 },
+    { key: 'warnings', says: 'Content warnings assessed', done: show.warningCount > 0 || show.warningsConfirmedNone },
+    { key: 'shifts', says: 'Shifts stamped on every performance we staff', done: show.unstampedPerformanceCount === 0 },
   ]
 }
 
@@ -456,6 +462,19 @@ export function publicShow(show: Omit<PublicShow, 'posterUrl'> & { posterKey: st
 // never been on sale and is nobody's business yet (D-121 criteria 1 and 5).
 export function isPublicPerformance(performance: { status: PerformanceStatus }): boolean {
   return performance.status !== 'DRAFT'
+}
+
+// Every reason a show cannot publish, so the sheet lists them all and the route refuses with them
+// all, rather than one at a time (D-131 criterion 5).
+export function publishBlockers(
+  title: string,
+  category: ShowReference | null | undefined,
+  season: ShowReference | null | undefined,
+): string[] {
+  const blockers: string[] = []
+  if (category?.archived) blockers.push(`its category, ${category.name}, has been retired`)
+  if (season?.archived) blockers.push(`its season, ${season.name}, has been retired`)
+  return blockers.map(one => `${title} cannot publish: ${one}`)
 }
 
 // A retired season or category still names the shows it holds; the picker says so (D-131).
