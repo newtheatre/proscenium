@@ -132,7 +132,7 @@ async function grant(): Promise<void> {
       variant="subtle"
       icon="i-lucide-smartphone"
       :title="`Granted, but ${saysRole(waitsOn)} needs an authenticator app`"
-      description="It does nothing for them until they set one up under Sign-in and security in their account. Tell them now, before they meet a refused screen."
+      description="It does nothing for them until they set one up under Security in their account. Tell them now, before they meet a refused screen."
     />
 
     <div class="grid gap-3 sm:grid-cols-2">

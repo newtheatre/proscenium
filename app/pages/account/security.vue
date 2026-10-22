@@ -62,6 +62,7 @@ async function attempt(action: () => Promise<void>, refused = sayOnPage): Promis
     if (needsReauthentication(error)) {
       // The confirmation gives way to the modal; what waits on it is the confirmed action itself.
       confirmingRemoval.value = false
+      confirmingRegenerate.value = false
       pending.value = action
       reauthenticating.value = true
     }
@@ -116,11 +117,22 @@ const confirm = (entered: string[]): Promise<void> => attempt(async () => {
   }
 })
 
+// The saved set dies the moment a new one is made, so it is asked first, like a removal (0154).
+const confirmingRegenerate = ref(false)
+const regenerateOpen = computed({
+  get: () => confirmingRegenerate.value,
+  set: (value) => { if (value || !working.value) confirmingRegenerate.value = value },
+})
+
+const regenerateFailure = ref<string | null>(null)
+
 const regenerate = (): Promise<void> => attempt(async () => {
+  regenerateFailure.value = null
   const fresh = await $fetch<{ recoveryCodes: string[] }>('/api/account/mfa/recovery-codes', { method: 'POST' })
+  confirmingRegenerate.value = false
   codes.value = fresh.recoveryCodes
   step.value = 'codes'
-})
+}, (said) => { regenerateFailure.value = said })
 
 // Asked first (A-109 criterion 6), then re-authenticated if the session is stale, never both
 // twice: a retry runs removeFactor directly (A-128 criterion 9).
@@ -373,7 +385,7 @@ useSeoMeta({ title: 'Security' })
             data-test="regenerate"
             variant="subtle"
             :loading="working"
-            @click="regenerate"
+            @click="confirmingRegenerate = true"
           >
             Show a new set of recovery codes
           </UButton>
@@ -466,6 +478,17 @@ useSeoMeta({ title: 'Security' })
       :loading="working"
       :failure="removeFailure"
       @confirm="remove"
+    />
+
+    <ConfirmModal
+      v-model:open="regenerateOpen"
+      name="regenerate-codes"
+      title="Show a new set of recovery codes"
+      verb="Show a new set"
+      :consequence="`The ${state?.recoveryCodesRemaining ?? 0} codes you have saved stop working at once, and eight new ones are shown here once.`"
+      :loading="working"
+      :failure="regenerateFailure"
+      @confirm="regenerate"
     />
 
     <ReauthenticateModal

@@ -96,6 +96,7 @@ const CATALOGUE = {
   'membership.claim.withdrawn': { label: 'Membership claim withdrawn', module: 'identity' },
   'account.method.added': { label: 'Sign-in method added', module: 'identity', self: true },
   'account.method.removed': { label: 'Sign-in method removed', module: 'identity', self: true },
+  'account.method.renamed': { label: 'Passkey renamed', module: 'identity', self: true },
   'account.email.changed': { label: 'Email address changed', module: 'identity', self: true },
   'account.email.changed.admin': { label: 'Email address changed by an officer', module: 'identity' },
   'account.profile.updated': { label: 'Profile updated', module: 'identity', self: true },
