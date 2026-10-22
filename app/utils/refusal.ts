@@ -39,7 +39,7 @@ export function writeFailureText(error: unknown, whatToCheck: string): string {
 
 export type SettledRead<T, F = string>
   = { kind: 'READ', value: T, at: number }
-    | { kind: 'FAILED', failure: F, status: number | undefined, at: number }
+    | { kind: 'FAILED', failure: F, status: number | undefined, at: number, refuses?: boolean }
 
 // A show-night read that never throws: a 403 is a refusal, drawn in place of the screen's work, and
 // anything else a failure that keeps the screen (issue 1304). `at` is epoch milliseconds either way.
@@ -54,11 +54,13 @@ export async function settleReadWith<T, F>(ask: () => Promise<T>, failureOf: (er
     return { kind: 'READ', value: await ask(), at: Date.now() }
   }
   catch (error) {
-    return { kind: 'FAILED', failure: failureOf(error), status: refusalStatus(error), at: Date.now() }
+    // A request no venue can answer is refused like a 403, since no control on the screen can work.
+    const refuses = refusalData<{ chooseVenue?: boolean }>(error)?.chooseVenue === true
+    return { kind: 'FAILED', failure: failureOf(error), status: refusalStatus(error), at: Date.now(), ...(refuses ? { refuses } : {}) }
   }
 }
 
 // What a screen draws in place of its work after a read: the refusal's own words, or nothing.
 export function refusalOf(read: SettledRead<unknown>): string | null {
-  return read.kind === 'FAILED' && read.status === 403 ? read.failure : null
+  return read.kind === 'FAILED' && (read.status === 403 || read.refuses === true) ? read.failure : null
 }

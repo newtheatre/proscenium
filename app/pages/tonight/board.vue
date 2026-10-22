@@ -64,11 +64,17 @@ async function load(): Promise<void> {
 // In the served page, so a refused viewer never sees the board's controls first (issue 1521).
 const waiting = useServedRead('tonight-board', read, apply)
 
+const codeFailure = ref<string | null>(null)
+
+// A refused reveal says why: a button that does nothing reads as a code that is not there.
 async function loadCode(): Promise<void> {
+  codeFailure.value = null
   try {
     boardCode.value = (await $fetch<{ code: string }>('/api/tonight/board/code')).code
   }
-  catch { /* the code block just stays hidden; the feed still polls */ }
+  catch (error) {
+    codeFailure.value = refusalText(error, 'The code could not be read just now. Try again.')
+  }
 }
 
 // Within five seconds, the contract E-121 criterion 3 states directly, not a configuration key.
@@ -367,6 +373,13 @@ async function reset(): Promise<void> {
           >
             Show the code
           </UButton>
+          <p
+            v-if="codeFailure && !boardCode"
+            class="mt-2 text-sm text-error"
+            data-test="board-code-failure"
+          >
+            {{ codeFailure }}
+          </p>
         </NightBlock>
       </BoardFeed>
 
