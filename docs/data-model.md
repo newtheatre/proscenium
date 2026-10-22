@@ -2174,7 +2174,11 @@ The queue is `GET /api/admin/rooms/queue`, gated on `rooms.write`, and it **re-j
 waiting request as it reads it** rather than recalling the verdict from when it was written: a
 request made on Monday may have run out of notice by Thursday, and the officer deciding needs what
 is true now (C-109 criterion 1). The requester's standing is what it judges against, never the
-reader's.
+reader's. A waiting request counts towards the member's cap because it holds its slot, but the row
+being judged is left out of its own count (`heldBesides`, 0208), so a member at the cap does not see
+every request of theirs read as breaking it. Each room row carries `preApprovalNoShows`: the
+requester's no-show count when they are under pre-approval and that is why it is here, `null`
+otherwise. It is counted per requester with constant-parameter statements, never an id list.
 
 `when`, `kind` and `room` are declared (`shared/utils/rooms-queue-list.ts`, K-129) and live in the
 URL, but the queue keeps its own envelope (`items`, `total`, `more`, `counts`) and its server-side
@@ -2188,7 +2192,10 @@ approving write, so an approval beaten to the slot returns a conflict listing wh
 than confirming a double booking (criterion 3, audit RM-4). No statement's parameter count grows
 with the batch; the read that fetches the rows first chunks at 90 (0003). A zero-row write is
 disambiguated by one read into missing, already settled, room gone, or beaten, so a partly refused
-batch says which ones and why rather than reading as a success. Each decision's audit entry is in
+batch says which ones and why rather than reading as a success. A conflict says "Somebody took that
+slot while this was waiting" only when something in the way was written after the request, in the
+room it held; a move, or a slot that was always taken, says "{room} is already booked then; choose
+another room". Each decision's audit entry is in
 that decision's own batch, so a batch failing part-way leaves every decision before it audited.
 `REJECTED`, `CANCELLED` and `BUMPED` are terminal for everyone, officers included: reopening is
 refused because the slot may already be somebody else's (criterion 5). An approval may move the

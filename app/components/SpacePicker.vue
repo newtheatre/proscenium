@@ -14,15 +14,18 @@ interface Space {
 
 const model = defineModel<string | undefined>()
 
-// The name as well as the id, for a screen collecting rooms rather than holding one.
-const emit = defineEmits<{ chosen: [{ id: string, name: string } | null] }>()
+// The name as well as the id, for a screen collecting rooms rather than holding one, and what we
+// know about it, for a screen that stops on a room marked no good.
+const emit = defineEmits<{ chosen: [{ id: string, name: string, verdict: string | null, warning: string | null } | null] }>()
 
 const props = withDefaults(defineProps<{
   // What the room is wanted for, so each result can say whether it suits.
   purpose?: string | null
   placeholder?: string
   disabled?: boolean
-}>(), { purpose: null, placeholder: 'Search for a room', disabled: false })
+  // The screen stops on a room marked no good itself, so the soft warning would say it twice.
+  stopsUnsuitable?: boolean
+}>(), { purpose: null, placeholder: 'Search for a room', disabled: false, stopsUnsuitable: false })
 
 const instance = useId()
 const searchTerm = ref('')
@@ -58,11 +61,17 @@ const options = computed(() => shown.value.map(space => ({ ...space, value: spac
 function choose(option: { value: string } | undefined): void {
   model.value = option?.value
   chosen.value = shown.value.find(space => space.id === option?.value) ?? null
-  emit('chosen', chosen.value ? { id: chosen.value.id, name: chosen.value.name } : null)
+  emit('chosen', chosen.value
+    ? { id: chosen.value.id, name: chosen.value.name, verdict: chosen.value.verdict, warning: chosen.value.warning }
+    : null)
 }
 
 // The warning follows the chosen room and the purpose, so changing either re-asks.
-const warning = computed(() => shown.value.find(space => space.id === model.value)?.warning ?? null)
+const warning = computed(() => {
+  const space = shown.value.find(one => one.id === model.value)
+  if (!space || (props.stopsUnsuitable && space.verdict === 'UNSUITABLE')) return null
+  return space.warning
+})
 
 function where(space: Space): string {
   return [space.building, space.campus].filter(Boolean).join(', ') || 'Somewhere on campus'
