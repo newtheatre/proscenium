@@ -62,8 +62,8 @@ const CARD_COLUMNS = sql`
   e.first_call_phone AS firstCallPhone, u.name AS updatedByName, e.updated_at AS updatedAt
 `
 
-// The latest row per venue is the current card: no supersede reference to chase, since nothing
-// else can be more recent than the highest `updated_at` (E-113 criterion 1).
+// The latest row per venue is the current card (E-113 criterion 1). `updated_at` is second precision
+// and `id` a random UUID, so `rowid` (insertion order) breaks a tie between two saves in one second.
 export function currentCardQuery(venueId: string): SQL {
   return sql`
     SELECT ${CARD_COLUMNS}
@@ -71,7 +71,7 @@ export function currentCardQuery(venueId: string): SQL {
     JOIN venues v ON v.id = e.venue_id
     JOIN users u ON u.id = e.updated_by
     WHERE e.venue_id = ${venueId}
-    ORDER BY e.updated_at DESC
+    ORDER BY e.updated_at DESC, e.rowid DESC
     LIMIT 1
   `
 }
@@ -89,7 +89,7 @@ export function cardVersionsQuery(venueId: string, limit: number, offset: number
     JOIN venues v ON v.id = e.venue_id
     JOIN users u ON u.id = e.updated_by
     WHERE e.venue_id = ${venueId}
-    ORDER BY e.updated_at DESC, e.id DESC
+    ORDER BY e.updated_at DESC, e.rowid DESC
     LIMIT ${limit} OFFSET ${offset}
   `
 }
@@ -144,7 +144,7 @@ export function currentCardsQuery(clause: ListClause, limit: number, offset: num
     SELECT ${CARD_COLUMNS}, v.address AS venueAddress
     FROM venues v
     LEFT JOIN venue_emergency_info e ON e.id = (
-      SELECT id FROM venue_emergency_info WHERE venue_id = v.id ORDER BY updated_at DESC LIMIT 1
+      SELECT id FROM venue_emergency_info WHERE venue_id = v.id ORDER BY updated_at DESC, rowid DESC LIMIT 1
     )
     LEFT JOIN users u ON u.id = e.updated_by
     WHERE v.id IN (
