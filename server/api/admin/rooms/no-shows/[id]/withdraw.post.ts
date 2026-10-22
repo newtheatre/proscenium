@@ -1,5 +1,5 @@
-import { eq } from 'drizzle-orm'
-import { withdrawForm } from '#shared/utils/no-shows'
+import { and, count, eq, gt } from 'drizzle-orm'
+import { releasedFromPreApproval, withdrawForm } from '#shared/utils/no-shows'
 
 // Withdraw a no-show, by superseding it rather than editing it.
 export default defineEventHandler(async (event) => {
@@ -27,6 +27,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'That record has already been superseded' })
   }
 
+  const before = await standingOf(event, record.userId)
   const withdrawalId = newId()
   await db.insert(schema.roomNoShows).values({
     id: withdrawalId,
@@ -46,5 +47,28 @@ export default defineEventHandler(async (event) => {
     detail: { supersedes: record.id, record: withdrawalId },
   }))
 
-  return { ok: true, id: withdrawalId, supersedes: record.id, ...await standingOf(event, record.userId) }
+  const after = await standingOf(event, record.userId)
+  const released = releasedFromPreApproval(before.standing, after.standing)
+
+  return {
+    ok: true,
+    id: withdrawalId,
+    supersedes: record.id,
+    ...after,
+    released,
+    userId: record.userId,
+    // Their requests still to come, any of which may have waited on the ladder alone.
+    waiting: released ? await waitingFor(record.userId) : 0,
+  }
 })
+
+async function waitingFor(userId: string): Promise<number> {
+  const [row] = await db.select({ waiting: count() })
+    .from(schema.roomBookings)
+    .where(and(
+      eq(schema.roomBookings.userId, userId),
+      eq(schema.roomBookings.status, 'PENDING_APPROVAL'),
+      gt(schema.roomBookings.endsAt, Math.floor(Date.now() / 1000)),
+    ))
+  return row?.waiting ?? 0
+}

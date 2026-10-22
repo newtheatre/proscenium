@@ -226,6 +226,8 @@ describe.skipIf(skip !== null)('the ladder, and what it costs (criteria 3 and 4)
     giveMembership(laddered.id)
   })
 
+  let askedWhileLaddered = ''
+
   function pastFor(who: TestMember, hoursAgo: number): string {
     return pastBooking(who.id, hoursAgo)
   }
@@ -288,6 +290,7 @@ describe.skipIf(skip !== null)('the ladder, and what it costs (criteria 3 and 4)
     expect(asked.status).toBe(200)
 
     const { id } = await asked.json() as { id: string }
+    askedWhileLaddered = id
     const queue = await (await send('GET', '/api/admin/rooms/queue', null, officer)).json() as
       { items: { id: string }[] }
     expect(queue.items.some(item => item.id === id)).toBe(true)
@@ -298,13 +301,29 @@ describe.skipIf(skip !== null)('the ladder, and what it costs (criteria 3 and 4)
       `SELECT id FROM room_no_shows WHERE user_id = ? AND kind = 'RECORDED' ORDER BY recorded_at DESC LIMIT 1`,
       laddered.id)!
 
-    await send('POST', `/api/admin/rooms/no-shows/${standing.id}/withdraw`,
-      { reason: 'Agreed at committee' }, officer)
+    const withdrawn = await (await send('POST', `/api/admin/rooms/no-shows/${standing.id}/withdraw`,
+      { reason: 'Agreed at committee' }, officer)).json() as { released: boolean, waiting: number, userId: string }
+    // Off pre-approval with a request waiting, so the dialogue offers a second look at it.
+    expect(withdrawn).toMatchObject({ released: true, waiting: 1, userId: laddered.id })
 
     const body = await (await send('GET', '/api/rooms/standing', null, laddered.cookie)).json() as
       { count: number, standing: string }
     expect(body.count).toBe(2)
     expect(body.standing).toBe('RECORDED')
+  })
+
+  test('judging their waiting requests again confirms one that now passes by itself', async () => {
+    const answered = await send('POST', '/api/admin/rooms/requests/rejudge', { userId: laddered.id }, officer)
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toMatchObject({ confirmed: 1, waiting: 0 })
+
+    const row = read<{ status: string, decided_by: string }>('SELECT status, decided_by FROM room_bookings WHERE id = ?', askedWhileLaddered)
+    expect(row).toEqual({ status: 'CONFIRMED', decided_by: officerId })
+    expect(read<{ n: number }>(`SELECT count(*) n FROM audit_log WHERE action = 'room.request.approved' AND target = ?`, `booking:${askedWhileLaddered}`)?.n).toBe(1)
+  })
+
+  test('a member cannot ask for a second look at anybody', async () => {
+    expect((await send('POST', '/api/admin/rooms/requests/rejudge', { userId: laddered.id }, laddered.cookie)).status).toBe(403)
   })
 
   test('and booking works again', async () => {
