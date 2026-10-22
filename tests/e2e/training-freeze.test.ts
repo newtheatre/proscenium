@@ -57,6 +57,11 @@ function today(): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+function yesterday(): string {
+  const { year, month, day } = londonParts(new Date())
+  return new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10)
+}
+
 const said = async (answered: Response): Promise<string> =>
   (await answered.json() as { statusMessage?: string }).statusMessage ?? ''
 
@@ -191,7 +196,8 @@ describe.skipIf(skip !== null)('the granting flags freeze the same way (G-109 cr
 describe.skipIf(skip !== null)('revoking every record thaws the module (G-109 criterion 3)', () => {
   test('the fields are editable again once nothing unrevoked is left', async () => {
     const module = await addModule({ kind: 'CERTIFICATION' })
-    const first = await award(module)
+    // A day apart: one day takes one award of a module (0240).
+    const first = await award(module, yesterday())
     const second = await award(module)
 
     expect((await edit(module, { kind: 'CERTIFICATION', grantsTrainer: true })).status).toBe(409)
