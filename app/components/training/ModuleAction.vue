@@ -48,6 +48,22 @@ async function signUp(): Promise<void> {
     working.value = false
   }
 }
+
+// A brief that allows it is recorded by its reader, dated today, with nobody else involved (0244).
+async function markRead(): Promise<void> {
+  working.value = true
+  try {
+    await $fetch(`/api/training/modules/${props.moduleId}/read`, { method: 'POST' })
+    toast.add({ title: 'Recorded', description: `${props.moduleName} is on your training now.`, icon: 'i-lucide-check', color: 'success' })
+    emit('changed')
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    working.value = false
+  }
+}
 </script>
 
 <template>
@@ -81,6 +97,17 @@ async function signUp(): Promise<void> {
       :class="large ? 'min-h-12' : undefined"
       disabled
       :data-test="`module-committee-only-${moduleId}`"
+    >
+      {{ saysTrainingAction(action) }}
+    </UButton>
+    <UButton
+      v-else-if="action.kind === 'READ'"
+      :size="large ? 'lg' : 'sm'"
+      :class="large ? 'min-h-12' : undefined"
+      icon="i-lucide-book-check"
+      :loading="working"
+      :data-test="`module-read-${moduleId}`"
+      @click.stop.prevent="markRead"
     >
       {{ saysTrainingAction(action) }}
     </UButton>

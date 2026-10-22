@@ -342,6 +342,7 @@ const CATALOGUE = {
   'record.signed-off': { label: 'Training signed off', module: 'training' },
   'record.signoff.unbounded': { label: 'Signed off as never expiring', module: 'training' },
   'record.external-certificate': { label: 'External certificate recorded', module: 'training' },
+  'record.self-registered': { label: 'Brief read and recorded by its reader', module: 'training' },
   'record.revoked': { label: 'Training record revoked', module: 'training' },
   'session.scheduled': { label: 'Training session scheduled', module: 'training' },
   'record.delivery-logged': { label: 'Delivered training logged', module: 'training' },

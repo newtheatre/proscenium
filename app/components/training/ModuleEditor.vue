@@ -400,6 +400,8 @@ async function save(event: FormSubmitEvent<ModuleInput & { id?: string }>): Prom
             v-if="state.kind === 'BRIEF'"
             v-model="state.selfRegistrable"
             label="People can register themselves for it"
+            description="Members who have read it press I have read this, and it goes on their record dated that day. Put what to read under Material links."
+            data-test="module-self-registrable"
           />
           <USwitch
             v-model="state.committeeOnly"

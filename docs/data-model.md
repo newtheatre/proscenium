@@ -2802,8 +2802,10 @@ stateDiagram-v2
 ### training_records  APPEND-ONLY (exception: revocation stamps `revoked_*` once)
 `id` PK · `user_id` restrict · `module_id` restrict · `awarded_on` civil date ·
 `expires_on` NULL = never · `expiry_overridden` bool · `source` CHECK
-`SESSION|SIGNOFF|EXTERNAL|SELF|LEGACY` (`SELF` is G-208 brief self-registration and V2
-quizzes; `LEGACY` is vocabulary only, nothing writes it) · `session_id` NULL ·
+`SESSION|SIGNOFF|EXTERNAL|SELF|LEGACY` (`SELF` is written by **I have read this** on a
+self-registrable brief, `POST /api/training/modules/:id/read`, at most once per person, brief and
+day (0244); G-208's posters and V2 quizzes will write it too; `LEGACY` is vocabulary only,
+nothing writes it) · `session_id` NULL ·
 `granted_by` · `evidence_ref` scrub · `revoked_at` / `revoked_by` / `revoke_reason` scrub ·
 `created_at`. Indexed on (`user_id`, `module_id`) and on `module_id`.
 Validity is derived (`VALID|EXPIRING|EXPIRED`), never stored; expiring counts as held. Which
