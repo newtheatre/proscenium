@@ -54,10 +54,14 @@ export const unitCostPence = sql`(
     AND NOT EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = d.id)
 )`
 
+// A void or a reversal keeps the charge's positive qty beside its negative amount, so it takes the
+// quantity away here as it takes the money, rather than adding to it.
+const signedQty = sql`CASE WHEN e.void_of_entry_id IS NOT NULL OR e.reverses_entry_id IS NOT NULL THEN -l.qty ELSE l.qty END`
+
 export function salesQuery(fromAt: number, toAt: number): SQL {
   return sql`
     SELECT c.name AS categoryName, p.name AS productName, v.label AS variantLabel,
-           sum(l.qty) AS qty, sum(l.amount_pence) AS revenuePence
+           sum(${signedQty}) AS qty, sum(l.amount_pence) AS revenuePence
     FROM ledger_lines l
     JOIN ledger_entries e ON e.id = l.entry_id
     JOIN product_variants v ON v.id = l.product_variant_id
@@ -109,7 +113,7 @@ export function gpDepletionQuery(fromAt: number, toAt: number): SQL {
 }
 
 // Products sold in the period whose lines poured nothing, so their cost is missing from the
-// figure rather than nought; the screen names them instead of overstating profit in silence.
+// figure rather than nought. A void's credit pours nothing by design and is not a sale.
 export function gpUnpouredQuery(fromAt: number, toAt: number): SQL {
   return sql`
     SELECT DISTINCT p.name AS productName
@@ -118,6 +122,7 @@ export function gpUnpouredQuery(fromAt: number, toAt: number): SQL {
     JOIN product_variants v ON v.id = l.product_variant_id
     JOIN bar_products p ON p.id = v.product_id
     WHERE l.kind = 'BAR_ITEM' AND e.happened_at >= ${fromAt} AND e.happened_at < ${toAt}
+      AND e.void_of_entry_id IS NULL AND e.reverses_entry_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM stock_movements m WHERE m.ref_table = 'ledger_lines' AND m.ref_id = l.id)
     ORDER BY p.name COLLATE NOCASE
   `

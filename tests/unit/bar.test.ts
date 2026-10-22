@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  saysMovementReason,
   HAND_ENTERED_KINDS,
   KINDS_NEEDING_A_REASON,
   MOVEMENT_WRITERS,
@@ -638,5 +639,14 @@ describe('what the order list asks a supplier for', () => {
   test('a measured item with no container size is left in millilitres', () => {
     expect(toOrder({ unit: 'ML', containerMl: null, shortfall: 500 })).toBeNull()
     expect(saysToOrder({ unit: 'ML', containerMl: null, shortfall: 500 })).toBe('500 ml')
+  })
+})
+
+// A void's stock return is stored as a count correction, but reads as the void it was.
+describe('a movement says why it happened', () => {
+  test('a reversal of a sale is a tab charge voided, not a count correction', () => {
+    expect(saysMovementReason({ kind: 'REVERSAL', reason: 'COUNT_CORRECTION', reversesKind: 'SALE' })).toBe('Tab charge voided')
+    expect(saysMovementReason({ kind: 'REVERSAL', reason: 'COUNT_CORRECTION', reversesKind: 'DELIVERY' })).toBe('Count correction')
+    expect(saysMovementReason({ kind: 'DELIVERY', reason: null, reversesKind: null })).toBeNull()
   })
 })

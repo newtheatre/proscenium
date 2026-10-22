@@ -792,6 +792,7 @@ const MOVEMENT_COLUMNS = sql`
   m.ref_table AS refTable,
   m.ref_id AS refId,
   m.reverses_id AS reversesId,
+  (SELECT t.kind FROM stock_movements t WHERE t.id = m.reverses_id) AS reversesKind,
   m.actor_id AS actorId,
   m.created_at AS createdAt,
   CASE WHEN EXISTS (SELECT 1 FROM stock_movements r WHERE r.reverses_id = m.id) THEN 1 ELSE 0 END AS reversed
