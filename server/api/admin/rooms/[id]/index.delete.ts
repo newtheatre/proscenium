@@ -1,5 +1,5 @@
 import { retireQuery } from '#shared/utils/rooms'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 import type { Stranded } from '#server/utils/blackouts'
 
 type Settled = Omit<Stranded, 'room'>
@@ -55,12 +55,13 @@ async function tellTurnedDown(event: Parameters<typeof notify>[0], requests: Str
     await notify(event, {
       type: 'room.request.rejected',
       userId,
+      about: [...new Set(theirs.flatMap(request => request.seriesId ? [request.id, request.seriesId] : [request.id]))],
       context: {
         name: '',
         bookings: theirs.map(request => ({
           room: request.room,
           title: request.title,
-          when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+          when: saysRoomSpan(request.startsAt, request.endsAt),
         })),
         reason,
         moved: null,
