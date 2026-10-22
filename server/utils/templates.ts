@@ -153,6 +153,11 @@ export function unwrapPlainText(text: string): string {
   })
 }
 
+// A shift is worked from its own start, not the curtain, so a volunteer is told when to arrive (0212).
+function callTimeSentence(context: TemplateContext): string {
+  return context.callTime ? ` Your call time is ${String(context.callTime)}.` : ''
+}
+
 const TEMPLATES = {
   'account-verify': (context: TemplateContext): Rendered => {
     const url = String(context.url)
@@ -605,11 +610,11 @@ The Nottingham New Theatre`,
     subject: `Your ${context.role} shift on ${context.show} is confirmed`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>Your ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, is
-now confirmed.</p>`),
+now confirmed.${callTimeSentence(context)}</p>`),
     text: `Hello ${context.name},
 
 Your ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, is
-now confirmed.
+now confirmed.${callTimeSentence(context)}
 
 The Nottingham New Theatre`,
   }),
@@ -622,7 +627,8 @@ The Nottingham New Theatre`,
 <p>Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
 ${context.when}, was declined.</p>
 <p>Why: ${context.reason}</p>
-<p>The shift stays on the open list, and so does everything else you are welcome to claim.</p>`),
+<p>That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it. Every other
+shift you are welcome to take is still on your rota.</p>`),
     text: `Hello ${context.name},
 
 Your claim on the ${context.role} shift for ${context.show} at ${context.venue},
@@ -630,28 +636,59 @@ ${context.when}, was declined.
 
 Why: ${context.reason}
 
-The shift stays on the open list, and so does everything else you are welcome to claim.
+That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it. Every other
+shift you are welcome to take is still on your rota.
 
 The Nottingham New Theatre`,
   }),
 
-  // Sent to the FOH officer, either because the night is close or because the role can never go
-  // unstaffed at all; a release further out only shows up in the seven-day digest (E-107 criterion 2).
-  'shift-released': (context: TemplateContext): Rendered => ({
-    subject: `A ${context.role} shift on ${context.show} has been released`,
-    html: layout(`<p>Hello ${context.name},</p>
-<p>The ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, has been
-released and is back on the open list.</p>
-<p>Assign somebody from the rota, or leave it for a member to claim.</p>`),
-    text: `Hello ${context.name},
+  // Sent to the FOH officer for a close night or a duty manager (E-107 criterion 2). A claim still
+  // waiting is withdrawn, not released: nobody had been confirmed on it (0212).
+  'shift-released': (context: TemplateContext): Rendered => {
+    const subject = context.withdrawn
+      ? `A claim on a ${context.role} shift on ${context.show} has been withdrawn`
+      : `A ${context.role} shift on ${context.show} has been released`
+    const what = context.withdrawn
+      ? `The claim on the ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, has been withdrawn, so the shift is open again.`
+      : `The ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, has been released and is back on the open list.`
+    const url = String(context.url)
+    return {
+      subject,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${what}</p>
+<p>Assign somebody on the <a href="${url}">rota board</a>, or leave it for a member to claim.</p>`),
+      text: `Hello ${context.name},
 
-The ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, has been
-released and is back on the open list.
+${what}
 
-Assign somebody from the rota, or leave it for a member to claim.
+Assign somebody on the rota board, or leave it for a member to claim:
+
+${url}
 
 The Nottingham New Theatre`,
-  }),
+    }
+  },
+
+  // Sent to the rota's officers when claims wait for them, so a claim is not left until the
+  // morning's digest (0212).
+  'shift-claim-waiting': (context: TemplateContext): Rendered => {
+    const url = String(context.url)
+    return {
+      subject: `A ${context.role} claim on ${context.show} is waiting for you`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${context.claimant} has claimed the ${context.role} shift on ${context.show} at ${context.venue},
+${context.when}. It waits for you to confirm or decline.</p>
+<p><a href="${url}">Open the claims waiting</a></p>`),
+      text: `Hello ${context.name},
+
+${context.claimant} has claimed the ${context.role} shift on ${context.show} at ${context.venue},
+${context.when}. It waits for you to confirm or decline:
+
+${url}
+
+The Nottingham New Theatre`,
+    }
+  },
 
   // An officer's assignment is confirmed by definition, so it reads exactly like an approval
   // (E-107 criterion 3).
@@ -659,32 +696,38 @@ The Nottingham New Theatre`,
     subject: `You have been assigned a ${context.role} shift on ${context.show}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>You have been assigned the ${context.role} shift on ${context.show} at ${context.venue},
-${context.when}.</p>`),
+${context.when}.${callTimeSentence(context)}</p>`),
     text: `Hello ${context.name},
 
 You have been assigned the ${context.role} shift on ${context.show} at ${context.venue},
-${context.when}.
+${context.when}.${callTimeSentence(context)}
 
 The Nottingham New Theatre`,
   }),
 
-  // The other side of a replacement: nothing was declined and nothing was their doing, so the
-  // wording says only that the shift has gone (E-107 criterion 5).
-  'shift-removed': (context: TemplateContext): Rendered => ({
-    subject: `Your ${context.role} shift on ${context.show} has been reassigned`,
-    html: layout(`<p>Hello ${context.name},</p>
-<p>The ${saysRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
-${context.venue}, ${context.when}, to somebody else.</p>
+  // Nothing was declined and nothing was their doing. "Reassigned" only where somebody replaced
+  // them; a stand-down says they were taken off and the shift is open again (E-107 c5, 0212).
+  'shift-removed': (context: TemplateContext): Rendered => {
+    const subject = context.replaced
+      ? `Your ${context.role} shift on ${context.show} has been reassigned`
+      : `You have been taken off your ${context.role} shift on ${context.show}`
+    const what = context.replaced
+      ? `The ${saysRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}, to somebody else.`
+      : `The ${saysRole('FOH_MANAGER')} has taken you off your ${context.role} shift on ${context.show} at ${context.venue}, ${context.when}. The shift is open again for somebody else to take.`
+    return {
+      subject,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${what}</p>
 <p>There is nothing for you to do. Other shifts you hold are unaffected.</p>`),
-    text: `Hello ${context.name},
+      text: `Hello ${context.name},
 
-The ${saysRole('FOH_MANAGER')} has reassigned your ${context.role} shift on ${context.show} at
-${context.venue}, ${context.when}, to somebody else.
+${what}
 
 There is nothing for you to do. Other shifts you hold are unaffected.
 
 The Nottingham New Theatre`,
-  }),
+    }
+  },
 
   // The attachment is what actually gets it into a calendar; the body just says why one arrived
   // (E-109 criterion 1).

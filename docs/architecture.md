@@ -1332,7 +1332,8 @@ assignment's 409 "That member already holds a shift on this performance"; a shif
 added open with no gate.
 A disabled account is refused before either check runs: a training gap and a disabled account are
 different reasons, and the route names the one that actually applies (0009). Both the outgoing and
-the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
+the incoming holder are emailed (`shift.removed` with `replaced`, `shift.assigned` with the shift's
+call time; an officer's stand-down sends `shift.removed` without `replaced`, 0212), and
 `GET /api/admin/rota/shifts/[id]/candidates?search=` is the narrow, `rota.write`-scoped member
 search the assignment screen picks a name from (each match carries `reason`, why it is locked,
 from `candidateLock()`: committee role, training, then already on the performance, 0210), distinct

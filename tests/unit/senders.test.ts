@@ -69,6 +69,7 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'shift.approved': 'ANNOUNCEMENTS',
   'shift.declined': 'ANNOUNCEMENTS',
   'shift.released': 'ANNOUNCEMENTS',
+  'shift.claim-waiting': 'ANNOUNCEMENTS',
   'shift.assigned': 'ANNOUNCEMENTS',
   'shift.removed': 'ANNOUNCEMENTS',
   'shift.reminder': 'ANNOUNCEMENTS',

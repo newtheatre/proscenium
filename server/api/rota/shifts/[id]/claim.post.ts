@@ -1,5 +1,6 @@
 import { changes } from '#shared/utils/audit'
-import { UNPUBLISHED_REFUSAL, clashRefusal } from '#shared/utils/rota'
+import { formatLondon, londonClock } from '#shared/utils/london'
+import { UNPUBLISHED_REFUSAL, clashRefusal, saysShiftRole } from '#shared/utils/rota'
 import { shiftClaimForm } from '#shared/utils/tonight'
 
 // Claim an open shift in one tap. Eligibility is re-checked live and availability rides the
@@ -47,6 +48,30 @@ export default defineEventHandler(async (event) => {
     const clash = await clashingShift(account.id, id)
     if (clash) throw createError({ statusCode: 409, statusMessage: clashRefusal(null, clash) })
     throw createError({ statusCode: 409, statusMessage: 'You already hold a shift on this performance' })
+  }
+
+  // Confirmed at once, the claimant has it in writing as an approval would give it; queued, the
+  // rota's officers are told now rather than at the morning's digest (0212).
+  const when = formatLondon(new Date(held.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+  const role = saysShiftRole(held.role).toLowerCase()
+  if (status === 'CONFIRMED') {
+    await notify(event, {
+      userId: account.id,
+      type: 'shift.approved',
+      context: {
+        name: '', show: held.showTitle, venue: held.venueName, when, role,
+        callTime: held.shiftStartsAt === null ? undefined : londonClock(new Date(held.shiftStartsAt * 1000)),
+      },
+    })
+  }
+  else {
+    const officers = await rotaOfficers()
+    const url = `${useRuntimeConfig(event).public.baseURL}/rota/manage/shifts?waiting=true`
+    await Promise.all(officers.map(officer => notify(event, {
+      userId: officer.id,
+      type: 'shift.claim-waiting',
+      context: { name: '', claimant: account.name, show: held.showTitle, venue: held.venueName, when, role, url },
+    })))
   }
 
   return { ok: true, status }
