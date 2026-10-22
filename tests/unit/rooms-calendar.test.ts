@@ -153,7 +153,9 @@ describe('what a slot and the calendar say', () => {
     expect(source).toContain('asked(\'view\')')
     expect(source).toContain('asked(\'room\')')
     expect(source).toContain('asked(\'day\')')
-    expect(source).toContain('{ replace: true }')
+    // Replaced in history without a router navigation, which raced the slot click.
+    expect(source).toContain('window.history.replaceState(window.history.state, \'\', href)')
+    expect(source).not.toContain('navigateTo({\n    query')
   })
 
   test('an account without a membership is told above the calendar, unless it manages rooms', async () => {
