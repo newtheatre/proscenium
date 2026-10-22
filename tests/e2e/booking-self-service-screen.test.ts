@@ -52,7 +52,8 @@ const slugged = (title: string): string => title.toLowerCase().replace(/[^a-z0-9
 const nextWeek = (offsetHours = 0): number => Math.floor(Date.now() / 1000) + 7 * 86_400 + offsetHours * 3600
 
 // Two nights, so the exchange form has somewhere to send the booking.
-async function twoNightBooking(): Promise<{ qrToken: string, reference: string, performanceId: string }> {
+// With `soon`, a third night forty minutes out, whose unpaid hold releases in about twenty-five.
+async function twoNightBooking(soon = false): Promise<{ qrToken: string, reference: string, performanceId: string }> {
   const title = named('Twelfth Night')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
   const showId = (await show.json() as { id: string }).id
@@ -61,6 +62,10 @@ async function twoNightBooking(): Promise<{ qrToken: string, reference: string, 
   for (const offset of [0, 24]) {
     const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek(offset), durationMinutes: 120 })
     nights.push((await performance.json() as { id: string }).id)
+  }
+  if (soon) {
+    const startsAt = Math.floor(Date.now() / 1000) + 40 * 60
+    expect((await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt, durationMinutes: 120 })).status).toBe(200)
   }
 
   const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
@@ -89,6 +94,26 @@ describe.skipIf(skip !== null)('the booking screen says which night and which wa
 
       // "Wed 14 Oct, 19:30", the short London form lists use everywhere else.
       expect(await textOf(view, '[data-test="booking-exchange-options"]')).toMatch(/\w{3}\s\d{1,2}\s\w{3},\s\d{2}:\d{2}/)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a night releasing within half an hour is greyed out, saying when it releases', async () => {
+    const { qrToken } = await twoNightBooking(true)
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${qrToken}`, '[data-test="booking-found"]')
+      await click(view, '[data-test="booking-exchange-start"]')
+      await waitFor(view, `document.querySelector('[data-test="booking-exchange-options"]')`)
+
+      expect(await textOf(view, '[data-test="booking-exchange-options"]')).toContain('too soon to move to')
+      const disabled = await view.evaluate<number>(
+        `document.querySelectorAll('[data-test="booking-exchange-options"] button[role="radio"][disabled], [data-test="booking-exchange-options"] [role="radio"][data-disabled]').length`,
+      )
+      expect(disabled).toBeGreaterThanOrEqual(1)
     }
     finally {
       view.close()

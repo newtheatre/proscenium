@@ -244,6 +244,18 @@ export function saysExchangeNight(night: { startsAt: number, venueName: string, 
   }
 }
 
+// A night whose unpaid hold would release within this many minutes is not offered to move to:
+// the exchanged booking would lapse before anyone could reach the desk to pay.
+export const EXCHANGE_MIN_HOLD_MINUTES = 30
+
+export function exchangeTooSoon(bookingClosesAt: number, now: number): boolean {
+  return bookingClosesAt - now < EXCHANGE_MIN_HOLD_MINUTES * 60
+}
+
+export function saysExchangeTooSoon(bookingClosesAt: number): string {
+  return `Unpaid bookings release at ${saysClock(bookingClosesAt)}, too soon to move to`
+}
+
 // Criterion 3: cancellation this close to curtain has nowhere useful to send the freed seats.
 export function pastCurtainReason(startsAt: number, now: number): string | null {
   if (startsAt > now) return null

@@ -28,10 +28,11 @@ function run(database: TestDatabase, statement: ReturnType<typeof releaseHoldSta
   database.raw.prepare(query).run(...parameters as never[])
 }
 
-function reserve(database: TestDatabase, id: string, performanceId: string, holdExpiresAt: number | null, status = 'PENDING'): string {
+// Booked a day before the hold releases unless told otherwise, so the reminder window opens after it.
+function reserve(database: TestDatabase, id: string, performanceId: string, holdExpiresAt: number | null, status = 'PENDING', createdAt = (holdExpiresAt ?? Math.floor(Date.now() / 1000)) - 86_400): string {
   database.batch([[
-    'INSERT INTO reservations (id, reference, performance_id, user_id, status, source, hold_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    id, id.toUpperCase().slice(0, 6), performanceId, 'u-1', status, 'WEB', holdExpiresAt,
+    'INSERT INTO reservations (id, reference, performance_id, user_id, status, source, hold_expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    id, id.toUpperCase().slice(0, 6), performanceId, 'u-1', status, 'WEB', holdExpiresAt, createdAt,
   ]])
   return id
 }
@@ -138,6 +139,19 @@ describe('the batch a reminder run finds (D-107 criteria 1, 4)', () => {
       const at = expiresAt - 10 * 60
       const found = rows<{ id: string }>(database, ...boundStatement(database, reminderCandidatesQuery(at, 15, 10)))
       expect(found).toEqual([])
+    })
+  })
+
+  test('a hold booked inside the window is never reminded: its confirmation has just said when', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const expiresAt = seeded.startsAt - 900
+      reserve(database, 'r-late', seeded.performanceId, expiresAt, 'PENDING', expiresAt - 14 * 60)
+      reserve(database, 'r-early', seeded.performanceId, expiresAt, 'PENDING', expiresAt - 16 * 60)
+
+      const at = expiresAt - 10 * 60
+      const found = rows<{ id: string }>(database, ...boundStatement(database, reminderCandidatesQuery(at, 15, 10)))
+      expect(found.map(row => row.id)).toEqual(['r-early'])
     })
   })
 

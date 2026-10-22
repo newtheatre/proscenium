@@ -2,7 +2,7 @@
 import type * as z from 'zod'
 import { CONFIRM_BACK_LABEL } from '#shared/utils/admin-conventions'
 import { SAYS_BEFORE_YOU_COME } from '#shared/utils/content-warnings'
-import { belowMinimumTicketsReason, qrStatusDisplay, qrStatusTone, reservationResendForm, saysExchangeNight, stepperMax } from '#shared/utils/reservations'
+import { belowMinimumTicketsReason, exchangeTooSoon, qrStatusDisplay, qrStatusTone, reservationResendForm, saysExchangeNight, saysExchangeTooSoon, stepperMax } from '#shared/utils/reservations'
 import type { OwnBookingListing } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { AuthFormField, FormSubmitEvent } from '@nuxt/ui'
@@ -48,6 +48,7 @@ interface ExchangeOption {
   venueName: string
   availability: string
   says: string
+  bookingClosesAt: number
   totalPence: number | null
 }
 
@@ -220,6 +221,7 @@ const exchangeOptions = ref<ExchangeOption[]>([])
 const exchangeChoice = ref<string | undefined>(undefined)
 const exchangeCurrentTotal = ref(0)
 const exchangeChosen = computed(() => exchangeOptions.value.find(option => option.id === exchangeChoice.value) ?? null)
+const exchangeReadAt = ref(0)
 // Said once the exchange lands, because the booking the page now shows has a new reference (D-111 criterion 4).
 const exchangedFrom = ref<string | null>(null)
 
@@ -229,6 +231,7 @@ async function startExchange(): Promise<void> {
   try {
     const options = await $fetch<{ performances: ExchangeOption[], currentTotalPence: number }>('/api/qr/exchange-options', { query: { reference: booking.value?.reference } })
     exchangeOptions.value = options.performances
+    exchangeReadAt.value = Math.floor(Date.now() / 1000)
     exchangeCurrentTotal.value = options.currentTotalPence
     exchangeChoice.value = undefined
     exchanging.value = true
@@ -491,11 +494,14 @@ useSeoMeta({ title: 'Your booking' })
             v-model="exchangeChoice"
             :items="exchangeOptions.map(option => {
               const night = saysExchangeNight(option)
+              const tooSoon = !SOLD_OUT_OR_CLOSED.includes(option.availability) && exchangeTooSoon(option.bookingClosesAt, exchangeReadAt)
               return {
                 label: night.label,
-                description: option.totalPence === null ? `${night.description} · not every ticket type is offered` : `${night.description} · ${saysPrice(option.totalPence)}`,
+                description: tooSoon
+                  ? `${option.venueName} · ${saysExchangeTooSoon(option.bookingClosesAt)}`
+                  : option.totalPence === null ? `${night.description} · not every ticket type is offered` : `${night.description} · ${saysPrice(option.totalPence)}`,
                 value: option.id,
-                disabled: SOLD_OUT_OR_CLOSED.includes(option.availability) || option.totalPence === null,
+                disabled: SOLD_OUT_OR_CLOSED.includes(option.availability) || option.totalPence === null || tooSoon,
               }
             })"
             data-test="booking-exchange-options"

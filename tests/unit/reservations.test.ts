@@ -23,6 +23,8 @@ import {
   sameNightReason,
   sameTicketLines,
   saysExchangeNight,
+  exchangeTooSoon,
+  saysExchangeTooSoon,
   saysTotalDue,
   ticketEditDelta,
   totalTickets,
@@ -450,6 +452,19 @@ describe('an exchange into the performance already held is not a real exchange',
 
 // Issue 1152 item 5: the exchange list offered "The Test House: Tickets available" with no date,
 // so a booker picked a night by guessing which radio was which.
+describe('a night releasing within half an hour is too soon to exchange into', () => {
+  const RELEASE = Math.floor(new Date('2026-10-21T20:15:00Z').getTime() / 1000)
+
+  test('29 minutes before the release is too soon, 31 is not', () => {
+    expect(exchangeTooSoon(RELEASE, RELEASE - 29 * 60)).toBe(true)
+    expect(exchangeTooSoon(RELEASE, RELEASE - 31 * 60)).toBe(false)
+  })
+
+  test('the reason names the release time in London', () => {
+    expect(saysExchangeTooSoon(RELEASE)).toBe('Unpaid bookings release at 21:15, too soon to move to')
+  })
+})
+
 describe('a night in the exchange list is named by its date (D-111 criterion 1)', () => {
   // 14 October 2026, 19:30 London, and a fixed today so the year rule is judged against a known
   // committee year rather than the clock the suite runs on (0009).
