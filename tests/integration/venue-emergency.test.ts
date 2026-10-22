@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
-import { currentCardQuery, currentCardsQuery, emergencyCardsClause, recordCardStatement } from '#server/utils/venue-emergency'
+import { cardVersionsQuery, currentCardQuery, currentCardsQuery, emergencyCardsClause, recordCardStatement } from '#server/utils/venue-emergency'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
@@ -107,6 +107,20 @@ describe('recording a version (criterion 1)', () => {
 
 // Issue 1519: who a campus venue rings first survives the round trip, on the night and on the
 // committee's overview alike, and a card that names nobody still reads null for both.
+describe('every version of a card is read back, newest first (0217)', () => {
+  test('two versions page one at a time, each naming who filed it', async () => {
+    await withDatabase(async (database) => {
+      const officer = person(database, 'officer')
+      const venue = testVenue(database)
+      run(database, recordCardStatement(venue.id, card({ assemblyPoint: 'First' }), officer, 'vei-1').statement)
+      run(database, recordCardStatement(venue.id, card({ assemblyPoint: 'Second' }), officer, 'vei-2').statement)
+
+      expect(run(database, cardVersionsQuery(venue.id, 10, 0)).map(row => row.assemblyPoint)).toEqual(['Second', 'First'])
+      expect(run(database, cardVersionsQuery(venue.id, 1, 1))).toMatchObject([{ assemblyPoint: 'First', updatedByName: `Someone ${officer}` }])
+    })
+  })
+})
+
 describe('who to ring first (issue 1519)', () => {
   test('a named first call comes back on the current card and the overview', async () => {
     await withDatabase(async (database) => {

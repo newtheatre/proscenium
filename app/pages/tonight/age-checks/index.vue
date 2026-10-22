@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AGE_CHECK_OUTCOMES, ID_TYPES, REFUSAL_REASONS, ageCheckReady, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
+import { AGE_CHECK_OUTCOMES, ID_TYPES, NAME_WARNING, REFUSAL_REASONS, ageCheckReady, looksLikeName, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { saysClock } from '#shared/utils/when'
 import { openingHouseId, saysPerformanceChoice } from '#shared/utils/tonight'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
@@ -348,6 +348,13 @@ async function submitCorrect(): Promise<void> {
             class="w-full"
             data-test="log-description"
           />
+          <p
+            v-if="looksLikeName(logForm.description)"
+            class="mt-1 text-sm text-warning"
+            data-test="log-name-warning"
+          >
+            {{ NAME_WARNING }}
+          </p>
         </UFormField>
 
         <UCollapsible data-test="log-more">
@@ -454,6 +461,13 @@ async function submitCorrect(): Promise<void> {
             class="w-full"
             data-test="correct-description"
           />
+          <p
+            v-if="looksLikeName(correctForm.description)"
+            class="mt-1 text-sm text-warning"
+            data-test="correct-name-warning"
+          >
+            {{ NAME_WARNING }}
+          </p>
         </UFormField>
 
         <UFormField

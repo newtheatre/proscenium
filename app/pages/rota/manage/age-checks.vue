@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { ageCheckVenue, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
+import { ageCheckVenue, looksLikeName, saysIdType, saysOutcome, saysRefusalReason } from '#shared/utils/age-checks'
 import { londonDay } from '#shared/utils/membership'
 import { saysWhen } from '#shared/utils/when'
 import type { AgeCheckOutcome, IdType, RefusalReason } from '#shared/utils/age-checks'
@@ -93,6 +93,10 @@ const columns: TableColumn<Entry>[] = [
     header: 'Description',
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.description),
+      // Flagged so it can be corrected on Tonight before the register goes to an inspector (0218).
+      looksLikeName(row.original.description)
+        ? h(UBadge, { 'color': 'warning', 'variant': 'subtle', 'size': 'sm', 'data-test': `name-flag-${row.original.id}` }, () => 'May name somebody')
+        : null,
       row.original.product ? h('div', { class: 'text-xs text-muted' }, row.original.product) : null,
     ]),
   },

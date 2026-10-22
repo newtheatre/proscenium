@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { EMERGENCY_SERVICES, cardAddressDraft, emergencyCalls, emergencyCardComplete, emergencyCardForm, firstCallOf, saysCall } from '#shared/utils/venue-emergency'
+import { EMERGENCY_SERVICES, cardAddressDraft, emergencyCalls, emergencyCardComplete, emergencyCardForm, emergencyCardProblems, firstCallOf, saysCall } from '#shared/utils/venue-emergency'
 
 // E-113's pure validation. What the database holds is proved against the real migrations in
 // `tests/integration/venue-emergency.test.ts`.
@@ -186,5 +186,20 @@ describe('no emergency call dials on the first tap (issue 1519)', () => {
     expect(screen).not.toContain('to="tel:999"')
     expect(screen).toContain('event.preventDefault()')
     expect(screen).toContain('<NightSheet')
+  })
+})
+
+describe('the form names each mistake by its field, as a sentence (0217)', () => {
+  test('a blank address and a lone name are each named against their own field', () => {
+    const problems = emergencyCardProblems({ ...filled, address: '  ', firstCallName: 'Security', firstCallPhone: '' })
+    expect(problems.address).toBe('The address is what gets read to a 999 handler, so give it')
+    expect(problems.firstCallPhone).toBe('Who to ring first needs both a name and a number, or neither')
+  })
+
+  test('a whole card has no problems, and every message starts with a capital', () => {
+    expect(emergencyCardProblems(filled)).toEqual({})
+    const messages = Object.values(emergencyCardProblems({ ...filled, address: '', firstCallName: 'A', firstCallPhone: '999' }))
+    expect(messages.length).toBeGreaterThan(0)
+    for (const message of messages) expect(message[0]).toBe(message[0]!.toUpperCase())
   })
 })

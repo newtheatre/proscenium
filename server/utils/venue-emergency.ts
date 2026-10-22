@@ -81,6 +81,28 @@ export async function currentCard(venueId: string): Promise<EmergencyCard | unde
   return row
 }
 
+// Every version of one venue's card, newest first, paged in SQL (0005, 0217).
+export function cardVersionsQuery(venueId: string, limit: number, offset: number): SQL {
+  return sql`
+    SELECT ${CARD_COLUMNS}
+    FROM venue_emergency_info e
+    JOIN venues v ON v.id = e.venue_id
+    JOIN users u ON u.id = e.updated_by
+    WHERE e.venue_id = ${venueId}
+    ORDER BY e.updated_at DESC, e.id DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `
+}
+
+export async function cardVersions(venueId: string, limit: number, offset: number): Promise<EmergencyCard[]> {
+  return db.all<EmergencyCard>(cardVersionsQuery(venueId, limit, offset))
+}
+
+export async function countCardVersions(venueId: string): Promise<number> {
+  const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venue_emergency_info WHERE venue_id = ${venueId}`)
+  return row?.total ?? 0
+}
+
 // A venue with no card at all yet: every column the outer join could not fill. The venue's own
 // address for audiences rides along, to prefill a card that has none (issue 1352).
 export type VenueCardRow = Omit<EmergencyCard, 'id' | 'updatedByName' | 'updatedAt'> & {
