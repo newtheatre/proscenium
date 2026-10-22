@@ -100,8 +100,7 @@ export const REINSTATED_HOLD_MINUTES = 15
 
 export function reinstatedHoldExpiresAt(startsAt: number, minutesBefore: number, now: number): number {
   const release = holdExpiresAt(startsAt, minutesBefore)
-  if (release > now) return release
-  return Math.max(startsAt, now + REINSTATED_HOLD_MINUTES * 60)
+  return Math.max(release > now ? release : startsAt, now + REINSTATED_HOLD_MINUTES * 60)
 }
 
 // D-107 criterion 2: keyed on the expiry it warns about, not the reservation alone, so a hold

@@ -56,6 +56,9 @@ describe('a reinstated hold always has time left to be paid', () => {
   test('before the release it holds until the release', () => {
     expect(reinstatedHoldExpiresAt(curtain, 15, curtain - 3600)).toBe(curtain - 900)
   })
+  test('a release only a minute ahead still leaves fifteen minutes, not one', () => {
+    expect(reinstatedHoldExpiresAt(curtain, 60, curtain - 3660)).toBe(curtain - 3660 + 900)
+  })
   test('after the release it holds until curtain', () => {
     expect(reinstatedHoldExpiresAt(curtain, 60, curtain - 1800)).toBe(curtain)
   })
