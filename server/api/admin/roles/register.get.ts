@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
     grantedBy: grantor.name,
     note: schema.roleGrants.note,
     disabled: schema.users.disabled,
-    waitsOnFactor: sql<number>`case when ${waitsOnFactor(privileged)} then 1 else 0 end`,
+    waitsOnFactor: sql<boolean>`case when ${waitsOnFactor(privileged)} then 1 else 0 end`.mapWith(Boolean),
   }
   const grants = () => db.select(columns)
     .from(schema.roleGrants)

@@ -415,8 +415,8 @@ describe.skipIf(skip !== null)('the account screen', () => {
   }, 120_000)
 
   test('a merged account names the account it went into, with a link (0157)', async () => {
-    const loser = await subject('merged-away')
-    const winner = await subject('merged-into')
+    const loser = await subject('folded-away')
+    const winner = await subject('folded-into')
     expect((await send('POST', `/api/admin/accounts/${loser.id}/merge`, { winnerId: winner.id, confirmEmail: loser.email }, cookie)).status).toBe(200)
     const view = await officerView()
     try {

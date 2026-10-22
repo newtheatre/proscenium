@@ -24,7 +24,7 @@ interface Holder {
   note: string | null
   live: boolean
   disabled: boolean
-  waitsOnFactor: number
+  waitsOnFactor: boolean
 }
 
 interface Register {
@@ -149,7 +149,7 @@ const columns: TableColumn<Holder>[] = [
       const marks: { label: string, color: 'error' | 'warning' | 'neutral' }[] = []
       if (!row.original.live) marks.push({ label: 'Lapsed', color: 'warning' })
       if (row.original.disabled) marks.push({ label: 'Disabled', color: 'error' })
-      if (row.original.live && row.original.waitsOnFactor === 1) marks.push({ label: 'Needs an authenticator', color: 'warning' })
+      if (row.original.live && row.original.waitsOnFactor) marks.push({ label: 'Needs an authenticator', color: 'warning' })
       if (row.original.expiresAt === null) marks.push({ label: 'Until further notice', color: 'neutral' })
       return h('div', { class: 'flex flex-wrap gap-1' }, marks.map(mark =>
         h(UBadge, { color: mark.color, variant: 'subtle', size: 'sm' }, () => mark.label)))
