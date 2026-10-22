@@ -220,7 +220,7 @@ query string. Every link to them carries the `next` its request was sent with, a
 
 | Route | Consumes |
 | --- | --- |
-| `/verify?token=` | `POST /api/auth/verify`, offering a sign-in link on a 410. A token issued by an address change is bound to that address and confirms no other (A-115). In the browser that registered, which holds the address sealed in the `nnt-registered` cookie (`server/utils/registered-here.ts`), it signs in as well (0103) |
+| `/verify?token=` | `POST /api/auth/verify`, offering a sign-in link on a 410. A token issued by an address change is bound to that address and confirms no other (A-115); opening it is what moves the account to that address, ends every session and tells the old address (0151). In the browser that registered, which holds the address sealed in the `nnt-registered` cookie (`server/utils/registered-here.ts`), it signs in as well (0103) |
 | `/reset?token=` | `GET /api/auth/password/check` on arrival, which answers `{ usable }` and spends nothing, so a dead link is said before the form (0121); then `POST /api/auth/password/reset`, which signs in once the password is set, or answers with an MFA attempt |
 | `/magic?token=` | `POST /api/auth/magic-link/consume`, which may answer with an MFA attempt |
 
@@ -1332,7 +1332,8 @@ assignment's 409 "That member already holds a shift on this performance"; a shif
 added open with no gate.
 A disabled account is refused before either check runs: a training gap and a disabled account are
 different reasons, and the route names the one that actually applies (0009). Both the outgoing and
-the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
+the incoming holder are emailed (`shift.removed` with `replaced`, `shift.assigned` with the shift's
+call time; an officer's stand-down sends `shift.removed` without `replaced`, 0212), and
 `GET /api/admin/rota/shifts/[id]/candidates?search=` is the narrow, `rota.write`-scoped member
 search the assignment screen picks a name from (each match carries `reason`, why it is locked,
 from `candidateLock()`: committee role, training, then already on the performance, 0210), distinct
@@ -2215,7 +2216,7 @@ predicate, so a filtered list is still one show's list. The same payload carries
 counted from seats on open holds, and the show row carries its house, its next curtain and that
 same unpaid figure for the status strip.
 
-Access profiles are declared at `/account/access` and verified at `/box-office/access-profiles`
+Access profiles are declared at `/account/access` and verified at `/people/access`
 (D-127), the one screen `access.verify` gates rather than any of the box office's ordinary
 permissions: the Secretary and Welfare Officer (`SECRETARY`, 0113), never general box office. The special-category payload is
 one AES-256-GCM blob per row, `server/utils/access-profile-crypto.ts` the only place that touches

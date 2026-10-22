@@ -37,6 +37,7 @@ export const ticketTypeForm = z.object({
   description: z.string().trim().max(500).nullish(),
   price: pence,
   activeByDefault: z.boolean().default(true),
+  sort: z.number().int('An order is a whole number').nonnegative('An order is nought or more').default(0),
 })
 
 export const newTicketTypeForm = ticketTypeForm.extend({
@@ -48,8 +49,10 @@ export const newTicketTypeForm = ticketTypeForm.extend({
 )
 
 // Members-only is fixed at creation (D-109); open and box office only swap either way (0190).
+// An edit that leaves the order out keeps it, so an older form never resets it to nought (0193).
 export const editTicketTypeForm = ticketTypeForm.extend({
   restrictedTo: z.enum(TICKET_TYPE_RESTRICTIONS).nullable().optional(),
+  sort: z.number().int('An order is a whole number').nonnegative('An order is nought or more').optional(),
 })
 
 export function restrictionChangeRefusal(held: TicketTypeRestriction | null, wanted: TicketTypeRestriction | null): string | null {
@@ -76,6 +79,7 @@ export interface TicketType {
   restrictedTo: TicketTypeRestriction | null
   archived: boolean
   activeByDefault: boolean
+  sort: number
   everSold: boolean
 }
 
@@ -134,6 +138,18 @@ export function saysRestriction(restrictedTo: string | null): string | null {
   if (restrictedTo === 'MEMBER') return 'Current members only'
   if (restrictedTo === 'DESK') return 'Box office only'
   return null
+}
+
+// "From" is the cheapest seat anybody may book; a cheaper members' price is said apart, never as
+// the floor a guest is then refused (D-109).
+export function saysFromPrice(prices: { price: number, restrictedTo: string | null }[]): string | null {
+  const open = prices.filter(one => one.restrictedTo === null).map(one => one.price)
+  const members = prices.filter(one => one.restrictedTo === 'MEMBER').map(one => one.price)
+  const floor = open.length ? Math.min(...open) : null
+  const memberFloor = members.length ? Math.min(...members) : null
+  if (floor === null) return memberFloor === null ? null : `Members from ${saysPrice(memberFloor)}`
+  if (memberFloor === null || memberFloor >= floor) return `From ${saysPrice(floor)}`
+  return `From ${saysPrice(floor)}, members ${saysPrice(memberFloor)}`
 }
 
 // Pence in, pounds out, unprefixed: the figure a machine reads, such as a schema.org offer.

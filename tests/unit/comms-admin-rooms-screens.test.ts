@@ -122,7 +122,8 @@ describe('one truth about a room override (C-106 criterion 7)', () => {
   test('each field takes its floor from the declaration, not from a typed-in number', async () => {
     const source = await read(ROOMS)
     expect(source).toContain('ROOM_OVERRIDE_FLOORS')
-    expect(source).toContain('saysOverrideFloor')
+    // Through the house default line, which ends with saysOverrideFloor's words.
+    expect(source).toContain('saysHouseDefault(')
   })
 
   test('the paragraph no longer claims nought is allowed everywhere', async () => {

@@ -192,6 +192,10 @@ export default defineNuxtConfig({
       ...Object.fromEntries(Object.entries(OLD_SITE_REDIRECTS)
         .map(([from, to]) => [from, { redirect: { to, statusCode: 301 } }])),
 
+      // The Secretary's queue moved under People (0156); a bookmark still lands.
+      '/box-office/access-profiles': { redirect: { to: '/people/access', statusCode: 301 } },
+      '/docs/box-office/access-profiles': { redirect: { to: '/docs/people/access-declarations', statusCode: 301 } },
+
       // Baseline security headers on every response.
       '/**': {
         headers: {
@@ -233,10 +237,12 @@ export default defineNuxtConfig({
   },
 
   // No crons under the harness: a tick that lands mid-suite held the file's lock for the rest of
-  // the shard (docs/known-issues.md). A suite that needs a task runs it by name.
+  // the shard. Nor a server source map: the dev error handler parses it per refusal (known-issues).
   hooks: {
     'nitro:config'(nitroConfig) {
-      if (process.env.E2E_BASE_URL) nitroConfig.scheduledTasks = {}
+      if (!process.env.E2E_BASE_URL) return
+      nitroConfig.scheduledTasks = {}
+      nitroConfig.sourceMap = false
     },
     // The dev server's dependency scan cannot see past Nuxt's virtual modules, and a dependency first
     // met by a browser reloads every open page. Warming the app's own files meets them all first.

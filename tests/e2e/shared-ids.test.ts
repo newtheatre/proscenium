@@ -136,7 +136,7 @@ describe.skipIf(skip !== null)('a group of controls gives each one its own id an
       const described = await view.evaluate<string>(`JSON.stringify([...document.querySelectorAll(
         '[data-test^="pass-type-price-label-"], [data-test^="pass-type-price-amount-"]')]
         .map(input => document.getElementById(input.getAttribute('aria-describedby') ?? '')?.innerText.trim() ?? ''))`)
-      expect(new Set(JSON.parse(described) as string[])).toEqual(new Set(['At least one, each with its own label.']))
+      expect(new Set(JSON.parse(described) as string[])).toEqual(new Set(['At least one, each with its own label. A label is only a name: anyone may buy any price point, so one called Member does not check membership.']))
     }
     finally {
       view.close()

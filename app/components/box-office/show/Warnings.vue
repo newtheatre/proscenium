@@ -103,13 +103,23 @@ watch(total, (count) => {
   if (count > 0) assessedClear.value = false
 })
 
+// Clearing chosen warnings is asked first; with none chosen the switch just moves.
+const discarding = ref(false)
+
 function confirmNone(value: boolean): void {
-  assessedClear.value = value
-  if (value) {
-    stagingIds.value = []
-    contentIds.value = []
-    levels.value = new Map()
+  if (value && total.value > 0) {
+    discarding.value = true
+    return
   }
+  assessedClear.value = value
+}
+
+function discardChosen(): void {
+  stagingIds.value = []
+  contentIds.value = []
+  levels.value = new Map()
+  assessedClear.value = true
+  discarding.value = false
 }
 
 function setLevel(warningId: string, level: ContentWarningLevel): void {
@@ -379,5 +389,14 @@ async function save(): Promise<void> {
         </UButton>
       </div>
     </div>
+
+    <ConfirmModal
+      v-model:open="discarding"
+      name="discard-warnings"
+      title="Clear the chosen warnings"
+      verb="Clear them"
+      :consequence="`${plural(total, 'warning')} chosen will be taken off, and the show will say there is nothing to warn about once you save.`"
+      @confirm="discardChosen"
+    />
   </UCard>
 </template>

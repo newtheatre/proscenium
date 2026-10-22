@@ -20,8 +20,13 @@ const flat = (part: string): string => part.replace(/\s+/g, ' ')
 const EVERYTHING: TemplateContext = {
   name: 'Ada',
   taught: 'Working at height',
+  missing: 'TECH-101 Ladder safety',
+  standing: 'You have a place.',
+  sessionUrl: 'https://newtheatre.org.uk/training/manage/sessions/1',
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
+  wanted: 'ada.new@example.invalid',
+  cancelUrl: 'https://newtheatre.org.uk/account/profile#email',
   securityUrl: 'https://newtheatre.org.uk/account/access',
   accountUrl: 'https://newtheatre.org.uk/my',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
@@ -45,6 +50,7 @@ const EVERYTHING: TemplateContext = {
   when: 'Friday 2 October 2026 at 19:30',
   title: 'Macbeth, act two',
   who: 'Bea Stone',
+  claimant: 'Amy Volunteer',
   reason: 'The room is closed that week',
   why: 'The room is closed that week',
   moved: 'The Green Room',
@@ -219,8 +225,14 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(text).toContain('We have made you an account.')
   })
 
+  test('email-change-requested links the cancel in both parts (0151)', () => {
+    const { html, text } = render('email-change-requested', EVERYTHING)
+    expect(html).toContain('href="https://newtheatre.org.uk/account/profile#email"')
+    expect(flat(text)).toContain('cancel it (https://newtheatre.org.uk/account/profile#email)')
+  })
+
   test('account-claim says we already know the address', () => {
-    expect(render('account-claim', EVERYTHING).html).toContain('We already know this address, from a booking or from our old records')
+    expect(render('account-claim', EVERYTHING).html).toContain('We already know this address, from a booking, a training record or our old records')
   })
 
   test('account-claim on an unconfirmed registration says why a password is asked for again (0153)', () => {
@@ -352,8 +364,35 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   })
 
   test('the reassignment names the Front of House Manager', () => {
-    expect(render('shift-removed', EVERYTHING).html)
+    expect(render('shift-removed', { ...EVERYTHING, replaced: true }).html)
       .toContain(`The ${saysRole('FOH_MANAGER')} has reassigned your door shift`)
+  })
+
+  // 0212: nobody replaced them, so nothing says "reassigned".
+  test('a stand-down says they were taken off and the shift is open again', () => {
+    const { subject, html } = render('shift-removed', { ...EVERYTHING, replaced: false })
+    expect(subject).toBe('You have been taken off your door shift on The Tempest')
+    expect(html).toContain('The shift is open again for somebody else to take.')
+    expect(html).not.toContain('reassigned')
+  })
+
+  test('an assignment and a confirmation give the call time, not only the curtain', () => {
+    expect(flat(render('shift-assigned', { ...EVERYTHING, callTime: '20:30' }).text)).toContain('Your call time is 20:30.')
+    expect(flat(render('shift-approved', { ...EVERYTHING, callTime: '20:30' }).text)).toContain('Your call time is 20:30.')
+    expect(render('shift-assigned', { ...EVERYTHING, callTime: undefined }).text).not.toContain('call time')
+  })
+
+  test('a release links the rota board, and a withdrawn claim says withdrawn', () => {
+    const released = render('shift-released', { ...EVERYTHING, url: 'https://newtheatre.org.uk/rota/manage/shifts' })
+    expect(released.html).toContain('href="https://newtheatre.org.uk/rota/manage/shifts"')
+    expect(render('shift-released', { ...EVERYTHING, withdrawn: true }).subject).toBe('A claim on a door shift on The Tempest has been withdrawn')
+  })
+
+  test('a waiting claim names the claimant and links the queue', () => {
+    const { subject, html } = render('shift-claim-waiting', { ...EVERYTHING, url: 'https://newtheatre.org.uk/rota/manage/shifts?waiting=true' })
+    expect(subject).toBe('A door claim on The Tempest is waiting for you')
+    expect(html).toContain('Amy Volunteer has claimed the door shift')
+    expect(html).toContain('href="https://newtheatre.org.uk/rota/manage/shifts?waiting=true"')
   })
 
   test('a room request names the Theatre Manager from the wording map', () => {
@@ -361,9 +400,11 @@ describe('the rewritten bodies and subjects (item 7)', () => {
       .toContain(`is with the ${saysRole('THEATRE_MANAGER')}`)
   })
 
-  test('a declined shift leaves the open list open', () => {
-    expect(render('shift-declined', EVERYTHING).html)
-      .toContain('The shift stays on the open list, and so does everything else you are welcome to claim.')
+  // 0212: the declined shift stays DECLINED, off the open list, until it is reassigned or dismissed.
+  test('a declined shift says it stays off the open list', () => {
+    const { text } = render('shift-declined', EVERYTHING)
+    expect(flat(text)).toContain(`That shift stays off the open list until the ${saysRole('FOH_MANAGER')} fills it or you dismiss the decline on your rota, which opens it again.`)
+    expect(text).not.toContain('stays on the open list')
   })
 
   test('a declined membership claim names a role that exists', () => {
@@ -381,6 +422,16 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(many.text).toContain(queue)
     expect(render('membership-claims-waiting', { ...EVERYTHING, count: 1, queueUrl: queue }).subject)
       .toBe('1 membership claim is waiting to be recorded')
+  })
+
+  test('the waiting declarations notice counts them, says since when and links the queue (0156)', () => {
+    const queue = 'https://newtheatre.org.uk/people/access'
+    const many = render('access-profiles-waiting', { ...EVERYTHING, count: 2, queueUrl: queue })
+    expect(many.subject).toBe('2 access declarations are waiting to be verified')
+    expect(flat(many.html)).toContain('since Friday 2 October 2026 at 06:00')
+    expect(many.text).toContain(queue)
+    expect(render('access-profiles-waiting', { ...EVERYTHING, count: 1, queueUrl: queue }).subject)
+      .toBe('1 access declaration is waiting to be verified')
   })
 
   // A-202, issue 1005: the SU's page where it is configured, and a clean sentence where it is not.
@@ -802,6 +853,14 @@ describe('the pass email follows the ticket terms (D-137)', () => {
 
   test('it says when the pass is valid and which shows it covers, in both parts', () => {
     for (const part of [html, text]) expect(flat(part)).toContain('It is valid 21 Oct to 18 Apr. It covers The Seagull, Small Hours.')
+  })
+
+  test('a pass whose dates could not be read says nothing about them, rather than a half sentence', () => {
+    const bare = render('pass-issued', { ...EVERYTHING, valid: '', shows: '' })
+    for (const part of [bare.html, bare.text]) {
+      expect(part).not.toContain('It is valid')
+      expect(part).not.toContain('It covers')
+    }
   })
 
   test('it links the ticket and pass terms in both parts', () => {

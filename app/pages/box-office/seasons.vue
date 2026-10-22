@@ -77,7 +77,7 @@ async function save(): Promise<void> {
       : await $fetch<{ overlaps: string[] }>('/api/admin/reference-data/seasons', { method: 'POST', body })
     const says = saysOverlaps(answer.overlaps)
     overlapping.value = says ? { name: body.name, says } : null
-    toast.add({ title: editing.value ? 'Season changed' : 'Season added', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: editing.value ? 'Season saved' : 'Season added', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await reload()
   }

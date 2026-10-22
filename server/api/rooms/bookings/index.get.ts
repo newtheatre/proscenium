@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, lt } from 'drizzle-orm'
+import { seriesPlace } from '#server/utils/room-writes'
 import { z } from 'zod'
 
 const query = z.object({
@@ -11,6 +12,7 @@ export default defineEventHandler(async (event) => {
   const account = await requireAccount(event)
   const input = await getValidatedQueryOrThrow(event, query)
   const now = Math.floor(Date.now() / 1000)
+  const place = seriesPlace()
 
   const rows = await db.select({
     id: schema.roomBookings.id,
@@ -28,8 +30,10 @@ export default defineEventHandler(async (event) => {
     reason: schema.roomBookings.reason,
     rejectionReason: schema.roomBookings.rejectionReason,
     seriesId: schema.roomBookings.seriesId,
-    occurrence: schema.roomBookings.occurrence,
-    seriesLength: schema.roomSeries.occurrences,
+    occurrence: place.occurrence,
+    seriesLength: place.length,
+    seriesFrequency: schema.roomSeries.frequency,
+    seriesWeekdays: schema.roomSeries.weekdays,
     bumpedReason: schema.roomBookings.bumpedReason,
     bumpedToBookingId: schema.roomBookings.bumpedToBookingId,
     // A cancellation carrying this was moved, not withdrawn, and must not read as cancelled.

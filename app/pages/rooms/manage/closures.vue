@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
-import { BLACKOUT_REASON_LIMIT, closeButtonLabel, closureSpan, saysSpan, wholeDaysByDefault } from '#shared/utils/blackouts'
+import { BLACKOUT_REASON_LIMIT, closeButtonLabel, closureSpan, saysCloseSpan, saysClosureSpan, saysOverlap, saysSpan, wholeDaysByDefault } from '#shared/utils/blackouts'
 import { blackoutsList } from '#shared/utils/blackouts-list'
 import type { ListedPerformanceClosure } from '#shared/utils/performance-closures'
 import type { TableColumn } from '@nuxt/ui'
@@ -102,10 +102,12 @@ const chosenName = computed(() => {
 // Counted by the same read the close makes, and again whenever the room or the span moves; a
 // count overtaken by a newer one is dropped, whether it answers or fails.
 const cancels = ref<number | null>(null)
+const overlap = ref<string | null>(null)
 const counting = ref(false)
 const countFailure = ref<string | null>(null)
 watch([() => form.roomId, span], async ([roomId, when], _, onCleanup) => {
   cancels.value = null
+  overlap.value = null
   countFailure.value = null
   if (!roomId || !when || when.endsAt <= when.startsAt) return
   let stale = false
@@ -114,10 +116,13 @@ watch([() => form.roomId, span], async ([roomId, when], _, onCleanup) => {
   })
   counting.value = true
   try {
-    const answer = await $fetch<{ count: number }>('/api/admin/rooms/blackouts/stranded', {
+    const answer = await $fetch<{ count: number, overlapping: Parameters<typeof saysOverlap>[0] }>('/api/admin/rooms/blackouts/stranded', {
       query: { ...(roomId === EVERY_ROOM ? {} : { roomId }), ...when },
     })
-    if (!stale) cancels.value = answer.count
+    if (!stale) {
+      cancels.value = answer.count
+      overlap.value = saysOverlap(answer.overlapping)
+    }
   }
   catch (error) {
     if (!stale) countFailure.value = `What closing would cancel could not be counted: ${refusalText(error)}`
@@ -127,7 +132,13 @@ watch([() => form.roomId, span], async ([roomId, when], _, onCleanup) => {
   }
 })
 
-const closeLabel = computed(() => closeButtonLabel(chosenName.value, cancels.value))
+// Said under the field, rather than only leaving the button off with no reason given.
+const backwards = computed(() => Boolean(span.value && span.value.endsAt <= span.value.startsAt))
+
+// The span is on the button, so a part-day closure never reads as the room shut all day.
+const closeLabel = computed(() => closeButtonLabel(chosenName.value, cancels.value, span.value && !backwards.value
+  ? saysCloseSpan(new Date(span.value.startsAt), new Date(span.value.endsAt))
+  : undefined))
 
 // The count is part of being ready: nothing is closed that has not said what it cancels first.
 const ready = computed(() => Boolean(
@@ -209,7 +220,7 @@ const columns: TableColumn<Closure>[] = [
     id: 'span',
     header: 'When',
     meta: { class: { td: 'whitespace-nowrap text-sm' } },
-    cell: ({ row }) => saysSpan(new Date(row.original.startsAt * 1000), new Date(row.original.endsAt * 1000)),
+    cell: ({ row }) => saysClosureSpan(new Date(row.original.startsAt * 1000), new Date(row.original.endsAt * 1000)),
   },
   { accessorKey: 'reason', header: 'Why', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-normal` } } },
   { accessorKey: 'by', header: 'Closed by', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } } },
@@ -392,6 +403,15 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
           :description="failure.message"
         />
         <UAlert
+          v-if="overlap"
+          data-test="close-overlap"
+          class="mb-4"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          :description="overlap"
+        />
+        <UAlert
           v-if="countFailure"
           data-test="close-count-failure"
           class="mb-4"
@@ -477,6 +497,8 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
             <UFormField
               label="Until"
               required
+              :error="backwards ? 'Until must be after From' : undefined"
+              data-test="close-to-field"
             >
               <UInput
                 v-model="form.to"
@@ -523,7 +545,7 @@ const modalOpen = computed(() => closing.value || removing.value !== null)
     >
       <template #body>
         <p class="text-sm text-muted">
-          {{ removing ? `${removing.room ?? 'Every room'}, ${saysSpan(new Date(removing.startsAt * 1000), new Date(removing.endsAt * 1000))}` : '' }}
+          {{ removing ? `${removing.room ?? 'Every room'}, ${saysClosureSpan(new Date(removing.startsAt * 1000), new Date(removing.endsAt * 1000))}` : '' }}
         </p>
       </template>
     </ConfirmModal>

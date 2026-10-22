@@ -10,6 +10,7 @@ import {
   offerEntryStatement,
   purgeCandidatesQuery,
   removeEntryStatement,
+  standingOfferSeatsQuery,
 } from '#server/utils/waiting-list'
 import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
@@ -114,6 +115,35 @@ describe('the queue offers strictly in join order (criterion 2)', () => {
       const second = statement(database, offerEntryStatement('w-1', seeded.startsAt - 9_000, seeded.startsAt - 4_000))
       expect(second.changes).toBe(0)
       expect(rows(database, 'SELECT status FROM waiting_list WHERE id = ?', 'w-1')[0]).toEqual({ status: 'OFFERED' })
+    })
+  })
+})
+
+// A run budgets against seats already offered, so a second run never offers the same seats again.
+describe('seats under a standing offer are not offered twice', () => {
+  test('only unexpired offers on this performance count, by party size', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const other = tonightsPerformance(database, { suffix: 'other' })
+      const now = seeded.startsAt - 10_000
+      database.batch([
+        ['INSERT INTO waiting_list (id, performance_id, user_id, party_size, status, offered_at, offer_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'w-standing', seeded.performanceId, 'u-1', 3, 'OFFERED', now - 60, now + 600],
+        ['INSERT INTO waiting_list (id, performance_id, user_id, party_size, status, offered_at, offer_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'w-lapsing', seeded.performanceId, 'u-2', 2, 'OFFERED', now - 900, now - 1],
+        ['INSERT INTO waiting_list (id, performance_id, user_id, party_size, status, offered_at, offer_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          'w-elsewhere', other.performanceId, 'u-2', 4, 'OFFERED', now - 60, now + 600],
+      ])
+      const [found] = rows<{ seats: number }>(database, ...boundStatement(database, standingOfferSeatsQuery(seeded.performanceId, now)))
+      expect(Number(found?.seats)).toBe(3)
+    })
+  })
+
+  test('nothing offered reads as no seats', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const [found] = rows<{ seats: number }>(database, ...boundStatement(database, standingOfferSeatsQuery(seeded.performanceId, seeded.startsAt)))
+      expect(Number(found?.seats)).toBe(0)
     })
   })
 })

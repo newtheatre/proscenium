@@ -39,3 +39,20 @@ export async function sellOnTheTill(app: AppUnderTest, body: Record<string, unkn
   }
   return Response.json({ ok: true, attemptId: id, ...outcome.receipt })
 }
+
+// A tab settled the way the till's Settle a tab does it (0162): a typed charge for exactly the
+// named charges, answered "Reader took it". A late refusal reads as a 409, as a basket's does.
+export async function settleOnTheReader(app: AppUnderTest, body: Record<string, unknown>, cookie: string): Promise<Response> {
+  const started = await request(app, 'POST', '/api/till/tab-settlements', body, cookie)
+  if (!started.ok) return started
+  const { id } = await started.json() as { id: string | null }
+  if (id === null) return Response.json({ ok: true, attemptId: null })
+
+  const answered = await answerCharge(app, id, 'succeeded', cookie)
+  if (!answered.ok) return answered
+  const outcome = await answered.json() as Outcome & { settlement?: { entryId: string, settledPence: number } }
+  if (outcome.status !== 'SUCCEEDED' || !outcome.settlement) {
+    return Response.json({ statusCode: 409, statusMessage: outcome.error ?? outcome.status }, { status: 409 })
+  }
+  return Response.json({ ok: true, attemptId: id, ...outcome.settlement })
+}

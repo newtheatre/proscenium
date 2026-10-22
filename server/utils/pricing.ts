@@ -83,7 +83,7 @@ const TYPE_COLUMNS = sql`
   so.active AS showActive
 `
 
-const ORDER = sql` ORDER BY t.archived, t.price, t.name COLLATE NOCASE`
+const ORDER = sql` ORDER BY t.archived, t.sort, t.price, t.name COLLATE NOCASE`
 
 // The system's own pass-admission row is never priced: a pass seats its holder at nought (0074).
 const PRICEABLE = sql`t.kind = 'SINGLE'`

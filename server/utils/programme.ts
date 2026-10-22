@@ -131,12 +131,13 @@ export function performanceSoldColumn(alias: string, references = soldReferences
 
 // The same count for a whole show, scoped through its performances by subquery rather than by an
 // id list read back from a result set (0006).
-export function showSoldColumn(alias: string, references = soldReferences()): SQL {
+export function showSoldColumn(alias: string, references = soldReferences(), goingAhead = false): SQL {
   if (references.length === 0) return sql`0`
+  const live = goingAhead ? sql` AND sold_p.status <> 'CANCELLED'` : sql``
   // Its own prefixed alias, so no caller's alias for the show can capture this performances row.
   const terms = references.map(reference => sql`(
     SELECT coalesce(sum(${heldTerm(reference, sql`sold_p.id`)}), 0)
-    FROM performances sold_p WHERE sold_p.show_id = ${sql.raw(alias)}.id
+    FROM performances sold_p WHERE sold_p.show_id = ${sql.raw(alias)}.id${live}
   )`)
   return sql.join(terms, sql` + `)
 }
@@ -273,6 +274,7 @@ const ON_SALE = sql`exists (SELECT 1 FROM performances p WHERE p.show_id = s.id 
 export function showsQuery(clause: ListClause, limit: number, offset: number, references = soldReferences()): SQL {
   return sql`
     SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s', references)} AS soldTickets,
+           ${showSoldColumn('s', references, true)} AS houseTickets,
            ${showUnpaidSeatsColumn('s')} AS unpaidTickets
     FROM shows s${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
@@ -306,6 +308,7 @@ export async function countShows(clause: ListClause): Promise<number> {
 export async function showById(id: string): Promise<AdminShow | undefined> {
   const [row] = await db.all<ShowRow>(sql`
     SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets,
+           ${showSoldColumn('s', undefined, true)} AS houseTickets,
            ${showUnpaidSeatsColumn('s')} AS unpaidTickets
     FROM shows s WHERE s.id = ${id}
   `)
@@ -357,6 +360,7 @@ export async function showBySlug(slug: string, exceptId?: string): Promise<Admin
   const except = exceptId ? sql` AND s.id <> ${exceptId}` : sql``
   const [row] = await db.all<ShowRow>(sql`
     SELECT ${SHOW_COLUMNS}, ${SHOW_COUNTS}, ${showSoldColumn('s')} AS soldTickets,
+           ${showSoldColumn('s', undefined, true)} AS houseTickets,
            ${showUnpaidSeatsColumn('s')} AS unpaidTickets
     FROM shows s WHERE s.slug = ${slug}${except} LIMIT 1
   `)
@@ -473,11 +477,30 @@ export async function performanceById(id: string): Promise<PerformanceWithShow |
 
 // The cascade D-121 criterion 2 asks for: one statement over the show's performances, binding the
 // show id alone however many there are, and skipping cancelled ones by predicate (0006).
-export function cascadeOnSaleQuery(showId: string): SQL {
+export function cascadeOnSaleQuery(showId: string, from: number): SQL {
   return sql`
     UPDATE performances SET status = 'ON_SALE', updated_at = unixepoch()
-    WHERE show_id = ${showId} AND status = 'DRAFT'
+    WHERE show_id = ${showId} AND status = 'DRAFT' AND starts_at >= ${from}
   `
+}
+
+export interface VenueClash {
+  showTitle: string
+  startsAt: number
+}
+
+// Another show's or this show's performance overlapping in the same venue, warned about and never
+// refused, since a double bill shares a house on purpose (0192). Two hours stands in for no running time.
+export async function venueClashes(venueId: string, startsAt: number, durationMinutes: number | null, except: string | null): Promise<VenueClash[]> {
+  const ends = startsAt + (durationMinutes ?? 120) * 60
+  return db.all<VenueClash>(sql`
+    SELECT s.title AS showTitle, p.starts_at AS startsAt
+    FROM performances p JOIN shows s ON s.id = p.show_id
+    WHERE p.venue_id = ${venueId} AND p.status <> 'CANCELLED' AND p.id IS NOT ${except}
+      AND p.starts_at < ${ends}
+      AND p.starts_at + coalesce(p.duration_minutes, 120) * 60 > ${startsAt}
+    ORDER BY p.starts_at LIMIT 3
+  `)
 }
 
 interface ProgrammeVenueRow extends Omit<ShowVenue, 'archived' | 'isExternal'> {

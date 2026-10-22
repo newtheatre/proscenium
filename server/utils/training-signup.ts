@@ -1,4 +1,5 @@
-import { asc, eq, sql } from 'drizzle-orm'
+import { saysDayLong } from '#shared/utils/when'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import {
   blockingGaps,
   demotedBy,
@@ -155,6 +156,8 @@ export interface MemberSession extends MemberSessionRow {
   closure: ClosureReason | null
   blocked: PrerequisiteGap[]
   warnings: PrerequisiteGap[]
+  // What it teaches that they hold already: they may still come to refresh it.
+  alreadyHeld: string[]
 }
 
 // Sessions a member can see, with where they stand on each. Their own row is a left join and
@@ -209,9 +212,10 @@ export async function sessionsForMember(
   // Every module in view once, so the gaps are worked out for the member rather than per session.
   const everyModule = [...new Map(taught.map(row =>
     [row.id, { id: row.id, safetyCritical: row.safetyCritical === 1 }])).values()]
-  const [gaps, committee] = await Promise.all([
+  const [gaps, committee, held] = await Promise.all([
     prerequisiteGapsFor(userId, everyModule, today),
     taught.some(row => row.committeeOnly === 1) ? hasCommitteeRole(userId) : true,
+    modulesHeldBy(userId, today),
   ])
 
   return rows.map((row) => {
@@ -236,7 +240,8 @@ export async function sessionsForMember(
         at,
       ),
       blocked: blockingGaps(mine),
-      warnings: warningGaps(mine),
+      warnings: warningGaps(mine, modules.map(module => module.id)),
+      alreadyHeld: modules.filter(module => held.has(module.id)).map(module => module.id),
     }
   })
 }
@@ -244,10 +249,11 @@ export async function sessionsForMember(
 // The one action each module offers this member (issue 1335), from one read of the sessions they
 // can see and one of their asks (`asked`, if already read): never a query per module (0003).
 export async function trainingActionsFor(userId: string, today: string, closesHours: number, asked?: ReadonlySet<string>): Promise<(moduleId: string) => TrainingAction> {
-  const [sessions, requested, barred] = await Promise.all([
+  const [sessions, requested, barred, readable] = await Promise.all([
     sessionsForMember(userId, today, closesHours),
     asked ?? openRequestsOf(userId),
     committeeOnlyModulesFor(userId),
+    selfRegistrableBriefs(),
   ])
 
   const byModule = new Map<string, ActionSession[]>()
@@ -265,7 +271,19 @@ export async function trainingActionsFor(userId: string, today: string, closesHo
     for (const module of session.modules) byModule.set(module.id, [...(byModule.get(module.id) ?? []), offered])
   }
 
-  return moduleId => trainingAction(byModule.get(moduleId) ?? [], requested.has(moduleId), barred.has(moduleId))
+  return moduleId => trainingAction(byModule.get(moduleId) ?? [], requested.has(moduleId), barred.has(moduleId), readable.has(moduleId))
+}
+
+// The published briefs a member may record by reading them (0244): a handful at most.
+export async function selfRegistrableBriefs(): Promise<ReadonlySet<string>> {
+  const rows = await db.select({ id: schema.trainingModules.id })
+    .from(schema.trainingModules)
+    .where(and(
+      eq(schema.trainingModules.selfRegistrable, true),
+      eq(schema.trainingModules.kind, 'BRIEF'),
+      eq(schema.trainingModules.status, 'ACTIVE'),
+    ))
+  return new Set(rows.map(row => row.id))
 }
 
 // The committee-only modules this member may not put themselves forward for: none if they hold a
@@ -282,7 +300,7 @@ export async function committeeOnlyModulesFor(userId: string): Promise<ReadonlyS
 function placeMessageContext(event: H3Event | undefined, session: SignUpSession): TemplateContext {
   return {
     name: '',
-    heldOn: session.heldOn,
+    heldOn: saysDayLong(session.heldOn),
     startsAt: session.startsAt,
     modules: session.modules.map(module => ({ id: module.id, name: module.name })),
     sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,

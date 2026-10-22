@@ -37,6 +37,13 @@ export default defineEventHandler(async (event) => {
     },
   )
 
+  // A slot already gone is no booking at all, and approving does not look at the clock.
+  const gone = verdict.failures.find(failure => failure.reason === 'IN_THE_PAST')
+  if (gone) throw createError({ statusCode: 422, statusMessage: gone.says })
+
+  // Any other outright refusal (a lapsed membership) queues: confirming it would wave it through.
+  const queued = verdict.needsApproval || verdict.refusedOutright
+
   // The member asked, so the tier is theirs as any member booking's is (C-115 criterion 1).
   const tier = bookingTier(request.purpose, undefined, false)
   const claim = {
@@ -48,7 +55,7 @@ export default defineEventHandler(async (event) => {
     endsAt: request.endsAt,
     tier,
     purpose: request.purpose,
-    status: verdict.needsApproval ? 'PENDING_APPROVAL' as const : 'CONFIRMED' as const,
+    status: queued ? 'PENDING_APPROVAL' as const : 'CONFIRMED' as const,
     notes: request.notes,
     offsets: await shiftOffsetDefaults(event),
   }
@@ -57,7 +64,7 @@ export default defineEventHandler(async (event) => {
     actorId: account.id,
     action: 'external.request.relisted',
     target: `external:${id}`,
-    detail: { became: claimId, room: room.id, tier, needsApproval: verdict.needsApproval },
+    detail: { became: claimId, room: room.id, tier, needsApproval: queued },
   })
 
   // The predicate rides the INSERT, so two officers claiming one slot cannot both win (0003), and
@@ -89,7 +96,7 @@ export default defineEventHandler(async (event) => {
       name: request.who,
       title: request.title,
       room: room.name,
-      settled: !verdict.needsApproval,
+      settled: !queued,
       when: saysRoomSpan(request.startsAt, request.endsAt),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },

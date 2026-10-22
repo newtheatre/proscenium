@@ -1,3 +1,4 @@
+import { saysDayLong } from '#shared/utils/when'
 import { sessionForm } from '#shared/utils/training'
 
 // Schedule a session. Standing to run one is derived from a current trainer certification, and
@@ -58,6 +59,26 @@ export default defineEventHandler(async (event) => {
   const resolvedRequests = input.opensAt === null
     ? await resolveRequestsFor(event, id, input.moduleIds)
     : 0
+
+  // Somebody named to teach hears it from the system, not by chance (0242).
+  if (teacher) {
+    const key = `training.session.assigned:${id}:${teacher.id}`
+    if (await claimNotification({ userId: teacher.id, type: 'training.session.assigned', key, sessionId: id })) {
+      const taught = await modulesTaughtBy(id)
+      await notify(event, {
+        type: 'training.session.assigned',
+        userId: teacher.id,
+        claim: key,
+        context: {
+          name: '',
+          taught: taught.map(module => module.name).join(', '),
+          when: `${saysDayLong(input.heldOn)} at ${input.startsAt}`,
+          where: input.place ?? 'a place still to be confirmed',
+          sessionUrl: `${useRuntimeConfig(event).public.baseURL}/training/manage/sessions/${id}`,
+        },
+      })
+    }
+  }
 
   return { ok: true, id, resolvedRequests }
 })

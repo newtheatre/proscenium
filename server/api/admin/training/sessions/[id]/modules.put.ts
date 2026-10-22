@@ -43,7 +43,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await assertTeachable(resolved, input.moduleIds, londonToday())
+  const today = londonToday()
+  await assertTeachable(resolved, input.moduleIds, today)
+  const lacking = input.tellLacking ? await lackingFor(id, input.moduleIds, today) : []
 
   // Criterion 2 and question 6's answer. The release is conditional on there being no marks, so a
   // release racing a submission cannot change what a mark is about to award.
@@ -68,5 +70,15 @@ export default defineEventHandler(async (event) => {
     `)),
   ])
 
-  return { ok: true, released: frozen }
+  // Told only if the change landed: a mark racing it leaves the modules, and nobody, alone.
+  const landed = lacking.length === 0
+    ? []
+    : await db.select({ moduleId: schema.sessionModules.moduleId, name: schema.trainingModules.name })
+        .from(schema.sessionModules)
+        .innerJoin(schema.trainingModules, eq(schema.trainingModules.id, schema.sessionModules.moduleId))
+        .where(eq(schema.sessionModules.sessionId, id))
+  const changed = landed.length === input.moduleIds.length && landed.every(row => input.moduleIds.includes(row.moduleId))
+  const told = changed ? await tellLacking(event, session, landed, lacking, Date.now()) : 0
+
+  return { ok: true, released: frozen, told }
 })

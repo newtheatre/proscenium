@@ -1,5 +1,5 @@
 import { changes } from '#shared/utils/audit'
-import { formatLondon } from '#shared/utils/london'
+import { formatLondon, londonClock } from '#shared/utils/london'
 import { MAX_SLOT_COUNT, addShiftForm, clashRefusal, saysShiftRole } from '#shared/utils/rota'
 
 // An ad hoc shift on a performance, outside the venue template (E-107 criterion 5, issue 933):
@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
 
   const offsets = await shiftOffsetDefaults(event)
   const [added] = await withShiftConstraints(() => db.batch([
-    db.all<{ id: string, slot: number }>(addShiftStatement(shiftId, input, resolved.account.id, offsets, gate)),
+    db.all<{ id: string, slot: number, startsAt: number | null }>(addShiftStatement(shiftId, input, resolved.account.id, offsets, gate)),
     db.run(addedShiftAuditStatement(entry, shiftId)),
   ]))
   if (added.length === 0) {
@@ -58,7 +58,10 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       userId: subject.id,
       type: 'shift.assigned',
-      context: { name: '', show: performance.showTitle, venue: performance.venueName, when, role: saysShiftRole(input.role).toLowerCase() },
+      context: {
+        name: '', show: performance.showTitle, venue: performance.venueName, when, role: saysShiftRole(input.role).toLowerCase(),
+        callTime: added[0]?.startsAt == null ? undefined : londonClock(new Date(added[0].startsAt * 1000)),
+      },
     })
   }
 

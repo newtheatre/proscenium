@@ -9,6 +9,8 @@ export const OWN_BOOKING_REFUND = 'Nobody refunds a booking in their own name: s
 
 export const OWN_ACCESS_DECISION = 'Nobody decides their own access requirements: someone else holding the Secretary and Welfare Officer\'s or the IT Manager\'s role decides them'
 
+export const OWN_TAB_SETTLEMENT = 'Nobody answers the reader for their own tab: someone else on the till checks the reader and answers it'
+
 export function ownTabCapOverride(holderName: string, outstandingPence: number, chargePence: number, capPence: number): string {
   return `${holderName}'s tab is at ${saysMoney(outstandingPence)}; this charge of ${saysMoney(chargePence)} `
     + `would take it past the ${saysMoney(capPence)} cap. Nothing has been charged: nobody overrides the cap on their own tab, `

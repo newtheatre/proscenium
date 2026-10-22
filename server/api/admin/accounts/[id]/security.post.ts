@@ -58,6 +58,7 @@ export default defineEventHandler(async (event) => {
       db.delete(schema.totpSecrets).where(eq(schema.totpSecrets.userId, id)),
       db.delete(schema.recoveryCodes).where(eq(schema.recoveryCodes.userId, id)),
       db.delete(schema.mfaAttempts).where(eq(schema.mfaAttempts.userId, id)),
+      cancelPendingEmailChange(account),
       touch,
       record,
     ])
@@ -65,7 +66,9 @@ export default defineEventHandler(async (event) => {
   else {
     // Disabling the last IT Manager strands the system as revoking would, guarded on the write.
     const guard = input.operation === 'disable' ? keepsAnItManagerWhere(id, Math.floor(Date.now() / 1000)) : null
-    await batchKeepingAnItManager(guard, [touch, record], () => refuseStranding(PROTECTED_ROLE, id, 'disabling'))
+    // An officer acting on a warning ends the address change it warned of, and enabling never revives it (0151).
+    const cancel = input.operation === 'enable' ? [] : [cancelPendingEmailChange(account)]
+    await batchKeepingAnItManager(guard, [...cancel, touch, record], () => refuseStranding(PROTECTED_ROLE, id, 'disabling'))
   }
 
   // A disable stays silent, as its refusal is (criterion 1); a reset and an enable say what next (0157).

@@ -11,6 +11,7 @@ const { account, refresh } = useAccount()
 type Outcome = 'working' | 'verified' | 'expired' | 'sent'
 
 const outcome = ref<Outcome>('working')
+const changed = ref(false)
 const notice = ref('')
 
 const addressOnly = z.object({ email: z.string({ error: 'Enter your email address' }).trim().min(1, 'Enter your email address').email(HOUSE_ERROR.email) })
@@ -30,6 +31,7 @@ onMounted(async () => {
   try {
     const result = await $fetch('/api/auth/verify', { method: 'POST', body: { token } })
     await refresh()
+    changed.value = result.changed
     if (result.signedIn) {
       await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight, account.value.authenticatorOwed))
       return
@@ -75,10 +77,12 @@ useSeoMeta({
       class="space-y-3"
     >
       <h1 class="nnt-headline text-xl">
-        Address confirmed
+        {{ changed ? 'Address changed' : 'Address confirmed' }}
       </h1>
       <p class="text-muted">
-        {{ account.signedIn ? 'Your new address is confirmed.' : 'Your account is ready. Sign in to carry on.' }}
+        {{ changed
+          ? 'Your account now signs in with this address, and every other device has been signed out.'
+          : account.signedIn ? 'Your address is confirmed.' : 'Your account is ready. Sign in to carry on.' }}
       </p>
       <UButton
         :to="account.signedIn ? landingAfterSignIn(route.query.next, account.onShiftTonight, account.authenticatorOwed) : withNext('/sign-in', route.query.next)"

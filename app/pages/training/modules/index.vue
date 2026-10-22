@@ -67,7 +67,7 @@ const asideLinks = computed<PageLink[]>(() => data.value.departments.map(one => 
   <div>
     <UPageHero
       title="What we teach"
-      description="Everything at the theatre is run by students, and nearly all of it is taught here first. No experience is assumed, and nothing on this list is closed to you."
+      description="Everything at the theatre is run by students, and nearly all of it is taught here first. No experience is assumed, and almost nothing on this list is closed to you."
       :ui="{ title: 'nnt-headline' }"
     />
 
@@ -126,7 +126,12 @@ const asideLinks = computed<PageLink[]>(() => data.value.departments.map(one => 
           class="py-12 text-center text-muted"
           data-test="catalogue-empty"
         >
-          Nothing here matches that. Clear the search above and the whole catalogue comes back.
+          <template v-if="data.items.length === 0">
+            Nothing is in the catalogue yet.
+          </template>
+          <template v-else>
+            Nothing here matches that. Clear the search above and the whole catalogue comes back.
+          </template>
         </p>
 
         <div data-test="catalogue">

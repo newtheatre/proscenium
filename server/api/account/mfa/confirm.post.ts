@@ -28,6 +28,7 @@ export default defineEventHandler(async (event) => {
     db.update(schema.users)
       .set({ sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
       .where(eq(schema.users.id, account.id)),
+    cancelPendingEmailChange(account),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
       action: 'mfa.confirmed',

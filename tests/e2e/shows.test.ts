@@ -249,6 +249,25 @@ describe.skipIf(skip !== null)('a show is a draft nobody outside can see until i
     expect((await detail(id)).show).toMatchObject({ seasonId: null })
   })
 
+  // 0194: publishing named one retired reference at a time, after the button was pressed.
+  test('publishing onto a retired category and season names both at once', async () => {
+    const id = await newShow()
+    const title = (await detail(id)).show.title
+    const seasonName = named('Summer')
+    const seasonId = (await (await send('POST', '/api/admin/reference-data/seasons', { name: seasonName, startsOn: '2041-06-01', endsOn: '2041-08-01' })).json() as { id: string }).id
+    const categoryName = named('Opera')
+    const categoryId = (await (await send('POST', '/api/admin/reference-data/show-categories', { name: categoryName })).json() as { id: string }).id
+    expect((await send('PUT', `/api/admin/shows/${id}`, { title, slug: slugged(title), seasonId, categoryId, loadedSeasonId: null })).status).toBe(200)
+    await send('POST', `/api/admin/reference-data/seasons/${seasonId}/archive`, { archived: true })
+    await send('POST', `/api/admin/reference-data/show-categories/${categoryId}/archive`, { archived: true })
+
+    const refused = await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: false })
+    expect(refused.status).toBe(409)
+    const says = await refused.text()
+    expect(says).toContain(`its category, ${categoryName}, has been retired`)
+    expect(says).toContain(`its season, ${seasonName}, has been retired`)
+  })
+
   test('a save that does not say which season it loaded is refused', async () => {
     const id = await newShow()
     expect((await send('PUT', `/api/admin/shows/${id}`, { title: 'Unsaid', slug: 'unsaid' })).status).toBe(400)
@@ -372,6 +391,56 @@ describe.skipIf(skip !== null)('a draft show\'s performance answers as a missing
   })
 })
 
+// A published show whose nights were all off sale said it had finished its run (process map, 21 October).
+describe.skipIf(skip !== null)('a show page says whether nights are still to come', () => {
+  test('off-sale nights still to come are flagged, and putting one on sale lists it', async () => {
+    const title = named('Small Hours')
+    const id = await newShow({ title })
+    const performance = await addPerformance(id)
+    expect((await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: false })).status).toBe(200)
+
+    const before = await (await send('GET', `/api/shows/${slugged(title)}`, undefined, '')).json() as { performances: unknown[], offSaleToCome: boolean }
+    expect(before.performances).toEqual([])
+    expect(before.offSaleToCome).toBe(true)
+
+    expect((await send('POST', `/api/admin/performances/${performance}/sale`, { onSale: true })).status).toBe(200)
+    const after = await (await send('GET', `/api/shows/${slugged(title)}`, undefined, '')).json() as { performances: unknown[], offSaleToCome: boolean }
+    expect(after.performances).toHaveLength(1)
+    expect(after.offSaleToCome).toBe(false)
+  })
+})
+
+// 0192: a played night went on sale, and two shows were booked into one house at one time silently.
+describe.skipIf(skip !== null)('a played performance stays off sale, and a clash is named', () => {
+  test('On sale refuses a played night, and publishing leaves it off sale', async () => {
+    const id = await newShow()
+    const played = await addPerformance(id, { startsAt: Math.floor(Date.now() / 1000) - 3 * 86_400 })
+    const coming = await addPerformance(id)
+
+    const refused = await send('POST', `/api/admin/performances/${played}/sale`, { onSale: true })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message: string }).message).toContain('already played')
+
+    const published = await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: true })
+    expect(await published.json()).toMatchObject({ performancesTakenOnSale: 1 })
+    const statuses = Object.fromEntries((await detail(id)).performances.map(one => [one.id, (one as unknown as { status: string }).status]))
+    expect(statuses).toEqual({ [played]: 'DRAFT', [coming]: 'ON_SALE' })
+  })
+
+  test('a second show in the same venue at the same time is saved and named', async () => {
+    const startsAt = nextWeek(61)
+    const first = await newShow({ title: named('The Seagull') })
+    await addPerformance(first, { startsAt })
+    const second = await newShow()
+
+    const answered = await send('POST', `/api/admin/shows/${second}/runs`, { venueId, durationMinutes: 120, intervalCount: 0, nights: [{ startsAt: startsAt + 1800 }] })
+    expect(answered.status).toBe(200)
+    const { clashes } = await answered.json() as { clashes: { showTitle: string, startsAt: number }[] }
+    expect(clashes.map(one => one.startsAt)).toEqual([startsAt])
+    expect(clashes[0]?.showTitle).toContain('The Seagull')
+  })
+})
+
 describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once it has sold (criterion 5)', () => {
   test('cancelling says how many tickets are owed a refund', async () => {
     const id = await newShow()
@@ -482,6 +551,42 @@ describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once 
     const answered = await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: startsAt + 86_400, durationMinutes: 120, intervalCount: 0 })
     expect(answered.status).toBe(200)
     expect(await answered.json()).toMatchObject({ bookingsTold: 0 })
+  })
+
+  // Process map, 21 October: three unpaid seats were reported as three refunds due at the desk.
+  test('only paid seats are refunds due, and the show stops counting the cancelled night', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+    const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900, activeByDefault: false })
+    const typeId = (await type.json() as { id: string }).id
+    const database = new Database(app.databaseFile)
+    try {
+      for (const [suffix, status, seats, price] of [['paid', 'COLLECTED', 1, 900], ['unpaid', 'PENDING', 2, 900], ['comp', 'COLLECTED', 1, 0]] as const) {
+        const reservation = `c-${suffix}-${performance}`
+        database.run(
+          'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          [reservation, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, status, 'WEB'],
+        )
+        for (let seat = 0; seat < seats; seat++) {
+          database.run(
+            'INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+            [`${reservation}-${seat}`, reservation, performance, typeId, price, 'BASE'],
+          )
+        }
+      }
+    }
+    finally {
+      database.close()
+    }
+
+    const answered = await send('POST', `/api/admin/performances/${performance}/cancel`)
+    expect(await answered.json()).toMatchObject({ ticketsOwedARefund: 1 })
+
+    const { show } = await detail(id) as unknown as { show: { unpaidTickets: number, houseTickets: number, soldTickets: number } }
+    expect(show.unpaidTickets).toBe(0)
+    expect(show.houseTickets).toBe(0)
+    expect(show.soldTickets).toBe(4)
+    await send('POST', `/api/admin/ticket-types/${typeId}/archive`, { archived: true })
   })
 
   test('a cancelled performance cannot be put back on sale by the sale action', async () => {
@@ -925,7 +1030,7 @@ describe.skipIf(skip !== null)('the screen', () => {
 
     await visit(view, `${app.baseURL}/box-office/shows/${id}?tab=performances`, '[data-test="performances-table"]')
     expect(await textOf(view, '[data-test="show-status"]')).toContain('Draft')
-    expect(await textOf(view, '[data-test="performances-table"]')).toContain('Closes at curtain-up')
+    expect(await textOf(view, '[data-test="performances-table"]')).toContain('before curtain, when unpaid holds release')
     view.close()
   }, 120_000)
 

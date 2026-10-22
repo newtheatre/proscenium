@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { addDays, expand, seriesForm, weekdayOf } from '#shared/utils/series'
+import { addDays, expand, saysPlaceInSeries, seriesForm, weekdayOf } from '#shared/utils/series'
 import { londonClock } from '#shared/utils/london'
 
 // C-110's pure half. Criterion 4 is the one that breaks silently, so both transitions are
@@ -154,5 +154,27 @@ describe('what a series may ask for', () => {
   test('a day that is not a day is refused', () => {
     expect(seriesForm.safeParse({ ...valid, startsOn: 'next Monday' }).success).toBe(false)
     expect(seriesForm.safeParse({ ...valid, weekdays: [7] }).success).toBe(false)
+  })
+
+  test('the reason is optional, and an empty one is none at all', () => {
+    expect(seriesForm.parse(valid).reason).toBeNull()
+    expect(seriesForm.parse({ ...valid, reason: '   ' }).reason).toBeNull()
+    expect(seriesForm.parse({ ...valid, reason: ' Opening week. ' }).reason).toBe('Opening week.')
+    expect(seriesForm.safeParse({ ...valid, reason: 'x'.repeat(1001) }).success).toBe(false)
+  })
+})
+
+// Rooms review, section 4: "Week 4 of 3", and a daily series called weeks.
+describe('where a date sits in its series', () => {
+  test('a series meeting once a week counts weeks', () => {
+    expect(saysPlaceInSeries({ occurrence: 2, length: 3, frequency: 'WEEKLY', weekdays: '4' })).toBe('Week 2 of 3')
+  })
+
+  test('a daily series counts days', () => {
+    expect(saysPlaceInSeries({ occurrence: 1, length: 5, frequency: 'DAILY', weekdays: null })).toBe('Day 1 of 5')
+  })
+
+  test('a series on two days a week counts dates, since a week holds two of them', () => {
+    expect(saysPlaceInSeries({ occurrence: 3, length: 12, frequency: 'WEEKLY', weekdays: '1,3' })).toBe('Date 3 of 12')
   })
 })

@@ -63,6 +63,16 @@ async function addModule(over: Record<string, unknown> = {}): Promise<string> {
   return id
 }
 
+function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return database.query(statement).get(...parameters as never[]) as T | undefined
+  }
+  finally {
+    database.close()
+  }
+}
+
 function write(statement: string, ...parameters: unknown[]): void {
   const database = new Database(app.databaseFile)
   try {
@@ -200,6 +210,50 @@ describe.skipIf(skip !== null)('the catalogue answers without an account (G-128)
     finally {
       view.close()
     }
+  }, CASE_TIMEOUT_MS)
+
+  test('a brief its reader may record says I have read this, and pressing it records it (0244)', async () => {
+    const id = await addModule({ kind: 'BRIEF', name: 'Get-in brief', selfRegistrable: true })
+    const card = `[data-slot="root"]:has(> [data-test="catalogue-module-${id}"])`
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', member.email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `document.querySelector('[data-test="account-menu"]')`, 30_000)
+
+      await visit(view, `${app.baseURL}/training/modules`, '[data-test="catalogue-page"]')
+      await waitFor(view, `document.querySelector('${card} [data-test="module-read-${id}"]')`, 30_000)
+      expect(await textOf(view, `${card} [data-test="module-read-${id}"]`)).toBe('I have read this')
+      await click(view, `${card} [data-test="module-read-${id}"]`)
+      await waitFor(view, `!document.querySelector('${card} [data-test="module-read-${id}"]')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+
+    const userId = read<{ id: string }>('SELECT id FROM users WHERE email = ?', member.email)!.id
+    expect(read<{ source: string, expiresOn: string | null }>(
+      'SELECT source, expires_on expiresOn FROM training_records WHERE user_id = ? AND module_id = ?', userId, id,
+    )).toEqual({ source: 'SELF', expiresOn: null })
+  }, CASE_TIMEOUT_MS)
+
+  test('pressing it twice in a day records it once, and a brief without the switch refuses (0244)', async () => {
+    const readable = await addModule({ kind: 'BRIEF', selfRegistrable: true })
+    const taught = await addModule({ kind: 'BRIEF' })
+    const reader = await adminSession(app, { roles: [] })
+
+    const first = await send('POST', `/api/training/modules/${readable}/read`, {}, reader.cookie)
+    expect(first.status).toBe(200)
+    expect((await first.json() as { recorded: boolean }).recorded).toBe(true)
+    const second = await send('POST', `/api/training/modules/${readable}/read`, {}, reader.cookie)
+    expect((await second.json() as { recorded: boolean }).recorded).toBe(false)
+    expect(read<{ n: number }>('SELECT count(*) n FROM training_records WHERE user_id = ? AND module_id = ?', reader.id, readable)?.n).toBe(1)
+    expect(read<{ n: number }>(`SELECT count(*) n FROM audit_log WHERE action = 'record.self-registered' AND target = ?`, `user:${reader.id}`)?.n).toBe(1)
+
+    expect((await send('POST', `/api/training/modules/${taught}/read`, {}, reader.cookie)).status).toBe(409)
+    expect((await send('POST', `/api/training/modules/${readable}/read`, {}, '')).status).toBe(401)
   }, CASE_TIMEOUT_MS)
 
   test('the old catalogue address still arrives somewhere', async () => {

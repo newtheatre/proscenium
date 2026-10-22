@@ -3,13 +3,15 @@ import { plural } from './text'
 // What the show screen's status strip says (D-132 criterion 2). Every figure is paired with the
 // words for it, because a colour on its own is not a state (K-101).
 
-export function saysOnSale(onSaleCount: number, performanceCount: number): string {
+// An unpublished show sells nothing, whatever its performances' own switches say.
+export function saysOnSale(onSaleCount: number, performanceCount: number, published = true): string {
   if (performanceCount === 0) return 'No performances'
-  return onSaleCount === 0 ? 'Nothing on sale' : 'On sale'
+  return onSaleCount === 0 || !published ? 'Nothing on sale' : 'On sale'
 }
 
-export function saysOnSaleCount(onSaleCount: number, performanceCount: number): string {
+export function saysOnSaleCount(onSaleCount: number, performanceCount: number, published = true): string {
   if (performanceCount === 0) return 'None scheduled yet'
+  if (!published) return 'Nothing sells while the show is unpublished'
   return `${onSaleCount} of ${plural(performanceCount, 'performance', 'performances')}`
 }
 

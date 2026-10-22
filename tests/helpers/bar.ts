@@ -26,3 +26,12 @@ export async function putOnTheTill(send: Send, productId: string): Promise<Respo
   }
   return landed(send('POST', `/api/admin/bar/products/${productId}/status`, { status: 'ACTIVE' }), 'activating')
 }
+
+// The code the holder's own My NNT shows tonight (F-108 criterion 6, 0164); null for somebody who
+// holds no tab, so a test of a refused holder still reaches the authority check.
+export async function tabCodeOf(baseURL: string, holderCookie: string): Promise<string | null> {
+  const answered = await fetch(`${baseURL}/api/account/tab/code`, { headers: { cookie: holderCookie } })
+  if (answered.status === 403) return null
+  if (!answered.ok) throw new Error(`tabCodeOf: ${answered.status}: ${await answered.text()}`)
+  return (await answered.json() as { code: string }).code
+}

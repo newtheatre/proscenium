@@ -50,6 +50,16 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+function write(statement: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(statement).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
+
 const send = (method: string, path: string, body?: unknown, as = cookie): Promise<Response> =>
   fetch(`${app.baseURL}${path}`, {
     method,
@@ -179,6 +189,11 @@ describe.skipIf(skip !== null)('declining is answering (G-104 criterion 3)', () 
     }
     expect(mine.items.find(one => one.moduleId === module)?.reason)
       .toBe('Not running this term, but it is on the list for next')
+
+    // 0242: the answer is emailed once, not left for them to find.
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE claim = ?`, `training.request.declined:${asked.id}`,
+    )?.n).toBe(1)
   })
 
   test('answering twice is refused, and it is on the trail', async () => {
@@ -226,12 +241,75 @@ describe.skipIf(skip !== null)('a scheduled session answers the asks (G-104 crit
     })
     expect(scheduled.status).toBe(200)
     expect(statusOf(module)).toBe('SCHEDULED')
+    const { id: session } = await scheduled.json() as { id: string }
 
-    // Once per request, held by the ledger's claim rather than by a read.
+    // Once per request and session, held by the ledger's claim rather than by a read.
     expect(read<{ n: number }>(
       `SELECT count(*) n FROM notification_log WHERE claim = ?`,
-      `training.request.scheduled:${asked.id}`,
+      `training.request.scheduled:${asked.id}:${session}`,
     )?.n).toBe(1)
+  })
+
+  // 0242: a cancelled session answers nothing, so the ask is open again and hears the next one.
+  test('cancelling the only session teaching it reopens the ask', async () => {
+    const module = await addModule()
+    const asked = await (await ask(module)).json() as { id: string }
+    const schedule = (days: number): Promise<Response> => send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(days), startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [module],
+    })
+    const { id: first } = await (await schedule(14)).json() as { id: string }
+    expect(statusOf(module)).toBe('SCHEDULED')
+
+    expect((await send('POST', `/api/admin/training/sessions/${first}/cancel`, { reason: 'The room flooded' })).status).toBe(200)
+    expect(statusOf(module)).toBe('OPEN')
+
+    const { id: second } = await (await schedule(21)).json() as { id: string }
+    expect(statusOf(module)).toBe('SCHEDULED')
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE claim = ?`, `training.request.scheduled:${asked.id}:${second}`,
+    )?.n).toBe(1)
+  })
+
+  test('another open session teaching it keeps the ask scheduled', async () => {
+    const module = await addModule()
+    await ask(module)
+    const schedule = (days: number): Promise<Response> => send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(days), startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [module],
+    })
+    const { id: first } = await (await schedule(14)).json() as { id: string }
+    await schedule(21)
+    expect((await send('POST', `/api/admin/training/sessions/${first}/cancel`, { reason: 'The room flooded' })).status).toBe(200)
+    expect(statusOf(module)).toBe('SCHEDULED')
+  })
+
+  // Review of 0242: only what this session scheduled goes back, never an ask another one answered.
+  test('cancelling a session that scheduled nothing leaves an ask another session answered', async () => {
+    const module = await addModule()
+    await ask(module)
+    const schedule = (days: number, opensAt?: number): Promise<Response> => send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(days), startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [module], opensAt,
+    })
+    const { id: planned } = await (await schedule(28, Math.floor(Date.now() / 1000) + 86_400)).json() as { id: string }
+    expect(statusOf(module)).toBe('OPEN')
+    const { id: answered } = await (await schedule(14)).json() as { id: string }
+    expect(statusOf(module)).toBe('SCHEDULED')
+    write('UPDATE training_sessions SET register_opened_at = unixepoch() WHERE id = ?', answered)
+
+    expect((await send('POST', `/api/admin/training/sessions/${planned}/cancel`, { reason: 'The room flooded' })).status).toBe(200)
+    expect(statusOf(module)).toBe('SCHEDULED')
+  })
+
+  test('cancelling leaves the ask alone once the member holds the module', async () => {
+    const module = await addModule()
+    await ask(module)
+    const { id: session } = await (await send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(14), startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [module],
+    })).json() as { id: string }
+    expect(statusOf(module)).toBe('SCHEDULED')
+    expect((await send('POST', '/api/admin/training/signoffs', { userId: memberId, moduleId: module, awardedOn: daysFrom(0) })).status).toBe(200)
+
+    expect((await send('POST', `/api/admin/training/sessions/${session}/cancel`, { reason: 'The room flooded' })).status).toBe(200)
+    expect(statusOf(module)).toBe('SCHEDULED')
   })
 
   test('a session that has not opened yet resolves nothing', async () => {

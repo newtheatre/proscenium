@@ -1,10 +1,10 @@
 import { db, schema } from '@nuxthub/db'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 // Named rather than auto-imported, because `tests/` typechecks this file under Bun (0055).
 import { auditedWrite } from './audit'
 import { conflictsWith } from './bookings'
 import { closedNow, roomOpenTerms } from './performance-closures'
-import { OWN_REQUEST, chunked, refusalToDecide } from '#shared/utils/approvals'
+import { OWN_REQUEST, chunked, refusalToDecide, saysTaken } from '#shared/utils/approvals'
 import { lostWriteCause } from '#shared/utils/blackouts'
 import { HOLDS_A_SLOT, maskConflicts } from '#shared/utils/bookings'
 import type { AuditRow } from '#shared/utils/audit'
@@ -138,7 +138,7 @@ async function whyItFailed(id: string, intoRoom: string | null, offsets?: ShiftO
   if (approverId !== undefined && row.userId === approverId) return { id, ok: false, why: 'own', says: OWN_REQUEST }
 
   const roomId = intoRoom ?? row.roomId
-  const [room] = await db.select({ id: schema.rooms.id, isActive: schema.rooms.isActive })
+  const [room] = await db.select({ id: schema.rooms.id, name: schema.rooms.name, isActive: schema.rooms.isActive })
     .from(schema.rooms)
     .where(eq(schema.rooms.id, roomId))
     .limit(1)
@@ -154,5 +154,23 @@ async function whyItFailed(id: string, intoRoom: string | null, offsets?: ShiftO
     return { id, ok: false, why: 'closed', says: 'The room is closed for that span' }
   }
   const conflicts = await conflictsWith({ roomId, startsAt: row.startsAt, endsAt: row.endsAt, exceptId: id })
-  return { id, ok: false, why: 'conflict', says: 'Somebody took that slot while this was waiting', conflicts: maskConflicts(conflicts, true) }
+  const takenWhileWaiting = intoRoom === null && await bookedSince(roomId, row)
+  return { id, ok: false, why: 'conflict', says: saysTaken({ room: room.name, takenWhileWaiting }), conflicts: maskConflicts(conflicts, true) }
+}
+
+// Whether anything in the way was written after the request was, which is the only case where
+// the request was beaten to a slot it held.
+async function bookedSince(roomId: string, row: PendingRow): Promise<boolean> {
+  const [later] = await db.select({ id: schema.roomBookings.id })
+    .from(schema.roomBookings)
+    .where(and(
+      eq(schema.roomBookings.roomId, roomId),
+      sql`${schema.roomBookings.id} <> ${row.id}`,
+      inArray(schema.roomBookings.status, [...HOLDS_A_SLOT]),
+      sql`${schema.roomBookings.startsAt} < ${row.endsAt}`,
+      sql`${schema.roomBookings.endsAt} > ${row.startsAt}`,
+      sql`${schema.roomBookings.createdAt} > ${row.createdAt}`,
+    ))
+    .limit(1)
+  return later !== undefined
 }

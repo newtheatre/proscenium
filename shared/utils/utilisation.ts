@@ -27,7 +27,15 @@ export interface UtilisationRow {
   cancelledHours: number
   noShowHours: number
   openHours: number
+  // A room with no hours recorded, so its open hours are not nought but unbounded.
+  alwaysOpen: boolean
   bookings: number
+}
+
+// The Open column and the CSV's openHours: blank where there is nothing to count against, an
+// always-open room or a kind of booking, so a spreadsheet never reads it as never open.
+export function openHoursCell(row: Pick<UtilisationRow, 'openHours' | 'alwaysOpen'>, by: Breakdown): number | '' {
+  return by === 'tier' || row.alwaysOpen ? '' : row.openHours
 }
 
 // Nought open hours is not nought per cent used; it is a room nobody could book, which is a

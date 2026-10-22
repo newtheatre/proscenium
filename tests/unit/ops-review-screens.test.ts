@@ -35,9 +35,10 @@ describe('a prerequisite members cannot open is named, never linked (G-103 crite
 })
 
 describe('a session is scheduled for a future day (G-112 criterion 1)', () => {
-  test('the day picker starts tomorrow, as the write path does', async () => {
+  test('the calendar starts tomorrow, as the write path does, and a day typed earlier is refused in words (0243)', async () => {
     const source = await read('app/pages/training/manage/sessions/index.vue')
-    expect(source).toContain(':min="tomorrow"')
+    expect(source).toContain(':calendar-min="tomorrow"')
+    expect(source).toMatch(/v-if="notAhead"[\s\S]{0,400}data-test="session-day-past"/)
   })
 
   test('an empty day asks for one rather than quoting a format', () => {

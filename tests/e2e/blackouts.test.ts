@@ -384,6 +384,8 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
       to: '16:00',
       occurrences: 3,
       skip: skipDays,
+      // The last Wednesday can fall past the booking horizon, and a series that asks gives its reason.
+      reason: 'The term\'s rehearsals.',
     }, member.cookie)
 
     const refused = await ask([])
@@ -482,10 +484,10 @@ describe.skipIf(skip !== null)('counting before closing (criteria 3 and 5, issue
 
     const answered = await stranded(room, span(50))
     expect(answered.status).toBe(200)
-    expect(await answered.json()).toEqual({ count: 1 })
+    expect(await answered.json()).toMatchObject({ count: 1 })
     expect(read<{ status: string }>('SELECT status FROM room_bookings WHERE id = ?', id)?.status).toBe('CONFIRMED')
 
-    expect(await (await stranded(room, span(51))).json()).toEqual({ count: 0 })
+    expect(await (await stranded(room, span(51))).json()).toMatchObject({ count: 0 })
   })
 
   test('with no room it counts across every room', async () => {
@@ -509,6 +511,19 @@ describe.skipIf(skip !== null)('counting before closing (criteria 3 and 5, issue
     const closed = await (await closeRoom(room, span(54, 12, 8))).json() as { cancelled: number }
     expect(counted.count).toBe(2)
     expect(closed.cancelled).toBe(counted.count)
+  })
+
+  // Warned of on the form and never refused: two closures over one span are allowed, but rarely meant.
+  test('the count names a closure already set over the span for the room, and not another room\'s', async () => {
+    const room = await makeRoom()
+    const other = await makeRoom()
+    const { id } = await (await closeRoom(room, span(56))).json() as { id: string }
+    await closeRoom(other, span(56), 'Somewhere else')
+
+    const counted = await (await stranded(room, span(56, 15))).json() as { overlapping: { id: string, reason: string }[] }
+    expect(counted.overlapping.map(one => one.id)).toContain(id)
+    expect(counted.overlapping.some(one => one.reason === 'Somewhere else')).toBe(false)
+    expect((await closeRoom(room, span(56, 15))).status).toBe(200)
   })
 
   // The close refuses a span that runs backwards, so the count does too rather than answer for it.

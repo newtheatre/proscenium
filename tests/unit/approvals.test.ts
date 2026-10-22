@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { BULK_LIMIT, chunked, decisionForm, refusalToDecide } from '#shared/utils/approvals'
+import { BULK_LIMIT, chunked, decisionForm, refusalToDecide, saysTaken } from '#shared/utils/approvals'
 
 // C-109's pure half: what may be decided, and what a decision has to carry.
 
@@ -74,5 +74,15 @@ describe('a read covering a batch stays under the parameter cap D1 sets (0003)',
 
   test('nothing chunks to nothing', () => {
     expect(chunked([])).toEqual([])
+  })
+})
+
+describe('a conflict says what actually happened', () => {
+  test('a booking made after the request beat it to the slot it held', () => {
+    expect(saysTaken({ room: 'The Studio', takenWhileWaiting: true })).toBe('Somebody took that slot while this was waiting')
+  })
+
+  test('a slot that was always taken, or a move, names the room and the fix', () => {
+    expect(saysTaken({ room: 'The Studio', takenWhileWaiting: false })).toBe('The Studio is already booked then; choose another room')
   })
 })

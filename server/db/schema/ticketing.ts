@@ -23,6 +23,8 @@ export const ticketTypes = sqliteTable('ticket_types', {
   restrictedTo: text('restricted_to'),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
   activeByDefault: integer('active_by_default', { mode: 'boolean' }).notNull().default(true),
+  // The order a show lists its types in; price is the tiebreak (0193).
+  sort: integer('sort').notNull().default(0),
 }, table => [
   unique('ticket_types_name').on(table.name),
   // Standard and standard are one name to everybody who reads a report, so the database says so

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { committeeYearToDate, saysShare, usedShare } from '#shared/utils/utilisation'
+import { committeeYearToDate, openHoursCell, saysShare, usedShare } from '#shared/utils/utilisation'
 import { utilisationList } from '#shared/utils/utilisation-list'
 import type { UtilisationRow } from '#shared/utils/utilisation'
 import type { TableColumn } from '@nuxt/ui'
@@ -18,7 +18,7 @@ interface Report {
   pageSize: number
   total: number
   pages: number
-  totals: Omit<UtilisationRow, 'key' | 'label'>
+  totals: Omit<UtilisationRow, 'key' | 'label' | 'alwaysOpen'>
 }
 
 // The committee year to date, London throughout (0009, 0014): a span read off the runtime's own
@@ -66,7 +66,10 @@ const columns = computed<TableColumn<UtilisationRow>[]>(() => [
   {
     id: 'open',
     header: 'Open',
-    cell: ({ row }) => (row.original.openHours > 0 ? `${row.original.openHours}h` : 'Always open'),
+    cell: ({ row }) => {
+      const open = openHoursCell(row.original, by.value)
+      return open === '' ? (row.original.alwaysOpen ? 'Always open' : '') : `${open}h`
+    },
   },
   {
     id: 'lost',

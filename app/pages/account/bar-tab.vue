@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
+import { renderSVG } from 'uqr'
 import { saysMoney } from '#shared/utils/bar'
+import { saysTabCode } from '#shared/utils/tab-presence'
 import { saysClock, saysWhen } from '#shared/utils/when'
 import type { ItemisedTab } from '#shared/utils/tab-settlement'
 
@@ -18,12 +20,21 @@ const listFailure = useListFailure(error, 'Your tab could not be read.')
 
 const tab = computed(() => data.value?.tab)
 
+// Tonight's code, shown at the bar so somebody else may charge this tab (F-108 criterion 6, 0164).
+// Only an authorised holder has one; somebody still owing after their authority lapsed does not.
+const { data: tonight, refresh: refreshCode } = await useAsyncData<{ code: string } | null>(
+  'account-tab-code',
+  () => request<{ code: string }>('/api/account/tab/code').catch(() => null),
+)
+const tabCode = computed(() => tonight.value?.code ?? null)
+const tabQr = computed(() => (tabCode.value ? `data:image/svg+xml;base64,${btoa(renderSVG(tabCode.value))}` : null))
+
 // The bar settles and voids from its own screen: re-reads on return to the tab, the same wake
 // this app's SumUp watch uses, so a balance left open here does not silently drift.
 const lastChecked = ref(new Date())
 
 async function reread(): Promise<void> {
-  await refresh()
+  await Promise.all([refresh(), refreshCode()])
   lastChecked.value = new Date()
 }
 
@@ -106,6 +117,34 @@ function describe(charge: ItemisedTab['charges'][number]): string {
           Checked {{ saysClock(lastChecked) }}
         </p>
       </UCard>
+
+      <UCard
+        v-if="tabCode && tabQr"
+        data-test="account-tab-code"
+      >
+        <template #header>
+          <h2 class="text-lg font-semibold">
+            Tonight's tab code
+          </h2>
+        </template>
+        <p class="text-sm text-muted">
+          Show this at the bar when somebody else is charging your tab. It works until 04:00.
+        </p>
+        <img
+          :src="tabQr"
+          alt="QR code for tonight's tab code"
+          class="mx-auto mt-4 size-48"
+          data-test="account-tab-code-qr"
+        >
+        <p
+          class="mt-2 text-center font-mono text-2xl tracking-widest"
+          data-test="account-tab-code-text"
+        >
+          {{ saysTabCode(tabCode) }}
+        </p>
+      </UCard>
+
+      <AccountAddToTab @added="reread" />
 
       <UCard data-test="account-tab-charges">
         <template #header>

@@ -44,6 +44,36 @@ export const MESSAGE_TYPES = {
     reachesUnverified: true,
   },
 
+  // The link that moves an account to a new address goes to that address, which has no account
+  // of its own yet, so it is sent by address rather than to the account (0151).
+  'account.email.confirm': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-change-confirm',
+    reachesUnverified: true,
+  },
+
+  // Security, to the address the account still signs in with, so no topic can suppress either.
+  'account.email.requested': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-change-requested',
+  },
+
+  'account.email.changed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-changed',
+  },
+
+  // Another account asked to move onto this address; its owner is warned, the asker told nothing.
+  'account.email.taken': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-taken',
+    reachesUnverified: true,
+  },
+
   'password.reset': {
     topic: null,
     channels: ['EMAIL'],
@@ -125,6 +155,14 @@ export const MESSAGE_TYPES = {
     topic: null,
     channels: ['EMAIL', 'INBOX'],
     template: 'membership-claims-waiting',
+  },
+
+  // A member waits for their access tickets until somebody sights the declaration, so the
+  // Secretary is told daily rather than left to think to open the queue (0156).
+  'access-profiles.waiting': {
+    topic: null,
+    channels: ['EMAIL', 'INBOX'],
+    template: 'access-profiles-waiting',
   },
 
   // A handover is planned rather than discovered, so this is transactional: no topic may
@@ -456,6 +494,13 @@ export const MESSAGE_TYPES = {
     template: 'shift-released',
     sender: 'ANNOUNCEMENTS',
   },
+  // Transactional: with claims queued for an officer, the claim is the officer's work (0212).
+  'shift.claim-waiting': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-claim-waiting',
+    sender: 'ANNOUNCEMENTS',
+  },
   // The officer's assignment is confirmed by definition, so it reads exactly like an approval
   // to the person it lands on (E-107 criterion 3).
   'shift.assigned': {
@@ -519,6 +564,28 @@ export const MESSAGE_TYPES = {
     template: 'training-request-scheduled',
   },
 
+  // A sign-up gave no feedback beyond the screen, and a place is worth having in writing (0242).
+  'training.session.signed-up': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-session-signed-up',
+  },
+
+  // A trainer the Theatre Manager named is told they are teaching, rather than finding out (0242).
+  'training.session.assigned': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'training-session-assigned',
+    sender: 'TRAINING',
+  },
+
+  // The answer to something they asked, so it reaches them rather than waiting on a page (0242).
+  'training.request.declined': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-request-declined',
+  },
+
   // Nothing has been held against them and nothing has been taken away: the module is simply
   // still outstanding, and the schedule is the way out of that.
   'training.session.absent': {
@@ -539,6 +606,14 @@ export const MESSAGE_TYPES = {
     topic: 'TRAINING',
     channels: ['EMAIL', 'INBOX'],
     template: 'training-session-added',
+  },
+
+  // What the session teaches changed after they signed up, and now needs something they lack.
+  // Sent only when the trainer chose to, having read the names (0243).
+  'training.session.needs-first': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-session-needs-first',
   },
 
   // Blunt, because it is to an officer about a system failure rather than to a member about

@@ -1,5 +1,6 @@
 import { eq, ne, sql } from 'drizzle-orm'
 import { sessionCancelForm } from '#shared/utils/training'
+import { saysDayLong } from '#shared/utils/when'
 
 // Call a session off and tell everybody signed up. A cancelled session awards nothing and its
 // register can never be opened, so this is only ever the path before one is (G-113).
@@ -64,6 +65,8 @@ export default defineEventHandler(async (event) => {
       WHERE id = ${id} AND status <> 'CANCELLED' RETURNING id
     `),
     entry,
+    // In the cancel's batch and only behind its audit entry, so a losing racer reopens nothing.
+    reopenRequestsFor(id, londonToday(), entryLanded(entry)),
   )
 
   // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
@@ -71,6 +74,8 @@ export default defineEventHandler(async (event) => {
   if (!applied) {
     throw createError({ statusCode: 409, statusMessage: 'That session is already cancelled' })
   }
+
+  const taught = (await modulesTaughtBy(id)).map(module => module.name).join(', ')
 
   // Claimed before it is sent, so a retry of this request cannot tell the same person twice.
   let told = 0
@@ -91,7 +96,8 @@ export default defineEventHandler(async (event) => {
       context: {
         // The recipient's own name is filled in by notify.
         name: '',
-        heldOn: session.heldOn,
+        heldOn: `${saysDayLong(session.heldOn)} at ${session.startsAt}`,
+        taught,
         reason: input.reason,
         sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
       },

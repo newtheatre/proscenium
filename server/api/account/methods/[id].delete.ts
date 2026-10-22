@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
 
   await db.batch([
     removal,
+    cancelPendingEmailChange(account),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
       action: 'account.method.removed',

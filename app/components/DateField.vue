@@ -8,7 +8,8 @@ import type { CalendarDate } from '@internationalized/date'
 const model = defineModel<string | undefined>()
 
 // A bound is a civil date like the model, so a caller never has to build a calendar value.
-const props = defineProps<{ disabled?: boolean, min?: string, max?: string }>()
+// `calendarMin` bounds only the calendar, so a day typed below it reaches the form to be refused.
+const props = defineProps<{ disabled?: boolean, min?: string, max?: string, calendarMin?: string }>()
 
 const bound = (value: string | undefined): CalendarDate | undefined => {
   if (!value) return undefined
@@ -66,7 +67,7 @@ const value = computed({
         <template #content>
           <UCalendar
             v-model="value"
-            :min-value="bound(props.min)"
+            :min-value="bound(props.calendarMin ?? props.min)"
             :max-value="bound(props.max)"
             class="p-2"
           />

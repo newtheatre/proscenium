@@ -1,4 +1,5 @@
 import { doorTicketOutcome, doorTicketScanForm, nothingToCollect } from '#shared/utils/reservations'
+import { firstNameOf } from '#shared/utils/night-hub'
 import { formatLondon } from '#shared/utils/london'
 import { saysPrice } from '#shared/utils/ticket-types'
 
@@ -27,8 +28,9 @@ export default defineEventHandler(async (event) => {
   )
 
   // Tonight's own booking only: the agreed wording is for the person in front of the door (D-128 4).
+  // A first name only, as door mode shows it, so the full name never rides the response (E-129 7).
   const [party, accessWording] = await Promise.all([
-    doorParty(reservation.id),
+    doorParty(reservation.id).then(row => ({ ...row, holderName: firstNameOf(row.holderName) })),
     reservation.performanceId === input.performanceId ? doorAccessWording(reservation.id) : null,
   ])
   // The door's own card reads `data`; the message is unchanged, so the desk still gets the

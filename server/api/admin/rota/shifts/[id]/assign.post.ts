@@ -1,5 +1,5 @@
 import { changes } from '#shared/utils/audit'
-import { formatLondon } from '#shared/utils/london'
+import { formatLondon, londonClock } from '#shared/utils/london'
 import { clashRefusal, reassignRefusal, saysShiftRole, shiftAssignForm } from '#shared/utils/rota'
 
 // Assign an eligible member to an open shift, or replace whoever holds it: confirmed by
@@ -23,11 +23,12 @@ export default defineEventHandler(async (event) => {
   if (!eligibility.eligible) throw ineligibleRefusal(held.role, eligibility, subject.name)
   const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000))
 
+  const movesOff = move && await holdsOtherShift(id, userId)
   const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'shift.reassigned',
     target: `shift:${id}`,
-    detail: { ...changes({ userId: [held.userId, userId], status: [held.status, 'CONFIRMED'] }), ...(move ? { movedOffOtherShift: true } : {}) },
+    detail: { ...changes({ userId: [held.userId, userId], status: [held.status, 'CONFIRMED'] }), ...(movesOff ? { movedOffOtherShift: true } : {}) },
   })
 
   // A move lets go of their other shift on the performance only behind this write's audit row (0211).
@@ -53,14 +54,14 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       userId: held.userId,
       type: 'shift.removed',
-      context: { name: '', show: held.showTitle, venue: held.venueName, when, role },
+      context: { name: '', show: held.showTitle, venue: held.venueName, when, role, replaced: true },
     })
   }
 
   await notify(event, {
     userId,
     type: 'shift.assigned',
-    context: { name: '', show: held.showTitle, venue: held.venueName, when, role },
+    context: { name: '', show: held.showTitle, venue: held.venueName, when, role, callTime: held.shiftStartsAt === null ? undefined : londonClock(new Date(held.shiftStartsAt * 1000)) },
   })
 
   return { ok: true, status: 'CONFIRMED' }

@@ -15,11 +15,18 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 410, statusMessage: 'That link has expired or has already been used. Ask for a new one.' })
   }
 
-  // A link bound to an address confirms that address and no other: changing again between the
-  // send and the click leaves the older link inert (A-115 criterion 1).
   const account = await findById(claimed.userId)
-  if (claimed.email !== null && (!account || normaliseEmail(account.email) !== normaliseEmail(claimed.email))) {
-    throw createError({ statusCode: 410, statusMessage: 'That link was for a different address. Ask for a new one.' })
+  if (claimed.email !== null && (!account || account.anonymisedAt !== null || account.disabled)) {
+    throw createError({ statusCode: 410, statusMessage: 'That link has expired or has already been used. Ask for a new one.' })
+  }
+
+  // A link bound to a new address is the change itself arriving: only now does the address move,
+  // and a session held here is re-sealed against it (0151).
+  if (claimed.email !== null && normaliseEmail(account!.email) !== normaliseEmail(claimed.email)) {
+    await completeEmailChange(event, account!, normaliseEmail(claimed.email))
+    const session = await getUserSession(event)
+    if (session.user?.id === account!.id) await resealSession(event, (await findById(account!.id))!)
+    return { ok: true, signedIn: false, changed: true }
   }
 
   // Opened in the browser that registered, the link is a sign-in as well; anywhere else, or for a
@@ -43,5 +50,5 @@ export default defineEventHandler(async (event) => {
   ])
 
   if (signsIn) await startSession(event, { ...account!, verified: true }, 'magic-link')
-  return { ok: true, signedIn: signsIn }
+  return { ok: true, signedIn: signsIn, changed: false }
 })

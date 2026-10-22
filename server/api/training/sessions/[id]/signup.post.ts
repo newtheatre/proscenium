@@ -1,4 +1,5 @@
 import { saysGaps } from '#shared/utils/training'
+import { saysDayLong } from '#shared/utils/when'
 import {
   blockingGaps,
   refreshBadgeStatement,
@@ -66,6 +67,26 @@ export default defineEventHandler(async (event) => {
   const mine = places.places.find(place => place.userId === account.id)
   if (!mine) throw createError({ statusCode: 409, statusMessage: 'That sign-up did not stick. Please try again.' })
 
+  // A sign-up is confirmed once, by email, keyed to the sign-up instant so a re-join is told too (0242).
+  if (took) {
+    const key = `training.session.signed-up:${sessionId}:${account.id}:${mine.signedUpAt}`
+    if (await claimNotification({ userId: account.id, type: 'training.session.signed-up', key, sessionId })) {
+      await notify(event, {
+        type: 'training.session.signed-up',
+        userId: account.id,
+        claim: key,
+        context: {
+          name: '',
+          taught: session.modules.map(module => module.name).join(', '),
+          when: `${saysDayLong(session.heldOn)} at ${session.startsAt}`,
+          where: session.place ?? 'a place the trainer will confirm',
+          standing: mine.placed ? 'You have a place.' : `The session is full, so you are number ${mine.waitlistPosition} on the waiting list.`,
+          sessionsUrl: `${useRuntimeConfig(event).public.baseURL}/training/sessions`,
+        },
+      })
+    }
+  }
+
   return {
     ok: true,
     // False means they were already on the list, so nothing moved and nothing is wrong.
@@ -73,6 +94,6 @@ export default defineEventHandler(async (event) => {
     position: mine.position,
     placed: mine.placed,
     waitlistPosition: mine.waitlistPosition,
-    warnings: warningGaps(gaps),
+    warnings: warningGaps(gaps, session.modules.map(module => module.id)),
   }
 })

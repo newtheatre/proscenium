@@ -91,6 +91,8 @@ export const saleForm = basketForm.extend({
   expectedTotalPence: z.number().int().nonnegative(),
   ageCheck: inlineAgeCheckForm.nullish().transform(value => value ?? null),
   tabHolderId: z.string().trim().min(1, 'Say who holds the tab').nullish().transform(value => value ?? null),
+  // The holder's code from My NNT, needed only when the tab is somebody else's (F-108 criterion 6).
+  tabCode: z.string().trim().max(32).nullish().transform(value => value ?? null),
   tickets: z.array(ticketLineForm).max(MAX_TICKET_LINES).default([])
     .refine(tickets => new Set(tickets.map(ticket => ticket.reservationId)).size === tickets.length, 'That booking is in the basket twice'),
   walkUps: z.array(walkUpLineForm).max(MAX_WALK_UP_LINES).default([])

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, viewEmergencyCard } from '#shared/utils/abilities'
-import { venueForm } from '#shared/utils/venues'
+import { saysVenueUse, venueForm } from '#shared/utils/venues'
 import { venuesList } from '#shared/utils/venues-list'
 import type { TableColumn } from '@nuxt/ui'
 import type { AdminVenue } from '#shared/utils/venues'
@@ -75,7 +75,7 @@ const state = reactive<FormState>({
 })
 
 const roomOptions = computed(() => [
-  { label: 'No room, blackouts do not apply', value: null },
+  { label: 'No room', value: null },
   ...(rooms.value ?? []).map(room => ({ label: room.name, value: room.id })),
 ])
 
@@ -111,7 +111,7 @@ async function save(): Promise<void> {
     else {
       await $fetch('/api/admin/reference-data/venues', { method: 'POST', body })
     }
-    toast.add({ title: editing.value ? 'Venue changed' : 'Venue added', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: editing.value ? 'Venue saved' : 'Venue added', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await reload()
   }
@@ -132,6 +132,8 @@ async function setArchived(venue: AdminVenue, archived: boolean): Promise<void> 
       description: archived ? 'It stops appearing for new performances and still serves every record that already points at it.' : undefined,
       icon: 'i-lucide-check',
       color: 'success',
+      // Retiring acts at once, so the toast carries its own way back.
+      actions: archived ? [{ label: 'Undo', color: 'neutral', variant: 'outline', onClick: () => { void setArchived(venue, false) } }] : undefined,
     })
     await reload()
   }
@@ -179,7 +181,7 @@ const columns: TableColumn<AdminVenue>[] = [
       row.original.address ? h('div', { class: 'text-xs text-muted' }, row.original.address) : null,
       // Below sm the capacity and whether anything uses it are hidden: shown here instead, so a
       // phone keeps the row actions in view without losing what they said (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.capacity === null ? 'Uncapped' : `${row.original.capacity} seats`}, ${row.original.inUse ? 'has records against it' : 'nothing yet'}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.capacity === null ? 'Uncapped' : `${row.original.capacity} seats`}, ${saysVenueUse(row.original).toLowerCase()}`),
     ]),
   },
   {
@@ -192,7 +194,7 @@ const columns: TableColumn<AdminVenue>[] = [
     id: 'inUse',
     header: 'In use',
     meta: { class: { th: HIDE_BELOW_SM, td: HIDE_BELOW_SM } },
-    cell: ({ row }) => h(StatusCell, { value: row.original.inUse, yes: 'Has records against it', no: 'Nothing yet' }),
+    cell: ({ row }) => h(StatusCell, { value: row.original.inUse, yes: saysVenueUse(row.original), no: 'Nothing yet' }),
   },
   {
     id: 'act',
@@ -215,14 +217,16 @@ const columns: TableColumn<AdminVenue>[] = [
       }, () => (row.original.archived ? 'Bring back' : 'Retire')),
       row.original.inUse
         ? null
-        : rowOverflow(row.original.id, [{
-            label: 'Delete',
-            color: 'error',
-            onSelect: () => {
+        : h(UButton, {
+            'size': 'sm',
+            'color': 'error',
+            'variant': 'ghost',
+            'data-test': `delete-${row.original.id}`,
+            'onClick': () => {
               failure.value = null
               removing.value = row.original
             },
-          }]),
+          }, () => 'Delete'),
     ]),
   },
 ]
@@ -315,7 +319,7 @@ const columns: TableColumn<AdminVenue>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'Add a venue'"
-      description="The name is held once. A room is optional, and its only effect is that this venue's performances apply blackouts to it."
+      description="The name is held once. A room is optional: attaching one closes it to rehearsal bookings while a performance is on."
     >
       <template #body>
         <UForm
@@ -366,7 +370,7 @@ const columns: TableColumn<AdminVenue>[] = [
           >
             <UInputNumber
               v-model="state.capacity"
-              :min="1"
+              :min="0"
               class="w-full"
               data-test="venue-capacity"
             />
@@ -375,7 +379,7 @@ const columns: TableColumn<AdminVenue>[] = [
           <UFormField
             label="Room"
             name="roomId"
-            description="Attaching a room means this venue's performances apply blackouts to it, and nothing else."
+            description="Attaching a room closes it to rehearsal bookings while a performance is on here, and does nothing else."
           >
             <USelect
               v-model="state.roomId"
@@ -400,7 +404,7 @@ const columns: TableColumn<AdminVenue>[] = [
           <USwitch
             v-model="state.isExternal"
             label="External venue"
-            description="A union or off-site space. It appears in reports and takes no blackouts."
+            description="A union or off-site space. It appears in reports, gets no rota, and closes no room."
             data-test="venue-external"
           />
         </UForm>

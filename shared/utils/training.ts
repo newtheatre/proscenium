@@ -471,13 +471,15 @@ const TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 
 export const SESSION_CAPACITY_MIN = 1
 export const SESSION_CAPACITY_MAX = 60
+// Said rather than clamped: a figure quietly changed in the box is not the one typed (0243).
+export const TOO_MANY_PLACES = `A session takes at most ${SESSION_CAPACITY_MAX} people: split a bigger group across two`
 
 export const sessionForm = z.object({
   heldOn: z.string().min(1, 'Choose the day it is held').regex(CIVIL_DATE, 'Choose the day from the calendar'),
   startsAt: z.string().regex(TIME, 'A time reads as HH:MM'),
   endsAt: z.string().regex(TIME, 'A time reads as HH:MM'),
   place: text(120),
-  capacity: z.number().int().min(SESSION_CAPACITY_MIN).max(SESSION_CAPACITY_MAX),
+  capacity: z.number().int().min(SESSION_CAPACITY_MIN, 'A session needs at least one place').max(SESSION_CAPACITY_MAX, TOO_MANY_PLACES),
   // Absent opens sign-up now; a later instant keeps it invisible to members until then.
   opensAt: z.number().int().positive().nullish().transform(value => value ?? null),
   description: text(2000),
@@ -583,6 +585,8 @@ export function prerequisiteGaps(
 export const sessionModulesForm = z.object({
   moduleIds: z.array(z.string().trim().min(1).max(32)).min(1).max(10),
   releaseFreeze: z.boolean().optional(),
+  // Email whoever signed up and lacks a prerequisite the change adds (0243).
+  tellLacking: z.boolean().optional(),
 })
 
 export type SessionModulesInput = z.output<typeof sessionModulesForm>

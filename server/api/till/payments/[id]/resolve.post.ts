@@ -1,3 +1,4 @@
+import { OWN_TAB_SETTLEMENT } from '#shared/utils/self-dealing'
 import { resolveAttemptForm } from '#shared/utils/sumup'
 import { tillScopeForm } from '#shared/utils/till'
 
@@ -12,6 +13,9 @@ export default defineEventHandler(async (event) => {
   if (!row) throw noSuch('SumUp attempt')
   // Tonight's shift never reaches back into an ended night, as its session's close does not.
   const account = await barAuthorityFor(event, row.night, scope.venueId ? scope : { venueId: row.venueId }, 'A charge from an earlier night', 'answer')
+
+  // The holder named in the attempt never changes, so this read cannot race its answer (0116, 0162).
+  if (basketOf(row).settlement?.holderId === account.id) throw createError({ statusCode: 403, statusMessage: OWN_TAB_SETTLEMENT })
 
   const outcome = await resolveAttempt(row, input.outcome, input.smpTxCode, input.note, {
     actorId: account.id,

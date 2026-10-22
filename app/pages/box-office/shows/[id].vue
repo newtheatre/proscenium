@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { SHOW_TABS, showTab } from '#shared/utils/show-tabs'
-import { saysShowStatus } from '#shared/utils/programme'
+import { publishBlockers, saysShowStatus } from '#shared/utils/programme'
 import type { AdminPerformance, AdminShow, ShowReference, ShowVenue } from '#shared/utils/programme'
 import type { ContentWarning, ShowContentWarning } from '#shared/utils/content-warnings'
 import type { CoveringPass } from '#shared/utils/pass-types'
@@ -55,6 +55,8 @@ const active = computed({
 
 const publishing = ref(false)
 const cascade = ref(true)
+// The route refuses on the same list, so the sheet names it all before anybody presses.
+const blockers = computed(() => (show.value ? publishBlockers(show.value.title, categories.value.find(one => one.id === show.value?.categoryId), seasons.value.find(one => one.id === show.value?.seasonId)) : []))
 const coverTicked = ref<string[]>([])
 
 // Taking a show off sale is not destruction, so the confirmation is primary rather than error
@@ -231,7 +233,11 @@ const loadFailure = useListFailure(error, 'The show could not be read.')
             :show="show"
             @changed="refresh()"
           />
-          <BoxOfficeShowChecklist :show="show" />
+          <BoxOfficeShowChecklist
+            :show="show"
+            :performances="performances"
+            :venues="venues"
+          />
           <BoxOfficeShowDangerZone
             :show="show"
             :busy="saving"
@@ -245,19 +251,21 @@ const loadFailure = useListFailure(error, 'The show could not be read.')
     <UModal
       v-model:open="publishing"
       title="Put this show on sale"
-      description="The public page goes live. Check each night before it does; nothing here stops you."
+      description="The public page goes live. Check each night before it does."
     >
       <template #body>
         <BoxOfficeShowPublishSheet
           v-model:cascade="cascade"
           v-model:cover="coverTicked"
           :detail="data"
+          :blockers="blockers"
         />
       </template>
 
       <template #footer>
         <UButton
           :loading="saving"
+          :disabled="blockers.length > 0"
           data-test="confirm-publish"
           @click="setPublished(true)"
         >

@@ -20,6 +20,7 @@ import {
   verdictBuzz,
   verdictHoldMs,
 } from '#shared/utils/door'
+import { saysAlreadyAdmitted } from '#shared/utils/reservations'
 
 // E-129 criteria 2 and 3: what a decoded QR resolves to, and why one code held in front of the
 // lens admits once. The camera itself is not here; this is the pure half.
@@ -176,7 +177,7 @@ describe('what the card says about tonight, which is what the volunteer reads be
   })
 
   test('redeemed and already through the door: admitting again is refused (criterion 4)', () => {
-    expect(saysPassTonight(1000, 'DOOR')).toEqual({ line: 'Already admitted tonight', admitted: true })
+    expect(saysPassTonight(1000, 'DOOR')).toEqual({ line: saysAlreadyAdmitted(1000), admitted: true })
   })
 
   test('redeemed but not yet arrived: the seat exists and the door still has a job', () => {
@@ -314,6 +315,24 @@ describe('a ticket found by name says paid, unpaid or in, with a first name only
 
   test('the surname never leaves the lookup', () => {
     expect(JSON.stringify(doorTicketFound({ ...row, status: 'COLLECTED' }))).not.toContain('Halvorsen')
+  })
+})
+
+// The 21 October process map: a booking LAPSED or CANCELLED by reference was NOT FOUND by name (0233).
+describe('a lapsed or cancelled booking says so, by name as by reference (0233)', () => {
+  const row = { reference: 'K7M4PQ', holderName: 'Mira Halvorsen', partySize: 2, admittedAt: null }
+
+  test('a released hold and a cancelled booking are listed with their state', () => {
+    expect(doorTicketFound({ ...row, status: 'EXPIRED' })).toMatchObject({ state: 'LAPSED', line: 'The hold was released. Send to the bar for a ticket.' })
+    expect(doorTicketFound({ ...row, status: 'CANCELLED', exchanged: 0 }))
+      .toMatchObject({ state: 'CANCELLED', line: 'Cancelled. Send to the bar for a ticket.' })
+    expect(doorTicketFound({ ...row, status: 'CANCELLED', exchanged: 1 }).line)
+      .toBe('Exchanged for another performance. Ask for the new booking.')
+  })
+
+  // Until the release task frees it, the desk still collects the hold and capacity still counts it.
+  test('a hold not yet released is unpaid, whatever its release time', () => {
+    expect(doorTicketFound({ ...row, status: 'PENDING' }).state).toBe('UNPAID')
   })
 })
 

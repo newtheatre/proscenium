@@ -4,6 +4,7 @@ import { HOLDS_A_SLOT } from '#shared/utils/bookings'
 import { isCurrent } from '#shared/utils/membership'
 import { LIST_CAP } from '#server/utils/external-requests'
 import { addWorkingDays, coversThrough, londonDate } from '#shared/utils/working-days'
+import { heldBesides } from '#shared/utils/queue'
 import type { QueueItem } from '#shared/utils/queue'
 import type { H3Event } from 'h3'
 
@@ -63,6 +64,7 @@ export async function pendingRoomRequests(
   const held = await heldByRequesters()
   const current = await membersAmongRequesters(event, now)
   const stopped = await requestersUnderPreApproval(event, rows, now)
+  const nowSeconds = Math.floor(now.getTime() / 1000)
 
   return rows.map((row) => {
     const found = rooms.find(one => one.id === row.roomId)
@@ -75,7 +77,7 @@ export async function pendingRoomRequests(
         // The requester's standing, never the reader's: this is what they were judged against.
         isAdmin: false,
         hasMembership: current.has(row.userId),
-        activeBookings: held.get(row.userId) ?? 0,
+        activeBookings: heldBesides(held.get(row.userId) ?? 0, row, nowSeconds),
         underPreApproval: stopped.has(row.userId),
       },
     )
@@ -86,16 +88,18 @@ export async function pendingRoomRequests(
       where: row.room,
       failures: verdict ? verdict.failures : [],
       sensitive: found?.sensitive ?? false,
+      preApprovalNoShows: stopped.get(row.userId) ?? null,
     }
   })
 }
 
-// Which requesters are on the no-show ladder. Counted per person rather than in one statement,
-// because the count is a window function over the latest entry per booking (C-116).
-async function requestersUnderPreApproval(event: H3Event, rows: { userId: string }[], now: Date): Promise<Set<string>> {
-  const stopped = new Set<string>()
+// Which requesters are under pre-approval, with their no-show count for the badge. Counted per
+// person, because the count is a window function over the latest entry per booking (C-116).
+async function requestersUnderPreApproval(event: H3Event, rows: { userId: string }[], now: Date): Promise<Map<string, number>> {
+  const stopped = new Map<string, number>()
   for (const userId of new Set(rows.map(row => row.userId))) {
-    if (await underPreApproval(event, userId, now)) stopped.add(userId)
+    const standing = await standingOf(event, userId, now)
+    if (standing.standing === 'PRE_APPROVAL') stopped.set(userId, standing.count)
   }
   return stopped
 }

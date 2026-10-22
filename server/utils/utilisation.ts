@@ -69,22 +69,29 @@ export function openHoursFor(hours: { weekday: number, opens: string, closes: st
 
 const hours = (seconds: number): number => Math.round((seconds / 3600) * 10) / 10
 
+// By room, every room in use is a row, booked or not: an unused room is what a review most needs
+// to see. Rooms come from one read of the estate, never an IN list built from the counts (0006).
 export async function utilisation(by: Breakdown, from: string, to: string): Promise<UtilisationRow[]> {
   const { fromAt, toAt } = boundsOf(from, to)
   const counted = await countHours(by, fromAt, toAt)
   const rooms = by === 'room' ? await listRooms(true) : []
+  const unbooked = rooms
+    .filter(room => room.isActive && !counted.some(row => row.key === room.id))
+    .map(room => ({ key: room.id, label: room.name, confirmedSeconds: 0, cancelledSeconds: 0, noShowSeconds: 0, bookings: 0 }))
 
-  return counted
-    .map(row => ({
-      key: row.key,
-      label: row.label,
-      confirmedHours: hours(row.confirmedSeconds),
-      cancelledHours: hours(row.cancelledSeconds),
-      noShowHours: hours(row.noShowSeconds),
-      openHours: by === 'room'
-        ? openHoursFor(rooms.find(one => one.id === row.key)?.hours ?? [], from, to)
-        : 0,
-      bookings: row.bookings,
-    }))
-    .sort((a, b) => b.confirmedHours - a.confirmedHours)
+  return [...counted, ...unbooked]
+    .map((row) => {
+      const room = rooms.find(one => one.id === row.key)
+      return {
+        key: row.key,
+        label: row.label,
+        confirmedHours: hours(row.confirmedSeconds),
+        cancelledHours: hours(row.cancelledSeconds),
+        noShowHours: hours(row.noShowSeconds),
+        openHours: room ? openHoursFor(room.hours, from, to) : 0,
+        alwaysOpen: room !== undefined && room.hours.length === 0,
+        bookings: row.bookings,
+      }
+    })
+    .sort((a, b) => b.confirmedHours - a.confirmedHours || a.label.localeCompare(b.label))
 }

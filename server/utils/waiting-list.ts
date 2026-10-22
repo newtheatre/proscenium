@@ -88,6 +88,15 @@ export function nextWaitingEntriesQuery(performanceId: string, cap: number): SQL
   `
 }
 
+// Seats already promised as first refusal: a later run offering them again would set two parties
+// racing for one seat, the loser refused at claim. A lapsed offer gives its seats back.
+export function standingOfferSeatsQuery(performanceId: string, at: number): SQL {
+  return sql`
+    SELECT coalesce(sum(party_size), 0) AS seats FROM waiting_list
+    WHERE performance_id = ${performanceId} AND status = 'OFFERED' AND offer_expires_at > ${at}
+  `
+}
+
 // The move from `WAITING` to `OFFERED` is a status change (0049's shape): the predicate rides the
 // write, and a losing race (a concurrent sweep, or a manual desk offer) claims nothing.
 export function offerEntryStatement(entryId: string, offeredAt: number, expiresAt: number): SQL {
@@ -120,12 +129,15 @@ export async function offerWaitingList(event: H3Event | undefined, performanceId
   const performance = await performanceById(performanceId)
   if (!performance) return { eligible: 0, offered: [] }
 
+  const now = Math.floor(at.getTime() / 1000)
   const capacity = effectiveCapacity(performance)
-  const [row] = await db.all<{ held: number }>(heldSeatsQuery(performanceId))
-  let remaining = capacity === null ? Number.POSITIVE_INFINITY : capacity - Number(row?.held ?? 0)
+  const [[row], [standing]] = await Promise.all([
+    db.all<{ held: number }>(heldSeatsQuery(performanceId)),
+    db.all<{ seats: number }>(standingOfferSeatsQuery(performanceId, now)),
+  ])
+  let remaining = capacity === null ? Number.POSITIVE_INFINITY : capacity - Number(row?.held ?? 0) - Number(standing?.seats ?? 0)
   if (remaining <= 0) return { eligible: 0, offered: [] }
 
-  const now = Math.floor(at.getTime() / 1000)
   const candidates = await db.all<NextEntryRow>(nextWaitingEntriesQuery(performanceId, cap))
   if (candidates.length === 0) return { eligible: 0, offered: [] }
 

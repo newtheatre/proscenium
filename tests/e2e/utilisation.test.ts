@@ -95,7 +95,7 @@ function place(roomId: string, day: string, hour: number, hours: number, status 
 }
 
 const report = async (over: Record<string, string> = {}): Promise<{
-  items: { key: string, label: string, confirmedHours: number, cancelledHours: number, noShowHours: number, openHours: number, bookings: number }[]
+  items: { key: string, label: string, confirmedHours: number, cancelledHours: number, noShowHours: number, openHours: number, alwaysOpen: boolean, bookings: number }[]
   totals: { confirmedHours: number, noShowHours: number, bookings: number }
   page: number
   pageSize: number
@@ -154,15 +154,19 @@ describe.skipIf(skip !== null)('booked hours against open hours (criterion 1)', 
     expect((await report()).items.find(item => item.key === room)?.noShowHours).toBe(4)
   })
 
-  test('a room nobody booked is not a row of noughts, it is absent', async () => {
+  // An unused room is what a year-end review most needs to see, so it is a row of noughts.
+  test('a room nobody booked is listed with nothing used', async () => {
     const body = await report()
-    expect(body.items.some(item => item.key === quiet)).toBe(false)
+    const row = body.items.find(item => item.key === quiet)
+    expect(row).toMatchObject({ confirmedHours: 0, bookings: 0, alwaysOpen: true })
   })
 
-  test('a span with nothing in it reports nothing', async () => {
+  test('a span with nothing in it lists the rooms with nothing used, and no kind of booking', async () => {
     const body = await report({ from: '2031-01-01', to: '2031-01-31' })
-    expect(body.items).toHaveLength(0)
+    expect(body.items.some(item => item.key === quiet)).toBe(true)
+    expect(body.items.every(item => item.confirmedHours === 0 && item.bookings === 0)).toBe(true)
     expect(body.totals.confirmedHours).toBe(0)
+    expect((await report({ from: '2031-01-01', to: '2031-01-31', by: 'tier' })).items).toHaveLength(0)
   })
 
   test('a booking outside the span is not counted', async () => {
@@ -222,6 +226,9 @@ describe.skipIf(skip !== null)('the report is paged and exportable (criterion 3)
     expect(lines.length).toBeGreaterThan(0)
     // Every cell quoted, so a room name with a comma cannot split a row.
     expect(lines[0]!.startsWith('"')).toBe(true)
+    // An always-open room's open hours are blank, never a nought that reads as never open.
+    const quietName = (await report()).items.find(item => item.key === quiet)!.label
+    expect(lines.find(line => line.startsWith(`"${quietName}"`))!.split(',')[4]).toBe('""')
   })
 
   test('a backwards span is refused rather than reported on', async () => {

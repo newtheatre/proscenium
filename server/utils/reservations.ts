@@ -90,7 +90,7 @@ export function bookableTicketTypesQuery(performanceId: string, showId: string, 
     LEFT JOIN show_ticket_overrides so ON so.show_id = ${showId} AND so.ticket_type_id = t.id
     LEFT JOIN performance_ticket_overrides po ON po.performance_id = ${performanceId} AND po.ticket_type_id = t.id
     WHERE t.archived = 0 AND t.kind = 'SINGLE'${accessFilter}
-    ORDER BY t.price, t.name COLLATE NOCASE
+    ORDER BY t.sort, t.price, t.name COLLATE NOCASE
   `
 }
 

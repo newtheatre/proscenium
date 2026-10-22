@@ -29,6 +29,7 @@ interface Session {
   committeeOnly: boolean
   blocked: PrerequisiteGap[]
   warnings: PrerequisiteGap[]
+  alreadyHeld: string[]
 }
 
 const request = useRequestFetch()
@@ -210,7 +211,7 @@ const sessionDay = (session: Session): string =>
                 {{ session.description }}
               </p>
               <p
-                v-if="!session.placed"
+                v-if="!session.placed && !session.closure"
                 class="mt-1 text-sm text-muted"
               >
                 A place comes to you the moment somebody drops out, and we will email you when it does.
@@ -294,8 +295,11 @@ const sessionDay = (session: Session): string =>
                 <template v-if="placesLeft(session) > 0">
                   {{ placesLeft(session) === 1 ? 'One place left' : `${placesLeft(session)} places left` }}
                 </template>
-                <template v-else>
+                <template v-else-if="!session.closure">
                   Full, so signing up puts you next in line rather than turning you away
+                </template>
+                <template v-else>
+                  Full
                 </template>
               </p>
 
@@ -318,6 +322,13 @@ const sessionDay = (session: Session): string =>
               >
                 This usually follows {{ saysGaps(session.warnings) }}. You can still come: the
                 trainer will know whether it matters on the night.
+              </p>
+              <p
+                v-if="session.alreadyHeld.length > 0 && !session.myStatus"
+                class="mt-2 text-sm text-muted"
+                :data-test="`already-held-${session.id}`"
+              >
+                You already hold {{ session.alreadyHeld.length === session.modules.length ? 'this' : session.alreadyHeld.join(', ') }}: sign up only to refresh it.
               </p>
               <p
                 v-if="session.closure"

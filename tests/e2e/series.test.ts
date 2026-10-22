@@ -219,6 +219,19 @@ describe.skipIf(skip !== null)('nothing is written when one week fails (criterio
     const body = await answered.json() as SeriesAnswer
     expect(body.occurrences).toHaveLength(2)
     expect(body.occurrences.map(one => one.day)).not.toContain(taken)
+    // Numbered by the dates held, so the list never says "Week 3 of 2".
+    expect(occurrencesOf(body.id).map(one => one.occurrence)).toEqual([1, 2])
+  })
+
+  test('a clash with the member s own booking says it is theirs', async () => {
+    const room = await makeRoom()
+    const startsOn = mondayIn(26)
+    await bookSeries(room, { startsOn, occurrences: 1 })
+
+    const answered = await bookSeries(room, { startsOn, occurrences: 2 })
+    expect(answered.status).toBe(422)
+    const body = await answered.json() as { data: { refusals: { yours: boolean }[] } }
+    expect(body.data.refusals).toEqual([expect.objectContaining({ yours: true })])
   })
 
   test('every failing week is listed, not just the first', async () => {
@@ -247,7 +260,7 @@ describe.skipIf(skip !== null)('nothing is written when one week fails (criterio
 describe.skipIf(skip !== null)('a series out of policy queues as a whole (criterion 6)', () => {
   test('a sensitive room queues every occurrence, not some of them', async () => {
     const room = await makeRoom({ sensitive: true })
-    const answered = await bookSeries(room, { startsOn: mondayIn(6) })
+    const answered = await bookSeries(room, { startsOn: mondayIn(6), reason: 'The term\'s rehearsals.' })
 
     const body = await answered.json() as SeriesAnswer
     expect(body.status).toBe('PENDING_APPROVAL')
@@ -261,11 +274,32 @@ describe.skipIf(skip !== null)('a series out of policy queues as a whole (criter
     const room = await makeRoom()
     const startsOn = londonDaysFrom(1)
 
-    const answered = await bookSeries(room, { frequency: 'DAILY', weekdays: [], startsOn, occurrences: 3 })
+    const answered = await bookSeries(room, { frequency: 'DAILY', weekdays: [], startsOn, occurrences: 3, reason: 'Opening week.' })
     const body = await answered.json() as SeriesAnswer
 
     expect(body.status).toBe('PENDING_APPROVAL')
     expect(occurrencesOf(body.id).every(one => one.status === 'PENDING_APPROVAL')).toBe(true)
+  })
+
+  // Rooms review, section 4: a series went to the queue without a reason or the rules it broke,
+  // and Change on one week then demanded the reason nobody had been asked for.
+  test('a series needing a decision names what each date breaks and asks why before holding anything', async () => {
+    const room = await makeRoom()
+    const startsOn = londonDaysFrom(1)
+    const before = read<{ n: number }>('SELECT count(*) n FROM room_bookings')!.n
+
+    const unasked = await bookSeries(room, { frequency: 'DAILY', weekdays: [], startsOn, occurrences: 3 })
+    expect(unasked.status).toBe(422)
+    const refused = await unasked.json() as { data: { decisions: { day: string, failures: { reason: string }[] }[], canRequest: boolean } }
+    expect(refused.data.canRequest).toBe(true)
+    expect(refused.data.decisions[0]!.day).toBe(startsOn)
+    expect(refused.data.decisions[0]!.failures.map(one => one.reason)).toContain('SHORT_NOTICE')
+    expect(read<{ n: number }>('SELECT count(*) n FROM room_bookings')!.n).toBe(before)
+
+    const asked = await bookSeries(room, { frequency: 'DAILY', weekdays: [], startsOn, occurrences: 3, reason: 'Opening week.' })
+    const { id } = await asked.json() as SeriesAnswer
+    const reasons = all<{ reason: string | null }>('SELECT reason FROM room_bookings WHERE series_id = ?', id).map(row => row.reason)
+    expect(reasons).toEqual(['Opening week.', 'Opening week.', 'Opening week.'])
   })
 })
 
@@ -290,7 +324,7 @@ describe.skipIf(skip !== null)('a series counts each occurrence against the cap'
     const room = await makeRoom()
     await send('PUT', '/api/admin/config/ROOM_ACTIVE_BOOKINGS_PER_MEMBER', { value: 3 }, officer)
     try {
-      const answered = await bookSeries(room, { startsOn: mondayIn(20), occurrences: 4 })
+      const answered = await bookSeries(room, { startsOn: mondayIn(20), occurrences: 4, reason: 'The whole term.' })
       const body = await answered.json() as SeriesAnswer
 
       expect(body.status).toBe('PENDING_APPROVAL')
@@ -639,7 +673,7 @@ const TOLD = '(SELECT user_id, type FROM notification_log UNION ALL SELECT user_
 describe.skipIf(skip !== null)('a term that mixes both kinds of room', () => {
   async function pendingSeries(): Promise<{ seriesId: string, occurrences: ReturnType<typeof occurrencesOf> }> {
     const room = await makeRoom({ sensitive: true })
-    const answered = await bookSeries(room)
+    const answered = await bookSeries(room, { reason: 'The term\'s rehearsals.' })
     const { id } = await answered.json() as SeriesAnswer
     return { seriesId: id, occurrences: occurrencesOf(id) }
   }

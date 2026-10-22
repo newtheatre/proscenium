@@ -14,7 +14,8 @@ without a word. **Remove** was offered on an opening's only slot and then refuse
 ## Decision
 
 **An opening is shorter than a day.** `barOpeningForm` refuses `endsAt - startsAt` of 86,400 seconds
-or more, and the screen refuses equal times before sending, with the same sentence. A closing time
+or more as lasting a day, and the screen refuses equal times before sending as closing at the time
+it opens. A closing time
 earlier on the clock than the opening time still means the next morning.
 
 **An overlapping opening at the venue is a warning, not a rule.** The route reads for a `PLANNED`

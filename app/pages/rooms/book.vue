@@ -88,7 +88,14 @@ const failures = ref<Failure[]>([])
 // A refusal with no rule list behind it (a clash, a closure, a room gone), said on the form where
 // it was caused rather than in a toast that has gone by the time it is read.
 const refused = ref<string | null>(null)
-const refusals = ref<{ occurrence: number, day: string, failures: Failure[], conflicts: unknown[] }[]>([])
+const refusals = ref<{ occurrence: number, day: string, failures: Failure[], conflicts: unknown[], yours?: boolean }[]>([])
+// The dates of a series that break a bendable rule, named before it is sent to be decided (C-108).
+const decisions = ref<{ occurrence: number, day: string, failures: Failure[] }[]>([])
+// Dates the member chose to leave out, carried through every resubmit until the series changes.
+const leftOut = ref<string[]>([])
+const seriesTotal = ref(0)
+// A closure or a slot already past cannot be agreed to, in a room that always asks as in any other.
+const finalRefusal = ref(false)
 
 // Read rather than restated: the cap is committee-editable, and a number written into a screen
 // stops being true the moment they change it (0012).
@@ -110,8 +117,9 @@ const limits = computed(() => rules.value
 const form = computed(() => fields
   .refine(booking => booking.to > booking.from, { path: ['to'], message: 'A booking ends after it starts' })
   .superRefine((booking, context) => {
-    if (booking.asking && !booking.repeats && booking.reason.length === 0) {
-      context.addIssue({ code: 'custom', path: ['reason'], message: 'Say why this one is worth an exception' })
+    if (booking.asking && booking.reason.length === 0) {
+      const message = booking.repeats ? 'Say why these dates are worth an exception' : 'Say why this one is worth an exception'
+      context.addIssue({ code: 'custom', path: ['reason'], message })
     }
     if (booking.repeats && booking.frequency === 'WEEKLY' && booking.weekdays.length === 0) {
       context.addIssue({ code: 'custom', path: ['weekdays'], message: 'Choose at least one day' })
@@ -122,7 +130,7 @@ const form = computed(() => fields
   }))
 
 // Said before submitting, not after: a member on the ladder should know every booking is going to
-// be checked by a person before they fill the form in (C-116 criterion 4).
+// be checked by the Theatre Manager before they fill the form in (C-116 criterion 4).
 const { data: standing } = await useAsyncData(
   'my-standing',
   () => request<{ standing: string, says: string }>('/api/rooms/standing'),
@@ -156,9 +164,9 @@ const recurrence = computed(() => ({
   occurrences: state.occurrences,
 }))
 
-// One body for the first submit and the resubmit without the refused weeks, so the two can never
-// disagree about what a series carries (issue 1143).
-function seriesBody(skip: string[]): Record<string, unknown> {
+// One body for the first submit and every resubmit, so they can never disagree about what a
+// series carries (issue 1143).
+function seriesBody(): Record<string, unknown> {
   return {
     roomId: state.roomId,
     title: nameOrPurpose(state.title, state.purpose),
@@ -166,70 +174,58 @@ function seriesBody(skip: string[]): Record<string, unknown> {
     tier: state.tier,
     purpose: state.purpose,
     ...recurrence.value,
-    skip,
+    skip: leftOut.value,
+    reason: state.asking ? state.reason : null,
   }
 }
 
+// One answer for every way a series lands, so dates that became requests never read as booked.
 async function bookSeries(): Promise<void> {
   saving.value = true
   failures.value = []
   refusals.value = []
+  decisions.value = []
   refused.value = null
 
   try {
-    const answer = await $fetch<{ id: string, status: string, occurrences: unknown[] }>('/api/rooms/series', {
+    const answer = await $fetch<{ id: string, status: string, occurrences: unknown[], warning: string | null }>('/api/rooms/series', {
       method: 'POST',
-      body: seriesBody([]),
+      body: seriesBody(),
     })
 
+    const confirmed = answer.status === 'CONFIRMED'
+    const count = plural(answer.occurrences.length, 'booking')
     toast.add({
-      title: answer.status === 'CONFIRMED'
-        ? `${plural(answer.occurrences.length, 'booking')} made`
-        : `${plural(answer.occurrences.length, 'booking')} asked for`,
-      description: answer.status === 'CONFIRMED'
-        ? `${made()}. Cancelling asks whether you mean one week or the whole run.`
-        : `${made()}. The slots are held while an officer decides.`,
+      title: confirmed ? `${count} made` : `${count} asked for`,
+      description: [
+        confirmed
+          ? `${made()}. Cancelling asks whether you mean one date or the whole run.`
+          : `${made()}. The slots are held while the Theatre Manager decides.`,
+        leftOut.value.length ? `${plural(leftOut.value.length, 'date')} left out.` : null,
+        answer.warning,
+      ].filter(Boolean).join(' '),
       icon: 'i-lucide-check',
-      color: answer.status === 'CONFIRMED' ? 'success' : 'warning',
+      color: confirmed && !answer.warning ? 'success' : 'warning',
     })
     await navigateTo('/rooms/mine')
   }
   catch (error) {
-    const data = refusalData<{ refusals?: typeof refusals.value }>(error)
+    const data = refusalData<{ refusals?: typeof refusals.value, decisions?: typeof decisions.value, total?: number }>(error)
     refusals.value = data?.refusals ?? []
-    if (refusals.value.length === 0) refused.value = refusalText(error)
+    decisions.value = data?.decisions ?? []
+    seriesTotal.value = data?.total ?? 0
+    if (data?.decisions) state.asking = true
+    else if (refusals.value.length === 0) refused.value = refusalText(error)
   }
   finally {
     saving.value = false
   }
 }
 
-// Resubmitted without the weeks that failed, which keeps every other week where it was.
+// Resubmitted without the dates that failed, which keeps every other date where it was.
 async function bookWithoutRefused(): Promise<void> {
-  const skip = refusals.value.map(one => one.day)
-  saving.value = true
-  refused.value = null
-  try {
-    const answer = await $fetch<{ occurrences: unknown[] }>('/api/rooms/series', {
-      method: 'POST',
-      body: seriesBody(skip),
-    })
-    toast.add({
-      title: `${plural(answer.occurrences.length, 'booking')} made`,
-      description: `${made()}. ${plural(skip.length, 'week')} left out.`,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-    await navigateTo('/rooms/mine')
-  }
-  catch (error) {
-    const data = refusalData<{ refusals?: typeof refusals.value }>(error)
-    refusals.value = data?.refusals ?? []
-    if (refusals.value.length === 0) refused.value = refusalText(error)
-  }
-  finally {
-    saving.value = false
-  }
+  leftOut.value = [...leftOut.value, ...refusals.value.map(one => one.day)]
+  await bookSeries()
 }
 
 const { data: rooms } = await useAsyncData(
@@ -244,7 +240,12 @@ const room = computed(() => rooms.value.find(one => one.id === state.roomId))
 
 // What was just made, said on the screen it lands on (C-105 criterion 7).
 function made(): string {
-  return `${room.value?.name ?? 'The room'}, ${saysDayLong(state.day)} from ${state.from} to ${state.to}`
+  return `${room.value?.name ?? 'The room'}, ${saysDayLong(state.day, { calendarYear: true })} from ${state.from} to ${state.to}`
+}
+
+// A refused or questioned date of a series, as a person says it, with its year when it needs one (0202).
+function saysSeriesDay(day: string): string {
+  return saysDayLong(day, { calendarYear: true })
 }
 
 function today(): string {
@@ -264,9 +265,8 @@ function instantOf(day: string, clock: string): string {
   return fromLondonWallClock(year!, month!, date!, hour!, minute!).toISOString()
 }
 
-// The room cannot hold more than it holds, so the field will not go above it. The write path
-// still only warns, which is what C-101 criterion 5 asks for: this guides rather than refuses.
-const capacity = computed(() => room.value?.capacity ?? undefined)
+// The number typed stands and is warned about, never clamped: the write path only warns too, which
+// is what C-101 criterion 5 asks for.
 const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.attendees ?? null))
 
 // Refused before the form rather than after it is filled in, in the policy's own words with the
@@ -301,13 +301,30 @@ const seriesReady = computed(() =>
 // worth knowing about while the form is still being filled in (C-105 criterion 5).
 const warnsUpFront = computed(() => {
   if (standing.value.standing === 'PRE_APPROVAL') return standing.value.says
-  if (room.value?.sensitive) return 'Every booking for this room is agreed by a person before it is held.'
+  if (room.value?.sensitive) return 'Every booking for this room is agreed by the Theatre Manager before it is held.'
   return null
 })
 
 // A refusal is about the span it was given, so changing the span puts it away.
 watch(() => [state.roomId, state.day, state.from, state.to], () => {
   refused.value = null
+  finalRefusal.value = false
+})
+
+// Dates left out or questioned belong to the series they were judged in, not to a changed one.
+watch(() => [state.roomId, state.day, state.from, state.to, state.frequency, state.weekdays.join(), state.occurrences], () => {
+  leftOut.value = []
+  refusals.value = []
+  decisions.value = []
+})
+
+const askable = computed(() => state.asking && !finalRefusal.value)
+
+// One reason for a whole series, asked the way the one-off form asks it (C-108).
+const reasonLabel = computed(() => {
+  const broken = failures.value.length > 0 || decisions.value.length > 0 || !alwaysAsks.value
+  if (!broken) return 'What the Theatre Manager should know'
+  return state.repeats ? 'Why these dates are worth an exception' : 'Why this one is worth an exception'
 })
 
 // Such a booking is always a request, so the form is the request from the start rather than a
@@ -331,6 +348,7 @@ async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
   saving.value = true
   failures.value = []
   refused.value = null
+  finalRefusal.value = false
 
   try {
     const answer = await $fetch<{ id: string, warning: string | null }>('/api/rooms/bookings', {
@@ -370,8 +388,9 @@ async function book(event: FormSubmitEvent<BookingForm>): Promise<void> {
 async function ask(): Promise<void> {
   saving.value = true
   refused.value = null
+  finalRefusal.value = false
   try {
-    await $fetch('/api/rooms/requests', {
+    const answer = await $fetch<{ warning: string | null }>('/api/rooms/requests', {
       method: 'POST',
       body: {
         roomId: state.roomId,
@@ -387,14 +406,15 @@ async function ask(): Promise<void> {
 
     toast.add({
       title: 'Asked for',
-      description: `${made()}. The slot is held while an officer decides.`,
+      description: [`${made()}. The slot is held while the Theatre Manager decides.`, answer.warning].filter(Boolean).join(' '),
       icon: 'i-lucide-check',
-      color: 'success',
+      color: answer.warning ? 'warning' : 'success',
     })
     await navigateTo('/rooms/mine')
   }
   catch (error) {
-    const data = refusalData<{ failures?: Failure[] }>(error)
+    const data = refusalData<{ failures?: Failure[], canRequest?: boolean }>(error)
+    finalRefusal.value = data?.canRequest === false
     if (data?.failures?.length) failures.value = data.failures
     else refused.value = refusalText(error)
   }
@@ -410,7 +430,7 @@ useSeoMeta({ title: 'Book a room' })
   <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       title="Book a room"
-      description="A booking inside the rules is held straight away. One outside them is a request an officer decides on."
+      description="A booking inside the rules is held straight away. One outside them is a request the Theatre Manager decides on."
       :ui="MEMBER_PAGE_HEADER"
     />
 
@@ -563,7 +583,6 @@ useSeoMeta({ title: 'Book a room' })
           <UInputNumber
             v-model="state.attendees"
             :min="1"
-            :max="capacity"
             class="w-full"
             data-test="booking-attendees"
           />
@@ -650,7 +669,6 @@ useSeoMeta({ title: 'Book a room' })
                 <UInputNumber
                   v-model="state.occurrences"
                   :min="1"
-                  :max="seriesCap"
                   class="w-full"
                   data-test="repeat-count"
                 />
@@ -681,8 +699,10 @@ useSeoMeta({ title: 'Book a room' })
                 v-for="refusal in refusals"
                 :key="refusal.day"
               >
-                {{ refusal.day }}:
-                {{ refusal.conflicts.length ? 'another member already has it' : refusal.failures.map(one => one.says).join(' ') }}
+                {{ saysSeriesDay(refusal.day) }}:
+                {{ refusal.conflicts.length
+                  ? (refusal.yours ? 'you already have this slot' : 'another member already has it')
+                  : refusal.failures.map(one => one.says).join(' ') }}
               </li>
             </ul>
             <UButton
@@ -692,8 +712,31 @@ useSeoMeta({ title: 'Book a room' })
               data-test="series-without-refused"
               @click="bookWithoutRefused"
             >
-              Book the other {{ plural(state.occurrences - refusals.length, 'date') }}
+              {{ state.asking ? 'Ask for' : 'Book' }} the other {{ plural(seriesTotal - refusals.length, 'date') }}
             </UButton>
+          </template>
+        </UAlert>
+
+        <UAlert
+          v-if="state.repeats && decisions.length"
+          color="warning"
+          variant="subtle"
+          title="These dates need the Theatre Manager to agree to them"
+          data-test="series-decisions"
+        >
+          <template #description>
+            <ul class="mt-1 list-disc ps-4">
+              <li
+                v-for="decision in decisions"
+                :key="decision.day"
+              >
+                {{ saysSeriesDay(decision.day) }}: {{ decision.failures.map(one => one.says).join(' ') }}
+              </li>
+            </ul>
+            <p class="mt-2">
+              Nothing has been held yet. Say why below and ask for the series, and the Theatre Manager
+              will decide. The slots are held while they do.
+            </p>
           </template>
         </UAlert>
 
@@ -709,9 +752,9 @@ useSeoMeta({ title: 'Book a room' })
 
         <UAlert
           v-if="failures.length"
-          :color="state.asking ? 'warning' : 'error'"
+          :color="askable ? 'warning' : 'error'"
           variant="subtle"
-          :title="state.asking ? 'This one needs an officer to agree to it' : 'That booking cannot be made'"
+          :title="askable ? 'This one needs the Theatre Manager to agree to it' : 'That booking cannot be made'"
           data-test="booking-failures"
         >
           <template #description>
@@ -724,10 +767,10 @@ useSeoMeta({ title: 'Book a room' })
               </li>
             </ul>
             <p
-              v-if="state.asking"
+              v-if="askable"
               class="mt-2"
             >
-              Ask for it anyway, and an officer will decide. The slot is held while they do.
+              Ask for it anyway, and the Theatre Manager will decide. The slot is held while they do.
             </p>
             <UButton
               v-if="needsMembership"
@@ -757,11 +800,11 @@ useSeoMeta({ title: 'Book a room' })
         </UAlert>
 
         <UFormField
-          v-if="state.asking && !state.repeats"
-          :label="failures.length || !alwaysAsks ? 'Why this one is worth an exception' : 'What the person deciding should know'"
+          v-if="askable"
+          :label="reasonLabel"
           name="reason"
           required
-          :description="`Shown to whoever decides. Up to ${REQUEST_REASON_LIMIT} characters.`"
+          :description="`Shown to the Theatre Manager. Up to ${REQUEST_REASON_LIMIT} characters.`"
         >
           <UTextarea
             v-model="state.reason"
@@ -786,6 +829,7 @@ useSeoMeta({ title: 'Book a room' })
             v-else-if="state.asking"
             type="submit"
             :loading="saving"
+            :disabled="finalRefusal"
             data-test="request-submit"
           >
             Ask for it

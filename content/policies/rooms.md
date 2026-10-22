@@ -11,8 +11,8 @@ rule, it changes here at the same moment.
 A booking runs from {{ROOM_MIN_BOOKING_MINUTES}} at the shortest to {{ROOM_MAX_BOOKING_HOURS}} at
 the longest. Administrators may book past that maximum: {{ROOM_MAX_BOOKING_ADMINS_EXEMPT}}.
 
-You may hold {{ROOM_ACTIVE_BOOKINGS_PER_MEMBER}} active bookings at once, and a recurring series
-counts each of its occurrences separately. A series runs to at most
+You may hold {{ROOM_ACTIVE_BOOKINGS_PER_MEMBER}} active bookings at once, counting requests still
+waiting on a decision, and a recurring series counts each of its occurrences separately. A series runs to at most
 {{ROOM_SERIES_MAX_OCCURRENCES}} occurrences.
 
 The calendar opens {{ROOM_BOOKING_HORIZON_WEEKS}} ahead. That is a number of weeks, not the end of

@@ -537,13 +537,13 @@ for the two that read and `ticketing.write` for the rest:
 | `POST /api/admin/shows` | Adds one, always DRAFT. The address is refused if it is already held. |
 | `GET /api/admin/shows/[id]` | One show, every performance of it (each with `shiftCount`, its live shifts, which the publish sheet reads back), the venues a performance may be put in, the category and season pickers (D-131), the warnings it carries, the vocabulary it may pick from, and `coveringPasses`: each pass on sale whose validity holds one of its uncancelled performances, with whether it covers the show (D-123 criterion 4). |
 | `PUT /api/admin/shows/[id]` | Changes the copy, the address, the age guidance, the latecomer policy and the booking window default. It does not take the status. `loadedSeasonId` (required, null for none) is the season the form loaded: a `seasonId` equal to it leaves the stored season as it is, and a different one is written only over the loaded season, else a 409 naming the season the show has now, so a save never undoes one set since (D-131 criterion 2, 0003). A retired season or category newly chosen is a 409 naming it, and an unknown one a 400; one the show already carries is kept (criterion 5). Every refusal rides the UPDATE, and the `show.updated` row rides its batch on `changes()`, recording the season pair only where the form chose one (0049). |
-| `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. `cascadePerformances` takes DRAFT performances on sale in the same batch; CANCELLED ones are skipped by predicate. `coverPassTypeIds` adds the show to each named pass in the same batch, with a `pass-type.shows.updated` audit row wherever the row went in (0049); a pass not among `coveringPasses` is a 409 naming it and nothing is published, and one already covering is left alone (D-123 criterion 4, issue 1323). |
+| `POST /api/admin/shows/[id]/publish` | Publishes or unpublishes. Publishing onto a retired category or season is a 409 naming every such reason at once, from `publishBlockers()`, which the sheet reads too (0194). `cascadePerformances` takes DRAFT performances from tonight's show night onwards on sale in the same batch; CANCELLED and played ones are skipped by predicate (0192). `coverPassTypeIds` adds the show to each named pass in the same batch, with a `pass-type.shows.updated` audit row wherever the row went in (0049); a pass not among `coveringPasses` is a 409 naming it and nothing is published, and one already covering is left alone (D-123 criterion 4, issue 1323). |
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
 | `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6), and so is a `capacityOverride` above the venue's own capacity, quoting both, unless `aboveVenueCapacity` confirms it (0124). A show with no season and no earlier live performance takes the unretired season this night falls in, in the same batch, audited as `show.updated` with `filledFrom` (D-131 criterion 2). |
-| `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). A show with no season and no earlier live performance takes the unretired season the run's earliest night falls in, in the same batch, audited once as `show.updated` (D-131 criterion 2). |
-| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). A `capacityOverride` above the venue's own capacity is a 400 quoting both unless `aboveVenueCapacity` is true: deliberate oversell is confirmed, never typed (0124, D-105 criterion 4). A new `startsAt` or `venueId` on a performance neither cancelled nor played emails every PENDING or COLLECTED booking with an account `reservation.performance-moved`, claimed per booking and destination so a repeated save tells nobody twice; the answer carries `bookingsTold` (0191). |
-| `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
-| `POST /api/admin/performances/[id]/cancel` | Cancels one, taking an optional `reason` (at most 500 characters). Emails every PENDING or COLLECTED booking with an account `reservation.performance-cancelled`, once per booking by claim, with the reason, which is never audited. Answers with the night, how many tickets are owed a refund and how many bookings were told. |
+| `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). A show with no season and no earlier live performance takes the unretired season the run's earliest night falls in, in the same batch, audited once as `show.updated` (D-131 criterion 2). Answers `ids` and `clashes`, the overlapping performances in the same venue, which warn and never refuse (0192). |
+| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). A `capacityOverride` above the venue's own capacity is a 400 quoting both unless `aboveVenueCapacity` is true: deliberate oversell is confirmed, never typed (0124, D-105 criterion 4). A new `startsAt` or `venueId` on a performance neither cancelled nor played emails every PENDING or COLLECTED booking with an account `reservation.performance-moved`, claimed per booking and destination so a repeated save tells nobody twice; the answer carries `bookingsTold` (0191) and `clashes`, as a run does (0192). |
+| `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409, and so is On sale for one whose show night is over (0192). |
+| `POST /api/admin/performances/[id]/cancel` | Cancels one, taking an optional `reason` (at most 500 characters). Emails every PENDING or COLLECTED booking with an account `reservation.performance-cancelled`, once per booking by claim, with the reason, which is never audited. Answers with the night, how many tickets are owed a refund (paid seats only: never an unpaid hold, a pass seat or a comp, 0192) and how many bookings were told. |
 | `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |
 | `GET /api/admin/venues` | The venues a performance may be put in, retired ones included. Venue administration itself is `/box-office/venues` (D-131), above. |
 
@@ -563,7 +563,7 @@ two routes that take no session at all:
 | Route | What it does |
 | --- | --- |
 | `GET /api/whats-on` | The paged envelope of published shows with at least one future on-sale performance, each with its public performances, availability and prices. `?venue=<name>` narrows it to the shows playing that venue; the page and its count share one predicate, so they cannot disagree (J-111). It also carries `season`, the name the heading shows, or `null` (0087). |
-| `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. |
+| `GET /api/shows/[slug]` | One published show. A draft show and an address nobody holds both answer 404, so the listing cannot be read backwards. `offSaleToCome` says a night still to come is not on sale yet, so an empty list is not read as a finished run. |
 
 Both build every field through `publicShow()` and `publicPerformance()` in
 `shared/utils/programme.ts`, which are the allow-lists; a column absent from those interfaces is
@@ -644,7 +644,8 @@ stateDiagram-v2
 `SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to`
 `MEMBER|DESK` NULL, enforced by Zod rather than a CHECK (D-109; `MEMBER` set once at creation,
 like `kind` and `access_kind`; NULL and `DESK` swap on edit, 0190) · `archived` bool ·
-`active_by_default` bool.
+`active_by_default` bool · `sort` int ≥ 0, default 0, the order every list shows types in
+before price (0193).
 Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
 the two override tables below; everything else in this module is unbuilt.
 
@@ -656,7 +657,7 @@ the two override tables below; everything else in this module is unbuilt.
 | `GET /api/admin/ticket-types` | The paged envelope, archived types included by default, each row carrying whether it has ever been sold. |
 | `GET /api/admin/ticket-types/access-kinds` | `{ access, companion }`: whether an unarchived type of each access kind exists, for the warning on Ticket types and Access profiles. Gated at `ticketing.read` or `access.verify`, since the Secretary holds only the second. |
 | `POST /api/admin/ticket-types` | Adds one. The name is refused if it is already held, compared without regard to capitals. |
-| `PUT /api/admin/ticket-types/[id]` | Changes the name, description, base price and default. It does not take `kind` or `access_kind`. |
+| `PUT /api/admin/ticket-types/[id]` | Changes the name, description, base price, default and order; an edit that leaves `sort` out keeps the order it had (0193). It does not take `kind` or `access_kind`. |
 | `POST /api/admin/ticket-types/[id]/archive` | Archives one, or takes it back out. Archiving an archived type is a 409. |
 | `DELETE /api/admin/ticket-types/[id]` | Deletes one nothing has ever been sold under, with its overrides. A sold type is a 409 naming archiving as the way. |
 
@@ -890,6 +891,10 @@ own ticket list immediately (criterion 5), the same filter that already frees ca
 to its `refundedTickets`, which the desk shows struck through and no route reads. The desk sends
 the cancel itself straight after the last ticket's refund, so a fully refunded booking never sits
 as "Paid, £0.00"; the cancel is still its own request, refused while anything is unrefunded.
+A refund also needs a fresh sign-in (0171): the route calls `requireFreshSession()` and answers 401
+with `reauthenticate` set when the last one is older than `REAUTH_WINDOW_MINUTES`, and the desk asks
+`GET /api/box-office/desk/refunds/ready` before it opens the refund, so the person signs in again
+before typing anything rather than after.
 
 **Walk-ups at the desk (D-115).** `POST /api/box-office/desk/reservations` creates a `DOOR`-source
 booking and collects it in the same flow (`sellWalkUp()` in `server/utils/desk-sale.ts`), with
@@ -961,7 +966,9 @@ none of it did.
 availability `publicShowBySlug()` gives the public listing, each with `totalPence`, this booking's
 lines at that night's bookable prices (`exchangeTotalPence()`, null when the night does not offer one
 of its types), beside `currentTotalPence`, so the form shows the new total before it is confirmed
-(criterion 2, 0122). `POST /api/qr/exchange` (body:
+(criterion 2, 0122), and `holdExpiresAt`, the release an exchanged hold there would actually get
+(that night's own `holdReleaseMinutesBefore` or the configured default), which the form's too-soon
+check reads rather than the start time. `POST /api/qr/exchange` (body:
 `{ performanceId, reference }`) refuses a different show (criterion 5, `differentShowReason()`) and
 a booking carrying an access or companion ticket type, since D-128's entitlement is checked once,
 against the performance it was granted for, and re-running it against a different one is a box
@@ -1021,7 +1028,8 @@ race-safe statement first, and only learns the reservation id afterward from a s
 
 **Offering (D-113 criterion 2).** `offerWaitingList()` in `server/utils/waiting-list.ts` walks
 `WAITING` entries oldest first, budgeted against `capacity` minus what `heldSeatsQuery()` already
-reports held, and stops the moment the next entry's party does not fit rather than skipping ahead
+reports held and the parties standing offers already cover (`standingOfferSeatsQuery()`, so a second
+run never offers the same seats again while the first offer can still be claimed), and stops the moment the next entry's party does not fit rather than skipping ahead
 to a smaller one further down the queue. Each offer's window is
 `WAITING_LIST_OFFER_WINDOW_MINUTES`, capped at the online cut-off (`onlineClosesAt()`, issue 1328)
 so an offer never promises what the claim would refuse, and an offer that would stand for no time
@@ -1888,7 +1896,8 @@ and `server/utils/sale.ts` all share one idea of what a comp request is and when
 restrict · `venue_id` → venues restrict · `night`, the same date CHECK `till_sessions.night`
 carries · `created_by` → users restrict · `created_at` ·
 `basket` JSON, the sale exactly as submitted plus the scope it resolved under, replayed at the
-answer and never resubmitted · `expected_total_pence` · `status` CHECK
+answer and never resubmitted, or for a tab settlement the holder and the charge ids it covers in
+place of the sale (0162) · `expected_total_pence` · `status` CHECK
 `STARTED|COMPLETING|SUCCEEDED|FAILED|ABANDONED|MISMATCH` · `smp_status`, `smp_tx_code`,
 `smp_message`, `smp_failure_cause`, `callback_at`, what the app sent back · `resolution` CHECK NULL
 or `CALLBACK|KEY|STAFF|SWEEP`, who answered · `resolved_by` NULL → users restrict · `resolved_at` ·
@@ -2039,7 +2048,7 @@ is always *room*. Rooms the Students' Union manages are **not in this table at a
 control (decision 0036, C-119, C-120). `is_external` is gone with them, and `sensitive` is now the
 only room-level reason a booking goes to the approval queue whatever the policy says.
 Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
-there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
+nothing deletes a room; the `DELETE` route below retires one. Capacity is compared against a
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
 compared neither.
 
@@ -2047,6 +2056,16 @@ compared neither.
 with `search` over the name and `sort` by name. A retired room is hidden unless `active` asks for
 one, the directory's `anonymised` default reused. Small and unpaged by design: it returns its
 whole filtered set rather than a windowed page, the estate being a handful of rooms.
+
+`DELETE /api/admin/rooms/[id]` retires rather than deletes. It takes `turnDown` and `cancel` in the
+query string (a DELETE carries no body, 0068), each asked only by `true`. Asked to, it turns down
+every request waiting on the room and cancels every confirmed booking in it that has not yet
+started, in the same batch as the retire and its one `room.updated` audit row, which counts both
+(0204). Each member is told: a turned-down request as
+the queue's `room.request.rejected`, a cancelled booking as `room.blackout.cancelled`, with the
+reason "{room} is no longer in use". It answers `{ alreadyRetired, turnedDown, cancelled }`.
+`GET /api/admin/rooms/[id]/held` gives the Retire dialogue `{ waiting, upcoming }`, counted by the
+same predicates. The **In use** switch on `PUT /api/admin/rooms/[id]` retires without settling.
 
 ### room_hours
 `id` PK · `room_id` cascade · `weekday` 0..6 CHECK · `opens` `HH:MM` · `closes` `HH:MM`, CHECK
@@ -2094,7 +2113,10 @@ purpose means a member who never looked at the field gets no suitability warning
 may carry it (`/rooms/book?purpose=REHEARSAL`), which is a stated intent rather than a silent
 default.
 `series_id` → room_series NULL and `occurrence` NULL carry an occurrence's place in its term
-(C-110). `bumped_to_booking_id` and `bumped_reason` carry a bump (C-115). Indexed on `series_id`,
+(C-110). `occurrence` numbers the dates written, after any left out with `skip`, so a term of
+four with one week skipped is 1 to 3. Rows written before that renumbering skip numbers, so My
+bookings (`GET /api/rooms/bookings`) counts the place from the series' own rows by start time
+(`seriesPlace()` in `server/utils/room-writes.ts`) rather than reading the stored number. `bumped_to_booking_id` and `bumped_reason` carry a bump (C-115). Indexed on `series_id`,
 which every series-scoped action reads. Adding a column is not a rebuild, and this table is not
 append-only.
 
@@ -2174,7 +2196,11 @@ The queue is `GET /api/admin/rooms/queue`, gated on `rooms.write`, and it **re-j
 waiting request as it reads it** rather than recalling the verdict from when it was written: a
 request made on Monday may have run out of notice by Thursday, and the officer deciding needs what
 is true now (C-109 criterion 1). The requester's standing is what it judges against, never the
-reader's.
+reader's. A waiting request counts towards the member's cap because it holds its slot, but the row
+being judged is left out of its own count (`heldBesides`, 0208), so a member at the cap does not see
+every request of theirs read as breaking it. Each room row carries `preApprovalNoShows`: the
+requester's no-show count when they are under pre-approval and that is why it is here, `null`
+otherwise. It is counted per requester with constant-parameter statements, never an id list.
 
 `when`, `kind` and `room` are declared (`shared/utils/rooms-queue-list.ts`, K-129) and live in the
 URL, but the queue keeps its own envelope (`items`, `total`, `more`, `counts`) and its server-side
@@ -2188,7 +2214,10 @@ approving write, so an approval beaten to the slot returns a conflict listing wh
 than confirming a double booking (criterion 3, audit RM-4). No statement's parameter count grows
 with the batch; the read that fetches the rows first chunks at 90 (0003). A zero-row write is
 disambiguated by one read into missing, already settled, room gone, or beaten, so a partly refused
-batch says which ones and why rather than reading as a success. Each decision's audit entry is in
+batch says which ones and why rather than reading as a success. A conflict says "Somebody took that
+slot while this was waiting" only when something in the way was written after the request, in the
+room it held; a move, or a slot that was always taken, says "{room} is already booked then; choose
+another room". Each decision's audit entry is in
 that decision's own batch, so a batch failing part-way leaves every decision before it audited.
 `REJECTED`, `CANCELLED` and `BUMPED` are terminal for everyone, officers included: reopening is
 refused because the slot may already be somebody else's (criterion 5). An approval may move the
@@ -2238,6 +2267,13 @@ No table: the figures are counted from `room_bookings`, `room_hours` and `room_n
 one statement and not a download. `GET /api/admin/rooms/reports/utilisation` breaks down by room or
 by tier, pages, and returns an envelope; `.../reports/export` is the same figures as CSV, every cell
 quoted so a room name with a comma cannot split a row (criterion 3).
+
+By room, **every room in use is a row**, booked or not, at nought hours if nothing was booked: an
+unused room is what an end-of-year review most needs to see. A retired room appears only where it
+was booked in the span. The rooms come from one read of the estate, merged in memory, never from an
+`IN` list built from the counts (0006). Each row carries `alwaysOpen`, true for a room with no hours
+recorded, and the CSV leaves `openHours` blank for such a room and for every row by tier, since
+neither has hours to count against; a nought there would read in a spreadsheet as never open.
 
 Confirmed, cancelled and no-show hours are told apart, and a no-show is **its own figure rather
 than a deduction**: the room was held and not used, which is the number the review wants
@@ -2462,6 +2498,11 @@ K-129): `past`, with `search` over the room and the reason and `sort` by when th
 A past closure is hidden unless `past` asks for one, the same default `rooms-list.ts` uses for a
 retired room; it too returns its whole filtered set rather than a windowed page.
 
+`GET /api/admin/rooms/blackouts/stranded` answers the close form before anything is closed:
+`count` is what the close would cancel, by the read the close itself makes, and `overlapping` lists
+the closures already set over the span for the same room or every room (any room, when closing
+every room), each with its room, reason and span. Overlap is a warning on the form, never a refusal.
+
 Erasure scrubs `created_by` to null and keeps the closure: the room was shut, which is a fact
 about the room; who typed it in lives in the audit trail (0010, 0011).
 
@@ -2482,9 +2523,15 @@ Creation expands, then **policy- and conflict-checks every occurrence before any
 (criterion 2). Each occurrence counts against `ROOM_ACTIVE_BOOKINGS_PER_MEMBER` as the check walks
 the term, which is what the setting means by "a series counts each occurrence". If any occurrence
 fails, nothing is written and the refusal lists every failing occurrence with its day and reason,
-so a member resubmits with `skip` and keeps every other week where it was (criterion 3). The whole
-series confirms or the whole series queues; an occurrence is never a different kind of thing from
-its siblings (criterion 6). Occurrences carry `series_id` and `occurrence`, and are ordinary
+so a member resubmits with `skip` and keeps every other week where it was (criterion 3). A clash
+with the member's own booking or request is marked `yours` on its refusal, so the screen says "you
+already have this slot" rather than blaming another member. A closure is final, so a closed date
+lists the closure without the bendable rules beside it. The whole series confirms or the whole
+series queues; an occurrence is never a different kind of thing from its siblings (criterion 6).
+A series that would queue is refused with 422 until it carries a `reason`, and that refusal lists
+under `decisions` every date that breaks a bendable rule and which rules, so the member reads them
+and gives one reason before anything is held, as a one-off request does (C-108). The reason is
+written to every occurrence's `reason`, which the change form on My bookings opens filled in. Occurrences carry `series_id` and `occurrence`, and are ordinary
 bookings for every other rule in the module (criterion 5).
 
 The write is one `db.batch`: the series row, then a guarded claim per occurrence, then a statement
@@ -2656,6 +2703,11 @@ than teaching it. A retired module, a draft, and a module carrying `signoff_requ
 refused: a certification is proved by experience gained outside a session, so it is signed off
 rather than taught (G-112 criteria 3 and 4).
 
+Changing a session's modules (`PUT /api/admin/training/sessions/:id/modules`) takes `tellLacking`.
+When it is set, everybody on the list who would lack a prerequisite the change adds is emailed
+once, `training.session.needs-first`, and the response's `told` counts them (G-115 criterion 7,
+0243). Nothing is stored for it beyond the notification ledger's claim.
+
 ### The register: opening it, and marking it
 
 A session carries two pieces of prose with different audiences. `description` is what to expect,
@@ -2797,13 +2849,17 @@ stateDiagram-v2
 ### training_records  APPEND-ONLY (exception: revocation stamps `revoked_*` once)
 `id` PK · `user_id` restrict · `module_id` restrict · `awarded_on` civil date ·
 `expires_on` NULL = never · `expiry_overridden` bool · `source` CHECK
-`SESSION|SIGNOFF|EXTERNAL|SELF|LEGACY` (`SELF` is G-208 brief self-registration and V2
-quizzes; `LEGACY` is vocabulary only, nothing writes it) · `session_id` NULL ·
+`SESSION|SIGNOFF|EXTERNAL|SELF|LEGACY` (`SELF` is written by **I have read this** on a
+self-registrable brief, `POST /api/training/modules/:id/read`, at most once per person, brief and
+day (0244); G-208's posters and V2 quizzes will write it too; `LEGACY` is vocabulary only,
+nothing writes it) · `session_id` NULL ·
 `granted_by` · `evidence_ref` scrub · `revoked_at` / `revoked_by` / `revoke_reason` scrub ·
 `created_at`. Indexed on (`user_id`, `module_id`) and on `module_id`.
 Validity is derived (`VALID|EXPIRING|EXPIRED`), never stored; expiring counts as held. Which
 record is current is derived the same way: a renewal is a newer award for the same person and
 module, and supersession is computed, not a column.
+The records list returns it as `superseded` and, on a superseded row, `supersededBy`: the award
+date of the current record for that module, so the screen can name the award that replaced it (0243).
 Partial UNIQUE (`session_id`, `user_id`, `module_id`) WHERE session NOT NULL AND revoked
 NULL.
 A merge cannot reassign `user_id` at all: see "Merging duplicate accounts" under `users` (A-123).
@@ -2935,8 +2991,12 @@ The reason never reaches audit detail, which carries identifiers and never words
 (0011).
 
 Opening a session for sign-up resolves every open ask for the modules it teaches and tells each
-requester once, the claim held by the notification ledger (criterion 4). A session created but not
-yet open resolves nothing, because there is nothing for a member to sign up to.
+requester once, the claim held by the notification ledger and keyed to the request and the session
+(criterion 4, 0242). A session created but not yet open resolves nothing, because there is nothing
+for a member to sign up to. Cancelling a session reopens what it scheduled: a SCHEDULED ask whose
+scheduled claim names the session goes back to OPEN, in the cancel's batch, unless another session
+open for sign-up teaches the module, the member has asked again, or the member now holds it. A decline is emailed
+once, `training.request.declined`.
 
 ## Platform (modules H, J, K)
 

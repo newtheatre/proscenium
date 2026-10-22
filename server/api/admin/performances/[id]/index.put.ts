@@ -188,7 +188,7 @@ export default defineEventHandler(async (event) => {
     ? await tellBookersItMoved(event, { id, venueId: input.venueId, startsAt: input.startsAt, showTitle: held.showTitle, venueName: venue.name, was: held.startsAt, wasVenueName: held.venueName, when })
     : 0
 
-  return { ok: true, bookingsTold }
+  return { ok: true, bookingsTold, clashes: await venueClashes(input.venueId, input.startsAt, input.durationMinutes ?? null, id) }
 })
 
 interface Moved {

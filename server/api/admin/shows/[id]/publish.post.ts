@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
-import { publishShowForm } from '#shared/utils/programme'
+import { publishBlockers, publishShowForm } from '#shared/utils/programme'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 
 // Publish a show, or take it back off the public site. Unpublishing closes sales through the sale
 // predicate and touches no performance and no ticket (D-121 criteria 2 and 4).
@@ -23,13 +24,9 @@ export default defineEventHandler(async (event) => {
   // refuses and names which, rather than publish against retired vocabulary (D-131 criterion 5).
   if (published) {
     const category = held.categoryId ? await showCategoryById(held.categoryId) : undefined
-    if (category?.archived) {
-      throw createError({ statusCode: 409, statusMessage: `${held.title} cannot publish: its category, ${category.name}, has been retired` })
-    }
     const season = held.seasonId ? await seasonById(held.seasonId) : undefined
-    if (season?.archived) {
-      throw createError({ statusCode: 409, statusMessage: `${held.title} cannot publish: its season, ${season.name}, has been retired` })
-    }
+    const blockers = publishBlockers(held.title, category, season)
+    if (blockers.length > 0) throw createError({ statusCode: 409, statusMessage: blockers.join('. ') })
   }
 
   // Only a pass the sheet could offer may be ticked, and one already covering is left alone: the
@@ -47,14 +44,16 @@ export default defineEventHandler(async (event) => {
   // Draft performances only, so a cancelled one is never quietly put back on sale. Counted before
   // the batch because the statement's own row count is not read back.
   const cascading = published && cascadePerformances
+  // A night already played is history, so the cascade leaves it off sale.
+  const tonight = showNightOpensAt(currentShowNight())
   const [pending] = cascading
-    ? await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM performances WHERE show_id = ${id} AND status = 'DRAFT'`)
+    ? await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM performances WHERE show_id = ${id} AND status = 'DRAFT' AND starts_at >= ${tonight}`)
     : [{ total: 0 }]
   const cascaded = Number(pending?.total ?? 0)
 
   await db.batch([
     db.run(sql`UPDATE shows SET status = ${status}, updated_at = unixepoch() WHERE id = ${id}`),
-    ...(cascading ? [db.run(cascadeOnSaleQuery(id))] : []),
+    ...(cascading ? [db.run(cascadeOnSaleQuery(id, tonight))] : []),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: published ? 'show.published' : 'show.unpublished',

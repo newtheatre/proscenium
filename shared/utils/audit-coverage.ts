@@ -97,7 +97,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/methods/[id].delete.ts', actions: ['account.method.removed'] },
   { route: 'server/api/account/methods/[id].patch.ts', actions: ['account.method.renamed'] },
   { route: 'server/api/account/password.put.ts', actions: ['account.method.added', 'password.set'] },
-  { route: 'server/api/account/email.put.ts', actions: ['account.email.changed', 'account.email.changed.admin'], via: ['server/utils/email-change.ts'] },
+  { route: 'server/api/account/email.put.ts', actions: ['account.email.change.requested'], via: ['server/utils/email-change.ts'] },
+  { route: 'server/api/account/email.delete.ts', actions: ['account.email.change.cancelled'] },
   { route: 'server/api/account/profile.put.ts', actions: ['account.profile.updated'], via: ['server/utils/profile.ts'] },
   { route: 'server/api/account/profile.get.ts', exempt: 'reads your own profile' },
   { route: 'server/api/account/methods/index.get.ts', exempt: 'reads what the account signs in with' },
@@ -109,7 +110,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/room-feed.get.ts', exempt: 'says whether your own feed exists' },
   { route: 'server/api/account/room-feed.post.ts', actions: ['account.calendar-feed.issued'] },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
-  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified', 'session.started.magic-link'] },
+  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified', 'session.started.magic-link', 'account.email.changed'], via: ['server/utils/email-change.ts'] },
   {
     route: 'server/api/auth/verify/resend.post.ts',
     exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
@@ -664,13 +665,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/payments/[id]/index.get.ts', exempt: 'reads one hand-off\'s state for the till to poll, writing nothing' },
   {
     route: 'server/api/till/payments/[id]/complete.post.ts',
-    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'age-check.logged', 'reservation.collected', 'account.created.guest'],
-    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/reservations.ts'],
+    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'age-check.logged', 'reservation.collected', 'account.created.guest', 'bar.tab.settled'],
+    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/reservations.ts', 'server/utils/tab-settlement.ts'],
   },
   {
     route: 'server/api/till/payments/[id]/resolve.post.ts',
-    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'age-check.logged', 'reservation.collected', 'account.created.guest'],
-    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/reservations.ts'],
+    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'age-check.logged', 'reservation.collected', 'account.created.guest', 'bar.tab.settled'],
+    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/reservations.ts', 'server/utils/tab-settlement.ts'],
   },
   { route: 'server/api/till/comp-requests/index.get.ts', exempt: 'reads tonight\'s pending comp requests, writing nothing' },
   { route: 'server/api/till/comp-requests/[id]/index.get.ts', exempt: 'reads one request\'s status, for the till to poll while it waits; nothing is written' },
@@ -687,12 +688,16 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/till/comp-requests/[id]/sale.post.ts', actions: ['bar.till.sale', 'age-check.logged'], via: ['server/utils/sale.ts'] },
   { route: 'server/api/till/tab-settlements/index.get.ts', exempt: 'reads one holder\'s outstanding charges, writing nothing' },
+  { route: 'server/api/till/tab-settlements/holders.get.ts', exempt: 'reads who owes the bar anything, writing nothing' },
   {
     route: 'server/api/till/tab-settlements/index.post.ts',
-    actions: ['bar.tab.settled'],
-    via: ['server/utils/tab-settlement.ts'],
+    actions: ['bar.sumup.started', 'bar.tab.settled'],
+    via: ['server/utils/tab-settlement.ts', 'server/utils/sumup-attempts.ts'],
   },
-  { route: 'server/api/account/tab.get.ts', exempt: 'reads your own tab' },
+  { route: 'server/api/account/tab/index.get.ts', exempt: 'reads your own tab' },
+  { route: 'server/api/account/tab/code.get.ts', exempt: 'reads your own code for tonight' },
+  { route: 'server/api/account/tab/bar.get.ts', exempt: 'reads what you may add to your own tab tonight, writing nothing' },
+  { route: 'server/api/account/tab/charge.post.ts', actions: ['bar.till.sale'], via: ['server/utils/sale.ts'] },
 
   // Module G: training
 
@@ -713,6 +718,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/people.get.ts', exempt: 'reads ids and names for the records screen\'s picker' },
   { route: 'server/api/training/records.get.ts', exempt: 'reads your own training records' },
   { route: 'server/api/training/modules.get.ts', exempt: 'reads the member-facing catalogue' },
+  { route: 'server/api/training/modules/[id]/read.post.ts', actions: ['record.self-registered'] },
   { route: 'server/api/training/next.get.ts', exempt: 'reads what you could take next, all from your own records' },
   { route: 'server/api/training/requests/index.get.ts', exempt: 'reads what you asked for' },
   { route: 'server/api/training/requests/index.post.ts', exempt: 'a demand signal about yourself, carrying no authority' },
@@ -801,8 +807,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/finance/reconciliation/index.post.ts', actions: ['finance.z-reading.recorded'] },
   {
     route: 'server/api/admin/finance/late-charges/[id].post.ts',
-    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'bar.till.sale.late', 'age-check.logged', 'reservation.collected', 'account.created.guest'],
-    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/late-charge.ts', 'server/utils/reservations.ts'],
+    actions: ['bar.sumup.claimed', 'bar.sumup.completed', 'bar.sumup.mismatched', 'bar.sumup.resolved', 'bar.till.sale', 'bar.till.sale.late', 'bar.tab.settled', 'age-check.logged', 'reservation.collected', 'account.created.guest'],
+    via: ['server/utils/sumup-attempts.ts', 'server/utils/sale.ts', 'server/utils/late-charge.ts', 'server/utils/reservations.ts', 'server/utils/tab-settlement.ts'],
   },
   { route: 'server/api/admin/finance/periods/index.get.ts', exempt: 'reads the close history, writing nothing' },
   {

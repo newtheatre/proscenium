@@ -61,8 +61,9 @@ export function venueForFilter(value: string, names: string[]): string | null {
   return names.find(name => toSlug(name) === value) ?? null
 }
 
+// An apostrophe joins its word rather than splitting it: "the-winters-tale", not "the-winter-s-tale".
 export function toSlug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_SHOW_SLUG)
+  return title.toLowerCase().replace(/['\u2019]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_SHOW_SLUG)
 }
 
 const hoursBefore = z.number().int().nonnegative().max(MAX_BOOKING_CLOSES_HOURS)
@@ -247,7 +248,9 @@ export interface AdminShow {
   performanceCount: number
   onSaleCount: number
   soldTickets: number
-  // Seats held but not yet paid for: the queue the desk still has to take money for (D-132).
+  // The same, on performances still going ahead: what the house below is measured against.
+  houseTickets: number
+  // Seats held but not yet paid for on a performance still going ahead (D-132).
   unpaidTickets: number
   // The house this theatre sells itself, and the next performance still to come. Both counted
   // from the performances, so the strip cannot state a figure the rows disagree with.
@@ -318,10 +321,14 @@ export interface PublishReadiness {
   untimedPerformanceCount: number
   uncoveredPassCount: number
   activePriceCount: number
+  warningCount: number
+  warningsConfirmedNone: boolean
+  // Uncancelled nights at a venue we run with no shift on them, counted from the rows the sheet reads.
+  unstampedPerformanceCount: number
 }
 
 export interface PublishCheck {
-  key: 'poster' | 'performances' | 'running-time' | 'passes' | 'pricing'
+  key: 'poster' | 'performances' | 'running-time' | 'passes' | 'pricing' | 'warnings' | 'shifts'
   says: string
   done: boolean
 }
@@ -335,6 +342,8 @@ export function publishChecklist(show: PublishReadiness): PublishCheck[] {
     { key: 'running-time', says: 'Running time set for every performance', done: show.untimedPerformanceCount === 0 },
     { key: 'passes', says: 'Covered by every pass on sale for its dates', done: show.uncoveredPassCount === 0 },
     { key: 'pricing', says: 'Pricing set', done: show.activePriceCount > 0 },
+    { key: 'warnings', says: 'Content warnings assessed', done: show.warningCount > 0 || show.warningsConfirmedNone },
+    { key: 'shifts', says: 'Shifts stamped on every performance we staff', done: show.unstampedPerformanceCount === 0 },
   ]
 }
 
@@ -389,6 +398,8 @@ export interface AdminPerformance {
   venueCapacity: number | null
   bookingClosesHoursBefore: number | null
   holdReleaseMinutesBefore: number | null
+  // The release in force, house default included; only the show's performance list resolves it.
+  holdReleaseMinutes?: number
   externalBookingUrl: string | null
   status: PerformanceStatus
   notes: string | null
@@ -451,6 +462,19 @@ export function publicShow(show: Omit<PublicShow, 'posterUrl'> & { posterKey: st
 // never been on sale and is nobody's business yet (D-121 criteria 1 and 5).
 export function isPublicPerformance(performance: { status: PerformanceStatus }): boolean {
   return performance.status !== 'DRAFT'
+}
+
+// Every reason a show cannot publish, so the sheet lists them all and the route refuses with them
+// all, rather than one at a time (D-131 criterion 5).
+export function publishBlockers(
+  title: string,
+  category: ShowReference | null | undefined,
+  season: ShowReference | null | undefined,
+): string[] {
+  const blockers: string[] = []
+  if (category?.archived) blockers.push(`its category, ${category.name}, has been retired`)
+  if (season?.archived) blockers.push(`its season, ${season.name}, has been retired`)
+  return blockers.map(one => `${title} cannot publish: ${one}`)
 }
 
 // A retired season or category still names the shows it holds; the picker says so (D-131).
@@ -567,6 +591,16 @@ export function bookingWindowSource(
 export function saysBookingWindow(hours: number): string {
   if (hours === 0) return 'Closes at curtain-up'
   return `Closes ${hours === 1 ? '1 hour' : `${hours} hours`} before curtain`
+}
+
+// Online booking closes at the earlier of the window and the hold release, so the line names
+// whichever governs rather than a window a booker never reaches (D-112 criterion 1).
+export function saysOnlineCutoff(hours: number, releaseMinutes: number | undefined): string {
+  if (releaseMinutes === undefined || releaseMinutes <= hours * 60) return saysBookingWindow(hours)
+  const said = releaseMinutes % 60 === 0
+    ? (releaseMinutes === 60 ? '1 hour' : `${releaseMinutes / 60} hours`)
+    : `${releaseMinutes} minutes`
+  return `Closes ${said} before curtain, when unpaid holds release`
 }
 
 // The moment online booking closes, in integer seconds UTC. An hour is 3600 seconds whatever the

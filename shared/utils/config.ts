@@ -239,7 +239,7 @@ export const CONFIG_KEYS = {
     schema: z.number().int().positive(),
     default: 10,
     workshop: 'spaces-and-training',
-    describes: 'Active bookings one member may hold. A series counts each occurrence.',
+    describes: 'Active bookings and waiting requests one member may hold. A series counts each occurrence (0208).',
   },
   ROOM_SERIES_MAX_OCCURRENCES: {
     schema: z.number().int().positive(),

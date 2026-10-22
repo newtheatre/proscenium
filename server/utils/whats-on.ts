@@ -156,7 +156,7 @@ export function listedPricesQuery(scope: SQL, at: number): SQL {
     LEFT JOIN show_ticket_overrides so ON so.show_id = p.show_id AND so.ticket_type_id = t.id
     LEFT JOIN performance_ticket_overrides po ON po.performance_id = p.id AND po.ticket_type_id = t.id
     WHERE p.show_id IN (${scope}) AND ${listable(at)}
-    ORDER BY p.id, t.price, t.name COLLATE NOCASE
+    ORDER BY p.id, t.sort, t.price, t.name COLLATE NOCASE
   `
 }
 
@@ -365,11 +365,11 @@ export async function publicShowBySlug(
   rules: ListingRules,
   slug: string,
   now: Date = new Date(),
-): Promise<ListedShow | null> {
+): Promise<(ListedShow & { offSaleToCome: boolean }) | null> {
   const at = Math.floor(now.getTime() / 1000)
   const scope = oneShowScope(slug)
 
-  const [shows, performances, prices, warnings] = await Promise.all([
+  const [shows, performances, prices, warnings, offSale] = await Promise.all([
     db.all<ShowRow>(sql`
       SELECT s.id AS id, s.slug AS slug, s.title AS title, s.subtitle AS subtitle,
              s.description AS description, s.long_description AS longDescription,
@@ -385,7 +385,13 @@ export async function publicShowBySlug(
     db.all<PerformanceRow>(listedPerformancesQuery(scope, at)),
     db.all<PriceRow>(listedPricesQuery(scope, at)),
     db.all<ShowWarningRow>(warningsForListedShowsQuery(scope)),
+    // A night still to come but not yet on sale, so an empty list is not read as a finished run.
+    db.all<{ offSaleToCome: number }>(sql`
+      SELECT EXISTS (SELECT 1 FROM performances p
+                     WHERE p.show_id IN (${scope}) AND p.status = 'DRAFT' AND p.starts_at >= ${at}) AS offSaleToCome
+    `),
   ])
 
-  return assemble(shows, performances, prices, warnings, rules, now)[0] ?? null
+  const show = assemble(shows, performances, prices, warnings, rules, now)[0]
+  return show ? { ...show, offSaleToCome: offSale[0]?.offSaleToCome === 1 } : null
 }

@@ -25,6 +25,7 @@ export default defineEventHandler(async (event) => {
     db.run(auditIfChanged(entry)),
     // The codes existed only to recover the factor, so they go with it (A-110 criterion 4).
     db.delete(schema.recoveryCodes).where(eq(schema.recoveryCodes.userId, account.id)),
+    cancelPendingEmailChange(account),
   ])
 
   return { ok: true }

@@ -101,6 +101,8 @@ export interface SeriesClaim {
   tier: string
   purpose: string
   notes: string | null
+  // The member's one reason for a series that waits on a decision, kept on every occurrence.
+  reason?: string | null
   status: 'CONFIRMED' | 'PENDING_APPROVAL'
   offsets: ShiftOffsets
 }
@@ -112,10 +114,10 @@ export function seriesClaimStatement(id: string, write: SeriesClaim, one: Occurr
   const endsAt = Math.floor(one.endsAt.getTime() / 1000)
   return sql`
     INSERT INTO room_bookings
-      (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, series_id, occurrence)
+      (id, room_id, user_id, title, attendees, starts_at, ends_at, tier, purpose, status, notes, reason, series_id, occurrence)
     SELECT ${id}, ${write.roomId}, ${write.userId}, ${write.title}, ${write.attendees},
            ${startsAt}, ${endsAt}, ${write.tier}, ${write.purpose}, ${write.status}, ${write.notes},
-           ${write.seriesId}, ${one.occurrence}
+           ${write.reason ?? null}, ${write.seriesId}, ${one.occurrence}
     WHERE EXISTS (SELECT 1 FROM rooms WHERE id = ${write.roomId} AND is_active = 1)
       AND ${clearOf(write.roomId, startsAt, endsAt)}
       AND ${roomOpenTerms(write.roomId, startsAt, endsAt, write.offsets)}
@@ -141,5 +143,81 @@ export function seriesCancelStatements(seriesId: string, userId: string, now: nu
     `,
     ours: sql`UPDATE room_bookings SET status = 'CANCELLED', updated_at = ${now} WHERE ${ours} RETURNING id, starts_at AS startsAt, ends_at AS endsAt`,
     theirs: sql`UPDATE external_requests SET status = 'CANCELLED', updated_at = ${now} WHERE ${theirs} RETURNING id, starts_at AS startsAt, ends_at AS endsAt, 1 AS external`,
+  }
+}
+
+export interface RetireWrite {
+  roomId: string
+  actorId: string
+  reason: string
+  now: number
+  turnDown: boolean
+  cancel: boolean
+}
+
+// What a retire settles, if asked: requests still waiting and bookings yet to start (0204). The
+// dialogue counts with the same predicates the write uses, so the two cannot drift.
+function heldBy(roomId: string, now: number): { waiting: SQL, upcoming: SQL } {
+  return {
+    waiting: sql`room_id = ${roomId} AND status = 'PENDING_APPROVAL' AND starts_at >= ${now}`,
+    upcoming: sql`room_id = ${roomId} AND status = 'CONFIRMED' AND starts_at >= ${now}`,
+  }
+}
+
+export function heldCountStatement(roomId: string, now: number): SQL {
+  const { waiting, upcoming } = heldBy(roomId, now)
+  return sql`
+    SELECT (SELECT count(*) FROM room_bookings WHERE ${waiting}) AS waiting,
+           (SELECT count(*) FROM room_bookings WHERE ${upcoming}) AS upcoming
+  `
+}
+
+const SETTLED = sql`id, user_id AS userId, title, starts_at AS startsAt, ends_at AS endsAt, series_id AS seriesId`
+
+// Every statement guarded on the room still being in use, so a second retire racing the first
+// settles nothing and audits nothing. The audit counts before the updates it describes (0049).
+export function retireStatements(write: RetireWrite, entry: AuditRow): { audit: SQL, turnDown: SQL | null, cancel: SQL | null, retire: SQL } {
+  const { waiting, upcoming } = heldBy(write.roomId, write.now)
+  const live = sql`EXISTS (SELECT 1 FROM rooms WHERE id = ${write.roomId} AND is_active = 1)`
+  const counted = (asked: boolean, predicate: SQL): SQL => (asked ? sql`(SELECT count(*) FROM room_bookings WHERE ${predicate})` : sql`0`)
+
+  return {
+    audit: sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target},
+             json_set(${detailOf(entry)}, '$.turnedDown', ${counted(write.turnDown, waiting)},
+                      '$.cancelled', ${counted(write.cancel, upcoming)})
+      WHERE ${live}
+    `,
+    turnDown: write.turnDown
+      ? sql`
+          UPDATE room_bookings
+          SET status = 'REJECTED', rejection_reason = ${write.reason}, decided_by = ${write.actorId},
+              decided_at = ${write.now}, updated_at = ${write.now}
+          WHERE ${waiting} AND ${live}
+          RETURNING ${SETTLED}
+        `
+      : null,
+    cancel: write.cancel
+      ? sql`
+          UPDATE room_bookings
+          SET status = 'CANCELLED', rejection_reason = ${write.reason}, updated_at = ${write.now}
+          WHERE ${upcoming} AND ${live}
+          RETURNING ${SETTLED}
+        `
+      : null,
+    retire: sql`UPDATE rooms SET is_active = 0, updated_at = ${write.now} WHERE id = ${write.roomId} AND is_active = 1`,
+  }
+}
+
+// Where a booking falls in its series, counted from the rows: a term written before skipped weeks
+// were renumbered stores "Week 4 of 3". Spelt out, as a select on one table leaves columns unqualified.
+export function seriesPlace(): { occurrence: SQL<number | null>, length: SQL<number | null> } {
+  return {
+    occurrence: sql<number | null>`CASE WHEN room_bookings.series_id IS NULL THEN NULL ELSE
+      (SELECT count(*) FROM room_bookings held WHERE held.series_id = room_bookings.series_id
+        AND held.starts_at <= room_bookings.starts_at) END`,
+    length: sql<number | null>`CASE WHEN room_bookings.series_id IS NULL THEN NULL ELSE
+      (SELECT count(*) FROM room_bookings held WHERE held.series_id = room_bookings.series_id) END`,
   }
 }

@@ -12,6 +12,8 @@ const props = defineProps<{
   action: TrainingAction
   // A 48px target where a phone is the likely reader (docs/design-language.md).
   large?: boolean
+  // What the member does not yet hold, said in the ask dialog before they ask (0242).
+  lacking?: string[]
 }>()
 
 const emit = defineEmits<{ changed: [] }>()
@@ -37,6 +39,22 @@ async function signUp(): Promise<void> {
       icon: 'i-lucide-check',
       color: 'success',
     })
+    emit('changed')
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    working.value = false
+  }
+}
+
+// A brief that allows it is recorded by its reader, dated today, with nobody else involved (0244).
+async function markRead(): Promise<void> {
+  working.value = true
+  try {
+    await $fetch(`/api/training/modules/${props.moduleId}/read`, { method: 'POST' })
+    toast.add({ title: 'Recorded', description: `${props.moduleName} is on your training now.`, icon: 'i-lucide-check', color: 'success' })
     emit('changed')
   }
   catch (error) {
@@ -82,12 +100,24 @@ async function signUp(): Promise<void> {
     >
       {{ saysTrainingAction(action) }}
     </UButton>
+    <UButton
+      v-else-if="action.kind === 'READ'"
+      :size="large ? 'lg' : 'sm'"
+      :class="large ? 'min-h-12' : undefined"
+      icon="i-lucide-book-check"
+      :loading="working"
+      :data-test="`module-read-${moduleId}`"
+      @click.stop.prevent="markRead"
+    >
+      {{ saysTrainingAction(action) }}
+    </UButton>
     <TrainingRequestModule
       v-else
       :module-id="moduleId"
       :module-name="moduleName"
       :requested="action.kind === 'ASKED'"
       :large="large"
+      :lacking="lacking"
       @requested="emit('changed')"
     />
     <span

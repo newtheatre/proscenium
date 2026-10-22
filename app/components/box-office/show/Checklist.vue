@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { publishChecklist, saysPublishCheck } from '#shared/utils/programme'
-import type { AdminShow } from '#shared/utils/programme'
+import type { AdminPerformance, AdminShow, ShowVenue } from '#shared/utils/programme'
 
 // What a show still wants before it is ready for the public site (D-132 criterion 7). It reports
 // and gates nothing: an outstanding check never stops the publish button (D-121).
 
-const props = defineProps<{ show: AdminShow }>()
+const props = defineProps<{ show: AdminShow, performances: AdminPerformance[], venues: ShowVenue[] }>()
 
-const checks = computed(() => publishChecklist(props.show))
+const external = computed(() => new Set(props.venues.filter(one => one.isExternal).map(one => one.id)))
+const unstampedPerformanceCount = computed(() => props.performances
+  .filter(one => one.status !== 'CANCELLED' && !external.value.has(one.venueId) && one.shiftCount === 0).length)
+const checks = computed(() => publishChecklist({ ...props.show, unstampedPerformanceCount: unstampedPerformanceCount.value }))
 const outstanding = computed(() => checks.value.filter(check => !check.done).length)
 </script>
 

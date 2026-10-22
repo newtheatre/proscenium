@@ -40,7 +40,7 @@ const module = computed(() => data.value.items.find(one => one.id === route.para
 
 // A module that is draft, retired or invented is the same answer to somebody reading a link.
 if (!module.value) {
-  throw createError({ statusCode: 404, statusMessage: saysNoSuch('module', 'Go back to the catalogue and open it again'), fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNoSuch('module', 'It is not taught at the moment: the catalogue lists everything that is'), fatal: true })
 }
 
 // What it unlocks is the interesting half, and it is the reverse of the edges we already have.
@@ -117,6 +117,7 @@ useSeoMeta({
                 :module-id="module.id"
                 :module-name="module.name"
                 :action="module.action"
+                :lacking="module.prerequisites.filter(need => need.held === false).map(need => need.name)"
                 @changed="refresh"
               />
               <ULink
@@ -183,6 +184,7 @@ useSeoMeta({
           :module-id="module.id"
           :module-name="module.name"
           :action="module.action"
+          :lacking="module.prerequisites.filter(need => need.held === false).map(need => need.name)"
           large
           @changed="refresh"
         />

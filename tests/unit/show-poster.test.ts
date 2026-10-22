@@ -41,17 +41,22 @@ const ready = (over: Partial<PublishReadiness> = {}): PublishReadiness => ({
   untimedPerformanceCount: 0,
   uncoveredPassCount: 0,
   activePriceCount: 2,
+  warningCount: 1,
+  warningsConfirmedNone: false,
+  unstampedPerformanceCount: 0,
   ...over,
 })
 
 describe('the publish checklist reports readiness (D-132 criterion 7)', () => {
-  test('five checks, each stated in words, the running time and the passes before the pricing (D-121, D-123)', () => {
+  test('seven checks, each stated in words, the running time and the passes before the pricing (D-121, D-123)', () => {
     expect(publishChecklist(ready()).map(check => [check.key, check.says, check.done])).toEqual([
       ['poster', 'Poster uploaded', true],
       ['performances', 'Performances scheduled', true],
       ['running-time', 'Running time set for every performance', true],
       ['passes', 'Covered by every pass on sale for its dates', true],
       ['pricing', 'Pricing set', true],
+      ['warnings', 'Content warnings assessed', true],
+      ['shifts', 'Shifts stamped on every performance we staff', true],
     ])
   })
 
@@ -63,6 +68,9 @@ describe('the publish checklist reports readiness (D-132 criterion 7)', () => {
     expect(missing({ activePriceCount: 0 })).toEqual(['pricing'])
     expect(missing({ untimedPerformanceCount: 2 })).toEqual(['running-time'])
     expect(missing({ uncoveredPassCount: 1 })).toEqual(['passes'])
+    expect(missing({ warningCount: 0 })).toEqual(['warnings'])
+    expect(missing({ warningCount: 0, warningsConfirmedNone: true })).toEqual([])
+    expect(missing({ unstampedPerformanceCount: 2 })).toEqual(['shifts'])
   })
 
   test('cast list and rights are absent: neither has a schema behind it yet', () => {

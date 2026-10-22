@@ -1,6 +1,6 @@
 import { entryFor } from '#shared/utils/site-nav'
 import { reachConsole } from '#shared/utils/abilities'
-import { rolesThatReach } from '#shared/utils/refusals'
+import { rolesThatReach, standingsThatReach } from '#shared/utils/refusals'
 
 // Rendering convenience only: the server guard is what actually refuses (docs/architecture.md).
 // The ability comes from the nav declaration, so a deep link and the sidebar cannot disagree.
@@ -12,6 +12,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // The refusal carries who the screen is for, so the page can name them (issue 1304, K-133).
   const entry = entryFor(to.path)
   if (await denies(reachConsole) || (entry && await denies(entry.ability))) {
-    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that', data: { roles: entry ? rolesThatReach(entry.ability) : [], changedByItManager: entry?.changedByItManager ?? false } })
+    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that', data: { roles: entry ? rolesThatReach(entry.ability) : [], standings: entry ? standingsThatReach(entry.ability) : [], changedByItManager: entry?.changedByItManager ?? false } })
   }
 })

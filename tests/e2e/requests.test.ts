@@ -310,6 +310,7 @@ describe.skipIf(skip !== null)('editing a request while it waits (C-108 criterio
       from: '19:00',
       to: '21:00',
       occurrences: 2,
+      reason: 'Opening week.',
     }, member.cookie)
     const { id: seriesId } = await series.json() as { id: string }
     const week = read<{ id: string, startsAt: number, endsAt: number }>(

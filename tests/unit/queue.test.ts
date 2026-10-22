@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { inQueueOrder } from '#shared/utils/queue'
+import { heldBesides, inQueueOrder, saysOutsideOpening, saysPreApproval, saysRequestName } from '#shared/utils/queue'
 import type { QueueItem } from '#shared/utils/queue'
 
 // C-122 criterion 2. The queue is a list of work, so open rows come first and soonest first, and
@@ -60,5 +60,54 @@ describe('what an officer sees first', () => {
     ]).map(one => one.id)
 
     expect(ordered).toEqual(['written-later', 'written-first'])
+  })
+})
+
+describe('how a row reads', () => {
+  test('an unnamed request shows its purpose once', () => {
+    expect(saysRequestName({ title: 'Meeting', purpose: 'MEETING' })).toBe('Meeting')
+    expect(saysRequestName({ title: '  ', purpose: 'REHEARSAL' })).toBe('Rehearsal')
+  })
+
+  test('a named request keeps its purpose beside the name', () => {
+    expect(saysRequestName({ title: 'Line run', purpose: 'REHEARSAL' })).toBe('Line run (Rehearsal)')
+  })
+
+  test('pre-approval names the count that put the member there', () => {
+    expect(saysPreApproval(3)).toBe('Under pre-approval (3 no-shows)')
+    expect(saysPreApproval(1)).toBe('Under pre-approval (1 no-show)')
+  })
+})
+
+describe('a request is never counted against itself (0208)', () => {
+  const now = 1000
+
+  test('a waiting request still to happen leaves itself out', () => {
+    expect(heldBesides(10, { status: 'PENDING_APPROVAL', endsAt: now + 60 }, now)).toBe(9)
+  })
+
+  test('a row that holds nothing, or has finished, is not in the count to begin with', () => {
+    expect(heldBesides(10, { status: 'REJECTED', endsAt: now + 60 }, now)).toBe(10)
+    expect(heldBesides(10, { status: 'PENDING_APPROVAL', endsAt: now - 60 }, now)).toBe(10)
+  })
+})
+
+describe('a batch approval asks about days the room is shut', () => {
+  const closed = { where: 'The Studio', failures: [{ reason: 'ROOM_CLOSED' }] }
+  const late = { where: 'The Studio', failures: [{ reason: 'OUT_OF_HOURS' }] }
+  const fine = { where: 'The Studio', failures: [{ reason: 'SHORT_NOTICE' }] }
+
+  test('nothing is asked when every one is inside the opening hours', () => {
+    expect(saysOutsideOpening([fine, { where: 'Green Room' }])).toBeNull()
+  })
+
+  test('closed days are counted and the room named', () => {
+    expect(saysOutsideOpening([closed, closed, fine])).toBe('2 of these are on days The Studio is closed')
+    expect(saysOutsideOpening([closed])).toBe('1 of these is on a day The Studio is closed')
+  })
+
+  test('hours and days together, across rooms', () => {
+    expect(saysOutsideOpening([closed, { ...late, where: 'Green Room' }]))
+      .toBe('1 of these is on a day their room is closed, and 1 of these is outside the hours their room opens')
   })
 })
