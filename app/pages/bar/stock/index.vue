@@ -552,6 +552,7 @@ const columns = computed(() => (data.value.items.some(item => item.category)
     </p>
 
     <UTable
+      :data="data.items"
       :columns="columns"
       :loading="status === 'pending'"
       data-test="bar-items-table"
