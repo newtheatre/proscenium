@@ -149,6 +149,31 @@ describe.skipIf(skip !== null)('the tab register lists every holder still carryi
   }, 120_000)
 })
 
+describe.skipIf(skip !== null)('nobody is offered a void on their own tab (0116)', () => {
+  test('the manager reading their own tab sees no Void, and is told who voids it', async () => {
+    const { venueId } = programme(`tabs-own-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(400)
+    await openTill(venueId)
+    await authorise([barManager.id])
+    await setCap(2000)
+    expect((await charge(venueId, variantId, 400, barManager)).status).toBe(200)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barManagerPassword)
+    await click(view, 'form button[type="submit"]')
+    await finishSignIn(app, view, barManager.email)
+
+    await visit(view, `${app.baseURL}/bar/tabs`, `[data-test="view-tab-${barManager.id}"]`)
+    await click(view, `[data-test="view-tab-${barManager.id}"]`)
+    await waitFor(view, `document.querySelector('[data-test="tab-charges"]')`)
+    expect(await textOf(view, '[data-test="own-tab-void-note"]')).toContain('Nobody voids a charge on their own tab')
+    expect(await view.evaluate<boolean>(`document.querySelector('[data-test="tab-charges"] [data-test^="void-"]') === null`)).toBe(true)
+    view.close()
+  }, 120_000)
+})
+
 describe.skipIf(skip !== null)('who may read and change the register (F-111 criterion 5)', () => {
   test('an ordinary member reads nothing', async () => {
     expect((await send('GET', '/api/admin/bar/tabs', undefined, member.cookie)).status).toBe(403)

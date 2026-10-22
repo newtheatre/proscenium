@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import { putOnTheTill, tabCodeOf } from '#tests/helpers/bar'
+import { answerCharge, settleOnTheReader } from '#tests/helpers/till'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-109: a tab holder's account is itemised and live; settlement is bounded to exactly the
@@ -106,6 +107,9 @@ const settleCandidates = (venueId: string, holderId: string, as = barStaff.cooki
   send('GET', `/api/till/tab-settlements?venueId=${venueId}&holderId=${holderId}`, undefined, as)
 
 const settle = (venueId: string, holderId: string, entryIds: string[], expectedTotalPence: number, as = barStaff.cookie): Promise<Response> =>
+  settleOnTheReader(app, { venueId, holderId, entryIds, expectedTotalPence }, as)
+
+const startSettling = (venueId: string, holderId: string, entryIds: string[], expectedTotalPence: number, as = barStaff.cookie): Promise<Response> =>
   send('POST', '/api/till/tab-settlements', { venueId, holderId, entryIds, expectedTotalPence }, as)
 
 const voidCharge = (entryId: string, reason: string, as: string): Promise<Response> =>
@@ -247,6 +251,196 @@ describe.skipIf(skip !== null)('settlement is bounded to the charges it covers (
     const answered = await settle(venueId, member.id, [charges[0]!.entryId], 500)
     expect(answered.status).toBe(409)
   })
+})
+
+function attemptStatus(id: string): string | null {
+  const database = new Database(app.databaseFile, { readonly: true })
+  try {
+    return (database.query('SELECT status FROM sumup_attempts WHERE id = ?').get(id) as { status: string } | null)?.status ?? null
+  }
+  finally {
+    database.close()
+  }
+}
+
+async function owed(member: TestMember): Promise<number> {
+  const answered = await send('GET', '/api/account/tab', undefined, member.cookie)
+  return (await answered.json() as { tab: { outstandingPence: number } }).tab.outstandingPence
+}
+
+describe.skipIf(skip !== null)('a settlement is a card charge answered at the reader (0096, 0162)', () => {
+  test('nothing is settled until the reader answers, and a declined card leaves the tab owed', async () => {
+    const { venueId, performanceId } = programme(`settle-typed-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member, 500)
+    const { charges } = await (await settleCandidates(venueId, member.id)).json() as { charges: OutstandingCharge[] }
+
+    const started = await startSettling(venueId, member.id, [charges[0]!.entryId], 500)
+    expect(started.status).toBe(200)
+    const { id } = await started.json() as { id: string }
+    expect(await owed(member)).toBe(500)
+
+    expect((await answerCharge(app, id, 'declined', barStaff.cookie)).status).toBe(200)
+    expect(attemptStatus(id)).toBe('FAILED')
+    expect(await owed(member)).toBe(500)
+
+    expect((await settle(venueId, member.id, [charges[0]!.entryId], 500)).status).toBe(200)
+    expect(await owed(member)).toBe(0)
+  })
+
+  test('a tab already on the reader is not keyed in a second time', async () => {
+    const { venueId, performanceId } = programme(`settle-twice-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member, 500)
+    const { charges } = await (await settleCandidates(venueId, member.id)).json() as { charges: OutstandingCharge[] }
+
+    expect((await startSettling(venueId, member.id, [charges[0]!.entryId], 500)).status).toBe(200)
+    const second = await startSettling(venueId, member.id, [charges[0]!.entryId], 500)
+    expect(second.status).toBe(409)
+    expect(await message(second)).toContain('already on the reader')
+  })
+
+  // Matt's call (22 October 2026): the 0116 rule reaches the reader's answer too.
+  test('a holder may key their own settlement but someone else answers the reader', async () => {
+    const { venueId, performanceId } = programme(`settle-own-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    await authorise([barStaff.id])
+    expect((await chargeToTab(venueId, variantId, barStaff, 500, barManager.cookie)).status).toBe(200)
+    const { charges } = await (await settleCandidates(venueId, barStaff.id)).json() as { charges: OutstandingCharge[] }
+    const entryIds = charges.map(charge => charge.entryId)
+    const owedPence = charges.reduce((sum, charge) => sum + charge.totalPence, 0)
+
+    const started = await startSettling(venueId, barStaff.id, entryIds, owedPence)
+    expect(started.status).toBe(200)
+    const { id } = await started.json() as { id: string }
+
+    const own = await answerCharge(app, id, 'succeeded', barStaff.cookie)
+    expect(own.status).toBe(403)
+    expect(await message(own)).toContain('Nobody answers the reader for their own tab')
+
+    const answered = await answerCharge(app, id, 'succeeded', barManager.cookie)
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('SUCCEEDED')
+  })
+
+  test('a Treasurer holding the tab cannot record its settlement as paid after the till closed', async () => {
+    const { venueId, performanceId } = programme(`settle-own-late-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const treasurer = await aMember()
+    await grantRole(app, treasurer, 'TREASURER', officer.cookie)
+    await authorise([treasurer.id])
+    expect((await chargeToTab(venueId, variantId, treasurer, 500)).status).toBe(200)
+    const { charges } = await (await settleCandidates(venueId, treasurer.id)).json() as { charges: OutstandingCharge[] }
+    const started = await startSettling(venueId, treasurer.id, charges.map(charge => charge.entryId), 500)
+    expect(started.status).toBe(200)
+    const { id } = await started.json() as { id: string }
+
+    const own = await send('POST', `/api/admin/finance/late-charges/${id}`, { expectedTotalPence: 500 }, treasurer.cookie)
+    expect(own.status).toBe(403)
+    expect(await message(own)).toContain('Nobody answers the reader for their own tab')
+  })
+
+  // Both tills read no attempt and both would key the card: the guard has to ride the insert,
+  // not a read before it, or the holder pays twice (0162).
+  test('two tills keying the same tab at once leave one charge on the reader', async () => {
+    const { venueId, performanceId } = programme(`settle-race-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member, 500)
+    const { charges } = await (await settleCandidates(venueId, member.id)).json() as { charges: OutstandingCharge[] }
+
+    const answers = await Promise.all([
+      startSettling(venueId, member.id, [charges[0]!.entryId], 500),
+      startSettling(venueId, member.id, [charges[0]!.entryId], 500, barManager.cookie),
+    ])
+    expect(answers.map(answer => answer.status).sort()).toEqual([200, 409])
+
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const held = database.query(`SELECT count(*) AS n FROM sumup_attempts WHERE json_extract(basket, '$.settlement.holderId') = ?`).get(member.id) as { n: number }
+      expect(held.n).toBe(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  test('a charge voided while the reader was asked leaves the money to explain, not a settlement', async () => {
+    const { venueId, performanceId } = programme(`settle-late-void-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member, 500)
+    const { charges } = await (await settleCandidates(venueId, member.id)).json() as { charges: OutstandingCharge[] }
+
+    const { id } = await (await startSettling(venueId, member.id, [charges[0]!.entryId], 500)).json() as { id: string }
+    expect((await voidCharge(charges[0]!.entryId, 'Charged in error', barManager.cookie)).status).toBe(200)
+
+    const answered = await answerCharge(app, id, 'succeeded', barStaff.cookie)
+    const outcome = await answered.json() as { status: string, error: string | null }
+    expect(outcome.status).toBe('MISMATCH')
+    expect(outcome.error).toContain('no longer outstanding')
+    expect(attemptStatus(id)).toBe('MISMATCH')
+  })
+
+  test('the picker lists everyone who owes, with what they owe', async () => {
+    const { venueId, performanceId } = programme(`settle-holders-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member, 500)
+
+    const answered = await send('GET', `/api/till/tab-settlements/holders?venueId=${venueId}`, undefined, barStaff.cookie)
+    expect(answered.status).toBe(200)
+    const { holders } = await answered.json() as { holders: { holderId: string, outstandingPence: number }[] }
+    expect(holders.find(holder => holder.holderId === member.id)?.outstandingPence).toBe(500)
+  })
+
+  test('the till settles a tab from the screen: pick the holder, charge the reader, Reader took it', async () => {
+    const { venueId, performanceId } = programme(`settle-screen-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member, 500)
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barStaff.email)
+    await fill(view, 'form input[type="password"]', barStaffPassword)
+    await click(view, 'form button[type="submit"]')
+    await finishSignIn(app, view, barStaff.email)
+
+    await visit(view, `${app.baseURL}/tonight/till?venueId=${venueId}`, '[data-test="till-settle-tab"]')
+    await click(view, '[data-test="till-settle-tab"]')
+    await waitFor(view, `document.querySelector('[data-test="settle-holder"]')`)
+    await pickOption(view, '[data-test="settle-holder"]', member.name)
+    await waitFor(view, `document.querySelector('[data-test="settle-total"]')`)
+    expect(await textOf(view, '[data-test="settle-total"]')).toContain('£5.00')
+
+    await click(view, '[data-test="settle-start"]')
+    await waitFor(view, `document.querySelector('[data-test="reader-charge"]')`)
+    expect(await textOf(view, '[data-test="charge-amount-figure"]')).toContain('£5.00')
+    expect(await owed(member)).toBe(500)
+
+    await click(view, '[data-test="reader-took-it"]')
+    await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
+    expect(await textOf(view, '[data-test="charge-confirmation"]')).toContain('Taken on the reader')
+    expect(await owed(member)).toBe(0)
+    view.close()
+  }, 120_000)
 })
 
 describe.skipIf(skip !== null)('only an unsettled charge may be voided, by the Front of House Manager, with a reason (criterion 4)', () => {

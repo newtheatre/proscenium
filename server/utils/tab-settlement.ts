@@ -7,6 +7,7 @@ import { newId } from '#server/utils/accounts'
 import { auditIfRow } from '#server/utils/audit'
 import { postEntry, runLedgerBatch } from '#server/utils/ledger'
 import { noSuch } from '#server/utils/no-such'
+import { recordPostedSaleStatement } from '#server/utils/sumup-queries'
 import { auditEntry } from '#shared/utils/audit'
 import { saysMoney } from '#shared/utils/bar'
 import { OWN_TAB_VOID } from '#shared/utils/self-dealing'
@@ -166,16 +167,13 @@ export async function unsettledTabsSummary(): Promise<{ holderId: string, holder
 export interface SettlementContext {
   actorId: string
   sessionId: string
+  // The card charge this settlement answers, marked recorded in the same batch (0162).
+  attemptId?: string
 }
 
-// Settles exactly the charges named, bounded at initiation (criterion 3): one line per charge,
-// unique on the charge it settles, so a race for the same charge loses the whole batch (0003).
-export async function settleTab(
-  holderId: string,
-  entryIds: string[],
-  expectedTotalPence: number,
-  context: SettlementContext,
-): Promise<{ entryId: string, settledPence: number }> {
+// The cross-check a settlement runs twice, before the reader is asked and again once it has
+// answered (0096, 0162): exactly the charges named, still outstanding, at the figure shown.
+export async function checkSettlement(holderId: string, entryIds: string[], expectedTotalPence: number): Promise<{ id: string, totalPence: number }[]> {
   if (entryIds.length === 0 || entryIds.length > MAX_SETTLEMENT_CHARGES) {
     throw createError({ statusCode: 400, statusMessage: 'A settlement needs between one and ninety charges' })
   }
@@ -199,6 +197,19 @@ export async function settleTab(
       statusMessage: `The screen said ${saysMoney(expectedTotalPence)}; the charges now read ${saysMoney(owedPence)}. Nothing has been taken: check the tab and try again.`,
     })
   }
+  return rows
+}
+
+// Settles exactly the charges named, bounded at initiation (criterion 3): one line per charge,
+// unique on the charge it settles, so a race for the same charge loses the whole batch (0003).
+export async function settleTab(
+  holderId: string,
+  entryIds: string[],
+  expectedTotalPence: number,
+  context: SettlementContext,
+): Promise<{ entryId: string, settledPence: number }> {
+  const rows = await checkSettlement(holderId, entryIds, expectedTotalPence)
+  const owedPence = expectedTotalPence
 
   const posted = postEntry({
     source: 'TILL',
@@ -212,8 +223,19 @@ export async function settleTab(
     actorId: context.actorId,
     action: 'bar.tab.settled',
     target: `till-session:${context.sessionId}`,
-    detail: { holderId, charges: uniqueIds.length, settledPence: owedPence },
+    detail: { holderId, charges: rows.length, settledPence: owedPence },
   })))
+  if (context.attemptId) {
+    // Ahead of the recording, as the sale's is, so the trail says completed only where this
+    // batch recorded the attempt (0027).
+    statements.push(db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${newId()}, ${context.actorId}, 'bar.sumup.completed', ${`sumup-attempt:${context.attemptId}`},
+             ${JSON.stringify({ claimedFrom: 'COMPLETING', to: 'SUCCEEDED', entryId: posted.id })}
+      WHERE EXISTS (SELECT 1 FROM sumup_attempts WHERE id = ${context.attemptId} AND entry_id IS NULL)
+    `))
+    statements.push(db.run(recordPostedSaleStatement(context.attemptId, posted.id, Math.floor(Date.now() / 1000))))
+  }
 
   try {
     await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
