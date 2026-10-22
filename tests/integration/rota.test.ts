@@ -26,7 +26,7 @@ import { venueInUseQuery } from '#server/utils/venues'
 import { auditEntry } from '#shared/utils/audit'
 import { daysAfter } from '#shared/utils/membership'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOf, showNightOpensAt } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { applyTag } from '#tests/helpers/migrations'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
@@ -375,9 +375,11 @@ describe('the backfill is idempotent (E-102 criterion 2)', () => {
 describe('a rota belongs to a performance', () => {
   test('a matinee and an evening at one venue each get their own rota', async () => {
     await withDatabase(async (database) => {
-      const matinee = tonightsPerformance(database, { suffix: 'a', curtainHoursAfterNightStart: 10.5 })
+      // A week ahead, since a matinee already over tonight is not stamped (0211).
+      const night = showNightOf(new Date(Date.now() + 7 * 86_400_000))
+      const matinee = tonightsPerformance(database, { suffix: 'a', night, curtainHoursAfterNightStart: 10.5 })
       const evening = tonightsPerformance(database, {
-        suffix: 'b', venueId: matinee.venueId, curtainHoursAfterNightStart: 15.5,
+        suffix: 'b', night, venueId: matinee.venueId, curtainHoursAfterNightStart: 15.5,
       })
       template(database, matinee.venueId)
 

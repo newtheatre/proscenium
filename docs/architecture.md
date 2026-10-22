@@ -1282,14 +1282,19 @@ new holder and `CONFIRMED` in the same statement. Replacing a confirmed duty man
 atomic for free: the partial unique index that allows only one `CONFIRMED` `DUTY_MANAGER` row per
 performance never sees a second row appear, because there was never a second row to begin with
 (E-107 criterion 4). The predicate is the same `NOT EXISTS` claiming uses, so a member cannot be
-assigned onto a second shift on a performance they already hold one on; the assignment re-checks
+assigned onto a second shift on a performance they already hold one on, unless the body says
+`move: true`, when `moveOffStatement` reopens their other shift there in the same batch, gated on
+the assignment's audit row (0211); nor onto one overlapping a shift they hold at another venue
+(`clashesWith()`, 0211). The candidate search marks a person locked only by the performance as
+`movable`. The assignment re-checks
 the same live eligibility gate self-claiming does, carries the same `holdsGate` predicate on its
 own UPDATE (issue 1302), and refuses the same way a self-claim would. An ad hoc shift
 (`POST /api/admin/rota/shifts/add`, `addShiftStatement`) takes the role's next slot number inside
 its own `INSERT` when the body names none, and its audit row reads the number back from the row
 (0140). One that names somebody is confirmed at once in the same way, so its `INSERT ... SELECT` carries `holdsGate` whenever a person is named, with the same
 `NOT EXISTS` an assignment carries, so the person holds no other claimed or confirmed shift on the
-performance (0210). An insert that matches nothing answers the same 403 for a training gap, or the
+performance (0210), and `clashesWith()`, so they hold no overlapping shift at another venue
+(0211). An insert that matches nothing answers the same 403 for a training gap, or the
 assignment's 409 "That member already holds a shift on this performance"; a shift naming nobody is
 added open with no gate.
 A disabled account is refused before either check runs: a training gap and a disabled account are
@@ -1324,9 +1329,11 @@ week of the Sunday night it belongs to. Each locked row carries the module id an
 member can act on is named: no module, or one that is a draft, retired or not in the catalogue
 (criterion 2). Where any role is in that state the list also carries `officers`, the names of the
 live Front of House Manager grants (at most three), which the screen names as the person to ask.
+Every list and every claim offers only a shift whose show is published (`showPublished`, 0211).
 `claimable=true` is what Rota asks for (issue 1335): only the roles the caller qualifies for
 (`roles` on `openShiftTerms`, bound once per role) and never a performance or bar opening they
-already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT EXISTS`); it
+already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT EXISTS`), nor one
+overlapping a shift they hold at another venue (0211); it
 holds no locked role, so its `officers` is always empty. The
 roles they do not qualify for come from `GET /api/rota/roles`, one card each with the open count
 (`openShiftCountsByRoleQuery`, plus bar opening slots for the bar), the published module and its

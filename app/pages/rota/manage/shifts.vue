@@ -25,6 +25,7 @@ interface RosterPerformance {
   isExternal: boolean
   hasTemplate: boolean
   isRetired: boolean
+  isPublished: boolean
   shifts: RosterShift[]
 }
 
@@ -41,7 +42,7 @@ interface RosterOpening {
 
 type Board = { items: BoardEntry<RosterPerformance, RosterOpening>[], waiting: number }
 
-interface Candidate { id: string, name: string, email: string, eligible: boolean, reason: string | null }
+interface Candidate { id: string, name: string, email: string, eligible: boolean, reason: string | null, movable?: boolean }
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -162,8 +163,18 @@ const { data: candidateData, status: candidateStatus } = await useAsyncData(
 
 const options = computed(() => candidateData.value.items.map(candidate => ({ ...candidate, value: candidate.id, label: candidate.name })))
 
+// Somebody on another shift of this performance can be moved onto this one, never doubled up (0211).
+const moving = ref(false)
+
+// A role's number is said only where the performance has more than one of it (0211).
+function saysRow(shifts: readonly RosterShift[], shift: RosterShift): string {
+  const role = saysShiftRole(shift.role)
+  return shifts.filter(one => one.role === shift.role).length > 1 ? `${role} ${shift.slot}` : role
+}
+
 function openAssign(shift: RosterShift): void {
   assigning.value = { shiftId: shift.shiftId, role: shift.role }
+  moving.value = false
   chosen.value = null
   candidateSearch.value = ''
   failure.value = null
@@ -178,7 +189,8 @@ async function submitAssign(): Promise<void> {
   if (!row || !chosen.value) return
   submitting.value = true
   try {
-    await $fetch(`/api/admin/rota/shifts/${row.shiftId}/assign`, { method: 'POST', body: { userId: chosen.value.id } })
+    const move = chosen.value.movable === true && moving.value
+    await $fetch(`/api/admin/rota/shifts/${row.shiftId}/assign`, { method: 'POST', body: { userId: chosen.value.id, move } })
     toast.add({ title: 'Assigned', icon: 'i-lucide-check', color: 'success' })
     assigning.value = null
     await refresh()
@@ -454,6 +466,16 @@ watch(modalOpen, (nowOpen) => {
               <p class="text-sm text-muted">
                 {{ entry.showTitle }}
               </p>
+              <UBadge
+                v-if="!entry.isPublished"
+                class="mt-1"
+                color="warning"
+                variant="subtle"
+                size="sm"
+                :data-test="`draft-${entry.performanceId}`"
+              >
+                Draft show: not offered to members yet
+              </UBadge>
             </div>
           </template>
 
@@ -467,7 +489,7 @@ watch(modalOpen, (nowOpen) => {
             >
               <div class="min-w-0">
                 <p class="text-xs text-muted">
-                  {{ saysShiftRole(shift.role) }}
+                  {{ saysRow(entry.shifts, shift) }}
                 </p>
                 <p class="font-medium">
                   {{ shift.holderName ?? 'Unfilled' }}
@@ -648,8 +670,16 @@ watch(modalOpen, (nowOpen) => {
             </template>
           </UInputMenu>
 
+          <UCheckbox
+            v-if="chosen?.movable"
+            v-model="moving"
+            label="Move them off their other shift on this performance"
+            description="That shift goes back to open."
+            data-test="assign-move"
+          />
+
           <UButton
-            :disabled="!chosen || !chosen.eligible"
+            :disabled="!chosen || !(chosen.eligible || (chosen.movable && moving))"
             :loading="submitting"
             data-test="assign-submit"
             @click="submitAssign"

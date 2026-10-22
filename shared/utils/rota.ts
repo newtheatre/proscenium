@@ -155,6 +155,15 @@ export function reassignRefusal(status: ShiftStatus): string {
   return 'That member already holds a shift on this performance'
 }
 
+// A person cannot be in two buildings at once, so an overlapping shift elsewhere refuses (0211).
+export function clashRefusal(member: string | null, clash: { showTitle: string, venueName: string } | null): string {
+  const holds = member === null ? 'You already hold' : `${member} already holds`
+  if (clash === null) return `${holds} a shift at another venue at the same time`
+  return `${holds} a shift on ${clash.showTitle} at ${clash.venueName} at the same time`
+}
+
+export const UNPUBLISHED_REFUSAL = 'That show is not published yet, so its shifts are not open for claiming'
+
 // Why standing a confirmed shift down did not apply: the only state the write accepts is
 // CONFIRMED, so anything else names what it actually is (issue 933).
 export function unconfirmRefusal(status: ShiftStatus): string {
@@ -167,6 +176,8 @@ export function unconfirmRefusal(status: ShiftStatus): string {
 // (E-107 criterion 3).
 export const shiftAssignForm = z.object({
   userId: z.string().min(1, 'Say which person you mean').max(64),
+  // Takes them off their other shift on the same performance in the same write (0211).
+  move: z.boolean().optional(),
 })
 
 // An ad hoc shift, outside the template, with an optional person that confirms it at once

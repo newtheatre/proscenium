@@ -344,6 +344,7 @@ watch(modalOpen, (nowOpen) => {
             >
               <UFormField
                 label="Starts before doors"
+                :hint="`Up to ${MAX_SHIFT_OFFSET_MINUTES} minutes`"
                 :description="saysHouseDefault(data.houseDefaults?.startBeforeDoorsMinutes)"
               >
                 <UInputNumber
@@ -357,6 +358,7 @@ watch(modalOpen, (nowOpen) => {
               </UFormField>
               <UFormField
                 label="Ends after the show"
+                :hint="`Up to ${MAX_SHIFT_OFFSET_MINUTES} minutes`"
                 :description="saysHouseDefault(data.houseDefaults?.endAfterEndMinutes)"
               >
                 <UInputNumber
