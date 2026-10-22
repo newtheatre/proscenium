@@ -1,10 +1,16 @@
 import { sql } from 'drizzle-orm'
-import { tillScopeForm } from '#shared/utils/till'
+import { openTillForm, saysReopenNeedsAsking } from '#shared/utils/till'
 
 // Open tonight's till session for a venue, or join the one already open (F-102 criteria 1, 2).
 export default defineEventHandler(async (event) => {
-  const scope = await readValidatedBodyOrThrow(event, tillScopeForm)
+  const { reopen, ...scope } = await readValidatedBodyOrThrow(event, openTillForm)
   const resolved = await requireNightAuthority(event, 'BAR', scope)
+
+  // Joining an open session asks nothing; a second one after tonight's close is asked for (0160).
+  if (!reopen && !(await openSessionFor(resolved.venueId, resolved.night))) {
+    const closed = await lastClosedTonight(resolved.venueId, resolved.night)
+    if (closed) throw createError({ statusCode: 409, statusMessage: saysReopenNeedsAsking(await venueNameOf(resolved.venueId), closed), data: { reopen: true } })
+  }
 
   const id = newId()
   const entry = auditEntry({

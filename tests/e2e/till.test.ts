@@ -288,13 +288,22 @@ describe.skipIf(skip !== null)('closing a session (F-102 criterion 4)', () => {
   })
 
   // The unique index covers open rows only (data-model.md, till sessions): a closed session is
-  // history, not a slot waiting to be reused.
-  test('a fresh session can open again after the last one closed', async () => {
+  // history, not a slot waiting to be reused. A second one tonight is asked for by name (0160).
+  test('a fresh session opens again after the last one closed, only when asked for', async () => {
     const reopened = programme('till-reopen')
     const first = await (await openTill(reopened.venueId, bar.cookie)).json() as { session: TillSessionBody }
     await closeTill(first.session.id, bar.cookie)
 
-    const second = await openTill(reopened.venueId, bar.cookie)
+    const status = await (await tillStatus(reopened.venueId, bar.cookie)).json() as { session: TillSessionBody | null, venueName: string, lastClosed: { closedAt: number, closedByName: string | null, actualZPence: number | null } | null }
+    expect(status.session).toBeNull()
+    expect(status.lastClosed?.actualZPence).toBe(0)
+    expect(status.lastClosed?.closedByName).toBeTruthy()
+
+    const unasked = await openTill(reopened.venueId, bar.cookie)
+    expect(unasked.status).toBe(409)
+    expect(await message(unasked)).toContain(`The till at ${status.venueName} closed at`)
+
+    const second = await request(app, 'POST', '/api/till', { venueId: reopened.venueId, reopen: true }, bar.cookie)
     expect(second.status).toBe(200)
     const body = await second.json() as { opened: boolean, session: TillSessionBody }
     expect(body.opened).toBe(true)
@@ -314,8 +323,7 @@ describe.skipIf(skip !== null)('closing a session (F-102 criterion 4)', () => {
   // The loser's Z reading and note are thrown away, so the loser has to be told plainly: a close
   // that answers "done" over somebody else's figure is the one lie this write must not tell.
 
-  // Skipped until #1581: a loser caught by the first read is told only that the session is closed.
-  test.skip('two closes at once leave one winner, and the loser is told whose reading stands', async () => {
+  test('two closes at once leave one winner, and the loser is told whose reading stands', async () => {
     const closing = programme('till-race-close')
     const opened = await (await openTill(closing.venueId, bar.cookie)).json() as { session: TillSessionBody }
 
@@ -346,8 +354,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // Close till is not a per-sale action, so the thumb zone is Charge and the SumUp hand-off
   // only (K-102 criterion 2).
 
-  // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
-  test.skip('Close till is a labelled button at the top, not one of the pinned actions, and still closes the session', async () => {
+  test('Close till is a labelled button at the top, not one of the pinned actions, and still closes the session', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-close', screenPassword)
     await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
@@ -364,21 +371,34 @@ describe.skipIf(skip !== null)('the screen', () => {
     await visit(view, `${app.baseURL}/tonight/till?venueId=${closing.venueId}`, `[data-test="till-open"]`)
     expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="open-close-till"]')`)).toBe(false)
 
+    const venueName = await textOf(view, '[data-test="till-venue-name"]')
+    expect(venueName).toBeTruthy()
+
     await click(view, '[data-test="till-close"]')
     await waitFor(view, `document.querySelector('[data-test="actual-z-input"]')`)
+    // The close names the bar it closes, so a phone that remembered another one is caught (0160).
+    expect(await view.evaluate<string>(`document.querySelector('[role="dialog"] h2')?.textContent ?? ''`)).toContain(`Close the till at ${venueName}`)
     // A blank field is not a reading, so the nought the reader shows is keyed in.
     await fillNumber(view, '[data-test="actual-z-input"]', '0')
     await waitFor(view, `!document.querySelector('[data-test="confirm-close-till"]').disabled`)
     await click(view, '[data-test="confirm-close-till"]')
     await waitFor(view, `document.querySelector('[data-test="till-closed"]')`)
+    // Shut, not still selling: the grid has gone, and the screen says when and by whom (issue 1580).
+    expect(await textOf(view, '[data-test="till-closed"]')).toContain(`The till at ${venueName} closed at`)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="till-open"]')`)).toBe(false)
+
+    // Opening again tonight is a second session, so it is asked for before it starts (0160).
+    await click(view, '[data-test="till-open-press"]')
+    await waitFor(view, `document.querySelector('[data-test="confirm-till-reopen-verb"]')`)
+    await click(view, '[data-test="confirm-till-reopen-verb"]')
+    await waitFor(view, `document.querySelector('[data-test="till-open"]')`)
     view.close()
   }, 120_000)
 
   // F-118 criterion 3: a disagreeing reading needs a note before it can be recorded, so the
   // control that records it waits for one.
 
-  // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
-  test.skip('Confirm close is disabled while a variance has no note, and enables once one is typed', async () => {
+  test('Confirm close is disabled while a variance has no note, and enables once one is typed', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-variance', screenPassword)
     await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)
@@ -445,8 +465,7 @@ describe.skipIf(skip !== null)('the screen', () => {
   // F-118 criterion 3: the server's own recomputed figure is the one that governs, so a sale
   // landing elsewhere while the modal sat open must not leave the note unreachable.
 
-  // Skipped until #1580: a closed session still reads as open on the screen until it reloads.
-  test.skip('a sale landing after the modal opens is caught by the refusal, and the note field catches up', async () => {
+  test('a sale landing after the modal opens is caught by the refusal, and the note field catches up', async () => {
     const screenPassword = generatePassword()
     const screenBar = await registerMember(app, 'till-screen-refresh', screenPassword)
     await grantRole(app, screenBar, 'FOH_MANAGER', admin.cookie)

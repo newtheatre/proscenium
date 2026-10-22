@@ -3,7 +3,7 @@ import { can, takeStocktakes } from '#shared/utils/abilities'
 import { saysMoney } from '#shared/utils/bar'
 import { passPromptFor } from '#shared/utils/passes'
 import { EXISTING_ACCOUNT_SAYS, needsTheReader, saleJustCompleted, uncountedProducts } from '#shared/utils/sale'
-import { chargePaths, saysChargeOnReader, saysChargeOnSumUp } from '#shared/utils/till'
+import { chargePaths, saysChargeOnReader, saysChargeOnSumUp, saysTillClosed } from '#shared/utils/till'
 import { saysClock } from '#shared/utils/when'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
 import type { CompRequest } from '#shared/utils/comps'
@@ -26,6 +26,8 @@ const {
   settled,
   session,
   venueId,
+  venueName,
+  lastClosed,
   sumupEnabled,
   venues,
   venuesFailure,
@@ -211,6 +213,20 @@ const {
 
 // Nothing about the session is drawn until the screen has its answer, so no Open till comes and goes.
 const tillClosed = computed(() => settled.value && !session.value)
+// Open till waits for a bar to be chosen, rather than sitting under the picker doing nothing.
+const openOffered = computed(() => tillClosed.value && !needsVenue.value)
+const closedSays = computed(() => (lastClosed.value ? saysTillClosed(venueName.value ?? 'this bar', lastClosed.value) : null))
+
+// A second session tonight is its own close and its own Z, so it is asked for, not pressed into (0160).
+const reopenOpen = ref(false)
+function pressOpen(): void {
+  if (lastClosed.value) reopenOpen.value = true
+  else void open()
+}
+async function confirmReopen(): Promise<void> {
+  await open()
+  if (session.value) reopenOpen.value = false
+}
 const hint = computed(() => {
   if (tillClosed.value) return 'One till for the whole night. Everyone at this bar sells against it.'
   return session.value && basketEmpty.value ? 'Tap an item to add it; one with several sizes asks which. Quantities and lines are editable before payment.' : undefined
@@ -690,7 +706,10 @@ const basketBindings = computed(() => ({
             data-test="till-open"
             class="text-xs text-muted"
           >
-            Open since {{ saysClock(session.openedAt) }}.
+            Open at <span
+              class="font-medium text-highlighted"
+              data-test="till-venue-name"
+            >{{ venueName }}</span> since {{ saysClock(session.openedAt) }}.
           </p>
           <!-- Not a per-sale action, so it sits up here rather than under the thumb (K-102
                criterion 2), labelled rather than in a menu of one (0141). -->
@@ -1045,7 +1064,7 @@ const basketBindings = computed(() => ({
         class="space-y-3"
       >
         <p data-test="till-closed">
-          The till is not open yet.
+          {{ closedSays ?? 'The till is not open yet.' }}
         </p>
         <!-- The bar came from this phone's memory of tonight, so the way to another one is here. -->
         <UButton
@@ -1186,11 +1205,12 @@ const basketBindings = computed(() => ({
           />
         </template>
         <NightAction
-          v-if="tillClosed"
-          label="Open till"
+          v-if="openOffered"
+          :label="lastClosed ? 'Open the till again' : 'Open till'"
           icon="i-lucide-lock-open"
           :loading="busy"
-          @press="open"
+          data-test="till-open-press"
+          @press="pressOpen"
         />
       </template>
     </NightScreen>
@@ -1274,7 +1294,20 @@ const basketBindings = computed(() => ({
       :close-failure="closeFailure"
       :closing-busy="closingBusy"
       :earlier="closing"
+      :venue-name="venueName"
       @confirm="confirmAnyClose"
+    />
+
+    <ConfirmModal
+      v-model:open="reopenOpen"
+      name="till-reopen"
+      :title="`Open the till at ${venueName ?? 'this bar'} again?`"
+      consequence="It closed earlier tonight. Opening it again starts a second session, which needs its own close and its own Z reading."
+      verb="Open it again"
+      color="primary"
+      :loading="busy"
+      :failure="reopenOpen ? failure?.message ?? null : null"
+      @confirm="confirmReopen"
     />
   </div>
 </template>

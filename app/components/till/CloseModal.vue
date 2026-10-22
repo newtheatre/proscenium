@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
 import { closeBreakdown, readerExpectation, saysWhereItWasTaken } from '#shared/utils/reconciliation'
+import { saysCloseTill } from '#shared/utils/till'
 import { saysDay } from '#shared/utils/when'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
 
@@ -17,6 +18,8 @@ const props = defineProps<{
   closingBusy: boolean
   // Named for a session an ended night left open, so nobody closes it thinking it is tonight's.
   earlier?: { venueName: string, night: string } | null
+  // Tonight's bar, named in the title so a phone that remembered another bar is caught (0160).
+  venueName: string | null
 }>()
 const emit = defineEmits<{ confirm: [] }>()
 
@@ -33,6 +36,7 @@ const needsVarianceNote = computed(() => hasReading.value && props.variancePrevi
 const expected = computed(() => (props.reconciliation ? readerExpectation(props.reconciliation) : null))
 const where = computed(() => (expected.value ? saysWhereItWasTaken(expected.value) : ''))
 const lines = computed(() => (props.reconciliation ? closeBreakdown(props.reconciliation.bar) : []))
+const title = computed(() => saysCloseTill(props.earlier?.venueName ?? props.venueName ?? 'this bar'))
 const description = computed(() => (props.earlier
   ? `${props.earlier.venueName}, ${saysDay(props.earlier.night)}: what the till took that night, and what the reader shows.`
   : 'What the till took, and what the reader shows.'))
@@ -41,7 +45,7 @@ const description = computed(() => (props.earlier
 <template>
   <UModal
     v-model:open="open"
-    title="Close till"
+    :title="title"
     :description="description"
   >
     <template #body>
@@ -80,6 +84,12 @@ const description = computed(() => (props.earlier
             data-test="expected-split"
           >
             {{ where }}
+          </p>
+          <p
+            class="mt-1 text-sm text-muted"
+            data-test="expected-whole-night"
+          >
+            One reader serves every bar and the desk, so this is the whole night's figure. If another bar is still open, say so in the note.
           </p>
         </div>
 
