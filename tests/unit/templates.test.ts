@@ -456,9 +456,18 @@ describe('the rewritten bodies and subjects (item 7)', () => {
 
   test('the safety notice says where and when in words, never the database\'s values (0235)', () => {
     const { subject, text } = render('incident-follow-up-required', { ...EVERYTHING, venue: 'New Theatre', when: 'Wednesday 21 October at 21:09' })
-    expect(subject).toBe('Follow-up required: a serious incident at New Theatre')
-    expect(text).toContain('A serious near miss incident was logged at New Theatre on Wednesday 21 October at 21:09')
+    expect(subject).toBe('Follow-up required: an incident logged as serious at New Theatre')
+    expect(text).toContain('An incident logged as serious (near miss) at New Theatre on Wednesday 21 October at 21:09 needs your follow-up.')
     expect(`${subject} ${text}`).not.toMatch(/SERIOUS|SECURITY/)
+  })
+
+  // Every severity reads as English: "incident" and "note" once read "A incident other incident".
+  test('the safety notice reads the same way at any severity', () => {
+    for (const severity of ['note', 'near miss', 'incident', 'serious']) {
+      const { subject, text } = render('incident-follow-up-required', { ...EVERYTHING, severity, category: 'other' })
+      expect(subject).toBe(`Follow-up required: an incident logged as ${severity}`)
+      expect(text).toContain(`An incident logged as ${severity} (other) needs your follow-up.`)
+    }
   })
 
   test('the safety notice links the list rather than describing it', () => {

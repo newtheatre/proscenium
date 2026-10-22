@@ -829,9 +829,9 @@ The Nottingham New Theatre`,
   'incident-follow-up-required': (context: TemplateContext): Rendered => {
     const where = context.venue ? ` at ${String(context.venue)}` : ''
     const when = context.when ? ` on ${String(context.when)}` : ''
-    const said = `A ${context.severity} ${context.category} incident was logged${where}${when}, and it needs your follow-up.`
+    const said = `An incident logged as ${context.severity} (${context.category})${where}${when} needs your follow-up.`
     return {
-      subject: `Follow-up required: a ${context.severity} incident${where}`,
+      subject: `Follow-up required: an incident logged as ${context.severity}${where}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${said}</p>
 <p>Read it and close it on the safety list.</p>
