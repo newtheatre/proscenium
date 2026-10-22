@@ -2472,6 +2472,11 @@ K-129): `past`, with `search` over the room and the reason and `sort` by when th
 A past closure is hidden unless `past` asks for one, the same default `rooms-list.ts` uses for a
 retired room; it too returns its whole filtered set rather than a windowed page.
 
+`GET /api/admin/rooms/blackouts/stranded` answers the close form before anything is closed:
+`count` is what the close would cancel, by the read the close itself makes, and `overlapping` lists
+the closures already set over the span for the same room or every room (any room, when closing
+every room), each with its room, reason and span. Overlap is a warning on the form, never a refusal.
+
 Erasure scrubs `created_by` to null and keeps the closure: the room was shut, which is a fact
 about the room; who typed it in lives in the audit trail (0010, 0011).
 
