@@ -61,10 +61,7 @@ export default defineEventHandler(async (event) => {
     ? await writeRecordByAddress(newcomer, actorId, record, target => entries(target, true))
     : input.userId!
   if (!newcomer) {
-    await db.batch([
-      db.insert(schema.trainingRecords).values({ ...record, userId, grantedBy: actorId }),
-      ...entries(`user:${userId}`, false).map(row => db.insert(schema.auditLog).values(row)),
-    ])
+    await awardOnce({ ...record, userId, grantedBy: actorId, evidenceRef: record.evidenceRef ?? null }, entries(`user:${userId}`, false))
   }
 
   return { ok: true, id: record.id, expiresOn, userId }

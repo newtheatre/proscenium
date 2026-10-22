@@ -1,5 +1,6 @@
 import { and, asc, eq, ne, sql } from 'drizzle-orm'
 import { expiryFor } from '#shared/utils/training'
+import { registerAsRead } from '#shared/utils/training-award'
 import { saysDayLong } from '#shared/utils/when'
 import type { AttendanceMark } from '#shared/utils/training'
 import type { H3Event } from 'h3'
@@ -183,39 +184,52 @@ export async function correctRegister(run: CorrectionRun): Promise<Correction> {
       inJsonSet(schema.trainingRecords.userId, dropped),
     ))
 
-  await db.batch([
+  // Criterion 6, written first and only while the register still reads as `before`: every write
+  // rides on it, so a correction computed from an older read applies nothing (0241).
+  const entry = auditEntry({
+    actorId: run.markedBy,
+    action: 'register.corrected',
+    target: `session:${run.sessionId}`,
+    detail: {
+      heldOn: run.heldOn,
+      present: present.length,
+      absent: run.marks.length - present.length,
+      revoked: living.length,
+      issued: rows.length,
+    },
+  })
+  const landed = entryLanded(entry)
+
+  const [applied] = await db.batch([
+    db.all<{ id: string }>(auditWhere(entry, registerAsRead(run.sessionId, [...before]))),
     // Revoked first: the partial unique index counts only live rows, so somebody dropped and the
     // set issued can never collide. One parameter for the people, however many (0003).
     db.run(sql`
       update training_records
       set revoked_at = ${now}, revoked_by = ${run.markedBy}, revoke_reason = ${run.reason}
-      where session_id = ${run.sessionId} and revoked_at is null
+      where session_id = ${run.sessionId} and revoked_at is null and ${landed}
         and user_id in (select value from json_each(${JSON.stringify(dropped)}))
     `),
     ...run.marks.map(mark => db.run(sql`
       update session_attendees
       set status = ${mark.mark}, marked_at = ${now}, marked_by = ${run.markedBy}
-      where session_id = ${run.sessionId} and user_id = ${mark.userId}
+      where session_id = ${run.sessionId} and user_id = ${mark.userId} and ${landed}
     `)),
     ...chunk(rows, RECORDS_PER_STATEMENT).map(part => db.run(sql`
       insert into training_records (id, user_id, module_id, awarded_on, expires_on, source, session_id, granted_by)
       select value ->> 'id', value ->> 'userId', value ->> 'moduleId', value ->> 'awardedOn',
         value ->> 'expiresOn', 'SESSION', value ->> 'sessionId', value ->> 'grantedBy'
       from json_each(${JSON.stringify(part)})
+      where ${landed}
     `)),
-    // Criterion 6. The diff, and the actor, in the same batch as the writes it describes.
-    db.run(sql`
-      insert into audit_log (id, actor_id, action, target, detail)
-      values (${newId()}, ${run.markedBy}, 'register.corrected', ${`session:${run.sessionId}`},
-        ${JSON.stringify({
-          heldOn: run.heldOn,
-          present: present.length,
-          absent: run.marks.length - present.length,
-          revoked: living.length,
-          issued: rows.length,
-        })})
-    `),
-  ] as never)
+  ] as never) as [{ id: string }[]]
+
+  if (applied.length === 0) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: 'The register changed while you were correcting it. Open it again and make your correction there',
+    })
+  }
 
   return { awarded: rows.length, revoked: living.length, added, dropped, at: now }
 }
