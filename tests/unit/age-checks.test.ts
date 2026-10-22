@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  saysAgeCheckCounts,
   AGE_CHECK_CONSTRAINT_REFUSALS,
   ageCheckConstraintRefusal,
   ageCheckForm,
@@ -196,5 +197,23 @@ describe('a description that reads like a name is flagged, never refused (0218)'
 
   test('the warning says why a name does not belong', () => {
     expect(NAME_WARNING).toContain('inspectors')
+  })
+})
+
+// The 21 October process map: the report left the visibly over 25 entries and a till refusal
+// with no performance out (0234).
+describe('the night report counts every outcome, and says what no house claims (0234)', () => {
+  test('the three outcomes are each named', () => {
+    expect(saysAgeCheckCounts({ accepted: 5, refused: 0, notRequired: 4, unassigned: 0 }))
+      .toBe('5 checks accepted, 0 checks refused and 4 visibly over 25.')
+  })
+
+  test('an entry with no performance is named beside them, not counted in them', () => {
+    expect(saysAgeCheckCounts({ accepted: 1, refused: 1, notRequired: 0, unassigned: 1 }))
+      .toBe('1 check accepted, 1 check refused and 0 visibly over 25. Logged tonight with no performance, such as at the bar, and not counted here: 1 check.')
+  })
+
+  test('a report frozen before the extra counts existed still reads', () => {
+    expect(saysAgeCheckCounts({ accepted: 2, refused: 1 })).toBe('2 checks accepted, 1 check refused and 0 visibly over 25.')
   })
 })

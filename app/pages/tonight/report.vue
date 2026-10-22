@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { saysAgeCheckCounts } from '#shared/utils/age-checks'
 import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
@@ -23,7 +24,8 @@ interface Report {
   attendance: { sold: number, admitted: number, noShows: number, walkUps: number, passAdmissions: number }
   takings: { desk: Takings, bar: Takings }
   incidents: { id: string, category: Category, severity: Severity, body: string, happenedAt: number, supersededBy: string | null, followUpRequired: boolean }[]
-  ageChecks: { accepted: number, refused: number }
+  // Visibly over 25 and the unassigned count are absent from a report frozen before 0234.
+  ageChecks: { accepted: number, refused: number, notRequired?: number, unassigned?: number }
   milestones: { id: string, label: string, composedAt: number, supersededBy: string | null }[]
   staffing: { shiftId: string, role: ShiftRole, slot: number, status: ShiftStatus, name: string | null, officerBypass?: boolean }[]
   bypasses?: OfficerBypassLine[]
@@ -344,7 +346,7 @@ async function signOff(): Promise<void> {
 
       <NightBlock title="Challenge 25">
         <p class="text-sm">
-          {{ plural(report.ageChecks.accepted, 'check') }} accepted, {{ plural(report.ageChecks.refused, 'check') }} refused.
+          {{ saysAgeCheckCounts(report.ageChecks) }}
         </p>
       </NightBlock>
 

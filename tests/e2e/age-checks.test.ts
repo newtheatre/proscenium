@@ -164,6 +164,21 @@ describe.skipIf(skip !== null)('correcting an entry (E-118 criterion 3, 0049)', 
     expect(second.status).toBe(409)
   })
 
+  // The 21 October process map: the route checked only that the caller held a shift tonight (0234).
+  test('an entry from another night is not tonight\'s to correct', async () => {
+    const database = new Database(app.databaseFile)
+    try {
+      database.query(`INSERT INTO age_checks (id, performance_id, checked_by, outcome, reason, description, created_at)
+        VALUES ('age-old-night', NULL, ?, 'REFUSED', 'NO_ID_SHOWN', 'Red hat', 1000)`).run(bar.id)
+    }
+    finally {
+      database.close()
+    }
+    const answered = await send('POST', '/api/tonight/age-checks/age-old-night/supersede', accepted, bar.cookie)
+    expect(answered.status).toBe(403)
+    expect(read<{ n: number }>('SELECT count(*) AS n FROM age_checks WHERE supersedes_id = ?', 'age-old-night')?.n).toBe(0)
+  })
+
   test('correcting a missing entry 404s', async () => {
     expect((await send('POST', '/api/tonight/age-checks/no-such-entry/supersede', refused, bar.cookie)).status).toBe(404)
   })

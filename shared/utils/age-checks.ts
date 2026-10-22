@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { constraintRefusal } from './constraint-refusal'
+import { plural } from './text'
 
 // The Challenge 25 register's vocabulary (E-118). Nothing here reads a request or the database;
 // `server/utils/age-checks.ts` is where an entry is actually written and read.
@@ -90,6 +91,17 @@ function shaped<T extends z.ZodType<OutcomeShape>>(schema: T): T {
 // rules the schema refines, so the screen never offers a write it would refuse.
 export function ageCheckReady(form: OutcomeShape): boolean {
   return SHAPE_RULES.every(([rule]) => rule({ ...form, description: form.description.trim() }))
+}
+
+// The night report's Challenge 25 line: the three outcomes apart (E-118), and any entry the night
+// logged with no performance, which no house can claim but the register still holds (0234).
+export function saysAgeCheckCounts(counts: { accepted: number, refused: number, notRequired?: number, unassigned?: number }): string {
+  const parts = [`${plural(counts.accepted, 'check')} accepted`, `${plural(counts.refused, 'check')} refused`]
+  parts.push(`${counts.notRequired ?? 0} visibly over 25`)
+  const said = `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}.`
+  const unassigned = counts.unassigned ?? 0
+  if (unassigned === 0) return said
+  return `${said} Logged tonight with no performance, such as at the bar, and not counted here: ${plural(unassigned, 'check')}.`
 }
 
 // What a register entry's product may hold; the till's refusal names its lines within it.

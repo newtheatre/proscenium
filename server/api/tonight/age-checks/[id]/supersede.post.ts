@@ -4,11 +4,20 @@ import { supersedeForm } from '#shared/utils/age-checks'
 // chain (E-118 criterion 3). Predicated on the write, decided from its own RETURNING (0049).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
-  const resolved = await requireAnyNightAuthority(event, ['BAR', 'DOOR', 'DUTY_MANAGER'])
+  await requireAnyNightAuthority(event, ['BAR', 'DOOR', 'DUTY_MANAGER'])
   const input = await readValidatedBodyOrThrow(event, supersedeForm)
 
   const original = await ageCheckById(id)
   if (!original) throw noSuch('entry')
+  // Corrected only by whoever has authority over the entry's own house tonight, and only tonight:
+  // another venue's or another night's register is not this shift's to rewrite (0234).
+  const { from, to } = showNightBounds(currentShowNight())
+  if (original.createdAt < Math.floor(from.getTime() / 1000) || original.createdAt >= Math.floor(to.getTime() / 1000)) {
+    throw createError({ statusCode: 403, statusMessage: 'That entry is from another night, and only tonight\'s register is corrected here' })
+  }
+  const resolved = original.performanceId
+    ? await requireAnyNightAuthority(event, ['BAR', 'DOOR', 'DUTY_MANAGER'], { performanceId: original.performanceId })
+    : await requireAnyNightAuthority(event, ['BAR', 'DOOR', 'DUTY_MANAGER'])
 
   const correctionId = newId()
   const write = supersedeAgeCheck(resolved.account.id, id, { ...input, performanceId: original.performanceId }, correctionId)
