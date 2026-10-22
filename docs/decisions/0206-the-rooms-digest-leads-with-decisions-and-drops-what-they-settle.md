@@ -28,8 +28,10 @@ as plain text whose line is its subject, so nothing already held is lost.
 or a series), closed, bumped, moved to or from the Students' Union, assigned, not being requested
 and withdrawn all decide. When `notify()` is given such a message with `about` ids, before
 anything else it deletes every unclaimed entry in that topic, for anybody, whose `about` shares an
-id, except entries of the same type: a decision told to five approvers is one decision, and the
-second must not delete the first one's entry. Already claimed entries are left alone. The ids
+id and which is not itself a decision. A decision is never dropped: the weeks of one series share
+the series' id, so approving the rest of a term would otherwise delete the held refusal of one
+week, and a decision told to five approvers must not delete the first one's entry either. Already
+claimed entries are left alone. The ids
 travel as one JSON parameter through `json_each`, so the statement's bound-parameter count never
 depends on how many there are (0006).
 
@@ -54,9 +56,9 @@ line is the subject.
 
 - Nothing stale reaches a member about a request once it is decided, and the subject names the
   change that matters most.
-- A decision held for a digest is never dropped by another decision of the same type, and a
-  decision of a different type about the same record does drop it: a request moved to the
-  Students' Union and then back is told once, as where it ended up.
+- A decision held for a digest is never dropped by another decision, so a request moved to the
+  Students' Union and then back within the hour is told twice, in order. Telling both is the price
+  of never losing the refusal of one week of a series to the approval of the rest.
 - Entries carry their `about` ids for as long as they live; erasure still scrubs the body to an
   empty string (`shared/utils/personal-data.ts`), which reads back as plain text.
 - The test that a digest coalesces (`tests/e2e/notification-digests.test.ts`) still holds plain

@@ -238,8 +238,8 @@ describe('a later decision drops the stale entries it settles (0206)', () => {
     ).run(id, userId, type, id, body, NOW - 600)
   }
 
-  function supersede(database: TestDatabase, type: string, about: string[]): void {
-    const [query, ...parameters] = boundStatement(database, supersedeStatement('ROOMS', type, about))
+  function supersede(database: TestDatabase, about: string[]): void {
+    const [query, ...parameters] = boundStatement(database, supersedeStatement('ROOMS', about))
     database.raw.prepare(query).run(...parameters as never[])
   }
 
@@ -253,7 +253,7 @@ describe('a later decision drops the stale entries it settles (0206)', () => {
       holdAbout(database, 'asked', 'room.request.received', ['b-1'])
       holdAbout(database, 'chased', 'room.request.waiting', ['b-1'], 'u2')
       holdAbout(database, 'other', 'room.request.received', ['b-2'])
-      supersede(database, 'room.request.approved', ['b-1'])
+      supersede(database, ['b-1'])
       expect(held(database)).toEqual(['other'])
     })
   })
@@ -262,7 +262,7 @@ describe('a later decision drops the stale entries it settles (0206)', () => {
     await withDatabase((database) => {
       seedUser(database)
       holdAbout(database, 'term', 'room.series.requested', ['s-1'])
-      supersede(database, 'room.request.rejected', ['b-7', 's-1'])
+      supersede(database, ['b-7', 's-1'])
       expect(held(database)).toEqual([])
     })
   })
@@ -272,8 +272,21 @@ describe('a later decision drops the stale entries it settles (0206)', () => {
       seedUser(database, 'u1')
       seedUser(database, 'u2')
       holdAbout(database, 'first', 'external.request.withdrawn', ['x-1'], 'u1')
-      supersede(database, 'external.request.withdrawn', ['x-1'])
+      supersede(database, ['x-1'])
       expect(held(database)).toEqual(['first'])
+    })
+  })
+
+  // Review of 22 October: the weeks of one series share its id, so approving the rest of a term
+  // once dropped the held refusal of week 2 and the member never heard it.
+  test('a decision on one week of a series keeps a decision held about another week', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      holdAbout(database, 'refused', 'room.request.rejected', ['b-2', 's-1'])
+      holdAbout(database, 'lapsed', 'room.request.expired', ['b-3', 's-1'])
+      holdAbout(database, 'term', 'room.series.requested', ['s-1'])
+      supersede(database, ['b-1', 's-1'])
+      expect(held(database)).toEqual(['lapsed', 'refused'])
     })
   })
 
@@ -283,7 +296,7 @@ describe('a later decision drops the stale entries it settles (0206)', () => {
       holdAbout(database, 'sent', 'room.request.received', ['b-1'])
       database.raw.prepare(`UPDATE notification_digest_entries SET digest_log_id = 'digest-1' WHERE id = 'sent'`).run()
       hold(database, { id: 'plain', type: 'room.request.received' })
-      supersede(database, 'room.request.approved', ['b-1'])
+      supersede(database, ['b-1'])
       expect(held(database)).toEqual(['plain', 'sent'])
     })
   })
@@ -291,7 +304,7 @@ describe('a later decision drops the stale entries it settles (0206)', () => {
   test('a hundred and fifty records are still one statement with the same parameters (0006)', async () => {
     await withDatabase((database) => {
       const many = Array.from({ length: 150 }, (_, index) => `b-${index}`)
-      expect(boundStatement(database, supersedeStatement('ROOMS', 'room.request.approved', many))).toHaveLength(4)
+      expect(boundStatement(database, supersedeStatement('ROOMS', many))).toHaveLength(4)
     })
   })
 })

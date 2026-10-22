@@ -174,8 +174,8 @@ async function holdForDigest(entry: { userId: string, topic: NotificationTopic, 
   })
 }
 
-async function supersede(topic: NotificationTopic, type: string, about: string[]): Promise<void> {
-  await db.run(supersedeStatement(topic, type, about))
+async function supersede(topic: NotificationTopic, about: string[]): Promise<void> {
+  await db.run(supersedeStatement(topic, about))
 }
 
 // The in-app channel. Never coalesced and never suppressed, so the individual entries stay
@@ -412,7 +412,7 @@ export async function notify(event: H3Event | undefined, notification: Notificat
 
   // Before anything can refuse this send: the record is settled whether or not this reaches
   // anybody, so what is still held about it is stale for everybody (0206).
-  if (type.decides && type.topic && notification.about?.length) await supersede(type.topic, notification.type, notification.about)
+  if (type.decides && type.topic && notification.about?.length) await supersede(type.topic, notification.about)
 
   // Read at send time, not at enqueue: an address changed in between reaches the new one
   // (H-101 criterion 5).

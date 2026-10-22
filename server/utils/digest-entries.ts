@@ -48,12 +48,13 @@ export function readHeld(subject: string, body: string): Held {
 
 const DECIDING = Object.entries(MESSAGE_TYPES).filter(([, type]) => 'decides' in type).map(([name]) => name)
 
-// Every unclaimed entry about any of these records, for anybody, but one of the same type: that is
-// this same decision told to another approver. The ids are one JSON parameter (0006, 0206).
-export function supersedeStatement(topic: NotificationTopic, type: string, about: string[]): SQL {
+// Every unclaimed entry about any of these records, for anybody, that is not itself a decision:
+// weeks of one series share its id, so a decision on one must never drop another's (0006, 0206).
+export function supersedeStatement(topic: NotificationTopic, about: string[]): SQL {
   return sql`
     DELETE FROM notification_digest_entries
-    WHERE topic = ${topic} AND digest_log_id IS NULL AND type <> ${type}
+    WHERE topic = ${topic} AND digest_log_id IS NULL
+      AND type NOT IN (SELECT value FROM json_each(${JSON.stringify(DECIDING)}))
       AND CASE WHEN json_valid(body) THEN EXISTS (
         SELECT 1 FROM json_each(notification_digest_entries.body, '$.about') AS held
         JOIN json_each(${JSON.stringify(about)}) AS decided ON decided.value = held.value
