@@ -2,7 +2,7 @@
 import { saysNoSuch } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
 import { saysPrice } from '#shared/utils/ticket-types'
-import { partySizeMismatchReason } from '#shared/utils/waiting-list'
+import { claimShortfallSays, partySizeMismatchReason, saysSeatsFree } from '#shared/utils/waiting-list'
 import { plural } from '#shared/utils/text'
 
 // Where every waiting-list email opens (issue 1340): WAITING says so, OFFERED lets it be claimed
@@ -44,9 +44,10 @@ const lines = computed(() => Object.entries(quantities)
 
 const requested = computed(() => lines.value.reduce((total, line) => total + line.quantity, 0))
 
-// Criterion 2 commits the claim to the whole party, so the screen says the rule rather than
-// leaving a disabled button to imply it.
+// Criterion 2 commits the claim to the whole party: the screen says the rule, and how many more
+// or fewer to choose, beside a button that waits for the count rather than refusing after it.
 const mismatch = computed(() => partySizeMismatchReason(requested.value, data.value?.partySize ?? 0))
+const shortfall = computed(() => claimShortfallSays(requested.value, data.value?.partySize ?? 0))
 
 const submitting = ref(false)
 const leaving = ref(false)
@@ -150,7 +151,7 @@ useSeoMeta({ title: 'Your waiting-list entry' })
         color="info"
         variant="subtle"
         icon="i-lucide-clock"
-        title="A seat is free"
+        :title="saysSeatsFree(data!.partySize)"
         :description="`You have first refusal until ${saysWhenLong(data!.offerExpiresAt)}. Nothing is kept for you until you claim.`"
       />
 
@@ -200,11 +201,17 @@ useSeoMeta({ title: 'Your waiting-list entry' })
       </UCard>
 
       <div class="flex items-center justify-between">
-        <p class="text-sm text-muted">
-          {{ requested }} of {{ data!.partySize }} chosen
+        <p
+          class="text-sm text-muted"
+          data-test="waiting-list-claim-count"
+        >
+          {{ requested }} of {{ data!.partySize }} chosen<template v-if="shortfall">
+            · {{ shortfall }}
+          </template>
         </p>
         <UButton
           :loading="submitting"
+          :disabled="shortfall !== null"
           data-test="waiting-list-claim-submit"
           @click="claim"
         >

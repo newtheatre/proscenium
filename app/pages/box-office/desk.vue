@@ -986,6 +986,12 @@ const resultColumns: TableColumn<SearchRow>[] = [
             </div>
           </dl>
         </UCard>
+
+        <DeskWaitingList
+          v-if="performanceId"
+          :key="performanceId"
+          :performance-id="performanceId"
+        />
       </div>
     </div>
 
