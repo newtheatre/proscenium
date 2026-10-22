@@ -312,7 +312,7 @@ describe.skipIf(skip !== null)('a settlement is a card charge answered at the re
     const { variantId } = await aSellableProduct(500)
     await openTill(venueId, performanceId)
     await authorise([barStaff.id])
-    expect((await chargeToTab(venueId, variantId, barStaff.id, 500, barManager.cookie)).status).toBe(200)
+    expect((await chargeToTab(venueId, variantId, barStaff, 500, barManager.cookie)).status).toBe(200)
     const { charges } = await (await settleCandidates(venueId, barStaff.id)).json() as { charges: OutstandingCharge[] }
     const entryIds = charges.map(charge => charge.entryId)
     const owedPence = charges.reduce((sum, charge) => sum + charge.totalPence, 0)
@@ -338,7 +338,7 @@ describe.skipIf(skip !== null)('a settlement is a card charge answered at the re
     await openTill(venueId, performanceId)
     const member = await aMember()
     await authorise([member.id])
-    await chargeToTab(venueId, variantId, member.id, 500)
+    await chargeToTab(venueId, variantId, member, 500)
     const { charges } = await (await settleCandidates(venueId, member.id)).json() as { charges: OutstandingCharge[] }
 
     const answers = await Promise.all([

@@ -156,7 +156,7 @@ describe.skipIf(skip !== null)('nobody is offered a void on their own tab (0116)
     await openTill(venueId)
     await authorise([barManager.id])
     await setCap(2000)
-    expect((await charge(venueId, variantId, 400, barManager.id)).status).toBe(200)
+    expect((await charge(venueId, variantId, 400, barManager)).status).toBe(200)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
