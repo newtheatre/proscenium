@@ -78,6 +78,20 @@ export function unpaidSeatsSubquery(performanceId: SQL): SQL {
   )`
 }
 
+// Seats somebody paid money for, which a cancelled performance owes back in person: an unpaid
+// hold, a pass seat and a comp were never paid for (D-116 criterion 1).
+export function paidSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} paid_t
+    JOIN ${sql.raw(RESERVATIONS)} paid_r ON paid_r.id = paid_t.reservation_id
+    WHERE paid_t.performance_id = ${performanceId}
+      AND paid_t.refunded_at IS NULL
+      AND paid_t.price_paid > 0
+      AND paid_r.status IN ('COLLECTED', 'DOOR')
+      AND NOT ${ticketOnPass(sql`paid_t.id`)}
+  )`
+}
+
 // Correlated to a row already in hand, so a listing reads many performances without binding a
 // parameter per performance (0006).
 export function unpaidSeatsColumn(alias: string): SQL {
@@ -179,7 +193,7 @@ export function heldAccessSeatsSubquery(performanceId: SQL): SQL {
 export function showUnpaidSeatsColumn(alias: string): SQL {
   return sql`(
     SELECT coalesce(sum(${unpaidSeatsSubquery(sql`show_p.id`)}), 0)
-    FROM performances show_p WHERE show_p.show_id = ${sql.raw(alias)}.id
+    FROM performances show_p WHERE show_p.show_id = ${sql.raw(alias)}.id AND show_p.status <> 'CANCELLED'
   )`
 }
 

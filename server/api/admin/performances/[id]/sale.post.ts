@@ -1,4 +1,5 @@
 import { performanceSaleForm } from '#shared/utils/programme'
+import { currentShowNight, showNightOf } from '#shared/utils/show-night'
 
 // Put one performance on or off sale, independently of its show and of every other performance
 // of it: two venues may run at once and a day may hold a matinee and an evening (D-121, E-127).
@@ -15,6 +16,11 @@ export default defineEventHandler(async (event) => {
   // is a decision D-118 owns.
   if (held.status === 'CANCELLED') {
     throw createError({ statusCode: 409, statusMessage: 'This performance has been cancelled, so it cannot be put on sale' })
+  }
+
+  // A night already over sells nothing, so On sale there would say something untrue.
+  if (onSale && showNightOf(new Date(held.startsAt * 1000)) < currentShowNight()) {
+    throw createError({ statusCode: 409, statusMessage: 'This performance has already played, so it cannot go on sale' })
   }
 
   const status = onSale ? 'ON_SALE' : 'DRAFT'

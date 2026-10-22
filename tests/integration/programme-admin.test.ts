@@ -120,7 +120,7 @@ describe('publishing cascades to draft performances only (D-121 criterion 2)', (
           'performance-selling', seeded.showId, seeded.venueId, seeded.startsAt + 172_800, 'ON_SALE'],
       ])
 
-      run(database, cascadeOnSaleQuery(seeded.showId))
+      run(database, cascadeOnSaleQuery(seeded.showId, 0))
 
       expect(statuses(database, seeded.showId)).toEqual([
         'performance-a:ON_SALE',
@@ -130,12 +130,30 @@ describe('publishing cascades to draft performances only (D-121 criterion 2)', (
     })
   })
 
+  // A performance added to record history was put on sale by publishing (process map, 21 October).
+  test('a draft performance before the cut-off stays off sale', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database, { status: 'DRAFT', showStatus: 'DRAFT' })
+      database.batch([
+        ['INSERT INTO performances (id, show_id, venue_id, starts_at, status) VALUES (?, ?, ?, ?, ?)',
+          'performance-played', seeded.showId, seeded.venueId, seeded.startsAt - 7 * 86_400, 'DRAFT'],
+      ])
+
+      run(database, cascadeOnSaleQuery(seeded.showId, seeded.startsAt - 86_400))
+
+      expect(statuses(database, seeded.showId)).toEqual([
+        'performance-a:ON_SALE',
+        'performance-played:DRAFT',
+      ])
+    })
+  })
+
   // One statement binding the show id alone, so a show with forty performances runs the same
   // query as a show with one (0003, 0006).
   test('the cascade binds one parameter however many performances the show has', async () => {
     await withDatabase((database) => {
-      const [statement, ...parameters] = boundStatement(database, cascadeOnSaleQuery('show-a'))
-      expect(parameters).toEqual(['show-a'])
+      const [statement, ...parameters] = boundStatement(database, cascadeOnSaleQuery('show-a', 1_000))
+      expect(parameters).toEqual(['show-a', 1_000])
       expect(statement).not.toContain(' IN (')
     })
   })
@@ -145,7 +163,7 @@ describe('publishing cascades to draft performances only (D-121 criterion 2)', (
       const first = tonightsPerformance(database, { status: 'DRAFT' })
       const second = tonightsPerformance(database, { suffix: 'b', status: 'DRAFT' })
 
-      run(database, cascadeOnSaleQuery(first.showId))
+      run(database, cascadeOnSaleQuery(first.showId, 0))
 
       expect(statuses(database, first.showId)).toEqual(['performance-a:ON_SALE'])
       expect(statuses(database, second.showId)).toEqual(['performance-b:DRAFT'])

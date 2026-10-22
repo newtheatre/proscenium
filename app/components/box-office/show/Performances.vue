@@ -152,15 +152,31 @@ const movesBookings = computed(() => {
     : null
 })
 
+// Adding a played night is allowed, to record history, but never by accident.
+const inThePast = computed(() => {
+  const days = editingPerformance.value ? [form.day] : form.days
+  const now = Date.now() / 1000
+  return days.some(day => /^\d{4}-\d{2}-\d{2}$/.test(day) && /^\d{2}:\d{2}$/.test(form.clock)
+    && nightInstants(day, form.clock, '').startsAt < now)
+})
+
+// A clash is saved, then named, since a double bill can share a house on purpose.
+function saysClashes(clashes: { showTitle: string, startsAt: number }[]): string | null {
+  if (clashes.length === 0) return null
+  const named = clashes.map(one => `${one.showTitle} at ${saysWhen(one.startsAt)}`).join('; ')
+  return `The venue is already in use then: ${named}. Check this is meant.`
+}
+
 async function savePerformance(): Promise<void> {
   saving.value = true
   failure.value = null
   const editing = editingPerformance.value
   const added = form.days.length
   let told = 0
+  let clashes: { showTitle: string, startsAt: number }[] = []
   try {
     if (editing) {
-      told = (await $fetch<{ bookingsTold: number }>(`/api/admin/performances/${editing.id}`, {
+      const answer = await $fetch<{ bookingsTold: number, clashes: typeof clashes }>(`/api/admin/performances/${editing.id}`, {
         method: 'PUT',
         body: {
           ...nightInstants(form.day, form.clock, form.doorsClock),
@@ -175,11 +191,13 @@ async function savePerformance(): Promise<void> {
           externalBookingUrl: blank(form.externalBookingUrl),
           notes: blank(form.notes),
         },
-      })).bookingsTold
+      })
+      told = answer.bookingsTold
+      clashes = answer.clashes
     }
     else {
       // Every night of a run in one request, so the run lands whole or not at all (D-132 criterion 10).
-      await $fetch(`/api/admin/shows/${props.show.id}/runs`, {
+      clashes = (await $fetch<{ clashes: typeof clashes }>(`/api/admin/shows/${props.show.id}/runs`, {
         method: 'POST',
         body: {
           venueId: form.venueId,
@@ -188,15 +206,18 @@ async function savePerformance(): Promise<void> {
           intervalMinutes: form.intervalMinutes,
           nights: form.days.map(day => nightInstants(day, form.clock, form.doorsClock)),
         },
-      })
+      })).clashes
     }
+    const clash = saysClashes(clashes)
     toast.add({
       title: editing ? 'Performance saved' : `${plural(added, 'performance', 'performances')} added`,
-      description: editing
-        ? (told > 0 ? `${plural(told, 'booking')} emailed the new day, time and venue.` : undefined)
-        : 'Off sale until you put them on sale, or publish the show.',
-      icon: 'i-lucide-check',
-      color: 'success',
+      description: [
+        clash,
+        editing && told > 0 ? `${plural(told, 'booking')} emailed the new day, time and venue.` : null,
+        editing ? null : 'Off sale until you put them on sale, or publish the show.',
+      ].filter(Boolean).join(' ') || undefined,
+      icon: clash ? 'i-lucide-triangle-alert' : 'i-lucide-check',
+      color: clash ? 'warning' : 'success',
     })
     performanceOpen.value = false
     await changed()
@@ -375,7 +396,8 @@ const columns: TableColumn<AdminPerformance>[] = [
           pricing.value = row.original
         },
       }, () => 'Prices'),
-      row.original.status === 'CANCELLED'
+      // A played night is only ever taken off sale, never put on (the route refuses it too).
+      row.original.status === 'CANCELLED' || (row.original.status !== 'ON_SALE' && saysPerformanceStatus(row.original.status, row.original.startsAt) === 'Played')
         ? null
         : h(UButton, {
             'size': 'sm',
@@ -525,7 +547,7 @@ const columns: TableColumn<AdminPerformance>[] = [
       :title="editingPerformance ? 'Edit this performance' : 'Add performances'"
       :description="editingPerformance
         ? 'A performance belongs to one venue at one time. Two venues can run at once, and one venue can run a matinee and an evening.'
-        : 'One night or a run: each night becomes its own performance at the venue, times and running time given here.'"
+        : 'One night or a run: each night becomes its own performance at the venue, times and running time given here. A capacity, booking window, external link or notes for one night are set afterwards, with Edit, then More.'"
     >
       <template #body>
         <UForm
@@ -552,6 +574,15 @@ const columns: TableColumn<AdminPerformance>[] = [
             variant="subtle"
             icon="i-lucide-mail"
             :description="movesBookings"
+          />
+
+          <UAlert
+            v-if="inThePast"
+            data-test="performance-in-the-past"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-history"
+            description="This curtain is in the past. Add it only to record a night that has played: it cannot go on sale."
           />
 
           <UFormField

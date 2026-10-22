@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { formatLondon } from '#shared/utils/london'
 import { performanceCancelForm } from '#shared/utils/programme'
 import { COMMITTED_SHIFT_STATUSES, saysShiftRole } from '#shared/utils/rota'
@@ -20,6 +21,9 @@ export default defineEventHandler(async (event) => {
   // Read before the write, because the cancellation is what takes the status away.
   const active = await activeShifts(id)
   const bookings = await db.all<{ reservationId: string, reference: string, userId: string, collected: number }>(cancelledPerformanceHoldersQuery(id))
+  // An unpaid hold, a pass seat and a comp owe nothing back, so only paid seats are refunds due.
+  const [paid] = await db.all<{ n: number }>(sql`SELECT ${paidSeatsSubquery(sql`${id}`)} AS n`)
+  const ticketsOwedARefund = Number(paid?.n ?? 0)
   // An open slot has nobody to tell; a claimed one is owed the same word a confirmed one is,
   // because it is what the delete route's own refusal promises (E-102 criterion 4).
   const holders = active.filter(shift => COMMITTED_SHIFT_STATUSES.includes(shift.status) && shift.userId !== null)
@@ -31,9 +35,7 @@ export default defineEventHandler(async (event) => {
     detail: {
       showId: held.showId,
       night: performanceNight(held.startsAt),
-      // Counted from the tables that reference the performance, so it is nought only while no
-      // such table exists (D-121 criterion 5).
-      ticketsOwedARefund: held.soldTickets,
+      ticketsOwedARefund,
       shiftsCancelled: active.length,
       bookingsTold: bookings.length,
     },
@@ -101,7 +103,7 @@ export default defineEventHandler(async (event) => {
     ok: true,
     status: 'CANCELLED',
     night: performanceNight(held.startsAt),
-    ticketsOwedARefund: held.soldTickets,
+    ticketsOwedARefund,
     shiftsCancelled: active.length,
     bookingsTold: bookings.length,
   }

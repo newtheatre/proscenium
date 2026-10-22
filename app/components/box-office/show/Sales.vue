@@ -20,17 +20,20 @@ const rows = computed(() => props.performances)
 
 const figure = (value: string): VNode => h('span', { class: 'font-mono text-sm' }, value)
 
-const unpaidTotal = computed(() => rows.value.reduce((sum, one) => sum + (one.externalBookingUrl ? 0 : one.unpaidTickets), 0))
-const soldTotal = computed(() => rows.value.reduce((sum, one) => sum + (one.externalBookingUrl ? 0 : one.soldTickets), 0))
-const capacityTotal = computed(() => rows.value.reduce((sum, one) => sum + (capacityOf(one) ?? 0), 0))
+// A cancelled performance sells nothing more and owes no payment, so the run leaves it out.
+const counted = computed(() => rows.value.filter(one => !one.externalBookingUrl && one.status !== 'CANCELLED'))
+const unpaidTotal = computed(() => counted.value.reduce((sum, one) => sum + one.unpaidTickets, 0))
+const soldTotal = computed(() => counted.value.reduce((sum, one) => sum + one.soldTickets, 0))
+const capacityTotal = computed(() => counted.value.reduce((sum, one) => sum + (capacityOf(one) ?? 0), 0))
 const leftOf = (one: AdminPerformance): number | null => {
   const capacity = capacityOf(one)
   return capacity === null ? null : Math.max(capacity - one.soldTickets, 0)
 }
 // An uncapped night has no figure to add, so the run's total says so rather than undercounting.
-const leftTotal = computed(() => rows.value.some(one => !one.externalBookingUrl && capacityOf(one) === null)
+const leftTotal = computed(() => counted.value.some(one => capacityOf(one) === null)
   ? 'No limit'
-  : `${rows.value.reduce((sum, one) => sum + (leftOf(one) ?? 0), 0)}`)
+  : `${counted.value.reduce((sum, one) => sum + (leftOf(one) ?? 0), 0)}`)
+const muted = (value: string): VNode => h('span', { class: 'font-sans text-sm text-muted' }, value)
 
 const columns = computed<TableColumn<AdminPerformance>[]>(() => [
   {
@@ -49,7 +52,8 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
     footer: () => figure(`${capacityTotal.value}`),
     cell: ({ row }) => {
       const capacity = capacityOf(row.original)
-      if (row.original.externalBookingUrl) return h('span', { class: 'font-sans text-sm text-muted' }, 'Externally ticketed')
+      if (row.original.externalBookingUrl) return muted('Externally ticketed')
+      if (row.original.status === 'CANCELLED') return muted('Cancelled')
       return figure(capacity === null ? 'Uncapped' : `${capacity}`)
     },
   },
@@ -72,8 +76,8 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
     header: 'Unpaid',
     meta: RIGHT_ALIGNED,
     footer: () => figure(`${unpaidTotal.value}`),
-    cell: ({ row }) => (row.original.externalBookingUrl
-      ? h('span', { class: 'font-sans text-sm text-muted' }, 'n/a')
+    cell: ({ row }) => (row.original.externalBookingUrl || row.original.status === 'CANCELLED'
+      ? muted('n/a')
       : figure(`${row.original.unpaidTickets}`)),
   },
   {
@@ -83,7 +87,7 @@ const columns = computed<TableColumn<AdminPerformance>[]>(() => [
     footer: () => figure(leftTotal.value),
     cell: ({ row }) => {
       const left = leftOf(row.original)
-      if (row.original.externalBookingUrl) return h('span', { class: 'font-sans text-sm text-muted' }, 'n/a')
+      if (row.original.externalBookingUrl || row.original.status === 'CANCELLED') return muted('n/a')
       if (left === null) return h('span', { class: 'font-sans text-sm text-muted' }, 'No limit')
       return figure(`${left}`)
     },
