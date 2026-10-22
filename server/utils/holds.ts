@@ -49,8 +49,8 @@ export interface ReminderCandidateRow {
   showTitle: string
 }
 
-// Still PENDING, not yet expired, and past the reminder's own trigger point. A collected or
-// cancelled reservation is never PENDING, so criterion 4 is the predicate, not a second check.
+// Still PENDING, not yet expired, past the trigger point, and booked before it: a booking made
+// inside the window has just been told when it releases. Collected or cancelled is never PENDING.
 export function reminderCandidatesQuery(at: number, reminderMinutes: number, cap: number): SQL {
   return sql`
     SELECT r.id AS id, r.reference AS reference, r.user_id AS userId, r.hold_expires_at AS holdExpiresAt,
@@ -61,6 +61,7 @@ export function reminderCandidatesQuery(at: number, reminderMinutes: number, cap
     WHERE r.status = 'PENDING' AND r.user_id IS NOT NULL AND r.hold_expires_at IS NOT NULL
       AND r.hold_expires_at > ${at}
       AND (r.hold_expires_at - ${reminderMinutes * 60}) <= ${at}
+      AND r.created_at < (r.hold_expires_at - ${reminderMinutes * 60})
     ORDER BY r.hold_expires_at
     LIMIT ${cap}
   `
