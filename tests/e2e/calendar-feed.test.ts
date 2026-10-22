@@ -282,6 +282,15 @@ describe.skipIf(skip !== null)('the screen (C-104)', () => {
       const url = await view.evaluate<string>(`document.querySelector('[data-test="feed-url"]').value`)
       expect(url).toContain('/rooms/feed/')
       expect((await fetch(url)).status).toBe(200)
+
+      // Replacing breaks every subscribed calendar, so a second visit asks before it does.
+      await visit(view, `${app.baseURL}/rooms/mine`, '[data-test="feed-exists"]')
+      await click(view, '[data-test="feed-mint"]')
+      await waitFor(view, `document.querySelector('[data-test="feed-replace-confirm"]')`, 30_000)
+      expect((await fetch(url)).status).toBe(200)
+      await click(view, '[data-test="feed-replace-confirm"]')
+      await waitFor(view, `document.querySelector('[data-test="feed-url"]')`, 30_000)
+      expect((await fetch(url)).status).toBe(404)
     }
     finally {
       view.close()

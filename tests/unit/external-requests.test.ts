@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   assignForm, EXTERNAL_REFUSALS, earliestAskDay, externalRequestForm, judgeExternal, refusalToAct, refuseAssignmentForm,
-  saysExternalStatus,
+  saysExternalStatus, saysShortNotice,
 } from '#shared/utils/external-requests'
 
 // C-120's pure half: the lifecycle, and what is needed before anybody will answer.
@@ -70,6 +70,22 @@ describe('what is needed before anybody will answer', () => {
   test('a lapsed membership is refused', () => {
     expect(judgeExternal(span(20), { ...CONTEXT, hasMembership: false }).map(one => one.reason))
       .toContain('NO_MEMBERSHIP')
+  })
+
+  test('the refusal says buy to somebody never a member, and renew only to a lapsed one', () => {
+    const says = (hasEverBeenMember: boolean): string | undefined =>
+      judgeExternal(span(20), { ...CONTEXT, hasMembership: false, hasEverBeenMember }).find(one => one.reason === 'NO_MEMBERSHIP')?.says
+    expect(says(false)).toContain('Buy one')
+    expect(says(true)).toContain('Renew it')
+  })
+
+  // The form refuses a day too soon in these words, rather than the browser's own bubble.
+  test('short notice is one sentence for the form and the route, naming the earliest day', () => {
+    const tooSoon = judgeExternal(span(1), CONTEXT).find(one => one.reason === 'SHORT_NOTICE')
+    const earliest = earliestAskDay(NOW, 3, HOLIDAYS)
+    expect(tooSoon?.says).toBe(saysShortNotice(3, earliest, NOW))
+    expect(tooSoon?.says).toStartWith('This needs 3 working days')
+    expect(tooSoon?.says).toContain('The earliest day you can ask for is')
   })
 
   // Opening hours, capacity and an active flag are things nobody tells us about a room we do

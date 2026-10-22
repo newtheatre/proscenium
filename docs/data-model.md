@@ -2137,7 +2137,9 @@ the displaced row still being `CONFIRMED`, its slot open and nothing else in it;
 flip to `BUMPED` land only if that booking did, and the flip links only an offer that was written.
 So a lost race leaves nothing behind, and a booking is never `BUMPED` with nobody in its slot. The
 audit entry (`room.booking.bumped`) is the batch's last statement, written only if the flip applied
-(0049), and names the booking that replaced it and the offer actually held.
+(0049), and names the booking that replaced it and the offer actually held. The held offer is the
+member's unless they cancel it, and the officer's dialogue, the `room.booking.bumped` email and My
+bookings all say so in those words (0207).
 `GET /api/admin/rooms/bookings` (`rooms.read`) is the officer's list of every member's bookings,
 the list a bump or a no-show starts from (C-115 criterion 6). It filters by its declaration
 (`shared/utils/room-bookings-list.ts`, K-129): `status`, `room`, `member`, `tier`, `startsAt`,
@@ -2149,7 +2151,8 @@ allow-list: the member's name and nothing else about them, never `notes`, `reaso
 `rejection_reason`. The console's row offers the one write its booking allows
 (`rowActionFor`): a bump before a confirmed booking ends, a no-show mark after, and a withdrawal
 of the standing record by its `noShowId`; the routes still decide, and each confirms first
-(C-115 criterion 7, C-116 criterion 7).
+(C-115 criterion 7, C-116 criterion 7). The bump dialogue's **Taken for** starts as the signed-in
+officer.
 Erasure scrubs `notes`, `reason` and `rejection_reason` to null and `title` to `Erased booking`,
 and keeps the row: the room was used, which is a fact about the room rather than about the person
 (0011). `title` is NOT NULL, and nulling it would fail the whole erasure batch, so the register
@@ -2159,7 +2162,11 @@ never a deletion**: no member-facing delete path exists at all, rather than one 
 (C-112 criterion 2, audit RM-3). The write is guarded on the status it read, so two cancels racing
 leave one success, and its audit entry is in the same batch, written only if the cancel applied
 (0049). `CANCELLED`, `REJECTED` and `BUMPED` are terminal, and the row stays in the member's own
-list with its status (criterion 5).
+list with its status (criterion 5). `GET /api/rooms/bookings` takes `when`: `upcoming` (the
+default) is everything not yet ended except a plain cancellation, `cancelled` is those
+cancellations still to come, and `past` is everything ended, cancelled or not. A booking moved to
+a Students' Union room is `CANCELLED` carrying `converted_to_request_id`, and stays under
+`upcoming`, because it was moved rather than withdrawn (C-123 criterion 5).
 A member changes a request through `PUT /api/rooms/bookings/[id]`, and only while it is
 `PENDING_APPROVAL` (C-108 criterion 4). The route re-runs the closure check and `judge()` in full,
 counting the member's other held bookings rather than this one against the cap, then writes through
@@ -2323,7 +2330,19 @@ committees ago does not follow somebody about (0009, criterion 3).
 At the pre-approval step, `judge()` sets `needsApproval` for **every** booking whatever the policy
 says about it, so it diverts to the approval queue, and the booking form says so before the member
 fills it in (criterion 4). `GET /api/rooms/standing` gives a member their own count, standing and
-records, withdrawals included, so a correction is visible rather than a gap (criterion 5).
+records, withdrawals included, so a correction is visible rather than a gap (criterion 5). My
+bookings shows it from the first mark, below the ladder included.
+
+`POST /api/admin/rooms/no-shows/[id]/withdraw` answers with the standing after the withdrawal, and
+with `released` (it took the member off pre-approval), `userId` and `waiting` (their
+`PENDING_APPROVAL` bookings still to come, counted only when released). The console then offers
+`POST /api/admin/rooms/requests/rejudge` (`rooms.write`, body `{ userId }`), which refuses 409 while
+the member is still under pre-approval and otherwise runs `judge()` over each waiting request as if
+asked today by somebody off the ladder (`isAdmin` false, the request not counted against its own
+cap, a closure leaving it waiting). One that now needs nothing approved is confirmed through
+`approveOne()`, each with its own `room.request.approved` audit entry (detail `rejudged: true`),
+and the member gets one `room.request.approved` message with the calendar file, as for any
+approval; the rest stay in the queue. It answers `{ confirmed, waiting, outcomes }`.
 
 Erasure keeps the rows: append-only means a scrub could not run here even if it were wanted, and
 the reference resolves to the tombstone the user row became, so the statistics survive and the
@@ -2382,6 +2401,16 @@ the "Moved to a Students' Union room" state, the notice setting and the personal
 same. "A room we do not manage" survives only in code comments and decision titles, which no
 member reads. The identifiers keep `external`, which is the domain word and is not read by anybody
 outside this repository.
+
+A request row read back (`selectRequests()` in `server/utils/external-requests.ts`) carries the
+`building` of its preferred and assigned spaces, and for a request moved into one of our rooms
+(`converted_to_booking_id`) the room and building of the booking the move made (`movedTo`,
+`movedToBuilding`). My bookings names each request by the room it is in, never the one first asked
+for once it has moved, with the building under it. A membership refusal says "Buy one at the
+Students' Union" to somebody with no term at all and "Renew it" only to a lapsed member
+(`saysExternalNoMembership`), as the booking refusal does. Too little notice is refused by the
+form under **Day** in the route's own words (`saysShortNotice`), reading
+`externalNoticeWorkingDays` and `externalEarliestDay` from `GET /api/rooms/policy`.
 
 The lifecycle is `REQUESTED → AWAITING_EXTERNAL → CONFIRMED`, with `refuse-assignment` looping back
 to the union and `reject`/`cancel` ending it. Every write is guarded on the status it read (0006).

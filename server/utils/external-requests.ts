@@ -22,6 +22,11 @@ export interface RequestRow {
   preferred: string | null
   assignedSpaceId: string | null
   assigned: string | null
+  assignedBuilding: string | null
+  preferredBuilding: string | null
+  // The room of ours it was moved into, read through the booking the move made (C-123).
+  movedTo: string | null
+  movedToBuilding: string | null
   notes: string | null
   suReference: string | null
   status: string
@@ -37,6 +42,8 @@ export const LIST_CAP = 200
 
 const preferred = alias(schema.externalSpaces, 'preferred_space')
 const assigned = alias(schema.externalSpaces, 'assigned_space')
+const movedBooking = alias(schema.roomBookings, 'moved_booking')
+const movedRoom = alias(schema.rooms, 'moved_room')
 
 const COLUMNS = {
   id: schema.externalRequests.id,
@@ -51,6 +58,10 @@ const COLUMNS = {
   preferred: preferred.name,
   assignedSpaceId: schema.externalRequests.assignedSpaceId,
   assigned: assigned.name,
+  assignedBuilding: assigned.building,
+  preferredBuilding: preferred.building,
+  movedTo: movedRoom.name,
+  movedToBuilding: movedRoom.building,
   notes: schema.externalRequests.notes,
   suReference: schema.externalRequests.suReference,
   status: schema.externalRequests.status,
@@ -69,6 +80,8 @@ async function selectRequests(where: SQL | undefined, order: SQL): Promise<Reque
     .innerJoin(schema.users, eq(schema.users.id, schema.externalRequests.userId))
     .leftJoin(preferred, eq(preferred.id, schema.externalRequests.preferredSpaceId))
     .leftJoin(assigned, eq(assigned.id, schema.externalRequests.assignedSpaceId))
+    .leftJoin(movedBooking, eq(movedBooking.id, schema.externalRequests.convertedToBookingId))
+    .leftJoin(movedRoom, eq(movedRoom.id, movedBooking.roomId))
     .where(where)
     .orderBy(order)
     .limit(LIST_CAP + 1)

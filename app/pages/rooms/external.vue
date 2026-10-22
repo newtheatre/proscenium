@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
 import { nameOrPurpose } from '#shared/utils/bookings'
-import { EXTERNAL_NO_MEMBERSHIP, SU_ROOM_ASK } from '#shared/utils/external-requests'
+import { MEMBERSHIP_SOLD_WHERE } from '#shared/utils/booking-policy'
+import { SU_ROOM_ASK, saysExternalNoMembership, saysShortNotice } from '#shared/utils/external-requests'
 import { fromLondonWallClock } from '#shared/utils/london'
 import { saysDayLong } from '#shared/utils/when'
 import type { FormSubmitEvent } from '@nuxt/ui'
@@ -17,7 +18,7 @@ const request = useRequestFetch()
 
 // The screen's own shape: a day and two wall clocks, which become the instants the write path
 // validates on the way out (C-120 criterion 7, 0014).
-const form = z.object({
+const fields = z.object({
   title: z.string().trim().max(200),
   purpose: z.string().min(1, 'Say what the room is for'),
   attendees: z.number().int().positive().optional(),
@@ -26,12 +27,9 @@ const form = z.object({
   to: z.string().regex(/^\d{2}:\d{2}$/, 'Choose an end time'),
   preferredSpaceId: z.string().optional(),
   notes: z.string().trim().max(1000),
-}).refine(ask => ask.to > ask.from, {
-  path: ['to'],
-  message: 'A booking ends after it starts',
 })
 
-type ExternalForm = z.output<typeof form>
+type ExternalForm = z.output<typeof fields>
 
 const state = reactive<ExternalForm>({
   title: '',
@@ -49,9 +47,18 @@ const failures = ref<Failure[]>([])
 
 const { data: rules } = await useAsyncData(
   'external-policy',
-  () => request<{ purposes: string[], externalEarliestDay: string | null }>('/api/rooms/policy'),
-  { default: () => ({ purposes: [] as string[], externalEarliestDay: null }) },
+  () => request<{ purposes: string[], externalEarliestDay: string | null, externalNoticeWorkingDays: number }>('/api/rooms/policy'),
+  { default: () => ({ purposes: [] as string[], externalEarliestDay: null, externalNoticeWorkingDays: 3 }) },
 )
+
+// A day too soon is refused under Day in the route's own words, never by the browser's own bubble.
+const form = computed(() => fields.refine(ask => ask.to > ask.from, {
+  path: ['to'],
+  message: 'A booking ends after it starts',
+}).refine(ask => !rules.value.externalEarliestDay || ask.day >= rules.value.externalEarliestDay, {
+  path: ['day'],
+  message: saysShortNotice(rules.value.externalNoticeWorkingDays, rules.value.externalEarliestDay, new Date()),
+}))
 
 // A purpose off the query string is a suggestion, and it only lands if the vocabulary still holds
 // it: an unknown one would be sent and refused, or worse, warned about against nothing.
@@ -78,6 +85,7 @@ const needsMembership = computed(() => failures.value.some(failure => failure.re
 
 // Refused before the form rather than after it is filled in (A-129 criterion 2, issue 1338).
 const lapsed = computed(() => !can(useViewer().value, memberOrGrace) && !can(useViewer().value, manageRoomsEstate))
+const refusedFor = computed(() => saysExternalNoMembership(useViewer().value?.membershipState.kind === 'lapsed'))
 
 async function ask(event: FormSubmitEvent<ExternalForm>): Promise<void> {
   saving.value = true
@@ -121,7 +129,7 @@ useSeoMeta({ title: SU_ROOM_ASK })
   <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       :title="SU_ROOM_ASK"
-      description="For when nothing of ours suits. The Theatre Manager decides which room we get, and this is a request rather than a booking."
+      description="For when nothing of ours suits. The Students' Union decides which room we get, and this is a request rather than a booking."
       :ui="MEMBER_PAGE_HEADER"
     />
 
@@ -144,7 +152,7 @@ useSeoMeta({ title: SU_ROOM_ASK })
       data-test="external-needs-membership"
     >
       <template #description>
-        <p>{{ EXTERNAL_NO_MEMBERSHIP }}</p>
+        <p>{{ refusedFor }} {{ MEMBERSHIP_SOLD_WHERE }}</p>
         <UButton
           class="mt-3"
           to="/account/membership"
@@ -201,7 +209,6 @@ useSeoMeta({ title: SU_ROOM_ASK })
         >
           <DateField
             v-model="state.day"
-            :min="rules.externalEarliestDay ?? undefined"
             data-test="external-day"
           />
         </UFormField>
