@@ -25,4 +25,6 @@ saying so leaks nothing and enumeration safety is unchanged. A placeholder addre
 ## Consequences
 
 - A mistyped reserved domain is corrected on the spot.
-- Test suites register on a real domain (`e2e.newtheatre.org.uk`) already, so nothing changes there.
+- A test that registers must use a deliverable test address (`registrableAddress`); the synthetic people
+  in `tests/helpers/seed.ts` sit on `.invalid` and are now refused.
+- The registering cookie's undeliverable branch is reached by a placeholder address instead.

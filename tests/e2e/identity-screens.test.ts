@@ -596,7 +596,7 @@ describe.skipIf(skip !== null)('the registering browser\'s cookie (0103)', () =>
       registrationCookie(await register(address('cookie-new'))),
       registrationCookie(await register(existing)),
       registrationCookie(await register(guestAddress)),
-      registrationCookie(await register(`cookie-${Math.random().toString(36).slice(2)}@example.com`)),
+      registrationCookie(await register(address('deleted-cookie'))),
     ]
 
     for (const line of lines) {
