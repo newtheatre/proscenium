@@ -164,13 +164,15 @@ export interface WriteReservationResult {
 export interface GuestAccountResult {
   id: string
   created: boolean
+  // The account's own name, which a reused address keeps whatever the booker typed (0170).
+  heldName: string | null
 }
 
 // An existing address, guest or full, is reused as it stands; a new one is a claimable guest
 // account (D-104 criteria 1, 6). The reservation succeeds identically either way (enumeration-safe).
 export async function guestAccount(email: string, name: string): Promise<GuestAccountResult> {
   const existing = await findByEmail(email)
-  if (existing) return { id: existing.id, created: false }
+  if (existing) return { id: existing.id, created: false, heldName: existing.name }
 
   const normalised = normaliseEmail(email)
   const id = newId()
@@ -186,11 +188,11 @@ export async function guestAccount(email: string, name: string): Promise<GuestAc
     `),
     entry,
   )
-  if (created) return { id, created: true }
+  if (created) return { id, created: true, heldName: name.trim() }
 
   // Lost the race: somebody else's checkout won between the read above and this insert.
   const winner = await findByEmail(email)
-  return { id: winner!.id, created: false }
+  return { id: winner!.id, created: false, heldName: winner!.name }
 }
 
 // An address already held in another name is never filed under silently (0123): the desk and the

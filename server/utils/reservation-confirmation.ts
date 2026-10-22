@@ -34,6 +34,8 @@ export interface ConfirmationContext {
   // replaced, whose reference no longer admits anybody (0122).
   change?: 'CHANGED' | 'EXCHANGED'
   replaces?: string
+  // The name a guest typed for an address whose account holds another; only the owner reads it (0170).
+  bookedAs?: string
 }
 
 // Where, when the doors open, when the hold is let go and each line's price, read from the booking
@@ -78,6 +80,7 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
       ...arrival,
       ...(context.change ? { change: context.change } : {}),
       ...(context.replaces ? { replaces: context.replaces } : {}),
+      ...(context.bookedAs ? { bookedAs: context.bookedAs } : {}),
     },
   })
 }

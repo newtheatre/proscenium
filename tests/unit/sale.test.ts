@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, sameBookerName, saysBasketLine, saysNoChoice, saysPouredLine, saysPouredLines, saysTillParty, walkUpGuestForm, EXISTING_ACCOUNT_SAYS, MAX_BASKET_LINES, MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
+import { basketForm, basketLineForm, bookedInAnotherName, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, sameBookerName, saysBasketLine, saysNoChoice, saysPouredLine, saysPouredLines, saysTillParty, walkUpGuestForm, EXISTING_ACCOUNT_SAYS, MAX_BASKET_LINES, MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
@@ -262,6 +262,13 @@ describe('a walk-up booker is the same person when the names agree', () => {
 
   test('an account with no name on it never matches a typed one', () => {
     expect(sameBookerName(null, 'Ada Kowalski')).toBe(false)
+  })
+
+  // 0170: online, the account's owner is told the name somebody else typed for their address.
+  test('an online guest in another name is named back to the owner, tidied; the same name is not', () => {
+    expect(bookedInAnotherName('Ada Kowalski', '  Zed   Zane ')).toBe('Zed Zane')
+    expect(bookedInAnotherName('Ada Kowalski', 'ada  kowalski')).toBeNull()
+    expect(bookedInAnotherName(null, 'Zed Zane')).toBe('Zed Zane')
   })
 
   test('the guest form carries the desk\'s say-so, off unless sent', () => {
