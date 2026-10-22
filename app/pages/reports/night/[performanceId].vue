@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { saysAgeCheckCounts } from '#shared/utils/age-checks'
 import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysDoorCover, saysOfficerBypass } from '#shared/utils/night-authority'
@@ -21,7 +22,7 @@ interface SignedReport {
   attendance: { sold: number, admitted: number, noShows: number, walkUps: number, passAdmissions?: number }
   takings: { desk: Takings, bar: Takings }
   incidents: { id: string, category: Category, severity: Severity, body: string, happenedAt: number, supersededBy: string | null, followUpRequired: boolean }[]
-  ageChecks: { accepted: number, refused: number }
+  ageChecks: { accepted: number, refused: number, notRequired?: number, unassigned?: number }
   staffing: { shiftId: string, role: ShiftRole, status: ShiftStatus, name: string | null }[]
   bypasses?: OfficerBypassLine[]
   covers?: { name: string | null }[]
@@ -177,7 +178,7 @@ async function addCorrection(): Promise<void> {
             </li>
           </ul>
           <p class="mt-3 text-sm">
-            Challenge 25: {{ plural(report.ageChecks.accepted, 'check') }} accepted, {{ plural(report.ageChecks.refused, 'check') }} refused.
+            Challenge 25: {{ saysAgeCheckCounts(report.ageChecks) }}
           </p>
         </UCard>
 

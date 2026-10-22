@@ -214,6 +214,6 @@ describe('the night report counts every outcome, and says what no house claims (
   })
 
   test('a report frozen before the extra counts existed still reads', () => {
-    expect(saysAgeCheckCounts({ accepted: 2, refused: 1 })).toBe('2 checks accepted, 1 check refused and 0 visibly over 25.')
+    expect(saysAgeCheckCounts({ accepted: 2, refused: 1 })).toBe('2 checks accepted and 1 check refused.')
   })
 })

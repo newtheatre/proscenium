@@ -97,7 +97,7 @@ export function ageCheckReady(form: OutcomeShape): boolean {
 // logged with no performance, which no house can claim but the register still holds (0234).
 export function saysAgeCheckCounts(counts: { accepted: number, refused: number, notRequired?: number, unassigned?: number }): string {
   const parts = [`${plural(counts.accepted, 'check')} accepted`, `${plural(counts.refused, 'check')} refused`]
-  parts.push(`${counts.notRequired ?? 0} visibly over 25`)
+  if (counts.notRequired !== undefined) parts.push(`${counts.notRequired} visibly over 25`)
   const said = `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}.`
   const unassigned = counts.unassigned ?? 0
   if (unassigned === 0) return said
