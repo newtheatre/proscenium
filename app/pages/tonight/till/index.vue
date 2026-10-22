@@ -3,6 +3,7 @@ import { can, takeStocktakes } from '#shared/utils/abilities'
 import { saysMoney } from '#shared/utils/bar'
 import { passPromptFor } from '#shared/utils/passes'
 import { EXISTING_ACCOUNT_SAYS, needsTheReader, saleJustCompleted, uncountedProducts } from '#shared/utils/sale'
+import { normaliseTabCode } from '#shared/utils/tab-presence'
 import { chargePaths, saysChargeOnReader, saysChargeOnSumUp, saysTillClosed } from '#shared/utils/till'
 import { saysClock } from '#shared/utils/when'
 import type { InlineAgeCheckInput } from '#shared/utils/age-checks'
@@ -272,6 +273,19 @@ const charged = ref<ChargedReceipt | null>(null)
 
 const ageCheckStep = ref<AgeCheckStep>('closed')
 
+// Somebody else's tab waits for its holder's code (F-108 criterion 6, 0164); your own needs none.
+const viewer = useViewer()
+const tabCode = ref('')
+const tabCodeOpen = ref(false)
+const tabCodeFailure = ref<string | null>(null)
+const tabCodeAgeCheck = ref<InlineAgeCheckInput | null>(null)
+const needsTabCode = computed(() => selectedTabHolderId.value !== null && selectedTabHolderId.value !== viewer.value?.id)
+const tabHolderName = computed(() => tabHolders.data.value?.holders.find(holder => holder.id === selectedTabHolderId.value)?.name ?? 'The holder')
+watch(selectedTabHolderId, () => {
+  tabCode.value = ''
+  tabCodeFailure.value = null
+})
+
 function readyToCharge(): boolean {
   if (!venueId.value || basketEmpty.value || walkUpGuestIncomplete.value) return false
   return basket.value.length === 0 || priced.value !== null
@@ -423,9 +437,16 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
     return
   }
 
+  if (needsTabCode.value && !normaliseTabCode(tabCode.value)) {
+    tabCodeAgeCheck.value = ageCheck
+    tabCodeOpen.value = true
+    return
+  }
+
   charging.value = true
   chargeFailure.value = null
-  const body = saleBody(ageCheck, grandTotalPence.value!)
+  tabCodeFailure.value = null
+  const body = { ...saleBody(ageCheck, grandTotalPence.value!), tabCode: needsTabCode.value ? tabCode.value : null }
   const typed = needsTheReader(body)
   try {
     if (typed) {
@@ -445,9 +466,19 @@ async function charge(ageCheck: InlineAgeCheckInput | null = passedAgeCheck.valu
       viaSumup: false,
     }
     ageCheckStep.value = 'closed'
+    tabCodeOpen.value = false
+    tabCode.value = ''
   }
   catch (refused) {
     if (await askedForAnAgeCheck(refused, 'reader')) return
+    if (refusalData<{ tabCodeFor?: string }>(refused)?.tabCodeFor) {
+      tabCodeFailure.value = refusalText(refused)
+      tabCode.value = ''
+      tabCodeAgeCheck.value = ageCheck
+      tabCodeOpen.value = true
+      ageCheckStep.value = 'closed'
+      return
+    }
     // K-103 protects reads, not writes: a transport failure needs different words from an
     // ordinary refusal, since whether the sale landed is unknown rather than settled (finding 16).
     chargeFailure.value = writeFailureText(refused, typed ? UNANSWERED_FIRST : 'Check the tab before charging it again.')
@@ -1225,6 +1256,15 @@ const basketBindings = computed(() => ({
         />
       </template>
     </NightScreen>
+
+    <TillTabCodeSheet
+      v-model:open="tabCodeOpen"
+      v-model:code="tabCode"
+      :holder-name="tabHolderName"
+      :failure="tabCodeFailure"
+      :loading="charging"
+      @charge="charge(tabCodeAgeCheck)"
+    />
 
     <UDrawer
       v-model:open="basketSheetOpen"

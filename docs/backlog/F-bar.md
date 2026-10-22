@@ -240,6 +240,11 @@ Open questions:
      only for an override by someone other than the holder (0116).
   5. A tab charge writes lines and stock movements atomically per F-105, with a ledger entry marked
      as credit extended, not money taken.
+  6. Added 22 October 2026 by decision 0164: somebody else's tab is charged only with its holder
+     there. The holder's My NNT shows tonight's code, as a QR code and eight characters, signed
+     for that holder and that show night; the till scans or types it, and the sale endpoint
+     refuses a missing or wrong code (403) before anything is written. Charging your own tab
+     needs no code.
 - Source: Prompt Book F-1; audit PR-12 (the old £20 cap was a nag, not a block).
 
 ## F-109: Tab settlement, itemisation, voids and year end

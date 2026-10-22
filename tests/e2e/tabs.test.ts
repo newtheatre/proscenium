@@ -6,7 +6,7 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
-import { putOnTheTill } from '#tests/helpers/bar'
+import { putOnTheTill, tabCodeOf } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-108: a tab charge is credit extended to an authorised holder, capped, atomic, and structurally
@@ -108,8 +108,9 @@ async function aSellableProduct(pricePence = 500): Promise<{ productId: string, 
   return { productId, variantId }
 }
 
-const charge = (venueId: string, lines: unknown[], expectedTotalPence: number, tabHolderId: string | null, as = barStaff.cookie): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines, expectedTotalPence, tabHolderId }, as)
+// Charged with the holder there to show their code, as the till does (F-108 criterion 6).
+const charge = async (venueId: string, lines: unknown[], expectedTotalPence: number, holder: TestMember, as = barStaff.cookie): Promise<Response> =>
+  send('POST', '/api/till/sale', { venueId, lines, expectedTotalPence, tabHolderId: holder.id, tabCode: await tabCodeOf(app.baseURL, holder.cookie) }, as)
 
 const aTicketType = async (price = 900): Promise<string> => {
   const answered = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price })
@@ -154,7 +155,7 @@ describe.skipIf(skip !== null)('a tab tender is offered only for authorised hold
     const member = await aMember()
     await authorise([])
 
-    const answered = await charge(venueId, [{ variantId, qty: 1 }], 500, member.id)
+    const answered = await charge(venueId, [{ variantId, qty: 1 }], 500, member)
     expect(answered.status).toBe(409)
     expect(await message(answered)).toContain('authorised')
   })
@@ -166,13 +167,13 @@ describe.skipIf(skip !== null)('a tab tender is offered only for authorised hold
     const member = await aMember()
     await authorise([member.id])
 
-    const first = await charge(venueId, [{ variantId, qty: 1 }], 500, member.id)
+    const first = await charge(venueId, [{ variantId, qty: 1 }], 500, member)
     expect(first.status).toBe(200)
     const entry = latestLedgerEntry()
     expect(entry).toMatchObject({ tender: 'TAB', tab_debtor_id: member.id, tab_settled_at: null })
 
     await authorise([])
-    const second = await charge(venueId, [{ variantId, qty: 1 }], 500, member.id)
+    const second = await charge(venueId, [{ variantId, qty: 1 }], 500, member)
     expect(second.status).toBe(409)
   })
 })
@@ -206,12 +207,12 @@ describe.skipIf(skip !== null)('a holder of a named role may run up a tab while 
     expect((await authoriseRoles(['COMMITTEE'])).status).toBe(200)
 
     try {
-      const charged = await charge(venueId, [{ variantId, qty: 1 }], 500, holder.id)
+      const charged = await charge(venueId, [{ variantId, qty: 1 }], 500, holder)
       expect(charged.status).toBe(200)
       expect(latestLedgerEntry()).toMatchObject({ tender: 'TAB', tab_debtor_id: holder.id })
 
       for (const refused of [lapsed, outsider]) {
-        const answered = await charge(venueId, [{ variantId, qty: 1 }], 500, refused.id)
+        const answered = await charge(venueId, [{ variantId, qty: 1 }], 500, refused)
         expect(answered.status).toBe(409)
         expect(await message(answered)).toContain('authorised')
       }
@@ -231,8 +232,8 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     await authorise([member.id])
     await setCap(2000)
 
-    expect((await charge(venueId, [{ variantId, qty: 1 }], 500, member.id)).status).toBe(200)
-    const second = await charge(venueId, [{ variantId, qty: 1 }], 500, member.id)
+    expect((await charge(venueId, [{ variantId, qty: 1 }], 500, member)).status).toBe(200)
+    const second = await charge(venueId, [{ variantId, qty: 1 }], 500, member)
     expect(second.status).toBe(200)
     const body = await second.json() as { tab: { outstandingPence: number } }
     expect(body.tab.outstandingPence).toBe(1000)
@@ -249,8 +250,8 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     await setCap(2000)
 
     const answers = await Promise.all([
-      charge(venueId, [{ variantId, qty: 1 }], 1500, member.id),
-      charge(venueId, [{ variantId, qty: 1 }], 1500, member.id),
+      charge(venueId, [{ variantId, qty: 1 }], 1500, member),
+      charge(venueId, [{ variantId, qty: 1 }], 1500, member),
     ])
 
     expect(answers.filter(answer => answer.status === 200)).toHaveLength(1)
@@ -272,7 +273,7 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     await authorise([member.id])
     await setCap(1000)
 
-    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member.id)
+    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member)
     expect(answered.status).toBe(409)
     const refusal = await message(answered)
     expect(refusal).toContain('£0.00')
@@ -288,7 +289,7 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     await authorise([member.id])
     await setCap(1000)
 
-    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member.id, barStaff.cookie)
+    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member, barStaff.cookie)
     expect(answered.status).toBe(409)
   })
 
@@ -301,7 +302,7 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     await setCap(1000)
     await setOverrideEnabled(true)
 
-    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member.id, barManager.cookie)
+    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member, barManager.cookie)
     expect(answered.status).toBe(200)
     const body = await answered.json() as { tab: { capOverridden: boolean } }
     expect(body.tab.capOverridden).toBe(true)
@@ -317,7 +318,7 @@ describe.skipIf(skip !== null)('a cap applies per holder, refused quoting balanc
     await setCap(1000)
     await setOverrideEnabled(false)
 
-    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member.id, barManager.cookie)
+    const answered = await charge(venueId, [{ variantId, qty: 1 }], 2000, member, barManager.cookie)
     expect(answered.status).toBe(409)
     await setOverrideEnabled(true)
   })
@@ -345,7 +346,7 @@ describe.skipIf(skip !== null)('a tab charge is credit extended, not money taken
     }
     const { entriesBefore, linesBefore } = counted
 
-    const answered = await charge(venueId, [{ variantId, qty: 1 }], 500, member.id)
+    const answered = await charge(venueId, [{ variantId, qty: 1 }], 500, member)
     expect(answered.status).toBe(200)
 
     const after = new Database(app.databaseFile, { readonly: true })
@@ -359,6 +360,73 @@ describe.skipIf(skip !== null)('a tab charge is credit extended, not money taken
 
     const entry = latestLedgerEntry()
     expect(entry?.tender).toBe('TAB')
+  })
+})
+
+describe.skipIf(skip !== null)('somebody else\'s tab is charged only with its holder there (criterion 6)', () => {
+  const ledgerCount = (): number => {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return (database.query('SELECT count(*) AS n FROM ledger_entries').get() as { n: number }).n
+    }
+    finally {
+      database.close()
+    }
+  }
+  const sale = (venueId: string, variantId: string, holderId: string, tabCode: string | null, as = barStaff.cookie): Promise<Response> =>
+    send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: 500, tabHolderId: holderId, tabCode }, as)
+
+  test('without the holder\'s code, or with a wrong one, nothing is charged and the till is told whose code it needs', async () => {
+    const { venueId, performanceId } = programme(`tabs-present-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    const before = ledgerCount()
+
+    const missing = await sale(venueId, variantId, member.id, null)
+    expect(missing.status).toBe(403)
+    const missingBody = await missing.json() as { statusMessage: string, data: { tabCodeFor: string } }
+    expect(missingBody.statusMessage).toContain('needs their tab code from My NNT')
+    expect(missingBody.data.tabCodeFor).toBe(member.name)
+
+    const wrong = await sale(venueId, variantId, member.id, 'AAAA-AAAA')
+    expect(wrong.status).toBe(403)
+    expect(await message(wrong)).toContain('not')
+    expect(ledgerCount()).toBe(before)
+  })
+
+  test('the code is read as typed: lower case and the hyphen do not matter', async () => {
+    const { venueId, performanceId } = programme(`tabs-typed-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    const code = (await tabCodeOf(app.baseURL, member.cookie))!
+    expect(code).toMatch(/^[0-9A-Z]{8}$/)
+
+    const answered = await sale(venueId, variantId, member.id, `${code.slice(0, 4)}-${code.slice(4)}`.toLowerCase())
+    expect(answered.status).toBe(200)
+    expect(latestLedgerEntry()).toMatchObject({ tender: 'TAB', tab_debtor_id: member.id })
+  })
+
+  test('a holder serving at the till charges their own tab with no code', async () => {
+    const { venueId, performanceId } = programme(`tabs-own-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct()
+    await openTill(venueId, performanceId)
+    await authorise([barStaff.id])
+
+    const answered = await sale(venueId, variantId, barStaff.id, null)
+    expect(answered.status).toBe(200)
+    expect(latestLedgerEntry()).toMatchObject({ tender: 'TAB', tab_debtor_id: barStaff.id })
+  })
+
+  test('only an authorised holder has a code to show', async () => {
+    const member = await aMember()
+    await authorise([])
+    const answered = await send('GET', '/api/account/tab/code', undefined, member.cookie)
+    expect(answered.status).toBe(403)
+    expect(await message(answered)).toContain('not authorised to run a tab')
   })
 })
 
@@ -384,7 +452,16 @@ describe.skipIf(skip !== null)('the screen', () => {
     await click(view, `[data-test="tab-holder-${member.id}"]`)
     await waitFor(view, `document.querySelector('[aria-label="Charge the tab"]')`)
 
+    // The tab is somebody else's, so the till asks for the code their My NNT shows (criterion 6).
     await click(view, `[aria-label="Charge the tab"]`)
+    await waitFor(view, `document.querySelector('[data-test="tab-code-ask"]')`)
+    await fill(view, '[data-test="tab-code-input"]', 'AAAA-AAAA')
+    await click(view, '[data-test="confirm-tab-code"]')
+    await waitFor(view, `document.querySelector('[data-test="tab-code-failure"]')`)
+    expect(await textOf(view, '[data-test="tab-code-failure"]')).toContain('not')
+
+    await fill(view, '[data-test="tab-code-input"]', (await tabCodeOf(app.baseURL, member.cookie))!)
+    await click(view, '[data-test="confirm-tab-code"]')
     await waitFor(view, `document.querySelector('[data-test="charge-confirmation"]')`)
     expect(await textOf(view, '[data-test="tab-balance-note"]')).toContain('£5.00')
     view.close()

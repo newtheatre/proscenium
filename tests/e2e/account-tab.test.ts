@@ -6,7 +6,7 @@ import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
-import { putOnTheTill } from '#tests/helpers/bar'
+import { putOnTheTill, tabCodeOf } from '#tests/helpers/bar'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-109 criterion 1: the holder's own account shows every charge itemised, with the live
@@ -72,8 +72,8 @@ async function aSellableProduct(pricePence: number): Promise<{ variantId: string
   return { variantId }
 }
 
-const charge = (venueId: string, variantId: string, pricePence: number, tabHolderId: string): Promise<Response> =>
-  send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId }, barManager.cookie)
+const charge = async (venueId: string, variantId: string, pricePence: number, holder: TestMember): Promise<Response> =>
+  send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId: holder.id, tabCode: await tabCodeOf(app.baseURL, holder.cookie) }, barManager.cookie)
 
 const settle = (venueId: string, holderId: string, entryIds: string[], expectedTotalPence: number): Promise<Response> =>
   send('POST', '/api/till/tab-settlements', { venueId, holderId, entryIds, expectedTotalPence }, barManager.cookie)
@@ -108,7 +108,7 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await authorise([holder.id])
     await setCap(2000)
 
-    expect((await charge(venueId, variantId, 650, holder.id)).status).toBe(200)
+    expect((await charge(venueId, variantId, 650, holder)).status).toBe(200)
 
     const view = await openSignedOutView(app.baseURL)
     await visit(view, `${app.baseURL}/sign-in`)
@@ -120,6 +120,11 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await visit(view, `${app.baseURL}/account/bar-tab`, `[data-test="account-tab-page"]`)
     expect(await textOf(view, '[data-test="account-tab-outstanding"]')).toContain('£6.50')
     expect(await textOf(view, '[data-test="account-tab-charges"]')).toContain('£6.50')
+
+    // Tonight's code is what the bar asks for before charging this tab (F-108 criterion 6).
+    const code = (await tabCodeOf(app.baseURL, holder.cookie))!
+    expect((await textOf(view, '[data-test="account-tab-code-text"]')).trim().replace('-', '')).toBe(code)
+    expect(await view.evaluate<boolean>(`!!document.querySelector('[data-test="account-tab-code-qr"]')`)).toBe(true)
     view.close()
   }, 120_000)
 
@@ -132,7 +137,7 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await authorise([holder.id])
     await setCap(2000)
 
-    const charged = await charge(venueId, variantId, 500, holder.id)
+    const charged = await charge(venueId, variantId, 500, holder)
     expect(charged.status).toBe(200)
     const { entryId } = await charged.json() as { entryId: string }
 
@@ -160,7 +165,7 @@ describe.skipIf(skip !== null)('a holder reads their own tab, itemised and live 
     await authorise([holder.id])
     await setCap(2000)
 
-    const charged = await charge(venueId, variantId, 500, holder.id)
+    const charged = await charge(venueId, variantId, 500, holder)
     expect(charged.status).toBe(200)
     const { entryId } = await charged.json() as { entryId: string }
 
