@@ -322,7 +322,7 @@ describe.skipIf(skip !== null)('the way in reads as one journey (A-103, A-112)',
   }, 90_000)
 
   // An absolute URL in `next` would make the link an open redirect, so only a path on this site
-  // is followed and anything else lands on the home page.
+  // is followed and anything else lands on My NNT.
   test('a sign-in link refuses to leave the site', async () => {
     const email = await unproven('magic-offsite')
     markVerified(app, email)
@@ -332,7 +332,7 @@ describe.skipIf(skip !== null)('the way in reads as one journey (A-103, A-112)',
     const view = await openSignedOutView(app.baseURL)
     try {
       await view.navigate(`${app.baseURL}/magic?token=${token}&next=https%3A%2F%2Fexample.invalid%2F`)
-      await waitFor(view, `location.pathname === '/'`, 30_000)
+      await waitFor(view, `location.pathname === '/my'`, 30_000)
       expect(await view.evaluate<string>('location.host')).toBe(new URL(app.baseURL).host)
     }
     finally {

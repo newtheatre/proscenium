@@ -10,5 +10,7 @@ export default defineEventHandler(async (event) => {
     signedIn: true as const,
     user: { id: account.id, name: account.name, email: account.email, verified: account.verified },
     ...sessionFacts(await viewerFacts(event, account.id)),
+    // A role that refuses its screens until an authenticator is set up sends sign-in to Security.
+    authenticatorOwed: await owesSecondFactor(event, account),
   }
 })

@@ -41,7 +41,7 @@ const askAgain = computed(() => withNext('/sign-in', route.query.next))
 async function signedIn(): Promise<void> {
   await refresh()
   // An explicit next wins; with none, somebody on shift lands on Tonight (0094).
-  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight, account.value.authenticatorOwed))
 }
 
 useSeoMeta({

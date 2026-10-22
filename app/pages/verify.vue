@@ -31,7 +31,7 @@ onMounted(async () => {
     const result = await $fetch('/api/auth/verify', { method: 'POST', body: { token } })
     await refresh()
     if (result.signedIn) {
-      await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
+      await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight, account.value.authenticatorOwed))
       return
     }
     outcome.value = 'verified'
@@ -81,7 +81,7 @@ useSeoMeta({
         {{ account.signedIn ? 'Your new address is confirmed.' : 'Your account is ready. Sign in to carry on.' }}
       </p>
       <UButton
-        :to="account.signedIn ? landingAfterSignIn(route.query.next, account.onShiftTonight) : withNext('/sign-in', route.query.next)"
+        :to="account.signedIn ? landingAfterSignIn(route.query.next, account.onShiftTonight, account.authenticatorOwed) : withNext('/sign-in', route.query.next)"
         class="min-h-11"
       >
         {{ account.signedIn ? 'Carry on' : 'Sign in' }}

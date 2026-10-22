@@ -103,7 +103,7 @@ export default defineOAuthGoogleEventHandler({
 
     // Where they were when they were asked to sign in again, remembered across the round trip;
     // with nowhere asked, somebody on shift lands on Tonight (0094).
-    return sendRedirect(event, landingAfterSignIn(asked, await onShiftTonight(event, account.id)))
+    return sendRedirect(event, landingAfterSignIn(asked, await onShiftTonight(event, account.id), await owesSecondFactor(event, account)))
   },
 
   onError(event, error) {
