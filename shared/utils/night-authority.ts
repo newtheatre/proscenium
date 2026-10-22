@@ -211,11 +211,17 @@ export function officerBypassEntry(
   performanceIds: string[],
   // Named where the evening was a bar opening, so the night report can say which one (0077).
   openingId?: string,
+  // Which of those had this role confirmed on the rota at the moment the officer acted (0231).
+  confirmedPerformanceIds?: string[],
 ): AuditRow {
   return auditEntry({
     actorId,
     action: OFFICER_BYPASS_ACTION,
     target: officerBypassTarget(night, venueId, role),
-    detail: { role, night, venueId, performanceIds, ...(openingId ? { openingId } : {}) },
+    detail: {
+      role, night, venueId, performanceIds,
+      ...(openingId ? { openingId } : {}),
+      ...(confirmedPerformanceIds ? { confirmedPerformanceIds } : {}),
+    },
   })
 }
