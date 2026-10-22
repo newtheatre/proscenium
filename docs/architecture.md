@@ -2046,6 +2046,10 @@ criterion 4 also asks for are H-105 and H-106's own scope, not this route's: dis
 yet wired to `notify()` (`docs/known-issues.md`), so a failed send here stops after the one
 attempt, recorded as `FAILED` rather than retried.
 
+`GET /api/admin/night-reports/[performanceId]` reopens a frozen report after its night, from
+`/reports/night/[performanceId]`: the snapshot verbatim with its addenda and delivery outcomes,
+guarded by `night.manage` or `safety.read` since it carries incident bodies (0239).
+
 An addendum (`POST /api/admin/night-reports/addenda`) is not shift-scoped: a correction can be found
 days after the night ends, when nobody holds a live shift on it any more, so the guard is the
 standing permission `night.manage` rather than `requireNightAuthority` (criterion 5). It lives

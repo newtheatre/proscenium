@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h } from 'vue'
+import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
 import { saysCategory, saysSeverity } from '#shared/utils/incidents'
 import { saysOpeningBypass } from '#shared/utils/season-reports'
@@ -16,6 +16,11 @@ type Report = 'incidents' | 'performances'
 
 const route = useRoute()
 const request = useRequestFetch()
+const viewer = useViewer()
+const ULink = resolveComponent('ULink')
+
+// A frozen report carries the night's incidents, so only the night's and safety's officers open it (0239).
+const opensReports = computed(() => (['night.manage', 'safety.read'] as const).some(permission => viewer.value?.permissions.includes(permission) ?? false))
 
 // The terms and seasons come through the reports gate, so no finance permission is needed here.
 const periodForm = await usePeriodForm('reports-period-choices', () => request<PeriodChoices>('/api/admin/reports/periods'))
@@ -93,7 +98,9 @@ const performanceColumns: TableColumn<PerformanceReportRow>[] = [
     id: 'performance',
     header: 'Performance',
     cell: ({ row }) => h('div', {}, [
-      h('div', {}, row.original.showTitle),
+      row.original.signedOff && opensReports.value
+        ? h(ULink, { 'to': `/reports/night/${row.original.performanceId}`, 'class': 'text-primary', 'data-test': `open-report-${row.original.performanceId}` }, () => row.original.showTitle)
+        : h('div', {}, row.original.showTitle),
       h('div', { class: 'text-xs text-muted' }, `${saysWhen(row.original.startsAt)}, ${row.original.venueName}`),
       // Listed only because it still holds card money: the treasurer's to refund or explain.
       row.original.cancelled

@@ -17,6 +17,7 @@ const NOT_IN_THE_NAV = new Set([
   'app/pages/bar/stock/stocktakes/[id].vue',
   'app/pages/box-office/shows/[id].vue',
   'app/pages/people/accounts/[id].vue',
+  'app/pages/reports/night/[performanceId].vue',
   'app/pages/comms/operations/accounts/[id].vue',
   'app/pages/training/manage/sessions/[id].vue',
   'app/pages/admin/[...legacy].vue',

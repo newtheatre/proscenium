@@ -15,7 +15,7 @@ walk-up line counted only walk-ups already scanned in, so it read nought while t
 admission was in **In** but nowhere else; **No-shows** read before the curtain as if the night were
 over; the card reader's figure was the whole night's at every venue, unlabelled; and **Sign off
 and close** greyed out with no reason while the note was empty. Once signed, the hub still led
-with the gold **Sign off and close** tile.
+with the gold **Sign off and close** tile, and no screen anywhere opened a signed report again.
 
 ## Decision
 
@@ -31,6 +31,10 @@ with the gold **Sign off and close** tile.
 - Before the curtain is down, **No-shows** reads **Paid, not yet in**. The card reader line says
   it is the whole night at every venue. A hint under the button says the note is what it waits for.
 - Once tonight's performance is closed, the hub's report tile reads **Signed off by …**.
+- A signed report opens again from its row on /reports, frozen as it was, with its corrections,
+  who it reached, and a form to add a correction (the addendum route had no screen). It is read
+  with `night.manage` or `safety.read`, not `reports.read`: the Committee role holds the latter
+  for season aggregates, and the report carries each incident's own words.
 
 ## Consequences
 

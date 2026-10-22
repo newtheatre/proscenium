@@ -277,3 +277,24 @@ describe.skipIf(skip !== null)('addenda (criterion 5)', () => {
     expect(refused.status).toBe(403)
   })
 })
+
+// A signed report opens again from /reports after its night, for the night's and safety's officers (0239).
+describe.skipIf(skip !== null)('a signed report opens after its night (0239)', () => {
+  test('the frozen report, its corrections and who it reached', async () => {
+    const dm = await registerMember(app, 'reopen-dm', generatePassword())
+    const { performanceId } = afterCurtain(withBatch(runner => tonightsPerformance(runner, { suffix: 'reopen' })))
+    shift(performanceId, 'DUTY_MANAGER', dm.id)
+
+    expect((await send('GET', `/api/admin/night-reports/${performanceId}`)).status).toBe(404)
+    await send('POST', '/api/tonight/report/sign-off', { performanceId, closingNote: 'A good night', incidentsSeen: 0 }, dm.cookie)
+
+    const opened = await send('GET', `/api/admin/night-reports/${performanceId}`)
+    expect(opened.status).toBe(200)
+    const body = await opened.json() as { showTitle: string | null, signedOff: { closingNote: string }, deliveries: { recipient: string, status: string }[] }
+    expect(body.showTitle).not.toBeNull()
+    expect(body.signedOff.closingNote).toBe('A good night')
+    expect(body.deliveries).toContainEqual(expect.objectContaining({ recipient: dm.email, status: 'SENT' }))
+
+    expect((await send('GET', `/api/admin/night-reports/${performanceId}`, undefined, dm.cookie)).status).toBe(403)
+  })
+})
