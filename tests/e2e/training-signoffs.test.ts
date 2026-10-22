@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
-import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, menuOptions, openSignedOutView, openView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -75,13 +75,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
   })
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-// London days, because that is what an award date is (0014). Adding to a UTC instant is not the
-// same thing: at 23:30 BST, "tomorrow in UTC" is already today in London.
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 const today = (): string => daysFrom(0)
 

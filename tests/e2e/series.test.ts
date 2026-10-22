@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonDaysFrom, londonWeekdayFrom } from '#tests/helpers/london-day'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
-import { londonClock, londonParts } from '#shared/utils/london'
+import { londonClock } from '#shared/utils/london'
 import { click, fill, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
@@ -92,13 +93,7 @@ async function makeRoom(over: Record<string, unknown> = {}): Promise<string> {
 }
 
 // Weeks out, so every occurrence clears the notice window and the whole series confirms.
-function mondayIn(weeks: number): string {
-  const today = londonParts(new Date())
-  const at = new Date(Date.UTC(today.year, today.month - 1, today.day + weeks * 7, 12))
-  while (at.getUTCDay() !== 1) at.setUTCDate(at.getUTCDate() + 1)
-  const { year, month, day } = londonParts(at)
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
+const mondayIn = (weeks: number): string => londonWeekdayFrom(weeks * 7, 1)
 
 interface SeriesAnswer { id: string, status: string, occurrences: { occurrence: number, day: string }[] }
 
@@ -264,10 +259,7 @@ describe.skipIf(skip !== null)('a series out of policy queues as a whole (criter
 
   test('one week inside the notice window queues the whole run', async () => {
     const room = await makeRoom()
-    const soon = new Date()
-    soon.setUTCDate(soon.getUTCDate() + 1)
-    const { year, month, day } = londonParts(soon)
-    const startsOn = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const startsOn = londonDaysFrom(1)
 
     const answered = await bookSeries(room, { frequency: 'DAILY', weekdays: [], startsOn, occurrences: 3 })
     const body = await answered.json() as SeriesAnswer

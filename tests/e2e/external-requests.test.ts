@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysDayLong } from '#shared/utils/when'
+import { londonDaysFrom } from '#tests/helpers/london-day'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { overrideConfig } from '#tests/helpers/config'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -496,9 +497,7 @@ describe.skipIf(skip !== null)('the screens (C-120)', () => {
       await click(view, 'form button[type="submit"]')
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-      const day = new Date()
-      day.setUTCDate(day.getUTCDate() + 40)
-      const asDay = day.toISOString().slice(0, 10)
+      const asDay = londonDaysFrom(40)
 
       await visit(view, `${app.baseURL}/rooms/external?day=${asDay}&purpose=REHEARSAL`, '[data-test="external-title"]')
       // A server render cannot see a hydration failure, so the page is read after it is live.

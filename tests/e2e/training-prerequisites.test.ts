@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { londonDaysFrom } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -296,7 +297,7 @@ describe.skipIf(skip !== null)('the catalogue a member browses (G-103)', () => {
     await needs(advanced, expiring)
     await needs(advanced, expired)
 
-    const soon = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10)
+    const soon = londonDaysFrom(10)
     write(
       `INSERT INTO training_records (id, user_id, module_id, awarded_on, expires_on, source)
        VALUES (?, ?, ?, '2026-09-01', ?, 'SIGNOFF')`,

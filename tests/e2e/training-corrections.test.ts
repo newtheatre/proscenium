@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { londonParts } from '#shared/utils/london'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -83,11 +83,6 @@ function write(statement: string, ...parameters: unknown[]): void {
   finally {
     database.close()
   }
-}
-
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
 }
 
 async function addModule(over: Record<string, unknown> = {}): Promise<string> {
