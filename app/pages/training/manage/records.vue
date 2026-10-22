@@ -23,6 +23,7 @@ interface Record {
   source: string
   revokedAt: number | null
   superseded: boolean
+  supersededBy: string | null
   says: string
   held: boolean
 }
@@ -57,9 +58,16 @@ const name = ref('')
 // Nobody stays chosen behind the address, or an award would leave from their history for it.
 function recordByAddress(): void {
   person.value = undefined
-  address.value = nobody.value?.includes('@') ? nobody.value : ''
+  const term = nobody.value?.trim() ?? ''
+  address.value = term.includes('@') ? term : ''
+  if (!term.includes('@') && !name.value) name.value = term
   byAddress.value = true
 }
+
+// The last search that found nobody outlives the box clearing on blur, until somebody is chosen.
+watch(person, (chosen) => {
+  if (chosen) nobody.value = null
+})
 
 function searchAgain(): void {
   nobody.value = null
@@ -246,7 +254,7 @@ const columns: TableColumn<Record>[] = [
       // Below sm the award and expiry days are hidden: shown here instead, so a phone keeps the
       // state and the row's action in view without losing what they said (issue 922).
       h('div', { class: 'sm:hidden text-xs text-muted' },
-        `Awarded ${saysDay(row.original.awardedOn)}, ${row.original.expiresOn ? `runs to ${saysDay(row.original.expiresOn)}` : 'never expires'}`),
+        `Awarded ${saysDay(row.original.awardedOn)}, ${row.original.expiresOn ? `runs to ${saysDay(row.original.expiresOn, { year: true })}` : 'never expires'}`),
     ]),
   },
   {
@@ -256,23 +264,24 @@ const columns: TableColumn<Record>[] = [
     cell: ({ row }) => h('div', {}, [
       h('div', {}, `Awarded ${saysDay(row.original.awardedOn)}`),
       h('div', { class: 'text-xs text-muted' },
-        row.original.expiresOn ? `Runs to ${saysDay(row.original.expiresOn)}` : 'Never expires'),
+        row.original.expiresOn ? `Runs to ${saysDay(row.original.expiresOn, { year: true })}` : 'Never expires'),
     ]),
   },
   {
     id: 'state',
     header: 'State',
     cell: ({ row }) => h('div', { class: 'flex flex-wrap gap-1' }, [
+      // A superseded record says only that: its own state is no longer what anybody holds.
       row.original.revokedAt
         ? h(UBadge, { color: 'error', variant: 'subtle', size: 'sm' }, () => 'Revoked')
-        : h(UBadge, {
-            color: row.original.held ? 'success' : 'neutral',
-            variant: 'subtle',
-            size: 'sm',
-          }, () => row.original.says),
-      row.original.superseded
-        ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Superseded')
-        : null,
+        : row.original.superseded
+          ? h(UBadge, { 'color': 'neutral', 'variant': 'subtle', 'size': 'sm', 'data-test': 'record-superseded' }, () =>
+              row.original.supersededBy ? `Superseded by the ${saysDay(row.original.supersededBy, { year: true })} award` : 'Superseded')
+          : h(UBadge, {
+              color: row.original.held ? 'success' : 'neutral',
+              variant: 'subtle',
+              size: 'sm',
+            }, () => row.original.says),
     ]),
   },
   {
@@ -335,7 +344,7 @@ watch(modalOpen, (nowOpen) => {
         v-model="person"
         :endpoint="pickerEndpoint"
         class="w-full sm:w-96"
-        @nobody="term => nobody = term"
+        @nobody="term => { if (term) nobody = term }"
       />
       <UButton
         v-if="nobody && byAddressAllowed && !byAddress"
@@ -561,7 +570,7 @@ watch(modalOpen, (nowOpen) => {
           <UFormField
             label="Evidence"
             required
-            :description="wanted ?? `A certificate number, the issuing body, or a document reference. Up to ${EVIDENCE_REF_LIMIT} characters.`"
+            :description="wanted ? `This module accepts: ${wanted.replace(/\.$/, '')}. Give its number or reference.` : `A certificate number, the issuing body, or a document reference. Up to ${EVIDENCE_REF_LIMIT} characters.`"
           >
             <UInput
               v-model="certificate.evidenceRef"

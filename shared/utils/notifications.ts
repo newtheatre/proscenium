@@ -563,6 +563,14 @@ export const MESSAGE_TYPES = {
     template: 'training-session-added',
   },
 
+  // What the session teaches changed after they signed up, and now needs something they lack.
+  // Sent only when the trainer chose to, having read the names (0243).
+  'training.session.needs-first': {
+    topic: 'TRAINING',
+    channels: ['EMAIL', 'INBOX'],
+    template: 'training-session-needs-first',
+  },
+
   // Blunt, because it is to an officer about a system failure rather than to a member about
   // themselves: until the register is marked, the training did not happen (G-119).
   'training.register.unmarked': {

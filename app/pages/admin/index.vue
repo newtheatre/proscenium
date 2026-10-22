@@ -6,6 +6,7 @@ import { queuesFor, saysSetUp, setUpHref } from '#shared/utils/console-overview'
 import { saysNotificationStatus } from '#shared/utils/notifications'
 import { currentShowNight } from '#shared/utils/show-night'
 import { NAV_COUNTS, NAV_QUEUES } from '#shared/utils/site-nav'
+import { londonDay } from '#shared/utils/membership'
 import { saysClock, saysDay, saysWhen } from '#shared/utils/when'
 import type { ConsoleOverview } from '#shared/utils/console-overview'
 import type { Ref } from 'vue'
@@ -94,6 +95,17 @@ function saysWhy(entry: Trouble): string {
   return WHY[entry.error ?? ''] ?? WHY[entry.status] ?? entry.error ?? 'no reason recorded'
 }
 
+// A trainer's own sessions, so the console home is the way to tonight's register (0243). Empty,
+// and so not shown, for anybody who teaches nothing.
+interface Taught { id: string, heldOn: string, startsAt: string, place: string | null, registerOpenedAt: number | null, modules: { id: string, name: string }[] }
+const { data: teaching } = await useAsyncData(
+  'console-teaching',
+  () => request<{ items: Taught[] }>('/api/training/teaching'),
+  { default: () => ({ items: [] as Taught[] }), immediate: false },
+)
+const registersToTake = computed(() => teaching.value.items.filter(one => one.registerOpenedAt !== null || one.heldOn <= londonDay(new Date())))
+const teachingNext = computed(() => teaching.value.items.filter(one => !registersToTake.value.includes(one)).slice(0, 3))
+
 // Only somebody who may read the trail is shown it: a trainer or a lead reaches this screen too
 // now, and an empty card would tell them nothing had failed (issue 1336).
 const seesTrouble = computed(() => can(viewer.value, viewAuditTrail))
@@ -113,7 +125,7 @@ onMounted(async () => {
   if (!account.value.signedIn) return
   // Silently empty when the reader holds no ticketing permission, which is the same answer the
   // route gives: the card renders nothing rather than a refusal they cannot act on.
-  const keys = ['console-overview', 'unassessed-shows', ...(seesDrill.value ? ['drill-status'] : []), ...(seesTrouble.value ? ['delivery-trouble'] : [])]
+  const keys = ['console-overview', 'console-teaching', 'unassessed-shows', ...(seesDrill.value ? ['drill-status'] : []), ...(seesTrouble.value ? ['delivery-trouble'] : [])]
   await Promise.allSettled(keys.map(key => refreshNuxtData(key)))
   settled.value = true
 })
@@ -203,6 +215,35 @@ onMounted(async () => {
     </UPageCard>
 
     <MoneyNightsNeedingYou />
+
+    <UPageCard
+      v-if="teaching.items.length > 0"
+      title="Sessions you teach"
+      :description="registersToTake.length > 0 ? 'Registers to take, then what you teach next.' : 'What you teach next. Each register opens on its day.'"
+      data-test="console-teaching"
+    >
+      <ul class="divide-y divide-default text-sm">
+        <li
+          v-for="session in [...registersToTake, ...teachingNext]"
+          :key="session.id"
+          class="flex flex-wrap items-baseline justify-between gap-3 py-2"
+          :data-test="`console-teaching-${session.id}`"
+        >
+          <span>
+            {{ session.modules.map(module => module.name).join(', ') }}
+            <span class="text-muted">· {{ saysDay(session.heldOn) }} at {{ session.startsAt }}</span>
+          </span>
+          <UButton
+            size="sm"
+            :variant="registersToTake.includes(session) ? 'solid' : 'outline'"
+            :color="registersToTake.includes(session) ? 'primary' : 'neutral'"
+            :to="`/training/sessions/${session.id}/register`"
+          >
+            {{ registersToTake.includes(session) ? 'Take the register' : `See the register (opens ${saysDay(session.heldOn)})` }}
+          </UButton>
+        </li>
+      </ul>
+    </UPageCard>
 
     <ReadFailure
       v-if="overviewOwn"

@@ -20,6 +20,7 @@ const flat = (part: string): string => part.replace(/\s+/g, ' ')
 const EVERYTHING: TemplateContext = {
   name: 'Ada',
   taught: 'Working at height',
+  missing: 'TECH-101 Ladder safety',
   standing: 'You have a place.',
   sessionUrl: 'https://newtheatre.org.uk/training/manage/sessions/1',
   url: 'https://newtheatre.org.uk/reset/abc',
@@ -222,7 +223,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   })
 
   test('account-claim says we already know the address', () => {
-    expect(render('account-claim', EVERYTHING).html).toContain('We already know this address, from a booking or from our old records')
+    expect(render('account-claim', EVERYTHING).html).toContain('We already know this address, from a booking, a training record or our old records')
   })
 
   test('account-claim on an unconfirmed registration says why a password is asked for again (0153)', () => {

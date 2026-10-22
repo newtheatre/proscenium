@@ -149,6 +149,13 @@ useSeoMeta({ title: 'Create an account' })
       >
         {{ resent }}
       </p>
+      <p
+        class="text-sm text-muted"
+        data-test="register-known-address"
+      >
+        If we already knew this address, from a booking or a training record, the message asks you to
+        choose a password instead, and the one typed here is not kept.
+      </p>
     </div>
   </WayIn>
 </template>

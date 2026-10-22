@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
 import { CONFIG_KEYS } from '#shared/utils/config'
-import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
+import { adminSession, forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickOption, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // G-107, G-110 and G-123 through the real routes and the real screen. Nothing here reads a stored
@@ -734,6 +734,64 @@ describe.skipIf(skip !== null)('the screen (G-107, G-110)', () => {
     }
 
     expect(read<{ name: string }>('SELECT name FROM departments WHERE code = ?', code)?.name).toBe('Wardrobe')
+  }, CASE_TIMEOUT_MS)
+})
+
+describe.skipIf(skip !== null)('a screen offers only what its reader may do (0243)', () => {
+  test('a lead sees the departments without the Theatre Manager\'s buttons, and each lead\'s end date', async () => {
+    const leadPassword = generatePassword()
+    const lead = await registerMember(app, 'lead', leadPassword)
+    const department = await addDepartment()
+    expect((await send('POST', `/api/admin/training/departments/${department}/leads`, { userId: lead.id })).status).toBe(200)
+
+    const view = await signInView(app, lead.email, leadPassword)
+    try {
+      await visit(view, `${app.baseURL}/training/manage/departments`, '[data-test="departments-table"]')
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(department)})`, 30_000)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="add-department"]'))`)).toBe(false)
+      expect(await textOf(view, '[data-test="departments-table"]')).not.toContain('Assign a lead')
+      expect(await textOf(view, '[data-test="departments-table"]')).toMatch(/until \w+ 31 Jul \d{4}/)
+      expect(await textOf(view, 'body')).toContain('both set by the Theatre Manager')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('somebody who is neither the Theatre Manager nor a lead is told the screen is for both', async () => {
+    const memberPassword = generatePassword()
+    const member = await registerMember(app, 'nobody', memberPassword)
+    const view = await signInView(app, member.email, memberPassword)
+    try {
+      await visit(view, `${app.baseURL}/training/manage`)
+      await waitFor(view, `document.body.innerText.includes('That is not yours to open')`, 30_000)
+      expect(await textOf(view, 'body')).toContain('or department leads.')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the catalogue table shows committee only, external certificates and what a module needs first', async () => {
+    const department = await addDepartment()
+    const needed = `NEED-${suffix()}`
+    const id = `BADGE-${suffix()}`
+    expect((await addModule(department, { id: needed, status: 'ACTIVE' })).status).toBe(200)
+    expect((await addModule(department, { id, committeeOnly: true, allowsExternal: true, externalEvidence: 'An IPAF card' })).status).toBe(200)
+    expect((await send('POST', `/api/admin/training/modules/${id}/prerequisites`, { requiresId: needed })).status).toBe(200)
+
+    const view = await signedInView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage?search=${id}`, '[data-test="modules-table"]')
+      await waitFor(view, `document.body.innerText.includes(${JSON.stringify(id)})`, 30_000)
+      const table = await textOf(view, '[data-test="modules-table"]')
+      expect(table).toContain('Committee only')
+      expect(table).toContain('External certificate')
+      expect(table).toContain(`Needs ${needed} first`)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })
 

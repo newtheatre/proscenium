@@ -86,9 +86,19 @@ const columns: TableColumn<CatalogueModule>[] = [
         row.original.safetyCritical
           ? h(UBadge, { color: 'error', variant: 'subtle', size: 'sm' }, () => 'Safety critical')
           : null,
+        row.original.committeeOnly
+          ? h(UBadge, { 'color': 'neutral', 'variant': 'outline', 'size': 'sm', 'data-test': 'catalogue-committee-only' }, () => 'Committee only')
+          : null,
+        row.original.allowsExternal
+          ? h(UBadge, { 'color': 'neutral', 'variant': 'outline', 'size': 'sm', 'data-test': 'catalogue-external' }, () => 'External certificate')
+          : null,
       ]),
       h('div', { class: 'text-xs text-muted' },
         `${row.original.department} · ${saysKind(row.original.kind)} · ${saysDeliveryMode(row.original.deliveryMode)}`),
+      row.original.prerequisites.length > 0
+        ? h('div', { 'class': 'text-xs text-muted', 'data-test': 'catalogue-needs' },
+            `Needs ${row.original.prerequisites.map(need => need.requiresId).join(', ')} first`)
+        : null,
       // Below sm the lifetime and what it grants are hidden: shown here instead, so a phone keeps
       // the status and the row's action in view without losing what they said (issue 922).
       h('div', { class: 'sm:hidden text-xs text-muted' }, [describeExpiry(row.original), ...grants(row.original)].join(' · ')),

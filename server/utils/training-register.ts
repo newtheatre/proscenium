@@ -271,7 +271,8 @@ export async function tellAbsentees(
   return told
 }
 
-const saysTaught = (modules: { name: string }[]): string => modules.map(module => module.name).join(', ')
+export const saysTaught = (modules: { name: string }[]): string =>
+  modules.map(module => module.name).join(', ')
 
 // A correction moves somebody's record one way or the other, and each direction says which. Keyed
 // to the correction, so being dropped, added back and dropped again each tells them (0241).

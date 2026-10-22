@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, manageTrainingDepartments } from '#shared/utils/abilities'
 import { departmentForm, newDepartmentForm } from '#shared/utils/training'
+import { saysDay } from '#shared/utils/when'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { DepartmentInput } from '#shared/utils/training'
@@ -28,6 +30,8 @@ interface Department {
 
 const request = useRequestFetch()
 const toast = useToast()
+// A lead reads this screen and changes nothing on it, so the buttons are the Theatre Manager's (0243).
+const manages = can(useViewer().value, manageTrainingDepartments)
 const search = ref('')
 const includeInactive = ref(false)
 const failure = ref<string | null>(null)
@@ -97,6 +101,12 @@ async function save(event: FormSubmitEvent<DepartmentInput & { code?: string }>)
   }
 }
 
+// The stamped lapse, read back so the toast states what the server wrote rather than a guess.
+async function refreshedLead(code: string, userId: string | undefined): Promise<Lead | undefined> {
+  await refresh()
+  return data.value.items.find(one => one.code === code)?.leads.find(lead => lead.userId === userId)
+}
+
 async function appoint(): Promise<void> {
   const department = appointing.value
   if (!department || !appointee.value) return
@@ -108,15 +118,17 @@ async function appoint(): Promise<void> {
       method: 'POST',
       body: { userId: appointee.value },
     })
+    const renewal = department.leads.some(lead => lead.userId === appointee.value)
+    const lapses = (await refreshedLead(department.code, appointee.value))?.expiresAt ?? null
+    const until = lapses === null ? 'permanently' : `to ${saysDay(lapses, { year: true })}`
     toast.add({
-      title: 'Lead assigned',
-      description: 'It lapses at handover unless somebody renews it.',
+      title: renewal ? `Renewed ${until}` : 'Lead assigned',
+      description: renewal ? 'Their lead appointment now runs to the next handover.' : `It runs ${until}, and lapses then unless somebody renews it.`,
       icon: 'i-lucide-check',
       color: 'success',
     })
     appointing.value = null
     appointee.value = undefined
-    await refresh()
   }
   catch (error) {
     failure.value = refusalText(error)
@@ -187,42 +199,50 @@ const columns: TableColumn<Department>[] = [
       : h('div', { class: 'flex flex-wrap gap-2' }, row.original.leads.map(lead =>
           h('span', { class: 'flex items-center gap-1 text-sm' }, [
             lead.name,
-            h(UButton, {
-              'icon': 'i-lucide-x',
-              'size': 'xs',
-              'color': 'neutral',
-              'variant': 'ghost',
-              'aria-label': `Remove ${lead.name} as a lead of ${row.original.name}`,
-              'data-test': `stand-down-${lead.id}`,
-              'onClick': () => {
-                standDownFailure.value = null
-                standingDown.value = lead
-              },
-            }),
+            h('span', { 'class': 'text-xs text-muted', 'data-test': `lead-until-${lead.id}` },
+              lead.expiresAt === null ? '(permanent)' : `until ${saysDay(lead.expiresAt, { year: true })}`),
+            !manages
+              ? null
+              : h(UButton, {
+                  'icon': 'i-lucide-x',
+                  'size': 'xs',
+                  'color': 'neutral',
+                  'variant': 'ghost',
+                  'aria-label': `Remove ${lead.name} as a lead of ${row.original.name}`,
+                  'data-test': `stand-down-${lead.id}`,
+                  'onClick': () => {
+                    standDownFailure.value = null
+                    standingDown.value = lead
+                  },
+                }),
           ])))),
   },
   {
     id: 'act',
     header: ACTIONS_HEADER,
     meta: ACTIONS_COLUMN,
-    cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
-      h(UButton, {
-        'size': 'sm',
-        'variant': 'subtle',
-        'data-test': `appoint-${row.original.code}`,
-        'onClick': () => {
-          appointing.value = row.original
-          appointee.value = undefined
-        },
-      }, () => 'Assign a lead'),
-      h(UButton, {
-        'size': 'sm',
-        'color': 'neutral',
-        'variant': 'ghost',
-        'data-test': `edit-department-${row.original.code}`,
-        'onClick': () => edit(row.original),
-      }, () => 'Edit'),
-    ]),
+    cell: ({ row }) => !manages
+      ? null
+      : h('div', { class: 'flex justify-end gap-1' }, [
+          !row.original.isActive
+            ? null
+            : h(UButton, {
+                'size': 'sm',
+                'variant': 'subtle',
+                'data-test': `appoint-${row.original.code}`,
+                'onClick': () => {
+                  appointing.value = row.original
+                  appointee.value = undefined
+                },
+              }, () => 'Assign a lead'),
+          h(UButton, {
+            'size': 'sm',
+            'color': 'neutral',
+            'variant': 'ghost',
+            'data-test': `edit-department-${row.original.code}`,
+            'onClick': () => edit(row.original),
+          }, () => 'Edit'),
+        ]),
   },
 ]
 
@@ -250,7 +270,7 @@ watch(modalOpen, (nowOpen) => {
     />
 
     <p class="text-sm text-muted">
-      The departments that own the catalogue, and who leads each.
+      The departments that own the catalogue and who leads each, both set by the Theatre Manager.
     </p>
 
     <AdminToolbar
@@ -270,7 +290,10 @@ watch(modalOpen, (nowOpen) => {
         </UFormField>
       </template>
 
-      <template #actions>
+      <template
+        v-if="manages"
+        #actions
+      >
         <UButton
           data-test="add-department"
           icon="i-lucide-plus"
@@ -331,9 +354,10 @@ watch(modalOpen, (nowOpen) => {
             description="Uppercase letters, digits and hyphens. TECH, BACKSTAGE, FOH."
           >
             <UInput
-              v-model="state.code"
+              :model-value="state.code"
               class="w-full"
               data-test="department-code"
+              @update:model-value="value => state.code = String(value ?? '').toUpperCase()"
             />
           </UFormField>
 

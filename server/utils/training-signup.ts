@@ -156,6 +156,8 @@ export interface MemberSession extends MemberSessionRow {
   closure: ClosureReason | null
   blocked: PrerequisiteGap[]
   warnings: PrerequisiteGap[]
+  // What it teaches that they hold already: they may still come to refresh it.
+  alreadyHeld: string[]
 }
 
 // Sessions a member can see, with where they stand on each. Their own row is a left join and
@@ -210,9 +212,10 @@ export async function sessionsForMember(
   // Every module in view once, so the gaps are worked out for the member rather than per session.
   const everyModule = [...new Map(taught.map(row =>
     [row.id, { id: row.id, safetyCritical: row.safetyCritical === 1 }])).values()]
-  const [gaps, committee] = await Promise.all([
+  const [gaps, committee, held] = await Promise.all([
     prerequisiteGapsFor(userId, everyModule, today),
     taught.some(row => row.committeeOnly === 1) ? hasCommitteeRole(userId) : true,
+    modulesHeldBy(userId, today),
   ])
 
   return rows.map((row) => {
@@ -237,7 +240,8 @@ export async function sessionsForMember(
         at,
       ),
       blocked: blockingGaps(mine),
-      warnings: warningGaps(mine),
+      warnings: warningGaps(mine, modules.map(module => module.id)),
+      alreadyHeld: modules.filter(module => held.has(module.id)).map(module => module.id),
     }
   })
 }

@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
       statusMessage: `This session is safety critical, so it needs ${saysGaps(blocked)} first`,
     })
   }
-  const warnings = warningGaps(gaps)
+  const warnings = warningGaps(gaps, session.modules.map(module => module.id))
   const keyed = warnings.map(gap => ({ ...gap, key: gapKey({ ...gap, userId: input.userId }) }))
   const outstanding = keyed.filter(gap => !input.acknowledged.includes(gap.key))
   if (outstanding.length > 0) {

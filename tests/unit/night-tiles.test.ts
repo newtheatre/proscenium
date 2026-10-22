@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { curtainIsDown, hubTiles, hubTilesWhileAsking, whoCanHelpTonight } from '#shared/utils/night-hub'
 import { NIGHT_ROLES, claimedShiftRefusal, nightAuthorityRefusal, outsideWindowRefusal } from '#shared/utils/night-authority'
-import { hubRefusal, rolesThatReach, saysScreenIsFor } from '#shared/utils/refusals'
-import { viewAccounts, viewProgramme } from '#shared/utils/abilities'
+import { hubRefusal, rolesThatReach, saysScreenIsFor, standingsThatReach } from '#shared/utils/refusals'
+import { viewAccounts, viewProgramme, viewTrainingCatalogue } from '#shared/utils/abilities'
 import type { NightRole } from '#shared/utils/night-authority'
 
 // Issue 1304: the hub is shaped by the viewer's own job, a refused screen says who can help, and a
@@ -141,5 +141,11 @@ describe('a signed-in refusal names the role that opens the screen (issue 1304, 
   test('two or more roles are joined in words, and none says so plainly', () => {
     expect(saysScreenIsFor(['FOH_MANAGER', 'TREASURER'])).toBe('This screen is for the Front of House Manager or the Treasurer.')
     expect(saysScreenIsFor([])).toBe('Your account does not open this screen')
+  })
+
+  test('a training screen a lead opens by standing names department leads too (0243)', () => {
+    expect(standingsThatReach(viewTrainingCatalogue)).toEqual(['lead'])
+    expect(standingsThatReach(viewProgramme)).toEqual([])
+    expect(saysScreenIsFor(rolesThatReach(viewTrainingCatalogue), ['lead'])).toMatch(/^This screen is for the .+ or department leads\.$/)
   })
 })

@@ -22,9 +22,26 @@ export function rolesThatReach(ability: BouncerAbility<Viewer>): Role[] {
   }, ability))
 }
 
-export function saysScreenIsFor(roles: readonly Role[]): string {
-  if (roles.length === 0) return 'Your account does not open this screen'
-  const named = roles.map(role => `the ${saysRole(role)}`)
+// A department lead or a trainer opens some screens by standing, not role (0243).
+export type ScreenStanding = 'lead' | 'trainer'
+const STANDING_SAYS: Record<ScreenStanding, string> = { lead: 'department leads', trainer: 'trainers' }
+
+export function standingsThatReach(ability: BouncerAbility<Viewer>): ScreenStanding[] {
+  const viewer = (standing: ScreenStanding): Viewer => ({
+    id: standing,
+    permissions: [],
+    onShiftTonight: false,
+    leadsDepartment: standing === 'lead',
+    isTrainer: standing === 'trainer',
+    keepsBarTab: false,
+    membershipState: { kind: 'none' },
+  })
+  return (['lead', 'trainer'] as const).filter(standing => can(viewer(standing), ability))
+}
+
+export function saysScreenIsFor(roles: readonly Role[], standings: readonly ScreenStanding[] = []): string {
+  if (roles.length === 0 && standings.length === 0) return 'Your account does not open this screen'
+  const named = [...roles.map(role => `the ${saysRole(role)}`), ...standings.map(one => STANDING_SAYS[one])]
   const joined = named.length > 1 ? `${named.slice(0, -1).join(', ')} or ${named[named.length - 1]}` : named[0]
   return `This screen is for ${joined}.`
 }

@@ -302,6 +302,35 @@ describe.skipIf(skip !== null)('prerequisites block or warn (G-105 criteria 3 an
     expect(standing.warnings.map(warning => warning.requiresId)).toEqual([needed])
   })
 
+  test('a prerequisite the same session teaches is no warning, on the schedule or at sign-up (0243)', async () => {
+    const needed = await addModule()
+    const taught = await addModule()
+    await send('POST', `/api/admin/training/modules/${taught}/prerequisites`, { requiresId: needed })
+
+    const session = await schedule({ moduleIds: [needed, taught] })
+    const person = await member()
+
+    const listing = await (await send('GET', '/api/training/sessions', undefined, person.cookie)).json() as
+      { items: { id: string, warnings: unknown[] }[] }
+    expect(listing.items.find(one => one.id === session)?.warnings).toEqual([])
+    expect((await (await signUp(session, person.cookie)).json() as Standing).warnings).toEqual([])
+  })
+
+  test('the schedule says what a member already holds, and still lets them sign up to refresh it (0243)', async () => {
+    const held = await addModule()
+    const session = await schedule({ moduleIds: [held] })
+    const { person, view } = await memberView()
+    award(person.id, held)
+    try {
+      await visit(view, `${app.baseURL}/training/sessions`, `[data-test="signup-${session}"]`)
+      expect(await textOf(view, `[data-test="already-held-${session}"]`)).toContain('You already hold this')
+    }
+    finally {
+      view.close()
+    }
+    expect((await signUp(session, person.cookie)).status).toBe(200)
+  }, CASE_TIMEOUT_MS)
+
   // Criterion 6, on both halves of criterion 3.
   test('an expiring record counts as held, so it neither blocks nor warns', async () => {
     const needed = await addModule()

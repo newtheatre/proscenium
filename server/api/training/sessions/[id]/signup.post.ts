@@ -94,6 +94,6 @@ export default defineEventHandler(async (event) => {
     position: mine.position,
     placed: mine.placed,
     waitlistPosition: mine.waitlistPosition,
-    warnings: warningGaps(gaps),
+    warnings: warningGaps(gaps, session.modules.map(module => module.id)),
   }
 })

@@ -427,6 +427,29 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
     expect(stored).toMatchObject({ starts: '18:30', capacity: 12, status: 'OPEN', place: 'The studio' })
   }, CASE_TIMEOUT_MS)
 
+  test('today typed into the day is refused in words, with the way to log it instead (0243)', async () => {
+    await addModule()
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/training/manage/sessions`, '[data-test="sessions-table"]')
+      await click(view, '[data-test="add-session"]')
+      await waitFor(view, `document.querySelector('[data-test="session-starts"]')`, 30_000)
+      await fillDate(view, '[data-test="session-day"]', daysFrom(0))
+      await waitFor(view, `document.querySelector('[data-test="session-day-past"]')`, 30_000)
+      expect(await textOf(view, '[data-test="session-day-past"]')).toContain('A session is scheduled for a future day')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="session-submit"]').disabled`)).toBe(true)
+
+      // More places than any session takes is said, not quietly turned into 60.
+      await fillNumber(view, '[data-test="session-capacity"]', '75')
+      await fillDate(view, '[data-test="session-day"]', daysFrom(14))
+      await click(view, '[data-test="session-submit"]')
+      await waitFor(view, `document.body.innerText.includes('A session takes at most 60 people')`, 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('a session\'s own page heads with the same short London day', async () => {
     const module = await addModule()
     const day = daysFrom(28)
@@ -521,14 +544,36 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
       await waitFor(view, `document.querySelector('[data-test="modules-lacking"]')?.innerText.includes(${JSON.stringify(trainer.name)})`, 30_000)
       expect(await textOf(view, '[data-test="modules-lacking"]')).toContain(needed)
 
+      // Offered ticked, so the people named are told unless the trainer chooses otherwise (0243).
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="modules-tell-lacking"]'))`)).toBe(true)
       await click(view, '[data-test="modules-save"]')
-      await waitFor(view, `document.querySelector('[data-test="modules-result"]')`, 30_000)
+      await waitFor(view, `document.querySelector('[data-test="modules-result"]')?.innerText.includes('emailed')`, 30_000)
     }
     finally {
       view.close()
     }
 
     expect(read<{ n: number }>('SELECT count(*) n FROM session_modules WHERE session_id = ?', id)?.n).toBe(2)
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND session_id = ? AND type = 'training.session.needs-first'`, trainerId, id,
+    )?.n).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
+  test('a change of modules saved without the email tells nobody', async () => {
+    const needed = await addModule()
+    const taught = await addModule()
+    const added = await addModule()
+    await send('POST', `/api/admin/training/modules/${added}/prerequisites`, { requiresId: needed })
+    const { id } = await (await schedule({ moduleIds: [taught] })).json() as { id: string }
+    write(`INSERT INTO session_attendees (id, session_id, user_id, status, source, signed_up_at, created_at)
+      VALUES (?, ?, ?, 'SIGNED_UP', 'SIGNUP', 100, 100)`, `a-${suffix()}`, id, trainerId)
+
+    const answered = await send('PUT', `/api/admin/training/sessions/${id}/modules`, { moduleIds: [taught, added] })
+    expect(answered.status).toBe(200)
+    expect(((await answered.json()) as { told: number }).told).toBe(0)
+    expect(read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE session_id = ? AND type = 'training.session.needs-first'`, id,
+    )?.n).toBe(0)
   }, CASE_TIMEOUT_MS)
 
   test('a module retired since scheduling is still offered, so it can be taken off', async () => {

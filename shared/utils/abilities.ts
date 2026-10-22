@@ -67,6 +67,9 @@ export const recordTrainingByAddress = defineAbility((viewer: Viewer) => holds(v
 // Running a session derives from a current trainer certification (requireTrainer, G-111).
 export const runTrainingSessions = defineAbility((viewer: Viewer) => holds(viewer, 'training.write') || viewer.isTrainer)
 
+// Adding, editing and staffing departments: the Theatre Manager's, never a lead's (G-110, 0243).
+export const manageTrainingDepartments = defineAbility((viewer: Viewer) => holds(viewer, 'training.write'))
+
 // Naming somebody else to teach a session: the Theatre Manager only, never a trainer (G-112, issue 1336).
 export const nameTrainers = defineAbility((viewer: Viewer) => holds(viewer, 'training.write'))
 
@@ -206,6 +209,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewTrainingCatalogue: 'training.read',
   runTrainingSessions: 'training.write',
   nameTrainers: 'training.write',
+  manageTrainingDepartments: 'training.write',
   recordTrainingByAddress: 'training.by-address',
   viewTicketTypes: 'ticketing.read',
   viewProgramme: 'ticketing.read',

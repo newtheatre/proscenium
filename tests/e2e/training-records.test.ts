@@ -221,10 +221,12 @@ describe.skipIf(skip !== null)('a record\'s state is derived from its dates (G-1
 
     const answered = await send('GET', `/api/admin/training/records?userId=${memberId}`)
     expect(answered.status).toBe(200)
-    const items = (await answered.json() as { items: { moduleId: string, superseded: boolean }[] }).items
+    const items = (await answered.json() as { items: { moduleId: string, superseded: boolean, supersededBy: string | null }[] }).items
     const forModule = items.filter(one => one.moduleId === module)
     expect(forModule).toHaveLength(2)
     expect(forModule.filter(one => one.superseded)).toHaveLength(1)
+    // The superseded one names the award that replaced it, so the screen can say only that (0243).
+    expect(forModule.map(one => one.supersededBy).sort()).toEqual(['2026-01-01', null].sort())
   })
 })
 

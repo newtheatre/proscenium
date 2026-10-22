@@ -15,7 +15,9 @@ export default defineEventHandler(async (event) => {
   const today = londonToday()
 
   const held = await recordsFor(input.userId, true)
-  const superseded = supersededIn(held.filter(record => record.revokedAt === null))
+  const live = held.filter(record => record.revokedAt === null)
+  const superseded = supersededIn(live)
+  const currentAward = new Map(live.filter(record => !superseded.has(record.id)).map(record => [record.moduleId, record.awardedOn]))
 
   const items = held
     .filter(record => scopeToLeadOf(resolved) === undefined
@@ -33,6 +35,7 @@ export default defineEventHandler(async (event) => {
         source: record.source,
         revokedAt: record.revokedAt,
         superseded: superseded.has(record.id),
+        supersededBy: superseded.has(record.id) ? currentAward.get(record.moduleId) ?? null : null,
         state: record.kind === 'BRIEF' ? null : state,
         says: record.kind === 'BRIEF' ? 'Attended' : saysState(state),
         held: record.revokedAt === null && !superseded.has(record.id) && countsAsHeld(state),
