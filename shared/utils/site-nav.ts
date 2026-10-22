@@ -69,7 +69,7 @@ export type NavCount = (typeof NAV_COUNTS)[number]
 // which a test holds them to (issue 1358).
 export const NAV_QUEUES: Record<NavCount, { says: string, to: string }> = {
   'membership-claims': { says: 'Membership claims to record', to: '/people/members?filter=awaiting-record' },
-  'access-profiles': { says: 'Access declarations to verify', to: '/box-office/access-profiles' },
+  'access-profiles': { says: 'Access declarations to verify', to: '/people/access' },
   'room-requests': { says: 'Room requests to decide', to: '/rooms/manage/requests' },
   'training-requests': { says: 'Training requests to answer', to: '/training/manage/requests' },
   'pass-requests': { says: 'Pass requests to fulfil', to: '/box-office/desk-passes' },
@@ -141,8 +141,6 @@ export const CONSOLE_NAV: NavGroup[] = [
       // own, with its own table and its own refusals (0082).
       { label: 'Pass desk', icon: 'i-lucide-ticket-plus', to: '/box-office/desk-passes', ability: viewProgramme, section: 'Every day', count: 'pass-requests' },
       { label: 'Shows', icon: 'i-lucide-drama', to: '/box-office/shows', ability: viewProgramme, section: 'Every day' },
-      // A declaration waits on somebody to be met in person, so it is daily work (issue 1334).
-      { label: 'Access profiles', icon: 'i-lucide-accessibility', to: '/box-office/access-profiles', ability: verifyAccessProfiles, section: 'Every day', count: 'access-profiles' },
       { label: 'Ticket types', icon: 'i-lucide-tag', to: '/box-office/ticket-types', ability: viewTicketTypes, section: 'Set-up' },
       { label: 'Pass types', icon: 'i-lucide-wallet-cards', to: '/box-office/pass-types', ability: viewPassTypes, section: 'Set-up' },
       { label: 'Venues', icon: 'i-lucide-map-pin', to: '/box-office/venues', ability: viewProgramme, section: 'Set-up' },
@@ -207,7 +205,7 @@ export const CONSOLE_NAV: NavGroup[] = [
     ],
   },
 
-  // Module A: identity. Four registers of people, which is one kind of thing, so the group is
+  // Module A: identity. Five registers of people, which is one kind of thing, so the group is
   // not split (0082).
   {
     key: 'people',
@@ -219,6 +217,8 @@ export const CONSOLE_NAV: NavGroup[] = [
       { label: 'Roles', icon: 'i-lucide-shield', to: '/people/roles', ability: viewAccounts, changedByItManager: true },
       { label: 'Members', icon: 'i-lucide-badge-check', to: '/people/members', ability: viewMembers, count: 'membership-claims', changedByItManager: true },
       { label: 'Fellows', icon: 'i-lucide-award', to: '/people/fellows', ability: viewFellows, changedByItManager: true },
+      // The Secretary's, never the box office's, so it sits with People rather than tickets (0156).
+      { label: 'Access declarations', icon: 'i-lucide-accessibility', to: '/people/access', ability: verifyAccessProfiles, count: 'access-profiles' },
     ],
   },
 

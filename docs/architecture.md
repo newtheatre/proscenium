@@ -2215,7 +2215,7 @@ predicate, so a filtered list is still one show's list. The same payload carries
 counted from seats on open holds, and the show row carries its house, its next curtain and that
 same unpaid figure for the status strip.
 
-Access profiles are declared at `/account/access` and verified at `/box-office/access-profiles`
+Access profiles are declared at `/account/access` and verified at `/people/access`
 (D-127), the one screen `access.verify` gates rather than any of the box office's ordinary
 permissions: the Secretary and Welfare Officer (`SECRETARY`, 0113), never general box office. The special-category payload is
 one AES-256-GCM blob per row, `server/utils/access-profile-crypto.ts` the only place that touches

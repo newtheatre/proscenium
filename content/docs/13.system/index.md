@@ -74,7 +74,7 @@ with nothing in it for you is not drawn at all. When no part has anything for yo
 | Line | For | Opens |
 | --- | --- | --- |
 | Membership claims to record | whoever records claims: the IT Manager | [Members](/docs/people/members), on its claims queue |
-| Access declarations to verify | the Secretary and Welfare Officer | [Access profiles](/docs/box-office/access-profiles) |
+| Access declarations to verify | the Secretary and Welfare Officer | [Access declarations](/docs/people/access-declarations) |
 | Room requests to decide | the Theatre Manager | [Room requests](/docs/spaces/room-requests) |
 | Training requests to answer | the Theatre Manager, and a department lead for their own departments | [Requests](/docs/training/requests) |
 | Pass requests to fulfil, for a pass on sale | the Front of House Manager | [Pass desk](/docs/box-office/pass-desk) |

@@ -192,6 +192,10 @@ export default defineNuxtConfig({
       ...Object.fromEntries(Object.entries(OLD_SITE_REDIRECTS)
         .map(([from, to]) => [from, { redirect: { to, statusCode: 301 } }])),
 
+      // The Secretary's queue moved under People (0156); a bookmark still lands.
+      '/box-office/access-profiles': { redirect: { to: '/people/access', statusCode: 301 } },
+      '/docs/box-office/access-profiles': { redirect: { to: '/docs/people/access-declarations', statusCode: 301 } },
+
       // Baseline security headers on every response.
       '/**': {
         headers: {

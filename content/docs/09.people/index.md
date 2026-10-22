@@ -32,6 +32,9 @@ that reaches these screens needs an authenticator app enrolled before it works.
   ::card{icon="i-lucide-award" title="Fellows" to="/docs/people/fellows"}
   The roll of Fellows: recording an award, the lifetime pass it issues, and revoking one.
   ::
+  ::card{icon="i-lucide-accessibility" title="Access declarations" to="/docs/people/access-declarations"}
+  Sighting the evidence behind an access declaration and agreeing the wording the door reads out.
+  ::
   ::card{icon="i-lucide-calendar-clock" title="Roles" to="/docs/people/roles"}
   What each role holds, why every grant runs out on 31 July, and why a shift beats a grant.
   ::
