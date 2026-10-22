@@ -26,12 +26,16 @@ The hands-on map of 21 October 2026 found these problems with requests and train
 
 ## Decision
 
-1. **Cancelling reopens what the session scheduled.** A request is reopened when it is Scheduled
-   for a module the cancelled session teaches and was decided at or after that session was created.
-   It stays as it is when another session still open for sign-up teaches the module, or when the
-   member has asked again since. No column records which session answered a request, so this is
-   inferred, which avoids a migration. The "scheduled" claim key now carries the session, so a
-   reopened request hears about the next one.
+1. **Cancelling reopens what the session scheduled.** The "scheduled" claim key carries the
+   request and the session (`training.request.scheduled:<request>:<session>`), so the notification
+   ledger records which session scheduled which request, and a reopened request hears about the
+   next one. A request is reopened when it is Scheduled and the cancelled session holds its claim.
+   It stays as it is when another session still open for sign-up teaches the module, when the
+   member has asked again since, or when the member now holds the module. The reopen runs in the
+   cancel's batch behind its `session.cancelled` audit entry, so a cancel that lost a race reopens
+   nothing. A claim pruned at the ledger's retention period leaves its request Scheduled, the safe
+   way to be wrong. Matching by decision time instead was rejected in review: it reopened requests
+   that a later session had scheduled and taught.
 2. **A decline is emailed once** (`training.request.declined`), with the words as stored, so of
    two leads answering at once the member reads the one that landed.
 3. **Training email dates go through `saysDayLong`**, and each subject or opening names the

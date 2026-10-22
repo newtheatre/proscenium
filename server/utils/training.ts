@@ -998,15 +998,16 @@ export async function resolveRequestsFor(
   return told
 }
 
-// A cancelled session answers nothing, so an ask it marked scheduled is open again, unless another
-// session still open for sign-up teaches the module or the member has asked again since (0242).
-export async function reopenRequestsFor(sessionId: string): Promise<void> {
-  await db.run(sql`
+// A cancelled session answers nothing, so an ask this session scheduled (its claim says so) is open
+// again, unless another open session teaches the module, the member asked again, or now holds it (0242).
+export function reopenRequestsFor(sessionId: string, today: string, after: SQL) {
+  return db.run(sql`
     update module_requests
     set status = 'OPEN', decided_at = null
-    where status = 'SCHEDULED'
-      and module_id in (select module_id from session_modules where session_id = ${sessionId})
-      and decided_at >= (select created_at from training_sessions where id = ${sessionId})
+    where ${after} and status = 'SCHEDULED'
+      and exists (
+        select 1 from notification_log
+        where claim = 'training.request.scheduled:' || module_requests.id || ':' || ${sessionId})
       and not exists (
         select 1 from session_modules sm join training_sessions s on s.id = sm.session_id
         where sm.module_id = module_requests.module_id and s.id <> ${sessionId}
@@ -1015,6 +1016,10 @@ export async function reopenRequestsFor(sessionId: string): Promise<void> {
         select 1 from module_requests again
         where again.user_id = module_requests.user_id and again.module_id = module_requests.module_id
           and again.status = 'OPEN')
+      and not exists (
+        select 1 from training_records r
+        where r.user_id = module_requests.user_id and r.module_id = module_requests.module_id
+          and r.revoked_at is null and (r.expires_on is null or r.expires_on > ${today}))
   `)
 }
 

@@ -65,6 +65,8 @@ export default defineEventHandler(async (event) => {
       WHERE id = ${id} AND status <> 'CANCELLED' RETURNING id
     `),
     entry,
+    // In the cancel's batch and only behind its audit entry, so a losing racer reopens nothing.
+    reopenRequestsFor(id, londonToday(), entryLanded(entry)),
   )
 
   // A losing racer is refused, not told it succeeded: the audit stayed silent, so the caller
@@ -73,7 +75,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'That session is already cancelled' })
   }
 
-  await reopenRequestsFor(id)
   const taught = (await modulesTaughtBy(id)).map(module => module.name).join(', ')
 
   // Claimed before it is sent, so a retry of this request cannot tell the same person twice.
