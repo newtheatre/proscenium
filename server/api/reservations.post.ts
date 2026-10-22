@@ -70,7 +70,7 @@ export default defineEventHandler(async (event) => {
 
   const lines = input.lines.map((line) => {
     const type = resolved.get(line.ticketTypeId)
-    if (!type) throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') })
+    if (!type) throw createError({ statusCode: 400, statusMessage: 'That ticket type is not on sale for this performance. Choose one of the ticket types it offers.' })
     return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source, accessKind: type.accessKind }
   })
 

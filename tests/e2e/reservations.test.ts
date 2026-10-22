@@ -145,6 +145,21 @@ describe.skipIf(skip !== null)('an order over the cap is refused (criterion 2)',
   })
 })
 
+describe.skipIf(skip !== null)('a ticket type the performance never offered is refused as not on sale', () => {
+  test('the refusal says not on sale for this performance, never that the type has gone', async () => {
+    const { performanceId } = await bookableShow()
+
+    const answered = await send('POST', '/api/reservations', {
+      performanceId,
+      lines: [{ ticketTypeId: 'never-a-type', quantity: 1 }],
+      guest: { name: 'Forged Type', email: `forged-${crypto.randomUUID().slice(0, 8)}@example.invalid` },
+    }, '')
+
+    expect(answered.status).toBe(400)
+    expect(await answered.text()).toContain('That ticket type is not on sale for this performance.')
+  })
+})
+
 describe.skipIf(skip !== null)('booking is refused with a stated reason (criterion 4)', () => {
   test('a performance past its booking window refuses online and names the door', async () => {
     const { performanceId, ticketTypeId } = await bookableShow({ bookingClosesHoursBefore: 24 * 7 * 2 })

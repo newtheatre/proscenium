@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { saysDay } from '#shared/utils/when'
+import { soldOutNightsSays } from '#shared/utils/listing'
 import { saysPrice } from '#shared/utils/ticket-types'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
 
@@ -115,6 +116,13 @@ const from = computed(() => {
     >
       {{ elsewhere && !bookable ? 'Tickets sold elsewhere' : speaks.says }}
     </UBadge>
+    <p
+      v-if="soldOutNightsSays(listed)"
+      class="mt-1 text-xs text-muted"
+      :data-test="`sold-out-nights-${listed.show.slug}`"
+    >
+      {{ soldOutNightsSays(listed) }}
+    </p>
 
     <template #footer>
       <div class="flex flex-wrap items-center justify-between gap-3">
