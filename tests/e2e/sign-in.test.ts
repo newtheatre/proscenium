@@ -293,6 +293,7 @@ describe.skipIf(skip !== null)('registering on an address that already booked as
 
   test('an address that can already sign in is told it exists, and gets no token', async () => {
     const email = await unproven('already-registered')
+    markVerified(app, email)
 
     expect((await post('/api/auth/register', { email, name: 'Twice (test)', password })).status).toBe(200)
 

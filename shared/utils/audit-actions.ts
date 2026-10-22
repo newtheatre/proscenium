@@ -66,6 +66,7 @@ const CATALOGUE = {
 
   'password.set': { label: 'First password set', module: 'identity', self: true },
   'password.reset': { label: 'Password reset', module: 'identity', self: true },
+  'password.cleared': { label: 'Unconfirmed password cleared on registering again', module: 'identity' },
 
   'mfa.challenged': { label: 'Second factor requested', module: 'identity', self: true },
   'mfa.confirmed': { label: 'Authenticator enrolled', module: 'identity', self: true },

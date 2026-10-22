@@ -1,3 +1,4 @@
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { RESERVED_DOMAIN_REFUSAL, hasReservedDomain } from '#shared/utils/deliverability'
 import { nextField, withNext } from '#shared/utils/sign-in'
@@ -34,7 +35,23 @@ export default defineEventHandler(async (event) => {
 
   // Enumeration safety: an address already registered gets the same answer as a new one, and
   // learns it is taken through the email it would already be able to read (A-101 criterion 2).
-  const existing = await findByEmail(email)
+  let existing = await findByEmail(email)
+  if (existing && !existing.verified && existing.password !== null) {
+    // Nobody has proved this mailbox, so a password set here is a stranger's as likely as the
+    // owner's: it goes, and the claim link below lets the mailbox's owner choose one (0153).
+    await db.batch([
+      db.update(schema.users)
+        .set({ password: null, sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
+        .where(eq(schema.users.id, existing.id)),
+      db.insert(schema.auditLog).values(auditEntry({
+        actorId: null,
+        action: 'password.cleared',
+        target: `user:${existing.id}`,
+        detail: { verified: false, sessions: 'all' },
+      })),
+    ])
+    existing = { ...existing, password: null }
+  }
   if (existing && await hasNoWayIn(existing)) {
     // A guest or an imported row has no way in, so "sign in as usual" is a dead end: the claim
     // link is the way onto the account already holding their bookings (A-116 criterion 2).
@@ -44,6 +61,7 @@ export default defineEventHandler(async (event) => {
       userId: existing.id,
       context: {
         name: existing.name,
+        unconfirmed: !existing.verified,
         url: withNext(`${useRuntimeConfig(event).public.baseURL}/reset?token=${plaintext}&kind=set`, input.next),
         expiresAt,
       },
