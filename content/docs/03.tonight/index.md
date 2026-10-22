@@ -52,10 +52,9 @@ which is how the committee sees a rota that is not being kept; looking at a scre
   any venue tonight, or the only one is cancelled. Check the programme.
 - **"Show-night tools open for tonight only, and that night has ended"**: the screen was open
   past 04:00. Go back to the hub and open it again.
-- **"More than one venue is running tonight: name the venue or the performance"**: two venues
-  are running and nothing narrowed the request. The hub passes the chosen performance to the
-  screens that take one; the till does not yet carry a picker and cannot be opened on such a
-  night from the phone.
+- **"More than one venue is running tonight: choose the one you are working on the Tonight
+  hub"**: two venues are running and this phone has not said which it is working. Go back to the
+  hub and press the venue; every screen then opens on it. The till asks for its own bar.
 - **"Showing what was last loaded: …"**: the connection dropped. The figures on screen are the
   last ones fetched, and the Last synced line says when.
 
@@ -80,6 +79,17 @@ Nothing on these screens refunds a ticket. The box office refunds a paid ticket 
 desk, on any day: take the person's booking reference and pass it to the Front of House Manager.
 
 ## The hub
+
+On a night more than one venue runs, the hub first asks **Choose the one you are working**, one
+row a venue naming what is on there, wherever you could work more than one of them: every running
+venue for the Front of House Manager, or the venues your own shifts are at. Until you choose, the
+hub shows the choice and **Emergency**, and nothing else, since the tiles would mix two houses.
+Once you have chosen, the venues stay at the top of the hub with yours highlighted, so changing is
+one press. The phone remembers the choice until 04:00, and every screen, the door and backstage
+included, works that venue. The choice never opens anything your shift or role would not: a door
+shift at one venue is still refused at the other. The choice belongs to the phone, not to you, so
+somebody signing in on it afterwards who is not working the venue chosen is not held to it: their
+screens open on their own shift as if nothing were chosen. The till keeps its own choice of bar.
 
 ![The hub with the on-shift badge (1), the performance switcher (2), the house numbers (3), your own job's tile (4) and the Emergency tile (5)](/images/docs/show-night/hub.png)
 
