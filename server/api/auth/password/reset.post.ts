@@ -51,6 +51,7 @@ export default defineEventHandler(async (event) => {
         ...(attempt ? {} : { lastLoginAt: now }),
       })
       .where(eq(schema.users.id, account.id)),
+    cancelPendingEmailChange(account),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
       action: input.kind === 'SET_PASSWORD' ? 'password.set' : 'password.reset',

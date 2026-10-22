@@ -180,6 +180,79 @@ The Nottingham New Theatre`,
     }
   },
 
+  'email-change-confirm': (context: TemplateContext): Rendered => {
+    const url = String(context.url)
+    const until = expiry(context.expiresAt as Date)
+    return {
+      subject: 'Confirm your new address',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>You asked to sign in to your New Theatre account with this address from now on. Confirm it and
+the change is made; until then you sign in with your old address.</p>
+<p><a href="${url}">Confirm my new address</a></p>
+<p>The link works until ${until}. If you did not ask for this, ignore it and nothing changes.</p>`),
+      text: `Hello ${context.name},
+
+You asked to sign in to your New Theatre account with this address from now on. Confirm it and
+the change is made; until then you sign in with your old address:
+
+${url}
+
+The link works until ${until}. If you did not ask for this, ignore it and nothing changes.
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'email-change-requested': (context: TemplateContext): Rendered => ({
+    subject: 'Someone asked to change your sign-in address',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Someone signed in to your account asked to move it to ${String(context.wanted)}. Nothing has
+changed yet: it moves only once that address confirms it.</p>
+<p>If this was not you, <a href="${String(context.cancelUrl)}">cancel it</a>, then change your
+password from <a href="${String(context.securityUrl)}">Security</a> and tell the ${saysRole('ADMIN')}.</p>`),
+    text: `Hello ${context.name},
+
+Someone signed in to your account asked to move it to ${String(context.wanted)}. Nothing has
+changed yet: it moves only once that address confirms it.
+
+If this was not you, cancel it (${String(context.cancelUrl)}), then change your
+password from Security (${String(context.securityUrl)}) and tell the ${saysRole('ADMIN')}.
+
+The Nottingham New Theatre`,
+  }),
+
+  'email-changed': (context: TemplateContext): Rendered => ({
+    subject: 'Your sign-in address has changed',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Your New Theatre account now signs in as ${String(context.wanted)}, and every device has been
+signed out. This is the last message sent to this address about the account.</p>
+<p>If this was not you, tell the ${saysRole('ADMIN')} straight away.</p>`),
+    text: `Hello ${context.name},
+
+Your New Theatre account now signs in as ${String(context.wanted)}, and every device has been
+signed out. This is the last message sent to this address about the account.
+
+If this was not you, tell the ${saysRole('ADMIN')} straight away.
+
+The Nottingham New Theatre`,
+  }),
+
+  'email-taken': (context: TemplateContext): Rendered => ({
+    subject: 'Someone tried to use your address',
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Someone tried to move another New Theatre account to this address. It already belongs to your
+account, so nothing changed and there is nothing to do.</p>
+<p><a href="${String(context.signInUrl)}">Sign in</a></p>`),
+    text: `Hello ${context.name},
+
+Someone tried to move another New Theatre account to this address. It already belongs to your
+account, so nothing changed and there is nothing to do.
+
+Sign in: ${String(context.signInUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
   // Nobody asked for this one, so it says who made it and why before it asks for anything.
   'set-password': (context: TemplateContext): Rendered => {
     const url = String(context.url)

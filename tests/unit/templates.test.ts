@@ -25,6 +25,8 @@ const EVERYTHING: TemplateContext = {
   sessionUrl: 'https://newtheatre.org.uk/training/manage/sessions/1',
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
+  wanted: 'ada.new@example.invalid',
+  cancelUrl: 'https://newtheatre.org.uk/account/profile#email',
   securityUrl: 'https://newtheatre.org.uk/account/access',
   accountUrl: 'https://newtheatre.org.uk/my',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
@@ -221,6 +223,12 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     const { html, text } = render('set-password', EVERYTHING)
     expect(html).toContain('We have made you an account.')
     expect(text).toContain('We have made you an account.')
+  })
+
+  test('email-change-requested links the cancel in both parts (0151)', () => {
+    const { html, text } = render('email-change-requested', EVERYTHING)
+    expect(html).toContain('href="https://newtheatre.org.uk/account/profile#email"')
+    expect(flat(text)).toContain('cancel it (https://newtheatre.org.uk/account/profile#email)')
   })
 
   test('account-claim says we already know the address', () => {

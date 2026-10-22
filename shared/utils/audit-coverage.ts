@@ -97,7 +97,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/methods/[id].delete.ts', actions: ['account.method.removed'] },
   { route: 'server/api/account/methods/[id].patch.ts', actions: ['account.method.renamed'] },
   { route: 'server/api/account/password.put.ts', actions: ['account.method.added', 'password.set'] },
-  { route: 'server/api/account/email.put.ts', actions: ['account.email.changed', 'account.email.changed.admin'], via: ['server/utils/email-change.ts'] },
+  { route: 'server/api/account/email.put.ts', actions: ['account.email.change.requested'], via: ['server/utils/email-change.ts'] },
+  { route: 'server/api/account/email.delete.ts', actions: ['account.email.change.cancelled'] },
   { route: 'server/api/account/profile.put.ts', actions: ['account.profile.updated'], via: ['server/utils/profile.ts'] },
   { route: 'server/api/account/profile.get.ts', exempt: 'reads your own profile' },
   { route: 'server/api/account/methods/index.get.ts', exempt: 'reads what the account signs in with' },
@@ -109,7 +110,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/account/room-feed.get.ts', exempt: 'says whether your own feed exists' },
   { route: 'server/api/account/room-feed.post.ts', actions: ['account.calendar-feed.issued'] },
   { route: 'server/api/auth/sign-out.post.ts', exempt: 'ending your own session changes no record' },
-  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified', 'session.started.magic-link'] },
+  { route: 'server/api/auth/verify/index.post.ts', actions: ['account.verified', 'session.started.magic-link', 'account.email.changed'], via: ['server/utils/email-change.ts'] },
   {
     route: 'server/api/auth/verify/resend.post.ts',
     exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
