@@ -265,8 +265,9 @@ describe.skipIf(skip !== null)('a holder adds to their own tab with nobody on th
 
     expect((await addToOwnTab(venueId, variantId, 1500, holder.cookie)).status).toBe(200)
     const over = await addToOwnTab(venueId, variantId, 1500, holder.cookie)
-    expect(over.status).toBe(409)
-    expect(await message(over)).toContain('Nothing has been charged')
+    // The holder is the one charging, so the cap's own-tab refusal answers, never an override (0116).
+    expect(over.status).toBe(403)
+    expect(await message(over)).toContain('nobody overrides the cap on their own tab')
   })
 
   test('the screen adds a drink and the balance follows', async () => {
