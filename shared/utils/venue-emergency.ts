@@ -77,14 +77,22 @@ export function cardAddressDraft(cardAddress: string | null, venueAddress: strin
   return cardAddress ?? venueAddress ?? ''
 }
 
+const SIGNED_OUT_KEEPS = new Set(['venueId', 'venueName', 'address', 'what3words'])
+
+// Signed out, the card is the address and what3words to read to 999 and nothing else (0237).
+export function signedOutCard<T extends object>(card: T): T {
+  return Object.fromEntries(Object.entries(card).map(([key, value]) => [key, SIGNED_OUT_KEEPS.has(key) ? value : null])) as T
+}
+
 // A cached answer outlives the person who fetched it on a shared phone, so its duty managers'
 // numbers show only to that account; everybody else keeps the addresses without them (A-114).
 export function emergencyCardsFor<T extends { dutyManagers: unknown[] | null }>(
-  answer: { viewerId: string, cards: T[] } | null,
+  answer: { viewerId: string | null, cards: T[] } | null,
   viewerId: string | null,
 ): T[] | null {
   if (!answer) return null
-  if (viewerId !== null && answer.viewerId === viewerId) return answer.cards
+  if (viewerId === null) return answer.cards.map(signedOutCard)
+  if (answer.viewerId === viewerId) return answer.cards
   return answer.cards.map(card => ({ ...card, dutyManagers: null }))
 }
 

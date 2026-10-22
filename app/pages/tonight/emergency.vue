@@ -7,7 +7,8 @@ import { telHref } from '#shared/utils/tonight'
 import { bareWhat3words, emergencyCalls, emergencyCardsFor, firstCallOf, otherVenuesFrom, saysCall, saysFirstAiders } from '#shared/utils/venue-emergency'
 import type { FirstAider, PinnedCall } from '#shared/utils/venue-emergency'
 
-definePageMeta({ layout: 'tonight', middleware: 'signed-in', docs: '/docs/tonight/emergency' })
+// Open signed out too: a phone with no account still gets the address and 999 (0237).
+definePageMeta({ layout: 'tonight', docs: '/docs/tonight/emergency' })
 useSeoMeta({ title: 'Emergency card' })
 
 interface Card {
@@ -31,7 +32,7 @@ interface Card {
   dutyManagers: { name: string, phone: string }[] | null
 }
 
-interface Cards { viewerId: string, cards: Card[] }
+interface Cards { viewerId: string | null, cards: Card[] }
 
 const request = useRequestFetch()
 const { account } = useAccount()
@@ -306,6 +307,27 @@ function isolation(one: Card): string[] {
       >
         No emergency card is saved on this phone yet, and none could be read just now.
       </p>
+
+      <div
+        v-if="!account.signedIn && cards?.length"
+        class="space-y-3 rounded-xl bg-elevated p-4"
+        data-test="emergency-signed-out"
+      >
+        <p class="text-lg">
+          Signed out, the card shows the address and 999. Sign in for the exits, first aid and who
+          to ring after 999.
+        </p>
+        <UButton
+          :to="`/sign-in?next=${encodeURIComponent('/tonight/emergency')}`"
+          color="neutral"
+          variant="outline"
+          block
+          class="min-h-12"
+          data-test="emergency-sign-in"
+        >
+          Sign in
+        </UButton>
+      </div>
     </div>
 
     <template #actions>

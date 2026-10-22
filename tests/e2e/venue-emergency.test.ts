@@ -187,11 +187,41 @@ describe.skipIf(skip !== null)('reading tonight\'s card (E-113 criteria 2, 4)', 
     expect(await page.text()).toContain('Cherry Tree Hill')
   })
 
-  test('somebody signed out is not given it, and the screen sends them to sign in', async () => {
-    expect((await request(app, 'GET', '/api/tonight/emergency')).status).toBe(401)
+  // 0237: a phone with no account still has the address to read to 999, and nothing else.
+  test('somebody signed out is given the address and what3words alone, served in the page', async () => {
+    await send('PUT', `/api/admin/venues/${house.venueId}/emergency`, {
+      address: 'The Nottingham New Theatre, Cherry Tree Hill, University Park, Nottingham NG7 2RD',
+      assemblyPoint: 'Signed out test',
+      firePanel: 'Foyer, left of the main doors',
+      what3words: 'stage.lights.velvet',
+      firstCallName: 'Estates Security',
+      firstCallPhone: '0115 951 3013',
+    })
+
+    const answered = await request(app, 'GET', '/api/tonight/emergency')
+    expect(answered.status).toBe(200)
+    const { viewerId, cards } = await answered.json() as { viewerId: string | null, cards: (TonightCard & { what3words: string | null })[] }
+    expect(viewerId).toBeNull()
+    expect(cards.find(card => card.venueId === house.venueId)).toMatchObject({
+      address: expect.stringContaining('Cherry Tree Hill'),
+      what3words: 'stage.lights.velvet',
+      assemblyPoint: null,
+      firePanel: null,
+      firstCallName: null,
+      firstCallPhone: null,
+      firstAidersTonight: null,
+      dutyManagers: null,
+    })
+
     const page = await request(app, 'GET', '/tonight/emergency')
-    expect(new URL(page.url).pathname).toBe('/sign-in')
-    expect(await page.text()).not.toContain('Cherry Tree Hill')
+    expect(new URL(page.url).pathname).toBe('/tonight/emergency')
+    const served = await page.text()
+    expect(served).toContain('Cherry Tree Hill')
+    expect(served).toContain('data-test="emergency-sign-in"')
+    expect(served).not.toContain('Signed out test')
+    expect(served).not.toContain('951 3013')
+
+    await send('PUT', `/api/admin/venues/${house.venueId}/emergency`, { address: 'The Nottingham New Theatre, Cherry Tree Hill, University Park, Nottingham NG7 2RD', assemblyPoint: 'After signed out' })
   })
 
   // A cached copy keeps its numbers only for the account it was fetched for (A-114).

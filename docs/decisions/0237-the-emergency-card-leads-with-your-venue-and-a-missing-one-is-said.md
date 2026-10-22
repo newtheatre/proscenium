@@ -23,8 +23,16 @@ screen names.
   shift's hub says so in red for its own performance.
 - what3words is stored without leading slashes, and a card filed before this shows without them.
 - The form's refusals are sentences, and the card names the Front of House Manager.
+- A phone with nobody signed in opens the card as well, decided by the IT Manager on 22 October
+  2026. It shows each running venue's name, address and what3words, and Call 999, with a sign-in
+  button; the server sends nothing else for a signed-out request, and the screen trims any cached
+  full copy the same way. Exits, first aid, notes, tonight's first aiders, the duty manager and
+  the card's own first call stay signed in: they are the building's business, and 999 is always
+  a right first call.
 
 ## Consequences
 
-- The card still opens only signed in. Showing the address to a signed-out phone was suggested and
-  is left for a decision of its own: the card carries more than an address.
+- Every other show-night screen still sends a signed-out visitor to sign in; the emergency card is
+  the one exemption, named in `tests/unit/night-signed-out.test.ts`.
+- A venue's emergency address is readable by anyone during a night it runs. It is the address an
+  audience is already sent to.

@@ -1,17 +1,25 @@
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { signedOutCard } from '#shared/utils/venue-emergency'
 import type { H3Event } from 'h3'
 import type { FirstAider } from '#shared/utils/venue-emergency'
 import type { OnCall, VenueTonight } from '#server/utils/tonight'
+import type { EmergencyCard } from '#server/utils/venue-emergency'
 
-// Every venue running tonight, to anyone signed in, cached on the device by any show-night screen
+// Every venue running tonight, to anyone, cached on the device by any show-night screen
 // (E-113 criteria 2, 4 as amended by issue 1310). The building's card is whoever holds the phone's.
 export default defineEventHandler(async (event) => {
-  const account = await requireAccount(event)
+  const account = await currentAccount(event)
   const { from, to } = showNightBounds(currentShowNight())
   const [start, end] = [Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)]
-  const firstAidModule = await configValueIfSet(event, 'FIRST_AID_MODULE')
-
   const venues = await venuesTonight(start, end)
+
+  // Signed out, only the address and what3words leave the server (0237).
+  if (!account) {
+    const bare = await Promise.all(venues.map(async venue => signedOutCard(cardFrom(venue, await currentCard(venue.venueId), null, null))))
+    return { viewerId: null, cards: bare }
+  }
+
+  const firstAidModule = await configValueIfSet(event, 'FIRST_AID_MODULE')
   const cards = await Promise.all(venues.map(venue => cardTonight(event, venue, start, end, firstAidModule)))
   // The venues the caller works tonight lead, so a two-venue night opens on their own building;
   // `viewerId` stamps whose numbers these are, for the copy the phone keeps (A-114).
@@ -27,6 +35,10 @@ async function cardTonight(event: H3Event, venue: VenueTonight, from: number, to
     onCallFor(event, venue.venueId),
     firstAidModule === null ? null : firstAidersTonight(venue.venueId, from, to, firstAidModule, londonToday()),
   ])
+  return cardFrom(venue, card, dutyManagers, derived)
+}
+
+function cardFrom(venue: VenueTonight, card: EmergencyCard | undefined, dutyManagers: OnCall[] | null, derived: FirstAider[] | null) {
   return {
     venueId: venue.venueId,
     venueName: venue.venueName,
@@ -43,7 +55,7 @@ async function cardTonight(event: H3Event, venue: VenueTonight, from: number, to
     firstCallName: card?.firstCallName ?? null,
     firstCallPhone: card?.firstCallPhone ?? null,
     updatedAt: card?.updatedAt ?? null,
-    firstAidersTonight: derived satisfies FirstAider[] | null,
+    firstAidersTonight: derived,
     dutyManagers,
   }
 }

@@ -353,7 +353,7 @@ describe('every show-night route checks authority itself (E-111 criterion 5)', (
   // guard asks when it refuses (0077), and the emergency card is every signed-in account's (E-113).
   const WITHOUT_AUTHORITY: Record<string, string> = {
     'server/api/till/venues.get.ts': 'names the venues a caller may open a till at, which is what a request naming none is refused for',
-    'server/api/tonight/emergency.get.ts': 'serves every venue\'s card to anyone signed in; nightAuthorityIfAny only adds the duty manager numbers (A-114)',
+    'server/api/tonight/emergency.get.ts': 'serves every venue\'s card to anyone, its address alone signed out (0237); nightAuthorityIfAny only adds the duty manager numbers (A-114)',
     'server/api/tonight/venues.get.ts': 'lists tonight\'s running venues for the hub\'s choice, which is what an unnarrowed request is refused for (0230)',
   }
 

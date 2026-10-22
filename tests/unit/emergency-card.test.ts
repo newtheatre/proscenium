@@ -60,7 +60,7 @@ describe('the card is primed and read for anyone, under one key (E-113 criterion
     expect(layout).toContain('screen: \'emergency-cards\'')
     expect(screen).toContain('screen: \'emergency-cards\'')
     expect(layout).not.toContain('screen: \'emergency-card\'')
-    expect(await source('server/api/tonight/emergency.get.ts')).toContain('requireAccount(event)')
+    expect(await source('server/api/tonight/emergency.get.ts')).toContain('currentAccount(event)')
   })
 })
 
@@ -77,10 +77,14 @@ describe('a cached card\'s numbers are the fetching account\'s alone', () => {
     expect(emergencyCardsFor(answer, 'rowan')).toEqual(answer.cards)
   })
 
-  test('another account, or nobody signed in, sees the card without them', () => {
-    for (const viewer of ['mel', null]) {
-      expect(emergencyCardsFor(answer, viewer)).toEqual([{ venueId: 'house', address: 'Cherry Tree Hill', dutyManagers: null }])
-    }
+  test('another account sees the card without them', () => {
+    expect(emergencyCardsFor(answer, 'mel')).toEqual([{ venueId: 'house', address: 'Cherry Tree Hill', dutyManagers: null }])
+  })
+
+  test('nobody signed in sees the address and nothing else, even from a full copy (0237)', () => {
+    interface FullCard { venueId: string, venueName: string, address: string | null, what3words: string | null, exits: string | null, firstCallPhone: string | null, dutyManagers: { name: string, phone: string }[] | null }
+    const full: { viewerId: string, cards: FullCard[] } = { viewerId: 'rowan', cards: [{ venueId: 'house', venueName: 'The Theatre', address: 'Cherry Tree Hill', what3words: 'stage.lights.velvet', exits: 'Stage left', firstCallPhone: '0115 951 0000', dutyManagers: [{ name: 'Rowan Ellis', phone: '07700 900333' }] }] }
+    expect(emergencyCardsFor(full, null)).toEqual([{ venueId: 'house', venueName: 'The Theatre', address: 'Cherry Tree Hill', what3words: 'stage.lights.velvet', exits: null, firstCallPhone: null, dutyManagers: null }])
   })
 
   test('nothing cached is nothing to show', () => {
@@ -100,10 +104,10 @@ describe('signing out takes the night off the phone', () => {
     expect(store.getItem('nnt.theme')).toBe('dark')
   })
 
-  test('sign-out clears it, and a signed-out visitor never reaches the screen', async () => {
+  test('sign-out clears it, and a signed-out visitor reaches the screen to read the address (0237)', async () => {
     const status = await source('app/components/AuthStatus.vue')
     expect(status).toContain('clearNightCache(deviceNightCacheStore())')
-    expect(await source('app/pages/tonight/emergency.vue')).toContain('middleware: \'signed-in\'')
+    expect(await source('app/pages/tonight/emergency.vue')).not.toContain('middleware: \'signed-in\'')
   })
 })
 
