@@ -84,8 +84,8 @@ export function createSessionPasswordResolver(): (request: SessionPasswordReques
     }
 
     // A leftover worker secret of this name beats the store binding, and the resulting key
-    // mismatch looks nothing like its cause.
-    if (!warnedAboutWorkerSecret && request.workerSecretSet) {
+    // mismatch looks nothing like its cause. Locally the same name is the .env value, as it should be.
+    if (!warnedAboutWorkerSecret && request.workerSecretSet && !request.dev) {
       warnedAboutWorkerSecret = true
       outcome.errors.push(
         '[secrets-store] NUXT_SESSION_PASSWORD is set as a worker secret and takes '
