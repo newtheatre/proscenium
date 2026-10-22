@@ -130,8 +130,8 @@ useSeoMeta({ title: 'Create an account' })
         {{ message }}
       </p>
       <p class="text-sm text-muted">
-        Follow the link in the message to confirm your address. Open it on this device and you are
-        signed in straight away.
+        Follow the link in the message to confirm your address. Open it in this browser and you are
+        signed in straight away; opened anywhere else, such as on your phone, you sign in there.
       </p>
       <UButton
         variant="link"
