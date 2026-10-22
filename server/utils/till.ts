@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { createError } from 'h3'
 import { openAttemptsOn, unresolvedBefore } from './sumup-queries'
+import { showNightBounds } from '#shared/utils/show-night'
 import type { SQL } from 'drizzle-orm'
 import type { EarlierTillLeftOpen, TillLeftOpen, TillSession } from '#shared/utils/till'
 
@@ -81,11 +82,23 @@ export function earlierOpenSessionsQuery(tonight: string): SQL {
 // For the close-night checklist: this venue's till tonight, and what earlier nights left at any
 // bar, since a house not running tonight has no checklist of its own (E-114.3, F-102.5).
 export function tillLeftOpenQuery(venueId: string, tonight: string): SQL {
+  const { from, to } = showNightBounds(tonight)
+  const bounds = { from: Math.floor(from.getTime() / 1000), to: Math.floor(to.getTime() / 1000) }
   return sql`
     SELECT
       (SELECT count(*) FROM till_sessions WHERE venue_id = ${venueId} AND night = ${tonight} AND closed_at IS NULL) AS tonight,
       (SELECT count(*) FROM till_sessions WHERE night < ${tonight} AND closed_at IS NULL) AS earlier,
-      (SELECT count(*) FROM sumup_attempts a WHERE ${unresolvedBefore(tonight)}) AS unanswered
+      (SELECT count(*) FROM sumup_attempts a WHERE ${unresolvedBefore(tonight)}) AS unanswered,
+      (EXISTS (SELECT 1 FROM shift_templates WHERE venue_id = ${venueId} AND role = 'BAR')
+        OR EXISTS (SELECT 1 FROM till_sessions WHERE venue_id = ${venueId} AND night = ${tonight})) AS hasBar,
+      (EXISTS (
+        SELECT 1 FROM shifts s JOIN performances p ON p.id = s.performance_id
+        WHERE p.venue_id = ${venueId} AND p.starts_at >= ${bounds.from} AND p.starts_at < ${bounds.to}
+          AND s.role = 'BAR' AND s.status = 'CONFIRMED'
+      ) OR EXISTS (
+        SELECT 1 FROM bar_opening_shifts s JOIN bar_openings o ON o.id = s.opening_id
+        WHERE o.venue_id = ${venueId} AND o.night = ${tonight} AND o.status <> 'CANCELLED' AND s.status = 'CONFIRMED'
+      )) AS barStaffed
   `
 }
 
@@ -104,8 +117,9 @@ export async function earlierOpenSessions(tonight: string): Promise<EarlierTillL
 }
 
 export async function tillLeftOpen(venueId: string, tonight: string): Promise<TillLeftOpen> {
-  const [row] = await db.all<TillLeftOpen>(tillLeftOpenQuery(venueId, tonight))
-  return row ?? { tonight: 0, earlier: 0, unanswered: 0 }
+  const [row] = await db.all<Omit<TillLeftOpen, 'hasBar' | 'barStaffed'> & { hasBar: number, barStaffed: number }>(tillLeftOpenQuery(venueId, tonight))
+  if (!row) return { tonight: 0, earlier: 0, unanswered: 0, hasBar: false, barStaffed: false }
+  return { ...row, hasBar: row.hasBar === 1, barStaffed: row.barStaffed === 1 }
 }
 
 export function isOpen(session: TillSession | null): session is TillSession {

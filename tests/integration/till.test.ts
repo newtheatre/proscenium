@@ -348,7 +348,18 @@ describe('the query builders read what the write path wrote', () => {
       attempt('att-tonight', 't-tonight', houseId, '2026-09-04', 'STARTED')
 
       const [left] = rows<{ tonight: number, earlier: number, unanswered: number }>(database, ...boundStatement(database, tillLeftOpenQuery(houseId, '2026-09-04')))
-      expect(left).toEqual({ tonight: 1, earlier: 2, unanswered: 2 })
+      expect(left).toMatchObject({ tonight: 1, earlier: 2, unanswered: 2, hasBar: 1, barStaffed: 0 })
+    })
+  })
+
+  // The 21 October process map: a house with no bar showed "The till is closed" ticked (0236).
+  test('a venue with no bar row and no till tonight has no bar, and a bar row is enough to have one', async () => {
+    await withDatabase((database) => {
+      const studioId = venue(database, '3')
+      const read = (): { hasBar: number } => rows<{ hasBar: number }>(database, ...boundStatement(database, tillLeftOpenQuery(studioId, '2026-09-04')))[0]!
+      expect(read().hasBar).toBe(0)
+      insert(database, 'shift_templates', { id: 'tpl-bar', venue_id: studioId, role: 'BAR', count: 1 })
+      expect(read().hasBar).toBe(1)
     })
   })
 })

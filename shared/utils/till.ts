@@ -56,13 +56,28 @@ export interface TillLeftOpen {
   tonight: number
   earlier: number
   unanswered: number
+  // A bar row in the venue's template, or a till opened there tonight: a house with neither has
+  // no till of its own to close, so the line speaks only for earlier nights (0236).
+  hasBar: boolean
+  // A confirmed bar shift tonight, so the line can say who closes the till when nobody holds one.
+  barStaffed: boolean
+}
+
+// Whether the checklist shows the till line at all: a house with no bar shows it only for what an
+// earlier night left, which any house's close should hear about (0236).
+export function showsTillLine(left: TillLeftOpen): boolean {
+  return left.hasBar || left.earlier > 0 || left.unanswered > 0
 }
 
 // Null is the line ticked. Only the bar closes a till, so the line says who does, and it never
 // holds the duty manager's close (F-102 criterion 5).
 export function saysTillLeftOpen(left: TillLeftOpen): string | null {
   const said: string[] = []
-  if (left.tonight > 0) said.push('Tonight\'s till is still open: whoever is on the bar closes it from the till.')
+  if (left.tonight > 0) {
+    said.push(left.barStaffed
+      ? 'Tonight\'s till is still open: whoever is on the bar closes it from the till.'
+      : 'Tonight\'s till is still open and nobody holds tonight\'s bar shift: the Front of House Manager closes it from the till.')
+  }
   const earlier = [
     left.earlier > 0 ? `${plural(left.earlier, 'till')} from an earlier night left open` : null,
     left.unanswered > 0 ? `${plural(left.unanswered, 'card charge')} from an earlier night left unanswered` : null,
