@@ -24,7 +24,7 @@ const model = defineModel<string | undefined>()
 
 // The name as well as the id, for a screen building a list of people rather than holding one.
 // nobody carries the search that found no account, and null once one does (A-132's fallback).
-const emit = defineEmits<{ chosen: [{ id: string, name: string } | null], nobody: [string | null] }>()
+const emit = defineEmits<{ chosen: [{ id: string, name: string, email: string } | null], nobody: [string | null] }>()
 
 const props = withDefaults(defineProps<{
   placeholder?: string
@@ -99,7 +99,7 @@ const shown = computed<Item[]>(() =>
 function choose(item: Item | undefined): void {
   chosen.value = item ?? null
   model.value = item?.value
-  emit('chosen', item ? { id: item.value, name: item.label } : null)
+  emit('chosen', item ? { id: item.value, name: item.label, email: item.email } : null)
 }
 
 // A form that resets its state clears the name too, rather than showing the last person picked.

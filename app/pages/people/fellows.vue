@@ -47,6 +47,10 @@ const revokeForm = useTemplateRef('revokeForm')
 
 const awarding = ref(false)
 const award = reactive<Partial<AwardFellowship>>({})
+// Who the picker chose, named back before a lifetime pass is issued to them (0158).
+const honoured = ref<{ id: string, name: string, email: string } | null>(null)
+const askedFor = ref<string | null>(null)
+const asking = computed(() => askedFor.value !== null && askedFor.value === award.userId && honoured.value?.id === award.userId)
 const revoking = ref<Fellow | null>(null)
 const revocation = reactive<{ reason?: string }>({})
 
@@ -77,6 +81,10 @@ function blame(error: unknown, form: { setErrors: (errors: { name: string, messa
 
 async function record(event: FormSubmitEvent<AwardFellowship>): Promise<void> {
   failure.value = null
+  if (!asking.value) {
+    askedFor.value = event.data.userId
+    return
+  }
   try {
     await $fetch('/api/admin/fellowships', { method: 'POST', body: event.data })
     toast.add({ title: 'Recorded on the roll', icon: 'i-lucide-award', color: 'success' })
@@ -85,6 +93,7 @@ async function record(event: FormSubmitEvent<AwardFellowship>): Promise<void> {
     award.awardedOn = undefined
     award.awardedBy = undefined
     award.citation = undefined
+    askedFor.value = null
     await load()
   }
   catch (error) {
@@ -270,6 +279,7 @@ onMounted(load)
             <PersonPicker
               v-model="award.userId"
               class="w-full"
+              @chosen="person => honoured = person"
             />
           </UFormField>
           <UFormField
@@ -311,6 +321,15 @@ onMounted(load)
               class="w-full"
             />
           </UFormField>
+          <UAlert
+            v-if="asking && honoured"
+            data-test="award-confirm"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-award"
+            :title="`Award a fellowship to ${honoured.name} (${honoured.email})?`"
+            description="They are entered on the roll and issued a lifetime pass. Check this is the right person, then press the button again."
+          />
         </UForm>
       </template>
 
@@ -320,7 +339,7 @@ onMounted(load)
           form="award-form"
           data-test="award-submit"
         >
-          Record the award
+          {{ asking && honoured ? `Award it to ${honoured.name}` : 'Record the award' }}
         </UButton>
         <UButton
           color="neutral"

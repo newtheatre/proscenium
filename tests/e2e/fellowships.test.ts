@@ -143,6 +143,27 @@ describe.skipIf(skip !== null)('recording the roll of Fellows (A-127)', () => {
 
     expect((await roll('?show=current')).items.some(fellow => fellow.id === id)).toBe(false)
     expect((await roll('?show=revoked')).items.some(fellow => fellow.id === id)).toBe(true)
+
+    // A fresh award may follow a revoked one, and the revoked row stays as history (0159).
+    const again = await record(alumna.id)
+    expect(again.status).toBe(200)
+    expect(read<{ rows: number, standing: number }>(
+      'SELECT count(*) AS rows, sum(revoked_at IS NULL) AS standing FROM fellowships WHERE user_id = ?', alumna.id))
+      .toEqual({ rows: 2, standing: 1 })
+    expect((await record(alumna.id)).status).toBe(409)
+  })
+
+  test('an award dated after today is refused, and each empty field says what it wants (0158)', async () => {
+    const alumna = await registerMember(app, 'future-fellow', password, { signIn: false })
+    const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10)
+    expect((await record(alumna.id, { awardedOn: tomorrow })).status).toBe(400)
+    const empty = await send('POST', '/api/admin/fellowships', {}, cookie)
+    expect(empty.status).toBe(400)
+    expect(((await empty.json()) as { data: { fields: Record<string, string> } }).data.fields).toMatchObject({
+      userId: 'Choose who is being honoured',
+      awardedBy: 'Name the meeting that resolved it',
+      citation: 'Write the citation, the public wording',
+    })
   })
 
   // The predicate rides the UPDATE, so of two officers revoking at once one wins and the other is
@@ -194,6 +215,10 @@ describe.skipIf(skip !== null)('the roll in a browser (A-127)', () => {
       await fillDate(view, '[data-test="award-date"]', '2021-03-04')
       await fill(view, 'input[data-test="award-by"]', 'Committee, 4 March 2021')
       await fill(view, '[data-test="award-citation"]', 'For twenty years of front of house.')
+      await click(view, '[data-test="award-submit"]')
+      // The first press names who would be honoured; the second records it (0158).
+      await waitFor(view, 'document.querySelector(\'[data-test="award-confirm"]\')')
+      expect(await textOf(view, '[data-test="award-confirm"]')).toContain(alumna.email)
       await click(view, '[data-test="award-submit"]')
 
       // The outcome rather than the notification: a toast dismisses itself, and racing one proves
@@ -254,10 +279,12 @@ describe.skipIf(skip !== null)('the lifetime entitlement rides the pass model (0
     const { passId } = await (await record(alumna.id)).json() as { passId: string }
     expect(passId).toBeTruthy()
 
-    const pass = read<{ status: string, pricePaid: number, slug: string }>(
-      `SELECT p.status AS status, p.price_paid AS pricePaid, t.slug AS slug
+    const pass = read<{ status: string, pricePaid: number, slug: string, issuedBy: string }>(
+      `SELECT p.status AS status, p.price_paid AS pricePaid, t.slug AS slug, p.issued_by AS issuedBy
        FROM passes p JOIN pass_types t ON t.id = p.pass_type_id WHERE p.id = ?`, passId)
-    expect(pass).toEqual({ status: 'ACTIVE', pricePaid: 0, slug: 'fellowship' })
+    const officerId = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+    // Issued by the officer who recorded it, never by the Fellow themselves (0158).
+    expect(pass).toEqual({ status: 'ACTIVE', pricePaid: 0, slug: 'fellowship', issuedBy: officerId })
   })
 
   test('a Fellow books a show nobody told the pass type about, at zero price (criteria 1, 2)', async () => {
