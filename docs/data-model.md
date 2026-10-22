@@ -2836,9 +2836,13 @@ account having been written; the unique address settles two recorders racing (00
 an account holds or is pre-linked to is refused with the instruction to choose that account.
 Making the account needs `training.by-address` or a live lead of the module's department, never
 `accounts.create`, and nothing is sent to the address: A-116's claim is what hands it over.
-A lead holds no `accounts.read`, so the records screen's picker asks
-`GET /api/admin/training/people?search=` in its place, which answers an id and a name and nothing
-more, to `training.write` or a live lead appointment.
+A lead or a trainer holds no `accounts.read`, so the records screen's picker, a register's walk-in
+picker and the delivery log's picker ask `GET /api/admin/training/people?search=` in its place,
+which answers an id and a name and nothing more, to `training.write`, a live lead appointment or
+current trainer standing (0240). An award is refused for a draft module, and for a person already
+holding an unrevoked record of the module dated the same day; a revoke answers `stillHeld` when
+another current record of the module remains. A prerequisite must be an active module, and
+neither a certification nor a sign-off-only module is teachable at a session.
 
 A **retrospective delivery log** (G-118) is the third, at `POST /api/admin/training/deliveries`,
 with its dry-run at `POST /api/admin/training/deliveries/preview`. It writes one record per

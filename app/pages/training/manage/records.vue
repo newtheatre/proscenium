@@ -106,9 +106,9 @@ const shown = computed(() => {
     [record.moduleId, record.moduleName].some(field => field.toLowerCase().includes(term)))
 })
 
-// A brief is attended rather than signed off, and a retired module takes nothing new.
+// A brief is attended rather than signed off, and only a published module is awarded (0240).
 const signable = computed(() => catalogue.value.items.filter(module =>
-  module.kind !== 'BRIEF' && module.status !== 'RETIRED'))
+  module.kind !== 'BRIEF' && module.status === 'ACTIVE'))
 
 // Accepting outside evidence is the module's own choice, made in the catalogue (G-121 c1).
 const external = computed(() => signable.value.filter(module => module.allowsExternal))
@@ -194,13 +194,15 @@ async function revoke(): Promise<void> {
   saving.value = true
   failure.value = null
   try {
-    await $fetch(`/api/admin/training/records/${record.id}/revoke`, {
+    const answer = await $fetch<{ ok: true, stillHeld: boolean }>(`/api/admin/training/records/${record.id}/revoke`, {
       method: 'POST',
       body: { reason: reason.value },
     })
     toast.add({
       title: 'Revoked',
-      description: 'The record stays on the history and stops counting at every gate.',
+      description: answer.stillHeld
+        ? `This record stops counting, but they still hold ${record.moduleName} through another current record. Revoke that too if they should not.`
+        : 'The record stays on the history and stops counting at every gate.',
       icon: 'i-lucide-ban',
     })
     revoking.value = null

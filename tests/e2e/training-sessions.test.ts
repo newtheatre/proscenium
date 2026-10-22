@@ -248,6 +248,13 @@ describe.skipIf(skip !== null)('a session is scheduled (G-112)', () => {
     expect(read<{ n: number }>('SELECT count(*) n FROM session_modules WHERE session_id = ?', id)?.n).toBe(1)
   })
 
+  test('a certification is signed off, so a session teaching one is refused (0240)', async () => {
+    const certification = await addModule({ kind: 'CERTIFICATION' })
+    const refused = await schedule({ moduleIds: [certification] })
+    expect(refused.status).toBe(422)
+    expect(await said(refused)).toContain('cannot be taught at a session')
+  })
+
   test('a capacity outside one to sixty is refused', async () => {
     const module = await addModule()
     expect((await schedule({ moduleIds: [module], capacity: 0 })).status).toBe(400)
@@ -598,6 +605,19 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
       view.close()
     }
   }, CASE_TIMEOUT_MS)
+})
+
+// 0240: a trainer on the door holds no accounts.read, and still has to find a known walk-in.
+describe.skipIf(skip !== null)('a trainer finds people for a register or a log', () => {
+  test('by name, answered with an id and a name and nothing more', async () => {
+    const teacher = await adminSession(app, { roles: [] })
+    award(teacher.id, trainerCert)
+    const found = await send('GET', `/api/admin/training/people?search=${encodeURIComponent(trainer.name)}`, undefined, teacher.cookie)
+    expect(found.status).toBe(200)
+    const { items } = await found.json() as { items: Record<string, unknown>[] }
+    expect(items.map(item => item.name)).toContain(trainer.name)
+    expect(items.every(item => Object.keys(item).sort().join(',') === 'id,name')).toBe(true)
+  })
 })
 
 // Issue 1336, G-112 as amended: whoever schedules a session names who teaches it, and the named

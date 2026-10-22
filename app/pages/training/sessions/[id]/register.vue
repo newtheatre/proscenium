@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { can, viewAccounts } from '#shared/utils/abilities'
 import { saysDay } from '#shared/utils/when'
 import { londonDay } from '#shared/utils/membership'
 
@@ -60,6 +61,8 @@ setNightSubject(() => ({ title: sessionTitle.value, meta: sessionWhen.value || n
 const present = ref(new Set<string>())
 
 const adding = ref(false)
+// A trainer holds no accounts.read, so their picker asks the route that answers ids and names (0240).
+const pickerEndpoint = can(useViewer().value, viewAccounts) ? undefined : '/api/admin/training/people'
 const person = ref<string | undefined>(undefined)
 const picked = ref<{ id: string, name: string } | null>(null)
 const address = ref('')
@@ -404,6 +407,7 @@ async function submit(): Promise<void> {
               v-model="person"
               class="w-full"
               data-test="walk-in-person"
+              :endpoint="pickerEndpoint"
               @chosen="value => picked = value"
             />
           </UFormField>

@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { revokeForm } from '#shared/utils/training'
 
 // Take a record away. Administrator only, a reason always, and never a deletion: the row stays and
@@ -36,5 +36,12 @@ export default defineEventHandler(async (event) => {
     `),
   ])
 
-  return { ok: true }
+  // Another current record of the same module keeps it held, and the screen says so (0240).
+  const [other] = await db.select({ id: schema.trainingRecords.id }).from(schema.trainingRecords).where(and(
+    eq(schema.trainingRecords.userId, record.userId),
+    eq(schema.trainingRecords.moduleId, record.moduleId),
+    heldNow(londonToday()),
+  )).limit(1)
+
+  return { ok: true, stillHeld: other !== undefined }
 })

@@ -3,10 +3,10 @@ import { z } from 'zod'
 
 const query = z.object({ search: z.string().trim().min(2).max(200) })
 
-// The records screen's picker for a lead, who holds no accounts.read: an id and a name and
-// nothing more, to whoever may award a record at all (G-130 criterion 1, 0091).
+// The picker for a lead or a trainer, who hold no accounts.read: an id and a name and nothing
+// more, to whoever may award a record at all (G-130 criterion 1, 0091, 0240).
 export default defineEventHandler(async (event) => {
-  await requireCatalogueAuthority(event)
+  await requireAwarder(event)
   const input = await getValidatedQueryOrThrow(event, query)
 
   const items = await db.select({ id: schema.users.id, name: schema.users.name })
