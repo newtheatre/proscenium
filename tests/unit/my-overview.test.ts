@@ -32,7 +32,7 @@ describe('the overview leads with what is soonest (K-127 criterion 6, issue 1153
   test('a booking takes its place by when the performance is, not by the standing order', () => {
     const summary: MySummary = {
       ...BASE,
-      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY + hours(24), status: 'CONFIRMED' },
+      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY + hours(24), status: 'CONFIRMED', windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
       ticket: { reference: 'K7M4PQ', showTitle: 'The Tempest', venueName: 'Main', startsAt: WEDNESDAY, url: '/qr/r-1.sig' },
     }
     expect(MY_TILES).toContain('tickets')
@@ -42,7 +42,7 @@ describe('the overview leads with what is soonest (K-127 criterion 6, issue 1153
   test('a room booking sooner than the shift is placed before it', () => {
     const summary: MySummary = {
       ...BASE,
-      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY + hours(24), status: 'CONFIRMED' },
+      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY + hours(24), status: 'CONFIRMED', windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
       room: { bookingId: 'b1', roomName: 'Studio', startsAt: WEDNESDAY, endsAt: WEDNESDAY + hours(2), purpose: null, cancellable: true },
     }
     expect(orderMyTiles(summary).slice(0, 2)).toEqual(['room', 'shift'])
@@ -51,7 +51,7 @@ describe('the overview leads with what is soonest (K-127 criterion 6, issue 1153
   test('a training session takes its place by when it is held, not by the standing order', () => {
     const summary: MySummary = {
       ...BASE,
-      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY + hours(48), status: 'CONFIRMED' },
+      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY + hours(48), status: 'CONFIRMED', windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
       training: {
         ...BASE.training,
         nextSession: { id: 't1', moduleName: 'Working at height', heldOn: '2026-10-14', startsAt: '18:00', place: null },
@@ -63,7 +63,7 @@ describe('the overview leads with what is soonest (K-127 criterion 6, issue 1153
   test('every tile is shown exactly once, whatever is coming up', () => {
     const summary: MySummary = {
       ...BASE,
-      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY, status: 'CONFIRMED' },
+      shift: { shiftId: 's1', role: 'Front of house', showTitle: 'Blue Stockings', venueName: 'Main', startsAt: WEDNESDAY, status: 'CONFIRMED', windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
       room: { bookingId: 'b1', roomName: 'Studio', startsAt: WEDNESDAY + hours(1), endsAt: WEDNESDAY + hours(2), purpose: null, cancellable: true },
       training: {
         ...BASE.training,

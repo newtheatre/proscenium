@@ -29,7 +29,9 @@ your account settings. The help icon at the top right of each screen opens its p
    be there, with the whole line a link to the one thing that fills it.
 
 The whole of each tile is its link. **Next shift**, once the member holds one, shows its role in
-words and whether it is **Confirmed**, **Declined** or **Claimed, waiting to be confirmed**.
+words, the hours it is worked (from its call time, not the curtain) and whether it is
+**Confirmed**, **Declined** or **Claimed, waiting to be confirmed**. Where the member holds more
+than one shift that night it says how many more.
 While the member is on shift the tile links to Tonight, and says **On shift tonight** when the
 shift it shows is tonight's; on shift at a bar opening with no performance shift, it reads **On
 shift at the bar tonight**.

@@ -1,4 +1,5 @@
 import { ownBookingsFrom } from '#shared/utils/reservations'
+import { showNightOf } from '#shared/utils/show-night'
 import type { MyShiftRow } from '#server/utils/rota'
 
 // The one request `/my` makes (K-127 criterion 1): every tile's reading composed here, so a tile
@@ -67,6 +68,10 @@ export default defineEventHandler(async (event) => {
           venueName: shifts[0].venueName,
           showTitle: shifts[0].showTitle,
           startsAt: shifts[0].startsAt,
+          windowStartsAt: shifts[0].windowStartsAt,
+          windowEndsAt: shifts[0].windowEndsAt,
+          moreThatNight: shifts.slice(1).filter(other => other.status !== 'DECLINED'
+            && showNightOf(new Date(other.startsAt * 1000)) === showNightOf(new Date(shifts[0]!.startsAt * 1000))).length,
         }
       : null,
     membershipTerm,

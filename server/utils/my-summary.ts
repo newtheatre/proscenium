@@ -84,6 +84,11 @@ export interface MySummaryShift {
   venueName: string
   showTitle: string
   startsAt: number
+  // The shift's own hours, which the tile gives rather than the curtain (0078, 0213).
+  windowStartsAt: number | null
+  windowEndsAt: number | null
+  // Other shifts the member holds that same show night, so a second one is never hidden (0213).
+  moreThatNight: number
 }
 
 export interface MySummaryInputs {
@@ -149,6 +154,9 @@ export function assembleMySummary(input: MySummaryInputs): MySummary {
           venueName: input.shift.venueName,
           startsAt: input.shift.startsAt,
           status: input.shift.status,
+          windowStartsAt: input.shift.windowStartsAt,
+          windowEndsAt: input.shift.windowEndsAt,
+          moreThatNight: input.shift.moreThatNight,
         },
     membership: { state: state.kind, until: untilOf(state), claim: claimWord(input.claim) },
     room: input.room === null
