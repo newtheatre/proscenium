@@ -5,6 +5,10 @@ import type { MessageTypeName } from './notifications'
 // Tonight's duty manager messages one of tonight's performances (0101, issue 1327). Nothing here
 // reads a request or the database; `server/utils/night-message.ts` resolves and sends.
 
+// What the preview greets in place of each recipient's own name: the sender's read as if the
+// message went to them alone (0238).
+export const PREVIEW_NAME = '[their name]'
+
 export const NIGHT_AUDIENCES = ['TICKET_HOLDERS', 'ROTA'] as const
 export type NightAudience = (typeof NIGHT_AUDIENCES)[number]
 

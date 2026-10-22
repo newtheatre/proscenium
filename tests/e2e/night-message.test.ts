@@ -94,7 +94,10 @@ describe.skipIf(skip !== null)('tonight\'s duty manager messages tonight\'s audi
 
     const previewed = await send('POST', '/api/tonight/message/preview', message(performanceId, 'TICKET_HOLDERS'), dm.cookie)
     expect(previewed.status).toBe(200)
-    expect((await previewed.json() as { count: number }).count).toBe(2)
+    const shown = await previewed.json() as { count: number, rendered: { text: string } }
+    expect(shown.count).toBe(2)
+    // Greets a placeholder, never the sender, so it does not read as going to them alone (0238).
+    expect(shown.rendered.text).toContain('Hello [their name]')
 
     const sent = await send('POST', '/api/tonight/message', message(performanceId, 'TICKET_HOLDERS'), dm.cookie)
     expect(sent.status).toBe(200)

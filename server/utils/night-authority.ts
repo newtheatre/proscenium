@@ -29,7 +29,7 @@ interface NightCoverage { venueId: string, performanceIds: string[], venuePerfor
 // nobody asked about. Shared, so both branches refuse it the same way (E-127 criterion 1).
 function refuseAmbiguousVenue(venues: string[]): void {
   if (venues.length > 1) {
-    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance' })
+    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance', data: { chooseVenue: true } })
   }
 }
 
