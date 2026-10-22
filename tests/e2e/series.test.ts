@@ -285,10 +285,7 @@ describe.skipIf(skip !== null)('a series out of policy queues as a whole (criter
   // and Change on one week then demanded the reason nobody had been asked for.
   test('a series needing a decision names what each date breaks and asks why before holding anything', async () => {
     const room = await makeRoom()
-    const soon = new Date()
-    soon.setUTCDate(soon.getUTCDate() + 1)
-    const { year, month, day } = londonParts(soon)
-    const startsOn = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const startsOn = londonDaysFrom(1)
     const before = read<{ n: number }>('SELECT count(*) n FROM room_bookings')!.n
 
     const unasked = await bookSeries(room, { frequency: 'DAILY', weekdays: [], startsOn, occurrences: 3 })
