@@ -20,6 +20,17 @@ export function defaultBoardWindow(at: Date): BoardWindow {
   return { from, to: daysAfter(from, BOARD_WINDOW_NIGHTS - 1) }
 }
 
+// A span linked or bookmarked in the address (`from`, and `to` or `until`), else the fortnight. A
+// date that does not read, or a span the board would refuse, falls back whole (0214).
+export function boardWindowFromQuery(query: Record<string, unknown>, at: Date): BoardWindow {
+  const day = (value: unknown): string | null => (typeof value === 'string' && londonDayField.safeParse(value).success ? value : null)
+  const fallback = defaultBoardWindow(at)
+  const from = day(query.from) ?? fallback.from
+  const to = day(query.to) ?? day(query.until) ?? daysAfter(from, BOARD_WINDOW_NIGHTS - 1)
+  const fits = from <= to && daysAfter(from, MAX_BOARD_WINDOW_NIGHTS) > to
+  return fits ? { from, to } : fallback
+}
+
 // Unix seconds, `from` inclusive and `to` exclusive: the last night is held whole to its 04:00.
 export function boardWindowBounds(window: BoardWindow): BoardBounds {
   return {

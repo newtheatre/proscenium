@@ -40,11 +40,14 @@ describe('the claims waiting for confirmation are worked on the board (E-105 cri
     const source = await read(APPROVALS)
     expect(source).toContain('navigateTo(BOARD_WAITING_HREF')
     expect(source).not.toContain('layout: \'console\'')
+    // It forwards before any guard, so nobody is refused at the old address (0214).
+    expect(source).not.toContain('middleware')
   })
 
   test('the board offers the filter, with how many claims are waiting', async () => {
     const source = await read(BOARD)
     expect(source).toContain('Waiting for confirmation')
+    expect(source).toContain('boardWindowFromQuery(route.query')
     expect(source).toContain('data-test="board-waiting"')
   })
 

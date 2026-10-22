@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { BOARD_WAITING_HREF, boardWindowBounds, boardWindowQuery, BOARD_WINDOW_NIGHTS, defaultBoardWindow, saysStaffing } from '#shared/utils/rota-board'
+import { BOARD_WAITING_HREF, boardWindowBounds, boardWindowFromQuery, boardWindowQuery, BOARD_WINDOW_NIGHTS, defaultBoardWindow, saysStaffing } from '#shared/utils/rota-board'
 import { ROTA_FLOW, rotaStepAfter } from '#shared/utils/rota-flow'
 import { showNightBounds } from '#shared/utils/show-night'
 
@@ -53,6 +53,30 @@ describe('the board opens on the coming fortnight (E-107 criterion 7)', () => {
   test('a window crossing the October clock change keeps counting nights, not seconds', () => {
     const { from, to } = boardWindowBounds({ from: '2026-10-20', to: '2026-11-02' })
     expect(to - from).toBe(14 * 86400 + 3600)
+  })
+})
+
+describe('a span in the address opens the board on it (0214)', () => {
+  const at = new Date('2026-09-21T09:00:00Z')
+
+  test('from and to open the board on that span', () => {
+    expect(boardWindowFromQuery({ from: '2026-11-01', to: '2026-11-30' }, at)).toEqual({ from: '2026-11-01', to: '2026-11-30' })
+  })
+
+  test('until is read as to', () => {
+    expect(boardWindowFromQuery({ from: '2026-11-01', until: '2026-11-07' }, at)).toEqual({ from: '2026-11-01', to: '2026-11-07' })
+  })
+
+  test('from alone reads a fortnight from it', () => {
+    expect(boardWindowFromQuery({ from: '2026-11-01' }, at)).toEqual({ from: '2026-11-01', to: '2026-11-14' })
+  })
+
+  test('nothing, a date that does not read, or a span running backwards opens the fortnight', () => {
+    const fortnight = defaultBoardWindow(at)
+    expect(boardWindowFromQuery({}, at)).toEqual(fortnight)
+    expect(boardWindowFromQuery({ from: 'next week' }, at)).toEqual(fortnight)
+    expect(boardWindowFromQuery({ from: '2026-11-30', to: '2026-11-01' }, at)).toEqual(fortnight)
+    expect(boardWindowFromQuery({ from: '2026-01-01', to: '2027-06-01' }, at)).toEqual(fortnight)
   })
 })
 
