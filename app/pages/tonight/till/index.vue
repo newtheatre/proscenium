@@ -1298,16 +1298,24 @@ const basketBindings = computed(() => ({
       @confirm="confirmAnyClose"
     />
 
-    <ConfirmModal
+    <NightSheet
       v-model:open="reopenOpen"
-      name="till-reopen"
       :title="`Open the till at ${venueName ?? 'this bar'} again?`"
-      consequence="It closed earlier tonight. Opening it again starts a second session, which needs its own close and its own Z reading."
-      verb="Open it again"
-      color="primary"
+      primary="Open it again"
+      primary-test-id="confirm-till-reopen-verb"
       :loading="busy"
-      :failure="reopenOpen ? failure?.message ?? null : null"
-      @confirm="confirmReopen"
-    />
+      @primary="confirmReopen"
+    >
+      <p data-test="confirm-till-reopen-consequence">
+        It closed earlier tonight. Opening it again starts a second session, which needs its own close and its own Z reading.
+      </p>
+      <UAlert
+        v-if="reopenOpen && failure"
+        data-test="confirm-till-reopen-failure"
+        color="error"
+        variant="subtle"
+        :description="failure.message"
+      />
+    </NightSheet>
   </div>
 </template>
