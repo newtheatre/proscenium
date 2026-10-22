@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { approveStatement, rejectStatement } from '#server/utils/approvals'
 import { auditIfChanged, auditIfRow } from '#server/utils/audit'
 import { claimRoomSlotStatement, editPendingStatement, lapseStatement } from '#server/utils/bookings'
-import { bumpStatements, seriesCancelStatements } from '#server/utils/room-writes'
+import { bumpStatements, heldCountStatement, retireStatements, seriesCancelStatements } from '#server/utils/room-writes'
 import { auditEntry } from '#shared/utils/audit'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { ClaimInput, EditInput } from '#server/utils/bookings'
@@ -238,6 +238,77 @@ describe('the lapse sweep audits a lapse only if it lapsed', () => {
         run(database, lapseStatement('b-asked', NOW - HOUR, NOW), auditIfChanged(auditEntry({ actorId: null, action: 'room.request.expired', target: 'booking:b-asked', detail: { room: 'The Studio' } })))
       }
       expect(audits(database, 'room.request.expired')).toHaveLength(1)
+    })
+  })
+})
+
+// 0204: retiring a room, asked to, turns down what waits on it and cancels what is yet to start,
+// counted by the same predicates the Retire dialogue reads and audited in the same batch.
+describe('a retire settles what the room holds only if asked, and only once', () => {
+  const PAST = { startsAt: NOW - 48 * HOUR, endsAt: NOW - 46 * HOUR }
+  const retired = () => entry('room.updated', 'room:r-studio', { changes: { isActive: { from: true, to: false } } })
+
+  function holdings(database: TestDatabase): void {
+    booking(database, 'b-waiting', 'PENDING_APPROVAL')
+    booking(database, 'b-coming', 'CONFIRMED', { startsAt: SPAN.startsAt + 168 * HOUR, endsAt: SPAN.endsAt + 168 * HOUR })
+    booking(database, 'b-held', 'CONFIRMED', PAST)
+    booking(database, 'b-elsewhere', 'PENDING_APPROVAL', { roomId: 'r-green' })
+  }
+
+  function retire(database: TestDatabase, asked: { turnDown: boolean, cancel: boolean }): { turnedDown: string[], cancelled: string[] } {
+    const { audit, turnDown, cancel, retire } = retireStatements({ roomId: 'r-studio', actorId: 'u-officer', reason: 'The Studio is no longer in use', now: NOW, ...asked }, retired())
+    const ids = (statement: SQL | null): string[] => {
+      if (!statement) return []
+      const [query, ...parameters] = boundStatement(database, statement)
+      return (database.raw.prepare(query).all(...parameters as never[]) as { id: string }[]).map(row => row.id)
+    }
+    run(database, audit)
+    const turnedDown = ids(turnDown)
+    const cancelled = ids(cancel)
+    run(database, retire)
+    return { turnedDown, cancelled }
+  }
+
+  test('the dialogue counts the waiting requests and the bookings yet to start in this room alone', async () => {
+    await withDatabase((database) => {
+      holdings(database)
+      const [query, ...parameters] = boundStatement(database, heldCountStatement('r-studio', NOW))
+      expect(database.raw.prepare(query).get(...parameters as never[])).toEqual({ waiting: 1, upcoming: 1 })
+    })
+  })
+
+  test('asked for both, it turns down and cancels what it counted, and leaves the past and other rooms alone', async () => {
+    await withDatabase((database) => {
+      holdings(database)
+      expect(retire(database, { turnDown: true, cancel: true })).toEqual({ turnedDown: ['b-waiting'], cancelled: ['b-coming'] })
+      expect(statusOf(database, 'b-waiting')).toBe('REJECTED')
+      expect(statusOf(database, 'b-coming')).toBe('CANCELLED')
+      expect(statusOf(database, 'b-held')).toBe('CONFIRMED')
+      expect(statusOf(database, 'b-elsewhere')).toBe('PENDING_APPROVAL')
+      expect(rows(database, 'SELECT rejection_reason reason, decided_by by FROM room_bookings WHERE id = ?', 'b-waiting'))
+        .toEqual([{ reason: 'The Studio is no longer in use', by: 'u-officer' }])
+      expect(rows(database, 'SELECT is_active active FROM rooms WHERE id = ?', 'r-studio')).toEqual([{ active: 0 }])
+      expect(audits(database, 'room.updated')[0]!.detail).toMatchObject({ turnedDown: 1, cancelled: 1 })
+    })
+  })
+
+  test('asked for nothing, it retires the room and leaves everything it holds standing', async () => {
+    await withDatabase((database) => {
+      holdings(database)
+      expect(retire(database, { turnDown: false, cancel: false })).toEqual({ turnedDown: [], cancelled: [] })
+      expect(statusOf(database, 'b-waiting')).toBe('PENDING_APPROVAL')
+      expect(statusOf(database, 'b-coming')).toBe('CONFIRMED')
+      expect(audits(database, 'room.updated')[0]!.detail).toMatchObject({ turnedDown: 0, cancelled: 0 })
+    })
+  })
+
+  test('a second retire racing the first settles nothing and audits nothing', async () => {
+    await withDatabase((database) => {
+      holdings(database)
+      retire(database, { turnDown: false, cancel: false })
+      expect(retire(database, { turnDown: true, cancel: true })).toEqual({ turnedDown: [], cancelled: [] })
+      expect(statusOf(database, 'b-waiting')).toBe('PENDING_APPROVAL')
+      expect(audits(database, 'room.updated')).toHaveLength(1)
     })
   })
 })

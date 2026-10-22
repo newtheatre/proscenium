@@ -6,8 +6,12 @@ import {
   isOpenAt,
   minutesOpen,
   overCapacity,
+  retireQuery,
   roomForm,
   roomHoursForm,
+  roomOverrides,
+  saysHouseDefault,
+  saysOpeningHours,
 } from '#shared/utils/rooms'
 
 // C-101. The bookable estate reflects reality: a room carries its own opening hours, is
@@ -129,5 +133,61 @@ describe('a closure reads back as the span it is', () => {
     const said = saysSpan(at('2026-09-15T21:00:00Z'), at('2026-09-15T23:30:00Z'))
     expect(said).toContain('15 Sept 2026, 22:00')
     expect(said).toContain('16 Sept 2026, 00:30')
+  })
+})
+
+// The rooms review, section 1: the list says when a room is open and which rules are its own.
+describe('a room reads back as its hours and its own rules', () => {
+  const weekdays = [1, 2, 3, 4, 5].map(weekday => ({ weekday, opens: '09:00', closes: '22:00' }))
+
+  test('no hours is always open, and one set of times for a run of days is said once', () => {
+    expect(saysOpeningHours([])).toBe('Always open')
+    expect(saysOpeningHours(weekdays)).toBe('Mon to Fri, 09:00 to 22:00')
+    expect(saysOpeningHours([0, 1, 2, 3, 4, 5, 6].map(weekday => ({ weekday, opens: '10:00', closes: '18:00' }))))
+      .toBe('Every day, 10:00 to 18:00')
+  })
+
+  test('days apart with the same times are listed, then the times', () => {
+    expect(saysOpeningHours([1, 3, 5].map(weekday => ({ weekday, opens: '09:00', closes: '17:00' }))))
+      .toBe('Mon, Wed, Fri, 09:00 to 17:00')
+  })
+
+  test('days whose times differ are said a run at a time', () => {
+    expect(saysOpeningHours([...weekdays.slice(0, 4), { weekday: 5, opens: '09:00', closes: '18:00' }]))
+      .toBe('Mon to Thu, 09:00 to 22:00; Fri, 09:00 to 18:00')
+  })
+
+  test('two spans in one day are both said', () => {
+    expect(saysOpeningHours([{ weekday: 6, opens: '14:00', closes: '18:00' }, { weekday: 6, opens: '09:00', closes: '12:00' }]))
+      .toBe('Sat, 09:00 to 12:00 and 14:00 to 18:00')
+  })
+
+  test('the house default is said with its unit and what the box accepts', () => {
+    expect(saysHouseDefault('minBookingMinutes', 30)).toBe('House default: 30 minutes. One or more.')
+    expect(saysHouseDefault('noticeHours', 48)).toBe('House default: 48 hours. 0 means none needed.')
+    expect(saysHouseDefault('horizonWeeks', 1)).toBe('House default: 1 week. One or more.')
+  })
+
+  test('a room following the house has no own rules, and one with them lists each', () => {
+    const none = { minBookingMinutes: null, maxBookingHours: null, noticeHours: null, horizonWeeks: null, activeBookingsCap: null }
+    expect(roomOverrides(none)).toEqual([])
+    expect(roomOverrides({ ...none, maxBookingHours: 2, noticeHours: 0 })).toEqual(['Longest booking 2 hours', 'No notice needed'])
+  })
+
+  test('backwards hours are refused in words that say what to change', () => {
+    const parsed = roomHoursForm.safeParse({ weekday: 1, opens: '22:00', closes: '09:00' })
+    expect(parsed.error?.issues[0]?.message).toBe('Closing time must be later than opening time')
+  })
+})
+
+describe('retiring settles nothing unless asked (0204)', () => {
+  test('nothing asked is the old retire', () => {
+    expect(retireQuery.parse({})).toEqual({ turnDown: false, cancel: false })
+    expect(retireQuery.parse({ turnDown: 'false', cancel: 'false' })).toEqual({ turnDown: false, cancel: false })
+  })
+
+  test('each half is asked for apart, and only by "true"', () => {
+    expect(retireQuery.parse({ turnDown: 'true' })).toEqual({ turnDown: true, cancel: false })
+    expect(retireQuery.safeParse({ cancel: 'yes' }).success).toBe(false)
   })
 })

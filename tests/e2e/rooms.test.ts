@@ -34,6 +34,16 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+function write(statement: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(statement).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
+
 const send = (method: string, path: string, body?: unknown, as = cookie): Promise<Response> =>
   fetch(`${app.baseURL}${path}`, {
     method,
@@ -119,6 +129,24 @@ describe.skipIf(skip !== null)('describing the bookable estate (C-101)', () => {
     expect((await again.json() as { alreadyRetired: boolean }).alreadyRetired).toBe(true)
   })
 
+  // 0204: asked to, a retire settles what the room holds rather than leaving members waiting.
+  test('retiring, asked to, turns down what waits on the room and cancels what is to come', async () => {
+    const id = await addRoom(`Settling ${crypto.randomUUID().slice(0, 6)}`)
+    const userId = read<{ id: string }>('SELECT id FROM users ORDER BY created_at LIMIT 1')!.id
+    const start = Math.floor(Date.now() / 1000) + 7 * 86_400
+    for (const [status, offset] of [['PENDING_APPROVAL', 0], ['CONFIRMED', 86_400]] as const) {
+      write(`INSERT INTO room_bookings (id, room_id, user_id, title, starts_at, ends_at, tier, status)
+        VALUES (?, ?, ?, 'Rehearsal', ?, ?, 'GENERAL', ?)`,
+      crypto.randomUUID().replaceAll('-', ''), id, userId, start + offset, start + offset + 3600, status)
+    }
+
+    expect(await (await send('GET', `/api/admin/rooms/${id}/held`)).json()).toEqual({ waiting: 1, upcoming: 1 })
+
+    const answered = await send('DELETE', `/api/admin/rooms/${id}?turnDown=true&cancel=true`)
+    expect(await answered.json()).toMatchObject({ alreadyRetired: false, turnedDown: 1, cancelled: 1 })
+    expect(read<{ n: number }>(`SELECT count(*) n FROM room_bookings WHERE room_id = ? AND status IN ('PENDING_APPROVAL', 'CONFIRMED')`, id)?.n).toBe(0)
+  })
+
   test('two rooms cannot share a name', async () => {
     const name = `Unique ${crypto.randomUUID().slice(0, 6)}`
     await addRoom(name)
@@ -196,7 +224,8 @@ describe.skipIf(skip !== null)('retiring a room confirms before anything changes
       expect(read<{ isActive: number }>('SELECT is_active AS isActive FROM rooms WHERE id = ?', id)?.isActive).toBe(1)
 
       await click(view, `[data-test="retire-room-${id}"]`)
-      await waitFor(view, `document.querySelector('[data-test="confirm-retire-room-verb"]')`, 15_000)
+      // The verb is offered once the dialogue has counted what the room holds (0204).
+      await waitFor(view, `document.querySelector('[data-test="retire-held"]')`, 15_000)
       await click(view, '[data-test="confirm-retire-room-verb"]')
       await waitFor(view, `!document.querySelector('[data-test="retire-room-${id}"]')`, 30_000)
 

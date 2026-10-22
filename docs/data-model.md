@@ -2039,7 +2039,7 @@ is always *room*. Rooms the Students' Union manages are **not in this table at a
 control (decision 0036, C-119, C-120). `is_external` is gone with them, and `sensitive` is now the
 only room-level reason a booking goes to the approval queue whatever the policy says.
 Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
-there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
+nothing deletes a room; the `DELETE` route below retires one. Capacity is compared against a
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
 compared neither.
 
@@ -2047,6 +2047,16 @@ compared neither.
 with `search` over the name and `sort` by name. A retired room is hidden unless `active` asks for
 one, the directory's `anonymised` default reused. Small and unpaged by design: it returns its
 whole filtered set rather than a windowed page, the estate being a handful of rooms.
+
+`DELETE /api/admin/rooms/[id]` retires rather than deletes. It takes `turnDown` and `cancel` in the
+query string (a DELETE carries no body, 0068), each asked only by `true`. Asked to, it turns down
+every request waiting on the room and cancels every confirmed booking in it that has not yet
+started, in the same batch as the retire and its one `room.updated` audit row, which counts both
+(0204). Each member is told: a turned-down request as
+the queue's `room.request.rejected`, a cancelled booking as `room.blackout.cancelled`, with the
+reason "{room} is no longer in use". It answers `{ alreadyRetired, turnedDown, cancelled }`.
+`GET /api/admin/rooms/[id]/held` gives the Retire dialogue `{ waiting, upcoming }`, counted by the
+same predicates. The **In use** switch on `PUT /api/admin/rooms/[id]` retires without settling.
 
 ### room_hours
 `id` PK · `room_id` cascade · `weekday` 0..6 CHECK · `opens` `HH:MM` · `closes` `HH:MM`, CHECK
