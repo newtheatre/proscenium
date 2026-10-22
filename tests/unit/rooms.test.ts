@@ -13,6 +13,7 @@ import {
   saysHouseDefault,
   saysOpeningHours,
 } from '#shared/utils/rooms'
+import { openHoursCell } from '#shared/utils/utilisation'
 
 // C-101. The bookable estate reflects reality: a room carries its own opening hours, is
 // deactivated rather than deleted, and its capacity warns rather than refuses.
@@ -189,5 +190,14 @@ describe('retiring settles nothing unless asked (0204)', () => {
   test('each half is asked for apart, and only by "true"', () => {
     expect(retireQuery.parse({ turnDown: 'true' })).toEqual({ turnDown: true, cancel: false })
     expect(retireQuery.safeParse({ cancel: 'yes' }).success).toBe(false)
+  })
+})
+
+describe('an always-open room is never exported as never open', () => {
+  test('its open hours are blank, as is a kind of booking\'s, and a room with hours keeps its number', () => {
+    expect(openHoursCell({ openHours: 0, alwaysOpen: true }, 'room')).toBe('')
+    expect(openHoursCell({ openHours: 0, alwaysOpen: false }, 'tier')).toBe('')
+    expect(openHoursCell({ openHours: 0, alwaysOpen: false }, 'room')).toBe(0)
+    expect(openHoursCell({ openHours: 32, alwaysOpen: false }, 'room')).toBe(32)
   })
 })

@@ -2249,6 +2249,13 @@ one statement and not a download. `GET /api/admin/rooms/reports/utilisation` bre
 by tier, pages, and returns an envelope; `.../reports/export` is the same figures as CSV, every cell
 quoted so a room name with a comma cannot split a row (criterion 3).
 
+By room, **every room in use is a row**, booked or not, at nought hours if nothing was booked: an
+unused room is what an end-of-year review most needs to see. A retired room appears only where it
+was booked in the span. The rooms come from one read of the estate, merged in memory, never from an
+`IN` list built from the counts (0006). Each row carries `alwaysOpen`, true for a room with no hours
+recorded, and the CSV leaves `openHours` blank for such a room and for every row by tier, since
+neither has hours to count against; a nought there would read in a spreadsheet as never open.
+
 Confirmed, cancelled and no-show hours are told apart, and a no-show is **its own figure rather
 than a deduction**: the room was held and not used, which is the number the review wants
 (criterion 1). Whether a booking counts as a no-show uses `CURRENTLY_MARKED`, the same

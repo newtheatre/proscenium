@@ -1,4 +1,4 @@
-import { REPORT_EXPORT_LIMIT, reportQuery, usedShare } from '#shared/utils/utilisation'
+import { REPORT_EXPORT_LIMIT, openHoursCell, reportQuery, usedShare } from '#shared/utils/utilisation'
 
 // Quoted always: a room name with a comma in it would otherwise split the row.
 const cell = (value: unknown): string => `"${String(value ?? '').replaceAll('"', '""')}"`
@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
       row.confirmedHours,
       row.cancelledHours,
       row.noShowHours,
-      row.openHours,
+      openHoursCell(row, input.by),
       usedShare(row) ?? '',
       row.bookings,
     ].map(cell).join(',')),
