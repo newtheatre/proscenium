@@ -8,7 +8,8 @@ import type { AdminShow } from '#shared/utils/programme'
 
 const props = defineProps<{ show: AdminShow }>()
 
-const onSale = computed(() => saysOnSale(props.show.onSaleCount, props.show.performanceCount))
+const published = computed(() => props.show.status === 'PUBLISHED')
+const onSale = computed(() => saysOnSale(props.show.onSaleCount, props.show.performanceCount, published.value))
 const share = computed(() => soldShare(props.show.houseTickets, props.show.capacity))
 
 const nextPerformance = computed(() => {
@@ -28,7 +29,7 @@ const nextPerformance = computed(() => {
         On sale
       </p>
       <UBadge
-        :color="show.onSaleCount > 0 ? 'success' : 'neutral'"
+        :color="show.onSaleCount > 0 && published ? 'success' : 'neutral'"
         variant="subtle"
         class="mt-2"
         data-test="strip-on-sale"
@@ -36,7 +37,7 @@ const nextPerformance = computed(() => {
         {{ onSale }}
       </UBadge>
       <p class="mt-2 text-sm text-muted">
-        {{ saysOnSaleCount(show.onSaleCount, show.performanceCount) }}
+        {{ saysOnSaleCount(show.onSaleCount, show.performanceCount, published) }}
       </p>
     </UCard>
 

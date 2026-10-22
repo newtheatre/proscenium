@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { publishShowForm } from '#shared/utils/programme'
+import { publishBlockers, publishShowForm } from '#shared/utils/programme'
 import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 
 // Publish a show, or take it back off the public site. Unpublishing closes sales through the sale
@@ -24,13 +24,9 @@ export default defineEventHandler(async (event) => {
   // refuses and names which, rather than publish against retired vocabulary (D-131 criterion 5).
   if (published) {
     const category = held.categoryId ? await showCategoryById(held.categoryId) : undefined
-    if (category?.archived) {
-      throw createError({ statusCode: 409, statusMessage: `${held.title} cannot publish: its category, ${category.name}, has been retired` })
-    }
     const season = held.seasonId ? await seasonById(held.seasonId) : undefined
-    if (season?.archived) {
-      throw createError({ statusCode: 409, statusMessage: `${held.title} cannot publish: its season, ${season.name}, has been retired` })
-    }
+    const blockers = publishBlockers(held.title, category, season)
+    if (blockers.length > 0) throw createError({ statusCode: 409, statusMessage: blockers.join('. ') })
   }
 
   // Only a pass the sheet could offer may be ticked, and one already covering is left alone: the

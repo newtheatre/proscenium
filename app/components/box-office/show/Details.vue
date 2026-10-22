@@ -74,7 +74,7 @@ async function saveCopy(): Promise<void> {
         loadedSeasonId: props.show.seasonId,
       },
     })
-    toast.add({ title: 'Show changed', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'Show saved', icon: 'i-lucide-check', color: 'success' })
     emit('saved')
   }
   catch (refused) {
