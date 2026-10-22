@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { can, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { saysDay } from '#shared/utils/when'
+import { londonDay } from '#shared/utils/membership'
 import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, plannerModuleOptions, saysGaps, saysSessionStatus } from '#shared/utils/training'
 import type { MemberLacking } from '#shared/utils/training'
 
@@ -246,7 +247,9 @@ async function saveModules(): Promise<void> {
 // What the button offers depends on where the session has got to, so it says which of those it is.
 const registerLabel = computed(() => {
   if (marked.value) return 'See the register'
-  return registerOpen.value ? 'Carry on with the register' : 'Take the register'
+  if (registerOpen.value) return 'Carry on with the register'
+  // Offered weeks ahead, so it says when it opens rather than promising a register (0241).
+  return data.value && data.value.heldOn > londonDay(new Date()) ? `See the register (opens ${saysDay(data.value.heldOn)})` : 'Take the register'
 })
 </script>
 
@@ -298,7 +301,7 @@ const registerLabel = computed(() => {
             variant="subtle"
             data-test="session-status"
           >
-            {{ saysSessionStatus(data.status) }}
+            {{ saysSessionStatus(data.status, data.registerOpenedAt) }}
           </UBadge>
           <UButton
             v-if="!cancelled"
@@ -371,7 +374,7 @@ const registerLabel = computed(() => {
       <div class="grid gap-6 lg:grid-cols-3">
         <section class="space-y-3 lg:col-span-2">
           <h2 class="text-sm font-semibold">
-            Who is coming
+            {{ cancelled ? 'Who was signed up' : 'Who is coming' }}
           </h2>
           <ul
             v-if="data.attendees.length"
@@ -394,7 +397,15 @@ const registerLabel = computed(() => {
                   Walk-in
                 </UBadge>
                 <UBadge
-                  v-if="!one.placed"
+                  v-if="cancelled"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                >
+                  Told it is cancelled
+                </UBadge>
+                <UBadge
+                  v-else-if="!one.placed"
                   color="warning"
                   variant="subtle"
                   size="sm"

@@ -1,5 +1,6 @@
 import { and, asc, eq, ne, sql } from 'drizzle-orm'
 import { expiryFor } from '#shared/utils/training'
+import { saysDayLong } from '#shared/utils/when'
 import type { AttendanceMark } from '#shared/utils/training'
 import type { H3Event } from 'h3'
 
@@ -33,6 +34,7 @@ export async function registerFor(sessionId: string): Promise<RegisterRow[]> {
 
 export interface TaughtModule {
   id: string
+  name: string
   expiryMode: string
   expiryMonths: number | null
 }
@@ -40,6 +42,7 @@ export interface TaughtModule {
 export async function modulesTaughtBy(sessionId: string): Promise<TaughtModule[]> {
   return db.select({
     id: schema.trainingModules.id,
+    name: schema.trainingModules.name,
     expiryMode: schema.trainingModules.expiryMode,
     expiryMonths: schema.trainingModules.expiryMonths,
   })
@@ -143,14 +146,25 @@ export interface CorrectionRun extends MarkRun {
   reason: string
 }
 
-// G-114 criterion 2. One batch: what was issued is revoked and the corrected set is issued beside
-// it, so nobody is ever readably without a record they are about to get back.
-export async function correctRegister(run: CorrectionRun): Promise<{ awarded: number, revoked: number }> {
+export interface Correction {
+  awarded: number
+  revoked: number
+  added: string[]
+  dropped: string[]
+  at: number
+}
+
+// G-114 criterion 2, as amended by 0241. One batch, touching only the people whose mark moved: a
+// record whose mark stands is left alone, so the history shows one row per person, not a pair.
+export async function correctRegister(run: CorrectionRun): Promise<Correction> {
   const year = await academicYear(run.event as H3Event)
   const present = run.marks.filter(mark => mark.mark === 'ATTENDED').map(mark => mark.userId)
+  const before = new Set((await registerFor(run.sessionId)).filter(row => row.status === 'ATTENDED').map(row => row.userId))
+  const added = present.filter(userId => !before.has(userId))
+  const dropped = [...before].filter(userId => !present.includes(userId))
 
   // Criterion 5. The award is dated to the day the session was held, not the day it was put right.
-  const rows = present.flatMap(userId => run.modules.map(module => ({
+  const rows = added.flatMap(userId => run.modules.map(module => ({
     id: newId(),
     userId,
     moduleId: module.id,
@@ -163,15 +177,20 @@ export async function correctRegister(run: CorrectionRun): Promise<{ awarded: nu
   const now = Math.floor(Date.now() / 1000)
   const living = await db.select({ id: schema.trainingRecords.id })
     .from(schema.trainingRecords)
-    .where(and(eq(schema.trainingRecords.sessionId, run.sessionId), sql`revoked_at is null`))
+    .where(and(
+      eq(schema.trainingRecords.sessionId, run.sessionId),
+      sql`revoked_at is null`,
+      inJsonSet(schema.trainingRecords.userId, dropped),
+    ))
 
   await db.batch([
-    // Revoked first: the partial unique index counts only live rows, so the corrected set can
-    // carry the same person and module as the set it replaces.
+    // Revoked first: the partial unique index counts only live rows, so somebody dropped and the
+    // set issued can never collide. One parameter for the people, however many (0003).
     db.run(sql`
       update training_records
       set revoked_at = ${now}, revoked_by = ${run.markedBy}, revoke_reason = ${run.reason}
       where session_id = ${run.sessionId} and revoked_at is null
+        and user_id in (select value from json_each(${JSON.stringify(dropped)}))
     `),
     ...run.marks.map(mark => db.run(sql`
       update session_attendees
@@ -198,7 +217,7 @@ export async function correctRegister(run: CorrectionRun): Promise<{ awarded: nu
     `),
   ] as never)
 
-  return { awarded: rows.length, revoked: living.length }
+  return { awarded: rows.length, revoked: living.length, added, dropped, at: now }
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -207,17 +226,26 @@ function chunk<T>(items: T[], size: number): T[][] {
   return parts
 }
 
-// Criterion 3's other half. Somebody marked absent hears why nothing landed on their record, and
-// the copy makes clear nothing has been held against them.
+// Who held a place they signed up for, read before marking moves anybody's status. Somebody only
+// ever on the waiting list, or a walk-in the trainer unticked, was never expected (0241).
+export async function expectedOn(sessionId: string): Promise<Set<string>> {
+  const signedUp = new Set((await registerFor(sessionId)).filter(row => row.source === 'SIGNUP').map(row => row.userId))
+  return new Set((await placesOnSession(sessionId)).placed.map(place => place.userId).filter(id => signedUp.has(id)))
+}
+
+// Criterion 3's other half. Somebody expected and marked absent hears why nothing landed on their
+// record, and the copy makes clear nothing has been held against them.
 export async function tellAbsentees(
   event: H3Event | undefined,
   sessionId: string,
   heldOn: string,
   marks: { userId: string, mark: AttendanceMark }[],
+  expected: Set<string>,
+  modules: { name: string }[],
 ): Promise<number> {
   let told = 0
   for (const mark of marks) {
-    if (mark.mark !== 'ABSENT') continue
+    if (mark.mark !== 'ABSENT' || !expected.has(mark.userId)) continue
     const key = `training.session.absent:${sessionId}:${mark.userId}`
     const took = await claimNotification({
       userId: mark.userId,
@@ -233,11 +261,44 @@ export async function tellAbsentees(
       claim: key,
       context: {
         name: '',
-        heldOn,
+        heldOn: saysDayLong(heldOn),
+        taught: saysTaught(modules),
         trainingUrl: `${useRuntimeConfig(event).public.baseURL}/training`,
       },
     })
     told++
   }
   return told
+}
+
+const saysTaught = (modules: { name: string }[]): string => modules.map(module => module.name).join(', ')
+
+// A correction moves somebody's record one way or the other, and each direction says which. Keyed
+// to the correction, so being dropped, added back and dropped again each tells them (0241).
+export async function tellCorrected(
+  event: H3Event | undefined,
+  sessionId: string,
+  heldOn: string,
+  modules: { name: string }[],
+  correction: Correction,
+): Promise<void> {
+  const moves = [
+    ...correction.dropped.map(userId => ({ userId, type: 'training.session.withdrawn' as const })),
+    ...correction.added.map(userId => ({ userId, type: 'training.session.added' as const })),
+  ]
+  for (const move of moves) {
+    const key = `${move.type}:${sessionId}:${move.userId}:${correction.at}`
+    if (!(await claimNotification({ userId: move.userId, type: move.type, key, sessionId }))) continue
+    await notify(event, {
+      type: move.type,
+      userId: move.userId,
+      claim: key,
+      context: {
+        name: '',
+        heldOn: saysDayLong(heldOn),
+        taught: saysTaught(modules),
+        trainingUrl: `${useRuntimeConfig(event).public.baseURL}/training`,
+      },
+    })
+  }
 }

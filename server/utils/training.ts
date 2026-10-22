@@ -71,6 +71,7 @@ export interface SessionRow {
   capacity: number
   opensAt: number | null
   status: string
+  registerOpenedAt: number | null
   trainerId: string
   trainerName: string
   modules: { id: string, name: string }[]
@@ -100,6 +101,7 @@ export async function listSessions(filter: { status?: string, trainerId?: string
     capacity: schema.trainingSessions.capacity,
     opensAt: schema.trainingSessions.opensAt,
     status: schema.trainingSessions.status,
+    registerOpenedAt: schema.trainingSessions.registerOpenedAt,
     trainerId: schema.trainingSessions.trainerId,
     trainerName: schema.users.name,
   })

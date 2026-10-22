@@ -65,9 +65,8 @@ export default defineEventHandler(async (event) => {
     reason: input.reason,
   })
 
-  // Criterion 3. Somebody dropped by the correction keeps their absence, and hears why nothing
-  // landed, the same way they would have on the night.
-  await tellAbsentees(event, id, session.heldOn, input.marks)
+  // Criterion 3, as amended by 0241: whoever the correction moved hears which way, and nobody else.
+  await tellCorrected(event, id, session.heldOn, modules, corrected)
 
-  return { ok: true, ...corrected }
+  return { ok: true, awarded: corrected.awarded, revoked: corrected.revoked, added: corrected.added.length, dropped: corrected.dropped.length }
 })

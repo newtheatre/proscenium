@@ -74,6 +74,8 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'night.auto-closed': 'ANNOUNCEMENTS',
   'training.request.scheduled': 'TRAINING',
   'training.session.absent': 'TRAINING',
+  'training.session.withdrawn': 'TRAINING',
+  'training.session.added': 'TRAINING',
   'training.register.unmarked': 'TRAINING',
   'training.session.promoted': 'TRAINING',
   'training.session.demoted': 'TRAINING',

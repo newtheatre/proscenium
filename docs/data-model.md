@@ -2676,16 +2676,21 @@ scrubbed on erasure alongside `notes`.
 
 **A marked register is corrected inside the edit window** (G-114). The window is
 `SESSION_EDIT_WINDOW_DAYS` and is counted from the held-on day, so lengthening it is a settings
-change rather than a deploy. A correction is one batch: every live record the session issued is
-revoked with a reason, the marks are restated, and the corrected set is inserted beside them, so
-there is no readable moment in which somebody has lost a record they are about to get back. The
-revoke runs first because the partial unique index counts only live rows. Nothing is deleted, and
+change rather than a deploy. A correction is one batch touching only the people whose mark moved
+(0241): the live records of somebody unmarked are revoked with a reason, scoped by one `json_each`
+parameter, the marks are restated, and records are inserted for somebody newly marked present.
+Each person moved is emailed `training.session.withdrawn` or `training.session.added`, keyed to the
+correction. The revoke runs first because the partial unique index counts only live rows. Nothing is deleted, and
 somebody dropped by a correction keeps their attendee row marked `ABSENT` as evidence. Past the
 window the only correction is an administrator's revocation and a fresh grant (G-122).
 
 **The freeze is releasable by the session's own trainer while no marks exist** (open question 6,
 answered 2 September). The release is conditional on `marked_at IS NULL`, so a release racing a
 submission cannot change what a mark is about to award.
+
+**The absentee email goes only to who was expected** (0241): somebody who signed up and held a
+place in the order as the register was marked, read before marking moves any status. `marks` may
+be empty once `confirmedAllAbsent` is sent, so a register nobody was on still closes.
 
 **Marking is the single act that awards.** Everything it does is one `db.batch`: the stamp, the
 attendee marks, the records, and the audit entry. Every statement after the stamp is guarded on
