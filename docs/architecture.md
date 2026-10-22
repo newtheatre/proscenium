@@ -1883,7 +1883,9 @@ per migrated row; the append-only triggers are hand-added after generation, as t
 of tables requires (0010).
 
 `GET /api/tonight/emergency` answers `{ viewerId, cards }` to any signed-in account
-(`requireAccount`, issue 1310): one card for every venue `venuesTonightQuery` finds running
+(`currentAccount`, issue 1310), and to a signed-out request `{ viewerId: null }` with every card
+passed through `signedOutCard`, which keeps the venue, address and what3words and nulls the rest,
+reading no rota, training or authority at all (0237): one card for every venue `venuesTonightQuery` finds running
 tonight, a venue with a non-cancelled performance or bar opening in the night, where an external
 venue counts only once its performance tonight carries a shift that is not cancelled (as
 `listedVenue` reads it) or its card has been filed. A venue with no card yet is still
@@ -1920,8 +1922,9 @@ copy. Whole-night rather than venue-scoped, since the answer already holds every
 venue running tonight. A phone may be shared, so the copy it keeps is stamped with `viewerId` and
 the screen shows its duty managers' numbers only to that account (`emergencyCardsFor`); anybody
 else sees the same cards without them. Signing out (`AuthStatus.vue`) clears every night key on
-the device (`clearNightCache`), and `/tonight/emergency` carries the `signed-in` middleware, so a
-signed-out visitor is sent to sign in rather than shown a cached card.
+the device (`clearNightCache`). `/tonight/emergency` is the one show-night page with no sign-in
+middleware (0237): signed out, `emergencyCardsFor` runs every card through `signedOutCard`, so even
+a full copy left by an ended session draws only the address, what3words and Call 999.
 
 `POST /api/rota/shifts/[id]/claim` takes an optional `{ shareNumber }` (`shiftClaimForm`). My
 rota asks it of a duty manager shift before the claim goes, with neither answer selected, and the

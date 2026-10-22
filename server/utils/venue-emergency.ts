@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { and, sql } from 'drizzle-orm'
 import { aliasColumns, predicate, whereFrom, yesNo } from './list-filters'
+import { venuesTonightQuery } from './tonight'
 import { listedVenue } from './venues'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
 import type { ListClause } from './list-filters'
@@ -163,4 +164,24 @@ export async function currentCards(clause: ListClause, limit: number, offset: nu
 export async function countVenuesForCards(clause: ListClause): Promise<number> {
   const [row] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM venues vp${predicate(clause)}`)
   return row?.total ?? 0
+}
+
+// The running venues tonight with no filed card, for whoever can file one (0237).
+export function unfiledTonightQuery(from: number, to: number): SQL {
+  return sql`
+    SELECT t.venueName AS venueName
+    FROM (${venuesTonightQuery(from, to)}) t
+    JOIN venues v ON v.id = t.venueId
+    WHERE NOT ${cardFiled('v')}
+    ORDER BY t.venueName COLLATE NOCASE
+  `
+}
+
+// Whether a performance's venue has a filed card, read with the house by every shift (0237).
+export function performanceCardFiledQuery(performanceId: string): SQL {
+  return sql`
+    SELECT ${cardFiled('v')} AS filed
+    FROM performances p JOIN venues v ON v.id = p.venue_id
+    WHERE p.id = ${performanceId}
+  `
 }

@@ -18,6 +18,7 @@ interface Performance {
   intervalMinutes: number | null
   house: HubHouse
   dutyManagerOnShift: boolean
+  emergencyCardFiled: boolean
 }
 interface HouseTonight { night: string, venueId: string, performances: Performance[] }
 
@@ -213,6 +214,17 @@ onUnmounted(() => {
       variant="subtle"
       title="Nobody is working the checklist"
       description="Nobody holds tonight's duty manager shift, so nobody on tonight's rota can tick the pre-show checks. Tell the Front of House Manager."
+    />
+
+    <!-- Every shift is told, not only whoever files the card, since any of them may need it (0237). -->
+    <UAlert
+      v-if="selected && !selected.emergencyCardFiled"
+      data-test="emergency-card-missing"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-siren"
+      title="No emergency card for this venue"
+      :description="`Nothing is filed to read to 999 for ${selected.venueName}. Tell the Front of House Manager before doors.`"
     />
 
     <!-- Asked before anything is drawn by role: until then the tiles would mix two venues' houses. -->

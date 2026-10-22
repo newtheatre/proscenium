@@ -6,13 +6,14 @@ import { filterQuerySchema } from '#shared/utils/list-filters'
 import { accessProfilesList } from '#shared/utils/access-profiles-list'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { OPERATIONAL_PERMISSIONS } from '#shared/utils/roles'
-import { currentShowNight } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { accessProfilesClause } from './access-profiles'
 import { allergensUnansweredCount, onHandColumn } from './bar'
 import { STOCK_COUNTED } from './bar-linkage'
 import { claimsClause } from './membership-claims'
 import { performancesOnNight } from './performances'
 import { qualifiedCounts, roleEligibilities } from './rota-readiness'
+import { unfiledTonightQuery } from './venue-emergency'
 import { demandScope } from './training-demand'
 import type { ConsoleOverview, FirstRunStep } from '#shared/utils/console-overview'
 import type { Permission } from '#shared/utils/roles'
@@ -92,7 +93,8 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
   const bar = holds('bar.read')
   const stocktakes = bar || holds('bar.stocktake')
 
-  const [eligibility, facts, tonight, routing, firstRun] = await Promise.all([
+  const { from, to } = showNightBounds(currentShowNight())
+  const [eligibility, facts, tonight, routing, firstRun, unfiled] = await Promise.all([
     holds('rota.read') ? roleEligibilities(event) : undefined,
     stocktakes ? db.all<BarSetUp>(barSetUpQuery()).then(([row]) => row) : undefined,
     OPERATIONAL_PERMISSIONS.some(holds) ? performancesOnNight(currentShowNight()) : null,
@@ -101,6 +103,9 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
       ? db.all<Record<FirstRunStep, number>>(firstRunQuery()).then(([row]) =>
           firstRunLines(Object.fromEntries(FIRST_RUN_STEPS.map(step => [step, Boolean(row?.[step])])) as Record<FirstRunStep, boolean>))
       : null,
+    holds('emergency-card.write')
+      ? db.all<{ venueName: string }>(unfiledTonightQuery(Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000))).then(rows => rows.map(row => row.venueName))
+      : undefined,
   ])
 
   const qualified = eligibility ? await qualifiedCounts(eligibility) : undefined
@@ -113,6 +118,7 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
       anyStocktake: stocktakes && facts ? Boolean(facts.anyStocktake) : undefined,
       allergensUnknown: bar && facts ? Number(facts.allergensUnknown) : undefined,
       anySeverityRoutes: routing,
+      venuesWithoutCard: unfiled,
     }),
     tonight: tonight === null ? null : tonightLines(tonight),
     firstRun,

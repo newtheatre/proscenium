@@ -28,7 +28,7 @@ export const emergencyCardForm = z.object({
   defibrillator: field(),
   firstAiders: field(),
   firePanel: field(),
-  what3words: field(100),
+  what3words: field(100).transform(bareWhat3words),
   notes: field(NOTES_LIMIT),
   firstCallName: field(80),
   firstCallPhone: field(40)
@@ -38,6 +38,12 @@ export const emergencyCardForm = z.object({
   message: 'Who to ring first needs both a name and a number, or neither',
   path: ['firstCallPhone'],
 })
+
+// Three words as what3words prints them, "///" and all, are stored and shown without the slashes,
+// which the card draws itself.
+export function bareWhat3words(value: string | null): string | null {
+  return value?.replace(/^[\s/]+/, '').trim() || null
+}
 
 export type EmergencyCardInput = z.output<typeof emergencyCardForm>
 
@@ -71,14 +77,22 @@ export function cardAddressDraft(cardAddress: string | null, venueAddress: strin
   return cardAddress ?? venueAddress ?? ''
 }
 
+const SIGNED_OUT_KEEPS = new Set(['venueId', 'venueName', 'address', 'what3words'])
+
+// Signed out, the card is the address and what3words to read to 999 and nothing else (0237).
+export function signedOutCard<T extends object>(card: T): T {
+  return Object.fromEntries(Object.entries(card).map(([key, value]) => [key, SIGNED_OUT_KEEPS.has(key) ? value : null])) as T
+}
+
 // A cached answer outlives the person who fetched it on a shared phone, so its duty managers'
 // numbers show only to that account; everybody else keeps the addresses without them (A-114).
 export function emergencyCardsFor<T extends { dutyManagers: unknown[] | null }>(
-  answer: { viewerId: string, cards: T[] } | null,
+  answer: { viewerId: string | null, cards: T[] } | null,
   viewerId: string | null,
 ): T[] | null {
   if (!answer) return null
-  if (viewerId !== null && answer.viewerId === viewerId) return answer.cards
+  if (viewerId === null) return answer.cards.map(signedOutCard)
+  if (answer.viewerId === viewerId) return answer.cards
   return answer.cards.map(card => ({ ...card, dutyManagers: null }))
 }
 
@@ -133,4 +147,12 @@ export function emergencyCalls(cards: readonly (FirstCall & { venueName: string 
 export function saysCall(call: PinnedCall): string {
   const rings = call.digits === EMERGENCY_SERVICES.phone ? 'This rings 999' : `This rings ${call.name} on ${call.phone}`
   return `${rings} from the phone you are holding. Have the address on the card ready to read.`
+}
+
+// Where the reader's own venues end, so every other venue running tonight folds under one line
+// beneath them. Null when there is nothing to fold: all theirs, or none of them (0237).
+export function otherVenuesFrom(cards: readonly { dutyManagers: unknown[] | null }[]): number | null {
+  const own = cards.filter(card => card.dutyManagers !== null).length
+  if (own === 0 || own === cards.length) return null
+  return cards.findIndex(card => card.dutyManagers === null)
 }

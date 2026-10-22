@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { EMERGENCY_SERVICES, cardAddressDraft, emergencyCalls, emergencyCardComplete, emergencyCardForm, emergencyCardProblems, firstCallOf, saysCall } from '#shared/utils/venue-emergency'
+import { EMERGENCY_SERVICES, bareWhat3words, cardAddressDraft, emergencyCalls, emergencyCardComplete, emergencyCardForm, emergencyCardProblems, firstCallOf, otherVenuesFrom, saysCall } from '#shared/utils/venue-emergency'
 
 // E-113's pure validation. What the database holds is proved against the real migrations in
 // `tests/integration/venue-emergency.test.ts`.
@@ -201,5 +201,31 @@ describe('the form names each mistake by its field, as a sentence (0217)', () =>
     const messages = Object.values(emergencyCardProblems({ ...filled, address: '', firstCallName: 'A', firstCallPhone: '999' }))
     expect(messages.length).toBeGreaterThan(0)
     for (const message of messages) expect(message[0]).toBe(message[0]!.toUpperCase())
+  })
+})
+
+// The 21 October process map: "///stage.lights.velvet" showed as six slashes (0237).
+describe('what3words is kept without its slashes', () => {
+  test('the leading slashes go, on the form and on a card already filed', () => {
+    expect(bareWhat3words('///stage.lights.velvet')).toBe('stage.lights.velvet')
+    expect(bareWhat3words(' /// stage.lights.velvet ')).toBe('stage.lights.velvet')
+    expect(bareWhat3words('stage.lights.velvet')).toBe('stage.lights.velvet')
+    expect(bareWhat3words('///')).toBeNull()
+    expect(emergencyCardForm.parse({ address: filled.address, what3words: '///stage.lights.velvet' }).what3words).toBe('stage.lights.velvet')
+  })
+})
+
+describe('the reader\'s own venues lead, and the rest fold (0237)', () => {
+  const own = { dutyManagers: [] }
+  const other = { dutyManagers: null }
+
+  test('folds from the first venue that is not theirs', () => {
+    expect(otherVenuesFrom([own, other, other])).toBe(1)
+  })
+
+  test('nothing folds when every venue is theirs, or none is', () => {
+    expect(otherVenuesFrom([own, own])).toBeNull()
+    expect(otherVenuesFrom([other, other])).toBeNull()
+    expect(otherVenuesFrom([])).toBeNull()
   })
 })

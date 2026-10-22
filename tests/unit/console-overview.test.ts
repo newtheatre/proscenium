@@ -117,6 +117,16 @@ describe('setting up a fresh install', () => {
   })
 })
 
+// The 21 October process map: The Studio ran with no card and nothing warned anyone (0237).
+describe('a venue running tonight with no emergency card', () => {
+  test('is a set-up line naming the venues, opening the cards screen', () => {
+    const lines = setUpLines({ venuesWithoutCard: ['The Studio', 'New Theatre'] })
+    expect(lines.map(saysSetUp)).toEqual(['Running tonight with no emergency card to read to 999: The Studio, New Theatre.'])
+    expect(lines.map(setUpHref)).toEqual(['/rota/manage/emergency'])
+    expect(setUpLines({ venuesWithoutCard: [] })).toEqual([])
+  })
+})
+
 describe('tonight, for whoever may open its screens', () => {
   test('a cancelled performance is not on tonight', () => {
     const lines = tonightLines([
