@@ -1,4 +1,5 @@
-import { barOpeningForm, noBarSlotsRefusal } from '#shared/utils/rota-openings'
+import { londonClock } from '#shared/utils/london'
+import { barOpeningForm, noBarSlotsRefusal, openingOverlapWarning } from '#shared/utils/rota-openings'
 
 // Plan a bar opening: an evening at a venue with nothing running, staffed from the venue's bar
 // template count (E-130 criteria 1 and 2, 0077).
@@ -15,6 +16,17 @@ export default defineEventHandler(async (event) => {
   // than given a slot the theatre never asked for (criterion 2).
   const slots = await barSlotCount(input.venueId)
   if (slots === 0) throw createError({ statusCode: 409, statusMessage: noBarSlotsRefusal(venue.name) })
+
+  // A warning, not a rule: two events can share a bar, so the officer may go ahead once told (0215).
+  const overlap = input.overlapping ? null : await overlappingOpening(input.venueId, input.startsAt, input.endsAt)
+  if (overlap) {
+    const says = (at: number) => londonClock(new Date(at * 1000))
+    throw createError({
+      statusCode: 409,
+      statusMessage: openingOverlapWarning({ label: overlap.label, opens: says(overlap.startsAt), closes: says(overlap.endsAt) }, venue.name),
+      data: { overlap: true },
+    })
+  }
 
   const openingId = newId()
   const entry = auditEntry({

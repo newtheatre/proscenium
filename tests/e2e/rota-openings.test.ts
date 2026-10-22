@@ -86,8 +86,9 @@ afterAll(async () => {
   await app?.stop()
 }, 30_000)
 
-// 18:00 to 23:00 on the night asked for, a week out unless a test says otherwise.
-function plan(label: string, as: string, on = night): Promise<Response> {
+// 18:00 to 23:00 on the night asked for, a week out unless a test says otherwise. These cases share
+// one venue and night, so each goes ahead past the overlap warning unless it is the one testing it (0215).
+function plan(label: string, as: string, on = night, overlapping = true): Promise<Response> {
   const from = showNightOpensAt(on)
   return request(app, 'POST', '/api/rota/openings', {
     venueId,
@@ -95,6 +96,7 @@ function plan(label: string, as: string, on = night): Promise<Response> {
     label,
     startsAt: from + 14 * 3600,
     endsAt: from + 19 * 3600,
+    overlapping,
   }, as)
 }
 
@@ -157,6 +159,30 @@ describe.skipIf(skip !== null)('an officer plans an evening with no performance 
       label: 'A bar that shuts first',
       startsAt: nightStart + 19 * 3600,
       endsAt: nightStart + 14 * 3600,
+    }, foh.cookie)
+    expect(response.status).toBe(400)
+  })
+})
+
+describe.skipIf(skip !== null)('an opening over another at the venue is warned of, and a whole day is refused (0215)', () => {
+  test('a second opening over the first is refused with a warning, then planned when the officer goes ahead', async () => {
+    const later = daysAfter(night, 3)
+    expect((await plan('An early quiz', foh.cookie, later, false)).status).toBe(200)
+
+    const warned = await plan('A late quiz', foh.cookie, later, false)
+    expect(warned.status).toBe(409)
+    const body = await warned.json() as { statusMessage?: string, data?: { overlap?: boolean } }
+    expect(body.statusMessage).toContain('An early quiz is already planned')
+    expect(body.data?.overlap).toBe(true)
+    expect((await listing(foh.cookie)).items.some(opening => opening.label === 'A late quiz')).toBe(false)
+
+    expect((await plan('A late quiz', foh.cookie, later, true)).status).toBe(200)
+  })
+
+  test('an opening a whole day long is refused', async () => {
+    const from = showNightOpensAt(night)
+    const response = await request(app, 'POST', '/api/rota/openings', {
+      venueId, night, label: 'A bar open all day', startsAt: from + 16 * 3600, endsAt: from + 40 * 3600,
     }, foh.cookie)
     expect(response.status).toBe(400)
   })

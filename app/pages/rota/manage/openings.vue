@@ -6,7 +6,7 @@ import { saysWhenLong } from '#shared/utils/when'
 import { daysAfter } from '#shared/utils/membership'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { can, manageRota } from '#shared/utils/abilities'
-import { BAR_OPENING_LABEL_LIMIT, saysBarOpeningStatus } from '#shared/utils/rota-openings'
+import { BAR_OPENING_LABEL_LIMIT, ONLY_SLOT_HINT, SAME_TIME_REFUSAL, saysBarOpeningStatus } from '#shared/utils/rota-openings'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 import { showNightOf } from '#shared/utils/show-night'
 import { saysShiftStatus } from '#shared/utils/rota'
@@ -58,6 +58,8 @@ const failure = ref<string | null>(null)
 const cancelling = ref<string | null>(null)
 const planning = ref(false)
 const saving = ref(false)
+// Set when the route warns of an overlapping opening; going ahead resends with the flag (0215).
+const overlapWarned = ref(false)
 
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(rotaOpeningsList)
 
@@ -98,13 +100,14 @@ function clockParts(value: string): [number, number] | null {
 
 // The night is the evening's own show night, worked out from the instant rather than typed: a bar
 // opening at 00:30 belongs to the night before, and the write path refuses a pair that disagrees.
-function instantsFor(): { night: string, startsAt: number, endsAt: number } | null {
+function instantsFor(): { night: string, startsAt: number, endsAt: number } | 'same' | null {
   const [year, month, day] = plan.evening.split('-').map(Number)
   const opensAt = clockParts(plan.opensAt)
   const closesAt = clockParts(plan.closesAt)
   if (!year || !month || !day || !opensAt || !closesAt) return null
 
   const opens = fromLondonWallClock(year, month, day, opensAt[0], opensAt[1])
+  if (opensAt[0] === closesAt[0] && opensAt[1] === closesAt[1]) return 'same'
   const sameDay = fromLondonWallClock(year, month, day, closesAt[0], closesAt[1])
   // A bar closing earlier on the clock than it opened closes the next morning, on the next London
   // day rather than this instant plus 86400: a clock-change night is not that long (0014).
@@ -115,18 +118,20 @@ function instantsFor(): { night: string, startsAt: number, endsAt: number } | nu
   return { night: showNightOf(opens), startsAt: Math.floor(opens.getTime() / 1000), endsAt: Math.floor(closes.getTime() / 1000) }
 }
 
-async function submitPlan(): Promise<void> {
+async function submitPlan(anyway = false): Promise<void> {
   const when = instantsFor()
-  if (!when) {
-    failure.value = 'Give the evening, the time the bar opens and the time it closes'
+  if (!when || when === 'same') {
+    failure.value = when === 'same' ? SAME_TIME_REFUSAL : 'Give the evening, the time the bar opens and the time it closes'
+    overlapWarned.value = false
     return
   }
   saving.value = true
   failure.value = null
+  overlapWarned.value = false
   try {
     const answer = await $fetch<{ stamped: number }>('/api/rota/openings', {
       method: 'POST',
-      body: { venueId: plan.venueId, label: plan.label.trim(), ...when },
+      body: { venueId: plan.venueId, label: plan.label.trim(), ...when, overlapping: anyway || undefined },
     })
     toast.add({
       title: 'Bar opening planned',
@@ -140,6 +145,7 @@ async function submitPlan(): Promise<void> {
   }
   catch (error) {
     failure.value = refusalText(error)
+    overlapWarned.value = refusalData<{ overlap?: boolean }>(error)?.overlap === true
   }
   finally {
     saving.value = false
@@ -254,6 +260,7 @@ async function removeSlot(): Promise<void> {
 }
 
 const slotsOf = (openingId: string): Slot[] => listing.value.slots.filter(slot => slot.openingId === openingId)
+const staffedSlots = (openingId: string): number => slotsOf(openingId).filter(slot => slot.status !== 'CANCELLED').length
 
 function spanOf(opening: Opening): string {
   const opens = saysWhenLong(opening.startsAt)
@@ -307,7 +314,7 @@ function slotLine(slot: Slot, opening: Opening): VNode {
         }, () => 'Stand down')]
       : []),
     // Only an open slot is removed: one with a name on it is stood down first (E-130).
-    ...(writes.value && slot.status === 'OPEN' && opening.status === 'PLANNED'
+    ...(writes.value && slot.status === 'OPEN' && opening.status === 'PLANNED' && staffedSlots(opening.openingId) > 1
       ? [h(UButton, {
           'size': 'xs',
           'color': 'neutral',
@@ -318,6 +325,9 @@ function slotLine(slot: Slot, opening: Opening): VNode {
             removing.value = slot
           },
         }, () => 'Remove')]
+      : []),
+    ...(writes.value && slot.status === 'OPEN' && opening.status === 'PLANNED' && staffedSlots(opening.openingId) <= 1
+      ? [h('span', { 'class': 'text-xs text-muted', 'data-test': `only-slot-${slot.slotId}` }, ONLY_SLOT_HINT)]
       : []),
   ])
 }
@@ -388,7 +398,9 @@ const modalOpen = computed(() => planning.value || cancellingOpening.value !== n
   || removing.value !== null || declining.value !== null)
 
 watch(modalOpen, (nowOpen) => {
-  if (!nowOpen) failure.value = null
+  if (nowOpen) return
+  failure.value = null
+  overlapWarned.value = false
 })
 </script>
 
@@ -491,7 +503,7 @@ watch(modalOpen, (nowOpen) => {
           v-if="failure"
           data-test="failure"
           class="mb-4"
-          color="error"
+          :color="overlapWarned ? 'warning' : 'error'"
           variant="subtle"
           :description="failure"
         />
@@ -556,14 +568,27 @@ watch(modalOpen, (nowOpen) => {
               class="w-full"
             />
           </UFormField>
-          <UButton
-            type="button"
-            :loading="saving"
-            data-test="opening-submit"
-            @click="submitPlan"
-          >
-            Plan the opening
-          </UButton>
+          <div class="flex gap-2">
+            <UButton
+              type="button"
+              :loading="saving"
+              data-test="opening-submit"
+              @click="submitPlan()"
+            >
+              Plan the opening
+            </UButton>
+            <UButton
+              v-if="overlapWarned"
+              type="button"
+              color="warning"
+              variant="soft"
+              :loading="saving"
+              data-test="opening-submit-anyway"
+              @click="submitPlan(true)"
+            >
+              Plan the opening anyway
+            </UButton>
+          </div>
         </div>
       </template>
     </UModal>
