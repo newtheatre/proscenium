@@ -22,7 +22,7 @@ screen names.
   table uses) is a **Set-up still to do** line for whoever holds `emergency-card.write`, and every
   shift's hub says so in red for its own performance.
 - what3words is stored without leading slashes, and a card filed before this shows without them.
-- The form's refusals are sentences, and the card names the Front of House Manager.
+- The card names the Front of House Manager. The form's refusals were made sentences by 0217, which landed first.
 - A phone with nobody signed in opens the card as well, decided by the IT Manager on 22 October
   2026. It shows each running venue's name, address and what3words, and Call 999, with a sign-in
   button; the server sends nothing else for a signed-out request, and the screen trims any cached
