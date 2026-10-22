@@ -456,6 +456,13 @@ export const MESSAGE_TYPES = {
     template: 'shift-released',
     sender: 'ANNOUNCEMENTS',
   },
+  // Transactional: with claims queued for an officer, the claim is the officer's work (0212).
+  'shift.claim-waiting': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'shift-claim-waiting',
+    sender: 'ANNOUNCEMENTS',
+  },
   // The officer's assignment is confirmed by definition, so it reads exactly like an approval
   // to the person it lands on (E-107 criterion 3).
   'shift.assigned': {

@@ -50,7 +50,10 @@ export default defineEventHandler(async (event) => {
     await Promise.all(officers.map(officer => notify(event, {
       userId: officer.id,
       type: 'shift.released',
-      context: { name: '', show: held.showTitle, venue: held.venueName, when, role: saysShiftRole(held.role).toLowerCase() },
+      context: {
+        name: '', show: held.showTitle, venue: held.venueName, when, role: saysShiftRole(held.role).toLowerCase(),
+        withdrawn: held.status === 'CLAIMED', url: `${useRuntimeConfig(event).public.baseURL}/rota/manage/shifts`,
+      },
     })))
   }
 

@@ -1,5 +1,5 @@
 import { changes } from '#shared/utils/audit'
-import { formatLondon } from '#shared/utils/london'
+import { formatLondon, londonClock } from '#shared/utils/london'
 import { approvalRefusal, saysShiftRole } from '#shared/utils/rota'
 
 // Approve a queued claim. The status and the training gate both ride the write, so two officers
@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
         venue: held.venueName,
         when: formatLondon(new Date(held.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
         role: saysShiftRole(held.role).toLowerCase(),
+        callTime: held.shiftStartsAt === null ? undefined : londonClock(new Date(held.shiftStartsAt * 1000)),
       },
     })
   }

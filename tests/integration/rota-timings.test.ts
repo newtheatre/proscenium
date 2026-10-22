@@ -345,8 +345,8 @@ describe('a shift added with no slot named is numbered after its role', () => {
       const door = run(database, addShiftStatement('added-door', { performanceId: tonight.performanceId, role: 'DOOR' }, 'actor', DEFAULTS, BAR_GATE))
       const bar = run(database, addShiftStatement('added-bar', { performanceId: tonight.performanceId, role: 'BAR' }, 'actor', DEFAULTS, BAR_GATE))
 
-      expect(door).toEqual([{ id: 'added-door', slot: 3 }])
-      expect(bar).toEqual([{ id: 'added-bar', slot: 1 }])
+      expect(door).toEqual([{ id: 'added-door', slot: 3, startsAt: expect.any(Number) }])
+      expect(bar).toEqual([{ id: 'added-bar', slot: 1, startsAt: expect.any(Number) }])
     })
   })
 })

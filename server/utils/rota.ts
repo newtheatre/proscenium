@@ -578,6 +578,8 @@ export interface ShiftDetail {
   status: ShiftStatus
   userId: string | null
   startsAt: number
+  // The shift's own start, the volunteer's call time; null where stamped before windows (0078).
+  shiftStartsAt: number | null
   venueId: string
   venueName: string
   showTitle: string
@@ -588,7 +590,7 @@ export interface ShiftDetail {
 export async function shiftDetail(id: string): Promise<ShiftDetail | null> {
   const [row] = await db.all<ShiftDetail>(sql`
     SELECT s.id AS shiftId, s.performance_id AS performanceId, s.role AS role, s.status AS status,
-           s.user_id AS userId, p.starts_at AS startsAt,
+           s.user_id AS userId, p.starts_at AS startsAt, s.starts_at AS shiftStartsAt,
            v.id AS venueId, v.name AS venueName, sh.title AS showTitle
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
@@ -766,7 +768,7 @@ export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId
     FROM performances p
     LEFT JOIN shift_templates t ON t.venue_id = p.venue_id AND t.role = ${input.role} AND ${ourVenue('t')}
     WHERE p.id = ${input.performanceId}${trained}${input.slot === undefined ? sql` AND ${nextSlotFree(input.role)}` : sql``}
-    RETURNING id, slot
+    RETURNING id, slot, starts_at AS startsAt
   `
 }
 

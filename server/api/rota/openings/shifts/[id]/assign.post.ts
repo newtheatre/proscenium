@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       userId: held.userId,
       type: 'shift.removed',
-      context: { name: '', show: held.label, venue: held.venueName, when, role: 'bar' },
+      context: { name: '', show: held.label, venue: held.venueName, when, role: 'bar', replaced: true },
     })
   }
 
