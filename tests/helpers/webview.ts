@@ -266,7 +266,14 @@ export async function openView(size?: { width: number, height: number }): Promis
 }
 
 const SETTLE_TIMEOUT_MS = 15_000
-const INTERACTIVE_TIMEOUT_MS = 120_000
+// Under the 120 second case timeout, so a screen that never becomes interactive is named, not timed out.
+const INTERACTIVE_TIMEOUT_MS = 100_000
+const PROBE_TIMEOUT_MS = 2_000
+
+// A browser call has no deadline of its own, and a renderer that stops answering would hold a wait forever.
+function within<T>(call: Promise<T>, ms: number, otherwise: T): Promise<T> {
+  return Promise.race([call, Bun.sleep(Math.max(0, ms)).then(() => otherwise)])
+}
 
 // Mounted is not interactive: until Suspense resolves the screen is server-rendered markup with
 // no listeners, and the marker must be inside the page, because chrome is patched before it.
@@ -281,7 +288,10 @@ export async function waitForInteractive(view: Bun.WebView, marker = 'main'): Pr
 // Navigate and wait until the screen will answer a click. Every browser test starts here. The
 // console's <main> is drawn before its data, so an admin screen names an element of its own.
 export async function visit(view: Bun.WebView, url: string, marker?: string): Promise<void> {
-  await view.navigate(url)
+  const unanswered = Symbol('unanswered')
+  if (await within(view.navigate(url).then(() => null), INTERACTIVE_TIMEOUT_MS, unanswered) === unanswered) {
+    throw new Error(`navigating to ${url} did not finish within ${INTERACTIVE_TIMEOUT_MS}ms`)
+  }
   await waitForInteractive(view, marker)
 }
 
@@ -324,15 +334,16 @@ export async function waitFor(view: Bun.WebView, expression: string, timeoutMs =
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     // Mid-navigation the document can be half gone, so a throw is a not-yet rather than an answer.
-    if (await view.evaluate<boolean>(`Boolean(${expression})`).catch(() => false)) return
+    const holds = view.evaluate<boolean>(`Boolean(${expression})`).catch(() => false)
+    if (await within(holds, deadline - Date.now(), false)) return
     await Bun.sleep(100)
   }
   // Where the page was and what it said, so a timeout on CI is read rather than rerun.
-  const seen = await view.evaluate<string>(`location.pathname + ': ' + (document.body?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 240)`).catch(() => 'unreadable')
+  const seen = await within(view.evaluate<string>(`location.pathname + ': ' + (document.body?.innerText ?? '').replace(/\\s+/g, ' ').slice(0, 240)`).catch(() => 'unreadable'), PROBE_TIMEOUT_MS, 'unanswered: the page did not respond')
   // What any alert, dialogue or failure notice said: the reason is usually there, not at the top.
-  const said = await view.evaluate<string>(`[...document.querySelectorAll('[role="alert"], [role="status"], [role="dialog"], [data-test*="failure"], [data-test*="refus"]')].map(el => el.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' | ').slice(0, 400)`).catch(() => '')
+  const said = await within(view.evaluate<string>(`[...document.querySelectorAll('[role="alert"], [role="status"], [role="dialog"], [data-test*="failure"], [data-test*="refus"]')].map(el => el.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' | ').slice(0, 400)`).catch(() => ''), PROBE_TIMEOUT_MS, '')
   // The show-night actions on offer, since a missing one is often only named differently.
-  const offered = await view.evaluate<string>(`[...document.querySelectorAll('[data-test="night-action"]')].map(el => el.getAttribute('aria-label') ?? '').filter(Boolean).join(' | ').slice(0, 200)`).catch(() => '')
+  const offered = await within(view.evaluate<string>(`[...document.querySelectorAll('[data-test="night-action"]')].map(el => el.getAttribute('aria-label') ?? '').filter(Boolean).join(' | ').slice(0, 200)`).catch(() => ''), PROBE_TIMEOUT_MS, '')
   throw new Error(`timed out waiting for ${expression} (at ${seen})${said ? ` (notices: ${said})` : ''}${offered ? ` (actions: ${offered})` : ''}`)
 }
 
