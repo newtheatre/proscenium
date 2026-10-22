@@ -43,10 +43,10 @@ function template(database: TestDatabase, venueId: string, role: string, count: 
   database.batch([['INSERT INTO shift_templates (id, venue_id, role, "count") VALUES (?, ?, ?, ?)', `${venueId}-${role}`, venueId, role, count]])
 }
 
-function systemItem(database: TestDatabase, venueId: string, check: string, active = true): void {
+function systemItem(database: TestDatabase, venueId: string, check: string, active = true, phase = 'POST'): void {
   database.batch([[
-    'INSERT INTO checklist_items (id, venue_id, phase, label, sort, required, system_check, active) VALUES (?, ?, \'POST\', ?, 0, 1, ?, ?)',
-    `${venueId}-${check}`, venueId, check, check, active ? 1 : 0,
+    'INSERT INTO checklist_items (id, venue_id, phase, label, sort, required, system_check, active) VALUES (?, ?, ?, ?, 0, 1, ?, ?)',
+    `${venueId}-${check}`, venueId, phase, check, check, active ? 1 : 0,
   ]])
 }
 
@@ -97,6 +97,16 @@ describe('the readiness card lists only the venues we run (issue 1318)', () => {
       const [row] = readiness(database)
       expect(row?.templateSlots).toBe(3)
       expect(row?.systemChecks).toBe('NO_SHOW_HOLDS_RELEASED')
+    })
+  })
+
+  // A row saved before the form pinned the phase still reads as missing, as it could never tick (0216).
+  test('a system check on the pre-show checklist does not count', async () => {
+    await withDatabase((database) => {
+      testVenue(database)
+      systemItem(database, 'venue-a', 'NO_SHOW_HOLDS_RELEASED')
+      systemItem(database, 'venue-a', 'INCIDENTS_REVIEWED', true, 'PRE')
+      expect(readiness(database)[0]?.systemChecks).toBe('NO_SHOW_HOLDS_RELEASED')
     })
   })
 

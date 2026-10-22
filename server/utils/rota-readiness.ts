@@ -87,7 +87,7 @@ export function venueReadinessQuery(): SQL {
     SELECT v.id AS venueId, v.name AS venueName,
       (SELECT coalesce(sum(t."count"), 0) FROM shift_templates t WHERE t.venue_id = v.id) AS templateSlots,
       (SELECT group_concat(DISTINCT ci.system_check) FROM checklist_items ci
-        WHERE ci.venue_id = v.id AND ci.active = 1 AND ci.system_check IS NOT NULL) AS systemChecks,
+        WHERE ci.venue_id = v.id AND ci.active = 1 AND ci.system_check IS NOT NULL AND ci.phase = 'POST') AS systemChecks,
       ${cardFiled('v')} AS emergencyFiled
     FROM venues v
     WHERE v.is_external = 0 AND v.archived = 0

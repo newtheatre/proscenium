@@ -1354,8 +1354,8 @@ same thing.
 `GET /api/admin/rota/readiness` (`rota.read`) answers the readiness card on **Shift templates**
 from `server/utils/rota-readiness.ts`: each role's gating module with its standing (`SET`, `UNSET`,
 `DRAFT`, `RETIRED` or `MISSING`, from `shared/utils/rota-readiness.ts`), every venue we run (not
-external, not retired) with its template's slot count, the active system checks on its checklist
-and whether its emergency card is filed, and the board's active preset and milestone counts.
+external, not retired) with its template's slot count, the active system checks on its post-show
+checklist (one on the pre-show list could never tick, so it does not count, 0216) and whether its emergency card is filed, and the board's active preset and milestone counts.
 `qualified` counts, per role, the usable accounts the role's confirming write would admit now
 (`qualifiedCountQuery`, the same `holdsGate` with the committee role for a duty manager), so the
 card reads **Closed** and says what to do when nobody could be put on the shift, which is where a
