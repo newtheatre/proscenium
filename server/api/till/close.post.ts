@@ -1,5 +1,6 @@
 import { closeTillSessionForm, closeVariancePence, readerExpectation, saysExpectedOnTheReader } from '#shared/utils/reconciliation'
 import { saysMoney } from '#shared/utils/bar'
+import { saysClosedFirst } from '#shared/utils/till'
 
 // Close a till session, stamping who and when with the expected-versus-actual reader figure, and
 // record that figure as the night's reading for the Treasurer, all in one write (F-118.3, 0097).
@@ -10,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const { id, actualZPence, varianceNote } = await readValidatedBodyOrThrow(event, closeTillSessionForm)
   const session = await sessionById(id)
   if (!session) throw noSuch('till session')
-  if (!isOpen(session)) throw createError({ statusCode: 409, statusMessage: 'That session is already closed' })
+  if (!isOpen(session)) throw await closedFirst(id)
 
   const account = await closerFor(event, session)
 
@@ -73,14 +74,18 @@ export default defineEventHandler(async (event) => {
   // This caller's own answer, not what the row happens to say: a loser here had their Z figure
   // and their note thrown away, and must not be told the close went through (F-118 criterion 3).
   if (!closed) {
+    if (after && !isOpen(after)) throw await closedFirst(id)
     throw createError({
       statusCode: 409,
-      statusMessage: after && !isOpen(after)
-        ? 'Somebody else closed this session first, so this reading was not recorded. Read the till before recording anything.'
-        : 'A card charge started while this close was in flight, so nothing was recorded. Answer it on the till and close again.',
+      statusMessage: 'A card charge started while this close was in flight, so nothing was recorded. Answer it on the till and close again.',
     })
   }
   if (!after) throw createError({ statusCode: 409, statusMessage: 'That session is no longer there' })
 
-  return { ok: true, session: after }
+  return { ok: true, session: after, closedByName: account.name }
 })
+
+async function closedFirst(id: string): Promise<Error> {
+  const closed = await closeOf(id)
+  return createError({ statusCode: 409, statusMessage: closed ? saysClosedFirst(closed) : 'That session is already closed' })
+}

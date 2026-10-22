@@ -6,9 +6,9 @@ import { TILL_VENUE_COOKIE, TILL_VENUE_DEVICE_KEY, heldTillVenue, recallTillVenu
 import type { ListFailure } from './useListFailure'
 import type { SettledRead } from '~/utils/refusal'
 import type { NightReconciliation } from '#shared/utils/reconciliation'
-import type { HeldTillVenue, TillSession, TillVenueOption } from '#shared/utils/till'
+import type { ClosedTill, HeldTillVenue, TillSession, TillVenueOption } from '#shared/utils/till'
 
-export interface TillStatus { night: string, venueId: string, session: TillSession | null, sumupEnabled: boolean }
+export interface TillStatus { night: string, venueId: string, venueName: string, session: TillSession | null, lastClosed: ClosedTill | null, sumupEnabled: boolean }
 
 export interface TillRead {
   // Settled keeping the enrol path a refusal carries (issue 897).
@@ -40,6 +40,9 @@ export function useTillSession() {
   const busy = ref(false)
   const session = ref<TillSession | null>(null)
   const venueId = ref<string | null>(null)
+  // Named on the till and on its close, so a phone that remembered another bar is caught (0160).
+  const venueName = ref<string | null>(null)
+  const lastClosed = ref<ClosedTill | null>(null)
   const sumupEnabled = ref(false)
   // Whether the screen has an answer to draw: until then, on a navigation, neither Open till nor a picker.
   const settled = ref(false)
@@ -88,6 +91,8 @@ export function useTillSession() {
     if (status.kind === 'READ') {
       session.value = status.value.session
       venueId.value = status.value.venueId
+      venueName.value = status.value.venueName
+      lastClosed.value = status.value.lastClosed
       sumupEnabled.value = status.value.sumupEnabled
       syncedAt.value = status.at
       if (queriedVenueId.value) remember(status.value.night, status.value.venueId)
@@ -163,6 +168,7 @@ export function useTillSession() {
     await load()
   }
 
+  // After tonight's close, only a press that has been told so opens a second session (0160).
   function open(): Promise<void> {
     failure.value = null
     failureStatus.value = null
@@ -170,7 +176,7 @@ export function useTillSession() {
       try {
         const opened = await request<{ session: TillSession }>('/api/till', {
           method: 'POST',
-          body: { venueId: requestedVenueId.value },
+          body: { venueId: requestedVenueId.value, reopen: lastClosed.value ? true : undefined },
         })
         session.value = opened.session
         syncedAt.value = Date.now()
@@ -243,7 +249,7 @@ export function useTillSession() {
     closingBusy.value = true
     closeFailure.value = null
     try {
-      const closed = await request<{ session: TillSession }>('/api/till/close', {
+      const closed = await request<{ session: TillSession, closedByName: string }>('/api/till/close', {
         method: 'POST',
         body: {
           id: closingId.value,
@@ -251,7 +257,11 @@ export function useTillSession() {
           varianceNote: varianceNote.value.trim() || undefined,
         },
       })
-      if (closed.session.id === session.value?.id) session.value = closed.session
+      // Tonight's till is shut, not still selling: the grid goes and the close is said (issue 1580).
+      if (closed.session.id === session.value?.id) {
+        lastClosed.value = { closedAt: closed.session.closedAt!, closedByName: closed.closedByName, actualZPence: closed.session.actualZPence }
+        session.value = null
+      }
       syncedAt.value = Date.now()
       closeModalOpen.value = false
       return closed.session
@@ -293,6 +303,8 @@ export function useTillSession() {
     settled,
     session,
     venueId,
+    venueName,
+    lastClosed,
     sumupEnabled,
     venues,
     venuesFailure,

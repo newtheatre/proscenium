@@ -1,6 +1,7 @@
 import { saysMoney } from './bar'
 import { showNightBounds } from './show-night'
 import { plural } from './text'
+import { saysClock } from './when'
 import { z } from 'zod'
 import type { NightCacheStore } from './night-cache'
 import type { SumupAttemptView } from './sumup'
@@ -31,6 +32,39 @@ export const tillScopeForm = z.object({
 })
 
 export type TillScopeInput = z.output<typeof tillScopeForm>
+
+// Opening after tonight's close starts a second session, so it is asked for by name (0160).
+export const openTillForm = tillScopeForm.extend({
+  reopen: z.boolean().optional(),
+})
+
+// This bar's latest close tonight, so the till says it closed rather than that it never opened.
+export interface ClosedTill {
+  closedAt: number
+  closedByName: string | null
+  actualZPence: number | null
+}
+
+// Every place a close is confirmed or reported names the bar, so nobody closes the wrong one (0160).
+export function saysCloseTill(venueName: string): string {
+  return `Close the till at ${venueName}`
+}
+
+export function saysTillClosed(venueName: string, closed: ClosedTill): string {
+  const by = closed.closedByName ? `, by ${closed.closedByName}` : ''
+  const z = closed.actualZPence === null ? '' : `, with a Z of ${saysMoney(closed.actualZPence)}`
+  return `The till at ${venueName} closed at ${saysClock(closed.closedAt)}${by}${z}.`
+}
+
+// The loser of two closes had their reading thrown away, so they are told whose stands (issue 1581).
+export function saysClosedFirst(closed: ClosedTill): string {
+  const z = closed.actualZPence === null ? '' : `, with a Z of ${saysMoney(closed.actualZPence)}`
+  return `${closed.closedByName ?? 'Somebody else'} closed this session first, at ${saysClock(closed.closedAt)}${z}, so this reading was not recorded. Read the till before recording anything.`
+}
+
+export function saysReopenNeedsAsking(venueName: string, closed: ClosedTill): string {
+  return `The till at ${venueName} closed at ${saysClock(closed.closedAt)} tonight. Open it again only if this bar is serving again.`
+}
 
 // One row of the picker the till shows when the scope names no venue: what the evening is there,
 // so a volunteer chooses by show or by the opening's label rather than by a database id (F-125).
