@@ -9,6 +9,7 @@ interface AccountRow {
   id: string
   name: string
   email: string
+  studentId: string | null
   anonymisedAt: number | null
 }
 
@@ -17,6 +18,7 @@ async function loadAccount(id: string): Promise<AccountRow> {
     id: schema.users.id,
     name: schema.users.name,
     email: schema.users.email,
+    studentId: schema.users.studentId,
     anonymisedAt: schema.users.anonymisedAt,
   }).from(schema.users).where(eq(schema.users.id, id)).limit(1)
   if (!row) throw noSuch('account')
