@@ -5,7 +5,7 @@ import { holdExpiresAtByReference, namedTicketLines, reservationCurrentState, re
 import { formatLondon } from '#shared/utils/london'
 import { nothingToCollect } from '#shared/utils/reservations'
 import { saysPrice } from '#shared/utils/ticket-types'
-import { saysClock } from '#shared/utils/when'
+import { saysClock, saysWhenLong } from '#shared/utils/when'
 import type { BookingLink } from './holds'
 import type { H3Event } from 'h3'
 
@@ -47,7 +47,7 @@ async function arrivalContext(reference: string): Promise<Record<string, unknown
     venue: state.venueName,
     venueAddress: state.venueAddress,
     doors: state.doorsAt ? saysClock(state.doorsAt) : null,
-    releasesAt: state.holdExpiresAt ? saysClock(state.holdExpiresAt) : null,
+    releasesAt: state.holdExpiresAt ? saysWhenLong(state.holdExpiresAt) : null,
     lines: lines.map(line => ({ name: line.ticketTypeName, quantity: Number(line.quantity), total: saysPrice(Number(line.totalPence)) })),
   }
 }

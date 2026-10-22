@@ -149,7 +149,7 @@ describe('the confirmation carries what somebody needs to arrive (D-106 criterio
     venue: 'The Portland Studio',
     venueAddress: 'University Park, Nottingham',
     doors: '19:00',
-    releasesAt: '19:10',
+    releasesAt: 'Thursday 22 October at 19:10',
     lines: [{ name: 'Standard', quantity: 2, total: '£14.00' }, { name: 'Concession', quantity: 1, total: '£5.00' }],
   }
 
@@ -159,7 +159,7 @@ describe('the confirmation carries what somebody needs to arrive (D-106 criterio
       expect(part).toContain('The Portland Studio')
       expect(part).toContain('University Park, Nottingham')
       expect(part).toContain('Doors open at 19:00')
-      expect(part).toContain('released at 19:10')
+      expect(part).toContain('released on Thursday 22 October at 19:10')
       expect(part).toContain('Standard × 2')
       expect(part).toContain('£14.00')
     }

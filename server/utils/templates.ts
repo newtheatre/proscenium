@@ -112,7 +112,7 @@ function arrivalBlock(context: TemplateContext): { html: string, text: string } 
   const facts = [
     where ? `Where: ${where}.` : null,
     doors ? `Doors open at ${doors}.` : null,
-    releasesAt ? `An unpaid booking is released at ${releasesAt}, and its seats go back on sale.` : null,
+    releasesAt ? `An unpaid booking is released on ${releasesAt}, and its seats go back on sale.` : null,
   ].filter((fact): fact is string => fact !== null)
   const priced = lines.map(line => `${line.name} × ${line.quantity}: ${line.total}`)
   return {
