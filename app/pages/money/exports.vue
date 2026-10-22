@@ -174,6 +174,8 @@ const overCap = computed(() => (coverage.value?.rows ?? 0) > SU_EXPORT_ROW_CAP)
       </p>
     </section>
 
+    <TicketExportCard v-if="mayExport" />
+
     <section
       class="space-y-4"
       data-test="section-mappings"

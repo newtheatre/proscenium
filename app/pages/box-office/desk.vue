@@ -444,9 +444,31 @@ const cancelConfirming = ref(false)
 const cancelling = ref(false)
 const cancelFailure = ref<string | null>(null)
 
-function askRefund(ticket: TicketLine): void {
+const refundReauthenticating = ref(false)
+const refundAwaitingSession = ref<TicketLine | null>(null)
+
+// A refund sends money back out, so a stale session re-asserts before the reader is touched (0171).
+async function askRefund(ticket: TicketLine): Promise<void> {
   refundFailure.value = null
+  try {
+    await $fetch('/api/box-office/desk/refunds/ready')
+  }
+  catch (refused) {
+    if (needsReauthentication(refused)) {
+      refundAwaitingSession.value = ticket
+      refundReauthenticating.value = true
+      return
+    }
+    refundFailure.value = refusalText(refused)
+  }
   refunding.value = ticket
+}
+
+function refundReauthenticated(): void {
+  const ticket = refundAwaitingSession.value
+  refundAwaitingSession.value = null
+  if (refunding.value) void refundTicket()
+  else if (ticket) void askRefund(ticket)
 }
 
 // The last ticket out closes the booking with it, so nothing reads "Paid, £0.00" afterwards.
@@ -481,7 +503,8 @@ async function refundTicket(): Promise<void> {
     void loadSummary()
   }
   catch (error) {
-    refundFailure.value = refusalText(error)
+    if (needsReauthentication(error)) refundReauthenticating.value = true
+    else refundFailure.value = refusalText(error)
   }
   finally {
     refundingTicketId.value = null
@@ -1229,6 +1252,11 @@ const resultColumns: TableColumn<SearchRow>[] = [
       :failure="refundFailure"
       @update:open="value => { if (!value) refunding = null }"
       @confirm="refundTicket"
+    />
+
+    <ReauthenticateModal
+      v-model:open="refundReauthenticating"
+      @reauthenticated="refundReauthenticated()"
     />
 
     <ConfirmModal

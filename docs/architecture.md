@@ -2201,8 +2201,8 @@ parameters, or three when narrowed by venue, however many performances the night
 
 ### Ticket export (D-129)
 
-`GET /api/admin/tickets/export`, gated on `ticketing.export`, is the box office's own copy of
-ticket sales: one row per seat, filtered by show, performance, date range or year, and source.
+`GET /api/admin/tickets/export`, gated on `ticketing.export` or `finance.export` (0171), is the box
+office's and the Treasurer's copy of ticket sales: one row per seat, filtered by show, performance, date range or year, and source.
 `ticketExportQuery()` (`server/utils/ticket-export.ts`) fetches one row over the 20,000-row cap
 (`TICKET_EXPORT_CAP`), so the route can tell "exactly full" from "more exists" without a separate
 count; over the cap it 400s naming the guidance to narrow the filter, rather than truncating

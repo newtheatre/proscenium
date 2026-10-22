@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -30,6 +30,8 @@ beforeAll(async () => {
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
+  // Refunding asks for a fresh session (0171); this suite's sessions must outlast the default.
+  await request(app, 'PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: 120 }, officer.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)

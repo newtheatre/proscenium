@@ -26,7 +26,8 @@ const query = z.object({
 // Ticket sales for reporting (D-129), filtered by show, performance, date range and source.
 // The column list is criterion 3 itself: no customer name, no notes, no access data, ever.
 export default defineEventHandler(async (event) => {
-  const resolved = await requirePermission(event, 'ticketing.export')
+  // The Treasurer reconciles against it too, and nothing in it names anybody (0171).
+  const resolved = await requireAnyPermission(event, ['ticketing.export', 'finance.export'])
   const input = await getValidatedQueryOrThrow(event, query)
 
   const filter: TicketExportFilter = {
