@@ -49,6 +49,13 @@ describe('the one action a member is offered for a module', () => {
     expect(trainingAction([], false)).toEqual({ kind: 'ASK' })
     expect(trainingAction([], true)).toEqual({ kind: 'ASKED' })
   })
+
+  test('a brief its reader may record offers I have read this, before signing up or asking (0244)', () => {
+    expect(trainingAction([session()], true, false, true)).toEqual({ kind: 'READ' })
+    expect(trainingAction([session({ placed: true })], false, false, true)).toMatchObject({ kind: 'PLACED' })
+    expect(trainingAction([], false, true, true)).toEqual({ kind: 'COMMITTEE_ONLY' })
+    expect(saysTrainingAction({ kind: 'READ' })).toBe('I have read this')
+  })
 })
 
 describe('what each action says', () => {

@@ -713,6 +713,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/admin/training/people.get.ts', exempt: 'reads ids and names for the records screen\'s picker' },
   { route: 'server/api/training/records.get.ts', exempt: 'reads your own training records' },
   { route: 'server/api/training/modules.get.ts', exempt: 'reads the member-facing catalogue' },
+  { route: 'server/api/training/modules/[id]/read.post.ts', actions: ['record.self-registered'] },
   { route: 'server/api/training/next.get.ts', exempt: 'reads what you could take next, all from your own records' },
   { route: 'server/api/training/requests/index.get.ts', exempt: 'reads what you asked for' },
   { route: 'server/api/training/requests/index.post.ts', exempt: 'a demand signal about yourself, carrying no authority' },

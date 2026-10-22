@@ -1,5 +1,5 @@
 import { saysDayLong } from '#shared/utils/when'
-import { asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import {
   blockingGaps,
   demotedBy,
@@ -249,10 +249,11 @@ export async function sessionsForMember(
 // The one action each module offers this member (issue 1335), from one read of the sessions they
 // can see and one of their asks (`asked`, if already read): never a query per module (0003).
 export async function trainingActionsFor(userId: string, today: string, closesHours: number, asked?: ReadonlySet<string>): Promise<(moduleId: string) => TrainingAction> {
-  const [sessions, requested, barred] = await Promise.all([
+  const [sessions, requested, barred, readable] = await Promise.all([
     sessionsForMember(userId, today, closesHours),
     asked ?? openRequestsOf(userId),
     committeeOnlyModulesFor(userId),
+    selfRegistrableBriefs(),
   ])
 
   const byModule = new Map<string, ActionSession[]>()
@@ -270,7 +271,19 @@ export async function trainingActionsFor(userId: string, today: string, closesHo
     for (const module of session.modules) byModule.set(module.id, [...(byModule.get(module.id) ?? []), offered])
   }
 
-  return moduleId => trainingAction(byModule.get(moduleId) ?? [], requested.has(moduleId), barred.has(moduleId))
+  return moduleId => trainingAction(byModule.get(moduleId) ?? [], requested.has(moduleId), barred.has(moduleId), readable.has(moduleId))
+}
+
+// The published briefs a member may record by reading them (0244): a handful at most.
+export async function selfRegistrableBriefs(): Promise<ReadonlySet<string>> {
+  const rows = await db.select({ id: schema.trainingModules.id })
+    .from(schema.trainingModules)
+    .where(and(
+      eq(schema.trainingModules.selfRegistrable, true),
+      eq(schema.trainingModules.kind, 'BRIEF'),
+      eq(schema.trainingModules.status, 'ACTIVE'),
+    ))
+  return new Set(rows.map(row => row.id))
 }
 
 // The committee-only modules this member may not put themselves forward for: none if they hold a
