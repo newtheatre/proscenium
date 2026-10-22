@@ -144,6 +144,8 @@ function describe(charge: ItemisedTab['charges'][number]): string {
         </p>
       </UCard>
 
+      <AccountAddToTab @added="reread" />
+
       <UCard data-test="account-tab-charges">
         <template #header>
           <h2 class="text-lg font-semibold">
