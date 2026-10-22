@@ -6,6 +6,7 @@ import { EXTERNAL_REASON_LIMIT, SU_ROOM_ASK, saysExternalState, saysExternalStat
 import { saysVerdict } from '#shared/utils/external-spaces'
 import { saysClock, saysDayLong, saysWhen } from '#shared/utils/when'
 import { roomsQueueList } from '#shared/utils/rooms-queue-list'
+import { saysOutsideOpening, saysPreApproval, saysRequestName } from '#shared/utils/queue'
 import type { FilterOption } from '#shared/utils/list-filters'
 import type { TableColumn } from '@nuxt/ui'
 
@@ -41,6 +42,7 @@ interface Request {
   escalatedAt?: number | null
   failures?: Failure[]
   sensitive?: boolean
+  preApprovalNoShows?: number | null
   // Not ours only: nothing here holds a slot, and the form has its own deadline (C-120, C-121).
   preferredSpaceId?: string | null
   assignedSpaceId?: string | null
@@ -116,7 +118,7 @@ const unlistedRejecting = ref<Request | null>(null)
 const reference = ref('')
 const chosenSpace = ref<string | undefined>()
 const despite = ref(false)
-const blockedBy = ref<{ verdict: string, reason: string } | null>(null)
+const blockedBy = ref<string | null>(null)
 const inModal = ref<string | null>(null)
 const refusalReason = ref('')
 const noteToo = ref(true)
@@ -165,9 +167,9 @@ async function act(path: string, body: Record<string, unknown>, said: string): P
   }
   catch (error) {
     // The one refusal a person may override: the room is one we have marked no good.
-    const data = refusalData<{ note?: { verdict: string, reason: string }, needsDespite?: boolean }>(error)
-    if (data?.needsDespite && data.note) {
-      blockedBy.value = data.note
+    const data = refusalData<{ needsDespite?: boolean }>(error)
+    if (data?.needsDespite) {
+      blockedBy.value = refusalText(error)
       return false
     }
     // Shown inside the modal: the page-root alert sits behind the overlay, so a 409 from a
@@ -218,12 +220,12 @@ async function rejectUnlisted(): Promise<void> {
   }
 }
 
-// An override is asserted about one room, so changing the room withdraws it. Without this, a
-// despite ticked for a room we know is no good waves the next room through unseen.
-watch(chosenSpace, () => {
+// Stops as soon as a room marked no good is picked. An override is about one room, so changing the
+// room withdraws it; otherwise a despite would wave the next room through unseen.
+function picked(pick: { verdict: string | null, warning: string | null } | null): void {
   despite.value = false
-  blockedBy.value = null
-})
+  blockedBy.value = pick?.verdict === 'UNSUITABLE' ? (pick.warning ?? 'This room is no good for that') : null
+}
 
 function begin(which: 'submit' | 'assign' | 'refuse' | 'reject', one: Request): void {
   inModal.value = null
@@ -322,6 +324,26 @@ async function confirmRejection(): Promise<void> {
   rejecting.value = false
 }
 
+// A batch reads past each row's badges, so a day the room is shut or a span outside its hours is
+// asked about before approving rather than going through silently.
+const offHours = ref<string | null>(null)
+
+function approveSelected(): void {
+  const chosen = listing.value.items.filter(item => selected.value.includes(item.id))
+  const warning = saysOutsideOpening(chosen)
+  if (!warning) {
+    decide(selected.value, 'APPROVE')
+    return
+  }
+  decidingOn.value = [...selected.value]
+  offHours.value = warning
+}
+
+async function confirmOffHours(): Promise<void> {
+  await decide(decidingOn.value, 'APPROVE')
+  offHours.value = null
+}
+
 async function confirmMove(): Promise<void> {
   await decide(decidingOn.value, 'APPROVE', { roomId: moveTo.value })
   moving.value = false
@@ -363,7 +385,7 @@ const columns = computed<TableColumn<Request>[]>(() => [
           ? h(UBadge, { color: 'info', variant: 'subtle', size: 'sm' }, () => 'Students\' Union')
           : null,
       ]),
-      h('div', { class: 'text-xs text-muted' }, `${row.original.title} (${describePurpose(row.original.purpose)})`),
+      h('div', { class: 'text-xs text-muted' }, saysRequestName(row.original)),
     ]),
   },
   {
@@ -392,13 +414,19 @@ const columns = computed<TableColumn<Request>[]>(() => [
             : null,
           row.original.notes ? h('p', { class: 'text-sm text-muted' }, row.original.notes) : null,
         ])
+      // The member's own words first: the rules are judged now and may have moved since they asked.
       : h('div', { class: 'space-y-1' }, [
+          row.original.reason
+            ? h('p', { 'class': 'border-l-2 border-default pl-2 text-sm', 'data-test': `reason-${row.original.id}` }, row.original.reason)
+            : null,
           h('div', { class: 'flex flex-wrap gap-1' }, [
             ...(row.original.sensitive ? [h(UBadge, { color: 'warning', variant: 'subtle', size: 'sm' }, () => 'Always asks')] : []),
+            ...(row.original.preApprovalNoShows
+              ? [h(UBadge, { 'color': 'warning', 'variant': 'subtle', 'size': 'sm', 'data-test': `pre-approval-${row.original.id}` }, () => saysPreApproval(row.original.preApprovalNoShows!))]
+              : []),
             ...(row.original.failures ?? []).map(fail =>
               h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm', title: fail.says, ...WRAPPING_BADGE }, () => fail.says)),
           ]),
-          row.original.reason ? h('p', { class: 'text-sm' }, row.original.reason) : null,
         ])),
   },
   ...(when.value === 'open'
@@ -526,7 +554,7 @@ onMounted(loadRooms)
           data-test="approve-selected"
           icon="i-lucide-check"
           :loading="acting"
-          @click="decide(selected, 'APPROVE')"
+          @click="approveSelected"
         >
           Approve {{ plural(selected.length, 'request') }}
         </UButton>
@@ -600,6 +628,30 @@ onMounted(loadRooms)
           color="neutral"
           variant="ghost"
           @click="rejecting = false"
+        >
+          {{ CONFIRM_BACK_LABEL }}
+        </UButton>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="offHours !== null"
+      title="Approve outside opening hours"
+      :description="offHours ?? undefined"
+      @update:open="offHours = null"
+    >
+      <template #footer>
+        <UButton
+          :loading="acting"
+          data-test="confirm-off-hours"
+          @click="confirmOffHours"
+        >
+          Approve {{ plural(decidingOn.length, 'request') }}
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="offHours = null"
         >
           {{ CONFIRM_BACK_LABEL }}
         </UButton>
@@ -712,6 +764,8 @@ onMounted(loadRooms)
             <SpacePicker
               v-model="chosenSpace"
               :purpose="unlistedAssigning?.purpose ?? null"
+              stops-unsuitable
+              @chosen="picked"
             />
           </UFormField>
 
@@ -732,11 +786,10 @@ onMounted(loadRooms)
             color="error"
             variant="subtle"
             icon="i-lucide-triangle-alert"
-            title="We know this room is no good for that"
             data-test="assign-blocked"
           >
             <template #description>
-              <p>{{ blockedBy.reason }}</p>
+              <p>{{ blockedBy }}</p>
               <UCheckbox
                 v-model="despite"
                 class="mt-3"

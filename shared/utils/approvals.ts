@@ -74,6 +74,13 @@ export const decisionForm = z.object({
 
 export type DecisionInput = z.output<typeof decisionForm>
 
+// "While this was waiting" only when a booking arrived after the request in the room it held; a
+// move, or a slot that was always taken, names the room and says what to do instead.
+export function saysTaken(input: { room: string, takenWhileWaiting: boolean }): string {
+  if (input.takenWhileWaiting) return 'Somebody took that slot while this was waiting'
+  return `${input.room} is already booked then; choose another room`
+}
+
 // Moving a request between a room we manage and one we do not (C-123). The reason is shown to the
 // member, so it is required in both directions: a room changing under them needs an explanation.
 export const unlistForm = z.object({

@@ -138,7 +138,7 @@ describe.skipIf(skip !== null)('the queue (C-109)', () => {
     const id = placeRequest(room, member.id, soon(1), 'The get-in is that morning')
 
     const answered = await send('GET', '/api/admin/rooms/queue', null, officer)
-    const body = await answered.json() as { items: { id: string, requester: string, reason: string, room: string, failures: { reason: string }[] }[] }
+    const body = await answered.json() as { items: { id: string, requester: string, reason: string, room: string, failures: { reason: string }[], preApprovalNoShows: number | null }[] }
     const row = body.items.find(item => item.id === id)
 
     expect(row).toBeDefined()
@@ -147,6 +147,8 @@ describe.skipIf(skip !== null)('the queue (C-109)', () => {
     expect(row!.room).toBeTruthy()
     // Judged now rather than recalled, so a request inside the notice window says so.
     expect(row!.failures.map(failure => failure.reason)).toContain('SHORT_NOTICE')
+    // No pre-approval badge for a member with no no-shows.
+    expect(row!.preApprovalNoShows).toBeNull()
   })
 
   test('a member cannot read the queue', async () => {
@@ -205,11 +207,13 @@ describe.skipIf(skip !== null)('approving (criterion 1)', () => {
 
     const answered = await send('POST', '/api/admin/rooms/requests/decide',
       { ids: [id], action: 'APPROVE', roomId: instead }, officer)
-    const body = await answered.json() as { ok: boolean, outcomes: { why: string, conflicts: unknown[] }[] }
+    const body = await answered.json() as { ok: boolean, outcomes: { why: string, says: string, conflicts: unknown[] }[] }
 
     expect(body.ok).toBe(false)
     expect(body.outcomes[0]!.why).toBe('conflict')
     expect(body.outcomes[0]!.conflicts.length).toBeGreaterThan(0)
+    // Nothing took it while this waited: the room was always held.
+    expect(body.outcomes[0]!.says).toEndWith('is already booked then; choose another room')
     // Never a confirmed double booking, and never silently dropped either (criterion 3).
     expect(statusOf(id)).toBe('PENDING_APPROVAL')
   })
@@ -342,6 +346,7 @@ describe.skipIf(skip !== null)('the approval race (criterion 3)', () => {
     const room = await makeRoom()
     const span = soon(15)
     const id = placeRequest(room, member.id, span)
+    write('UPDATE room_bookings SET created_at = created_at - 60 WHERE id = ?', id)
     // Written straight in, which is the only way to reach the state a bump or an import could:
     // the booking route would refuse it, because the request holds the slot.
     write(
@@ -353,9 +358,10 @@ describe.skipIf(skip !== null)('the approval race (criterion 3)', () => {
     )
 
     const answered = await send('POST', '/api/admin/rooms/requests/decide', { ids: [id], action: 'APPROVE' }, officer)
-    const body = await answered.json() as { ok: boolean, outcomes: { why: string }[] }
+    const body = await answered.json() as { ok: boolean, outcomes: { why: string, says: string }[] }
 
     expect(body.outcomes[0]!.why).toBe('conflict')
+    expect(body.outcomes[0]!.says).toBe('Somebody took that slot while this was waiting')
     expect(statusOf(id)).toBe('PENDING_APPROVAL')
   })
 })
