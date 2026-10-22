@@ -694,6 +694,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/account/tab/index.get.ts', exempt: 'reads your own tab' },
   { route: 'server/api/account/tab/code.get.ts', exempt: 'reads your own code for tonight' },
+  { route: 'server/api/account/tab/bar.get.ts', exempt: 'reads what you may add to your own tab tonight, writing nothing' },
+  { route: 'server/api/account/tab/charge.post.ts', actions: ['bar.till.sale'], via: ['server/utils/sale.ts'] },
 
   // Module G: training
 
