@@ -1,6 +1,6 @@
 import { firstNameOf } from './night-hub'
 import { MAX_LIKE_PATTERN } from './migrations'
-import { RESERVATION_REFERENCE_LENGTH, doorStatusAt, saysAlreadyAdmitted } from './reservations'
+import { RESERVATION_REFERENCE_LENGTH, saysAlreadyAdmitted } from './reservations'
 import { plural } from './text'
 
 // Door mode's own pure logic (E-129): what a camera hands the door, and what the verdict card is
@@ -267,18 +267,17 @@ export interface DoorTicketFound {
 }
 
 // A ticket the name lookup found: a first name, a count, and its state at the door (E-129
-// criterion 7, 0233). `admittedAt`, `holdExpiresAt` and `now` are epoch seconds.
+// criterion 7, 0233). `admittedAt` is epoch seconds, or null for a booking not yet in.
 export function doorTicketFound(row: {
   reference: string
   holderName: string | null
   partySize: number
   status: string
   admittedAt: number | null
-  holdExpiresAt?: number | null
   exchanged?: number | boolean
-}, now = Math.floor(Date.now() / 1000)): DoorTicketFound {
+}): DoorTicketFound {
   const found = { reference: row.reference, firstName: firstNameOf(row.holderName), partySize: row.partySize }
-  const status = doorStatusAt(row.status, row.holdExpiresAt ?? null, now)
+  const status = row.status
   if (status === 'DOOR') return { ...found, state: 'ADMITTED', line: saysAlreadyAdmitted(row.admittedAt) }
   if (status === 'EXPIRED') return { ...found, state: 'LAPSED', line: 'The hold was released. Send to the bar for a ticket.' }
   if (status === 'CANCELLED') {

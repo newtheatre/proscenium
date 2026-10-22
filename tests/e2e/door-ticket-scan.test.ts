@@ -238,25 +238,22 @@ describe.skipIf(skip !== null)('the door role, and nobody else (0009)', () => {
   }, CASE_TIMEOUT_MS)
 })
 
-// The 21 October process map: for up to ten minutes after a hold's release time the door said
-// UNPAID, sending somebody to pay for a seat about to be freed; and by name it was not found (0233).
-describe.skipIf(skip !== null)('a lapsed hold is lapsed at the door before the release task runs (0233)', () => {
-  test('an unpaid hold past its release time is refused as lapsed, and nothing is written', async () => {
+// The 21 October process map: a booking LAPSED or CANCELLED by reference was NOT FOUND by name (0233).
+describe.skipIf(skip !== null)('a lapsed or cancelled booking is found by name, with its state (0233)', () => {
+  // The desk still collects the hold and capacity still counts it until the release task runs.
+  test('an unpaid hold past its release time is still unpaid until it is released', async () => {
     const { eveningId } = houseWithTwoPerformances()
     const { reference, id } = ticket(eveningId, 'PENDING')
     write('UPDATE reservations SET hold_expires_at = unixepoch() - 60 WHERE id = ?', id)
 
-    const scanned = await send('POST', '/api/tonight/door/tickets/scan', { reference, performanceId: eveningId })
-    expect(scanned.status).toBe(409)
-    const body = await scanned.json() as { data: { verdict: { headline: string } } }
-    expect(body.data.verdict.headline).toBe('LAPSED')
-    expect(query<{ status: string }>('SELECT status FROM reservations WHERE id = ?', id)?.status).toBe('PENDING')
+    const found = await send('GET', `/api/tonight/door/tickets/search?q=${reference}&performanceId=${eveningId}`)
+    const { items } = await found.json() as { items: { reference: string, state: string }[] }
+    expect(items).toEqual([expect.objectContaining({ reference, state: 'UNPAID' })])
   }, CASE_TIMEOUT_MS)
 
   test('the lookup lists a lapsed and a cancelled booking with their state, rather than nothing', async () => {
     const { eveningId } = houseWithTwoPerformances()
-    const lapsed = ticket(eveningId, 'PENDING')
-    write('UPDATE reservations SET hold_expires_at = unixepoch() - 60 WHERE id = ?', lapsed.id)
+    const lapsed = ticket(eveningId, 'EXPIRED')
     const cancelled = ticket(eveningId, 'CANCELLED')
 
     for (const [reference, state] of [[lapsed.reference, 'LAPSED'], [cancelled.reference, 'CANCELLED']] as const) {

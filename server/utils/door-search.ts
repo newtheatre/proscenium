@@ -27,7 +27,6 @@ export interface DoorTicketSearchRow {
   holderName: string | null
   partySize: number
   admittedAt: number | null
-  holdExpiresAt: number | null
   exchanged: number
 }
 
@@ -37,7 +36,7 @@ export function doorTicketSearchQuery(term: string, performanceId: string): SQL 
   return sql`
     SELECT rv.reference AS reference, rv.status AS status, u.name AS holderName,
            ${heldSeatsForReservation(sql`rv.id`)} AS partySize, ${admittedAtColumn('rv')} AS admittedAt,
-           rv.hold_expires_at AS holdExpiresAt, rv.exchanged_to_reservation_id IS NOT NULL AS exchanged
+           rv.exchanged_to_reservation_id IS NOT NULL AS exchanged
     FROM reservations rv
     LEFT JOIN users u ON u.id = rv.user_id
     WHERE rv.performance_id = ${performanceId}

@@ -1,4 +1,4 @@
-# 0233: The door answers from the clock, and never admits a pass blind
+# 0233: The door finds every booking, and never admits a pass blind
 
 - Status: Proposed
 - Date: 2026-10-21
@@ -14,9 +14,8 @@ wrong for the person in front of it:
 - A pass already admitted tonight still offered **Admit one**, and pressing it gave the refusal.
   Its "already in" line was also worded differently from a ticket's ("This pass was already
   admitted tonight, at Wednesday, 21 October 2026 at 21:07" against "Already admitted at 21:02").
-- For up to ten minutes after an unpaid hold's release time the door said UNPAID, sending the
-  person to the bar to pay for a seat the release task was about to free. The task runs every
-  ten minutes; the hold expires on the minute.
+- For up to ten minutes after an unpaid hold's release time the door said UNPAID. The task that
+  releases holds runs every ten minutes; the hold expires on the minute.
 - A lapsed or cancelled booking was LAPSED or CANCELLED by reference but NOT FOUND by name, which
   tells the volunteer to check the spelling.
 
@@ -27,10 +26,11 @@ wrong for the person in front of it:
 - **The pass card refuses tonight's own admission in the scan's words**: already admitted ("Already
   admitted at 21:07", the ticket's wording) or tonight's admission cancelled. Admit one shows only
   where the scan would admit.
-- **The door reads a hold against the clock.** `doorStatusAt` treats a `PENDING` reservation whose
-  `hold_expires_at` has passed as `EXPIRED`, for the scan and the name lookup alike. Nothing is
-  written: the release task still does the release, so capacity and the booker's own page follow the
-  one path they always have.
+- **A hold is unpaid until it is released, at the door as everywhere else.** The map's finding
+  is not taken up: until the release task runs, the desk still collects the hold and capacity still
+  counts its seats. A door that called it LAPSED on the clock would send the booker to buy a new
+  ticket that capacity, counting their own hold, can refuse on a sold-out night, and the sweep would
+  then give the seats to the waiting list. UNPAID sends them to the bar, where the hold is paid.
 - **The name lookup lists lapsed and cancelled bookings for the performance**, saying so, with no
   Admit. An erased booker is still found by reference only (0011).
 - The ticket scan's response carries the booker's first name only, which is all door mode shows.
@@ -38,6 +38,7 @@ wrong for the person in front of it:
 ## Consequences
 
 - A volunteer never admits a pass without seeing whose it is, and never presses a button that refuses.
-- A hold that lapsed at 21:15 is lapsed at the door at 21:15, not at the next sweep.
+- A hold past its release time reads UNPAID at the door until the sweep, and LAPSED after it. Making
+  the release itself immediate is a change to the release task, outside the door.
 - Not changed: mapping a typed `0` to `O`. The reference alphabet has neither `0` nor `O` (nor `1`
   or `I`), so there is no letter a `0` could have meant; the NOT FOUND line already says so.

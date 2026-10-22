@@ -436,12 +436,6 @@ export function doorTicketOutcome(
   return { ...doorStatusWording(status, cancelledBy, exchangedTo, admittedAt), admit: false }
 }
 
-// A hold past its release time has lapsed at the door, whether or not the release task has run
-// yet: it sweeps every ten minutes, and the door must not send someone to pay for a seat it is about to free (0233).
-export function doorStatusAt(status: string, holdExpiresAt: number | null, now: number): string {
-  return status === 'PENDING' && holdExpiresAt !== null && holdExpiresAt <= now ? 'EXPIRED' : status
-}
-
 // When a booking came through the door, in the door's own words (issue 1301).
 export function saysAlreadyAdmitted(admittedAt: number | null): string {
   return admittedAt === null ? 'Already admitted tonight' : `Already admitted at ${saysClock(admittedAt)}`
