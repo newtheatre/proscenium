@@ -95,6 +95,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/auth/register.post.ts', actions: ['account.registered'], via: ['server/utils/accounts.ts'] },
   { route: 'server/api/auth/sign-in.post.ts', actions: ['session.started', 'mfa.challenged'] },
   { route: 'server/api/account/methods/[id].delete.ts', actions: ['account.method.removed'] },
+  { route: 'server/api/account/methods/[id].patch.ts', actions: ['account.method.renamed'] },
   { route: 'server/api/account/password.put.ts', actions: ['account.method.added', 'password.set'] },
   { route: 'server/api/account/email.put.ts', actions: ['account.email.changed', 'account.email.changed.admin'], via: ['server/utils/email-change.ts'] },
   { route: 'server/api/account/profile.put.ts', actions: ['account.profile.updated'], via: ['server/utils/profile.ts'] },

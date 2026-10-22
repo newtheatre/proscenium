@@ -171,6 +171,7 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
 
       await visit(view, `${app.baseURL}/account/security`)
       await click(view, '[data-test="regenerate"]')
+      await click(view, '[data-test="confirm-regenerate-codes-verb"]')
       await waitFor(view, 'document.querySelector(\'[data-test="recovery-codes"]\')')
 
       const second = await view.evaluate<string[]>(
