@@ -51,7 +51,7 @@ watch(open, (isOpen) => {
 // Deleting or archiving the last row of the last page would otherwise leave the reader past the
 // end, with no control to get back.
 async function reload(): Promise<void> {
-  await refresh()
+  await Promise.all([refresh(), refreshNuxtData('access-kinds-on-offer')])
   if (page.value > data.value.pages) page.value = data.value.pages
 }
 
@@ -260,6 +260,7 @@ const columns: TableColumn<TicketType>[] = [
     class="space-y-6"
     @retry="refresh"
   >
+    <AccessKindsWarning />
     <UAlert
       v-if="failure && !open && removing === null"
       data-test="failure"

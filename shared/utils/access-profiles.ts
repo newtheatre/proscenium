@@ -70,7 +70,7 @@ const optionalText = (max: number): z.ZodType<string | null> => z.string().trim(
 
 // What a patron submits. The agreed door wording is the officer's to set, not theirs (D-127
 // criterion 3), so it has no place in this form.
-export const declareAccessProfileForm = z.strictObject({
+const declarationShape = z.strictObject({
   flags: z.strictObject(flagsShape),
   companions: z.number().int().min(0).max(MAX_COMPANIONS),
   requesterNote: optionalText(MAX_NOTE_LENGTH),
@@ -79,6 +79,15 @@ export const declareAccessProfileForm = z.strictObject({
   // with the declaration and changeable independently of verification (D-127 criterion 2).
   consent: z.boolean(),
 })
+
+// An empty declaration gives the Secretary nothing to verify, so it is refused before it is sent.
+export const SAYS_DECLARATION_EMPTY = 'Tick at least one need, ask for a companion, or say in your own words what helps.'
+
+function declaresSomething(input: z.output<typeof declarationShape>): boolean {
+  return Object.values(input.flags).some(Boolean) || input.companions > 0 || input.requesterNote !== null
+}
+
+export const declareAccessProfileForm = declarationShape.refine(declaresSomething, { message: SAYS_DECLARATION_EMPTY, path: ['requesterNote'] })
 
 export type DeclareAccessProfileInput = z.output<typeof declareAccessProfileForm>
 
@@ -121,7 +130,8 @@ const decidedOn = { version: z.string().nullable() }
 
 export const verifyAccessProfileRequest = verifyAccessProfileForm.extend(decidedOn)
 export const declineAccessProfileRequest = declineAccessProfileForm.extend(decidedOn)
-export const declareAccessProfileRequest = declareAccessProfileForm.extend(decidedOn)
+export const declareAccessProfileRequest = declarationShape.extend(decidedOn)
+  .refine(declaresSomething, { message: SAYS_DECLARATION_EMPTY, path: ['requesterNote'] })
 
 // The declaration and where it stands: every flag, both notes and the card number.
 export interface AccessProfileDeclaration {

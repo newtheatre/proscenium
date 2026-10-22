@@ -652,6 +652,7 @@ the two override tables below; everything else in this module is unbuilt.
 | Route | What it does |
 | --- | --- |
 | `GET /api/admin/ticket-types` | The paged envelope, archived types included by default, each row carrying whether it has ever been sold. |
+| `GET /api/admin/ticket-types/access-kinds` | `{ access, companion }`: whether an unarchived type of each access kind exists, for the warning on Ticket types and Access profiles. Gated at `ticketing.read` or `access.verify`, since the Secretary holds only the second. |
 | `POST /api/admin/ticket-types` | Adds one. The name is refused if it is already held, compared without regard to capitals. |
 | `PUT /api/admin/ticket-types/[id]` | Changes the name, description, base price and default. It does not take `kind` or `access_kind`. |
 | `POST /api/admin/ticket-types/[id]/archive` | Archives one, or takes it back out. Archiving an archived type is a 409. |

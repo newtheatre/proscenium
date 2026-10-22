@@ -8,6 +8,7 @@ import {
   accessEntitlementRefusal,
   changesDeclaration,
   declareAccessProfileForm,
+  declareAccessProfileRequest,
   declineAccessProfileForm,
   declineAccessProfileRequest,
   doorWording,
@@ -15,6 +16,7 @@ import {
   isEntitledToAccessTickets,
   saveRepends,
   saysAccessProfileStatus,
+  SAYS_DECLARATION_EMPTY,
   verifyAccessProfileRequest,
 } from '#shared/utils/access-profiles'
 
@@ -69,10 +71,20 @@ describe('effective status is read at enforcement time, not swept (0009)', () =>
 })
 
 describe('the declaration form (D-127 criterion 1)', () => {
-  const valid = { flags: flags(), companions: 0, requesterNote: '', accessCardNumber: '', consent: false }
+  const valid = { flags: { ...flags(), levelAccess: true }, companions: 0, requesterNote: '', accessCardNumber: '', consent: false }
 
-  test('accepts a bare declaration', () => {
+  test('accepts a declaration of one need and nothing else', () => {
     expect(declareAccessProfileForm.parse(valid).companions).toBe(0)
+  })
+
+  test('refuses a declaration with no need, no companion and no words, saying what to give', () => {
+    const empty = { ...valid, flags: flags() }
+    const answered = declareAccessProfileForm.safeParse(empty)
+    expect(answered.success).toBe(false)
+    expect(answered.error?.issues[0]?.message).toBe(SAYS_DECLARATION_EMPTY)
+    expect(declareAccessProfileRequest.safeParse({ ...empty, version: null }).success).toBe(false)
+    expect(declareAccessProfileForm.safeParse({ ...empty, companions: 1 }).success).toBe(true)
+    expect(declareAccessProfileForm.safeParse({ ...empty, requesterNote: 'I need to sit near an exit' }).success).toBe(true)
   })
 
   test('caps companions at two', () => {

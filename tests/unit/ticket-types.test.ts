@@ -9,6 +9,7 @@ import {
   priceOverridesForm,
   publicTicketTypes,
   saysAccessKind,
+  saysAccessKindsMissing,
   saysPrice,
   saysRestriction,
   systemTicketTypeRefusal,
@@ -200,5 +201,17 @@ describe('a field settable only at creation is read-only on the edit form, never
     const source = await screen()
     expect(source).toContain('saysAccessKind')
     expect(source).toContain('saysRestriction')
+  })
+})
+
+describe('the warning when an access kind has no ticket type', () => {
+  test('nothing is said once both kinds exist', () => {
+    expect(saysAccessKindsMissing({ access: true, companion: true })).toBeNull()
+  })
+
+  test('each missing kind is named, and both together', () => {
+    expect(saysAccessKindsMissing({ access: false, companion: true })).toStartWith('There is no Access ticket type,')
+    expect(saysAccessKindsMissing({ access: true, companion: false })).toStartWith('There is no Companion ticket type,')
+    expect(saysAccessKindsMissing({ access: false, companion: false })).toStartWith('There is no Access or Companion ticket type,')
   })
 })
