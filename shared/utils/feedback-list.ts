@@ -1,4 +1,5 @@
 import { FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, FEEDBACK_STATUSES } from './feedback'
+import { localPath } from './local-path'
 import type { FeedbackKind, FeedbackStatus } from './feedback'
 import type { ListSpec } from './list-filters'
 
@@ -49,3 +50,9 @@ export interface FeedbackRow {
   reporterName: string | null
   createdAt: number
 }
+
+// Rows written before paths were checked may hold anything, so only a local path or a GitHub issue is linked.
+export const linkablePage = (path: string): string | null => localPath(path)
+
+export const linkableIssue = (url: string | null): string | null =>
+  url?.startsWith('https://github.com/') ? url : null

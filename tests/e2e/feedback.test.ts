@@ -90,10 +90,40 @@ describe.skipIf(skip !== null)('the route records one row and one trail line (cr
     expect(audited!.detail).not.toContain('froze')
   })
 
+  test('a page that is not a path on this site is refused before anything is written', async () => {
+    const before = read<{ n: number }>('SELECT COUNT(*) AS n FROM feedback_reports')!.n
+    expect((await send('POST', '/api/feedback', { ...valid, path: 'javascript:fetch(\'/api/admin/accounts\')' })).status).toBe(400)
+    expect(read<{ n: number }>('SELECT COUNT(*) AS n FROM feedback_reports')!.n).toBe(before)
+  })
+
   test('too few words are refused before anything is written', async () => {
     const before = read<{ n: number }>('SELECT COUNT(*) AS n FROM feedback_reports')!.n
     expect((await send('POST', '/api/feedback', { ...valid, body: 'Broken.' })).status).toBe(400)
     expect(read<{ n: number }>('SELECT COUNT(*) AS n FROM feedback_reports')!.n).toBe(before)
+  })
+})
+
+// The 21 Oct process map: the reports were readable only through the database connector.
+describe.skipIf(skip !== null)('the IT Manager reads the reports on a screen of their own', () => {
+  test('a member without feedback.read is refused', async () => {
+    expect((await send('GET', '/api/admin/feedback')).status).toBe(403)
+  })
+
+  test('the list is paged in SQL, newest first, and searchable', async () => {
+    const marker = `marker-${crypto.randomUUID().slice(0, 8)}`
+    for (let sent = 0; sent < 3; sent++) {
+      expect((await send('POST', '/api/feedback', { ...valid, body: `${valid.body} ${marker} ${sent}` }, admin.cookie)).status).toBe(200)
+    }
+    const page = await (await send('GET', `/api/admin/feedback?search=${marker}&pageSize=2`, undefined, admin.cookie)).json() as
+      { items: { body: string }[], total: number, page: number, pages: number }
+    expect(page).toMatchObject({ total: 3, page: 1, pages: 2 })
+    expect(page.items).toHaveLength(2)
+    const second = await (await send('GET', `/api/admin/feedback?search=${marker}&pageSize=2&page=2`, undefined, admin.cookie)).json() as { items: unknown[] }
+    expect(second.items).toHaveLength(1)
+  })
+
+  test('the screen renders for the IT Manager', async () => {
+    expect((await send('GET', '/admin/feedback', undefined, admin.cookie)).status).toBe(200)
   })
 })
 

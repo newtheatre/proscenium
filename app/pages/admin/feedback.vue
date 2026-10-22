@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { feedbackList, saysFeedbackKind, saysFeedbackStatus } from '#shared/utils/feedback-list'
+import { feedbackList, linkableIssue, linkablePage, saysFeedbackKind, saysFeedbackStatus } from '#shared/utils/feedback-list'
 import { saysWhen } from '#shared/utils/when'
 import type { FeedbackRow } from '#shared/utils/feedback-list'
 import type { Page } from '#shared/utils/pagination'
@@ -85,13 +85,15 @@ const reports = computed<FeedbackRow[]>(() => data.value.items)
         <p class="text-xs text-muted">
           {{ report.reporterName ?? 'An account since removed' }}, {{ saysWhen(report.createdAt) }}, from
           <ULink
-            :to="report.pagePath"
+            v-if="linkablePage(report.pagePath)"
+            :to="linkablePage(report.pagePath)!"
             class="underline"
           >{{ report.pagePath }}</ULink>
-          <template v-if="report.issueUrl">
+          <span v-else>{{ report.pagePath }}</span>
+          <template v-if="linkableIssue(report.issueUrl)">
             ·
             <ULink
-              :to="report.issueUrl"
+              :to="linkableIssue(report.issueUrl)!"
               target="_blank"
               class="underline"
             >Its issue</ULink>
