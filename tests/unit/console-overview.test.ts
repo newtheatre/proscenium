@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { queuesFor, saysSetUp, setUpHref, setUpLines, tonightLines } from '#shared/utils/console-overview'
+import { FIRST_RUN_STEPS, firstRunHref, firstRunLines, queuesFor, saysFirstRun, saysSetUp, setUpHref, setUpLines, tonightLines } from '#shared/utils/console-overview'
 import { PERMISSION_MAP } from '#shared/utils/roles'
 import type { Permission, Role } from '#shared/utils/roles'
 import type { RoleEligibility } from '#shared/utils/rota-readiness'
@@ -83,6 +83,37 @@ describe('a named module nobody can meet is still set-up to do', () => {
     const [line] = setUpLines({ eligibility: [SET_DM], qualified: { DUTY_MANAGER: 0 } })
     expect(saysSetUp(line!)).toContain('nobody holds both ADMN-201 and a committee role')
     expect(setUpHref(line!)).toBe('/rota/manage/templates')
+  })
+})
+
+// A fresh install is set up in an order its screens lean on, and the card goes once it is (0221).
+describe('setting up a fresh install', () => {
+  const none = Object.fromEntries(FIRST_RUN_STEPS.map(step => [step, false])) as Record<(typeof FIRST_RUN_STEPS)[number], boolean>
+
+  test('every step is listed in order, each ticked by its own fact', () => {
+    const lines = firstRunLines({ ...none, VENUE: true, SHOW: true })!
+    expect(lines.map(line => line.step)).toEqual(['VENUE', 'SEASON', 'TICKET_TYPE', 'SHOW', 'ROLES', 'ROTA_TEMPLATE', 'BAR_PRODUCT'])
+    expect(lines.filter(line => line.done).map(line => line.step)).toEqual(['VENUE', 'SHOW'])
+  })
+
+  test('with every step started the card is gone, not a list of ticks', () => {
+    expect(firstRunLines(Object.fromEntries(FIRST_RUN_STEPS.map(step => [step, true])) as typeof none)).toBeNull()
+  })
+
+  test('each step says what to do and opens the screen that does it', () => {
+    for (const step of FIRST_RUN_STEPS) {
+      expect(saysFirstRun(step)).toMatch(/^[A-Z]/)
+      expect(firstRunHref(step)).toMatch(/^\/[a-z]/)
+    }
+    expect(firstRunHref('ROLES')).toBe('/people/roles')
+  })
+
+  test('the overview shows it, and the route reads it only for whoever grants roles', async () => {
+    expect(await read(OVERVIEW)).toContain('data-test="first-run"')
+    const source = await read('server/utils/console-overview.ts')
+    expect(source).toContain('holds(\'roles.grant\')')
+    // Started once is done for good: no expiry or status filter can bring the card back (0221).
+    expect(source).not.toMatch(/expires_at > unixepoch\(\)|archived = 0|status <> 'RETIRED'/)
   })
 })
 

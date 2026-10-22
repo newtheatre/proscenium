@@ -164,14 +164,19 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
   })
 
   test('tonight is offered to whoever may open its screens, and set-up to whoever can finish it', async () => {
-    const officerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(officer.cookie, '/api/admin/overview')
+    const officerView = await read<{ setUp: unknown[], tonight: unknown[] | null, firstRun: { step: string, done: boolean }[] | null }>(officer.cookie, '/api/admin/overview')
     expect(officerView.status).toBe(200)
     expect(Array.isArray(officerView.body.tonight)).toBe(true)
     expect(Array.isArray(officerView.body.setUp)).toBe(true)
+    // The Theatre Manager's grant below is a role besides the IT Manager's, so that step is ticked,
+    // or the card is gone altogether once every step is (0221).
+    const roles = officerView.body.firstRun?.find(line => line.step === 'ROLES')
+    expect(officerView.body.firstRun === null || roles?.done === true).toBe(true)
 
     // Every severity ships routing nowhere, so the Theatre Manager is told until one is routed.
     const unrouted = await read<{ setUp: Array<{ kind: string }>, tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
     expect(unrouted.body.tonight).toBeNull()
+    expect((unrouted.body as { firstRun?: unknown }).firstRun).toBeNull()
     expect(unrouted.body.setUp).toEqual([{ kind: 'NO_SAFETY_ROUTING' }])
 
     expect((await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: true }, theatre.cookie)).status).toBe(200)

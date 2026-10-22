@@ -80,6 +80,32 @@ export function setUpHref(line: SetUpLine): string {
   }
 }
 
+// A fresh install's set-up in the order its screens lean on each other, shown to the IT Manager
+// until every step has been started once (0221).
+export const FIRST_RUN_STEPS = ['VENUE', 'SEASON', 'TICKET_TYPE', 'SHOW', 'ROLES', 'ROTA_TEMPLATE', 'BAR_PRODUCT'] as const
+export type FirstRunStep = (typeof FIRST_RUN_STEPS)[number]
+
+export interface FirstRunLine { step: FirstRunStep, done: boolean }
+
+// Null once every step is done, so a working install never carries the card.
+export function firstRunLines(done: Readonly<Record<FirstRunStep, boolean>>): FirstRunLine[] | null {
+  if (FIRST_RUN_STEPS.every(step => done[step])) return null
+  return FIRST_RUN_STEPS.map(step => ({ step, done: done[step] }))
+}
+
+const FIRST_RUN: Record<FirstRunStep, { says: string, to: string }> = {
+  VENUE: { says: 'Add the venues the theatre performs in', to: '/box-office/venues' },
+  SEASON: { says: 'Open a season for the programme', to: '/box-office/seasons' },
+  TICKET_TYPE: { says: 'Set the ticket types and their prices', to: '/box-office/ticket-types' },
+  SHOW: { says: 'Add the first show and its performances', to: '/box-office/shows' },
+  ROLES: { says: 'Grant the rest of the committee their roles', to: '/people/roles' },
+  ROTA_TEMPLATE: { says: 'Give a venue the shifts its nights need', to: '/rota/manage/templates' },
+  BAR_PRODUCT: { says: 'Add the bar\'s products', to: '/bar/products' },
+}
+
+export const saysFirstRun = (step: FirstRunStep): string => FIRST_RUN[step].says
+export const firstRunHref = (step: FirstRunStep): string => FIRST_RUN[step].to
+
 export interface TonightLine {
   performanceId: string
   showTitle: string
@@ -93,8 +119,10 @@ export function tonightLines(performances: readonly { id: string, showTitle: str
     .map(({ id, showTitle, venueName, startsAt }) => ({ performanceId: id, showTitle, venueName, startsAt }))
 }
 
-// Tonight is null for a reader who holds no night permission, and a list, maybe empty, otherwise.
+// Tonight is null for a reader who holds no night permission, and a list, maybe empty, otherwise;
+// the first run is null for anybody but the IT Manager, and for them once it is finished.
 export interface ConsoleOverview {
   setUp: SetUpLine[]
   tonight: TonightLine[] | null
+  firstRun: FirstRunLine[] | null
 }

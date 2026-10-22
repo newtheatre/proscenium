@@ -106,6 +106,12 @@ describe('resolving the session password for one event', () => {
     expect(outcome.errors.join(' ')).toContain('NUXT_SESSION_PASSWORD')
   })
 
+  test('locally the .env password under the same name is not mistaken for a worker secret', async () => {
+    const outcome = await createSessionPasswordResolver()({ ...external(binding()), dev: true, workerSecretSet: true })
+    expect(outcome.password).toBe(PASSWORD)
+    expect(outcome.errors).toEqual([])
+  })
+
   test('locally an absent binding is expected and stays quiet', async () => {
     const outcome = await createSessionPasswordResolver()({ ...internal, dev: true })
     expect(outcome.password).toBeNull()

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { WORKSPACE_DOMAIN } from '#shared/utils/auth'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { markVerified } from '#tests/helpers/accounts'
+import { adminSession, grantRole, markVerified, registerMember } from '#tests/helpers/accounts'
 import { generatePassword, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillPin, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -322,6 +322,27 @@ describe.skipIf(skip !== null)('signing in in a browser (A-103, A-111)', () => {
       await click(view, SUBMIT)
 
       await waitFor(view, 'document.querySelector(\'[data-test="account-menu"]\')')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // A role owing an authenticator is refused on its own screens, so that is the next step (0152).
+  test('an officer with no authenticator lands on Security, which says why', async () => {
+    const admin = await adminSession(app, { additional: true })
+    const officer = await registerMember(app, 'owing', password, { signIn: false })
+    expect((await grantRole(app, officer, 'TREASURER', admin.cookie)).ok).toBe(true)
+
+    const view = await open('/sign-in')
+    try {
+      await fill(view, SIGN_IN_FORM, officer.email)
+      await fill(view, PASSWORD_FIELD, password)
+      await click(view, SUBMIT)
+
+      await waitFor(view, `location.pathname === '/account/security' && ${SIGNED_IN}`, 30_000)
+      await waitFor(view, 'document.querySelector(\'[data-test="next-step"]\')', 30_000)
+      expect(await textOf(view, '[data-test="next-step"]')).toContain('Your role needs an authenticator app')
     }
     finally {
       view.close()

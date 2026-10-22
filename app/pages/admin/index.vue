@@ -2,7 +2,7 @@
 import { can, viewAuditTrail, viewBackups, viewCommsOperations, viewSeasonSummary } from '#shared/utils/abilities'
 import { nightsNeedingYou } from '#shared/utils/night-reconciliation'
 import type { Outstanding } from '#shared/utils/night-reconciliation'
-import { queuesFor, saysSetUp, setUpHref } from '#shared/utils/console-overview'
+import { firstRunHref, queuesFor, saysFirstRun, saysSetUp, setUpHref } from '#shared/utils/console-overview'
 import { saysNotificationStatus } from '#shared/utils/notifications'
 import { currentShowNight } from '#shared/utils/show-night'
 import { NAV_COUNTS, NAV_QUEUES } from '#shared/utils/site-nav'
@@ -32,7 +32,7 @@ const decidesAny = computed(() => viewer.value !== null && queuesFor(new Set(vie
 const { data: overview, error: overviewError } = await useAsyncData(
   'console-overview',
   () => request<ConsoleOverview>('/api/admin/overview'),
-  { default: (): ConsoleOverview => ({ setUp: [], tonight: null }), immediate: false },
+  { default: (): ConsoleOverview => ({ setUp: [], tonight: null, firstRun: null }), immediate: false },
 )
 const overviewFailure = useListFailure(overviewError, 'Tonight and the set-up still to do could not be read.')
 
@@ -116,7 +116,7 @@ const seesSendLog = computed(() => can(viewer.value, viewCommsOperations))
 const { data: outstanding } = useNuxtData<Outstanding>('nights-needing-you')
 const settled = ref(false)
 const quiet = computed(() => settled.value && waiting.value.length === 0 && !waitingOwn.value && !wall.value
-  && (overview.value.tonight === null || overview.value.tonight.length === 0) && overview.value.setUp.length === 0
+  && (overview.value.tonight === null || overview.value.tonight.length === 0) && overview.value.setUp.length === 0 && overview.value.firstRun === null
   && !seesTrouble.value && unassessed.value.total === 0 && !(seesDrill.value && drill.value?.overdue)
   && (outstanding.value ? nightsNeedingYou(outstanding.value).length === 0 : true))
 const seesMoney = computed(() => can(viewer.value, viewSeasonSummary))
@@ -157,6 +157,41 @@ onMounted(async () => {
       :failure="wall"
       data-test="authenticator-wall"
     />
+
+    <UPageCard
+      v-if="overview.firstRun"
+      title="Setting up the theatre"
+      description="A new install, in the order its screens need each other. Each step ticks once it has been started, and this goes when every one has."
+      data-test="first-run"
+    >
+      <ol class="divide-y divide-default text-sm">
+        <li
+          v-for="(line, index) in overview.firstRun"
+          :key="line.step"
+          class="flex items-baseline gap-3 py-2"
+          :data-test="`first-run-${line.step}`"
+          :data-done="line.done"
+        >
+          <span class="w-5 shrink-0 text-end font-mono text-xs text-muted">{{ index + 1 }}</span>
+          <UIcon
+            v-if="line.done"
+            name="i-lucide-circle-check"
+            class="shrink-0 self-center text-success"
+          />
+          <span
+            v-if="line.done"
+            class="text-muted"
+          >{{ saysFirstRun(line.step) }}, done</span>
+          <ULink
+            v-else
+            :to="firstRunHref(line.step)"
+            class="underline underline-offset-4"
+          >
+            {{ saysFirstRun(line.step) }}
+          </ULink>
+        </li>
+      </ol>
+    </UPageCard>
 
     <UAlert
       v-if="seesDrill && drill?.overdue"
