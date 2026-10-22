@@ -56,6 +56,8 @@ export function noLongerOnCommittee(role: ShiftRole, claimantName: string): Laps
   }
 }
 
+export const ALREADY_ON_PERFORMANCE = 'Already on this performance'
+
 export interface CandidateFacts {
   role: ShiftRole
   moduleId: string | null
@@ -63,6 +65,8 @@ export interface CandidateFacts {
   held: ReadonlySet<string>
   committee: boolean
   onPerformance: boolean
+  // Holds a shift at another venue whose window overlaps this one (0211).
+  clashes?: boolean
 }
 
 // Why an officer cannot put somebody on a shift, read under their "Locked" badge, or null when
@@ -72,5 +76,6 @@ export function candidateLock(facts: CandidateFacts): string | null {
   if (refusal === UNCONFIGURED_ELIGIBILITY_RULE) return 'No training is named for this role yet'
   if (needsCommitteeRole(facts.role) && !facts.committee) return 'Needs a committee role'
   if (refusal !== null) return `Needs ${facts.moduleName ?? refusal}`
-  return facts.onPerformance ? 'Already on this performance' : null
+  if (facts.onPerformance) return ALREADY_ON_PERFORMANCE
+  return facts.clashes ? 'On a shift at another venue at the same time' : null
 }

@@ -516,8 +516,8 @@ useSeoMeta({ title: 'Rota' })
         data-test="open-shifts-empty"
       >
         Nothing you can take {{ week === 'ALL' ? 'is open' : `is open ${saysRotaWeek(week).toLowerCase()}` }}. A shift
-        appears here as soon as one is put up for a role you hold the training for, and a night you
-        already work is left out.
+        appears here as soon as one is put up for a role you hold the training for. A performance you
+        already work is left out, and so is one that overlaps a shift you hold at another venue.
       </p>
 
       <div

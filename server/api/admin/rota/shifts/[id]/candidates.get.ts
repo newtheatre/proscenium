@@ -1,10 +1,11 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { candidateLock, needsCommitteeRole } from '#shared/utils/rota-eligibility'
+import { ALREADY_ON_PERFORMANCE, candidateLock, needsCommitteeRole } from '#shared/utils/rota-eligibility'
 
 const query = z.object({ search: z.string().trim().min(1).max(200) })
 
-export interface AssignCandidate { id: string, name: string, email: string, eligible: boolean, reason: string | null }
+// `movable`: locked only by another shift on this performance, which an assignment can move them off (0211).
+export interface AssignCandidate { id: string, name: string, email: string, eligible: boolean, reason: string | null, movable: boolean }
 
 // `%` and `_` are LIKE wildcards; a search for an address containing either would otherwise
 // match more than was typed (the same escape every other search route in the app applies).
@@ -22,12 +23,13 @@ export default defineEventHandler(async (event) => {
 
   const term = contains(search.toLowerCase())
   // The assignment refuses anybody already holding another shift on the performance, so this says so.
-  const matched = await db.all<{ id: string, name: string, email: string, onPerformance: number }>(sql`
+  const matched = await db.all<{ id: string, name: string, email: string, onPerformance: number, clashes: number }>(sql`
     SELECT id, name, email, EXISTS (
       SELECT 1 FROM shifts other
       WHERE other.performance_id = ${held.performanceId} AND other.id <> ${id}
         AND other.user_id = users.id AND other.status IN ('CLAIMED', 'CONFIRMED')
-    ) AS onPerformance
+    ) AS onPerformance,
+    ${clashesWith(sql`users.id`, sql`(SELECT starts_at FROM shifts WHERE id = ${id})`, sql`(SELECT ends_at FROM shifts WHERE id = ${id})`, sql`${held.venueId}`)} AS clashes
     FROM users
     WHERE anonymised_at IS NULL AND disabled = 0
       AND (lower(name) LIKE ${term} ESCAPE '\\' OR lower(email) LIKE ${term} ESCAPE '\\')
@@ -40,10 +42,12 @@ export default defineEventHandler(async (event) => {
   const moduleName = moduleId === null ? null : (await gatingModules([moduleId])).get(moduleId)?.name ?? null
   const today = londonToday()
   // A duty manager also needs a live committee role, which the assignment's write reads too (0115).
-  const items: AssignCandidate[] = await Promise.all(matched.map(async ({ onPerformance, ...row }) => {
+  const items: AssignCandidate[] = await Promise.all(matched.map(async ({ onPerformance, clashes, ...row }) => {
     const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), needsCommitteeRole(held.role) ? hasCommitteeRole(row.id) : true])
-    const reason = candidateLock({ role: held.role, moduleId, moduleName, held: heldModules, committee, onPerformance: onPerformance === 1 })
-    return { ...row, eligible: reason === null, reason }
+    const facts = { role: held.role, moduleId, moduleName, held: heldModules, committee, onPerformance: onPerformance === 1, clashes: clashes === 1 }
+    const reason = candidateLock(facts)
+    const movable = reason === ALREADY_ON_PERFORMANCE && candidateLock({ ...facts, onPerformance: false }) === null
+    return { ...row, eligible: reason === null, reason, movable }
   }))
 
   return { items }
