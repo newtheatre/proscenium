@@ -71,8 +71,8 @@ export function safetyRoutingQuery(): SQL {
   return sql`SELECT EXISTS (SELECT 1 FROM incident_severity_config WHERE requires_follow_up = 1) AS anySeverityRoutes`
 }
 
-// One row, each step a constant EXISTS with no status or expiry filter: started once is done for
-// good, so a lapsed committee year or an archived catalogue never reopens it (0221).
+// One row, each step a constant EXISTS with no status or expiry filter, so a lapsed committee year
+// or an archived catalogue never reopens it; only deleting a step's last row does (0221).
 export function firstRunQuery(): SQL {
   const started: Record<FirstRunStep, SQL> = {
     VENUE: sql`EXISTS (SELECT 1 FROM venues)`,

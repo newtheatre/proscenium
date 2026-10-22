@@ -168,8 +168,10 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
     expect(officerView.status).toBe(200)
     expect(Array.isArray(officerView.body.tonight)).toBe(true)
     expect(Array.isArray(officerView.body.setUp)).toBe(true)
-    // The Theatre Manager's grant below is a role besides the IT Manager's, so that step is ticked (0221).
-    expect(officerView.body.firstRun?.find(line => line.step === 'ROLES')?.done).toBe(true)
+    // The Theatre Manager's grant below is a role besides the IT Manager's, so that step is ticked,
+    // or the card is gone altogether once every step is (0221).
+    const roles = officerView.body.firstRun?.find(line => line.step === 'ROLES')
+    expect(officerView.body.firstRun === null || roles?.done === true).toBe(true)
 
     // Every severity ships routing nowhere, so the Theatre Manager is told until one is routed.
     const unrouted = await read<{ setUp: Array<{ kind: string }>, tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')

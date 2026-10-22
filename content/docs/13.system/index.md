@@ -104,9 +104,10 @@ order the screens need each other in, each step opening the screen that does it.
 6. Give a venue the shifts its nights need ([Shift templates](/docs/rota/shift-templates)).
 7. Add the bar's products ([Products](/docs/bar/products)).
 
-A step ticks as soon as one of its things exists, and the card goes once every step has ticked. It
-does not come back if something is later removed: from then on **Set-up still to do** says what is
-missing.
+A step ticks as soon as one of its things exists, and the card goes once every step has ticked.
+A role running out at the year end, or a ticket type archived or a product retired, does not bring
+it back. Deleting the last of something does: if every shift template is removed, say, the card
+returns with that step unticked. Otherwise **Set-up still to do** says what is missing.
 
 ### An overdue restore drill
 

@@ -28,8 +28,10 @@ person a new install is sure to have.
   with the data (0006).
 - Once every step is done the answer is `null` and the card is not drawn. A working install never
   sees it.
-- It does not come back when something is later removed. Keeping a running install whole is
-  **Set-up still to do**'s job, which names what is missing in its own words.
+- Expiry, archiving and retirement never reopen a step. Deleting the last row of a step does: a
+  shift template removed, the last role revoked, the only venue deleted. That is rare on a running
+  install and true when it happens, so the card is not made sticky. Keeping a running install
+  whole is otherwise **Set-up still to do**'s job, which names what is missing in its own words.
 - There is no dismiss: a dismissal would be one more piece of state for a card that clears itself.
 
 ## Consequences
