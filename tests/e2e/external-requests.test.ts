@@ -811,6 +811,20 @@ describe.skipIf(skip !== null)('moving a request into one of our rooms', () => {
     expect((await answered.json() as { status: string }).status).toBe('PENDING_APPROVAL')
   })
 
+  // Review of 22 October: a requester the rules refuse outright was relisted CONFIRMED.
+  test('a requester whose membership has lapsed since asking lands in the queue, not confirmed', async () => {
+    const lapsing = await registerMember(app, 'lapsing', generatePassword())
+    giveMembership(lapsing.id)
+    const id = await ask(span(38), lapsing.cookie)
+    write('DELETE FROM memberships WHERE user_id = ?', lapsing.id)
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/relist`,
+      { roomId: await ourRoom(), reason: 'The Studio came free' }, officer)
+
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('PENDING_APPROVAL')
+  })
+
   test('a settled request has nothing to move', async () => {
     const id = await ask(span(36))
     await send('POST', `/api/rooms/external-requests/${id}/cancel`, {}, member.cookie)
