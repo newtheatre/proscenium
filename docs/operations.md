@@ -1175,6 +1175,12 @@ Opening one person's history from a row (`/comms/operations/accounts/[id]`) answ
 query with types, dates and outcomes only, never a message body; every such view writes a
 `notifications.history.viewed` audit entry regardless of what it finds.
 
+Two rooms rules explain a gap that is not a fault. A new room request, ours or the Students'
+Union's, is emailed to every approver at once and is in the log within the minute; it never waits
+for the rooms digest (0205). And a rooms message held for a digest is deleted, unsent, once the
+request it is about is decided: a member whose request was approved within the hour has an
+**Approved** row and no **Asked for** anywhere, which is intended (0206).
+
 ## The restore drill (J-107 criterion 5)
 
 Run by the IT Manager at the command line, on the cadence `BACKUP_DRILL_INTERVAL_DAYS` sets, and

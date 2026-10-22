@@ -2993,6 +2993,12 @@ day range), with `search` over `type` rather than an exact match, so `shift` now
 `type` · `subject` · `body` · `digest_log_id` NULL, no foreign key · `created_at`. Indexed on
 `(topic, user_id, digest_log_id)`.
 
+**`body` is JSON once written by `notify()`** (0206): `{ text, line, link, about }`, the message's
+full text, its one-line form, the one link that line leads to and the ids of the bookings, series
+or Students' Union requests it concerns. A plain-text body (held before 0206, or scrubbed by
+erasure) reads as its subject. A deciding message deletes unclaimed rows whose `about` shares an
+id with its own, so the row may go without ever being sent.
+
 **A row is written when `notify()` holds a message for its topic's digest instead of sending
 (H-104 criterion 1).** Unclaimed and topic-bearing is what qualifies; a claimed call (0048) or one
 carrying an attachment sends immediately as before. No `notification_log` row exists for a held

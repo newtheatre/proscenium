@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { CANCELLABLE, cancelForm, refusalToCancel } from '#shared/utils/bookings'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 import type { AuditRow } from '#shared/utils/audit'
 
 // Cancel a booking you hold, or the series it belongs to.
@@ -61,8 +61,8 @@ export default defineEventHandler(async (event) => {
   }
 })
 
-// `endsAt` comes back only for a room we manage: those are the ones a calendar file was sent for.
-interface Cancelled { id: string, startsAt: number, endsAt?: number }
+// `external` marks a week in a room we do not manage: no calendar file was ever sent for one.
+interface Cancelled { id: string, startsAt: number, endsAt: number, external?: number }
 
 // A status change, never a deletion, and guarded on the status it read: two cancels racing must
 // not both count as the one that freed the slot (0006, C-112 criterion 2).
@@ -105,26 +105,28 @@ async function cancelSeries(seriesId: string, userId: string, now: number, entry
 async function tell(
   event: Parameters<typeof notify>[0],
   account: { id: string, name: string },
-  booking: { room: string, title: string, startsAt: number },
+  booking: { room: string, title: string, startsAt: number, endsAt: number, seriesId: string | null },
   cancelled: Cancelled[],
 ): Promise<void> {
   const base = useRuntimeConfig(event).public.baseURL
   // The calendar file every confirmation carried is taken back by one that cancels it (C-104).
-  const ours = cancelled.filter(one => one.endsAt !== undefined)
+  const ours = cancelled.filter(one => !one.external)
   const attachments = ours.length
-    ? [cancellationAttachment(event, ours.map(one => ({ id: one.id, title: booking.title, room: booking.room, startsAt: one.startsAt, endsAt: one.endsAt! })))]
+    ? [cancellationAttachment(event, ours.map(one => ({ id: one.id, title: booking.title, room: booking.room, startsAt: one.startsAt, endsAt: one.endsAt })))]
     : []
+  const about = cancelled.map(one => one.id)
 
   if (cancelled.length === 1) {
     await notify(event, {
       type: 'room.booking.cancelled',
       userId: account.id,
+      about,
       context: {
         name: account.name,
         room: booking.room,
-        when: formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+        when: saysRoomSpan(booking.startsAt, booking.endsAt),
         title: booking.title,
-        roomsUrl: `${base}/rooms`,
+        roomsUrl: `${base}/rooms/mine`,
       },
       attachments,
     })
@@ -134,13 +136,14 @@ async function tell(
   await notify(event, {
     type: 'room.series.cancelled',
     userId: account.id,
+    about: booking.seriesId ? [booking.seriesId, ...about] : about,
     context: {
       name: account.name,
       room: booking.room,
       days: cancelled
         .sort((a, b) => a.startsAt - b.startsAt)
-        .map(one => formatLondon(new Date(one.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })),
-      roomsUrl: `${base}/rooms`,
+        .map(one => saysRoomSpan(one.startsAt, one.endsAt)),
+      roomsUrl: `${base}/rooms/mine`,
     },
     attachments,
   })

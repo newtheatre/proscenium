@@ -217,6 +217,9 @@ describe.skipIf(skip !== null)('a request tells the approvers when it arrives (c
     // slot is a conflict rather than a request.
     const quiet = await makeRoom()
     const before = sentTo(officerId, 'room.request.raised')
+    const logged = (): number => read<{ n: number }>(
+      `SELECT count(*) n FROM notification_log WHERE user_id = ? AND type = 'room.request.raised'`, officerId)?.n ?? 0
+    const loggedBefore = logged()
     const asked = await send('POST', '/api/rooms/requests', {
       roomId: quiet,
       title: 'Understudy call',
@@ -227,6 +230,8 @@ describe.skipIf(skip !== null)('a request tells the approvers when it arrives (c
     expect(asked.status).toBe(200)
 
     expect(sentTo(officerId, 'room.request.raised') - before).toBe(1)
+    // Sent, never held for the rooms digest (0205).
+    expect(logged() - loggedBefore).toBe(1)
   })
 
   // A muted inbox must not lose a request: the queue is the backstop, so the request has to be

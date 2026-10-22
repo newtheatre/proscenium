@@ -19,6 +19,12 @@ export interface MessageType {
   // Overrides the topic-derived sender: for a transactional type that still wants a branded
   // identity rather than the generic accounts address (D-107).
   sender?: SenderKey
+  // Sent the moment it is raised, never held for a digest, though the topic preference still
+  // applies: somebody has to act on it, and an hour's wait costs a short-notice slot (0205).
+  immediate?: true
+  // Settles what it is `about`, so anything still held for a digest about the same record is
+  // stale and is dropped as this goes out (0206).
+  decides?: true
 }
 
 export const MESSAGE_TYPES = {
@@ -146,6 +152,7 @@ export const MESSAGE_TYPES = {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-request-raised',
+    immediate: true,
   },
 
   'room.request.waiting': {
@@ -158,6 +165,7 @@ export const MESSAGE_TYPES = {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-request-expired',
+    decides: true,
   },
 
   // One message carries every decision taken on one member's requests in one action, so a batch
@@ -166,18 +174,21 @@ export const MESSAGE_TYPES = {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-approved',
+    decides: true,
   },
 
   'room.request.rejected': {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-rejected',
+    decides: true,
   },
 
   'room.booking.cancelled': {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-cancelled',
+    decides: true,
   },
 
   // The day before, once, carrying every booking that member holds tomorrow (C-113 criteria 2
@@ -205,6 +216,7 @@ export const MESSAGE_TYPES = {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-series-cancelled',
+    decides: true,
   },
 
   // Nobody asked for this one: the room was shut under them, so it leads with the reason.
@@ -212,6 +224,7 @@ export const MESSAGE_TYPES = {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-blackout-cancelled',
+    decides: true,
   },
 
   // Their room was taken for something with a higher claim, so it leads with the reason and
@@ -220,6 +233,7 @@ export const MESSAGE_TYPES = {
     topic: 'ROOMS',
     channels: ['EMAIL', 'INBOX'],
     template: 'room-bumped',
+    decides: true,
   },
 
   // Sent when the mark changes what booking costs them, not for every mark: a message about
@@ -233,24 +247,24 @@ export const MESSAGE_TYPES = {
   // A third party decides, so the member hears at every step (C-120).
   'external.request.received': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-received' },
 
-  'external.request.raised': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-raised' },
+  'external.request.raised': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-raised', immediate: true },
 
   'external.request.submitted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-submitted' },
 
-  'external.request.assigned': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-assigned' },
+  'external.request.assigned': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-assigned', decides: true },
 
   'external.request.reassigning': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-reassigning' },
 
-  'external.request.rejected': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-rejected' },
+  'external.request.rejected': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-rejected', decides: true },
 
-  'external.request.withdrawn': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-withdrawn' },
+  'external.request.withdrawn': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-withdrawn', decides: true },
 
   'external.request.waiting': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'external-waiting' },
 
   // A move changes what the member holds, so both directions say whether the slot went (C-123).
-  'room.request.unlisted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'request-unlisted' },
+  'room.request.unlisted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'request-unlisted', decides: true },
 
-  'external.request.relisted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'request-relisted' },
+  'external.request.relisted': { topic: 'ROOMS', channels: ['EMAIL', 'INBOX'], template: 'request-relisted', decides: true },
 
   // Module D: ticketing
 
@@ -643,9 +657,9 @@ export function isTransactional(type: MessageType): boolean {
 }
 
 // `topic: null` means a deadline a digest interval would eat (a hold, an offer), so transactional
-// never coalesces; a claim or an attachment bypass it for their own reasons (H-104, 0061).
+// never coalesces; a claim, an attachment or `immediate` bypass it for their own reasons (0061, 0205).
 export function joinsDigest(type: MessageType, hasClaim: boolean, hasAttachment: boolean): boolean {
-  return !hasClaim && !isTransactional(type) && !hasAttachment
+  return !hasClaim && !isTransactional(type) && !hasAttachment && !type.immediate
 }
 
 export interface Preference {
@@ -666,6 +680,16 @@ export const DIGEST_TYPE_FOR_TOPIC: Record<NotificationTopic, MessageTypeName> =
   TRAINING: 'digest.training',
   ROOMS: 'digest.rooms',
   ANNOUNCEMENTS: 'digest.announcements',
+}
+
+// A topic whose digest is one line per change under one greeting and one link (0206); the rest
+// still nest each message whole.
+export const DIGEST_IN_LINES: Record<NotificationTopic, boolean> = {
+  BOOKINGS: false,
+  SHIFTS: false,
+  TRAINING: false,
+  ROOMS: true,
+  ANNOUNCEMENTS: false,
 }
 
 export const DIGEST_TOPIC_NOUN: Record<NotificationTopic, string> = {

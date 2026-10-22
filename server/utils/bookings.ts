@@ -153,7 +153,7 @@ export function lapseStatement(id: string, createdAt: number, now: number): SQL 
     UPDATE room_bookings
     SET status = 'REJECTED', rejection_reason = 'Nobody answered this in time, so it lapsed.', updated_at = ${now}
     WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt}
-    RETURNING title, starts_at AS startsAt
+    RETURNING title, starts_at AS startsAt, ends_at AS endsAt
   `
 }
 
@@ -162,7 +162,7 @@ export function chaseStatement(id: string, createdAt: number, now: number): SQL 
     UPDATE room_bookings
     SET escalated_at = ${now}
     WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt} AND escalated_at IS NULL
-    RETURNING title, starts_at AS startsAt
+    RETURNING title, starts_at AS startsAt, ends_at AS endsAt
   `
 }
 

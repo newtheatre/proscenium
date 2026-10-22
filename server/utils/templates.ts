@@ -2,7 +2,7 @@ import { saysRole } from '#shared/utils/roles'
 import { SAYS_BEFORE_YOU_COME, SAYS_WARNINGS_LINK } from '#shared/utils/content-warnings'
 import { formatLondon } from '#shared/utils/london'
 import { PRODUCTION_SITE_URL } from '#shared/utils/seo'
-import { ordinal, plural } from '#shared/utils/text'
+import { asSentence, ordinal, plural } from '#shared/utils/text'
 
 // Every message carries both parts (H-109 criterion 3), and any date in one is London-pinned,
 // because the worker runs in UTC (0014).
@@ -11,6 +11,8 @@ export interface Rendered {
   subject: string
   html: string
   text: string
+  // What a digest prints for this message on one line; the subject when a template sets none.
+  line?: string
 }
 
 export interface TemplateContext {
@@ -24,6 +26,27 @@ ${body}
 <hr>
 <p style="font-size:0.875rem;color:#555">The Nottingham New Theatre</p>
 </body></html>`
+}
+
+// One greeting, a line per change with the most important first, and one link: a whole email
+// nested under each bullet buried the change that mattered (0206).
+function digestInLines(context: TemplateContext, entries: { subject: string, line?: string }[], noun: string): Rendered {
+  const lead = entries[0]!
+  const link = context.link as { url: string, says: string } | null
+  const lines = entries.map(entry => entry.line ?? entry.subject)
+  return {
+    subject: entries.length === 1 ? lead.subject : `${lead.subject}, and ${plural(entries.length - 1, `more ${noun}`)}`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>Since the last email:</p>
+<ul>${lines.map(line => `<li>${line}</li>`).join('')}</ul>${link ? `\n<p><a href="${link.url}">${link.says}</a></p>` : ''}`),
+    text: `Hello ${context.name},
+
+Since the last email:
+
+${lines.map(line => `- ${line}`).join('\n')}${link ? `\n\n${link.says}: ${link.url}` : ''}
+
+The Nottingham New Theatre`,
+  }
 }
 
 // Said on any message carrying a link nobody asked for, so a reader can check the address
@@ -363,7 +386,9 @@ The Nottingham New Theatre`,
   // One decision or five, the same shape: a list, so a batch never becomes a run of emails.
   'room-approved': (context: TemplateContext): Rendered => {
     const bookings = context.bookings as { room: string, title: string, when: string }[]
-    const moved = context.moved ? `They are in ${String(context.moved)}, which is not the room asked for.` : ''
+    const moved = context.moved
+      ? `${bookings.length === 1 ? 'It is' : 'They are'} in ${String(context.moved)}, which is not the room asked for.`
+      : ''
     return {
       subject: bookings.length === 1
         ? `Approved: ${bookings[0]!.room}, ${bookings[0]!.when}`
@@ -388,10 +413,12 @@ The Nottingham New Theatre`,
   'room-rejected': (context: TemplateContext): Rendered => {
     const bookings = context.bookings as { room: string, title: string, when: string }[]
     const reason = String(context.reason ?? '')
+    const subject = bookings.length === 1
+      ? `Turned down: ${bookings[0]!.room}, ${bookings[0]!.when}`
+      : `Turned down: ${bookings.length} room requests`
     return {
-      subject: bookings.length === 1
-        ? `Turned down: ${bookings[0]!.room}, ${bookings[0]!.when}`
-        : `Turned down: ${bookings.length} room requests`,
+      subject,
+      line: `${subject}. Why: ${asSentence(reason)}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${bookings.length === 1 ? 'Your request was turned down.' : 'Your requests were turned down.'}</p>
 <ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
@@ -1012,14 +1039,14 @@ The Nottingham New Theatre`,
     subject: `Booked: ${plural(Number(context.count), 'booking')} in ${String(context.room)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>${context.count} bookings in ${context.room} are confirmed, from ${context.first} to
-${context.last}.</p>
+${context.last}, ${context.times} each time.</p>
 <p>${context.title}</p>
 <p>Cancelling asks whether you mean one week or the whole run.</p>
 <p><a href="${String(context.roomsUrl)}">See your bookings</a></p>`),
     text: `Hello ${context.name},
 
 ${String(context.count)} bookings in ${String(context.room)} are confirmed, from
-${String(context.first)} to ${String(context.last)}.
+${String(context.first)} to ${String(context.last)}, ${String(context.times)} each time.
 
 ${String(context.title)}
 
@@ -1034,13 +1061,14 @@ The Nottingham New Theatre`,
     subject: `Asked for: ${plural(Number(context.count), 'booking')} in ${String(context.room)}`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>Your request for ${context.count} bookings in ${context.room}, from ${context.first} to
-${context.last}, is waiting for a decision.</p>
+${context.last}, ${context.times} each time, is waiting for a decision.</p>
 <p>${context.title}</p>
 <p>The slots are held while somebody decides, so nobody else can book them meanwhile.</p>`),
     text: `Hello ${context.name},
 
 Your request for ${String(context.count)} bookings in ${String(context.room)}, from
-${String(context.first)} to ${String(context.last)}, is waiting for a decision.
+${String(context.first)} to ${String(context.last)}, ${String(context.times)} each time, is waiting
+for a decision.
 
 ${String(context.title)}
 
@@ -1068,25 +1096,31 @@ The Nottingham New Theatre`,
     }
   },
 
+  // A closure takes requests as well as bookings, and a member who only asked never booked.
   'room-blackout-cancelled': (context: TemplateContext): Rendered => {
-    const bookings = context.bookings as { room: string, title: string, when: string }[]
+    const bookings = context.bookings as { room: string, title: string, when: string, asked?: boolean }[]
     const one = bookings.length === 1
+    const asked = bookings.filter(booking => booking.asked).length
+    const kind = asked === 0 ? 'booked' : asked === bookings.length ? 'asked for' : 'booked or asked for'
+    const nouns = asked === 0 ? 'bookings' : asked === bookings.length ? 'requests' : 'bookings and requests'
+    const closed = `${one ? `A room you ${kind} has` : `Rooms you ${kind} have`} been closed: ${asSentence(String(context.reason))}`
+    const these = one ? `This ${asked ? 'request' : 'booking'} is` : `These ${nouns} are`
+    const subject = one ? `Cancelled: ${bookings[0]!.room}, ${bookings[0]!.when}` : `Cancelled: ${bookings.length} ${nouns}`
     return {
-      subject: one
-        ? `Cancelled: ${bookings[0]!.room}, ${bookings[0]!.when}`
-        : `Cancelled: ${bookings.length} bookings`,
+      subject,
+      line: `${subject}. ${closed}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>${one ? 'A room you booked has' : 'Rooms you booked have'} been closed: ${context.reason}.</p>
-<p>${one ? 'This booking is' : 'These bookings are'} cancelled. Nothing is rebooked automatically,
-so please book again if you still need the space.</p>
+<p>${closed}</p>
+<p>${these} cancelled. Nothing is rebooked automatically, so please book again if you still need
+the space.</p>
 <ul>${bookings.map(booking => `<li>${booking.room}, ${booking.when}: ${booking.title}</li>`).join('')}</ul>
 <p><a href="${String(context.roomsUrl)}">Find another slot</a></p>`),
       text: `Hello ${context.name},
 
-${one ? 'A room you booked has' : 'Rooms you booked have'} been closed: ${String(context.reason)}.
+${closed}
 
-${one ? 'This booking is' : 'These bookings are'} cancelled. Nothing is rebooked automatically, so
-please book again if you still need the space.
+${these} cancelled. Nothing is rebooked automatically, so please book again if you still need the
+space.
 
 ${bookings.map(booking => `- ${booking.room}, ${booking.when}: ${booking.title}`).join('\n')}
 
@@ -1102,7 +1136,7 @@ The Nottingham New Theatre`,
       subject: `Moved: ${String(context.room)}, ${String(context.when)}`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>Your booking of ${context.room}, ${context.when}, has been given to something with a higher
-claim on the room: ${context.reason}.</p>
+claim on the room: ${asSentence(String(context.reason))}</p>
 <p>${context.title}</p>
 ${offered
   ? `<p>You have been booked into <strong>${offered}</strong> instead, and that slot is held for
@@ -1113,7 +1147,7 @@ another slot.</p>`}
       text: `Hello ${context.name},
 
 Your booking of ${String(context.room)}, ${String(context.when)}, has been given to something with
-a higher claim on the room: ${String(context.reason)}.
+a higher claim on the room: ${asSentence(String(context.reason))}
 
 ${String(context.title)}
 
@@ -1965,8 +1999,9 @@ The Nottingham New Theatre`,
   // One topic's coalesced entries, every change kept individually visible even though the send
   // is one (H-104 criterion 1). `entries` is what the sweep claimed off notification_digest_entries.
   'notification-digest': (context: TemplateContext): Rendered => {
-    const entries = context.entries as { subject: string, body: string }[]
+    const entries = context.entries as { subject: string, body: string, line?: string }[]
     const noun = String(context.noun)
+    if (context.inLines === true) return digestInLines(context, entries, noun)
     return {
       subject: plural(entries.length, noun.charAt(0).toUpperCase() + noun.slice(1)),
       html: layout(`<p>Hello ${context.name},</p>

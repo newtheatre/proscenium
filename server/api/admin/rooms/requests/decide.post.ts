@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { decisionForm } from '#shared/utils/approvals'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 import type { DecisionOutcome, PendingRow } from '#server/utils/approvals'
 import type { CalendarEvent } from '#shared/utils/ics'
 import type { H3Event } from 'h3'
@@ -71,7 +71,7 @@ async function tellRequesters(
   const movedTo = intoRoom ? await roomName(intoRoom) : null
 
   const now = Math.floor(Date.now() / 1000)
-  const byMember = new Map<string, { room: string, title: string, when: string, event: CalendarEvent }[]>()
+  const byMember = new Map<string, { room: string, title: string, when: string, event: CalendarEvent, about: string[] }[]>()
   for (const outcome of decided) {
     const row = before.get(outcome.id)
     if (!row) continue
@@ -80,17 +80,19 @@ async function tellRequesters(
     lines.push({
       room,
       title: row.title,
-      when: formatLondon(new Date(row.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(row.startsAt, row.endsAt),
       event: { id: row.id, title: row.title, room, startsAt: row.startsAt, endsAt: row.endsAt, status: 'CONFIRMED', updatedAt: now },
+      about: row.seriesId ? [row.id, row.seriesId] : [row.id],
     })
     byMember.set(row.userId, lines)
   }
 
   for (const [userId, decisions] of byMember) {
-    const bookings = decisions.map(({ event: _event, ...line }) => line)
+    const bookings = decisions.map(({ event: _event, about: _about, ...line }) => line)
     await notify(event, {
       type: action === 'APPROVE' ? 'room.request.approved' : 'room.request.rejected',
       userId,
+      about: [...new Set(decisions.flatMap(one => one.about))],
       context: {
         name: '',
         bookings,

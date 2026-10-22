@@ -13,3 +13,11 @@ export function ordinal(count: number): string {
   const suffix = teens >= 11 && teens <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][size % 10] ?? 'th')
   return `${count}${suffix}`
 }
+
+// Ends quoted words with a full stop unless they already end a sentence, so an officer's
+// "short notice." is not printed as "short notice..". Reads escaped quotes too, for the HTML part.
+export function asSentence(words: string): string {
+  const trimmed = words.trim()
+  if (!trimmed) return trimmed
+  return /[.!?…](?:["'”’)\]]|&quot;|&#39;)*$/.test(trimmed) ? trimmed : `${trimmed}.`
+}

@@ -2,7 +2,8 @@ import { expand, seriesForm } from '#shared/utils/series'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { bookingTier, maskConflicts } from '#shared/utils/bookings'
 import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
-import { formatLondon } from '#shared/utils/london'
+import { saysTimes } from '#shared/utils/room-messages'
+import { saysDayLong } from '#shared/utils/when'
 import type { Blackout } from '#shared/utils/blackouts'
 import type { Occurrence } from '#shared/utils/series'
 import type { OccurrenceRefusal } from '#server/utils/series'
@@ -160,13 +161,16 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: status === 'CONFIRMED' ? 'room.series.confirmed' : 'room.series.requested',
     userId: account.id,
+    about: [seriesId],
     context: {
       name: account.name,
       room: room.name,
       title: input.title,
       count: occurrences.length,
-      first: formatLondon(occurrences[0]!.startsAt, { dateStyle: 'full', timeStyle: 'short' }),
-      last: formatLondon(occurrences.at(-1)!.startsAt, { dateStyle: 'full', timeStyle: 'short' }),
+      // Every week shares one From and Until, so the times are said once for the run.
+      first: saysDayLong(occurrences[0]!.startsAt, { year: true }),
+      last: saysDayLong(occurrences.at(-1)!.startsAt, { year: true }),
+      times: saysTimes(occurrences[0]!.startsAt, occurrences[0]!.endsAt),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
     // A term held at once reaches a calendar as a single booking does, one event per week (C-104).

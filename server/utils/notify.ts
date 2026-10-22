@@ -5,6 +5,7 @@ import { eq, inArray, sql } from 'drizzle-orm'
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { findById } from './accounts'
 import { configValue } from './configuration'
+import { heldBody, supersedeStatement } from './digest-entries'
 import { MAILBOX, writeToMailbox } from './mailbox'
 import { preferenceDefaults, storedPreferences } from './notification-preferences'
 import { render } from './templates'
@@ -97,6 +98,9 @@ export interface Notification {
   // The row id a caller already reserved, so an unclaimed insert lands at a known id: only the
   // digest sweep uses this, claiming entries against the id before sending under it (H-104).
   id?: string
+  // The records this message is about (booking, series or request ids), so a later decision on
+  // any of them can drop it from a digest it is still waiting in (0206).
+  about?: string[]
 }
 
 // The terminal outcomes of one send. `PENDING` is claimNotification()'s and `RETRYING` is
@@ -168,6 +172,10 @@ async function holdForDigest(entry: { userId: string, topic: NotificationTopic, 
     subject: entry.subject,
     body: entry.body,
   })
+}
+
+async function supersede(topic: NotificationTopic, type: string, about: string[]): Promise<void> {
+  await db.run(supersedeStatement(topic, type, about))
 }
 
 // The in-app channel. Never coalesced and never suppressed, so the individual entries stay
@@ -402,6 +410,10 @@ export async function claimHeld(key: string): Promise<boolean> {
 export async function notify(event: H3Event | undefined, notification: Notification): Promise<Outcome> {
   const type = messageType(notification.type)
 
+  // Before anything can refuse this send: the record is settled whether or not this reaches
+  // anybody, so what is still held about it is stale for everybody (0206).
+  if (type.decides && type.topic && notification.about?.length) await supersede(type.topic, notification.type, notification.about)
+
   // Read at send time, not at enqueue: an address changed in between reaches the new one
   // (H-101 criterion 5).
   const account = await findById(notification.userId)
@@ -445,7 +457,7 @@ export async function notify(event: H3Event | undefined, notification: Notificat
       topic: type.topic!,
       type: notification.type,
       subject: rendered.subject,
-      body: rendered.text,
+      body: heldBody(rendered, notification.context, notification.about ?? []),
     })
     return 'HELD_FOR_DIGEST'
   }

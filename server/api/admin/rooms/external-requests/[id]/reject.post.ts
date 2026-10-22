@@ -1,5 +1,5 @@
 import { refusalToAct, rejectExternalForm } from '#shared/utils/external-requests'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Turn a request down, with a reason the member is shown.
 export default defineEventHandler(async (event) => {
@@ -42,11 +42,12 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'external.request.rejected',
     userId: request.userId,
+    about: [id],
     context: {
       name: request.who,
       title: request.title,
       reason: input.reason,
-      when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(request.startsAt, request.endsAt),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms`,
     },
   })

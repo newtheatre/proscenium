@@ -1,7 +1,7 @@
 import { refusalToUnlist } from '#shared/utils/bookings'
 import { addWorkingDays, coversThrough, londonDate } from '#shared/utils/working-days'
 import { unlistForm } from '#shared/utils/approvals'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Move a request to a room we do not manage, freeing the slot it was holding.
 export default defineEventHandler(async (event) => {
@@ -58,11 +58,12 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'room.request.unlisted',
     userId: booking.userId,
+    about: [id, requestId],
     context: {
       name: booking.requester,
       title: booking.title,
       room: booking.room,
-      when: formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(booking.startsAt, booking.endsAt),
       dueBy,
       why: input.reason,
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
