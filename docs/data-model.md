@@ -2751,6 +2751,9 @@ Each person moved is emailed `training.session.withdrawn` or `training.session.a
 correction. The revoke runs first because the partial unique index counts only live rows. Nothing is deleted, and
 somebody dropped by a correction keeps their attendee row marked `ABSENT` as evidence. Past the
 window the only correction is an administrator's revocation and a fresh grant (G-122).
+The `register.corrected` entry is written first, only while the register's attended marks are
+still the set the correction was computed from (`registerAsRead`), and every write in the batch
+rides on it: a correction raced by another applies nothing and answers a worded 409.
 
 **The freeze is releasable by the session's own trainer while no marks exist** (open question 6,
 answered 2 September). The release is conditional on `marked_at IS NULL`, so a release racing a
@@ -2917,7 +2920,8 @@ A lead or a trainer holds no `accounts.read`, so the records screen's picker, a 
 picker and the delivery log's picker ask `GET /api/admin/training/people?search=` in its place,
 which answers an id and a name and nothing more, to `training.write`, a live lead appointment or
 current trainer standing (0240). An award is refused for a draft module, and for a person already
-holding an unrevoked record of the module dated the same day; a revoke answers `stillHeld` when
+holding an unrevoked record of the module dated the same day, a check the insert itself carries
+(`awardOnceStatement`) so two sign-offs sent at once write one; a revoke answers `stillHeld` when
 another current record of the module remains. A prerequisite must be an active module, and
 neither a certification nor a sign-off-only module is teachable at a session.
 

@@ -30,6 +30,7 @@ The hands-on map of 21 October 2026 drove the training screens end to end and fo
 3. **A certification is never taught at a session.** `assertTeachable` refuses it beside a
    sign-off-only module, and the planner does not list it.
 4. **One unrevoked award per person, module and day.** A second award dated the same day is a 409.
+   The insert carries the check as well as the read before it, so two awards sent at once write one.
    Different days still supersede, which is how renewal works. A revoke answers `stillHeld` when
    another current record of the module remains, and the screen says so.
 5. **Whoever may award by any path may search people.** `GET /api/admin/training/people` answers

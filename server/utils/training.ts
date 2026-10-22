@@ -4,6 +4,9 @@ import { saysRole } from '#shared/utils/roles'
 import { saysDayLong } from '#shared/utils/when'
 import { MAX_PREREQUISITE_DEPTH, expiryFor, leadsDepartment, mayRecordByAddress, missingPrerequisites, saysGaps } from '#shared/utils/training'
 import type { AcademicYear, ExpiryMode, ExpiryPolicy, LeadAssignment, ModuleInput } from '#shared/utils/training'
+import { awardOnceStatement } from '#shared/utils/training-award'
+import type { AwardRow } from '#shared/utils/training-award'
+import type { AuditRow } from '#shared/utils/audit'
 import { demandScope } from './training-demand'
 import type { Authority } from '#server/utils/authorise'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
@@ -633,6 +636,16 @@ export function assertStewards(resolved: CatalogueAuthority, department: string)
 
 export type AwardablePolicy = ExpiryPolicy & { kind: string, status: string, allowsExternal: boolean }
 
+const AWARDED_THAT_DAY = 'They already hold this, awarded on that day'
+
+// The write half of assertAwardable's same-day check, which a racer passes too: the insert refuses
+// the twin, and the trail is written only behind a record that landed (0240).
+export async function awardOnce(record: AwardRow, entries: AuditRow[]): Promise<void> {
+  if (!await auditedWrite(db.all<{ id: string }>(awardOnceStatement(record)), entries)) {
+    throw createError({ statusCode: 409, statusMessage: AWARDED_THAT_DAY })
+  }
+}
+
 // Every refusal an award outside a register makes before it writes, shared so a sign-off and a
 // certificate cannot drift apart (G-120 criteria 1 to 3, G-121 criterion 5).
 export async function assertAwardable(
@@ -684,7 +697,7 @@ export async function assertAwardable(
       isNull(schema.trainingRecords.revokedAt),
     )).limit(1)
     if (twin) {
-      throw createError({ statusCode: 409, statusMessage: 'They already hold this, awarded on that day' })
+      throw createError({ statusCode: 409, statusMessage: AWARDED_THAT_DAY })
     }
   }
 
