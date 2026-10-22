@@ -100,6 +100,28 @@ describe.skipIf(skip !== null)('the booking screen says which night and which wa
     }
   }, CASE_TIMEOUT_MS)
 
+  // Judged on the hold an exchange would get, never on when online booking closes, which a
+  // show may set a day out while its unpaid holds still run to near curtain.
+  test('each night offered carries the hold release an exchange there would get', async () => {
+    const { qrToken, reference } = await twoNightBooking()
+    const { CONFIG_KEYS } = await import('#shared/utils/config')
+    const releaseMinutes = CONFIG_KEYS.HOLD_RELEASE_MINUTES_BEFORE.default as number
+
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      await visit(view, `${app.baseURL}/qr/${qrToken}`, '[data-test="booking-found"]')
+      const answer = await view.evaluate<string>(
+        `fetch('/api/qr/exchange-options?reference=${reference}').then(response => response.text())`,
+      )
+      const { performances } = JSON.parse(answer) as { performances: { startsAt: number, holdExpiresAt: number }[] }
+      expect(performances.length).toBeGreaterThan(0)
+      for (const night of performances) expect(night.holdExpiresAt).toBe(night.startsAt - releaseMinutes * 60)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   test('a night releasing within half an hour is greyed out, saying when it releases', async () => {
     const { qrToken } = await twoNightBooking(true)
 

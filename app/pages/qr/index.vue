@@ -49,6 +49,7 @@ interface ExchangeOption {
   availability: string
   says: string
   bookingClosesAt: number
+  holdExpiresAt: number
   totalPence: number | null
 }
 
@@ -494,11 +495,11 @@ useSeoMeta({ title: 'Your booking' })
             v-model="exchangeChoice"
             :items="exchangeOptions.map(option => {
               const night = saysExchangeNight(option)
-              const tooSoon = !SOLD_OUT_OR_CLOSED.includes(option.availability) && exchangeTooSoon(option.bookingClosesAt, exchangeReadAt)
+              const tooSoon = !SOLD_OUT_OR_CLOSED.includes(option.availability) && exchangeTooSoon(option.holdExpiresAt, exchangeReadAt)
               return {
                 label: night.label,
                 description: tooSoon
-                  ? `${option.venueName} · ${saysExchangeTooSoon(option.bookingClosesAt)}`
+                  ? `${option.venueName} · ${saysExchangeTooSoon(option.holdExpiresAt)}`
                   : option.totalPence === null ? `${night.description} · not every ticket type is offered` : `${night.description} · ${saysPrice(option.totalPence)}`,
                 value: option.id,
                 disabled: SOLD_OUT_OR_CLOSED.includes(option.availability) || option.totalPence === null || tooSoon,

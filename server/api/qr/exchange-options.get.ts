@@ -1,4 +1,4 @@
-import { exchangeTotalPence, showingBookingQuery } from '#shared/utils/reservations'
+import { exchangeTotalPence, holdExpiresAt, showingBookingQuery } from '#shared/utils/reservations'
 
 // What the exchange form needs: the other performances of the same show, the same honest
 // availability the public listing shows (D-111, D-101), each with what this booking would cost there.
@@ -21,8 +21,10 @@ export default defineEventHandler(async (event) => {
   // Priced the way the exchange itself prices them, so the total shown before confirming is the
   // total the exchange writes (D-111 criterion 2). One read per night of one show's run.
   const performances = await Promise.all(others.map(async (one) => {
-    const offered = await bookableTicketTypes(one.id, reservation.showId, isMember, false)
-    return { ...one, totalPence: exchangeTotalPence(lines, offered) }
+    const [offered, row] = await Promise.all([bookableTicketTypes(one.id, reservation.showId, isMember, false), performanceById(one.id)])
+    // The hold an exchange there would get, which is what "too soon to move to" is judged on.
+    const releaseMinutes = await holdReleaseMinutesFor(event, { holdReleaseMinutesBefore: row?.holdReleaseMinutesBefore ?? null })
+    return { ...one, totalPence: exchangeTotalPence(lines, offered), holdExpiresAt: holdExpiresAt(one.startsAt, releaseMinutes) }
   }))
 
   return {
