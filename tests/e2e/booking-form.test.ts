@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { adminSession } from '#tests/helpers/accounts'
+import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { sqliteTarget } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
-import { registrableAddress } from '#tests/helpers/seed'
-import { click, fill, fillNumber, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { generatePassword, registrableAddress } from '#tests/helpers/seed'
+import { click, fill, fillNumber, letters, openSignedOutView, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -345,6 +345,29 @@ describe.skipIf(skip !== null)('the screen answers everybody the same way (crite
       await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="book-page"]')
       await waitFor(view, `document.querySelector('[data-test="member-prices"]')`)
       expect(await textOf(view, '[data-test="member-prices"]')).toContain('member')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a signed-in non-member looking at a member price is offered membership, not sign-in', async () => {
+    const title = named('The Seagull')
+    const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) })
+    const showId = (await show.json() as { id: string }).id
+    const performance = await send('POST', `/api/admin/shows/${showId}/performances`, { venueId, startsAt: nextWeek(), durationMinutes: 120 })
+    const performanceId = (await performance.json() as { id: string }).id
+    await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900 })
+    await send('POST', '/api/admin/ticket-types', { name: named('Member'), price: 400, restrictedTo: 'MEMBER' })
+    expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true })).status).toBe(200)
+
+    const password = generatePassword()
+    const visitor = await registerMember(app, 'nonmember', password)
+    const view = await signInView(app, visitor.email, password)
+    try {
+      await visit(view, `${app.baseURL}/book/${performanceId}`, '[data-test="book-page"]')
+      await waitFor(view, `document.querySelector('[data-test="member-prices-join"]')`)
+      expect(await view.evaluate<string>(`document.querySelector('[data-test="member-prices-join"]').getAttribute('href')`)).toBe('/account/membership')
     }
     finally {
       view.close()

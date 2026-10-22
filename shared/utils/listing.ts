@@ -1,4 +1,5 @@
 import { saysAvailability } from './programme'
+import { saysDay } from './when'
 import type { ListedShow } from './programme'
 
 // What the listing says about a whole run, as against what `programme.ts` says about one house.
@@ -13,6 +14,15 @@ export function listingFlag(listed: ListedShow): ListingFlag | null {
   if (onSale.length === 0) return null
   if (onSale.every(one => one.availability === 'SOLD_OUT')) return saysAvailability('SOLD_OUT', null) as ListingFlag
   return onSale.some(one => one.availability === 'LIMITED') ? 'Selling fast' : null
+}
+
+// The nights already full while others still sell, so a card saying "Tickets available" does not
+// hide that the last night has gone. Null when nothing is sold out or nothing else is on sale.
+export function soldOutNightsSays(listed: ListedShow): string | null {
+  const onOffer = listed.performances.filter(one => !one.cancelled && !one.externalBookingUrl)
+  const full = onOffer.filter(one => one.availability === 'SOLD_OUT').sort((a, b) => a.startsAt - b.startsAt)
+  if (full.length === 0 || !onOffer.some(one => one.availability === 'AVAILABLE' || one.availability === 'LIMITED')) return null
+  return `Sold out ${full.map(one => saysDay(one.startsAt)).join(', ')}`
 }
 
 // A show with no artwork still needs a frame of its own, so the two hues come from a stable seed:

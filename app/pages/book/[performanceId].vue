@@ -72,12 +72,14 @@ const nights = computed(() => (run.value?.performances ?? []).filter(one => !one
 // already said it once (D-104 criterion 8).
 const acrossVenues = computed(() => new Set(nights.value.map(one => one.venueName)).size > 1)
 
-// A member price the server has not offered this caller, because they are signed out: the listing
+// A member price the server has not offered this caller, signed out or not a member: the listing
 // prices the whole run publicly, so the page can say it exists without ever quoting it (D-109).
-const memberPrice = computed(() => {
-  if (account.value.signedIn) return false
+const memberPrice = computed<'sign-in' | 'join' | null>(() => {
   const tonight = (run.value?.performances ?? []).find(one => one.id === performanceId.value)
-  return (tonight?.prices ?? []).some(price => price.restrictedTo === 'MEMBER')
+  const memberOnly = (tonight?.prices ?? []).filter(price => price.restrictedTo === 'MEMBER').map(price => price.name)
+  if (memberOnly.length === 0) return null
+  if (!account.value.signedIn) return 'sign-in'
+  return data.value?.ticketTypes.some(type => memberOnly.includes(type.name)) ? null : 'join'
 })
 
 const quantities = reactive<Record<string, number>>(
@@ -419,12 +421,23 @@ useSeoMeta({
               can book.
             </p>
             <UButton
+              v-if="memberPrice === 'sign-in'"
               :to="`/sign-in?next=${encodeURIComponent(`/book/${performanceId}`)}`"
               variant="subtle"
               size="sm"
               class="shrink-0"
             >
               Sign in for member prices
+            </UButton>
+            <UButton
+              v-else
+              to="/account/membership"
+              variant="subtle"
+              size="sm"
+              class="shrink-0"
+              data-test="member-prices-join"
+            >
+              Become a member
             </UButton>
           </div>
 

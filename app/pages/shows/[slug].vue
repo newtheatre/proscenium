@@ -116,17 +116,17 @@ const from = computed(() => {
   return prices[0] === undefined ? null : saysPrice(prices[0])
 })
 
-// The run's distinct prices as one line: cheapest first, each carrying its restriction so
-// "£4.00 members" reads as the condition it is (show-page.png).
+// The run's distinct prices as one line, dearest first, each named and carrying its restriction,
+// so two equal figures never read as a duplicate (show-page.png).
 const tickets = computed(() => {
-  const seen = new Map<string, { price: number, restrictedTo: string | null }>()
+  const seen = new Map<string, { name: string, price: number, restrictedTo: string | null }>()
   for (const price of onOffer.value.flatMap(one => one.prices)) {
-    const key = `${price.price}:${price.restrictedTo ?? ''}`
-    if (!seen.has(key)) seen.set(key, { price: price.price, restrictedTo: price.restrictedTo })
+    const key = `${price.name}:${price.price}:${price.restrictedTo ?? ''}`
+    if (!seen.has(key)) seen.set(key, { name: price.name, price: price.price, restrictedTo: price.restrictedTo })
   }
   return [...seen.values()]
     .sort((a, b) => b.price - a.price)
-    .map(price => [saysPrice(price.price), saysRestriction(price.restrictedTo)].filter(Boolean).join(' '))
+    .map(price => [`${price.name} ${saysPrice(price.price)}`, saysRestriction(price.restrictedTo)?.toLowerCase()].filter(Boolean).join(', '))
 })
 
 function saysInterval(performance: ListedPerformance): string {
