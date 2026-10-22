@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { BOARD_WAITING_HREF } from '#shared/utils/rota-board'
 import { ROTA_FLOW } from '#shared/utils/rota-flow'
 import { sessionForm } from '#shared/utils/training'
 
@@ -38,7 +39,7 @@ describe('each rota screen names the step after it (K-123 criterion 12)', () => 
 describe('the claims waiting for confirmation are worked on the board (E-105 criteria 2 and 3)', () => {
   test('the old approvals address forwards to the board\'s filter, and draws nothing of its own', async () => {
     const source = await read(APPROVALS)
-    expect(source).toContain('navigateTo(BOARD_WAITING_HREF')
+    expect(source).toContain(`definePageMeta({ redirect: '${BOARD_WAITING_HREF}' })`)
     expect(source).not.toContain('layout: \'console\'')
     // It forwards before any guard, so nobody is refused at the old address (0214).
     expect(source).not.toContain('middleware')
