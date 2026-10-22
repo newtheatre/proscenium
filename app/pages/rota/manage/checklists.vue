@@ -126,7 +126,16 @@ async function setActive(venueId: string, item: Item, active: boolean): Promise<
   }
 }
 
-const refusal = computed(() => (checklistItemForm.safeParse(state).success ? null : 'Give the item a label'))
+const refusal = computed(() => {
+  const issue = checklistItemForm.safeParse(state).error?.issues[0]
+  if (!issue) return null
+  return issue.path[0] === 'label' ? 'Give the item a label' : issue.message
+})
+
+// A system check belongs after the show, so choosing one moves the item there (0216).
+watch(() => state.systemCheck, (check) => {
+  if (check) state.phase = 'POST'
+})
 
 const columns: TableColumn<VenueChecklist>[] = [
   {
@@ -142,6 +151,7 @@ const columns: TableColumn<VenueChecklist>[] = [
       : h('div', { class: 'space-y-1' }, row.original.items.map(item =>
           h('div', { class: item.active ? 'flex flex-wrap items-center gap-2' : 'flex flex-wrap items-center gap-2 text-muted' }, [
             h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => saysPhase(item.phase)),
+            h('span', { 'class': 'text-xs text-muted tabular-nums', 'title': 'Order', 'data-test': `item-order-${item.id}` }, String(item.sort)),
             h('span', { class: 'text-sm' }, item.label),
             item.systemCheck ? h(UBadge, { color: 'primary', variant: 'subtle', size: 'sm' }, () => 'System-verified') : null,
             item.required ? null : h('span', { class: 'text-xs text-muted' }, '(optional)'),
@@ -293,7 +303,7 @@ watch(modalOpen, (nowOpen) => {
 
           <UFormField
             label="Order"
-            description="Lowest first."
+            description="Lowest first: the number beside each item on the list."
           >
             <UInputNumber
               v-model="state.sort"
@@ -305,7 +315,7 @@ watch(modalOpen, (nowOpen) => {
 
           <UFormField
             label="How it ticks"
-            description="A system-verified item ticks itself from data and cannot be hand-ticked."
+            description="A system-verified item ticks itself from data and cannot be hand-ticked. It goes on the post-show checklist."
           >
             <USelect
               v-model="state.systemCheck"

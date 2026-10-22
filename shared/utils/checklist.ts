@@ -83,6 +83,8 @@ export function saysNightClosed(close: { closedByName: string | null, automatic:
 
 const LABEL_LIMIT = 200
 
+export const SYSTEM_CHECK_PHASE_REFUSAL = 'A system check is ticked after the show, so it goes on the post-show checklist'
+
 export const checklistItemForm = z.object({
   venueId: z.string().min(1, 'Say which venue you mean'),
   phase: z.enum(PHASES),
@@ -90,6 +92,10 @@ export const checklistItemForm = z.object({
   sort: z.number().int(),
   required: z.boolean(),
   systemCheck: z.enum(SYSTEM_CHECKS).nullish().transform(value => value ?? null),
+// Both system checks read what happened during the night, so before the show they could only fail (0216).
+}).refine(input => input.systemCheck === null || input.phase === 'POST', {
+  message: SYSTEM_CHECK_PHASE_REFUSAL,
+  path: ['phase'],
 })
 
 export type ChecklistItemInput = z.output<typeof checklistItemForm>

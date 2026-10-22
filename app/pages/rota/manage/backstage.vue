@@ -210,7 +210,11 @@ const UButton = resolveComponent('UButton')
 const retiredNote = (active: boolean): VNode | null =>
   (active ? null : h('span', { class: 'ml-2 text-xs text-muted' }, '(retired)'))
 
+// The order is shown, so a new row's place is read off the table rather than guessed (0216).
+const orderColumn = { id: 'sort', header: 'Order', cell: ({ row }: { row: { original: { sort: number } } }) => h('span', { class: 'text-sm tabular-nums text-muted' }, String(row.original.sort)) }
+
 const typeColumns = computed<TableColumn<MilestoneType>[]>(() => [
+  orderColumn,
   { id: 'label', header: 'Milestone type', cell: ({ row }) => h('span', { class: 'text-sm' }, [row.original.label, retiredNote(row.original.active)]) },
   { id: 'side', header: 'Called by', cell: ({ row }) => h('span', { class: 'text-sm' }, saysBoardSide(row.original.side)) },
   ...(writes.value
@@ -239,6 +243,7 @@ const typeColumns = computed<TableColumn<MilestoneType>[]>(() => [
 ])
 
 const presetColumns = computed<TableColumn<Preset>[]>(() => [
+  orderColumn,
   {
     id: 'label',
     header: 'Preset',
@@ -387,7 +392,7 @@ watch(modalOpen, (nowOpen) => {
           </UFormField>
           <UFormField
             label="Order"
-            description="Lowest first."
+            description="Lowest first, as the Order column reads. A gap is fine."
           >
             <UInputNumber
               v-model="typeState.sort"
@@ -461,7 +466,7 @@ watch(modalOpen, (nowOpen) => {
           </UFormField>
           <UFormField
             label="Order"
-            description="Lowest first."
+            description="Lowest first, as the Order column reads. A gap is fine."
           >
             <UInputNumber
               v-model="presetState.sort"
