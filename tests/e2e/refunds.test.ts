@@ -17,6 +17,7 @@ import type { TestMember } from '#tests/helpers/accounts'
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
 const CASE_TIMEOUT_MS = 120_000
+const SUITE_REAUTH_MINUTES = 120
 
 let app: AppUnderTest
 let officer: TestMember
@@ -32,6 +33,8 @@ beforeAll(async () => {
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   venueId = venue()
+  // Refunding asks for a fresh session (0171); this suite's sessions must outlast the default.
+  expect((await send('PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: SUITE_REAUTH_MINUTES }, officer.cookie)).status).toBe(200)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -214,6 +217,30 @@ describe.skipIf(skip !== null)('a refund is money handed back in person, one tic
 
     const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
     expect(refused.status).toBe(409)
+  }, CASE_TIMEOUT_MS)
+})
+
+// 0171: money goes back out, so a stale session confirms itself, and the desk asks before the reader.
+describe.skipIf(skip !== null)('a refund asks that it is still you', () => {
+  test('a stale session is refused on the readiness check and the refund alike, and nothing is refunded', async () => {
+    const { reservationId, ticketId } = await collectedBooking(900)
+    await send('PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: 1 }, officer.cookie)
+    try {
+      await Bun.sleep(61_000)
+
+      const ready = await send('GET', '/api/box-office/desk/refunds/ready')
+      expect(ready.status).toBe(401)
+      expect((await ready.json() as { data: { reauthenticate?: boolean } }).data.reauthenticate).toBe(true)
+
+      const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
+      expect(refused.status).toBe(401)
+      expect(query<{ refundedAt: number | null }>('SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', ticketId)?.refundedAt).toBeNull()
+    }
+    finally {
+      await send('PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: SUITE_REAUTH_MINUTES }, officer.cookie)
+    }
+
+    expect((await send('GET', '/api/box-office/desk/refunds/ready')).status).toBe(200)
   }, CASE_TIMEOUT_MS)
 })
 

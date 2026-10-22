@@ -33,6 +33,8 @@ beforeAll(async () => {
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
+  // Refunding asks for a fresh session (0171); this suite's sessions must outlast the default.
+  await request(app, 'PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: 120 }, officer.cookie)
 
   // Both roles, plus MFA: ADMIN is privileged (0037/A-112). ticketing.manage, the IT Manager's alone
   // (0113), is what decides a comp request rather than what collects one (D-117).
