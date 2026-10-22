@@ -11,6 +11,10 @@ const TOPICS = ['BOOKINGS', 'SHIFTS', 'TRAINING', 'ROOMS', 'ANNOUNCEMENTS'] as c
 const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'account.verify': 'ACCOUNTS',
   'account.exists': 'ACCOUNTS',
+  'account.email.confirm': 'ACCOUNTS',
+  'account.email.requested': 'ACCOUNTS',
+  'account.email.changed': 'ACCOUNTS',
+  'account.email.taken': 'ACCOUNTS',
   'password.reset': 'ACCOUNTS',
   'account.magic-link': 'ACCOUNTS',
   'account.set-password': 'ACCOUNTS',

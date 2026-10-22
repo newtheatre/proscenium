@@ -6,6 +6,10 @@ defineProps<{ audience: string }>()
 const toast = useToast()
 const { account, refresh: refreshAccount } = useAccount()
 
+const request = useRequestFetch()
+const { data: address, refresh: refreshAddress } = await useAsyncData('account-email', () =>
+  request<{ email: string, pending: string | null }>('/api/account/email'))
+
 const reauthenticating = ref(false)
 const changing = ref(false)
 const wantedEmail = ref('')
@@ -19,7 +23,7 @@ async function changeEmail(): Promise<void> {
     })
     wantedEmail.value = ''
     toast.add({ title: answer.message, icon: 'i-lucide-mail', color: 'success' })
-    await refreshAccount()
+    await Promise.all([refreshAccount(), refreshAddress()])
   }
   catch (error) {
     if (needsReauthentication(error)) reauthenticating.value = true
@@ -42,10 +46,18 @@ async function changeEmail(): Promise<void> {
       <p class="text-sm text-muted">
         You sign in as <span data-test="current-email">{{ account.user?.email }}</span>.
       </p>
+      <UAlert
+        v-if="address?.pending"
+        data-test="pending-email"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-mail"
+        :description="`Waiting for ${address.pending} to be confirmed. Until the link in that inbox is opened, you still sign in as ${account.user?.email}.`"
+      />
       <UFormField
         label="New email address"
         name="email"
-        description="Changing it signs out your other devices and asks the new address to confirm itself."
+        description="We email a link to the new address. Nothing changes until it is opened; then every device signs out and you sign in with the new address."
       >
         <div class="flex flex-wrap items-center gap-2">
           <UInput

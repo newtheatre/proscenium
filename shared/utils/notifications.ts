@@ -44,6 +44,36 @@ export const MESSAGE_TYPES = {
     reachesUnverified: true,
   },
 
+  // The link that moves an account to a new address goes to that address, which has no account
+  // of its own yet, so it is sent by address rather than to the account (0151).
+  'account.email.confirm': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-change-confirm',
+    reachesUnverified: true,
+  },
+
+  // Security, to the address the account still signs in with, so no topic can suppress either.
+  'account.email.requested': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-change-requested',
+  },
+
+  'account.email.changed': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-changed',
+  },
+
+  // Another account asked to move onto this address; its owner is warned, the asker told nothing.
+  'account.email.taken': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'email-taken',
+    reachesUnverified: true,
+  },
+
   'password.reset': {
     topic: null,
     channels: ['EMAIL'],

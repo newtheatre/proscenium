@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, letters, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 // A-114 and A-115, which share a screen: the profile is what the theatre holds, and the address
@@ -156,24 +156,69 @@ describe.skipIf(skip !== null)('the profile (A-114)', () => {
   }, CASE_TIMEOUT_MS)
 })
 
-describe.skipIf(skip !== null)('changing an email address (A-115)', () => {
-  test('it resets to unverified, ends the other sessions and re-seals this one', async () => {
+// The link to the address it reached, read from the dev mailbox the way a person reads theirs.
+async function verifyLinkTo(email: string): Promise<string> {
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    const found = (await letters(app))
+      .filter(letter => letter.startsWith(`To: ${email}`))
+      .map(letter => letter.match(/https?:\/\/\S*\/verify\?token=([0-9a-f]+)/)?.[1])
+      .find(Boolean)
+    if (found) return found
+    await Bun.sleep(200)
+  }
+  throw new Error(`no confirmation link reached ${email}`)
+}
+
+describe.skipIf(skip !== null)('changing an email address (A-115, 0151)', () => {
+  test('asking moves nothing, and the old address is told', async () => {
     const { email, cookie, view } = await signedIn('email-change')
     try {
       const before = read<{ e: number }>('SELECT session_epoch e FROM users WHERE email = ?', email)!
       const wanted = registrableAddress('email-changed')
 
-      const changed = await send('PUT', '/api/account/email', cookie, { email: wanted })
-      expect(changed.status).toBe(200)
+      const asked = await send('PUT', '/api/account/email', cookie, { email: wanted })
+      expect(asked.status).toBe(200)
+
+      const still = read<{ e: number, verified: number }>('SELECT session_epoch e, verified FROM users WHERE email = ?', email)
+      expect(still?.verified).toBe(1)
+      expect(still?.e).toBe(before.e)
+      expect((await send('GET', '/api/account/methods', cookie)).status).toBe(200)
+      expect(await (await send('GET', '/api/account/email', cookie)).json()).toEqual({ email, pending: wanted })
+
+      const warned = read<{ n: number }>(`
+        SELECT count(*) n FROM notification_log l JOIN users u ON u.id = l.user_id
+        WHERE u.email = ? AND l.type = 'account.email.requested'`, email)
+      expect(warned?.n).toBe(1)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the link from the new address moves it, ends every session and tells the old one', async () => {
+    const { email, cookie, view } = await signedIn('email-confirm')
+    try {
+      const before = read<{ e: number }>('SELECT session_epoch e FROM users WHERE email = ?', email)!
+      const wanted = registrableAddress('email-confirmed')
+      await send('PUT', '/api/account/email', cookie, { email: wanted })
+
+      const token = await verifyLinkTo(wanted)
+      const confirmed = await fetch(`${app.baseURL}/api/auth/verify`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      expect(confirmed.status).toBe(200)
+      expect(await confirmed.json()).toMatchObject({ changed: true, signedIn: false })
 
       const after = read<{ e: number, verified: number }>('SELECT session_epoch e, verified FROM users WHERE email = ?', wanted)
-      expect(after?.verified).toBe(0)
+      expect(after?.verified).toBe(1)
       expect(after?.e).toBe(before.e + 1)
-
-      // The cookie held a moment ago is done; the one the change handed back is not.
-      const resealed = (changed.headers.get('set-cookie') ?? '').split(';')[0]!
       expect((await send('GET', '/api/account/methods', cookie)).status).toBe(401)
-      expect((await send('GET', '/api/account/methods', resealed)).status).toBe(200)
+
+      const told = (await letters(app)).filter(letter => letter.startsWith(`To: ${email}`) && letter.includes(wanted))
+      expect(told.length).toBeGreaterThanOrEqual(2)
     }
     finally {
       view.close()
@@ -190,7 +235,7 @@ describe.skipIf(skip !== null)('changing an email address (A-115)', () => {
 
       const warned = read<{ n: number }>(`
         SELECT count(*) n FROM notification_log l JOIN users u ON u.id = l.user_id
-        WHERE u.email = ? AND l.type = 'account.exists'`, other.email)
+        WHERE u.email = ? AND l.type = 'account.email.taken'`, other.email)
       expect(warned?.n).toBe(1)
     }
     finally {
@@ -214,19 +259,15 @@ describe.skipIf(skip !== null)('changing an email address (A-115)', () => {
   test('a link issued for one address will not confirm a later one', async () => {
     const { cookie, view } = await signedIn('email-replay')
     try {
-      const first = await send('PUT', '/api/account/email', cookie, { email: registrableAddress('email-first') })
+      await send('PUT', '/api/account/email', cookie, { email: registrableAddress('email-first') })
       const stale = read<{ hash: string }>('SELECT token_hash hash FROM auth_tokens ORDER BY created_at DESC LIMIT 1')
       expect(stale).toBeDefined()
 
-      // Changed again before the first link is followed, which is what the binding is for. Each
-      // change ends the session it was made from, so the next one uses the cookie it handed back.
-      const carried = (first.headers.get('set-cookie') ?? '').split(';')[0]!
-      const second = await send('PUT', '/api/account/email', carried, { email: registrableAddress('email-second') })
-      const resealed = (second.headers.get('set-cookie') ?? '').split(';')[0]!
-      expect((await send('GET', '/api/account/methods', resealed)).status).toBe(200)
-
-      // The first token was replaced when the second was issued, so it is gone rather than usable.
+      // Asking again before the first link is followed replaces it, which is what the binding is for.
+      const second = registrableAddress('email-second')
+      await send('PUT', '/api/account/email', cookie, { email: second })
       expect(read('SELECT token_hash FROM auth_tokens WHERE token_hash = ?', stale!.hash)).toBeUndefined()
+      expect((await (await send('GET', '/api/account/email', cookie)).json()).pending).toBe(second)
     }
     finally {
       view.close()

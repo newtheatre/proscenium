@@ -22,6 +22,7 @@ const EVERYTHING: TemplateContext = {
   taught: 'Working at height',
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
+  wanted: 'ada.new@example.invalid',
   securityUrl: 'https://newtheatre.org.uk/account/access',
   accountUrl: 'https://newtheatre.org.uk/my',
   membershipUrl: 'https://newtheatre.org.uk/account/membership',
