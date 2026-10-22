@@ -901,7 +901,9 @@ a walk-up never renames an account (0123). The till asks the same question
 **Reinstating a lapsed or self-cancelled hold (D-118).** `POST
 /api/box-office/desk/reservations/[id]/reinstate` flips a booking straight back to `PENDING`,
 its tickets never having left the table, so the reference and the QR (D-108) are exactly what
-they always were. The eligible shape is `status = 'EXPIRED' OR (status = 'CANCELLED' AND
+they always were. The fresh `hold_expires_at` is `reinstatedHoldExpiresAt()`: the release if it is
+still ahead, otherwise curtain-up, and never less than 15 minutes away, so a hold brought back
+after its release is not lapsed again by the next sweep. The eligible shape is `status = 'EXPIRED' OR (status = 'CANCELLED' AND
 cancelled_by = 'CUSTOMER')`, carried on the same `UPDATE` that also re-checks capacity
 (`capacityAllows()`), so an officer deciding while the house fills loses the write rather than
 the seat (criterion 1, 0003). A staff cancellation is never eligible: D-116's own

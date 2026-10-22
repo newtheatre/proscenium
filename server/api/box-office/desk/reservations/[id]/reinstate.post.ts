@@ -1,4 +1,5 @@
 import { reinstateReservationForm, reinstateRefusal } from '#shared/utils/desk'
+import { reinstatedHoldExpiresAt } from '#shared/utils/reservations'
 
 // D-118: bringing back a lapsed or self-cancelled hold, with capacity re-checked at the moment
 // of the write, never at the moment the screen last read it (0003).
@@ -17,6 +18,7 @@ export default defineEventHandler(async (event) => {
   if (!performance) throw noSuch('performance')
 
   const releaseMinutes = await holdReleaseMinutesFor(event, performance)
+  const freshHoldExpiresAt = reinstatedHoldExpiresAt(performance.startsAt, releaseMinutes, Math.floor(Date.now() / 1000))
   const capacity = effectiveCapacity(performance)
   const ticketCount = reservation.tickets.length
 
@@ -27,7 +29,7 @@ export default defineEventHandler(async (event) => {
     reason: input.reason,
     ticketCount,
     capacity,
-    freshHoldExpiresAt: holdExpiresAt(performance.startsAt, releaseMinutes),
+    freshHoldExpiresAt,
     previousStatus: reservation.status,
     previousHoldExpiresAt: reservation.holdExpiresAt,
   })
@@ -46,5 +48,5 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  return { status: 'PENDING' as const }
+  return { status: 'PENDING' as const, holdExpiresAt: freshHoldExpiresAt }
 })

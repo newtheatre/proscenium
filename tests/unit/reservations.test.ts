@@ -16,6 +16,7 @@ import {
   passCollectReason,
   pastCurtainReason,
   qrStatusDisplay,
+  reinstatedHoldExpiresAt,
   reservationEditForm,
   reservationExchangeForm,
   reservationForm,
@@ -47,6 +48,25 @@ describe('a person\'s own bookings are listed from the start of tonight\'s show 
 
   test('in GMT the night starts at 04:00 UTC', () => {
     expect(ownBookingsFrom(new Date('2026-11-10T03:30:00Z'))).toBe(Date.parse('2026-11-09T04:00:00Z') / 1000)
+  })
+})
+
+// A reinstated hold is never born expired: before the release it keeps the release, after it
+// runs to curtain, and close to or past curtain it still has a quarter of an hour.
+describe('a reinstated hold always has time left to be paid', () => {
+  const curtain = 1_800_000_000
+  test('before the release it holds until the release', () => {
+    expect(reinstatedHoldExpiresAt(curtain, 15, curtain - 3600)).toBe(curtain - 900)
+  })
+  test('a release only a minute ahead still leaves fifteen minutes, not one', () => {
+    expect(reinstatedHoldExpiresAt(curtain, 60, curtain - 3660)).toBe(curtain - 3660 + 900)
+  })
+  test('after the release it holds until curtain', () => {
+    expect(reinstatedHoldExpiresAt(curtain, 60, curtain - 1800)).toBe(curtain)
+  })
+  test('within a quarter of an hour of curtain, or past it, it holds fifteen minutes', () => {
+    expect(reinstatedHoldExpiresAt(curtain, 15, curtain - 60)).toBe(curtain - 60 + 900)
+    expect(reinstatedHoldExpiresAt(curtain, 15, curtain + 300)).toBe(curtain + 300 + 900)
   })
 })
 
