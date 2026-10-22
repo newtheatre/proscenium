@@ -176,6 +176,7 @@ watch(modalOpen, (nowOpen) => {
     class="space-y-6"
     @retry="refresh"
   >
+    <AccessKindsWarning />
     <UAlert
       v-if="failure && !modalOpen"
       data-test="failure"

@@ -110,6 +110,14 @@ export function saysAccessKind(accessKind: string | null): string | null {
   return null
 }
 
+// The warning when verifying an access profile would entitle its holder to nothing (or to no
+// companion): null once both kinds have a ticket type on offer.
+export function saysAccessKindsMissing(kinds: { access: boolean, companion: boolean }): string | null {
+  const missing = [kinds.access ? null : 'Access', kinds.companion ? null : 'Companion'].filter(Boolean)
+  if (missing.length === 0) return null
+  return `There is no ${missing.join(' or ')} ticket type, so a verified access profile cannot book one. Add it under Ticket types, choosing it in Access or companion.`
+}
+
 export function saysRestriction(restrictedTo: string | null): string | null {
   return restrictedTo === 'MEMBER' ? 'Current members only' : null
 }

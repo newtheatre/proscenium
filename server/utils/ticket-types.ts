@@ -162,3 +162,13 @@ export async function ticketTypeNamed(name: string, exceptId?: string): Promise<
   `)
   return row ? read(row) : undefined
 }
+
+// Which access kinds have a type a verified booker could be offered: without one, verifying a
+// profile entitles its holder to nothing, and nobody is told unless the screens say so.
+export async function accessKindsOnOffer(): Promise<{ access: boolean, companion: boolean }> {
+  const [row] = await db.all<{ access: number, companion: number }>(sql`
+    SELECT EXISTS (SELECT 1 FROM ticket_types WHERE access_kind = 'ACCESS' AND archived = 0) AS access,
+           EXISTS (SELECT 1 FROM ticket_types WHERE access_kind = 'COMPANION' AND archived = 0) AS companion
+  `)
+  return { access: row?.access === 1, companion: row?.companion === 1 }
+}
