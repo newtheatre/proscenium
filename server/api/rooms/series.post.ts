@@ -1,10 +1,11 @@
 import { expand, seriesForm } from '#shared/utils/series'
-import { judge, resolvePolicy } from '#shared/utils/booking-policy'
+import { finalOnly, judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { bookingTier, maskConflicts } from '#shared/utils/bookings'
 import { blackoutOver, saysClosed } from '#shared/utils/blackouts'
 import { saysTimes } from '#shared/utils/room-messages'
 import { saysDayLong } from '#shared/utils/when'
 import type { Blackout } from '#shared/utils/blackouts'
+import type { Failure } from '#shared/utils/booking-policy'
 import type { Occurrence } from '#shared/utils/series'
 import type { OccurrenceRefusal } from '#server/utils/series'
 
@@ -31,7 +32,7 @@ export default defineEventHandler(async (event) => {
   // Expanded first, then the dropped weeks removed, so resubmitting without a bad one leaves
   // every other week on the day it was already on (criterion 3).
   const skipped = new Set(input.skip)
-  const occurrences = expand({
+  const kept = expand({
     frequency: input.frequency,
     weekdays: input.weekdays,
     startsOn: input.startsOn,
@@ -39,6 +40,8 @@ export default defineEventHandler(async (event) => {
     to: input.to,
     occurrences: input.occurrences,
   }).filter(one => !skipped.has(one.day))
+  // Numbered by the dates actually held, so a skipped week never leaves "Week 4 of 3".
+  const occurrences = kept.map((one, at) => ({ ...one, occurrence: at + 1 }))
 
   if (occurrences.length === 0) {
     throw createError({ statusCode: 422, statusMessage: 'That leaves no occurrences to book' })
@@ -60,6 +63,7 @@ export default defineEventHandler(async (event) => {
   // Judged before any row is written, each counting against the cap as it goes: a series counts
   // each occurrence, which is what the setting says (criterion 2).
   const refusals: OccurrenceRefusal[] = []
+  const decisions: { occurrence: number, day: string, failures: Failure[] }[] = []
   let needsApproval = false
 
   for (const [at, one] of occurrences.entries()) {
@@ -79,11 +83,16 @@ export default defineEventHandler(async (event) => {
       refusals.push({
         occurrence: one.occurrence,
         day: one.day,
+        // A closure is final, so the bendable rules beside it are not worth naming.
         failures: closed
-          ? [...verdict.failures, { reason: 'ROOM_CLOSED' as const, says: saysClosed(closed) }]
+          ? [...finalOnly(verdict.failures), { reason: 'ROOM_CLOSED' as const, says: saysClosed(closed) }]
           : verdict.failures,
         conflicts: maskConflicts(conflicts, permissions.has('rooms.read')),
+        yours: conflicts.length > 0 && conflicts.every(conflict => conflict.heldBy === account.id),
       })
+    }
+    else if (verdict.failures.length > 0) {
+      decisions.push({ occurrence: one.occurrence, day: one.day, failures: verdict.failures })
     }
   }
 
@@ -94,6 +103,16 @@ export default defineEventHandler(async (event) => {
       statusCode: 422,
       statusMessage: `${plural(refusals.length, 'occurrence')} cannot be booked`,
       data: { refusals, total: occurrences.length },
+    })
+  }
+
+  // Asked before anything is held, naming what each date breaks, as the one-off form does: the
+  // reason then travels on every occurrence, so changing one week later is already filled in.
+  if (needsApproval && !input.reason) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: 'That series needs the Theatre Manager to agree to it',
+      data: { decisions, canRequest: true, sensitive: room.sensitive, total: occurrences.length },
     })
   }
 
@@ -129,6 +148,7 @@ export default defineEventHandler(async (event) => {
       tier,
       purpose,
       notes: input.notes,
+      reason: status === 'PENDING_APPROVAL' ? input.reason : null,
       status,
       recurrence,
       occurrences,
@@ -142,7 +162,7 @@ export default defineEventHandler(async (event) => {
     const closedWeeks = occurrences.flatMap((one) => {
       const closed = closedWeek(closedSince, room.id, one)
       return closed
-        ? [{ occurrence: one.occurrence, day: one.day, failures: [{ reason: 'ROOM_CLOSED' as const, says: saysClosed(closed) }], conflicts: [] }]
+        ? [{ occurrence: one.occurrence, day: one.day, failures: [{ reason: 'ROOM_CLOSED' as const, says: saysClosed(closed) }], conflicts: [], yours: false }]
         : []
     })
     if (closedWeeks.length > 0) {

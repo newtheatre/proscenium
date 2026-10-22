@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { TIERS } from './bookings'
+import { REQUEST_REASON_LIMIT } from './requests'
 import { fromLondonWallClock, londonWeekday } from './london'
 
 // A term of rehearsals as one action (C-110). The arithmetic walks calendar days, never
@@ -98,6 +99,8 @@ export const seriesForm = z.object({
   // Occurrences the member has chosen to leave out, so a series refused for two weeks can be
   // resubmitted without them (criterion 3).
   skip: z.array(z.string().regex(DAY)).default([]),
+  // Asked once for the whole series when it needs a decision, as a one-off request is (C-108).
+  reason: z.string().trim().max(REQUEST_REASON_LIMIT).nullish().transform(value => value || null),
 })
   .refine(series => series.to > series.from, {
     path: ['to'],
@@ -115,4 +118,18 @@ export function saysRecurrence(recurrence: Recurrence): string {
   if (recurrence.frequency === 'DAILY') return `Every day, ${recurrence.occurrences} times`
   const days = [...recurrence.weekdays].sort().map(weekday => names[weekday]).join(' and ')
   return `${days}, ${recurrence.occurrences} times`
+}
+
+export interface SeriesPlace {
+  occurrence: number | null
+  length: number | null
+  frequency: string | null
+  weekdays: string | null
+}
+
+// Where one date sits in its series. A week is the unit only when the series meets once a week.
+export function saysPlaceInSeries(place: SeriesPlace): string {
+  const meetsWeekly = place.frequency === 'WEEKLY' && (place.weekdays ?? '').split(',').filter(Boolean).length === 1
+  const unit = place.frequency === 'DAILY' ? 'Day' : meetsWeekly ? 'Week' : 'Date'
+  return `${unit} ${place.occurrence ?? '?'} of ${place.length ?? '?'}`
 }

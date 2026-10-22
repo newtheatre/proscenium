@@ -8,6 +8,8 @@ export type When = number | string | Date
 
 export interface WhenOptions {
   year?: boolean
+  // Tests the calendar year rather than the committee year, for a date booked months ahead (0202).
+  calendarYear?: boolean
   now?: Date
 }
 
@@ -27,7 +29,9 @@ export function whenInstant(value: When): Date {
 // (0009). A caller that knows better says so either way.
 function showsYear(at: Date, options: WhenOptions): boolean {
   if (options.year !== undefined) return options.year
-  return committeeYearOf(at) !== committeeYearOf(options.now ?? new Date())
+  const now = options.now ?? new Date()
+  if (options.calendarYear) return londonParts(at).year !== londonParts(now).year
+  return committeeYearOf(at) !== committeeYearOf(now)
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']

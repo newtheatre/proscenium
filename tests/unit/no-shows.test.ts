@@ -28,7 +28,7 @@ describe('the ladder is the configured numbers', () => {
 
   test('what a member is told names the next step, not just the count', () => {
     expect(saysStanding('RECORDED', 2, LADDER)).toContain('3')
-    expect(saysStanding('PRE_APPROVAL', 3, LADDER)).toContain('checked by a person')
+    expect(saysStanding('PRE_APPROVAL', 3, LADDER)).toContain('checked by the Theatre Manager')
     expect(saysStanding('CLEAR', 0, LADDER)).toBe('Nothing on your record.')
   })
 })

@@ -3,6 +3,7 @@ import { fromLondonWallClock, londonClock } from '#shared/utils/london'
 import { saysClock, saysWhenLong } from '#shared/utils/when'
 import { SERIES_EDIT_REFUSAL, nameOrPurpose, saysBookingState } from '#shared/utils/bookings'
 import { SU_ROOMS, saysExternalState } from '#shared/utils/external-requests'
+import { saysPlaceInSeries } from '#shared/utils/series'
 import { REQUEST_REASON_LIMIT } from '#shared/utils/requests'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { z } from 'zod'
@@ -28,6 +29,8 @@ interface Booking {
   seriesId: string | null
   occurrence: number | null
   seriesLength: number | null
+  seriesFrequency: string | null
+  seriesWeekdays: string | null
   bumpedReason: string | null
   bumpedToBookingId: string | null
   convertedToRequestId: string | null
@@ -159,8 +162,18 @@ const stateOf = (booking: { status: string, convertedToRequestId?: string | null
   return { label, color: STATES[booking.status]?.color ?? 'neutral' }
 }
 
-function spanOf(booking: Booking): string {
-  return `${saysWhenLong(booking.startsAt)} to ${saysClock(booking.endsAt)}`
+// A booking can be months ahead, so its year is named whenever it is not this calendar year (0202).
+function spanOf(booking: { startsAt: number, endsAt: number }): string {
+  return `${saysWhenLong(booking.startsAt, { calendarYear: true })} to ${saysClock(booking.endsAt)}`
+}
+
+function placeOf(booking: Booking): string {
+  return saysPlaceInSeries({
+    occurrence: booking.occurrence,
+    length: booking.seriesLength,
+    frequency: booking.seriesFrequency,
+    weekdays: booking.seriesWeekdays,
+  })
 }
 
 // Which of the two, chosen explicitly. Nothing is preselected: a member cancelling one week must
@@ -280,7 +293,7 @@ async function saveEdit(event: FormSubmitEvent<EditFields>): Promise<void> {
       title: 'Request changed',
       description: answer.restartedClock
         ? 'A new room or day is a new question, so it waits for a decision as if asked today.'
-        : 'It still holds its slot while an officer decides.',
+        : 'It still holds its slot while the Theatre Manager decides.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -398,7 +411,7 @@ useSeoMeta({ title: 'My bookings' })
             class="text-xs text-muted"
             :data-test="`series-of-${booking.id}`"
           >
-            Week {{ booking.occurrence }} of {{ booking.seriesLength }} in a series
+            {{ placeOf(booking) }} in a series
           </p>
           <p
             v-if="booking.rejectionReason"
@@ -496,7 +509,7 @@ useSeoMeta({ title: 'My bookings' })
               </UBadge>
             </p>
             <p class="text-sm text-muted">
-              {{ saysWhenLong(one.startsAt) }} to {{ saysClock(one.endsAt) }}
+              {{ spanOf(one) }}
             </p>
             <p class="text-sm">
               {{ one.title }}
@@ -643,7 +656,7 @@ useSeoMeta({ title: 'My bookings' })
             v-model="editScope"
             data-test="edit-scope"
             :items="[
-              { label: 'Just this one', description: `Week ${editing.occurrence} of ${editing.seriesLength}. The rest stay as they are.`, value: 'occurrence' },
+              { label: 'Just this one', description: `${placeOf(editing)}. The rest stay as they are.`, value: 'occurrence' },
               { label: 'The whole series', description: 'Every date still waiting.', value: 'series' },
             ]"
           />
@@ -755,7 +768,7 @@ useSeoMeta({ title: 'My bookings' })
               label="Why this one is worth an exception"
               name="reason"
               required
-              :description="`Shown to whoever decides. Up to ${REQUEST_REASON_LIMIT} characters.`"
+              :description="`Shown to the Theatre Manager. Up to ${REQUEST_REASON_LIMIT} characters.`"
             >
               <UTextarea
                 v-model="draft.reason"
@@ -811,7 +824,7 @@ useSeoMeta({ title: 'My bookings' })
           class="mt-4"
           data-test="cancel-scope"
           :items="[
-            { label: 'Just this one', description: `Week ${cancelling.occurrence} of ${cancelling.seriesLength}. The rest stand.`, value: 'occurrence' },
+            { label: 'Just this one', description: `${placeOf(cancelling)}. The rest stand.`, value: 'occurrence' },
             { label: 'The whole series', description: 'Every date still standing. Ones already cancelled or turned down are left alone.', value: 'series' },
           ]"
         />

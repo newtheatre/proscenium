@@ -147,6 +147,20 @@ describe('a sensitive room always goes to a person', () => {
     expect(judge(soon, policy(), ROOM, CONTEXT).needsApproval).toBe(true)
   })
 
+  // Rooms review, section 3: a past slot also said "Ask, and somebody will decide" with no Ask.
+  test('a final refusal names only what is final, never a rule an Ask could bend', () => {
+    const past = { startsAt: new Date('2026-09-01T07:00:00Z'), endsAt: new Date('2026-09-01T08:00:00Z') }
+    const verdict = judge(past, policy(), ROOM, CONTEXT)
+    expect(verdict.refusedOutright).toBe(true)
+    expect(reasons(verdict)).toEqual(['IN_THE_PAST'])
+  })
+
+  test('short notice names who decides', () => {
+    const soon = { startsAt: new Date('2026-09-01T14:00:00Z'), endsAt: new Date('2026-09-01T16:00:00Z') }
+    const said = judge(soon, policy(), ROOM, CONTEXT).failures.find(one => one.reason === 'SHORT_NOTICE')?.says
+    expect(said).toBe('Booking needs 48 hours\' notice. Ask, and the Theatre Manager will decide.')
+  })
+
   // A lapsed membership is not a thing an approver can wave through, so it is not divertible.
   test('a lapsed membership is a refusal, not a request', () => {
     const verdict = judge(GOOD, policy(), ROOM, { ...CONTEXT, hasMembership: false })

@@ -27,10 +27,10 @@ export function standingFor(count: number, ladder: Ladder): Standing {
 
 export function saysStanding(standing: Standing, count: number, ladder: Ladder): string {
   if (standing === 'PRE_APPROVAL') {
-    return `You have missed ${plural(count, 'booking')}. Every booking you make now is checked by a person first.`
+    return `You have missed ${plural(count, 'booking')}. Every booking you make now is checked by the Theatre Manager first.`
   }
   if (standing === 'RECORDED') {
-    return `You have missed ${plural(count, 'booking')}. At ${ladder.preApprovalAt}, every booking you make is checked by a person first.`
+    return `You have missed ${plural(count, 'booking')}. At ${ladder.preApprovalAt}, every booking you make is checked by the Theatre Manager first.`
   }
   return count === 1
     ? 'You have missed one booking. Nothing follows from it.'
