@@ -237,3 +237,30 @@ describe.skipIf(skip !== null)('the door role, and nobody else (0009)', () => {
     expect(answered.status).toBe(403)
   }, CASE_TIMEOUT_MS)
 })
+
+// The 21 October process map: a booking LAPSED or CANCELLED by reference was NOT FOUND by name (0233).
+describe.skipIf(skip !== null)('a lapsed or cancelled booking is found by name, with its state (0233)', () => {
+  // The desk still collects the hold and capacity still counts it until the release task runs.
+  test('an unpaid hold past its release time is still unpaid until it is released', async () => {
+    const { eveningId } = houseWithTwoPerformances()
+    const { reference, id } = ticket(eveningId, 'PENDING')
+    write('UPDATE reservations SET hold_expires_at = unixepoch() - 60 WHERE id = ?', id)
+
+    const found = await send('GET', `/api/tonight/door/tickets/search?q=${reference}&performanceId=${eveningId}`)
+    const { items } = await found.json() as { items: { reference: string, state: string }[] }
+    expect(items).toEqual([expect.objectContaining({ reference, state: 'UNPAID' })])
+  }, CASE_TIMEOUT_MS)
+
+  test('the lookup lists a lapsed and a cancelled booking with their state, rather than nothing', async () => {
+    const { eveningId } = houseWithTwoPerformances()
+    const lapsed = ticket(eveningId, 'EXPIRED')
+    const cancelled = ticket(eveningId, 'CANCELLED')
+
+    for (const [reference, state] of [[lapsed.reference, 'LAPSED'], [cancelled.reference, 'CANCELLED']] as const) {
+      const found = await send('GET', `/api/tonight/door/tickets/search?q=${reference}&performanceId=${eveningId}`)
+      expect(found.status).toBe(200)
+      const { items } = await found.json() as { items: { reference: string, state: string }[] }
+      expect(items).toEqual([expect.objectContaining({ reference, state })])
+    }
+  }, CASE_TIMEOUT_MS)
+})

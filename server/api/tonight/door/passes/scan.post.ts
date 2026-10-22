@@ -1,4 +1,5 @@
 import { doorPassScanForm } from '#shared/utils/passes'
+import { saysAlreadyAdmitted } from '#shared/utils/reservations'
 
 // Scan a pass at the door (D-126). Admits in one gesture if it is already redeemed for tonight;
 // offers to redeem it on the spot, capacity-checked, if it is not (criterion 1).
@@ -17,8 +18,7 @@ export default defineEventHandler(async (event) => {
     // Once-per-performance already spent the seat; the door's only job left is the physical
     // admission, or refusing a second one, quoting it (criterion 2, criterion 3, criterion 4).
     if (existing.reservationStatus === 'DOOR') {
-      const when = formatLondon(new Date(existing.admittedAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
-      throw createError({ statusCode: 409, statusMessage: `This pass was already admitted tonight, at ${when}` })
+      throw createError({ statusCode: 409, statusMessage: saysAlreadyAdmitted(existing.admittedAt) })
     }
     if (existing.reservationStatus !== 'PENDING' && existing.reservationStatus !== 'COLLECTED') {
       throw createError({ statusCode: 409, statusMessage: 'This pass\'s admission for tonight was cancelled' })
@@ -48,8 +48,7 @@ export default defineEventHandler(async (event) => {
   if (!result.applied) {
     const raced = await existingAdmissionFor(state.id, input.performanceId)
     if (raced) {
-      const when = formatLondon(new Date(raced.admittedAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
-      throw createError({ statusCode: 409, statusMessage: `This pass was already admitted tonight, at ${when}` })
+      throw createError({ statusCode: 409, statusMessage: saysAlreadyAdmitted(raced.admittedAt) })
     }
     const capacityFailure = await currentCapacityRefusal(input.performanceId, capacity, 1)
     throw createError({ statusCode: 409, statusMessage: capacityFailure?.says ?? 'This performance no longer has room for that admission' })

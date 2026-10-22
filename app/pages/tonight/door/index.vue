@@ -184,20 +184,14 @@ async function admit(code: string, name: string | null = null): Promise<void> {
       showRefusal(ticketRefused, code)
       return
     }
-    try {
-      await scanPass(code, null)
-    }
-    catch (passRefused) {
-      if (refusalStatus(passRefused) !== 404) showRefusal(passRefused, code)
-      else if (name) await lookUp(name)
-      else show(doorMissVerdict(), code, null, 0)
-    }
+    // A typed pass reference lists the holder's card, as a scanned pass does: never admitted blind (0233).
+    await lookUp(code, { passesOnly: true, onMiss: name ? () => lookUp(name) : undefined })
   }
 }
 
 // Tickets and passes are asked together. Nothing found is amber, but a lookup that failed is
 // never read as nothing found: its own refusal or no answer is shown (issue 1145, issue 1301).
-async function lookUp(term: string, options: { passesOnly?: boolean } = {}): Promise<void> {
+async function lookUp(term: string, options: { passesOnly?: boolean, onMiss?: () => Promise<void> } = {}): Promise<void> {
   const asked = performanceId.value
   const query = { q: term, performanceId: asked }
   const [tickets, passes] = await Promise.allSettled([
@@ -208,6 +202,7 @@ async function lookUp(term: string, options: { passesOnly?: boolean } = {}): Pro
   if (performanceId.value !== asked) return
   const outcome = lookUpOutcome(tickets, passes)
   if (outcome.kind === 'FAILED') showRefusal(outcome.reason, '')
+  else if (outcome.kind === 'MISS' && options.onMiss) await options.onMiss()
   else if (outcome.kind === 'MISS') show(doorMissVerdict(), '', null, 0)
   else {
     clearVerdict()
