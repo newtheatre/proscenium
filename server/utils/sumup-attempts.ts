@@ -6,6 +6,7 @@ import { createError } from 'h3'
 import { newId } from './accounts'
 import { auditedWrite } from './audit'
 import { commitSale } from './sale'
+import { settleTab } from './tab-settlement'
 import type { SaleContext } from './sale'
 import { openSessionFor, requireOpenSession } from './till'
 import { qrTokenFor, verifyQrToken } from './qr-tokens'
@@ -42,14 +43,21 @@ export function sumupEnabled(config: SumupConfig | undefined): config is SumupCo
 
 // What the completion replays: the basket exactly as submitted, and the scope the sale resolved
 // under, so the write happens under the same session and houses the start did (criterion 2).
-export interface AttemptBasket {
-  sale: SaleInput
+interface AttemptScope {
   sessionId: string
   venueId: string
   night: string
   performanceId: string | null
   performanceIds: string[]
 }
+
+// A tab settlement keyed into the reader holds the charges it names instead of a basket (0162).
+export interface SettlementHeld {
+  holderId: string
+  entryIds: string[]
+}
+
+export type AttemptBasket = AttemptScope & ({ sale: SaleInput, settlement?: undefined } | { settlement: SettlementHeld, sale?: undefined })
 
 interface AttemptRow {
   id: string
@@ -148,10 +156,22 @@ export async function refuseBookingsInOpenAttempts(night: string, reservationIds
   const rows = await db.all<{ basket: string }>(sql`SELECT basket FROM sumup_attempts WHERE ${openAttemptsOn(night)}`)
   for (const row of rows) {
     const basket = JSON.parse(row.basket) as AttemptBasket
-    const held = basket.sale.tickets.map(ticket => ticket.reservationId)
+    const held = (basket.sale?.tickets ?? []).map(ticket => ticket.reservationId)
     if (reservationIds.some(id => held.includes(id))) {
       throw createError({ statusCode: 409, statusMessage: 'That booking is in a charge still waiting for its answer. Answer that one first.' })
     }
+  }
+}
+
+// One holder's tab is on the reader once at a time, and a settlement taken and not recorded is
+// answered before another is keyed in, or the reader would take the same charges twice (0162).
+export async function refuseSettlementInOpenAttempt(holderId: string): Promise<void> {
+  const [row] = await db.all<{ id: string }>(sql`
+    SELECT a.id AS id FROM sumup_attempts a
+    WHERE ${UNRESOLVED} AND json_extract(a.basket, '$.settlement.holderId') = ${holderId} LIMIT 1
+  `)
+  if (row) {
+    throw createError({ statusCode: 409, statusMessage: 'This tab is already on the reader, waiting for an answer. Answer that charge first.' })
   }
 }
 
@@ -258,6 +278,7 @@ export interface CompletionOutcome {
   status: SumupAttemptStatus
   receipt: SaleReceipt | null
   error: string | null
+  settlement?: { entryId: string, settledPence: number }
 }
 
 export interface CompletionActor {
@@ -313,6 +334,7 @@ interface ClaimedCommit {
 // The sale behind a claimed attempt, through the one `commitSale` (criteria 4 and 5).
 async function commitClaimed(row: AttemptRow, commit: ClaimedCommit): Promise<CompletionOutcome> {
   const basket = basketOf(row)
+  if (basket.settlement) return commitSettlement(row, basket.settlement, commit)
   let receipt: SaleReceipt
   try {
     receipt = await commitSale(
@@ -351,6 +373,31 @@ async function commitClaimed(row: AttemptRow, commit: ClaimedCommit): Promise<Co
     ? await recordPostedSale(row.id, null, commit.actorId)
     : (await attemptById(row.id))?.entryId === receipt.entryId
   return { status: 'SUCCEEDED', receipt, error: recorded ? null : DUPLICATE }
+}
+
+// A settlement behind a claimed attempt: the same cross-check again, now the reader has answered,
+// and a refusal is a mismatch for a person, exactly as a basket's is (0162).
+async function commitSettlement(row: AttemptRow, held: SettlementHeld, commit: ClaimedCommit): Promise<CompletionOutcome> {
+  let settlement: { entryId: string, settledPence: number }
+  try {
+    settlement = await settleTab(held.holderId, held.entryIds, row.expectedTotalPence, {
+      actorId: row.createdBy,
+      sessionId: await commit.session(),
+      attemptId: row.id,
+    })
+  }
+  catch (error) {
+    const statusCode = (error as { statusCode?: number }).statusCode
+    if (statusCode !== undefined && statusCode < 500) {
+      const message = (error as { statusMessage?: string }).statusMessage ?? 'The settlement could not be recorded'
+      await move(row.id, 'COMPLETING', 'MISMATCH', { error: message, resolvedBy: commit.actorId }, commit.actorId)
+      return { status: 'MISMATCH', receipt: null, error: message }
+    }
+    await move(row.id, 'COMPLETING', commit.interrupted.status, commit.interrupted.change, commit.actorId)
+    throw error
+  }
+  const recorded = (await attemptById(row.id))?.entryId === settlement.entryId
+  return { status: 'SUCCEEDED', receipt: null, error: recorded ? null : DUPLICATE, settlement }
 }
 
 // Staff answering (criterion 5, 0096): "it went through" replays a success through the same path,

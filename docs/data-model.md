@@ -1888,7 +1888,8 @@ and `server/utils/sale.ts` all share one idea of what a comp request is and when
 restrict · `venue_id` → venues restrict · `night`, the same date CHECK `till_sessions.night`
 carries · `created_by` → users restrict · `created_at` ·
 `basket` JSON, the sale exactly as submitted plus the scope it resolved under, replayed at the
-answer and never resubmitted · `expected_total_pence` · `status` CHECK
+answer and never resubmitted, or for a tab settlement the holder and the charge ids it covers in
+place of the sale (0162) · `expected_total_pence` · `status` CHECK
 `STARTED|COMPLETING|SUCCEEDED|FAILED|ABANDONED|MISMATCH` · `smp_status`, `smp_tx_code`,
 `smp_message`, `smp_failure_cause`, `callback_at`, what the app sent back · `resolution` CHECK NULL
 or `CALLBACK|KEY|STAFF|SWEEP`, who answered · `resolved_by` NULL → users restrict · `resolved_at` ·

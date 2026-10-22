@@ -606,6 +606,18 @@ const chargeOffered = computed(() => Boolean(session.value) && !charged.value &&
   && (grandTotalPence.value !== null || offline.value) && !sumup.pending.value && !compLocked.value)
 
 // A typed charge this screen holds, waiting for the person at the reader to answer it (0096).
+// A tab settlement is a typed charge like any other, answered with the same two buttons (0162).
+const settleOpen = ref(false)
+const toast = useToast()
+function settleStarted(started: { id: string, totalPence: number }): void {
+  chargeFailure.value = null
+  rememberAttempt(started, 'TYPED')
+  waiting.value = null
+}
+function settleZero(): void {
+  toast.add({ title: 'Nothing to take, so the tab is settled', color: 'success' })
+}
+
 const typedPending = computed(() => sumup.pending.value?.kind === 'TYPED' ? sumup.pending.value : null)
 
 function answerTyped(outcome: 'succeeded' | 'declined'): void {
@@ -755,6 +767,16 @@ const basketBindings = computed(() => ({
               icon="i-lucide-map-pin"
               label="Change bar"
               @click="changeVenue"
+            />
+            <UButton
+              v-if="basketEmpty && !typedPending && !charged"
+              data-test="till-settle-tab"
+              color="neutral"
+              variant="outline"
+              class="min-h-12"
+              icon="i-lucide-book-user"
+              label="Settle a tab"
+              @click="settleOpen = true"
             />
             <UButton
               data-test="till-close"
@@ -1333,6 +1355,12 @@ const basketBindings = computed(() => ({
       @dismiss="dismissComp"
     />
 
+    <TillSettleTabModal
+      v-model:open="settleOpen"
+      :venue-id="venueId"
+      @started="settleStarted"
+      @settled="settleZero"
+    />
     <TillCloseModal
       v-model:open="closeModalOpen"
       v-model:actual-z-pounds="actualZPounds"

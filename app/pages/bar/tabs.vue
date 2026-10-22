@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
+import { OWN_TAB_VOID } from '#shared/utils/self-dealing'
 import { voidTabChargeForm } from '#shared/utils/tab-settlement'
 import type { ItemisedTab, TabCharge } from '#shared/utils/tab-settlement'
 import type { TableColumn } from '@nuxt/ui'
@@ -11,6 +12,7 @@ const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
 
 const request = useRequestFetch()
+const { account } = useAccount()
 const toast = useToast()
 const saving = ref(false)
 
@@ -25,6 +27,8 @@ const data = computed(() => register.value?.holders ?? [])
 const listingFailure = useListFailure(error, 'The tab register could not be read.')
 
 const viewing = ref<HolderRow | null>(null)
+// Your own tab is voided by someone else, so its Void is not offered only to be refused.
+const ownTab = computed(() => viewing.value !== null && viewing.value.holderId === account.value.user?.id)
 const tab = ref<ItemisedTab | null>(null)
 const tabLoading = ref(false)
 const tabFailure = ref<string | null>(null)
@@ -195,8 +199,15 @@ const columns: TableColumn<HolderRow>[] = [
           />
         </div>
 
+        <p
+          v-if="ownTab && tab && tab.outstandingPence > 0 && !tabFailure && !tabLoading"
+          class="mb-3 text-sm text-muted"
+          data-test="own-tab-void-note"
+        >
+          {{ OWN_TAB_VOID }}.
+        </p>
         <ul
-          v-else-if="tab && tab.charges.length > 0"
+          v-if="!tabFailure && !tabLoading && tab && tab.charges.length > 0"
           class="space-y-3"
           data-test="tab-charges"
         >
@@ -232,7 +243,7 @@ const columns: TableColumn<HolderRow>[] = [
               </p>
             </div>
             <UButton
-              v-if="!charge.voided && !charge.settledAt"
+              v-if="!charge.voided && !charge.settledAt && !ownTab"
               size="sm"
               color="error"
               variant="ghost"
@@ -245,7 +256,7 @@ const columns: TableColumn<HolderRow>[] = [
         </ul>
 
         <p
-          v-else
+          v-else-if="!tabFailure && !tabLoading"
           class="py-6 text-center text-sm text-muted"
         >
           No charges yet.

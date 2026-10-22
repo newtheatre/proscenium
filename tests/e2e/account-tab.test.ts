@@ -7,6 +7,7 @@ import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import { putOnTheTill, tabCodeOf } from '#tests/helpers/bar'
+import { settleOnTheReader } from '#tests/helpers/till'
 import type { TestMember } from '#tests/helpers/accounts'
 
 // F-109 criterion 1: the holder's own account shows every charge itemised, with the live
@@ -76,7 +77,7 @@ const charge = async (venueId: string, variantId: string, pricePence: number, ho
   send('POST', '/api/till/sale', { venueId, lines: [{ variantId, qty: 1 }], expectedTotalPence: pricePence, tabHolderId: holder.id, tabCode: await tabCodeOf(app.baseURL, holder.cookie) }, barManager.cookie)
 
 const settle = (venueId: string, holderId: string, entryIds: string[], expectedTotalPence: number): Promise<Response> =>
-  send('POST', '/api/till/tab-settlements', { venueId, holderId, entryIds, expectedTotalPence }, barManager.cookie)
+  settleOnTheReader(app, { venueId, holderId, entryIds, expectedTotalPence }, barManager.cookie)
 
 const voidCharge = (entryId: string, reason: string): Promise<Response> =>
   send('POST', `/api/admin/bar/tab-charges/${entryId}/void`, { reason }, barManager.cookie)

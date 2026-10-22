@@ -13,10 +13,11 @@ export const ATTEMPT_COLUMNS = sql`
   a.resolution AS resolution, a.resolved_by AS resolvedBy, a.resolved_at AS resolvedAt,
   a.resolution_note AS resolutionNote, a.callback_at AS callbackAt, a.entry_id AS entryId, a.error AS error,
   coalesce(a.kind, 'SUMUP') AS kind, (SELECT name FROM venues WHERE id = a.venue_id) AS venueName,
-  (SELECT group_concat(json_extract(j.value, '$.qty') || '× ' || v.label || ' ' || p.name, ', ')
+  coalesce((SELECT group_concat(json_extract(j.value, '$.qty') || '× ' || v.label || ' ' || p.name, ', ')
     FROM json_each(a.basket, '$.sale.lines') j
     JOIN product_variants v ON v.id = json_extract(j.value, '$.variantId')
-    JOIN bar_products p ON p.id = v.product_id) AS basketLines,
+    JOIN bar_products p ON p.id = v.product_id),
+    (SELECT 'Settling ' || h.name || '''s tab' FROM users h WHERE h.id = json_extract(a.basket, '$.settlement.holderId'))) AS basketLines,
   coalesce(json_array_length(a.basket, '$.sale.tickets'), 0) AS basketBookings,
   (SELECT coalesce(sum(json_extract(w.value, '$.quantity')), 0) FROM json_each(a.basket, '$.sale.walkUps') w) AS basketWalkUps
 `
