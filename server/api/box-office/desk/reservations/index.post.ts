@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
   // Recorded only when the window is genuinely what a customer sale would have been refused for.
   const windowBypassed = saleRefusal(performance, new Date(), 'CUSTOMER')?.reason === 'WINDOW_CLOSED'
 
-  const resolvedTypes = new Map((await bookableTicketTypes(input.performanceId, performance.showId, false, false)).map(type => [type.id, type]))
+  const resolvedTypes = new Map((await bookableTicketTypes(input.performanceId, performance.showId, false, false, 'DESK')).map(type => [type.id, type]))
   const lines = input.lines.map((line) => {
     const type = resolvedTypes.get(line.ticketTypeId)
     if (!type) throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') })

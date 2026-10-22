@@ -354,6 +354,24 @@ describe.skipIf(skip !== null)('unpublishing closes sales and touches nothing so
   })
 })
 
+// D-101 criterion 1 reaches the booking form and the waiting list: a draft show's night is not there.
+describe.skipIf(skip !== null)('a draft show\'s performance answers as a missing one does', () => {
+  test('the booking form and the waiting list say 404, before publishing and after taking it off sale', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+    const join = { performanceId: performance, partySize: 1, guest: { name: 'Nina Zarechnaya', email: `nina-${crypto.randomUUID().slice(0, 8)}@nnt-trial.co.uk` } }
+
+    expect((await send('GET', `/api/performances/${performance}/booking`, undefined, '')).status).toBe(404)
+    expect((await send('POST', `/api/performances/${performance}/waiting-list`, join, '')).status).toBe(404)
+
+    await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: true })
+    expect((await send('GET', `/api/performances/${performance}/booking`, undefined, '')).status).toBe(200)
+
+    await send('POST', `/api/admin/shows/${id}/publish`, { published: false })
+    expect((await send('GET', `/api/performances/${performance}/booking`, undefined, '')).status).toBe(404)
+  })
+})
+
 describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once it has sold (criterion 5)', () => {
   test('cancelling says how many tickets are owed a refund', async () => {
     const id = await newShow()
@@ -405,6 +423,65 @@ describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once 
     const entry = trail<{ detail: Record<string, unknown> }>('performance.cancelled', `performance:${performance}`)
     expect(entry?.detail.bookingsTold).toBe(2)
     expect(JSON.stringify(entry?.detail)).not.toContain('unwell')
+  })
+
+  // 0191: a moved curtain saved silently, and the booker's confirmation kept the old time.
+  test('moving a performance with bookings emails each one once per move, and a capacity edit tells nobody', async () => {
+    const id = await newShow()
+    const startsAt = nextWeek()
+    const performance = await addPerformance(id, { startsAt })
+    const database = new Database(app.databaseFile)
+    try {
+      for (const [suffix, status] of [['paid', 'COLLECTED'], ['unpaid', 'PENDING'], ['gone', 'CANCELLED']] as const) {
+        database.run(
+          'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          [`m-${suffix}-${performance}`, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, status, 'WEB'],
+        )
+      }
+    }
+    finally {
+      database.close()
+    }
+    const edit = (over: Record<string, unknown>) => send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt, durationMinutes: 120, intervalCount: 0, ...over })
+
+    expect(await (await edit({ capacityOverride: 50 })).json()).toMatchObject({ bookingsTold: 0 })
+    expect(await (await edit({ startsAt: startsAt + 1800 })).json()).toMatchObject({ bookingsTold: 2 })
+    expect(await (await edit({ startsAt: startsAt + 1800, capacityOverride: 40 })).json()).toMatchObject({ bookingsTold: 0 })
+
+    const readOnly = new Database(app.databaseFile, { readonly: true })
+    try {
+      const told = readOnly
+        .query(`SELECT claim FROM notification_log WHERE user_id = ? AND type = 'reservation.performance-moved' AND claim LIKE ?`)
+        .all(member.id, `%${performance}%`) as { claim: string }[]
+      expect(told.map(row => row.claim).sort()).toEqual([
+        `reservation.performance-moved:m-paid-${performance}:${startsAt + 1800}:${venueId}`,
+        `reservation.performance-moved:m-unpaid-${performance}:${startsAt + 1800}:${venueId}`,
+      ])
+    }
+    finally {
+      readOnly.close()
+    }
+  })
+
+  test('correcting a cancelled performance\'s date tells its bookers nothing', async () => {
+    const id = await newShow()
+    const startsAt = nextWeek()
+    const performance = await addPerformance(id, { startsAt })
+    const database = new Database(app.databaseFile)
+    try {
+      database.run(
+        'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+        [`x-paid-${performance}`, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, 'COLLECTED', 'WEB'],
+      )
+    }
+    finally {
+      database.close()
+    }
+    await send('POST', `/api/admin/performances/${performance}/cancel`)
+
+    const answered = await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: startsAt + 86_400, durationMinutes: 120, intervalCount: 0 })
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toMatchObject({ bookingsTold: 0 })
   })
 
   test('a cancelled performance cannot be put back on sale by the sale action', async () => {

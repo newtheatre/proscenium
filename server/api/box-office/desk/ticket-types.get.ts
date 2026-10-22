@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const refusal = saleRefusal(performance, new Date(), 'DESK')
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
 
-  const options: WalkUpOption[] = (await bookableTicketTypes(performanceId, performance.showId, false, false))
+  const options: WalkUpOption[] = (await bookableTicketTypes(performanceId, performance.showId, false, false, 'DESK'))
     .filter(type => type.accessKind === null)
     .map(type => ({ id: type.id, name: type.name, price: type.price }))
 

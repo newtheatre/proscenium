@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysNoSuch } from '#shared/utils/no-such'
+import { saysNotFoundYet } from '#shared/utils/no-such'
 import { saysClock, saysWhen, saysWhenLong } from '#shared/utils/when'
 import { SAYS_PAYMENT, saysAvailability, saysNightLine } from '#shared/utils/programme'
 import { overCapReason, saysOrderCap, stepperMax } from '#shared/utils/reservations'
@@ -57,7 +57,7 @@ const performanceId = computed(() => String(route.params.performanceId))
 const { data } = await useFetch<BookingInfo>(() => `/api/performances/${performanceId.value}/booking`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: saysNoSuch('performance', 'Go back to what is on and choose another'), fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNotFoundYet('performance', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const { account } = useAccount()

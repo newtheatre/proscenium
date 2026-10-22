@@ -1,9 +1,9 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
-import { systemTicketTypeRefusal, ticketTypeForm } from '#shared/utils/ticket-types'
+import { editTicketTypeForm, restrictionChangeRefusal, systemTicketTypeRefusal } from '#shared/utils/ticket-types'
 
 // Edit a ticket type. Kind and access kind are what a sold ticket was sold under, so this does
-// not take them: a type set up wrongly and never sold is deleted and made again (D-119).
+// not take them: a type set up wrongly and never sold is deleted and made again (D-119, 0190).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'ticketing.write')
@@ -13,10 +13,13 @@ export default defineEventHandler(async (event) => {
   const reserved = systemTicketTypeRefusal(held)
   if (reserved) throw createError({ statusCode: 409, statusMessage: reserved })
 
-  const input = await readValidatedBodyOrThrow(event, ticketTypeForm)
+  const input = await readValidatedBodyOrThrow(event, editTicketTypeForm)
   if (held.accessKind === 'COMPANION' && input.price !== 0) {
     throw createError({ statusCode: 400, statusMessage: 'A companion ticket is always free' })
   }
+  const restrictedTo = input.restrictedTo === undefined ? held.restrictedTo : input.restrictedTo
+  const restrictionRefusal = restrictionChangeRefusal(held.restrictedTo, restrictedTo)
+  if (restrictionRefusal) throw createError({ statusCode: 400, statusMessage: restrictionRefusal })
   const description = input.description ?? null
   const priceChanged = input.price !== held.price
   // The description is prose, so the trail records that it moved and never what it says (0011).
@@ -24,6 +27,7 @@ export default defineEventHandler(async (event) => {
   const otherwiseChanged = input.name !== held.name
     || descriptionChanged
     || input.activeByDefault !== held.activeByDefault
+    || restrictedTo !== held.restrictedTo
 
   // The base price is a column and a ticket keeps the price it sold at (D-120 criterion 3), so
   // the before and after live in the trail rather than in a superseding row.
@@ -45,6 +49,7 @@ export default defineEventHandler(async (event) => {
             ...changes({
               name: [held.name, input.name],
               activeByDefault: [held.activeByDefault, input.activeByDefault],
+              restrictedTo: [held.restrictedTo, restrictedTo],
             }),
             descriptionChanged,
           },
@@ -59,7 +64,8 @@ export default defineEventHandler(async (event) => {
     SET name = ${input.name},
         description = ${description},
         price = ${input.price},
-        active_by_default = ${input.activeByDefault ? 1 : 0}
+        active_by_default = ${input.activeByDefault ? 1 : 0},
+        restricted_to = ${restrictedTo}
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM ticket_types WHERE name = ${input.name} COLLATE NOCASE AND id <> ${id})
     RETURNING id

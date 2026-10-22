@@ -186,6 +186,16 @@ describe('a bookable price resolves the same chain the public listing does', () 
     expect(readBookableTicketTypes([row()], false)).toHaveLength(1)
     expect(readBookableTicketTypes([row()], true)).toHaveLength(1)
   })
+
+  test('a box-office-only type is never offered to a customer, member or not (0190)', () => {
+    expect(readBookableTicketTypes([row({ restrictedTo: 'DESK', basePrice: 0 })], false)).toEqual([])
+    expect(readBookableTicketTypes([row({ restrictedTo: 'DESK', basePrice: 0 })], true, 'CUSTOMER')).toEqual([])
+  })
+
+  test('a box-office-only type is offered to the desk', () => {
+    const [resolved] = readBookableTicketTypes([row({ restrictedTo: 'DESK', basePrice: 0 })], false, 'DESK')
+    expect(resolved?.price).toBe(0)
+  })
 })
 
 describe('what the QR answers, loudly distinct per state (D-108 criterion 5)', () => {

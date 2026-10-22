@@ -541,7 +541,7 @@ for the two that read and `ticketing.write` for the rest:
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
 | `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6), and so is a `capacityOverride` above the venue's own capacity, quoting both, unless `aboveVenueCapacity` confirms it (0124). A show with no season and no earlier live performance takes the unretired season this night falls in, in the same batch, audited as `show.updated` with `filledFrom` (D-131 criterion 2). |
 | `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). A show with no season and no earlier live performance takes the unretired season the run's earliest night falls in, in the same batch, audited once as `show.updated` (D-131 criterion 2). |
-| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). A `capacityOverride` above the venue's own capacity is a 400 quoting both unless `aboveVenueCapacity` is true: deliberate oversell is confirmed, never typed (0124, D-105 criterion 4). |
+| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). A `capacityOverride` above the venue's own capacity is a 400 quoting both unless `aboveVenueCapacity` is true: deliberate oversell is confirmed, never typed (0124, D-105 criterion 4). A new `startsAt` or `venueId` on a performance neither cancelled nor played emails every PENDING or COLLECTED booking with an account `reservation.performance-moved`, claimed per booking and destination so a repeated save tells nobody twice; the answer carries `bookingsTold` (0191). |
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
 | `POST /api/admin/performances/[id]/cancel` | Cancels one, taking an optional `reason` (at most 500 characters). Emails every PENDING or COLLECTED booking with an account `reservation.performance-cancelled`, once per booking by claim, with the reason, which is never audited. Answers with the night, how many tickets are owed a refund and how many bookings were told. |
 | `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |
@@ -641,8 +641,9 @@ stateDiagram-v2
 
 ### ticket_types
 `id` PK · `name` UNIQUE global · `description` · `price` pence (base) · `kind` CHECK
-`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to` CHECK
-`MEMBER` NULL (D-109; set once at creation, like `kind` and `access_kind`) · `archived` bool ·
+`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to`
+`MEMBER|DESK` NULL, enforced by Zod rather than a CHECK (D-109; `MEMBER` set once at creation,
+like `kind` and `access_kind`; NULL and `DESK` swap on edit, 0190) · `archived` bool ·
 `active_by_default` bool.
 Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
 the two override tables below; everything else in this module is unbuilt.
@@ -685,13 +686,17 @@ drops archived types and every flagged one, and allow-lists `id`, `name`, `descr
 
 `GET /api/performances/[id]/booking` also names what is being booked, so the form need not fetch
 the show again: `show` is its slug and title, `performance` its curtain and venue, and no more.
+A performance of a show that is not `PUBLISHED` answers 404 there and on
+`POST /api/performances/[id]/waiting-list`, exactly as an unknown id does (D-101 criterion 1).
 
 **Entitlement (D-109).** `restricted_to = 'MEMBER'` drops a type from what
 `GET /api/performances/[id]/booking` and `POST /api/reservations` offer a caller who is not
 currently a member (`hasCurrentMembership()`, checked fresh at each, since a membership can lapse
 between the two). Concession has no committee-agreed eligibility evidence yet (open question,
 `docs/backlog/D-ticketing.md`), so it is not a value here: a concession type stays open online and
-is checked at collection instead. Entitlement is read from a session-scoped call, never folded
+is checked at collection instead. `restricted_to = 'DESK'` (0190) drops a type from every
+customer path, and from the public listing's prices in SQL; only callers passing the `DESK`
+channel to `bookableTicketTypes()` (the desk and the till) are offered it. Entitlement is read from a session-scoped call, never folded
 into the cacheable public listing (`/api/whats-on`, `/api/shows/[slug]`), so those stay
 viewer-independent.
 

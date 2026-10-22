@@ -39,7 +39,8 @@ const shown = computed(() => {
   // A page that knows what was missing says so, as /qr does for a bad link (0121); the router's
   // own unknown-address 404 keeps the generic words.
   if (props.error.statusCode === 404 && isNoSuchMessage(props.error.statusMessage)) {
-    return { title: 'That link does not lead anywhere now', says: props.error.statusMessage }
+    const hidden = props.error.statusMessage.startsWith('We cannot find')
+    return { title: hidden ? 'There is nothing here' : 'That link does not lead anywhere now', says: props.error.statusMessage }
   }
   return SAYS[props.error.statusCode ?? 0] ?? {
     title: 'Something went wrong',
