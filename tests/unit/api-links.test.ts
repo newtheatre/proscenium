@@ -53,7 +53,7 @@ describe('a link to a server route downloads rather than routing (I-108, D-129, 
   test('the scan finds the export links, so a broken pattern cannot pass by finding none', () => {
     const where = links.map(link => link.file)
     expect(where).toContain('pages/money/exports.vue')
-    expect(where).toContain('pages/box-office/shows/index.vue')
+    expect(where).toContain('components/TicketExportCard.vue')
     expect(where).toContain('pages/bar/reports.vue')
     expect(where).toContain('pages/bar/stock/order-list.vue')
     expect(where).toContain('pages/account/security.vue')
@@ -67,7 +67,7 @@ describe('a link to a server route downloads rather than routing (I-108, D-129, 
 
   test.each([
     ['SU export', 'I-108', 'pages/money/exports.vue', 'export-csv'],
-    ['ticket sales export', 'D-129', 'pages/box-office/shows/index.vue', 'ticket-export-csv'],
+    ['ticket sales export', 'D-129', 'components/TicketExportCard.vue', 'ticket-export-csv'],
     ['incident trend export', 'E-126', 'pages/reports/index.vue', 'export-incidents'],
     ['performance report export', 'E-126', 'pages/reports/index.vue', 'export-performances'],
   ])('the %s button is an external link (%s)', (_label, _story, file, dataTest) => {
