@@ -136,6 +136,18 @@ export function saysRestriction(restrictedTo: string | null): string | null {
   return null
 }
 
+// "From" is the cheapest seat anybody may book; a cheaper members' price is said apart, never as
+// the floor a guest is then refused (D-109).
+export function saysFromPrice(prices: { price: number, restrictedTo: string | null }[]): string | null {
+  const open = prices.filter(one => one.restrictedTo === null).map(one => one.price)
+  const members = prices.filter(one => one.restrictedTo === 'MEMBER').map(one => one.price)
+  const floor = open.length ? Math.min(...open) : null
+  const memberFloor = members.length ? Math.min(...members) : null
+  if (floor === null) return memberFloor === null ? null : `Members from ${saysPrice(memberFloor)}`
+  if (memberFloor === null || memberFloor >= floor) return `From ${saysPrice(floor)}`
+  return `From ${saysPrice(floor)}, members ${saysPrice(memberFloor)}`
+}
+
 // Pence in, pounds out, unprefixed: the figure a machine reads, such as a schema.org offer.
 export const pounds = (pence: number): string => (pence / 100).toFixed(2)
 

@@ -19,6 +19,7 @@ import {
   resolveBookingClosesHours,
   saleRefusal,
   saysBookingWindow,
+  saysOnlineCutoff,
   saysClosingTime,
   saysSeasonMoved,
   saysVenueOption,
@@ -126,6 +127,8 @@ describe('a show is draft until it is published, and a draft is invisible (D-121
 
   test('a slug is lowercase words joined by hyphens, and the form refuses anything else', () => {
     expect(toSlug('The Seagull: Act II')).toBe('the-seagull-act-ii')
+    expect(toSlug('The Winter\u2019s Tale')).toBe('the-winters-tale')
+    expect(toSlug('Shakespeare\'s Sonnets')).toBe('shakespeares-sonnets')
     const base = { title: 'The Seagull' }
     expect(showForm.safeParse({ ...base, slug: 'the-seagull' }).success).toBe(true)
     expect(showForm.safeParse({ ...base, slug: 'The Seagull' }).success).toBe(false)
@@ -157,6 +160,15 @@ describe('the booking window inherits performance, then show, then curtain-up (D
     expect(saysBookingWindow(0)).toBe('Closes at curtain-up')
     expect(saysBookingWindow(1)).toBe('Closes 1 hour before curtain')
     expect(saysBookingWindow(3)).toBe('Closes 3 hours before curtain')
+  })
+
+  // A 19:30 curtain closed online at 19:15 while the row said curtain-up (process map, 21 October).
+  test('the cut-off names the hold release when it comes before the window', () => {
+    expect(saysOnlineCutoff(0, 15)).toBe('Closes 15 minutes before curtain, when unpaid holds release')
+    expect(saysOnlineCutoff(0, 120)).toBe('Closes 2 hours before curtain, when unpaid holds release')
+    expect(saysOnlineCutoff(2, 15)).toBe('Closes 2 hours before curtain')
+    expect(saysOnlineCutoff(0, 0)).toBe('Closes at curtain-up')
+    expect(saysOnlineCutoff(0, undefined)).toBe('Closes at curtain-up')
   })
 
   // Measured back from the curtain instant, so the clocks going back do not move the window
