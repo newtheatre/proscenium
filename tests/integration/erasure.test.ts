@@ -292,6 +292,31 @@ describe('erasure (K-109, 0011)', () => {
     })
   })
 
+  // An erased officer held the office until the day they left, and holds nothing after it (0150).
+  test('every live role grant lapses at the erasure, and a lapsed one keeps its own date', async () => {
+    await withDatabase(async (database) => {
+      const id = seedPerson(database)
+      const now = Math.floor(Date.now() / 1000)
+      database.batch([
+        ['INSERT INTO role_grants (id, user_id, role, granted_at, expires_at) VALUES (?, ?, ?, ?, ?)',
+          `g2-${id}`, id, 'COMMITTEE', now - 100, now + 86_400 * 200],
+        ['INSERT INTO role_grants (id, user_id, role, granted_at, expires_at) VALUES (?, ?, ?, ?, ?)',
+          `g3-${id}`, id, 'TREASURER', now - 86_400 * 400, now - 86_400 * 30],
+      ])
+
+      await erase(database, id)
+
+      const grants = rows<{ role: string, expiresAt: number | null }>(database,
+        'SELECT role, expires_at AS expiresAt FROM role_grants WHERE user_id = ? ORDER BY role', id)
+      expect(grants).toHaveLength(3)
+      for (const grant of grants.filter(each => each.role !== 'TREASURER')) {
+        expect(grant.expiresAt).not.toBeNull()
+        expect(grant.expiresAt!).toBeLessThanOrEqual(Math.floor(Date.now() / 1000))
+      }
+      expect(grants.find(each => each.role === 'TREASURER')?.expiresAt).toBe(now - 86_400 * 30)
+    })
+  })
+
   // J-102 criteria 2 and 4: the trail keeps what happened, and loses who it was about.
   test('an identifying value in an audit detail is redacted, and the entry survives it', async () => {
     await withDatabase(async (database) => {
