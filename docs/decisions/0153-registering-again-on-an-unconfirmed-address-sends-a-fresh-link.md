@@ -40,3 +40,5 @@ is never lost without a word, and shows that it is working once pressed.
   again.
 - A confirmation link from the first email still confirms the address, but leaves no password, so
   it signs nobody in by password.
+- Clearing the password is audited as `password.cleared`, with no actor, since nobody signed in
+  asked for it.

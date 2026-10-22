@@ -235,6 +235,9 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
     const claim = await linkSentTo(email, '/reset')
     expect(claim).toContain('kind=set')
     expect(withDatabase(database => database.query('SELECT password FROM users WHERE email = ?').get(email) as { password: string | null }).password).toBeNull()
+    expect(withDatabase(database => database.query(`
+      SELECT count(*) n FROM audit_log l JOIN users u ON l.target = 'user:' || u.id
+      WHERE u.email = ? AND l.action = 'password.cleared'`).get(email) as { n: number }).n).toBe(1)
     expect((await letters(app)).some(letter => letter.startsWith(`To: ${email}`) && letter.includes('You already have an account'))).toBe(false)
 
     // Confirming from the first email still leaves the stranger's password refused.

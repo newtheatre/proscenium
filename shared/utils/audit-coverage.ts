@@ -92,7 +92,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     exempt: 'issues a token and asks for a message; the send is recorded in notification_log',
   },
   { route: 'server/api/auth/password/reset.post.ts', actions: ['password.set', 'password.reset', 'session.started.magic-link', 'mfa.challenged'] },
-  { route: 'server/api/auth/register.post.ts', actions: ['account.registered'], via: ['server/utils/accounts.ts'] },
+  { route: 'server/api/auth/register.post.ts', actions: ['account.registered', 'password.cleared'], via: ['server/utils/accounts.ts'] },
   { route: 'server/api/auth/sign-in.post.ts', actions: ['session.started', 'mfa.challenged'] },
   { route: 'server/api/account/methods/[id].delete.ts', actions: ['account.method.removed'] },
   { route: 'server/api/account/password.put.ts', actions: ['account.method.added', 'password.set'] },
