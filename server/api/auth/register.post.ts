@@ -46,6 +46,11 @@ export default defineEventHandler(async (event) => {
       },
     })
   }
+  else if (existing && !existing.verified) {
+    // Registered but never confirmed: "sign in as usual" would be refused, so a fresh link is the
+    // way on, the same one the first registration sent (A-102 criterion 3, 0153).
+    await sendVerification(event, existing.id, { next: input.next })
+  }
   else if (existing) {
     await notify(event, {
       type: 'account.exists',

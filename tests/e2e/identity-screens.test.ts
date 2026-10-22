@@ -222,6 +222,45 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
     }
   }, CASE_TIMEOUT_MS)
 
+  // Somebody who lost the first message and registers again is sent a link, not told to sign in (0153).
+  test('registering again on an address never confirmed sends a fresh confirmation link', async () => {
+    const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+    const email = address('again')
+    await send('POST', '/api/auth/register', { email, name: person.name, password })
+    const first = await linkSentTo(email, '/verify')
+    await send('POST', '/api/auth/register', { email, name: person.name, password })
+
+    const deadline = Date.now() + 15_000
+    let links: string[] = []
+    while (Date.now() < deadline && links.length < 2) {
+      links = (await letters(app)).filter(letter => letter.startsWith(`To: ${email}`) && letter.includes('/verify?token='))
+      await Bun.sleep(200)
+    }
+    expect(links.length).toBe(2)
+    expect((await letters(app)).some(letter => letter.startsWith(`To: ${email}`) && letter.includes('You already have an account'))).toBe(false)
+    expect(first).toContain('/verify?token=')
+  }, CASE_TIMEOUT_MS)
+
+  test('the check-your-email screen sends the link again on request', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+      const email = address('resend')
+      await visit(view, `${app.baseURL}/register`)
+      await waitFor(view, 'document.querySelector(\'form button[type="submit"]:not([disabled])\')', 30_000)
+      await fill(view, 'form input[type="text"]', person.name)
+      await fill(view, SIGN_IN_FORM, email)
+      await fill(view, PASSWORD_FIELD, password)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="resend-verification"]\')', 30_000)
+      await click(view, '[data-test="resend-verification"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="resent"]\')', 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   // A dead end is the failure this page exists to prevent (A-102 criterion 3).
   // A sign-in link confirms the address as it signs in, so it is the fresh send (0103).
   test('an expired verification link offers a sign-in link rather than a dead end', async () => {
