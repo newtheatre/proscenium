@@ -32,7 +32,7 @@ function decoded(value: string): void {
       class="text-sm text-muted"
       data-test="tab-code-ask"
     >
-      Ask {{ props.holderName }} to open Bar tab in My NNT and show you tonight's code.
+      Ask {{ props.holderName }} to open Bar tab in My NNT and show you tonight's tab code.
     </p>
     <QrScanner
       v-if="open && scanning"
