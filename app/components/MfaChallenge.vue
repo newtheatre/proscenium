@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{ attemptId: string }>()
 const emit = defineEmits<{ answered: [] }>()
+const toast = useToast()
 
 const CODE_LENGTH = 6
 
@@ -20,7 +21,16 @@ async function answer(code: string): Promise<void> {
 
   try {
     // @ts-expect-error an options-carrying call has no working generic form yet (0053).
-    await $fetch<unknown>('/api/auth/mfa/challenge', { method: 'POST', body: { attemptId: attempt.value, code } })
+    const done = await $fetch<unknown>('/api/auth/mfa/challenge', { method: 'POST', body: { attemptId: attempt.value, code } }) as { recoveryCodesRemaining?: number }
+    // A spent recovery code is one fewer for next time, so the count is said while it still matters.
+    if (typeof done?.recoveryCodesRemaining === 'number') {
+      const left = done.recoveryCodesRemaining
+      toast.add({
+        title: left === 1 ? '1 recovery code left' : `${left} recovery codes left`,
+        description: left <= 3 ? 'Make a new set from Security before you run out.' : undefined,
+        color: left <= 3 ? 'warning' : 'info',
+      })
+    }
     emit('answered')
   }
   catch (error) {
@@ -45,10 +55,12 @@ async function answer(code: string): Promise<void> {
       <!-- The page heading, not a section one: this stands alone on the sign-in and magic-link
            screens, and a lone h2 is a heading-order failure (issue 917). -->
       <h1 class="nnt-headline text-xl">
-        Enter your code
+        {{ usingRecoveryCode ? 'Use a recovery code' : 'Enter your code' }}
       </h1>
       <p class="text-sm text-muted">
-        Open your authenticator app and type the six digits it shows.
+        {{ usingRecoveryCode
+          ? 'Type one of the codes you saved when you set up your authenticator. Each works once.'
+          : 'Open your authenticator app and type the six digits it shows.' }}
       </p>
     </div>
 

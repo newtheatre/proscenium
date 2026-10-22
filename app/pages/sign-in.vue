@@ -23,7 +23,7 @@ const REFUSALS: Record<string, string> = {
 }
 
 // A refused password keeps one wording for every cause, so the way on is said beside it (0103).
-const LINK_INSTEAD = 'If your address is not confirmed yet, or the password escapes you, use Email me a sign-in link: it needs no password, and it confirms the address as it signs you in.'
+const LINK_INSTEAD = 'If your address is not confirmed yet, or the password escapes you, use Email me a sign-in link: it needs no password, and it confirms the address as it signs you in. Still stuck? Ask the IT Manager.'
 
 type Step = 'address' | 'forgot' | 'challenge' | 'sent'
 
@@ -162,7 +162,7 @@ async function suggestPasskeys(): Promise<void> {
 async function signedIn(): Promise<void> {
   await refresh()
   // An explicit next wins; with none, somebody on shift lands on Tonight (0094).
-  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight, account.value.authenticatorOwed))
 }
 
 function startAgain(): void {

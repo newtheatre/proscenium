@@ -70,10 +70,10 @@ export function worksTonight(viewer: { onShiftTonight: boolean, permissions: rea
   return NIGHT_ROLES.some(role => viewer.permissions.includes(NIGHT_ROLE_PERMISSION[role]))
 }
 
-// An explicit `next` on this site always wins, the home page included; with none, somebody on
-// shift lands on Tonight. Anything but a local path is no `next`, or sign-in is an open redirect.
-export function landingAfterSignIn(next: unknown, onShiftTonight: boolean): string {
-  return localPath(next) ?? (onShiftTonight ? '/tonight' : '/')
+// An explicit `next` on this site always wins, the home page included; with none, somebody on shift
+// lands on Tonight, an officer owing an authenticator on Security, everyone else on My NNT (0152).
+export function landingAfterSignIn(next: unknown, onShiftTonight: boolean, authenticatorOwed = false): string {
+  return localPath(next) ?? (onShiftTonight ? '/tonight' : authenticatorOwed ? '/account/security' : '/my')
 }
 
 // A confirmed duty manager for the door's performance; the first name only for somebody on tonight's

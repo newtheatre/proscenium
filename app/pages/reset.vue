@@ -95,7 +95,7 @@ async function reset(payload: FormSubmitEvent<z.output<typeof schema>>): Promise
 async function signedIn(): Promise<void> {
   await refresh()
   toast.add({ title: 'Password set', description: 'Every other session on your account has ended.', color: 'success' })
-  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight))
+  await navigateTo(landingAfterSignIn(route.query.next, account.value.onShiftTonight, account.value.authenticatorOwed))
 }
 
 useSeoMeta({ title: 'Set a new password' })
