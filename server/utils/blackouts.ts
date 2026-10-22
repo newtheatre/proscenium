@@ -91,6 +91,28 @@ export async function bookingsUnder(blackout: { roomId: string | null, startsAt:
     .orderBy(asc(schema.roomBookings.startsAt))
 }
 
+export interface OverlappingClosure { id: string, room: string | null, reason: string, startsAt: number, endsAt: number }
+
+// Closures an officer already set over a span, for the same room, every room, or (closing every
+// room) any room. A warning on the form, never a refusal.
+export async function closuresOverlapping(roomId: string | null, startsAt: number, endsAt: number): Promise<OverlappingClosure[]> {
+  return db.select({
+    id: schema.roomBlackouts.id,
+    room: schema.rooms.name,
+    reason: schema.roomBlackouts.reason,
+    startsAt: schema.roomBlackouts.startsAt,
+    endsAt: schema.roomBlackouts.endsAt,
+  })
+    .from(schema.roomBlackouts)
+    .leftJoin(schema.rooms, eq(schema.rooms.id, schema.roomBlackouts.roomId))
+    .where(and(
+      lt(schema.roomBlackouts.startsAt, endsAt),
+      sql`${schema.roomBlackouts.endsAt} > ${startsAt}`,
+      roomId ? or(eq(schema.roomBlackouts.roomId, roomId), sql`${schema.roomBlackouts.roomId} IS NULL`) : undefined,
+    ))
+    .orderBy(asc(schema.roomBlackouts.startsAt))
+}
+
 // Only the occurrences a blackout actually covers, never a whole series: a get-in on one Monday
 // does not cancel a term (criterion 3).
 export function cancelStranded(blackout: { id: string, roomId: string | null, startsAt: number, endsAt: number }, now: number): ReturnType<typeof db.run> {

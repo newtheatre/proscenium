@@ -2047,7 +2047,7 @@ is always *room*. Rooms the Students' Union manages are **not in this table at a
 control (decision 0036, C-119, C-120). `is_external` is gone with them, and `sensitive` is now the
 only room-level reason a booking goes to the approval queue whatever the policy says.
 Retired, never deleted: a booking made last term still names something (C-101 criterion 2), and
-there is no delete endpoint at all rather than one that refuses. Capacity is compared against a
+nothing deletes a room; the `DELETE` route below retires one. Capacity is compared against a
 booking's attendee count as a **warning, never a refusal**: the old estate recorded both and
 compared neither.
 
@@ -2055,6 +2055,16 @@ compared neither.
 with `search` over the name and `sort` by name. A retired room is hidden unless `active` asks for
 one, the directory's `anonymised` default reused. Small and unpaged by design: it returns its
 whole filtered set rather than a windowed page, the estate being a handful of rooms.
+
+`DELETE /api/admin/rooms/[id]` retires rather than deletes. It takes `turnDown` and `cancel` in the
+query string (a DELETE carries no body, 0068), each asked only by `true`. Asked to, it turns down
+every request waiting on the room and cancels every confirmed booking in it that has not yet
+started, in the same batch as the retire and its one `room.updated` audit row, which counts both
+(0204). Each member is told: a turned-down request as
+the queue's `room.request.rejected`, a cancelled booking as `room.blackout.cancelled`, with the
+reason "{room} is no longer in use". It answers `{ alreadyRetired, turnedDown, cancelled }`.
+`GET /api/admin/rooms/[id]/held` gives the Retire dialogue `{ waiting, upcoming }`, counted by the
+same predicates. The **In use** switch on `PUT /api/admin/rooms/[id]` retires without settling.
 
 ### room_hours
 `id` PK · `room_id` cascade · `weekday` 0..6 CHECK · `opens` `HH:MM` · `closes` `HH:MM`, CHECK
@@ -2246,6 +2256,13 @@ No table: the figures are counted from `room_bookings`, `room_hours` and `room_n
 one statement and not a download. `GET /api/admin/rooms/reports/utilisation` breaks down by room or
 by tier, pages, and returns an envelope; `.../reports/export` is the same figures as CSV, every cell
 quoted so a room name with a comma cannot split a row (criterion 3).
+
+By room, **every room in use is a row**, booked or not, at nought hours if nothing was booked: an
+unused room is what an end-of-year review most needs to see. A retired room appears only where it
+was booked in the span. The rooms come from one read of the estate, merged in memory, never from an
+`IN` list built from the counts (0006). Each row carries `alwaysOpen`, true for a room with no hours
+recorded, and the CSV leaves `openHours` blank for such a room and for every row by tier, since
+neither has hours to count against; a nought there would read in a spreadsheet as never open.
 
 Confirmed, cancelled and no-show hours are told apart, and a no-show is **its own figure rather
 than a deduction**: the room was held and not used, which is the number the review wants
@@ -2469,6 +2486,11 @@ again, because its slot may be somebody else's by then. Creation and removal are
 K-129): `past`, with `search` over the room and the reason and `sort` by when the closure starts.
 A past closure is hidden unless `past` asks for one, the same default `rooms-list.ts` uses for a
 retired room; it too returns its whole filtered set rather than a windowed page.
+
+`GET /api/admin/rooms/blackouts/stranded` answers the close form before anything is closed:
+`count` is what the close would cancel, by the read the close itself makes, and `overlapping` lists
+the closures already set over the span for the same room or every room (any room, when closing
+every room), each with its room, reason and span. Overlap is a warning on the form, never a refusal.
 
 Erasure scrubs `created_by` to null and keeps the closure: the room was shut, which is a fact
 about the room; who typed it in lives in the audit trail (0010, 0011).

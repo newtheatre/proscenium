@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { plural } from './text'
 
 // The bookable estate. Opening hours belong to the room rather than to settings, so a room can be
 // renamed or archived with them (0025, C-101); the absence of a row for a weekday means closed.
@@ -44,6 +45,11 @@ export const roomForm = z.object({
 
 export type RoomInput = z.output<typeof roomForm>
 
+// A query string, since a DELETE carries no body (0068). Absent is the old retire, which settles
+// nothing; only "true" asks (0204).
+const asked = z.enum(['true', 'false']).optional().transform(value => value === 'true')
+export const retireQuery = z.object({ turnDown: asked, cancel: asked })
+
 // The smallest number each override takes, declared once so a field, its hint and the write path
 // cannot disagree (C-106 criterion 7). Only notice takes nought, meaning none needed.
 export const ROOM_OVERRIDE_FLOORS = {
@@ -60,13 +66,44 @@ export function saysOverrideFloor(key: RoomOverrideKey): string {
   return ROOM_OVERRIDE_FLOORS[key] === 0 ? '0 means none needed' : 'One or more'
 }
 
+const OVERRIDE_UNITS: Record<RoomOverrideKey, string> = {
+  minBookingMinutes: 'minute',
+  maxBookingHours: 'hour',
+  noticeHours: 'hour',
+  horizonWeeks: 'week',
+  activeBookingsCap: 'booking',
+}
+
+export const ROOM_OVERRIDE_KEYS = Object.keys(OVERRIDE_UNITS) as RoomOverrideKey[]
+
+// What a blank box falls back to, with its unit, said under the box.
+export function saysHouseDefault(key: RoomOverrideKey, value: number): string {
+  return `House default: ${plural(value, OVERRIDE_UNITS[key])}. ${saysOverrideFloor(key)}.`
+}
+
+export function saysOverride(key: RoomOverrideKey, value: number): string {
+  switch (key) {
+    case 'minBookingMinutes': return `Shortest booking ${plural(value, 'minute')}`
+    case 'maxBookingHours': return `Longest booking ${plural(value, 'hour')}`
+    case 'noticeHours': return value === 0 ? 'No notice needed' : `${plural(value, 'hour')} notice`
+    case 'horizonWeeks': return `Bookable ${plural(value, 'week')} ahead`
+    case 'activeBookingsCap': return `${plural(value, 'booking')} per member`
+    default: return key satisfies never
+  }
+}
+
+// The rules a room sets for itself, in words, for the list's Own rules badge.
+export function roomOverrides(room: Record<RoomOverrideKey, number | null>): string[] {
+  return ROOM_OVERRIDE_KEYS.flatMap(key => (room[key] === null ? [] : [saysOverride(key, room[key])]))
+}
+
 export const roomHoursForm = z.object({
   weekday: z.number().int().min(0).max(6),
   opens: z.string().regex(TIME, 'A time reads as HH:MM'),
   closes: z.string().regex(TIME, 'A time reads as HH:MM'),
 }).refine(hours => hours.closes > hours.opens, {
   path: ['closes'],
-  message: 'A room closes after it opens',
+  message: 'Closing time must be later than opening time',
 })
 
 export type RoomHours = z.output<typeof roomHoursForm>
@@ -136,6 +173,42 @@ export function minutesOpen(hours: RoomHours[], weekday: number): number {
   return hours
     .filter(day => day.weekday === weekday)
     .reduce((total, day) => total + (minutesInto(day.closes) - minutesInto(day.opens)), 0)
+}
+
+// Monday first, the way the week is read here; Sunday's index stays 0 as Date has it.
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]
+
+// "Mon to Fri, 09:00 to 22:00", or a run of days per set of times when the days differ.
+export function saysOpeningHours(hours: RoomHours[]): string {
+  if (unrestricted(hours)) return 'Always open'
+  const timesOf = (weekday: number): string => hours
+    .filter(day => day.weekday === weekday)
+    .sort((one, other) => one.opens.localeCompare(other.opens))
+    .map(day => `${day.opens} to ${day.closes}`)
+    .join(' and ')
+
+  const runs: { days: number[], times: string }[] = []
+  let previous = ''
+  for (const weekday of WEEK_ORDER) {
+    const times = timesOf(weekday)
+    if (times && times === previous) runs.at(-1)!.days.push(weekday)
+    else if (times) runs.push({ days: [weekday], times })
+    previous = times
+  }
+
+  const shortOf = (weekday: number): string => WEEKDAYS[weekday]!.short
+  const daysOf = (days: number[]): string => {
+    if (days.length === 7) return 'Every day'
+    if (days.length === 1) return shortOf(days[0]!)
+    if (days.length === 2) return `${shortOf(days[0]!)} and ${shortOf(days[1]!)}`
+    return `${shortOf(days[0]!)} to ${shortOf(days.at(-1)!)}`
+  }
+  const sameTimes = new Set(runs.map(run => run.times)).size === 1
+  if (sameTimes && runs.length > 1) {
+    const listed = runs.map(run => daysOf(run.days)).join(', ')
+    return `${listed}, ${runs[0]!.times}`
+  }
+  return runs.map(run => `${daysOf(run.days)}, ${run.times}`).join('; ')
 }
 
 function minutesInto(time: string): number {

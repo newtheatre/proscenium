@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate } from '#shared/utils/abilities'
 import { SU_ROOMS } from '#shared/utils/external-requests'
-import { HOURS_MODES, ROOM_OVERRIDE_FLOORS, WEEKDAYS, hoursForMode, hoursModeOf, minutesOpen, roomForm, saysHoursMode, saysOverrideFloor } from '#shared/utils/rooms'
+import { HOURS_MODES, ROOM_OVERRIDE_FLOORS, WEEKDAYS, hoursForMode, hoursModeOf, roomForm, roomOverrides, saysHouseDefault, saysHoursMode, saysOpeningHours } from '#shared/utils/rooms'
 import { roomsList } from '#shared/utils/rooms-list'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { HoursMode, RoomHours } from '#shared/utils/rooms'
@@ -70,9 +70,6 @@ const { data: listing, status, refresh, error } = await useAsyncData(
 const failure = useListFailure(error, 'The rooms could not be read.')
 
 const estate = computed(() => listing.value.estate)
-
-// What a blank override means, said where the blank is.
-const fallsBackTo = (value: number | boolean): string => `Estate default: ${value}`
 
 const state = reactive({
   name: '',
@@ -165,9 +162,22 @@ const retiring = ref<Room | null>(null)
 const retireFailure = ref<string | null>(null)
 const retireWorking = ref(false)
 
-function askRetire(room: Room): void {
+// Counted before the verb is offered, the way a closure counts what it cancels (0204).
+const held = ref<{ waiting: number, upcoming: number } | null>(null)
+const settle = reactive({ turnDown: true, cancel: true })
+
+async function askRetire(room: Room): Promise<void> {
   retireFailure.value = null
+  held.value = null
+  Object.assign(settle, { turnDown: true, cancel: true })
   retiring.value = room
+  try {
+    const counted = await $fetch<{ waiting: number, upcoming: number }>(`/api/admin/rooms/${room.id}/held`)
+    if (retiring.value?.id === room.id) held.value = counted
+  }
+  catch (error) {
+    retireFailure.value = `What the room still holds could not be counted: ${refusalText(error)}`
+  }
 }
 
 async function retire(): Promise<void> {
@@ -176,8 +186,23 @@ async function retire(): Promise<void> {
   retireWorking.value = true
   retireFailure.value = null
   try {
-    await $fetch(`/api/admin/rooms/${room.id}`, { method: 'DELETE' })
-    toast.add({ title: `${room.name} retired`, icon: 'i-lucide-archive', color: 'success' })
+    const answer = await $fetch<{ turnedDown: number, cancelled: number }>(`/api/admin/rooms/${room.id}`, {
+      method: 'DELETE',
+      query: {
+        turnDown: String(settle.turnDown && (held.value?.waiting ?? 0) > 0),
+        cancel: String(settle.cancel && (held.value?.upcoming ?? 0) > 0),
+      },
+    })
+    const settled = [
+      ...(answer.turnedDown ? [`${plural(answer.turnedDown, 'request')} turned down`] : []),
+      ...(answer.cancelled ? [`${plural(answer.cancelled, 'booking')} cancelled`] : []),
+    ]
+    toast.add({
+      title: `${room.name} retired`,
+      ...(settled.length ? { description: `${settled.join(', ')}, and each member told.` } : {}),
+      icon: 'i-lucide-archive',
+      color: 'success',
+    })
     retiring.value = null
     await refresh()
   }
@@ -195,13 +220,6 @@ const hoursSummary = computed(() => (hoursMode.value === 'EACH_DAY'
 
 const OVERRIDES = ['minBookingMinutes', 'maxBookingHours', 'noticeHours', 'horizonWeeks', 'activeBookingsCap'] as const
 const overrideCount = computed(() => OVERRIDES.filter(field => state[field] !== undefined).length)
-
-function openDays(room: Room): string {
-  if (room.hours.length === 0) return 'Always open'
-  const days = WEEKDAYS.filter(day => minutesOpen(room.hours, day.index) > 0)
-  if (days.length === 7) return 'Open every day'
-  return days.map(day => day.short).join(', ')
-}
 
 const columns: TableColumn<Room>[] = [
   { id: 'name', header: 'Room', accessorKey: 'name' },
@@ -287,7 +305,7 @@ const columns: TableColumn<Room>[] = [
           <!-- Below sm the capacity and the opening days are hidden: shown here instead, so a
             phone keeps the state and the row actions in view (issue 922). -->
           <p class="text-xs text-muted sm:hidden">
-            {{ row.original.capacity ?? 'Uncapped' }}, {{ openDays(row.original) }}
+            {{ row.original.capacity ?? 'Uncapped' }}, {{ saysOpeningHours(row.original.hours) }}
           </p>
         </div>
       </template>
@@ -297,7 +315,7 @@ const columns: TableColumn<Room>[] = [
       </template>
 
       <template #hours-cell="{ row }">
-        <span class="text-sm text-muted">{{ openDays(row.original) }}</span>
+        <span class="text-sm text-muted">{{ saysOpeningHours(row.original.hours) }}</span>
       </template>
 
       <template #state-cell="{ row }">
@@ -318,7 +336,22 @@ const columns: TableColumn<Room>[] = [
           >
             Retired
           </UBadge>
+          <UBadge
+            v-if="roomOverrides(row.original).length"
+            color="info"
+            variant="subtle"
+            size="sm"
+            :data-test="`own-rules-${row.original.id}`"
+          >
+            Own rules
+          </UBadge>
         </div>
+        <p
+          v-if="roomOverrides(row.original).length"
+          class="mt-1 text-xs text-muted whitespace-normal"
+        >
+          {{ roomOverrides(row.original).join(', ') }}
+        </p>
       </template>
 
       <template #actions-cell="{ row }">
@@ -366,7 +399,7 @@ const columns: TableColumn<Room>[] = [
     <UModal
       v-model:open="open"
       :title="editing ? `Edit ${editing.name}` : 'Add a room'"
-      description="Left alone, a room is open whenever and follows the estate settings."
+      description="Left alone, a room is open whenever and follows the house settings."
     >
       <template #body>
         <UForm
@@ -523,13 +556,13 @@ const columns: TableColumn<Room>[] = [
               block
               class="justify-between"
             >
-              This room's own rules ({{ overrideCount === 0 ? 'follows the estate' : plural(overrideCount, 'override') }})
+              This room's own rules ({{ overrideCount === 0 ? 'follows the house' : plural(overrideCount, 'override') }})
             </UButton>
 
             <template #content>
               <div class="space-y-4 pt-4">
                 <p class="text-sm text-muted">
-                  Left blank, a room follows the estate settings shown under each box. A number
+                  Left blank, a room follows the house settings shown under each box. A number
                   here applies to this room only. Each box says the smallest it accepts.
                 </p>
 
@@ -537,7 +570,7 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Shortest booking"
                     name="minBookingMinutes"
-                    :description="`${fallsBackTo(estate.minBookingMinutes)} ${saysOverrideFloor('minBookingMinutes')}.`"
+                    :description="saysHouseDefault('minBookingMinutes', estate.minBookingMinutes)"
                     hint="Minutes"
                   >
                     <UInputNumber
@@ -551,7 +584,7 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Longest booking"
                     name="maxBookingHours"
-                    :description="`${fallsBackTo(estate.maxBookingHours)} ${saysOverrideFloor('maxBookingHours')}.`"
+                    :description="saysHouseDefault('maxBookingHours', estate.maxBookingHours)"
                     hint="Hours"
                   >
                     <UInputNumber
@@ -565,7 +598,7 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Notice needed"
                     name="noticeHours"
-                    :description="`${fallsBackTo(estate.noticeHours)} ${saysOverrideFloor('noticeHours')}.`"
+                    :description="saysHouseDefault('noticeHours', estate.noticeHours)"
                     hint="Hours"
                   >
                     <UInputNumber
@@ -579,7 +612,7 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Booking opens"
                     name="horizonWeeks"
-                    :description="`${fallsBackTo(estate.horizonWeeks)} ${saysOverrideFloor('horizonWeeks')}.`"
+                    :description="saysHouseDefault('horizonWeeks', estate.horizonWeeks)"
                     hint="Weeks ahead"
                   >
                     <UInputNumber
@@ -593,7 +626,7 @@ const columns: TableColumn<Room>[] = [
                   <UFormField
                     label="Bookings one member may hold"
                     name="activeBookingsCap"
-                    :description="`${fallsBackTo(estate.activeBookingsCap)} ${saysOverrideFloor('activeBookingsCap')}.`"
+                    :description="saysHouseDefault('activeBookingsCap', estate.activeBookingsCap)"
                   >
                     <UInputNumber
                       v-model="state.activeBookingsCap"
@@ -616,7 +649,7 @@ const columns: TableColumn<Room>[] = [
             <USwitch
               v-model="state.isActive"
               label="In use"
-              description="A retired room keeps its history and leaves the calendar."
+              description="A retired room keeps its history and leaves the calendar. Switched off here, nothing it holds is touched; Retire on the list offers to settle it."
             />
           </UFormField>
         </UForm>
@@ -646,11 +679,52 @@ const columns: TableColumn<Room>[] = [
       name="retire-room"
       :title="retiring ? `Retire ${retiring.name}` : ''"
       :verb="retiring ? `Retire ${retiring.name}` : ''"
-      consequence="It comes off the calendar from now. Bookings already made and everything it has held stay."
-      :loading="retireWorking"
+      consequence="It comes off the calendar from now, and keeps its history."
+      :loading="retireWorking || (held === null && retireFailure === null)"
+      :disabled="held === null"
       :failure="retireFailure"
       @update:open="value => { if (!value) retiring = null }"
       @confirm="retire"
-    />
+    >
+      <template #body>
+        <div
+          v-if="held"
+          class="space-y-3"
+          data-test="retire-held"
+        >
+          <p
+            v-if="held.waiting === 0 && held.upcoming === 0"
+            class="text-sm text-muted"
+          >
+            Nothing is waiting on it or booked in it from now.
+          </p>
+          <UCheckbox
+            v-if="held.waiting > 0"
+            v-model="settle.turnDown"
+            :label="`Turn down ${plural(held.waiting, 'waiting request')}`"
+            description="Each member is told the room is no longer in use. Left unticked, they wait in the queue, and approving one into this room is refused."
+            data-test="retire-turn-down"
+          />
+          <UCheckbox
+            v-if="held.upcoming > 0"
+            v-model="settle.cancel"
+            :label="`Cancel ${plural(held.upcoming, 'booking')} yet to come`"
+            description="Each member is told, and nothing is rebooked. Left unticked, they stand."
+            data-test="retire-cancel"
+          />
+          <p
+            v-if="held.waiting > 0"
+            class="text-sm text-muted"
+          >
+            To move a request to another room instead, decide it on
+            <ULink
+              to="/rooms/manage/requests"
+              class="underline"
+            >Room requests</ULink>
+            first.
+          </p>
+        </div>
+      </template>
+    </ConfirmModal>
   </ReadGate>
 </template>

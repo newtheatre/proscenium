@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { overlaps } from './bookings'
-import { formatLondon, fromLondonWallClock, startOfLondonDay, startOfLondonDayAfter } from './london'
+import { formatLondon, fromLondonWallClock, londonClock, startOfLondonDay, startOfLondonDayAfter } from './london'
 import { plural } from './text'
+import { saysClock, saysDay } from './when'
 import type { Span } from './bookings'
 
 // A room shut for a reason everybody can read (C-114). The old app had no way to say a room was
@@ -48,13 +49,50 @@ export function saysSpan(startsAt: Date, endsAt: Date): string {
   return `${from} to ${to}`
 }
 
-// Closing cannot be undone (criterion 5), so the button says what it will cancel before it is
-// pressed, and nothing is closed until a room, or every room, has been chosen (issue 1353).
-export function closeButtonLabel(room: string | null, cancels: number | null): string {
+// Noon on the last day, safely inside it whichever way the clocks moved.
+const HALF_DAY_MS = 12 * 3600 * 1000
+
+// Midnight to midnight in London, which is what the Whole days switch writes.
+function wholeDays(startsAt: Date, endsAt: Date): boolean {
+  return endsAt > startsAt && londonClock(startsAt) === '00:00' && londonClock(endsAt) === '00:00'
+}
+
+// "Thu 5 to Fri 6 Nov (whole days)" rather than two midnights.
+export function saysClosureSpan(startsAt: Date, endsAt: Date): string {
+  if (!wholeDays(startsAt, endsAt)) return saysSpan(startsAt, endsAt)
+  const last = new Date(endsAt.getTime() - HALF_DAY_MS)
+  const first = saysDay(startsAt)
+  const final = saysDay(last)
+  if (first === final) return `${first} (whole day)`
+  const [weekday, date, month] = first.split(' ')
+  const sameMonth = final.split(' ').slice(2).join(' ') === first.split(' ').slice(2).join(' ')
+  return `${sameMonth ? `${weekday} ${date}` : `${weekday} ${date} ${month}`} to ${final} (whole days)`
+}
+
+// The span as the close button says it: the clock alone for part of one day, else as listed.
+export function saysCloseSpan(startsAt: Date, endsAt: Date): string {
+  const sameDay = formatLondon(startsAt, LONDON_DAY) === formatLondon(endsAt, LONDON_DAY)
+  return sameDay ? `${saysClock(startsAt)} to ${saysClock(endsAt)}` : saysClosureSpan(startsAt, endsAt)
+}
+
+// Closing cannot be undone (criterion 5), so the button says what it will cancel, and over what
+// span, before it is pressed; nothing is closed until a room has been chosen (issue 1353).
+export function closeButtonLabel(room: string | null, cancels: number | null, span?: string): string {
   if (room === null) return 'Choose a room to close'
-  if (cancels === null) return `Close ${room}`
-  if (cancels === 0) return `Close ${room}: cancels nothing`
-  return `Close ${room}: cancels ${plural(cancels, 'booking')}`
+  const what = span ? `Close ${room} ${span}` : `Close ${room}`
+  if (cancels === null) return what
+  if (cancels === 0) return `${what}: cancels nothing`
+  return `${what}: cancels ${plural(cancels, 'booking')}`
+}
+
+// Said, never refused: two closures over one span are allowed, but rarely meant.
+export function saysOverlap(overlapping: { room: string | null, reason: string, startsAt: number, endsAt: number }[]): string | null {
+  if (overlapping.length === 0) return null
+  const [first] = overlapping
+  const named = `${first!.room ?? 'Every room'}, ${saysClosureSpan(new Date(first!.startsAt * 1000), new Date(first!.endsAt * 1000))} (${first!.reason})`
+  return overlapping.length === 1
+    ? `This overlaps a closure already set: ${named}`
+    : `This overlaps ${overlapping.length} closures already set, the first ${named}`
 }
 
 // A get-in over several days means the days, not nine to six on each of them.
