@@ -235,6 +235,8 @@ UNIQUE (`user_id`, `role`). Enforced at read time; the last-administrator guard 
 check, not a constraint. The stamp is for a reader: what stops a second warning is the claim in
 `notification_log`, which carries the expiry the warning was computed against (0048).
 A merge reconciles rather than reassigning: see "Merging duplicate accounts" above (A-123).
+Erasure lapses every live grant (`expires_at` set to the erasure time) and leaves an already lapsed
+one its own date, so a tombstone holds no office from that day on (0150, migration 0134).
 A grant on a shadow account whose `last_login_at` is NULL is pending (A-132, 0088): made by
 granting to an address the picker could not find, listed apart on the register, never counted as
 a holder and never usable for the last-administrator guard. It needs no column and no claim of its

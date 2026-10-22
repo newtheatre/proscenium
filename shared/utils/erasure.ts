@@ -49,6 +49,15 @@ export function erasureStatements(userId: string, now: number): SQL[] {
       and exists (select 1 from users where id = ${userId} and anonymised_at is null)
   `)
 
+  // Who held which office survives as history, but a tombstone holds nothing from today on: every
+  // live grant lapses now, so no register or permission check counts it again (0150).
+  statements.push(sql`
+    update role_grants set expires_at = ${now}
+    where user_id = ${userId}
+      and (expires_at is null or expires_at > ${now})
+      and exists (select 1 from users where id = ${userId} and anonymised_at is null)
+  `)
+
   // Last, so a failure above leaves no tombstone: the row is the thing every guard reads.
   statements.push(sql`
     update users set

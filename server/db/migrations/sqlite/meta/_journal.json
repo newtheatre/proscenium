@@ -953,6 +953,13 @@
       "when": 1792672645814,
       "tag": "0135_a_ticket_type_keeps_its_own_order",
       "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "6",
+      "when": 1792673000000,
+      "tag": "0136_an_erased_account_holds_no_live_role",
+      "breakpoints": true
     }
   ]
 }

@@ -162,12 +162,24 @@ const finish = (): Promise<void> => attempt(async () => {
 const closing = ref(false)
 const confirmation = reactive({ email: '' })
 const { account, refresh: refreshAccount } = useAccount()
+const toast = useToast()
+
+// The same rule as the server's, so the button wakes only for the address it will accept.
+const closeConfirmed = computed(() =>
+  confirmation.email.trim().toLowerCase() === (account.value.user?.email ?? '').toLowerCase())
 
 // Erasure is final and the session goes with it, so the screen leaves rather than re-reading.
 const closeAccount = (): Promise<void> => attempt(async () => {
   await $fetch('/api/account/close', { method: 'POST', body: { ...confirmation } })
   await refreshAccount()
   await navigateTo('/')
+  toast.add({
+    title: 'Your account is closed',
+    description: 'Your name and address are gone. Bookings stay on our own count of the year, with nobody named on them.',
+    icon: 'i-lucide-check',
+    color: 'success',
+    duration: 0,
+  })
 })
 
 const confirmedOn = computed(() =>
@@ -446,6 +458,13 @@ useSeoMeta({ title: 'Security' })
             variant="subtle"
             description="This cannot be undone. Your bookings and attendance stay on our own count of the year, with your name taken off them."
           />
+          <UAlert
+            v-if="account.holdsRole"
+            data-test="close-ends-roles"
+            color="warning"
+            variant="subtle"
+            description="You hold a committee role. It ends the moment the account closes, so tell the IT Manager first if somebody needs to take it over."
+          />
           <UFormField
             label="Type your email address to confirm"
             :description="account.user?.email"
@@ -462,6 +481,7 @@ useSeoMeta({ title: 'Security' })
             color="error"
             data-test="close-submit"
             :loading="working"
+            :disabled="!closeConfirmed"
           >
             Close my account
           </UButton>
