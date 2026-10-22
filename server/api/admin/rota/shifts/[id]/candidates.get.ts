@@ -1,10 +1,10 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { eligibilityRefusal, needsCommitteeRole } from '#shared/utils/rota-eligibility'
+import { candidateLock, needsCommitteeRole } from '#shared/utils/rota-eligibility'
 
 const query = z.object({ search: z.string().trim().min(1).max(200) })
 
-export interface AssignCandidate { id: string, name: string, email: string, eligible: boolean }
+export interface AssignCandidate { id: string, name: string, email: string, eligible: boolean, reason: string | null }
 
 // `%` and `_` are LIKE wildcards; a search for an address containing either would otherwise
 // match more than was typed (the same escape every other search route in the app applies).
@@ -21,8 +21,14 @@ export default defineEventHandler(async (event) => {
   if (!held) throw noSuch('shift')
 
   const term = contains(search.toLowerCase())
-  const matched = await db.all<{ id: string, name: string, email: string }>(sql`
-    SELECT id, name, email FROM users
+  // The assignment refuses anybody already holding another shift on the performance, so this says so.
+  const matched = await db.all<{ id: string, name: string, email: string, onPerformance: number }>(sql`
+    SELECT id, name, email, EXISTS (
+      SELECT 1 FROM shifts other
+      WHERE other.performance_id = ${held.performanceId} AND other.id <> ${id}
+        AND other.user_id = users.id AND other.status IN ('CLAIMED', 'CONFIRMED')
+    ) AS onPerformance
+    FROM users
     WHERE anonymised_at IS NULL AND disabled = 0
       AND (lower(name) LIKE ${term} ESCAPE '\\' OR lower(email) LIKE ${term} ESCAPE '\\')
     ORDER BY name COLLATE NOCASE
@@ -30,11 +36,14 @@ export default defineEventHandler(async (event) => {
   `)
 
   const rules = await shiftRoleRules(event)
+  const moduleId = rules[held.role]
+  const moduleName = moduleId === null ? null : (await gatingModules([moduleId])).get(moduleId)?.name ?? null
   const today = londonToday()
   // A duty manager also needs a live committee role, which the assignment's write reads too (0115).
-  const items: AssignCandidate[] = await Promise.all(matched.map(async (row) => {
+  const items: AssignCandidate[] = await Promise.all(matched.map(async ({ onPerformance, ...row }) => {
     const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), needsCommitteeRole(held.role) ? hasCommitteeRole(row.id) : true])
-    return { ...row, eligible: committee && eligibilityRefusal(rules[held.role], heldModules) === null }
+    const reason = candidateLock({ role: held.role, moduleId, moduleName, held: heldModules, committee, onPerformance: onPerformance === 1 })
+    return { ...row, eligible: reason === null, reason }
   }))
 
   return { items }

@@ -554,6 +554,7 @@ describe.skipIf(skip !== null)('shift eligibility is set from the templates scre
 describe.skipIf(skip !== null)('the show-night readiness card', () => {
   interface Readiness {
     eligibility: { role: string, moduleId: string | null, standing: string }[]
+    qualified: Record<string, number>
     venues: { venueId: string, templateSlots: number, systemChecks: string[], emergencyFiled: boolean }[]
     board: { presets: number, milestones: number }
   }
@@ -567,6 +568,8 @@ describe.skipIf(skip !== null)('the show-night readiness card', () => {
     expect(readiness.eligibility.map(line => line.role)).toEqual(['DUTY_MANAGER', 'DOOR', 'BAR'])
     expect(readiness.venues.some(venue => venue.venueId === house.venueId)).toBe(true)
     expect(readiness.board).toMatchObject({ presets: expect.any(Number), milestones: expect.any(Number) })
+    // 0210: who could be put on each role's shift now, read by the card's Open and Closed.
+    expect(readiness.qualified).toEqual({ DUTY_MANAGER: expect.any(Number), DOOR: expect.any(Number), BAR: expect.any(Number) })
   })
 
   test('a gating module the catalogue does not hold reads as missing, and a published one as set', async () => {
