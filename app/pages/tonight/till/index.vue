@@ -293,6 +293,7 @@ const {
   resolveAttempt,
   refreshOpenAttempts,
   rememberAttempt,
+  answeredNotice,
 } = useSumUpCharge({
   request: (path, options) => $fetch(path, options),
   returnedAttemptId: typeof route.query.attempt === 'string' ? route.query.attempt : null,
@@ -797,6 +798,16 @@ const basketBindings = computed(() => ({
           :waiting-failure="waitingFailure"
           :resolving="resolving"
           @resolve="resolveAttempt"
+        />
+
+        <UAlert
+          v-if="answeredNotice"
+          data-test="answered-notice"
+          color="info"
+          variant="subtle"
+          :description="answeredNotice"
+          close
+          @update:open="answeredNotice = null"
         />
 
         <TillSumUpWaiting

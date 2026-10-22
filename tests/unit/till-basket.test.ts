@@ -247,7 +247,7 @@ describe('the tap just made is named, and Undo takes back exactly that one (F-10
     const withChoice = aVariant({ choice: { id: 'choice-1', name: 'Mixer', options: [{ id: 'opt-1', itemName: 'Tonic' }] } })
     basket.tapVariant('Gin', withChoice)
     basket.chooseOption('opt-1', 'Tonic')
-    expect(basket.lastAdded.value?.said).toBe('Gin, Pint, Tonic')
+    expect(basket.lastAdded.value?.said).toBe('Gin, Pint with Tonic')
     basket.undoLastAdded()
     expect(basket.basket.value).toHaveLength(0)
     scope.stop()

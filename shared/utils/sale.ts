@@ -128,6 +128,13 @@ export function saysPouredLine(line: PouredLine): string {
   return line.choiceItemName ? `${line.productName} with ${line.choiceItemName}` : line.productName
 }
 
+// A basket line as the till says it: a lone "Each" names no size, so it is left out, and a
+// choice reads "with" it, as the Challenge 25 prompt says it (bar review, C2).
+export function saysBasketLine(line: PouredLine & { variantLabel: string }): string {
+  const sized = line.variantLabel.trim().toLowerCase() === 'each' ? line.productName : `${line.productName}, ${line.variantLabel}`
+  return line.choiceItemName ? `${sized} with ${line.choiceItemName}` : sized
+}
+
 export function pouredNames(lines: readonly PouredLine[]): string[] {
   return [...new Set(lines.map(saysPouredLine))]
 }
