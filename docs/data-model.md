@@ -774,7 +774,9 @@ window, an unpublished show, an off-sale or externally ticketed performance, eac
 named; `PUBLIC_ORDER_SEAT_CAP` (10 by default) is checked per line and against the order total.
 Reservation endpoints are rate limited by IP (`server/utils/request-ip.ts`, reading
 `CF-Connecting-IP`) and by email address, and every refusal is enumeration-safe: nothing in the
-response distinguishes an address that already held an account from one that did not.
+response distinguishes an address that already held an account from one that did not. A reused
+account keeps its own name and details; only the tickets join it, and when the typed name differs
+(`bookedInAnotherName()`) the owner's confirmation names it and says how to cancel (0170).
 
 **Release and reminders (D-106, D-107).** `hold_expires_at` is set at reservation to curtain
 minus `HOLD_RELEASE_MINUTES_BEFORE` (15 by default), or a performance's own

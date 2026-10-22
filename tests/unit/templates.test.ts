@@ -274,6 +274,14 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     }
   })
 
+  // 0170: a guest typed this account's address in another name, so the owner learns and can cancel.
+  test('a booking made with the address in another name tells the owner how to undo it', () => {
+    const { html, text } = render('reservation-confirmed', { ...EVERYTHING, bookedAs: 'Zed <Zane>' })
+    expect(flat(text)).toContain('This booking was made online with your email address in the name Zed <Zane>. If that was not you, open your booking and cancel it.')
+    expect(html).toContain('in the name Zed &lt;Zane&gt;')
+    expect(flat(render('reservation-confirmed', EVERYTHING).text)).not.toContain('in the name')
+  })
+
   // D-115 criterion 6: the desk's walk-up sends the till's confirmation, naming where it was paid.
   test('a walk-up paid at the desk says the box office, and one at the bar says the bar', () => {
     expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'DESK' }).text)).toContain('paid at the box office')

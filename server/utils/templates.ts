@@ -1651,19 +1651,23 @@ The Nottingham New Theatre`,
       : change === 'CHANGED'
         ? `Your booking ${reference} for ${show}, ${when}, has changed${nothingDue ? '' : `, and is now ${totalDue}`}.`
         : `Reference ${reference} for ${show}, ${when}.`
+    // A guest typed this account's address under another name (0170): the owner can undo it.
+    const bookedAs = typeof context.bookedAs === 'string' && context.bookedAs !== ''
+      ? `This booking was made online with your email address in the name ${context.bookedAs}. If that was not you, open your booking and cancel it. Nothing has been paid.`
+      : null
     const subject = change === 'EXCHANGED'
       ? `Your booking for ${show} has moved`
       : change === 'CHANGED' ? `Your booking for ${show} has changed` : `Your booking for ${show}`
     return {
       subject,
       html: layout(`<p>Hello ${context.name},</p>
-<p>${change === null ? `Reference <strong>${reference}</strong> for ${show}, ${when}.` : opening}</p>${arrival.html}
+<p>${change === null ? `Reference <strong>${reference}</strong> for ${show}, ${when}.` : opening}</p>${bookedAs ? `\n<p>${bookedAs}</p>` : ''}${arrival.html}
 <p>${owed}</p>
 <p><a href="${url}"><img src="${imageUrl}" alt="Booking QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>${guidance.html}`),
       text: `Hello ${context.name},
 
-${opening}${arrival.text}
+${opening}${bookedAs ? `\n\n${bookedAs}` : ''}${arrival.text}
 
 ${owed}
 

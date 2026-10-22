@@ -104,6 +104,33 @@ describe.skipIf(skip !== null)('a guest reserves online without an account (crit
     expect(row?.userId).not.toBeNull()
   }, CASE_TIMEOUT_MS)
 
+  // 0170: an address with an account answers exactly as a fresh one does, gains only the tickets,
+  // and the confirmation goes to the account's owner, never renaming them.
+  test('a guest typing a member\'s address in another name books onto the account and renames nobody', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const order = (email: string) => send('POST', '/api/reservations', {
+      performanceId, lines: [{ ticketTypeId, quantity: 1 }], guest: { name: 'Zed Zane', email },
+    }, '')
+
+    const fresh = await order(`zed-${crypto.randomUUID().slice(0, 8)}@example.invalid`)
+    const taken = await order(officer.email)
+    expect(taken.status).toBe(fresh.status)
+    const body = await taken.json() as Record<string, unknown>
+    expect(Object.keys(body).sort()).toEqual(Object.keys(await fresh.json() as Record<string, unknown>).sort())
+
+    expect(reservationFor(String(body.reference))?.userId).toBe(officer.id)
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      expect((database.query('SELECT name FROM users WHERE id = ?').get(officer.id) as { name: string }).name).toBe(officer.name)
+      const sent = database.query('SELECT count(*) AS total FROM notification_log WHERE type = ? AND user_id = ?')
+        .get('reservation.confirmed', officer.id) as { total: number }
+      expect(sent.total).toBeGreaterThan(0)
+    }
+    finally {
+      database.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   // Issue 1329: Book lands on the booking page itself, from its top, rather than a panel above
   // the fold whose link opened a server route inside the app and found nothing there.
   test('a guest can complete the whole flow through the real booking page, and lands on the booking', async () => {
