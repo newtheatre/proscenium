@@ -79,6 +79,13 @@ export default defineEventHandler(async (event) => {
     if (!result.applied) throw await editRefusal(reservationId, current, 'This booking can no longer be changed here')
   }
 
+  // Seats given back are offered to the list exactly as a cancel's are, never left for public sale.
+  if (delta.removals.length > 0) {
+    const cap = await configValue(event, 'WAITING_LIST_OFFER_BATCH_CAP')
+    const run = await offerWaitingList(event, reservation.performanceId, new Date(), cap)
+    await notifyWaitingListOffers(event, run.offered)
+  }
+
   const state = await reservationCurrentState(reservationId)
 
   // The only email the booker held quoted the old total, so a change sends a fresh copy with the same
