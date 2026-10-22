@@ -173,20 +173,20 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
     const roles = officerView.body.firstRun?.find(line => line.step === 'ROLES')
     expect(officerView.body.firstRun === null || roles?.done === true).toBe(true)
 
-    // Every severity ships routing nowhere, so the Theatre Manager is told until one is routed.
-    const unrouted = await read<{ setUp: Array<{ kind: string }>, tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
-    expect(unrouted.body.tonight).toBeNull()
-    expect((unrouted.body as { firstRun?: unknown }).firstRun).toBeNull()
-    expect(unrouted.body.setUp).toEqual([{ kind: 'NO_SAFETY_ROUTING' }])
+    // Serious ships routed (0235), so the Theatre Manager is told only once nothing is.
+    const routed = await read<{ setUp: unknown[], tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
+    expect(routed.body.tonight).toBeNull()
+    expect((routed.body as { firstRun?: unknown }).firstRun).toBeNull()
+    expect(routed.body.setUp).toEqual([])
 
-    expect((await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: true }, theatre.cookie)).status).toBe(200)
+    expect((await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: false }, theatre.cookie)).status).toBe(200)
     try {
-      const trainerView = await read<{ setUp: unknown[], tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
-      expect(trainerView.body.tonight).toBeNull()
-      expect(trainerView.body.setUp).toEqual([])
+      const unrouted = await read<{ setUp: Array<{ kind: string }>, tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
+      expect(unrouted.body.tonight).toBeNull()
+      expect(unrouted.body.setUp).toEqual([{ kind: 'NO_SAFETY_ROUTING' }])
     }
     finally {
-      await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: false }, theatre.cookie)
+      await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: true }, theatre.cookie)
     }
   })
 
