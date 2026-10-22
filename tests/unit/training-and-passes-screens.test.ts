@@ -73,9 +73,11 @@ describe('a way out and one message per change (A-112, H-104, issue 1153 item 6)
     expect(source).not.toContain('nothing delivers them yet')
   })
 
+  // A quiet tick beside the switch, never a toast of its own (0154).
   test('a toggle saved does not raise a message of its own', async () => {
     const source = await read(NOTIFICATIONS)
-    expect(source).not.toContain('Saved')
+    expect(source).not.toMatch(/toast\.add\(\{ title: '[^']*[Ss]aved/)
+    expect(source).toContain('`saved-${cell.topic}`')
   })
 
   test('the sessions screen no longer tells a waiting member they are in', async () => {

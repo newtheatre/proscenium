@@ -42,6 +42,6 @@ describe('a grant that waits on an authenticator says so', () => {
   test('the grant form tells the granter, naming where the holder sets one up', async () => {
     const source = await read('app/components/RoleGrantForm.vue')
     expect(source).toContain('data-test="grant-waits-on-factor"')
-    expect(source).toContain('Sign-in and security')
+    expect(source).toContain('under Security in their account')
   })
 })

@@ -32,7 +32,9 @@ async function save(cell: Cell, wanted: boolean): Promise<void> {
     cell.email = wanted
     saved.value = cell.topic
     clearTimeout(fading)
-    fading = setTimeout(() => { saved.value = '' }, 2500)
+    fading = setTimeout(() => {
+      saved.value = ''
+    }, 2500)
   }
   catch (error) {
     toast.add({ title: refusalText(error), color: 'error' })
