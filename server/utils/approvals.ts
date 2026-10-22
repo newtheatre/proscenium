@@ -4,7 +4,7 @@ import { eq, inArray, sql } from 'drizzle-orm'
 import { auditedWrite } from './audit'
 import { conflictsWith } from './bookings'
 import { closedNow, roomOpenTerms } from './performance-closures'
-import { chunked, refusalToDecide } from '#shared/utils/approvals'
+import { OWN_REQUEST, chunked, refusalToDecide } from '#shared/utils/approvals'
 import { lostWriteCause } from '#shared/utils/blackouts'
 import { HOLDS_A_SLOT, maskConflicts } from '#shared/utils/bookings'
 import type { AuditRow } from '#shared/utils/audit'
@@ -34,7 +34,7 @@ export interface PendingRow {
 
 export type DecisionOutcome
   = | { id: string, ok: true, status: 'CONFIRMED' | 'REJECTED' }
-    | { id: string, ok: false, why: 'missing' | 'settled' | 'gone' | 'conflict' | 'closed', says: string, conflicts?: Conflict[] }
+    | { id: string, ok: false, why: 'missing' | 'settled' | 'own' | 'gone' | 'conflict' | 'closed', says: string, conflicts?: Conflict[] }
 
 // Read back the rows a batch names, split so no statement's parameter count grows with the batch
 // (0003). Ids come from the body rather than a result set, and the cap is the same either way.
@@ -73,11 +73,11 @@ export async function approveOne(id: string, actorId: string, intoRoom: string |
   if (await auditedWrite(db.all<{ id: string }>(approveStatement(id, actorId, intoRoom, now, offsets)), entry)) {
     return { id, ok: true, status: 'CONFIRMED' }
   }
-  return whyItFailed(id, intoRoom, offsets)
+  return whyItFailed(id, intoRoom, offsets, actorId)
 }
 
-// Still waiting, room still bookable, nothing overlapping it in the room it goes into. The alias
-// is not usable in RETURNING, which is why the column is bare (SQLite).
+// Still waiting, not the approver's own, room still bookable, nothing overlapping it in the room it
+// goes into (0116, 0201). The alias is not usable in RETURNING, which is why the column is bare.
 export function approveStatement(id: string, actorId: string, intoRoom: string | null, now: number, offsets: ShiftOffsets): SQL {
   const held = HOLDS_A_SLOT.map(status => sql`${status}`)
 
@@ -90,6 +90,7 @@ export function approveStatement(id: string, actorId: string, intoRoom: string |
         updated_at = ${now}
     WHERE target.id = ${id}
       AND target.status = 'PENDING_APPROVAL'
+      AND target.user_id <> ${actorId}
       AND EXISTS (SELECT 1 FROM rooms WHERE id = COALESCE(${intoRoom}, target.room_id) AND is_active = 1)
       AND NOT EXISTS (
         SELECT 1 FROM room_bookings AS other
@@ -126,12 +127,13 @@ export async function rejectOne(id: string, actorId: string, reason: string, now
 
 // Nothing written, disambiguated rather than guessed: gone, already answered, closed or beaten to it.
 // A rejection carries no closure predicate, so it reads none.
-async function whyItFailed(id: string, intoRoom: string | null, offsets?: ShiftOffsets): Promise<DecisionOutcome> {
+async function whyItFailed(id: string, intoRoom: string | null, offsets?: ShiftOffsets, approverId?: string): Promise<DecisionOutcome> {
   const [row] = await selectPending(eq(schema.roomBookings.id, id))
   if (!row) return { id, ok: false, why: 'missing', says: 'That request is no longer there' }
 
   const settled = refusalToDecide(row)
   if (settled) return { id, ok: false, why: 'settled', says: settled }
+  if (approverId !== undefined && row.userId === approverId) return { id, ok: false, why: 'own', says: OWN_REQUEST }
 
   const roomId = intoRoom ?? row.roomId
   const [room] = await db.select({ id: schema.rooms.id, isActive: schema.rooms.isActive })

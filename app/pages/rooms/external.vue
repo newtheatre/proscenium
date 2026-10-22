@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { can, memberOrGrace } from '#shared/utils/abilities'
+import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
 import { nameOrPurpose } from '#shared/utils/bookings'
 import { EXTERNAL_NO_MEMBERSHIP, SU_ROOM_ASK } from '#shared/utils/external-requests'
 import { fromLondonWallClock } from '#shared/utils/london'
@@ -77,7 +77,7 @@ function instantOf(day: string, clock: string): string {
 const needsMembership = computed(() => failures.value.some(failure => failure.reason === 'NO_MEMBERSHIP'))
 
 // Refused before the form rather than after it is filled in (A-129 criterion 2, issue 1338).
-const lapsed = computed(() => !can(useViewer().value, memberOrGrace))
+const lapsed = computed(() => !can(useViewer().value, memberOrGrace) && !can(useViewer().value, manageRoomsEstate))
 
 async function ask(event: FormSubmitEvent<ExternalForm>): Promise<void> {
   saving.value = true

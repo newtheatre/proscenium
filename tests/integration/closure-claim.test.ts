@@ -28,6 +28,7 @@ async function withDatabase(fn: (database: TestDatabase) => void | Promise<void>
   try {
     database.batch([
       ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-booker', 'booker@example.invalid', 'A Booker'],
+      ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-officer', 'officer@example.invalid', 'An Officer'],
       ['INSERT INTO rooms (id, name) VALUES (?, ?)', 'r-house', 'The Auditorium'],
       ['INSERT INTO rooms (id, name) VALUES (?, ?)', 'r-studio', 'The Studio'],
     ])
@@ -151,7 +152,7 @@ describe('every other write that places a booking holds the closures too', () =>
     await withDatabase((database) => {
       booking(database, 'b-asked', 'PENDING_APPROVAL', EVENING)
       closeRoom(database, 'r-house', EVENING)
-      expect(write(database, approveStatement('b-asked', 'u-booker', null, NOW_SECONDS, OFFSETS))).toBe(0)
+      expect(write(database, approveStatement('b-asked', 'u-officer', null, NOW_SECONDS, OFFSETS))).toBe(0)
       expect(statusOf(database, 'b-asked')).toBe('PENDING_APPROVAL')
     })
   })
@@ -160,8 +161,8 @@ describe('every other write that places a booking holds the closures too', () =>
     await withDatabase((database) => {
       booking(database, 'b-moving', 'PENDING_APPROVAL', { startsAt: NIGHT_START + 16 * 3600, endsAt: NIGHT_START + 17 * 3600 }, 'r-studio')
       tonightsPerformance(database, { night: NIGHT, suffix: 'house', roomId: 'r-house', curtainHoursAfterNightStart: CURTAIN_HOURS })
-      expect(write(database, approveStatement('b-moving', 'u-booker', 'r-house', NOW_SECONDS, OFFSETS))).toBe(0)
-      expect(write(database, approveStatement('b-moving', 'u-booker', null, NOW_SECONDS, OFFSETS))).toBe(1)
+      expect(write(database, approveStatement('b-moving', 'u-officer', 'r-house', NOW_SECONDS, OFFSETS))).toBe(0)
+      expect(write(database, approveStatement('b-moving', 'u-officer', null, NOW_SECONDS, OFFSETS))).toBe(1)
     })
   })
 

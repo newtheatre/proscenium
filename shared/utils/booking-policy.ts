@@ -170,6 +170,22 @@ export function judge(proposal: Proposal, policy: EstatePolicy, room: RoomUnderP
   }
 }
 
+const counted = (count: number, unit: string): string => `${count} ${unit}${count === 1 ? '' : 's'}`
+
+// The rules said before they are met, in the policy's own numbers, so nobody finds a limit by
+// breaking it. The cap counts waiting requests too, as judge() does.
+export function saysLimits(policy: EstatePolicy, held: number, exemptFromLongest: boolean): string {
+  const shortest = counted(policy.minBookingMinutes, 'minute')
+  const length = exemptFromLongest
+    ? `at least ${shortest}`
+    : `${shortest} to ${counted(policy.maxBookingHours, 'hour')}`
+  const horizon = counted(policy.horizonWeeks, 'week')
+  const ahead = policy.noticeHours > 0
+    ? `${counted(policy.noticeHours, 'hour')} to ${horizon} ahead`
+    : `up to ${horizon} ahead`
+  return `Bookings run ${length}, made ${ahead}. You hold ${held} of your ${policy.activeBookingsCap}.`
+}
+
 // The London day a booking belongs to, for grouping and for the calendar (0014).
 export function londonDayOfBooking(at: Date): string {
   const { year, month, day } = londonParts(at)
