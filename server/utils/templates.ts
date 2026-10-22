@@ -210,7 +210,7 @@ The Nottingham New Theatre`,
     // An unconfirmed registration is told why a password it may have chosen is asked for again (0153).
     const why = context.unconfirmed
       ? 'Somebody registered this address with us, but it was never confirmed, so we cannot tell whether the password chosen was yours. Choose one now and the account is yours.'
-      : 'We already know this address, from a booking or from our old records, but it has no way to sign in yet. Choose a password and everything already on it is yours.'
+      : 'We already know this address, from a booking, a training record or our old records, but it has no way to sign in yet. Choose a password and everything already on it is yours.'
     return {
       subject: 'Finish setting up your account',
       html: layout(`<p>Hello ${context.name},</p>
@@ -1034,6 +1034,25 @@ all, and the record is now on your training, dated to the day of the session.
 
 If we told you before that you were missed, this replaces that. Your training shows it:
 ${String(context.trainingUrl)}
+
+The Nottingham New Theatre`,
+  }),
+
+  'training-session-needs-first': (context: TemplateContext): Rendered => ({
+    subject: `${String(context.taught)} on ${String(context.heldOn)} now needs ${String(context.missing)} first`,
+    html: layout(`<p>Hello ${context.name},</p>
+<p>What the session on ${context.heldOn} teaches has changed since you signed up. It now covers
+${context.taught}, which usually follows ${context.missing}, and you do not hold that yet.</p>
+<p>Your place is unchanged. You can still come, and the trainer will know whether it matters on
+the night, or you can withdraw on <a href="${String(context.sessionsUrl)}">the sessions page</a>.</p>`),
+    text: `Hello ${context.name},
+
+What the session on ${context.heldOn} teaches has changed since you signed up. It now covers
+${context.taught}, which usually follows ${context.missing}, and you do not hold that yet.
+
+Your place is unchanged. You can still come, and the trainer will know whether it matters on the
+night, or you can withdraw on the sessions page:
+${String(context.sessionsUrl)}
 
 The Nottingham New Theatre`,
   }),

@@ -247,8 +247,9 @@ export function blockingGaps(gaps: readonly PrerequisiteGap[]): PrerequisiteGap[
   return gaps.filter(gap => gap.severity === 'BLOCKS')
 }
 
-export function warningGaps(gaps: readonly PrerequisiteGap[]): PrerequisiteGap[] {
-  return gaps.filter(gap => gap.severity === 'ACKNOWLEDGE')
+// A prerequisite the same session teaches is no gap to warn about: they will have it by the end.
+export function warningGaps(gaps: readonly PrerequisiteGap[], taughtHere: readonly string[] = []): PrerequisiteGap[] {
+  return gaps.filter(gap => gap.severity === 'ACKNOWLEDGE' && !taughtHere.includes(gap.requiresId))
 }
 
 // The one figure a member wants back: where they stand right now, said plainly.

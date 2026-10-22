@@ -2,6 +2,7 @@
 import { isNoSuchMessage } from '#shared/utils/no-such'
 import { saysScreenIsFor } from '#shared/utils/refusals'
 import type { NuxtError } from '#app'
+import type { ScreenStanding } from '#shared/utils/refusals'
 import type { Role } from '#shared/utils/roles'
 
 // Inside the site chrome, so a mistyped show URL costs the page and not the rest of the theatre
@@ -32,8 +33,9 @@ const shown = computed(() => {
   }
   // A signed-in refusal names who the screen is for, never the IT Manager (issue 1304, K-133).
   if (props.error.statusCode === 403) {
-    const asked = forRoles.value ? `${saysScreenIsFor(forRoles.value)} Ask them if you need something from it.` : saysScreenIsFor([])
-    const says = refusalData.value?.changedByItManager === true ? `${asked} The IT Manager makes every change on it.` : asked
+    const { roles, standings } = reaches.value
+    const asked = roles.length + standings.length > 0 ? `${saysScreenIsFor(roles, standings)} Ask them if you need something from it.` : saysScreenIsFor([])
+    const says = reaches.value.changedByItManager ? `${asked} The IT Manager makes every change on it.` : asked
     return { title: 'That is not yours to open', says }
   }
   // A page that knows what was missing says so, as /qr does for a bad link (0121); the router's
@@ -50,12 +52,14 @@ const shown = computed(() => {
 
 // The roles a console refusal carries, read defensively: a server-rendered error's data arrives
 // as text.
-const refusalData = computed(() => (typeof props.error.data === 'string' ? safeParse(props.error.data) : props.error.data) as
-  { roles?: unknown, changedByItManager?: unknown } | null | undefined)
-
-const forRoles = computed<Role[] | null>(() => {
-  const roles = refusalData.value?.roles
-  return Array.isArray(roles) && roles.length > 0 ? roles as Role[] : null
+const reaches = computed<{ roles: Role[], standings: ScreenStanding[], changedByItManager: boolean }>(() => {
+  const data = (typeof props.error.data === 'string' ? safeParse(props.error.data) : props.error.data) as
+    { roles?: unknown, standings?: unknown, changedByItManager?: unknown } | null | undefined
+  return {
+    roles: Array.isArray(data?.roles) ? data.roles as Role[] : [],
+    standings: Array.isArray(data?.standings) ? data.standings as ScreenStanding[] : [],
+    changedByItManager: data?.changedByItManager === true,
+  }
 })
 
 function safeParse(text: string): unknown {

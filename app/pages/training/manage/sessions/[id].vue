@@ -2,7 +2,7 @@
 import { can, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { saysDay } from '#shared/utils/when'
 import { londonDay } from '#shared/utils/membership'
-import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, plannerModuleOptions, saysGaps, saysSessionStatus } from '#shared/utils/training'
+import { SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, TOO_MANY_PLACES, plannerModuleOptions, saysGaps, saysSessionStatus } from '#shared/utils/training'
 import type { MemberLacking } from '#shared/utils/training'
 
 definePageMeta({ layout: 'console', title: 'Session', middleware: 'console', docs: '/docs/training/sessions' })
@@ -94,6 +94,7 @@ const canChangePlaces = computed(() =>
 
 const changingPlaces = ref(false)
 const places = ref(0)
+const tooManyPlaces = computed(() => places.value > SESSION_CAPACITY_MAX)
 const placesFailure = ref<string | null>(null)
 const placesResult = ref<string | null>(null)
 
@@ -156,6 +157,7 @@ const moduleIds = ref<string[]>([])
 const catalogue = ref<Module[]>([])
 const releaseFreeze = ref(false)
 const lacking = ref<MemberLacking[]>([])
+const tellLacking = ref(true)
 const previewing = ref(false)
 const previewFailure = ref<string | null>(null)
 const modulesFailure = ref<string | null>(null)
@@ -184,6 +186,7 @@ async function startChangingModules(): Promise<void> {
   moduleIds.value = data.value?.modules.map(module => module.id) ?? []
   releaseFreeze.value = false
   lacking.value = []
+  tellLacking.value = true
   previewFailure.value = null
   modulesFailure.value = null
   modulesResult.value = null
@@ -225,13 +228,16 @@ async function saveModules(): Promise<void> {
   working.value = true
   modulesFailure.value = null
   try {
-    const answered = await $fetch<{ released: boolean }>(
+    const telling = lacking.value.length > 0 && tellLacking.value
+    const answered = await $fetch<{ released: boolean, told: number }>(
       `/api/admin/training/sessions/${route.params.id}/modules`,
-      { method: 'PUT', body: { moduleIds: moduleIds.value, ...(registerOpen.value ? { releaseFreeze: true } : {}) } },
+      { method: 'PUT', body: { moduleIds: moduleIds.value, ...(registerOpen.value ? { releaseFreeze: true } : {}), ...(telling ? { tellLacking: true } : {}) } },
     )
-    const warned = lacking.value.length > 0
-      ? ` ${plural(lacking.value.length, 'person', 'people')} signed up without a prerequisite it adds.`
-      : ''
+    const warned = lacking.value.length === 0
+      ? ''
+      : telling
+        ? ` ${plural(answered.told, 'person', 'people')} without a prerequisite it adds ${answered.told === 1 ? 'was' : 'were'} emailed.`
+        : ` ${plural(lacking.value.length, 'person', 'people')} signed up without a prerequisite it adds.`
     modulesResult.value = `${answered.released ? 'The freeze was released and what' : 'What'} it teaches is changed.${warned}`
     changingModules.value = false
     await refresh()
@@ -468,11 +474,11 @@ const registerLabel = computed(() => {
             <UFormField
               label="Places"
               :description="`Between ${SESSION_CAPACITY_MIN} and ${SESSION_CAPACITY_MAX}. ${placesConsequence}`"
+              :error="tooManyPlaces ? TOO_MANY_PLACES : undefined"
             >
               <UInputNumber
                 v-model="places"
                 :min="SESSION_CAPACITY_MIN"
-                :max="SESSION_CAPACITY_MAX"
                 data-test="capacity-input"
               />
             </UFormField>
@@ -487,6 +493,7 @@ const registerLabel = computed(() => {
               <UButton
                 type="submit"
                 :loading="working"
+                :disabled="tooManyPlaces"
                 data-test="capacity-save"
               >
                 Save the places
@@ -598,6 +605,13 @@ const registerLabel = computed(() => {
                 </ul>
               </template>
             </UAlert>
+            <UCheckbox
+              v-if="lacking.length && !previewFailure"
+              v-model="tellLacking"
+              :label="lacking.length === 1 ? 'Email them when it is saved' : `Email all ${lacking.length} when it is saved`"
+              description="Each is told what it now needs first, and that their place is unchanged."
+              data-test="modules-tell-lacking"
+            />
 
             <UCheckbox
               v-if="registerOpen"

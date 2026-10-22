@@ -2,8 +2,8 @@
 import { h, resolveComponent } from 'vue'
 import { can, nameTrainers, viewAccounts, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
-import { saysDay } from '#shared/utils/when'
 import { addDays } from '#shared/utils/series'
+import { saysDay } from '#shared/utils/when'
 import { DELIVERY_ATTENDEES_MAX, SESSION_CAPACITY_MAX, SESSION_CAPACITY_MIN, plannerModuleOptions, saysSessionStatus, saysSource, sessionForm } from '#shared/utils/training'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
@@ -134,8 +134,16 @@ const today = computed(() => {
   const pad = (part: number, width: number): string => String(part).padStart(width, '0')
   return `${pad(parts.year, 4)}-${pad(parts.month, 2)}-${pad(parts.day, 2)}`
 })
-// The write path refuses today, so the picker never offers it (G-112 criterion 1).
+// The write path refuses today or earlier (G-112 criterion 1): typed in, it says so and offers the log.
 const tomorrow = computed(() => addDays(today.value, 1))
+const notAhead = computed(() => Boolean(state.heldOn) && state.heldOn <= today.value)
+
+function logInstead(): void {
+  const day = state.heldOn
+  open.value = false
+  beginLog()
+  heldOn.value = day
+}
 
 // Sign-up opening is one instant on the wire, collected as a day and a wall clock and read in
 // London like every other domain date (0014): a browser in another zone would be wrong.
@@ -261,6 +269,11 @@ function addPerson(): void {
 const byEmail = ref(false)
 const address = ref('')
 const theirName = ref('')
+// Said beside the address, where the eye is: the dialog's own alert is scrolled out of sight.
+const emailFailure = ref<string | null>(null)
+watch([address, byEmail], () => {
+  emailFailure.value = null
+})
 
 // Teaching that happened off-system was often taught to people who had not signed in yet, so the
 // log needs the same door the register has (G-117, widened).
@@ -268,6 +281,7 @@ async function addByEmail(): Promise<void> {
   if (!address.value.trim()) return
   working.value = true
   failure.value = null
+  emailFailure.value = null
   try {
     const found = await $fetch<{ id: string, name: string }>('/api/admin/training/attendees/lookup', {
       method: 'POST',
@@ -281,7 +295,7 @@ async function addByEmail(): Promise<void> {
     byEmail.value = false
   }
   catch (caught) {
-    failure.value = refusalText(caught)
+    emailFailure.value = refusalText(caught)
   }
   finally {
     working.value = false
@@ -547,11 +561,22 @@ const columns: TableColumn<Session>[] = [
           >
             <DateField
               v-model="state.heldOn"
-              :min="tomorrow"
+              :calendar-min="tomorrow"
               data-test="session-day"
               class="w-full"
             />
           </UFormField>
+
+          <UAlert
+            v-if="notAhead"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-calendar-x"
+            title="A session is scheduled for a future day"
+            description="One already taught, today or earlier, is logged instead, with who was there."
+            :actions="[{ label: 'Log a session', color: 'neutral', variant: 'outline', onClick: logInstead }]"
+            data-test="session-day-past"
+          />
 
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField
@@ -599,7 +624,6 @@ const columns: TableColumn<Session>[] = [
             <UInputNumber
               v-model="state.capacity"
               :min="SESSION_CAPACITY_MIN"
-              :max="SESSION_CAPACITY_MAX"
               class="w-full"
               data-test="session-capacity"
             />
@@ -709,7 +733,7 @@ const columns: TableColumn<Session>[] = [
           type="submit"
           form="session-form"
           :loading="saving"
-          :disabled="!opensAtReady"
+          :disabled="!opensAtReady || notAhead"
           data-test="session-submit"
         >
           Schedule the session
@@ -727,7 +751,7 @@ const columns: TableColumn<Session>[] = [
     <UModal
       v-model:open="logging"
       title="Log a session"
-      description="Teaching that already happened, recorded after the fact. You see exactly what it creates before anything is kept: one record per person per module, dated to the day it was taught."
+      description="Teaching that already happened, recorded after the fact. You see exactly what it creates before anything is kept: one record per person per module, dated to the day it was taught. This adds records only, with no session to open later: correct them on Records."
     >
       <template #body>
         <div class="space-y-6">
@@ -838,6 +862,13 @@ const columns: TableColumn<Session>[] = [
                   />
                 </UFormField>
               </div>
+              <UAlert
+                v-if="emailFailure"
+                color="error"
+                variant="subtle"
+                :description="emailFailure"
+                data-test="delivery-email-failure"
+              />
               <UButton
                 :loading="working"
                 :disabled="!address.trim()"
@@ -930,8 +961,8 @@ const columns: TableColumn<Session>[] = [
                   {{ record.moduleName }}
                 </span>
                 <span class="flex items-center gap-2 text-xs text-muted">
-                  <span>Awarded {{ record.awardedOn }}</span>
-                  <span>{{ record.expiresOn ? `Runs to ${record.expiresOn}` : 'Never expires' }}</span>
+                  <span>Awarded {{ saysDay(record.awardedOn, { year: true }) }}</span>
+                  <span>{{ record.expiresOn ? `Runs to ${saysDay(record.expiresOn, { year: true })}` : 'Never expires' }}</span>
                   <UBadge
                     v-if="record.alreadyHeld"
                     color="neutral"
@@ -952,10 +983,18 @@ const columns: TableColumn<Session>[] = [
               </li>
             </ul>
 
-            <p class="text-sm text-muted">
-              {{ plural(plan.creates, 'record') }} would be created.
+            <p
+              class="text-sm text-muted"
+              data-test="delivery-counts"
+            >
+              <template v-if="blocking.length">
+                Nothing can be logged until the prerequisites above are held.
+              </template>
+              <template v-else>
+                {{ plural(plan.creates, 'record') }} would be created.
+              </template>
               {{ plan.records.length - plan.creates > 0
-                ? `${plural(plan.records.length - plan.creates, 'record')} already exist for that day and would not be written again.`
+                ? `${plural(plan.records.length - plan.creates, 'record')} already ${plan.records.length - plan.creates === 1 ? 'exists' : 'exist'} for that day and would not be written again.`
                 : '' }}
             </p>
 

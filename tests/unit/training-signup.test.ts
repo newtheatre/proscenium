@@ -212,6 +212,12 @@ describe('a prerequisite gap blocks or warns by the module it is on (criterion 3
     expect(warningGaps(gaps).map(gap => gap.moduleId)).toEqual(['TECH-300'])
   })
 
+  test('an ordinary gap the same session teaches is not warned about (0243)', () => {
+    const gaps = prerequisiteGaps(ordinary, needed, new Set())
+    expect(warningGaps(gaps, ['TECH-100', 'TECH-300'])).toEqual([])
+    expect(warningGaps(gaps, ['TECH-300']).map(gap => gap.requiresId)).toEqual(['TECH-100'])
+  })
+
   test('a safety-critical module whose prerequisites are held blocks nothing', () => {
     expect(blockingGaps(prerequisiteGaps(safety, needed, new Set(['TECH-100'])))).toEqual([])
   })
