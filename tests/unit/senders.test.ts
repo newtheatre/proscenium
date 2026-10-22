@@ -52,6 +52,7 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'reservation.walk-up-paid': 'BOX_OFFICE',
   'reservation.cancelled': 'BOX_OFFICE',
   'reservation.performance-cancelled': 'BOX_OFFICE',
+  'reservation.performance-moved': 'BOX_OFFICE',
   'pass.issued': 'BOX_OFFICE',
   'waiting-list.joined': 'BOX_OFFICE',
   'waiting-list.offered': 'BOX_OFFICE',

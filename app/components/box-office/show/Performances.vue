@@ -142,14 +142,25 @@ function editPerformance(one: AdminPerformance): void {
   performanceOpen.value = true
 }
 
+// Saving a new day, curtain or venue emails every booking, so the officer hears that first (0191).
+const movesBookings = computed(() => {
+  const editing = editingPerformance.value
+  if (!editing || editing.soldTickets === 0) return null
+  const moved = form.venueId !== editing.venueId || form.day !== dayOf(editing.startsAt) || form.clock !== clockOf(editing.startsAt)
+  return moved
+    ? `${plural(editing.soldTickets, 'ticket is', 'tickets are')} held on this performance. Saving emails every booking the new day, time and venue.`
+    : null
+})
+
 async function savePerformance(): Promise<void> {
   saving.value = true
   failure.value = null
   const editing = editingPerformance.value
   const added = form.days.length
+  let told = 0
   try {
     if (editing) {
-      await $fetch(`/api/admin/performances/${editing.id}`, {
+      told = (await $fetch<{ bookingsTold: number }>(`/api/admin/performances/${editing.id}`, {
         method: 'PUT',
         body: {
           ...nightInstants(form.day, form.clock, form.doorsClock),
@@ -164,7 +175,7 @@ async function savePerformance(): Promise<void> {
           externalBookingUrl: blank(form.externalBookingUrl),
           notes: blank(form.notes),
         },
-      })
+      })).bookingsTold
     }
     else {
       // Every night of a run in one request, so the run lands whole or not at all (D-132 criterion 10).
@@ -180,8 +191,10 @@ async function savePerformance(): Promise<void> {
       })
     }
     toast.add({
-      title: editing ? 'Performance changed' : `${plural(added, 'performance', 'performances')} added`,
-      description: editing ? undefined : 'Off sale until you put them on sale, or publish the show.',
+      title: editing ? 'Performance saved' : `${plural(added, 'performance', 'performances')} added`,
+      description: editing
+        ? (told > 0 ? `${plural(told, 'booking')} emailed the new day, time and venue.` : undefined)
+        : 'Off sale until you put them on sale, or publish the show.',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -529,6 +542,15 @@ const columns: TableColumn<AdminPerformance>[] = [
             color="error"
             variant="subtle"
             :description="failure"
+          />
+
+          <UAlert
+            v-if="movesBookings"
+            data-test="performance-moves-bookings"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-mail"
+            :description="movesBookings"
           />
 
           <UFormField

@@ -1753,6 +1753,39 @@ ${next}
 The Nottingham New Theatre`,
     }
   },
+  // 0191: the booking still stands, so it says what moved, from what, and that the same code admits.
+  'reservation-performance-moved': (context: TemplateContext): Rendered => {
+    const reference = String(context.reference)
+    const show = String(context.show)
+    const when = String(context.when)
+    const was = String(context.was)
+    const venue = String(context.venue)
+    const wasVenue = String(context.wasVenue)
+    const url = String(context.url)
+    const moved = venue === wasVenue
+      ? `${show} has moved from ${was} to ${when}, at ${venue}.`
+      : `${show} has moved from ${was} at ${wasVenue} to ${when} at ${venue}.`
+    const next = context.collected
+      ? 'If the new time does not suit you, bring this reference to the box office.'
+      : 'If the new time does not suit you, open your booking and cancel it: nothing has been charged.'
+    return {
+      subject: `${show} has moved: now ${when}`,
+      html: layout(`<p>Hello ${context.name},</p>
+<p>${moved}</p>
+<p>Your booking <strong>${reference}</strong> still stands, and the same code admits you.
+<a href="${url}">Open your booking</a></p>
+<p>${next}</p>`),
+      text: `Hello ${context.name},
+
+${moved}
+
+Your booking ${reference} still stands, and the same code admits you: ${url}
+
+${next}
+
+The Nottingham New Theatre`,
+    }
+  },
   // D-124 criterion 5: the same hosted PNG shape as the reservation confirmation, for the same
   // reason (Gmail), with the reference and the text link as the fallback.
   'pass-issued': (context: TemplateContext): Rendered => {

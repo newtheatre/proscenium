@@ -50,6 +50,8 @@ const EVERYTHING: TemplateContext = {
   venue: 'The Nottingham New Theatre',
   venueName: 'The Nottingham New Theatre',
   oldVenue: 'The Studio',
+  was: 'Thursday 1 October 2026 at 19:30',
+  wasVenue: 'The Studio',
   newVenue: 'The Green Room',
   role: 'door',
   severity: 'serious',
@@ -293,6 +295,21 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(flat(text)).toContain('Nothing was charged')
     expect(flat(text)).not.toContain('refunded at the box office')
     expect(flat(text)).not.toContain('The room is closed that week')
+  })
+
+  // 0191: a moved performance says from what to what, and that the booking still stands.
+  test('a moved performance names the old and new time and place, and keeps the booking', () => {
+    const { subject, text } = render('reservation-performance-moved', { ...EVERYTHING, collected: false })
+    expect(subject).toBe('The Tempest has moved: now Friday 2 October 2026 at 19:30')
+    expect(flat(text)).toContain('from Thursday 1 October 2026 at 19:30 at The Studio to Friday 2 October 2026 at 19:30 at The Nottingham New Theatre')
+    expect(flat(text)).toContain('still stands')
+    expect(flat(text)).toContain('nothing has been charged')
+  })
+
+  test('a moved performance at the same venue names the venue once, and a paid holder is sent to the box office', () => {
+    const { text } = render('reservation-performance-moved', { ...EVERYTHING, wasVenue: EVERYTHING.venue, collected: true })
+    expect(flat(text)).toContain('to Friday 2 October 2026 at 19:30, at The Nottingham New Theatre.')
+    expect(flat(text)).toContain('bring this reference to the box office')
   })
 
   test('the cancellation is a booking that was still unpaid', () => {

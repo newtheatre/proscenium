@@ -4,6 +4,7 @@ import { formatLondon } from '#shared/utils/london'
 import { capacityOverrideRefusal, performanceForm, runningTimeRefusal } from '#shared/utils/programme'
 import { COMMITTED_SHIFT_STATUSES, saysShiftRole } from '#shared/utils/rota'
 import type { ShiftRole } from '#shared/utils/rota'
+import type { H3Event } from 'h3'
 
 // Edit a performance: its venue, its times, its capacity and its booking window. It does not take
 // the status, which moves by its own actions (D-112 criterion 1, D-121 criterion 2).
@@ -127,10 +128,10 @@ export default defineEventHandler(async (event) => {
   // A window says when the shift is worked, so a curtain at a new time is a new window (0078).
   if (moved || retimed) await db.run(restampShiftTimesStatement(id, offsets))
 
+  const when = formatLondon(new Date(input.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+
   // The batch committed, so every holder below is real: tell them after, never before (0003).
   if (moved) {
-    const when = formatLondon(new Date(input.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
-
     for (const shift of carried) {
       const key = `shift.venue-changed:${shift.shiftId}:${input.venueId}`
       const took = await claimNotification({
@@ -179,5 +180,52 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  return { ok: true }
+  // A booker holds a seat at a time and a place, so a change to either is theirs to hear (0191).
+  const bookingsTold = moved || input.startsAt !== held.startsAt
+    ? await tellBookersItMoved(event, { id, venueId: input.venueId, startsAt: input.startsAt, showTitle: held.showTitle, venueName: venue.name, was: held.startsAt, wasVenueName: held.venueName, when })
+    : 0
+
+  return { ok: true, bookingsTold }
 })
+
+interface Moved {
+  id: string
+  venueId: string
+  startsAt: number
+  showTitle: string
+  venueName: string
+  was: number
+  wasVenueName: string
+  when: string
+}
+
+// Keyed on where and when it moved to, so a second edit to the same slot tells nobody twice and a
+// later move tells everybody again.
+async function tellBookersItMoved(event: H3Event, moved: Moved): Promise<number> {
+  const bookings = await db.all<{ reservationId: string, reference: string, userId: string, collected: number }>(cancelledPerformanceHoldersQuery(moved.id))
+  const was = formatLondon(new Date(moved.was * 1000), { dateStyle: 'full', timeStyle: 'short' })
+  let told = 0
+  for (const booking of bookings) {
+    const key = `reservation.performance-moved:${booking.reservationId}:${moved.startsAt}:${moved.venueId}`
+    const took = await claimNotification({ userId: booking.userId, type: 'reservation.performance-moved', key })
+    if (!took) continue
+    told += 1
+    await notify(event, {
+      userId: booking.userId,
+      type: 'reservation.performance-moved',
+      claim: key,
+      context: {
+        name: '',
+        reference: booking.reference,
+        show: moved.showTitle,
+        when: moved.when,
+        was,
+        venue: moved.venueName,
+        wasVenue: moved.wasVenueName,
+        collected: booking.collected === 1,
+        ...await bookingLinkFor(event, booking.reservationId),
+      },
+    })
+  }
+  return told
+}

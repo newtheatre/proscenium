@@ -168,6 +168,7 @@ describe('what an override change records', () => {
     description: null,
     kind: 'SINGLE',
     accessKind: null,
+    restrictedTo: null,
     archived: false,
     basePrice: 900,
     activeByDefault: true,

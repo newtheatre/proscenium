@@ -425,6 +425,44 @@ describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once 
     expect(JSON.stringify(entry?.detail)).not.toContain('unwell')
   })
 
+  // 0191: a moved curtain saved silently, and the booker's confirmation kept the old time.
+  test('moving a performance with bookings emails each one once per move, and a capacity edit tells nobody', async () => {
+    const id = await newShow()
+    const startsAt = nextWeek()
+    const performance = await addPerformance(id, { startsAt })
+    const database = new Database(app.databaseFile)
+    try {
+      for (const [suffix, status] of [['paid', 'COLLECTED'], ['unpaid', 'PENDING'], ['gone', 'CANCELLED']] as const) {
+        database.run(
+          'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          [`m-${suffix}-${performance}`, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, status, 'WEB'],
+        )
+      }
+    }
+    finally {
+      database.close()
+    }
+    const edit = (over: Record<string, unknown>) => send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt, durationMinutes: 120, intervalCount: 0, ...over })
+
+    expect(await (await edit({ capacityOverride: 50 })).json()).toMatchObject({ bookingsTold: 0 })
+    expect(await (await edit({ startsAt: startsAt + 1800 })).json()).toMatchObject({ bookingsTold: 2 })
+    expect(await (await edit({ startsAt: startsAt + 1800, capacityOverride: 40 })).json()).toMatchObject({ bookingsTold: 0 })
+
+    const readOnly = new Database(app.databaseFile, { readonly: true })
+    try {
+      const told = readOnly
+        .query(`SELECT claim FROM notification_log WHERE user_id = ? AND type = 'reservation.performance-moved' AND claim LIKE ?`)
+        .all(member.id, `%${performance}%`) as { claim: string }[]
+      expect(told.map(row => row.claim).sort()).toEqual([
+        `reservation.performance-moved:m-paid-${performance}:${startsAt + 1800}:${venueId}`,
+        `reservation.performance-moved:m-unpaid-${performance}:${startsAt + 1800}:${venueId}`,
+      ])
+    }
+    finally {
+      readOnly.close()
+    }
+  })
+
   test('a cancelled performance cannot be put back on sale by the sale action', async () => {
     const id = await newShow()
     const performance = await addPerformance(id)

@@ -303,6 +303,15 @@ export const MESSAGE_TYPES = {
     sender: 'BOX_OFFICE',
   },
 
+  // Transactional, the same reach as the cancellation: the booking stands at a new time or place (0191).
+  'reservation.performance-moved': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'reservation-performance-moved',
+    reachesUnverified: true,
+    sender: 'BOX_OFFICE',
+  },
+
   // Transactional (the pass exists because of this message, not despite a preference), reaching
   // an unverified account the same way a reservation confirmation does (D-124 criterion 5).
   'pass.issued': {
