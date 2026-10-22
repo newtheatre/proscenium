@@ -137,7 +137,12 @@ watch(model, (value) => {
               Erased
             </UBadge>
           </span>
-          <span class="font-mono text-xs text-muted">{{ item.hint ?? item.email }}</span>
+          <span class="text-xs text-muted">
+            <span class="font-mono">{{ item.email }}</span><span
+              v-if="item.hint"
+              class="font-mono"
+            > · {{ item.hint }}</span>
+          </span>
         </span>
       </template>
 
@@ -147,5 +152,14 @@ watch(model, (value) => {
         </span>
       </template>
     </UInputMenu>
+    <!-- Said in full under the field, since two people can share a first name and the first option
+         is a click away from the wrong one (0155). -->
+    <p
+      v-if="chosen && chosen.value === model"
+      class="mt-1 text-xs text-muted"
+      data-test="person-picker-chosen"
+    >
+      Chosen: <span class="text-default">{{ chosen.label }}</span>, {{ chosen.email }}<span v-if="chosen.hint">, student number {{ chosen.hint }}</span>
+    </p>
   </div>
 </template>

@@ -87,7 +87,7 @@ interface Claim { id: string, studentId: string, startsOn: string, term: number,
 interface Own { membership: { startsOn: string, expiresOn: string } | null, state: { kind: string }, claim: Claim | null, studentId: string | null }
 
 // The open claim says what happens now and what comes later, the order 0031 and the runbook keep.
-const RECORDING_SAYS = 'An officer records it, usually within a day. The committee checks memberships against the SU\'s list later.'
+const RECORDING_SAYS = 'The IT Manager records it, usually within a day. The committee checks memberships against the SU\'s list later.'
 
 const claim = (as: TestMember, over: Record<string, unknown> = {}): Promise<Response> =>
   send('POST', '/api/account/membership/claim', { studentId: nextNumber(), startsOn: today, term: 1, ...over }, as.cookie)
@@ -350,7 +350,10 @@ describe.skipIf(skip !== null)('the screens (A-130 criterion 4)', () => {
       await click(view, 'form button[type="submit"]')
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-      await visit(view, `${app.baseURL}/account/membership`, '[data-test="claim-form"]')
+      // Current, so the form waits behind the renewal question (0155).
+      await visit(view, `${app.baseURL}/account/membership`, '[data-test="claim-renewal"]')
+      await click(view, '[data-test="claim-renewal"]')
+      await waitFor(view, `document.querySelector('[data-test="claim-form"]')`)
       await waitFor(view, `document.querySelector('input[data-test="claim-student-id"]')?.value === ${JSON.stringify(number)}`)
       expect(await readDate(view, '[data-test="claim-starts"]')).not.toMatch(/\d/)
     }

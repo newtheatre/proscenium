@@ -3,7 +3,8 @@ import { h, resolveComponent } from 'vue'
 import { can, manageMembers } from '#shared/utils/abilities'
 import { recordMembership } from '#shared/utils/admin-forms'
 import { saysDay } from '#shared/utils/when'
-import { MEMBERSHIP_TERMS, daysAfter, isInGrace, londonDay, saysMembershipSource } from '#shared/utils/membership'
+import { MEMBERSHIP_TERMS, daysAfter, endOfTerm, isInGrace, londonDay, saysMembershipSource } from '#shared/utils/membership'
+import type { MembershipTerm } from '#shared/utils/membership'
 import { claimDeclineForm } from '#shared/utils/membership-claims'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { membershipsList } from '#shared/utils/memberships-list'
@@ -26,6 +27,7 @@ interface Member {
   startsOn: string
   expiresOn: string
   source: string
+  fromClaim: number
   confirmedAt: number | null
 }
 
@@ -182,15 +184,29 @@ async function record(event: FormSubmitEvent<RecordMembership>): Promise<void> {
   }
 }
 
+// Asked first, naming who and which term, since a check cannot be taken back (0155).
+const confirming = ref<Member | null>(null)
+const confirmFailure = ref<string | null>(null)
+const confirmWorking = ref(false)
+const confirmOpen = computed({
+  get: () => confirming.value !== null,
+  set: (value) => { if (!value && !confirmWorking.value) confirming.value = null },
+})
+
 async function confirm(member: Member): Promise<void> {
-  failure.value = null
+  confirmFailure.value = null
+  confirmWorking.value = true
   try {
     await $fetch(`/api/admin/memberships/${member.id}/confirm`, { method: 'POST' })
+    confirming.value = null
     toast.add({ title: `${member.name} checked against the SU's list`, icon: 'i-lucide-check', color: 'success' })
     await load()
   }
   catch (error) {
-    failure.value = listFailureFrom(error)
+    confirmFailure.value = refusalText(error)
+  }
+  finally {
+    confirmWorking.value = false
   }
 }
 
@@ -267,11 +283,17 @@ const columns: TableColumn<Member>[] = [
     header: 'Member',
     cell: ({ row }) => h('div', {}, [
       h('div', {}, row.original.name),
-      h('div', { class: 'font-mono text-xs text-muted' }, row.original.studentId ?? row.original.email),
+      h('div', { class: 'text-xs text-muted' }, row.original.email),
       // Below sm the start day and the source are hidden: shown here instead, so a phone keeps
       // the end date and whether it is checked in view (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `From ${saysDay(row.original.startsOn)}, ${saysMembershipSource(row.original.source)}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `From ${saysDay(row.original.startsOn)}, ${saysMembershipSource(row.original.source, row.original.fromClaim === 1)}`),
     ]),
+  },
+  {
+    id: 'studentId',
+    header: 'Student number',
+    cell: ({ row }) => row.original.studentId ?? '',
+    meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} font-mono text-sm` } },
   },
   {
     id: 'startsOn',
@@ -289,7 +311,7 @@ const columns: TableColumn<Member>[] = [
         : null,
     ]),
   },
-  { id: 'source', header: 'Source', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } }, cell: ({ row }) => saysMembershipSource(row.original.source) },
+  { id: 'source', header: 'Source', meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm text-muted` } }, cell: ({ row }) => saysMembershipSource(row.original.source, row.original.fromClaim === 1) },
   {
     id: 'confirmed',
     header: 'Checked',
@@ -300,7 +322,7 @@ const columns: TableColumn<Member>[] = [
         'variant': 'subtle',
         'size': 'sm',
         'data-test': 'confirm',
-        'onClick': () => confirm(row.original),
+        'onClick': () => { confirming.value = row.original },
       }, () => 'Confirm')
     },
   },
@@ -349,7 +371,8 @@ const claimBase: TableColumn<Claim>[] = [
   {
     id: 'term',
     header: 'Term',
-    cell: ({ row }) => plural(row.original.term, 'year'),
+    // What recording creates, said before the one click that creates it (0155).
+    cell: ({ row }) => `${plural(row.original.term, 'year')}, to ${saysDay(endOfTerm(row.original.startsOn, row.original.term as MembershipTerm))}`,
     meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} text-sm whitespace-nowrap` } },
   },
   {
@@ -705,5 +728,17 @@ const modalOpen = computed(() => declining.value !== null || granting.value)
         </UButton>
       </template>
     </UModal>
+
+    <ConfirmModal
+      v-model:open="confirmOpen"
+      name="confirm-membership"
+      title="Checked against the SU's list"
+      verb="Mark it checked"
+      color="primary"
+      :consequence="confirming ? `${confirming.name}'s membership from ${saysDay(confirming.startsOn)} to ${saysDay(confirming.expiresOn)} is marked as found on the SU's list. This cannot be taken back.` : undefined"
+      :loading="confirmWorking"
+      :failure="confirmFailure"
+      @confirm="confirming && confirm(confirming)"
+    />
   </ReadGate>
 </template>

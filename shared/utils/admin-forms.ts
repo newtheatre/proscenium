@@ -48,7 +48,8 @@ export const recordMembership = z.object({
   startsOn: londonDayField,
   years: z.union([z.literal(1), z.literal(3)]),
   evidence: z.string().trim().max(200).optional(),
-  studentId: z.string().trim().max(32).optional(),
+  studentId: z.string().trim().max(32).optional()
+    .refine(value => !value || /^\d{6,12}$/.test(value), 'A student number is the 6 to 12 digits on the student card'),
 })
 
 export const recordManualEntry = z.object({

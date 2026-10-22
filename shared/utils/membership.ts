@@ -14,6 +14,9 @@ export function londonDay(at: Date): string {
 }
 
 // The last day a term covers: a year from the fourteenth is the thirteenth, not the fourteenth.
+// The SU's student number is digits only; anything else would never match its list (0155).
+export const studentIdField = z.string().trim().regex(/^\d{6,12}$/, 'A student number is the 6 to 12 digits on your student card')
+
 export function endOfTerm(startsOn: string, years: MembershipTerm): string {
   const [year, month, day] = startsOn.split('-').map(Number) as [number, number, number]
   const end = new Date(Date.UTC(year + years, month - 1, day))
@@ -113,8 +116,8 @@ export function membershipState(term: Term | null, today: string, graceDays: num
 }
 
 // Where a term came from, in words: the stored value is a code (A-117 criterion 1).
-export function saysMembershipSource(source: string): string {
+export function saysMembershipSource(source: string, fromClaim = false): string {
   if (source === 'ROSTER') return 'SU roster'
-  if (source === 'MANUAL') return 'Recorded by hand'
+  if (source === 'MANUAL') return fromClaim ? 'From a claim' : 'Recorded by hand'
   return source
 }

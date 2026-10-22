@@ -91,6 +91,8 @@ export interface MergeStatementsInput {
   actorId: string
   grantPlan: GrantPlan
   trainingRecords: TrainingRecordRow[]
+  // The loser's student number, carried to a winner holding none so the SU can still find them.
+  loserStudentId?: string | null
   now: number
 }
 
@@ -106,7 +108,7 @@ export interface MergeStatements {
 }
 
 export function mergeStatements(input: MergeStatementsInput): MergeStatements {
-  const { winnerId, loserId, actorId, grantPlan, trainingRecords, now } = input
+  const { winnerId, loserId, actorId, grantPlan, trainingRecords, loserStudentId = null, now } = input
 
   // A fresh row under the winner, copying the original award exactly (0041); the original is
   // revoked, if it was not already, rather than deleted (`training_records_no_delete`, G-122).
@@ -134,6 +136,14 @@ export function mergeStatements(input: MergeStatementsInput): MergeStatements {
     ...records,
     sql`update shifts set user_id = ${winnerId} where user_id = ${loserId}`,
     sql`update memberships set user_id = ${winnerId} where user_id = ${loserId}`,
+    // The number is unique, so it leaves the loser before it lands on a winner that has none (0155).
+    ...(loserStudentId === null
+      ? []
+      : [
+          sql`update users set student_id = null where id = ${loserId} and student_id = ${loserStudentId}
+            and exists (select 1 from users where id = ${winnerId} and student_id is null)`,
+          sql`update users set student_id = ${loserStudentId} where id = ${winnerId} and student_id is null`,
+        ]),
     ...grantPlan.reassign.map(id => sql`update role_grants set user_id = ${winnerId} where id = ${id}`),
     ...grantPlan.extend.map(({ id, expiresAt }) => sql`update role_grants set expires_at = ${expiresAt} where id = ${id}`),
     ...grantPlan.retire.map(id => sql`delete from role_grants where id = ${id}`),
