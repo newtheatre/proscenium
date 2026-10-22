@@ -9,7 +9,7 @@ import type { AdminShow } from '#shared/utils/programme'
 const props = defineProps<{ show: AdminShow }>()
 
 const onSale = computed(() => saysOnSale(props.show.onSaleCount, props.show.performanceCount))
-const share = computed(() => soldShare(props.show.soldTickets, props.show.capacity))
+const share = computed(() => soldShare(props.show.houseTickets, props.show.capacity))
 
 const nextPerformance = computed(() => {
   const at = props.show.nextPerformanceAt
@@ -63,14 +63,14 @@ const nextPerformance = computed(() => {
         class="mt-2 font-semibold"
         data-test="strip-sold"
       >
-        {{ saysHouse(show.soldTickets, show.capacity) }}
+        {{ saysHouse(show.houseTickets, show.capacity) }}
       </p>
       <UProgress
         v-if="share !== null"
         :model-value="share"
         size="sm"
         class="mt-3"
-        :get-value-label="() => saysHouse(show.soldTickets, show.capacity)"
+        :get-value-label="() => saysHouse(show.houseTickets, show.capacity)"
       />
       <p
         v-else

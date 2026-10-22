@@ -106,7 +106,7 @@ const columns: TableColumn<AdminShow>[] = [
       h('div', { class: 'sm:hidden mt-1 max-w-56 text-xs text-muted' }, [
         saysShowStanding(row.original).says,
         saysShowDates(row.original.firstPerformanceAt, row.original.lastPerformanceAt),
-        saysHouse(row.original.soldTickets, row.original.capacity),
+        saysHouse(row.original.houseTickets, row.original.capacity),
       ].join(' \u00b7 ')),
     ]),
   },
@@ -138,8 +138,8 @@ const columns: TableColumn<AdminShow>[] = [
     // The bar is decoration over the figure and never instead of it: a meter with no number is a
     // colour, and a colour is not a state (K-101).
     cell: ({ row }) => {
-      const share = soldShare(row.original.soldTickets, row.original.capacity)
-      const says = saysHouse(row.original.soldTickets, row.original.capacity)
+      const share = soldShare(row.original.houseTickets, row.original.capacity)
+      const says = saysHouse(row.original.houseTickets, row.original.capacity)
       if (share === null) return h('span', { class: 'text-sm text-muted' }, says)
       return h('div', { class: 'flex items-center gap-2' }, [
         h(UProgress, { modelValue: share, size: 'sm', class: 'hidden w-16 lg:block' }),

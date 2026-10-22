@@ -391,6 +391,37 @@ describe.skipIf(skip !== null)('a show page says whether nights are still to com
   })
 })
 
+// 0192: a played night went on sale, and two shows were booked into one house at one time silently.
+describe.skipIf(skip !== null)('a played performance stays off sale, and a clash is named', () => {
+  test('On sale refuses a played night, and publishing leaves it off sale', async () => {
+    const id = await newShow()
+    const played = await addPerformance(id, { startsAt: Math.floor(Date.now() / 1000) - 3 * 86_400 })
+    const coming = await addPerformance(id)
+
+    const refused = await send('POST', `/api/admin/performances/${played}/sale`, { onSale: true })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { message: string }).message).toContain('already played')
+
+    const published = await send('POST', `/api/admin/shows/${id}/publish`, { published: true, cascadePerformances: true })
+    expect(await published.json()).toMatchObject({ performancesTakenOnSale: 1 })
+    const statuses = Object.fromEntries((await detail(id)).performances.map(one => [one.id, (one as unknown as { status: string }).status]))
+    expect(statuses).toEqual({ [played]: 'DRAFT', [coming]: 'ON_SALE' })
+  })
+
+  test('a second show in the same venue at the same time is saved and named', async () => {
+    const startsAt = nextWeek(61)
+    const first = await newShow({ title: named('The Seagull') })
+    await addPerformance(first, { startsAt })
+    const second = await newShow()
+
+    const answered = await send('POST', `/api/admin/shows/${second}/runs`, { venueId, durationMinutes: 120, intervalCount: 0, nights: [{ startsAt: startsAt + 1800 }] })
+    expect(answered.status).toBe(200)
+    const { clashes } = await answered.json() as { clashes: { showTitle: string, startsAt: number }[] }
+    expect(clashes.map(one => one.startsAt)).toEqual([startsAt])
+    expect(clashes[0]?.showTitle).toContain('The Seagull')
+  })
+})
+
 describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once it has sold (criterion 5)', () => {
   test('cancelling says how many tickets are owed a refund', async () => {
     const id = await newShow()
@@ -501,6 +532,42 @@ describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once 
     const answered = await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: startsAt + 86_400, durationMinutes: 120, intervalCount: 0 })
     expect(answered.status).toBe(200)
     expect(await answered.json()).toMatchObject({ bookingsTold: 0 })
+  })
+
+  // Process map, 21 October: three unpaid seats were reported as three refunds due at the desk.
+  test('only paid seats are refunds due, and the show stops counting the cancelled night', async () => {
+    const id = await newShow()
+    const performance = await addPerformance(id)
+    const type = await send('POST', '/api/admin/ticket-types', { name: named('Standard'), price: 900, activeByDefault: false })
+    const typeId = (await type.json() as { id: string }).id
+    const database = new Database(app.databaseFile)
+    try {
+      for (const [suffix, status, seats, price] of [['paid', 'COLLECTED', 1, 900], ['unpaid', 'PENDING', 2, 900], ['comp', 'COLLECTED', 1, 0]] as const) {
+        const reservation = `c-${suffix}-${performance}`
+        database.run(
+          'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+          [reservation, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, status, 'WEB'],
+        )
+        for (let seat = 0; seat < seats; seat++) {
+          database.run(
+            'INSERT INTO tickets (id, reservation_id, performance_id, ticket_type_id, price_paid, price_source) VALUES (?, ?, ?, ?, ?, ?)',
+            [`${reservation}-${seat}`, reservation, performance, typeId, price, 'BASE'],
+          )
+        }
+      }
+    }
+    finally {
+      database.close()
+    }
+
+    const answered = await send('POST', `/api/admin/performances/${performance}/cancel`)
+    expect(await answered.json()).toMatchObject({ ticketsOwedARefund: 1 })
+
+    const { show } = await detail(id) as unknown as { show: { unpaidTickets: number, houseTickets: number, soldTickets: number } }
+    expect(show.unpaidTickets).toBe(0)
+    expect(show.houseTickets).toBe(0)
+    expect(show.soldTickets).toBe(4)
+    await send('POST', `/api/admin/ticket-types/${typeId}/archive`, { archived: true })
   })
 
   test('a cancelled performance cannot be put back on sale by the sale action', async () => {

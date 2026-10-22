@@ -248,7 +248,9 @@ export interface AdminShow {
   performanceCount: number
   onSaleCount: number
   soldTickets: number
-  // Seats held but not yet paid for: the queue the desk still has to take money for (D-132).
+  // The same, on performances still going ahead: what the house below is measured against.
+  houseTickets: number
+  // Seats held but not yet paid for on a performance still going ahead (D-132).
   unpaidTickets: number
   // The house this theatre sells itself, and the next performance still to come. Both counted
   // from the performances, so the strip cannot state a figure the rows disagree with.

@@ -43,5 +43,7 @@ export default defineEventHandler(async (event) => {
 
   await db.batch([...created, ...filled] as unknown as Parameters<typeof db.batch>[0])
 
-  return { ok: true, ids: nights.map(night => night.id) }
+  const clashes = (await Promise.all(nights.map(night =>
+    venueClashes(input.venueId, night.startsAt, input.durationMinutes ?? null, night.id)))).flat()
+  return { ok: true, ids: nights.map(night => night.id), clashes }
 })
