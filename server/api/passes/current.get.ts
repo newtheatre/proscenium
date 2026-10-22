@@ -20,6 +20,8 @@ export default defineEventHandler(async (event) => {
     priceLabel: pass.priceLabel,
     pricePaid: saysPrice(pass.pricePaid),
     status: pass.status,
+    validFrom: pass.validFrom,
+    validUntil: pass.validUntil,
     qrSvg: qrSvgBase64(url),
     // What booking ahead can use it for (D-135); booking itself needs the holder signed in.
     coveredShows: await passCoveredShows(passId, Math.floor(Date.now() / 1000)),

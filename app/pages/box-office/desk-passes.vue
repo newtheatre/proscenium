@@ -63,21 +63,38 @@ async function loadRequests(): Promise<void> {
 watch(passTypeId, loadRequests, { immediate: true })
 
 const priceId = ref<string | undefined>(undefined)
-// Immediate: selectedPassType is already set by the time this registers, since the watcher
-// above runs synchronously first, and a price left blank silently zeroes what Issue charges.
+// Immediate, since a blank price zeroes what Issue charges. The dearest by default: a member
+// price is a choice the officer makes, never one a non-member gets by not looking.
 watch(selectedPassType, (type) => {
-  priceId.value = type?.prices[0]?.id
+  priceId.value = type?.prices.reduce<PassPrice | undefined>((dearest, one) => !dearest || one.price > dearest.price ? one : dearest, undefined)?.id
 }, { immediate: true })
 
 const buyerId = ref<string | undefined>(undefined)
+const buyerName = ref<string | null>(null)
 const personPicker = useTemplateRef('personPicker')
 
 const requestId = ref<string | undefined>(undefined)
+
+const buyerIsMember = ref<boolean | null>(null)
+watch(buyerId, async (id) => {
+  buyerIsMember.value = null
+  // A different buyer from the picker is no longer the chosen request's.
+  if (requestId.value && requests.value.find(one => one.id === requestId.value)?.userId !== id) requestId.value = undefined
+  if (!id) return
+  try {
+    const { member } = await $fetch<{ member: boolean }>(`/api/box-office/desk/passes/buyers/${id}`)
+    if (buyerId.value === id) buyerIsMember.value = member
+  }
+  catch {
+    // Unread, the line is simply left out: the price stays the officer's call either way.
+  }
+})
 
 // A person is chosen, never typed (0032): the picker's own preset shows the requester's name
 // without a search, since fulfilling a request already knows exactly who they are.
 function fulfilRequest(request: PendingRequest): void {
   requestId.value = request.id
+  buyerName.value = request.name
   buyerId.value = request.userId
   personPicker.value?.preset({ id: request.userId, name: request.name, email: '' })
 }
@@ -105,6 +122,7 @@ async function issue(): Promise<void> {
     })
     toast.add({ title: `${passName} issued`, icon: 'i-lucide-check', color: 'success' })
     buyerId.value = undefined
+    buyerName.value = null
     requestId.value = undefined
     await Promise.all([refreshPassTypes(), loadRequests(), nav.refresh()])
   }
@@ -180,10 +198,21 @@ async function issue(): Promise<void> {
             <li
               v-for="pending in requests"
               :key="pending.id"
-              class="flex items-center justify-between"
+              class="flex items-center justify-between rounded px-2 py-1"
+              :class="pending.id === requestId ? 'bg-primary/10 font-medium' : ''"
+              :data-test="`desk-pass-request-${pending.id}`"
             >
               <span>{{ pending.name }}</span>
+              <UBadge
+                v-if="pending.id === requestId"
+                color="primary"
+                variant="subtle"
+                :data-test="`desk-pass-chosen-${pending.id}`"
+              >
+                Chosen
+              </UBadge>
               <UButton
+                v-else
                 size="xs"
                 variant="subtle"
                 :data-test="`desk-pass-fulfil-${pending.id}`"
@@ -202,8 +231,18 @@ async function issue(): Promise<void> {
             endpoint="/api/box-office/desk/passes/buyers"
             search-param="q"
             placeholder="Search by name or email"
+            @chosen="person => buyerName = person?.name ?? null"
           />
         </UFormField>
+
+        <p
+          v-if="buyerIsMember !== null"
+          class="text-sm"
+          :class="buyerIsMember ? 'text-muted' : 'text-warning'"
+          data-test="desk-pass-buyer-membership"
+        >
+          {{ buyerIsMember ? 'A current member.' : 'Not a current member, so a member price does not apply.' }}
+        </p>
 
         <UAlert
           v-if="issueFailure"
@@ -216,7 +255,7 @@ async function issue(): Promise<void> {
           class="text-lg font-semibold"
           data-test="desk-pass-due"
         >
-          Due now: {{ saysPrice(duePence) }}
+          Due now{{ buyerId && buyerName ? ` from ${buyerName}` : '' }}: {{ saysPrice(duePence) }}
         </p>
 
         <UButton

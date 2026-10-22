@@ -3,7 +3,7 @@ import { Database } from 'bun:sqlite'
 import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickOption, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -450,9 +450,11 @@ describe.skipIf(skip !== null)('a member views what they hold, and receives a sc
 
     const current = await fetch(`${app.baseURL}/api/passes/current`, { headers: { cookie: cookie.split(';')[0]! } })
     expect(current.status).toBe(200)
-    const body = await current.json() as { reference: string, status: string }
+    const body = await current.json() as { reference: string, status: string, validFrom: number, validUntil: number }
     expect(body.reference).toBe(reference)
     expect(body.status).toBe('ACTIVE')
+    // The page says when the pass is good for, from the pass type's own window.
+    expect([body.validFrom, body.validUntil]).toEqual([now, now + 180 * 86_400])
   }, CASE_TIMEOUT_MS)
 
   test('a forged pass token is refused, and a reservation token does not resolve here either', async () => {
@@ -486,5 +488,40 @@ describe.skipIf(skip !== null)('a buyer is chosen by name or email, never typed 
     expect(found.status).toBe(200)
     const { items } = await found.json() as { items: { id: string }[] }
     expect(items.some(item => item.id === buyer.id)).toBe(true)
+  }, CASE_TIMEOUT_MS)
+})
+
+// The desk defaults to the dearest price and says whether the buyer is a member, so a member price
+// is a choice the officer makes, never one a non-member gets by default.
+describe.skipIf(skip !== null)('the pass desk prices a request with the buyer in view', () => {
+  test('a chosen request is marked, named in Due now, and a non-member is flagged against the dearer default', async () => {
+    const { id: passTypeId } = await onSalePassType({
+      prices: [{ label: 'Member', price: 2000 }, { label: 'Standard', price: 3000 }],
+    })
+    const passName = query<{ name: string }>('SELECT name FROM pass_types WHERE id = ?', passTypeId)!.name
+    const requester = await registerMember(app, 'requester', generatePassword())
+    const requested = await send('POST', '/api/account/passes/request', { passTypeId }, requester.cookie)
+    const { id: requestId } = await requested.json() as { id: string }
+
+    const password = generatePassword()
+    const desk = await registerMember(app, 'passdesk', password)
+    await grantRole(app, desk, 'FOH_MANAGER', officer.cookie)
+
+    const view = await signedInView(desk, password)
+    try {
+      await visit(view, `${app.baseURL}/box-office/desk-passes`, '[data-test="desk-passes-page"]')
+      await pickOption(view, '[data-test="desk-pass-type"]', passName)
+      await waitFor(view, `document.querySelector('[data-test="desk-pass-fulfil-${requestId}"]')`)
+      expect(await textOf(view, '[data-test="desk-pass-price"]')).toContain('Standard')
+
+      await click(view, `[data-test="desk-pass-fulfil-${requestId}"]`)
+      await waitFor(view, `document.querySelector('[data-test="desk-pass-chosen-${requestId}"]')`)
+      await waitFor(view, `document.querySelector('[data-test="desk-pass-buyer-membership"]')`)
+      expect(await textOf(view, '[data-test="desk-pass-buyer-membership"]')).toContain('Not a current member')
+      expect(await textOf(view, '[data-test="desk-pass-due"]')).toBe(`Due now from ${requester.name}: £30.00`)
+    }
+    finally {
+      view.close()
+    }
   }, CASE_TIMEOUT_MS)
 })

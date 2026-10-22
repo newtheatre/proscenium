@@ -1092,7 +1092,9 @@ the pass's own id: no dedicated column exists for it, and the field is documente
 for exactly this (0033). A buyer is chosen through `GET
 /api/box-office/desk/passes/buyers`, column allow-listed (name, email) and gated at
 `ticketing.write` rather than `accounts.read`, since an ordinary desk officer holds the first and
-not the second (K-123 criterion 1).
+not the second (K-123 criterion 1). Once chosen, `GET /api/box-office/desk/passes/buyers/{userId}`
+answers only `{ member }`, so the screen can show whether a member price point fits the buyer;
+the price itself defaults to the type's dearest, never its cheapest.
 
 **Requesting online, and fulfilling at the desk (criterion 3).** `POST /api/account/passes/request`
 writes a `pass_requests` row and nothing else: no capacity, no cap, no pass. One statement

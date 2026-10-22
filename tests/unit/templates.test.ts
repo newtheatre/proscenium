@@ -35,6 +35,8 @@ const EVERYTHING: TemplateContext = {
   rolesUrl: 'https://newtheatre.org.uk/people/accounts',
   entryUrl: 'https://newtheatre.org.uk/waiting-list/entry/tok',
   termsUrl: 'https://newtheatre.org.uk/policies/booking',
+  valid: '21 Oct to 18 Apr',
+  shows: 'The Seagull, Small Hours',
   imageUrl: 'https://newtheatre.org.uk/qr/r-1.sig/image.png',
   expiresAt: new Date('2026-10-02T18:30:00Z'),
   method: 'Google',
@@ -641,6 +643,10 @@ describe('the pass email follows the ticket terms (D-137)', () => {
 
   test('it says turning up without booking is subject to space', () => {
     for (const part of [html, text]) expect(flat(part)).toContain('You can also just turn up, subject to space on the night.')
+  })
+
+  test('it says when the pass is valid and which shows it covers, in both parts', () => {
+    for (const part of [html, text]) expect(flat(part)).toContain('It is valid 21 Oct to 18 Apr. It covers The Seagull, Small Hours.')
   })
 
   test('it links the ticket and pass terms in both parts', () => {
