@@ -672,8 +672,14 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
 // criterion 5); with none named it takes the next (0140), never past MAX_SLOT_COUNT.
 export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string, defaults: ShiftOffsets, gate: TrainingGate): SQL {
   const confirmed = input.userId !== undefined
-  // Somebody named is confirmed at once, as an assignment is, so the training gate rides the insert (#1302).
-  const trained = input.userId === undefined ? sql`` : sql` AND ${holdsGate(gate, input.userId)}`
+  // Somebody named is confirmed at once, as an assignment is, so the training gate rides the insert (#1302)
+  // and one shift per performance holds for them as an assignment's does (0210).
+  const trained = input.userId === undefined
+    ? sql``
+    : sql` AND ${holdsGate(gate, input.userId)} AND NOT EXISTS (
+        SELECT 1 FROM shifts other
+        WHERE other.performance_id = p.id AND other.user_id = ${input.userId} AND other.status IN ('CLAIMED', 'CONFIRMED')
+      )`
   // The window comes from the performance and the template the same way a stamp's does: a shift
   // added by hand with no window would hold authority for the whole night (0078).
   return sql`

@@ -1,6 +1,8 @@
 import { SYSTEM_CHECKS, saysSystemCheck } from './checklist'
 import { saysRole } from './roles'
 import { SHIFT_ROLES, saysShiftRole } from './rota'
+import { needsCommitteeRole } from './rota-eligibility'
+import { plural } from './text'
 import type { SystemCheck } from './checklist'
 import type { ConfigKey } from './config'
 import type { ShiftRole } from './rota'
@@ -41,13 +43,24 @@ function saysModule(line: RoleEligibility): string {
 export function saysEligibility(line: RoleEligibility): string {
   const shift = `${saysShiftRole(line.role).toLowerCase()} shift`
   switch (line.standing) {
-    case 'SET': return `Unlocked by ${saysModule(line)}.`
+    case 'SET': return needsCommitteeRole(line.role) ? `Unlocked by ${saysModule(line)} and a committee role.` : `Unlocked by ${saysModule(line)}.`
     case 'UNSET': return `No module named yet, so nobody can claim a ${shift}.`
     case 'DRAFT': return `${saysModule(line)} is still a draft, so nobody holds it and nobody can claim a ${shift}.`
     case 'RETIRED': return `${saysModule(line)} is retired, so nobody new can gain it to claim a ${shift}.`
     case 'MISSING': return `Names ${line.moduleId}, which is not in the catalogue, so nobody can claim a ${shift}.`
     default: return line.standing satisfies never
   }
+}
+
+// How many people could be put on the role's shift now, and for none, what would change that (0210).
+// Null for a role whose module line already says why nobody can.
+export function saysQualified(line: RoleEligibility, qualified: number): string | null {
+  if (line.standing !== 'SET') return null
+  if (qualified > 0) return `${plural(qualified, 'person', 'people')} can take one now.`
+  if (needsCommitteeRole(line.role)) {
+    return `Nobody can take one yet: nobody holds both ${line.moduleId} and a committee role. Sign off ${line.moduleId} for a committee member, or give a committee role to somebody who holds it.`
+  }
+  return `Nobody holds ${saysModule(line)} yet, so nobody can take one. Sign it off for somebody in Training.`
 }
 
 // A role nobody can claim yet is the rota owner's to open, so the member is told whom to ask.

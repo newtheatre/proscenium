@@ -101,8 +101,8 @@ const nights = computed(() => byNight(data.value.items))
 interface RoleCard { role: ShiftRole, openShifts: number, module: { id: string, name: string } | null, action: TrainingAction | null }
 
 // Said once per role rather than on every locked row: what opens it, and the one thing to do.
-const { data: locked, refresh: refreshRoles } = await useFetch<{ roles: RoleCard[], officers: string[] }>('/api/rota/roles', {
-  default: () => ({ roles: [] as RoleCard[], officers: [] as string[] }),
+const { data: locked, refresh: refreshRoles } = await useFetch<{ roles: RoleCard[], officers: string[], committeeOnly: ShiftRole[] }>('/api/rota/roles', {
+  default: () => ({ roles: [] as RoleCard[], officers: [] as string[], committeeOnly: [] as ShiftRole[] }),
 })
 
 const notOpenYet = computed(() => saysNotOpenYet(locked.value.officers))
@@ -622,17 +622,34 @@ useSeoMeta({ title: 'Rota' })
     </section>
 
     <section
-      v-if="locked.roles.length > 0"
+      v-if="locked.roles.length > 0 || locked.committeeOnly.length > 0"
       class="mt-10"
       data-test="roles-you-could-take"
     >
       <h2 class="text-lg font-semibold">
         Roles you could take
       </h2>
-      <p class="mt-1 text-sm text-muted">
+      <p
+        v-if="locked.roles.length > 0"
+        class="mt-1 text-sm text-muted"
+      >
         Each needs a piece of training you do not hold yet. Doing it opens every shift of that role.
       </p>
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      <UAlert
+        v-for="role in locked.committeeOnly"
+        :key="role"
+        class="mt-4"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-info"
+        :title="`${saysShiftRole(role)} shifts are for committee members`"
+        description="You hold the training, but these shifts also need a committee role, so none are offered to you. If you have joined the committee, ask the IT Manager to record your role."
+        :data-test="`committee-only-${role}`"
+      />
+      <div
+        v-if="locked.roles.length > 0"
+        class="mt-4 grid gap-4 sm:grid-cols-2"
+      >
         <UPageCard
           v-for="card in locked.roles"
           :key="card.role"

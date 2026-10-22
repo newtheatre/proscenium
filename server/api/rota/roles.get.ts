@@ -1,4 +1,7 @@
 import { SHIFT_ROLES } from '#shared/utils/rota'
+import { eligibilityRefusal } from '#shared/utils/rota-eligibility'
+import type { H3Event } from 'h3'
+import type { ShiftEligibility } from '#server/utils/rota-eligibility'
 import type { ShiftRole } from '#shared/utils/rota'
 import type { TrainingAction } from '#shared/utils/training-action'
 
@@ -18,9 +21,11 @@ export default defineEventHandler(async (event) => {
   const now = Math.floor(Date.now() / 1000)
 
   const eligibilities = await shiftEligibilities(event, account.id, today)
-  // A role no training opens for this member is not one they could take (0115).
+  // A role no training opens for this member is not one they could take (0115). One they hold the
+  // training for is named, so they know why its shifts never appear (0210).
   const locked = SHIFT_ROLES.filter(role => !eligibilities[role].eligible && !eligibilities[role].needsCommittee)
-  if (locked.length === 0) return { roles: [] as RoleCard[], officers: [] as string[] }
+  const committeeOnly = await trainedButNotOnCommittee(event, account.id, today, eligibilities)
+  if (locked.length === 0) return { roles: [] as RoleCard[], officers: [] as string[], committeeOnly }
 
   const [counts, [openings], actionFor, officers] = await Promise.all([
     db.all<{ role: ShiftRole, total: number }>(openShiftCountsByRoleQuery(now)),
@@ -39,5 +44,12 @@ export default defineEventHandler(async (event) => {
     }
   })
 
-  return { roles, officers }
+  return { roles, officers, committeeOnly }
 })
+
+async function trainedButNotOnCommittee(event: H3Event, userId: string, today: string, eligibilities: Record<ShiftRole, ShiftEligibility>): Promise<ShiftRole[]> {
+  const waiting = SHIFT_ROLES.filter(role => eligibilities[role].needsCommittee)
+  if (waiting.length === 0) return []
+  const [rules, held] = await Promise.all([shiftRoleRules(event), modulesHeldBy(userId, today)])
+  return waiting.filter(role => eligibilityRefusal(rules[role], held) === null)
+}

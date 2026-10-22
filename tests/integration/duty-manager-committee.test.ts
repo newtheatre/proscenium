@@ -7,6 +7,7 @@ import {
   confirmedShiftsTonightQuery,
   shiftGate,
 } from '#server/utils/rota'
+import { qualifiedCountQuery } from '#server/utils/rota-readiness'
 import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { tonightsPerformance } from '#tests/helpers/programme'
@@ -205,6 +206,45 @@ describe('a confirmed duty manager shift opens nothing without a live committee 
       confirmed(database, tonight.performanceId, 'DUTY_MANAGER', holder)
 
       expect(run(database, confirmedShiftsTonightQuery(holder, 'DUTY_MANAGER', from, to, { anyStanding: true }, NOW))).toHaveLength(1)
+    })
+  })
+})
+
+// 0210: the readiness card's count is the gate's own, so it reads 0 exactly when nobody could be
+// put on a duty manager shift, which is where a fresh install starts.
+describe('who could take a duty manager shift now (0210)', () => {
+  test.each(STANDINGS)('a trained member holding %s', async (_, grant, counted) => {
+    await withDatabase((database) => {
+      trained(database, 'member', grant)
+      expect(run(database, qualifiedCountQuery(dutyManagerGate))).toEqual([{ total: counted }])
+    })
+  })
+
+  test('a disabled account is not counted', async () => {
+    await withDatabase((database) => {
+      trained(database, 'member', { role: 'COMMITTEE' })
+      database.batch([['UPDATE users SET disabled = 1 WHERE id = ?', 'member']])
+      expect(run(database, qualifiedCountQuery(dutyManagerGate))).toEqual([{ total: 0 }])
+    })
+  })
+})
+
+// 0210: an added shift naming somebody holds them to one shift per performance, as assigning does.
+describe('an added shift naming somebody already on the performance', () => {
+  test('is refused, and leaves an open one alone', async () => {
+    await withDatabase((database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = trained(database, 'officer', { role: 'FOH_MANAGER' })
+      const member = trained(database, 'member', { role: 'COMMITTEE' })
+      const doorGate = shiftGate('DOOR', MODULE, TODAY, NOW)
+      const door = { performanceId: tonight.performanceId, role: 'DOOR' as const, slot: 2, userId: member }
+      expect(run(database, addShiftStatement('shift-door', door, officer, OFFSETS, doorGate))).toHaveLength(1)
+
+      const bar = { performanceId: tonight.performanceId, role: 'BAR' as const, slot: 3, userId: member }
+      expect(run(database, addShiftStatement('shift-bar', bar, officer, OFFSETS, shiftGate('BAR', MODULE, TODAY, NOW)))).toHaveLength(0)
+
+      const open = { performanceId: tonight.performanceId, role: 'BAR' as const, slot: 3 }
+      expect(run(database, addShiftStatement('shift-open', open, officer, OFFSETS, shiftGate('BAR', MODULE, TODAY, NOW)))).toHaveLength(1)
     })
   })
 })

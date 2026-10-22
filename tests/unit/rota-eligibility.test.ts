@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { eligibilityRefusal, noLongerQualifies } from '#shared/utils/rota-eligibility'
+import { candidateLock, eligibilityRefusal, noLongerQualifies } from '#shared/utils/rota-eligibility'
 
 // E-103's safety gate: an empty or unreadable rule refuses eligibility rather than granting it to
 // everyone (criterion 4). Held modules come from `modulesHeldBy()`, never a copy (criterion 3).
@@ -35,5 +35,34 @@ describe('a queued claim that no longer qualifies says so, and offers its declin
       statusMessage: 'No longer qualifies: no training is named for duty manager shifts, so nobody can be confirmed on one',
       declineReason: 'Duty manager shifts cannot be confirmed until the committee names the training they need.',
     })
+  })
+})
+
+// 0210: an officer reads why somebody is locked, in the order the confirming write checks.
+describe('a locked candidate says why', () => {
+  const facts = { role: 'DUTY_MANAGER' as const, moduleId: 'ADMN-201', moduleName: 'Committee Operations', held: new Set(['ADMN-201']), committee: true, onPerformance: false }
+
+  test('somebody who meets every gate is not locked', () => {
+    expect(candidateLock(facts)).toBeNull()
+  })
+
+  test('training without a committee role names the role, not the training', () => {
+    expect(candidateLock({ ...facts, committee: false })).toBe('Needs a committee role')
+  })
+
+  test('a missing module is named', () => {
+    expect(candidateLock({ ...facts, held: new Set() })).toBe('Needs Committee Operations')
+  })
+
+  test('a door shift never asks for a committee role', () => {
+    expect(candidateLock({ ...facts, role: 'DOOR', moduleId: 'ADMN-103', moduleName: 'Box Office', held: new Set(['ADMN-103']), committee: false })).toBeNull()
+  })
+
+  test('somebody already on the performance is locked for that', () => {
+    expect(candidateLock({ ...facts, onPerformance: true })).toBe('Already on this performance')
+  })
+
+  test('an unset rule locks everybody and says so', () => {
+    expect(candidateLock({ ...facts, moduleId: null })).toBe('No training is named for this role yet')
   })
 })

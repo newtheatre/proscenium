@@ -1287,13 +1287,18 @@ the same live eligibility gate self-claiming does, carries the same `holdsGate` 
 own UPDATE (issue 1302), and refuses the same way a self-claim would. An ad hoc shift
 (`POST /api/admin/rota/shifts/add`, `addShiftStatement`) takes the role's next slot number inside
 its own `INSERT` when the body names none, and its audit row reads the number back from the row
-(0140). One that names somebody is confirmed at once in the same way, so its `INSERT ... SELECT` carries `holdsGate` whenever a person is named, and an insert that
-matches nothing answers the same 403; a shift naming nobody is added open with no gate.
+(0140). One that names somebody is confirmed at once in the same way, so its `INSERT ... SELECT` carries `holdsGate` whenever a person is named, with the same
+`NOT EXISTS` an assignment carries, so the person holds no other claimed or confirmed shift on the
+performance (0210). An insert that matches nothing answers the same 403 for a training gap, or the
+assignment's 409 "That member already holds a shift on this performance"; a shift naming nobody is
+added open with no gate.
 A disabled account is refused before either check runs: a training gap and a disabled account are
 different reasons, and the route names the one that actually applies (0009). Both the outgoing and
 the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
 `GET /api/admin/rota/shifts/[id]/candidates?search=` is the narrow, `rota.write`-scoped member
-search the assignment screen picks a name from, distinct from the account directory that
+search the assignment screen picks a name from (each match carries `reason`, why it is locked,
+from `candidateLock()`: committee role, training, then already on the performance, 0210), distinct
+from the account directory that
 `accounts.read` gates (E-107 criterion 5); its search term is escaped against `%` and `_` before
 it reaches `LIKE`, the same guard every other search route in the app applies.
 
@@ -1325,7 +1330,8 @@ already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT
 holds no locked role, so its `officers` is always empty. The
 roles they do not qualify for come from `GET /api/rota/roles`, one card each with the open count
 (`openShiftCountsByRoleQuery`, plus bar opening slots for the bar), the published module and its
-one training action. `GET /api/rota/mine` is a member's own shifts and opening slots from the start
+one training action, and `committeeOnly`, the roles whose training the member holds but whose
+committee role they lack, so Rota says why no duty manager shift is offered (0210). `GET /api/rota/mine` is a member's own shifts and opening slots from the start
 of the current show night on, so tonight's shift stays on the list until 04:00 rather than dropping
 at its curtain, each performance shift with its own window (`windowStartsAt`, `windowEndsAt`). It
 adds `dutyManagers`, keyed by performance, for the member's confirmed non-duty-manager shifts
@@ -1349,7 +1355,11 @@ same thing.
 from `server/utils/rota-readiness.ts`: each role's gating module with its standing (`SET`, `UNSET`,
 `DRAFT`, `RETIRED` or `MISSING`, from `shared/utils/rota-readiness.ts`), every venue we run (not
 external, not retired) with its template's slot count, the active system checks on its checklist
-and whether its emergency card is filed, and the board's active preset and milestone counts. The
+and whether its emergency card is filed, and the board's active preset and milestone counts.
+`qualified` counts, per role, the usable accounts the role's confirming write would admit now
+(`qualifiedCountQuery`, the same `holdsGate` with the committee role for a duty manager), so the
+card reads **Closed** and says what to do when nobody could be put on the shift, which is where a
+new install starts; the console's set-up list carries the same line (0210). The
 same standings are `/api/health`'s `shiftEligibility` line, `{ ok, roles }`, reported beside `ok`
 and never failing it, as the bank holiday coverage is: the line names no module, since the route
 is public. `shiftRoleRules()` and `gatingModules()` there are the one reader of the three keys and

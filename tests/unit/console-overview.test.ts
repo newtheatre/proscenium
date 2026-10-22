@@ -65,6 +65,27 @@ describe('set-up still to do', () => {
   })
 })
 
+// 0210: out of the box nobody holds both a duty manager needs, and the console says so.
+describe('a named module nobody can meet is still set-up to do', () => {
+  const SET_DM: RoleEligibility = { role: 'DUTY_MANAGER', moduleId: 'ADMN-201', moduleName: 'Committee Operations', standing: 'SET' }
+
+  test('a role nobody qualifies for is a line, and one somebody does is none', () => {
+    expect(setUpLines({ eligibility: [SET_DM, SET_BAR], qualified: { DUTY_MANAGER: 0, BAR: 2 } })).toEqual([
+      { kind: 'NOBODY_QUALIFIES', eligibility: SET_DM },
+    ])
+  })
+
+  test('without counts, nothing is assumed', () => {
+    expect(setUpLines({ eligibility: [SET_DM] })).toEqual([])
+  })
+
+  test('the line says what both halves are and how to meet them', () => {
+    const [line] = setUpLines({ eligibility: [SET_DM], qualified: { DUTY_MANAGER: 0 } })
+    expect(saysSetUp(line!)).toContain('nobody holds both ADMN-201 and a committee role')
+    expect(setUpHref(line!)).toBe('/rota/manage/templates')
+  })
+})
+
 describe('tonight, for whoever may open its screens', () => {
   test('a cancelled performance is not on tonight', () => {
     const lines = tonightLines([

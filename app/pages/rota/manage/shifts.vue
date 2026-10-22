@@ -41,7 +41,7 @@ interface RosterOpening {
 
 type Board = { items: BoardEntry<RosterPerformance, RosterOpening>[], waiting: number }
 
-interface Candidate { id: string, name: string, email: string, eligible: boolean }
+interface Candidate { id: string, name: string, email: string, eligible: boolean, reason: string | null }
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -145,7 +145,7 @@ const candidateSettled = useDebounced(candidateSearch, 250)
 const chosen = ref<Candidate | null>(null)
 
 const { data: candidateData, status: candidateStatus } = await useAsyncData(
-  () => `shift-candidates-${assigning.value?.shiftId ?? adding.value?.role ?? 'none'}-${candidateSettled.value}`,
+  () => `shift-candidates-${assigning.value?.shiftId ?? `${adding.value?.performanceId}-${adding.value?.role}`}-${candidateSettled.value}`,
   () => {
     const term = candidateSettled.value.trim()
     if (term.length < 2) return Promise.resolve({ items: [] as Candidate[] })
@@ -153,7 +153,7 @@ const { data: candidateData, status: candidateStatus } = await useAsyncData(
       return request<{ items: Candidate[] }>(`/api/admin/rota/shifts/${assigning.value.shiftId}/candidates`, { query: { search: term } })
     }
     if (adding.value?.role) {
-      return request<{ items: Candidate[] }>('/api/admin/rota/candidates', { query: { search: term, role: adding.value.role } })
+      return request<{ items: Candidate[] }>('/api/admin/rota/candidates', { query: { search: term, role: adding.value.role, performanceId: adding.value.performanceId } })
     }
     return Promise.resolve({ items: [] as Candidate[] })
   },
@@ -634,6 +634,11 @@ watch(modalOpen, (nowOpen) => {
                 >
                   {{ item.eligible ? 'Eligible' : 'Locked' }}
                 </UBadge>
+                <span
+                  v-if="item.reason"
+                  class="text-xs text-muted"
+                  data-test="candidate-reason"
+                >{{ item.reason }}</span>
               </span>
             </template>
             <template #empty>
@@ -713,6 +718,11 @@ watch(modalOpen, (nowOpen) => {
                   >
                     {{ item.eligible ? 'Eligible' : 'Locked' }}
                   </UBadge>
+                  <span
+                    v-if="item.reason"
+                    class="text-xs text-muted"
+                    data-test="candidate-reason"
+                  >{{ item.reason }}</span>
                 </span>
               </template>
               <template #empty>

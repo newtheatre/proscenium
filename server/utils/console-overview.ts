@@ -12,7 +12,7 @@ import { allergensUnansweredCount, onHandColumn } from './bar'
 import { STOCK_COUNTED } from './bar-linkage'
 import { claimsClause } from './membership-claims'
 import { performancesOnNight } from './performances'
-import { roleEligibilities } from './rota-readiness'
+import { qualifiedCounts, roleEligibilities } from './rota-readiness'
 import { demandScope } from './training-demand'
 import type { ConsoleOverview } from '#shared/utils/console-overview'
 import type { Permission } from '#shared/utils/roles'
@@ -84,9 +84,12 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
     holds('safety.write') ? db.all<{ anySeverityRoutes: number }>(safetyRoutingQuery()).then(([row]) => Boolean(row?.anySeverityRoutes)) : undefined,
   ])
 
+  const qualified = eligibility ? await qualifiedCounts(eligibility) : undefined
+
   return {
     setUp: setUpLines({
       eligibility,
+      qualified,
       anythingOnHand: bar && facts ? Boolean(facts.anythingOnHand) : undefined,
       anyStocktake: stocktakes && facts ? Boolean(facts.anyStocktake) : undefined,
       allergensUnknown: bar && facts ? Number(facts.allergensUnknown) : undefined,

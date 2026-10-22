@@ -1,8 +1,9 @@
-import { saysEligibility } from './rota-readiness'
+import { saysEligibility, saysQualified } from './rota-readiness'
 import { plural } from './text'
 import { NAV_COUNTS } from './site-nav'
 import type { Permission } from './roles'
 import type { RoleEligibility } from './rota-readiness'
+import type { ShiftRole } from './rota'
 import type { NavCount } from './site-nav'
 
 // The console overview (issue 1358): what waits for the viewer, what set-up is unfinished and what
@@ -25,6 +26,7 @@ export function queuesFor(permissions: ReadonlySet<Permission>, leadsDepartment:
 // Each fact is left out for a reader who could not act on it, so it is never read for them.
 export interface SetUpFacts {
   eligibility?: readonly RoleEligibility[]
+  qualified?: Partial<Record<ShiftRole, number>>
   anythingOnHand?: boolean
   anyStocktake?: boolean
   allergensUnknown?: number
@@ -33,6 +35,7 @@ export interface SetUpFacts {
 
 export type SetUpLine
   = | { kind: 'ELIGIBILITY', eligibility: RoleEligibility }
+    | { kind: 'NOBODY_QUALIFIES', eligibility: RoleEligibility }
     | { kind: 'NOTHING_ON_HAND' }
     | { kind: 'NO_STOCKTAKE' }
     | { kind: 'ALLERGENS_UNKNOWN', items: number }
@@ -41,6 +44,10 @@ export type SetUpLine
 export function setUpLines(facts: SetUpFacts): SetUpLine[] {
   return [
     ...(facts.eligibility ?? []).filter(line => line.standing !== 'SET').map(eligibility => ({ kind: 'ELIGIBILITY' as const, eligibility })),
+    // A named module nobody holds still leaves the role unstaffable, the duty manager most of all (0210).
+    ...(facts.qualified === undefined ? [] : (facts.eligibility ?? []))
+      .filter(line => line.standing === 'SET' && facts.qualified?.[line.role] === 0)
+      .map(eligibility => ({ kind: 'NOBODY_QUALIFIES' as const, eligibility })),
     ...(facts.anythingOnHand === false ? [{ kind: 'NOTHING_ON_HAND' as const }] : []),
     ...(facts.anyStocktake === false ? [{ kind: 'NO_STOCKTAKE' as const }] : []),
     ...(facts.allergensUnknown ? [{ kind: 'ALLERGENS_UNKNOWN' as const, items: facts.allergensUnknown }] : []),
@@ -51,6 +58,7 @@ export function setUpLines(facts: SetUpFacts): SetUpLine[] {
 export function saysSetUp(line: SetUpLine): string {
   switch (line.kind) {
     case 'ELIGIBILITY': return saysEligibility(line.eligibility)
+    case 'NOBODY_QUALIFIES': return saysQualified(line.eligibility, 0) ?? ''
     case 'NOTHING_ON_HAND': return 'Nothing is on hand at the bar: record a delivery or an opening count.'
     case 'NO_STOCKTAKE': return 'No stocktake has been applied yet, so on-hand is what deliveries and sales say, not a count.'
     case 'ALLERGENS_UNKNOWN': return `${plural(line.items, 'stocked item')} ${line.items === 1 ? 'has' : 'have'} no allergen answer.`
@@ -63,6 +71,7 @@ export function saysSetUp(line: SetUpLine): string {
 export function setUpHref(line: SetUpLine): string {
   switch (line.kind) {
     case 'ELIGIBILITY': return '/rota/manage/templates'
+    case 'NOBODY_QUALIFIES': return '/rota/manage/templates'
     case 'NOTHING_ON_HAND': return '/bar/stock'
     case 'NO_STOCKTAKE': return '/bar/stock/stocktakes'
     case 'ALLERGENS_UNKNOWN': return '/bar/stock/allergens'
