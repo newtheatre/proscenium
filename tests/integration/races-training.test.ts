@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { placesFrom, promotedBy, promotionClaimFor, signUpOrderStatement, withdrawStatement } from '#shared/utils/training-signup'
 import type { Place, SignUpOrder } from '#shared/utils/training-signup'
+import { awardOnceStatement, registerAsRead } from '#shared/utils/training-award'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 
 // Named regression cases (K-121), not among K-105's four invariants: training's own revocation
@@ -111,6 +112,70 @@ describe('contended invariants (K-105)', () => {
         .toHaveLength(2)
       expect(rows(database, `SELECT id FROM notification_log WHERE user_id IN ('u-one', 'u-two')`))
         .toHaveLength(0)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  // 0240. Two sign-offs on one day both pass a read-then-check, so the insert carries the check:
+  // the second, identical but for its id, writes nothing and returns nothing.
+  test('the same-day award race: the second award of the day writes no row', async () => {
+    const database = await createTestDatabase()
+    try {
+      database.batch([
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-held', 'held@example.invalid', 'A Member'],
+        ['INSERT INTO departments (code, name) VALUES (?, ?)', 'TECH', 'Technical'],
+        ['INSERT INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', 'TECH-111', 'TECH', 'MODULE', 'Working at height'],
+      ])
+      const award = (id: string, awardedOn = '2026-10-22'): unknown[] => {
+        const [text, ...parameters] = boundStatement(database, awardOnceStatement({
+          id, userId: 'u-held', moduleId: 'TECH-111', awardedOn, expiresOn: null,
+          expiryOverridden: false, source: 'SIGNOFF', grantedBy: null, evidenceRef: null,
+        }))
+        return database.raw.prepare(text).all(...parameters as never[])
+      }
+
+      expect(award('tr-first')).toHaveLength(1)
+      expect(award('tr-second')).toHaveLength(0)
+      expect(rows(database, `SELECT id FROM training_records`)).toEqual([{ id: 'tr-first' }])
+
+      // Another day is another award, and a revoked twin stands in the way of nothing.
+      expect(award('tr-later', '2026-10-23')).toHaveLength(1)
+      database.batch([[`UPDATE training_records SET revoked_at = 1, revoked_by = 'u-held', revoke_reason = 'Recorded twice' WHERE id = 'tr-first'`]])
+      expect(award('tr-again')).toHaveLength(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+
+  // 0241. A correction is computed from the register as read; once another correction moves a
+  // mark, that read is stale and the guard every statement of the batch rides on is false.
+  test('the correction race: a correction computed from an older register applies nothing', async () => {
+    const database = await createTestDatabase()
+    try {
+      database.batch([
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-trainer', 'trainer@example.invalid', 'A Trainer'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-one', 'one@example.invalid', 'Member One'],
+        ['INSERT INTO users (id, email, name, verified) VALUES (?, ?, ?, 1)', 'u-two', 'two@example.invalid', 'Member Two'],
+        [`INSERT INTO training_sessions (id, held_on, starts_at, ends_at, capacity, status, trainer_id)
+          VALUES ('s1', '2026-10-20', '19:00', '21:00', 10, 'OPEN', 'u-trainer')`],
+        [`INSERT INTO session_attendees (id, session_id, user_id, signed_up_at, status) VALUES ('a1', 's1', 'u-one', 100, 'ATTENDED')`],
+        [`INSERT INTO session_attendees (id, session_id, user_id, signed_up_at, status) VALUES ('a2', 's1', 'u-two', 101, 'ABSENT')`],
+      ])
+      const holds = (attended: string[]): boolean => {
+        const [text, ...parameters] = boundStatement(database, registerAsRead('s1', attended))
+        return (database.raw.prepare(`SELECT (${text}) AS ok`).get(...parameters as never[]) as { ok: number }).ok === 1
+      }
+
+      expect(holds(['u-one'])).toBe(true)
+      expect(holds([])).toBe(false)
+
+      // The first correction lands; the second, read before it, no longer matches.
+      database.batch([[`UPDATE session_attendees SET status = 'ATTENDED' WHERE id = 'a2'`]])
+      expect(holds(['u-one'])).toBe(false)
+      expect(holds(['u-two', 'u-one'])).toBe(true)
     }
     finally {
       database.close()
