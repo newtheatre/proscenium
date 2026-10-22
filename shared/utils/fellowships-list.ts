@@ -23,3 +23,10 @@ export const fellowshipsList = {
     default: 'awardedOn',
   },
 } as const satisfies ListSpec
+
+// The refusal for a second award says which kind of fellowship they hold, never just "holds" (0158).
+export function fellowshipHeldRefusal(revokedAt: number | null): string {
+  return revokedAt === null
+    ? 'That person already holds a fellowship'
+    : 'That person holds a revoked fellowship, which stays on the roll. A second award is the committee\'s to decide with the IT Manager.'
+}

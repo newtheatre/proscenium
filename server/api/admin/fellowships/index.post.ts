@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import { awardFellowship as body } from '#shared/utils/admin-forms'
+import { fellowshipHeldRefusal } from '#shared/utils/fellowships-list'
 
 // Record a fellowship (A-127).
 export default defineEventHandler(async (event) => {
@@ -14,9 +15,9 @@ export default defineEventHandler(async (event) => {
 
   // A person is a Fellow once, and the constraint is what enforces it (criterion 2). This is the
   // sentence somebody reads instead of a unique violation.
-  const [held] = await db.select({ id: schema.fellowships.id })
+  const [held] = await db.select({ id: schema.fellowships.id, revokedAt: schema.fellowships.revokedAt })
     .from(schema.fellowships).where(eq(schema.fellowships.userId, input.userId)).limit(1)
-  if (held) throw createError({ statusCode: 409, statusMessage: 'That person already holds a fellowship' })
+  if (held) throw createError({ statusCode: 409, statusMessage: fellowshipHeldRefusal(held.revokedAt) })
 
   const id = newId()
   // Batch invariant: a Fellow can never exist without the entitlement (A-127 criterion 3, 0023).

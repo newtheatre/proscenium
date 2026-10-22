@@ -80,7 +80,7 @@ export async function fellowshipPassStatements(userId: string, actorId: string |
     statements: [
       db.run(sql`
         INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, status, issued_by)
-        VALUES (${passId}, ${reference}, ${passTypeId}, ${priceId}, ${userId}, 0, 'ACTIVE', ${userId})
+        VALUES (${passId}, ${reference}, ${passTypeId}, ${priceId}, ${userId}, 0, 'ACTIVE', ${actorId})
       `),
       ...posted.statements,
       db.run(sql`

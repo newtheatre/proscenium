@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { MANUAL_ACTION_NAMES } from './audit-actions'
-import { londonDayField } from './membership'
+import { londonDay, londonDayField } from './membership'
 import type { AuditActionName } from './audit-actions'
 
 // One schema per admin form, validating the request and driving the form that sends it (0032).
@@ -31,12 +31,13 @@ export function wholeFromTyped(raw: string): number | null {
   return /^\d{1,9}$/.test(trimmed) ? Number(trimmed) : null
 }
 
+// Each field says what it wants, empty or not, rather than the house's last resort (0158).
 export const awardFellowship = z.object({
-  userId: accountId,
-  awardedOn: londonDayField,
+  userId: z.string('Choose who is being honoured').min(1, 'Choose who is being honoured').max(64),
+  awardedOn: londonDayField.refine(day => day <= londonDay(new Date()), 'Give the day it was resolved, today or earlier'),
   // The meeting, never an individual: the theatre awards this (0023).
-  awardedBy: z.string().trim().min(1, 'Name the meeting that resolved it').max(200),
-  citation: z.string().trim().min(1, 'The citation is the public wording').max(1000),
+  awardedBy: z.string('Name the meeting that resolved it').trim().min(1, 'Name the meeting that resolved it').max(200),
+  citation: z.string('Write the citation, the public wording').trim().min(1, 'Write the citation, the public wording').max(1000),
 })
 
 export const revokeFellowship = z.object({
