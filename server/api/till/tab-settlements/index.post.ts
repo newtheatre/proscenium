@@ -13,9 +13,7 @@ export default defineEventHandler(async (event) => {
     const settled = await settleTab(input.holderId, input.entryIds, 0, { actorId: resolved.account.id, sessionId: session.id })
     return { ok: true, id: null, kind: null, totalPence: 0, ...settled }
   }
-  await refuseSettlementInOpenAttempt(input.holderId)
-
-  const id = await startAttempt({
+  const id = await startSettlementAttempt({
     kind: 'TYPED',
     basket: {
       settlement: { holderId: input.holderId, entryIds: input.entryIds },
@@ -27,6 +25,6 @@ export default defineEventHandler(async (event) => {
     },
     expectedTotalPence: input.expectedTotalPence,
     actorId: resolved.account.id,
-  })
+  }, input.holderId)
   return { ok: true, id, kind: 'TYPED' as const, totalPence: input.expectedTotalPence }
 })

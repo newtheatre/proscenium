@@ -163,16 +163,29 @@ export async function refuseBookingsInOpenAttempts(night: string, reservationIds
   }
 }
 
-// One holder's tab is on the reader once at a time, and a settlement taken and not recorded is
-// answered before another is keyed in, or the reader would take the same charges twice (0162).
-export async function refuseSettlementInOpenAttempt(holderId: string): Promise<void> {
-  const [row] = await db.all<{ id: string }>(sql`
-    SELECT a.id AS id FROM sumup_attempts a
-    WHERE ${UNRESOLVED} AND json_extract(a.basket, '$.settlement.holderId') = ${holderId} LIMIT 1
-  `)
-  if (row) {
+// One holder's tab is on the reader once at a time, or the reader would take the same charges
+// twice (0162). The guard rides the insert itself, so two tills racing leave one attempt (0001).
+export async function startSettlementAttempt(input: StartAttemptInput, holderId: string): Promise<string> {
+  const id = newId()
+  const entry = auditEntry({
+    actorId: input.actorId,
+    action: 'bar.sumup.started',
+    target: `sumup-attempt:${id}`,
+    detail: { kind: input.kind, sessionId: input.basket.sessionId, expectedTotalPence: input.expectedTotalPence },
+  })
+  const landed = await auditedWrite(db.all(sql`
+    INSERT INTO sumup_attempts (id, kind, till_session_id, venue_id, night, created_by, basket, expected_total_pence, status)
+    SELECT ${id}, ${input.kind}, ${input.basket.sessionId}, ${input.basket.venueId}, ${input.basket.night}, ${input.actorId},
+           ${JSON.stringify(input.basket)}, ${input.expectedTotalPence}, 'STARTED'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM sumup_attempts a WHERE ${UNRESOLVED} AND json_extract(a.basket, '$.settlement.holderId') = ${holderId}
+    )
+    RETURNING id
+  `), entry)
+  if (!landed) {
     throw createError({ statusCode: 409, statusMessage: 'This tab is already on the reader, waiting for an answer. Answer that charge first.' })
   }
+  return id
 }
 
 export interface StartAttemptInput {

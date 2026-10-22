@@ -306,6 +306,33 @@ describe.skipIf(skip !== null)('a settlement is a card charge answered at the re
     expect(await message(second)).toContain('already on the reader')
   })
 
+  // Both tills read no attempt and both would key the card: the guard has to ride the insert,
+  // not a read before it, or the holder pays twice (0162).
+  test('two tills keying the same tab at once leave one charge on the reader', async () => {
+    const { venueId, performanceId } = programme(`settle-race-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    const member = await aMember()
+    await authorise([member.id])
+    await chargeToTab(venueId, variantId, member.id, 500)
+    const { charges } = await (await settleCandidates(venueId, member.id)).json() as { charges: OutstandingCharge[] }
+
+    const answers = await Promise.all([
+      startSettling(venueId, member.id, [charges[0]!.entryId], 500),
+      startSettling(venueId, member.id, [charges[0]!.entryId], 500, barManager.cookie),
+    ])
+    expect(answers.map(answer => answer.status).sort()).toEqual([200, 409])
+
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      const held = database.query(`SELECT count(*) AS n FROM sumup_attempts WHERE json_extract(basket, '$.settlement.holderId') = ?`).get(member.id) as { n: number }
+      expect(held.n).toBe(1)
+    }
+    finally {
+      database.close()
+    }
+  })
+
   test('a charge voided while the reader was asked leaves the money to explain, not a settlement', async () => {
     const { venueId, performanceId } = programme(`settle-late-void-${crypto.randomUUID().slice(0, 6)}`)
     const { variantId } = await aSellableProduct(500)

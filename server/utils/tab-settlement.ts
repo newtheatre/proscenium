@@ -226,13 +226,15 @@ export async function settleTab(
     detail: { holderId, charges: rows.length, settledPence: owedPence },
   })))
   if (context.attemptId) {
+    // Ahead of the recording, as the sale's is, so the trail says completed only where this
+    // batch recorded the attempt (0027).
+    statements.push(db.run(sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${newId()}, ${context.actorId}, 'bar.sumup.completed', ${`sumup-attempt:${context.attemptId}`},
+             ${JSON.stringify({ claimedFrom: 'COMPLETING', to: 'SUCCEEDED', entryId: posted.id })}
+      WHERE EXISTS (SELECT 1 FROM sumup_attempts WHERE id = ${context.attemptId} AND entry_id IS NULL)
+    `))
     statements.push(db.run(recordPostedSaleStatement(context.attemptId, posted.id, Math.floor(Date.now() / 1000))))
-    statements.push(db.insert(schema.auditLog).values(auditEntry({
-      actorId: context.actorId,
-      action: 'bar.sumup.completed',
-      target: `sumup-attempt:${context.attemptId}`,
-      detail: { claimedFrom: 'COMPLETING', to: 'SUCCEEDED', entryId: posted.id },
-    })))
   }
 
   try {
