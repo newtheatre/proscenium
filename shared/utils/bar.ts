@@ -264,6 +264,18 @@ export const SERVING_KINDS = [
 ] as const
 export type ServingKind = (typeof SERVING_KINDS)[number]
 
+// Kinds that pour a measure, so the stock behind them is counted in millilitres, never whole items.
+export const MEASURE_KINDS: readonly ServingKind[] = ['pint', 'half', '125ml', '175ml', '250ml', 'single', 'double']
+
+// The set-up's two shape refusals, named by the size that breaks them (process map, 21 October 2026).
+export function saysMeasureOnWholeItems(kind: ServingKind, itemName: string): string {
+  return `${says(kind)} pours a measure, so ${itemName} needs counting in millilitres, not whole items`
+}
+
+export function saysPoursMoreThanContainer(label: string, qty: number, containerMl: number): string {
+  return `${label} pours ${qty} ml, more than the ${containerMl} ml container holds`
+}
+
 export const VARIANT_STATUSES = ['ACTIVE', 'RETIRED'] as const
 export type VariantStatus = (typeof VARIANT_STATUSES)[number]
 
@@ -637,8 +649,13 @@ export const productSetupForm = z.discriminatedUnion('shape', [
     if (unit === 'ML' && servings.some(serving => serving.servingKind === 'item')) {
       ctx.addIssue({ code: 'custom', message: 'A measured item sells by a measure: say the size and how much it pours', path: ['serving'] })
     }
-    if (containerMl && servings.some(serving => serving.qty > containerMl)) {
-      ctx.addIssue({ code: 'custom', message: 'A serving cannot pour more than the container holds', path: ['serving'] })
+    const overflowing = containerMl ? servings.find(serving => serving.qty > containerMl) : undefined
+    if (overflowing && containerMl) {
+      ctx.addIssue({ code: 'custom', message: saysPoursMoreThanContainer(overflowing.label, overflowing.qty, containerMl), path: ['serving'] })
+    }
+    const measured = unit === 'ITEM' ? servings.find(serving => MEASURE_KINDS.includes(serving.servingKind)) : undefined
+    if (measured) {
+      ctx.addIssue({ code: 'custom', message: saysMeasureOnWholeItems(measured.servingKind, value.item.item.name), path: ['item'] })
     }
   }
   if (value.shape === 'RECIPE') {

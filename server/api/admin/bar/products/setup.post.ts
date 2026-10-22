@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { londonDayOf } from '#shared/utils/ledger'
-import { checkIdRefusal, productSetupForm, restrictedStockOf, setupItemIds } from '#shared/utils/bar'
+import { MEASURE_KINDS, checkIdRefusal, productSetupForm, restrictedStockOf, saysMeasureOnWholeItems, saysPoursMoreThanContainer, setupItemIds } from '#shared/utils/bar'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { ServingKind, StockUnit } from '#shared/utils/bar'
 
@@ -40,12 +40,12 @@ export default defineEventHandler(async (event) => {
         statusMessage: `${item.name} is measured, so it sells by a measure: say the size and how much it pours`,
       })
     }
-    if (item.containerMl && servings.some(serving => serving.qty > item.containerMl!)) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: `A serving cannot pour more than a ${item.name} holds`,
-      })
+    const overflowing = item.containerMl ? servings.find(serving => serving.qty > item.containerMl!) : undefined
+    if (overflowing && item.containerMl) {
+      throw createError({ statusCode: 409, statusMessage: saysPoursMoreThanContainer(overflowing.label, overflowing.qty, item.containerMl) })
     }
+    const measured = item.unit === 'ITEM' ? servings.find(serving => MEASURE_KINDS.includes(serving.servingKind)) : undefined
+    if (measured) throw createError({ statusCode: 409, statusMessage: saysMeasureOnWholeItems(measured.servingKind, item.name) })
     if (item.status === 'RETIRED' && input.opening) {
       throw createError({
         statusCode: 409,

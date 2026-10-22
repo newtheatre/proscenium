@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { londonDayOf } from '#shared/utils/ledger'
-import { componentsForm, saysQuantity } from '#shared/utils/bar'
+import { MEASURE_KINDS, componentsForm, saysMeasureOnWholeItems, saysQuantity } from '#shared/utils/bar'
 import type { ProductVariant } from '#shared/utils/bar'
 
 // Set what pouring one of these consumes. Editing affects future sales only: movements already
@@ -34,8 +34,8 @@ export default defineEventHandler(async (event) => {
   const named = components.map(component => component.itemId)
   const usable = named.length === 0
     ? []
-    : await db.all<{ id: string, name: string, status: string }>(sql`
-      SELECT id, name, status FROM bar_items WHERE id IN (${sql.join(named.map(id => sql`${id}`), sql`, `)})
+    : await db.all<{ id: string, name: string, status: string, unit: string }>(sql`
+      SELECT id, name, status, unit FROM bar_items WHERE id IN (${sql.join(named.map(id => sql`${id}`), sql`, `)})
     `)
 
   if (usable.length !== named.length) throw noSuch('stocked item')
@@ -46,6 +46,11 @@ export default defineEventHandler(async (event) => {
       statusCode: 409,
       statusMessage: `${retired.name} is retired, so nothing can be poured from it: put it back or choose another`,
     })
+  }
+
+  // A pint of something counted in whole items would pour 568 kegs a sale; a mixer beside a measure is fine.
+  if (MEASURE_KINDS.includes(held.servingKind) && usable.length > 0 && usable.every(item => item.unit === 'ITEM')) {
+    throw createError({ statusCode: 409, statusMessage: saysMeasureOnWholeItems(held.servingKind, usable[0]!.name) })
   }
 
   const entry = auditEntry({
