@@ -1240,7 +1240,7 @@ queue is not a list of its own any more: it is the rota board's "Waiting for con
 `GET /api/admin/rota/shifts/board?waiting=true`, which reads every performance holding a claim
 from the start of tonight's show night on, whatever the window, and carries the count (a claim
 on a night already past can no longer be staffed, so it waits on nobody), and
-`/rota/manage/approvals` forwards there (issue 1365). Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
+`/rota/manage/approvals` forwards there (issue 1365), before any guard. The board page reads its window from `?from=&to=` (or `until`) through `boardWindowFromQuery()` and writes changes back, so a span can be linked (0214). Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
 eligibility gate on the confirming `UPDATE` itself: the role's `SHIFT_ELIGIBILITY_*_MODULE` and
 London's today are bound into an `EXISTS` over the claimant's unrevoked, unexpired
 `training_records` (the SQL twin of `heldNow`), so a claimant whose record lapsed after claiming is

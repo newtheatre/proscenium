@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysDay, saysDayRange, saysClock, saysDayLong } from '#shared/utils/when'
-import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
+import { boardWindowFromQuery, defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus, saysStamped } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { BoardEntry } from '#shared/utils/rota-board'
@@ -48,13 +48,17 @@ const request = useRequestFetch()
 const toast = useToast()
 const failure = ref<string | null>(null)
 
-// A span the officer is working on rather than a filter over a fixed set of rows, so it is a
-// pair of date fields and not a K-129 condition, as the utilisation report's span is.
-const window = reactive(defaultBoardWindow(new Date()))
-
 // The approvals queue is this filter, and it lives in the URL so the old address can land on it
 // (E-105 criterion 2). It reads every claim to confirm from tonight on, whatever the window.
 const route = useRoute()
+
+// A span, not a K-129 condition, read from and kept in the address so it can be linked (0214).
+const window = reactive(boardWindowFromQuery(route.query, new Date()))
+watch(() => [window.from, window.to], ([from, to]) => {
+  const opened = defaultBoardWindow(new Date())
+  const shown = from === opened.from && to === opened.to ? { from: undefined, to: undefined } : { from, to }
+  void navigateTo({ query: { ...route.query, ...shown, until: undefined } }, { replace: true })
+})
 const waiting = computed<boolean>({
   get: () => route.query.waiting === 'true',
   set: (on) => {
