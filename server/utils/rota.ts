@@ -731,6 +731,17 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
   `
 }
 
+// Whether a move has anything to move: another live shift of theirs on the same performance (0211).
+export function otherShiftHeldQuery(shiftId: string, userId: string): SQL {
+  return sql`SELECT EXISTS (SELECT 1 FROM shifts WHERE performance_id = (SELECT performance_id FROM shifts WHERE id = ${shiftId})
+    AND id <> ${shiftId} AND user_id = ${userId} AND status IN ('CLAIMED', 'CONFIRMED')) AS held`
+}
+
+export async function holdsOtherShift(shiftId: string, userId: string): Promise<boolean> {
+  const [row] = await db.all<{ held: number }>(otherShiftHeldQuery(shiftId, userId))
+  return row?.held === 1
+}
+
 // The other half of a move: the person's other shifts on the performance go back to open, only
 // once the assignment's own audit row has landed, so a refused assignment moves nobody (0049).
 export function moveOffStatement(shiftId: string, userId: string, landed: SQL): SQL {

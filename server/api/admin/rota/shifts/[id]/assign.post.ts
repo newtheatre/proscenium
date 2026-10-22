@@ -23,11 +23,12 @@ export default defineEventHandler(async (event) => {
   if (!eligibility.eligible) throw ineligibleRefusal(held.role, eligibility, subject.name)
   const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000))
 
+  const movesOff = move && await holdsOtherShift(id, userId)
   const entry = auditEntry({
     actorId: resolved.account.id,
     action: 'shift.reassigned',
     target: `shift:${id}`,
-    detail: { ...changes({ userId: [held.userId, userId], status: [held.status, 'CONFIRMED'] }), ...(move ? { movedOffOtherShift: true } : {}) },
+    detail: { ...changes({ userId: [held.userId, userId], status: [held.status, 'CONFIRMED'] }), ...(movesOff ? { movedOffOtherShift: true } : {}) },
   })
 
   // A move lets go of their other shift on the performance only behind this write's audit row (0211).

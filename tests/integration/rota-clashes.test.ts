@@ -6,6 +6,7 @@ import {
   claimShiftStatement,
   moveOffStatement,
   openShiftsQuery,
+  otherShiftHeldQuery,
   shiftGate,
 } from '#server/utils/rota'
 import { sql } from 'drizzle-orm'
@@ -177,6 +178,20 @@ describe('moving somebody from the bar to the door (0211)', () => {
 
       expect(statusOf(database, door)).toEqual({ status: 'CONFIRMED', user_id: member })
       expect(statusOf(database, bar)).toEqual({ status: 'OPEN', user_id: null })
+    })
+  })
+
+  // The audit says a move took somebody off another shift only when there was one to take (0211).
+  test('whether there is another shift to move off is read before the write', async () => {
+    await withDatabase((database) => {
+      const { here } = twoVenues(database)
+      const member = trained(database, 'member')
+      const door = shift(database, 'door', here.performanceId, here.startsAt)
+      const heldOther = (): unknown => (run(database, otherShiftHeldQuery(door, member))[0] as { held: number }).held
+
+      expect(heldOther()).toBe(0)
+      shift(database, 'bar', here.performanceId, here.startsAt, member, 'BAR')
+      expect(heldOther()).toBe(1)
     })
   })
 })
