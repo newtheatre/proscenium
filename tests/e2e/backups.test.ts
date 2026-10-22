@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonToday } from '#tests/helpers/london-day'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -59,7 +60,7 @@ describe.skipIf(skip !== null)('recording a restore drill (K-108, J-107)', () =>
   })
 
   test('a recorded drill clears the flag and writes one audit entry', async () => {
-    const ranAt = new Date().toISOString().slice(0, 10)
+    const ranAt = londonToday()
     const answered = await send('POST', '/api/admin/backups/drills', {
       ranAt, outcome: 'PASS', timeToRestoreMinutes: 24, rowCountsMatch: true, moneyTotalsMatch: true,
     })
@@ -82,7 +83,7 @@ describe.skipIf(skip !== null)('recording a restore drill (K-108, J-107)', () =>
   // A failure is the finding, not a reason to omit it: it records and it does not clear the flag.
   test('a failed drill still records, and does not count as proof the backup restores', async () => {
     const answered = await send('POST', '/api/admin/backups/drills', {
-      ranAt: new Date().toISOString().slice(0, 10),
+      ranAt: londonToday(),
       outcome: 'FAIL',
       timeToRestoreMinutes: 90,
       rowCountsMatch: true,

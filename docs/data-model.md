@@ -170,7 +170,7 @@ SUMS remains the system of record and nothing here sells anything (0005, 0031, A
 member-facing routes are `GET /api/account/membership` (the longest-running term, its state as
 `membershipState()` computes it from `MEMBERSHIP_GRACE_DAYS`, and the newest claim with its
 reason), `POST /api/account/membership/claim` (Zod: `studentId`, `startsOn` not after today,
-`term` 1 or 3) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate,
+`term` 1 or 3; writes `membership.claim.sent` with the claim id and term in the same batch, 0157) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate,
 idempotent, writing `membership.claim.withdrawn` with the member as actor and the claim id alone
 in the same batch, guarded on the claim still being open, A-130 criterion 14). The screen is `/account/membership`, a `MY_NAV` entry.
 
@@ -211,7 +211,8 @@ what it was awarded for) · `revoked_at` NULL · `revoked_by` NULL · `revocatio
 `created_at`. No `pass_id` column: D-130 finds the entitlement by `passes.user_id` and
 `pass_types.slug = 'fellowship'` rather than a direct foreign key, so awarding needs no migration
 on this already-shipped table and the fellowship and the pass can be read independently.
-UNIQUE (`user_id`): a person is a Fellow once. `restrict` rather than `cascade` on purpose, so
+UNIQUE (`user_id`) WHERE `revoked_at` IS NULL (`fellowships_one_standing`): one standing
+fellowship per person; a revoked row stays and a fresh award may follow it (0159). `restrict` rather than `cascade` on purpose, so
 deleting a user cannot silently remove an award from the theatre's own record; erasure
 anonymises the person and the award stands.
 A revoked fellowship stops future admissions and rewrites nothing (0023): awarding writes
@@ -540,7 +541,7 @@ for the two that read and `ticketing.write` for the rest:
 | `DELETE /api/admin/shows/[id]` | Deletes a show nothing has sold under, with its performances and prices. A show with sold tickets is a 409 naming unpublishing and cancelling as the way. |
 | `POST /api/admin/shows/[id]/performances` | Adds a performance, always DRAFT. One at a venue we run without a running time is a 400 naming the venue (D-121 criterion 6), and so is a `capacityOverride` above the venue's own capacity, quoting both, unless `aboveVenueCapacity` confirms it (0124). A show with no season and no earlier live performance takes the unretired season this night falls in, in the same batch, audited as `show.updated` with `filledFrom` (D-131 criterion 2). |
 | `POST /api/admin/shows/[id]/runs` | Adds a run: `venueId`, the running time and intervals once, and `nights` (each a curtain and optional doors, one to 31, each curtain once). Every night is written DRAFT and stamped from its venue's template in one batch, each with its own `performance.created` row, or none is: a missing running time at a venue we run, a retired venue or a night with doors after its curtain refuses the whole run (D-132 criterion 10). A show with no season and no earlier live performance takes the unretired season the run's earliest night falls in, in the same batch, audited once as `show.updated` (D-131 criterion 2). |
-| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). A `capacityOverride` above the venue's own capacity is a 400 quoting both unless `aboveVenueCapacity` is true: deliberate oversell is confirmed, never typed (0124, D-105 criterion 4). |
+| `PUT /api/admin/performances/[id]` | Changes venue, times, capacity, the booking window, the hold-release override and internal notes. It does not take the status. Saving one at a venue we run without a running time is a 400, unless it is cancelled (D-121 criterion 6). A `capacityOverride` above the venue's own capacity is a 400 quoting both unless `aboveVenueCapacity` is true: deliberate oversell is confirmed, never typed (0124, D-105 criterion 4). A new `startsAt` or `venueId` on a performance neither cancelled nor played emails every PENDING or COLLECTED booking with an account `reservation.performance-moved`, claimed per booking and destination so a repeated save tells nobody twice; the answer carries `bookingsTold` (0191). |
 | `POST /api/admin/performances/[id]/sale` | On sale or off sale, per performance. A cancelled or externally ticketed performance is a 409. |
 | `POST /api/admin/performances/[id]/cancel` | Cancels one, taking an optional `reason` (at most 500 characters). Emails every PENDING or COLLECTED booking with an account `reservation.performance-cancelled`, once per booking by claim, with the reason, which is never audited. Answers with the night, how many tickets are owed a refund and how many bookings were told. |
 | `DELETE /api/admin/performances/[id]` | Deletes a performance nothing has sold for. One that has is a 409 naming cancelling as the way. |
@@ -640,8 +641,9 @@ stateDiagram-v2
 
 ### ticket_types
 `id` PK · `name` UNIQUE global · `description` · `price` pence (base) · `kind` CHECK
-`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to` CHECK
-`MEMBER` NULL (D-109; set once at creation, like `kind` and `access_kind`) · `archived` bool ·
+`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to`
+`MEMBER|DESK` NULL, enforced by Zod rather than a CHECK (D-109; `MEMBER` set once at creation,
+like `kind` and `access_kind`; NULL and `DESK` swap on edit, 0190) · `archived` bool ·
 `active_by_default` bool.
 Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
 the two override tables below; everything else in this module is unbuilt.
@@ -652,6 +654,7 @@ the two override tables below; everything else in this module is unbuilt.
 | Route | What it does |
 | --- | --- |
 | `GET /api/admin/ticket-types` | The paged envelope, archived types included by default, each row carrying whether it has ever been sold. |
+| `GET /api/admin/ticket-types/access-kinds` | `{ access, companion }`: whether an unarchived type of each access kind exists, for the warning on Ticket types and Access profiles. Gated at `ticketing.read` or `access.verify`, since the Secretary holds only the second. |
 | `POST /api/admin/ticket-types` | Adds one. The name is refused if it is already held, compared without regard to capitals. |
 | `PUT /api/admin/ticket-types/[id]` | Changes the name, description, base price and default. It does not take `kind` or `access_kind`. |
 | `POST /api/admin/ticket-types/[id]/archive` | Archives one, or takes it back out. Archiving an archived type is a 409. |
@@ -683,13 +686,17 @@ drops archived types and every flagged one, and allow-lists `id`, `name`, `descr
 
 `GET /api/performances/[id]/booking` also names what is being booked, so the form need not fetch
 the show again: `show` is its slug and title, `performance` its curtain and venue, and no more.
+A performance of a show that is not `PUBLISHED` answers 404 there and on
+`POST /api/performances/[id]/waiting-list`, exactly as an unknown id does (D-101 criterion 1).
 
 **Entitlement (D-109).** `restricted_to = 'MEMBER'` drops a type from what
 `GET /api/performances/[id]/booking` and `POST /api/reservations` offer a caller who is not
 currently a member (`hasCurrentMembership()`, checked fresh at each, since a membership can lapse
 between the two). Concession has no committee-agreed eligibility evidence yet (open question,
 `docs/backlog/D-ticketing.md`), so it is not a value here: a concession type stays open online and
-is checked at collection instead. Entitlement is read from a session-scoped call, never folded
+is checked at collection instead. `restricted_to = 'DESK'` (0190) drops a type from every
+customer path, and from the public listing's prices in SQL; only callers passing the `DESK`
+channel to `bookableTicketTypes()` (the desk and the till) are offered it. Entitlement is read from a session-scoped call, never folded
 into the cacheable public listing (`/api/whats-on`, `/api/shows/[slug]`), so those stay
 viewer-independent.
 
@@ -774,7 +781,9 @@ window, an unpublished show, an off-sale or externally ticketed performance, eac
 named; `PUBLIC_ORDER_SEAT_CAP` (10 by default) is checked per line and against the order total.
 Reservation endpoints are rate limited by IP (`server/utils/request-ip.ts`, reading
 `CF-Connecting-IP`) and by email address, and every refusal is enumeration-safe: nothing in the
-response distinguishes an address that already held an account from one that did not.
+response distinguishes an address that already held an account from one that did not. A reused
+account keeps its own name and details; only the tickets join it, and when the typed name differs
+(`bookedInAnotherName()`) the owner's confirmation names it and says how to cancel (0170).
 
 **Release and reminders (D-106, D-107).** `hold_expires_at` is set at reservation to curtain
 minus `HOLD_RELEASE_MINUTES_BEFORE` (15 by default), or a performance's own
@@ -787,7 +796,8 @@ anything else in the window writes no trail for a release that did not happen. A
 (`holdReminderClaim()`), which is why an extended or edited hold re-arms it rather than finding
 the old claim already spent: the expiry is part of the key. Reminders read
 `HOLD_REMINDER_MINUTES_BEFORE` (60 by default, proposed and unconfirmed per
-`docs/workshops.md`). A booking whose hold would already be due for release the moment it is
+`docs/workshops.md`), and skip a booking made inside that window (`created_at` on or after the
+trigger point): its confirmation has just said when it releases. A booking whose hold would already be due for release the moment it is
 made is refused outright at the write path, quoting the box office as the alternative, rather
 than held and released minutes later (committee decision).
 
@@ -897,7 +907,9 @@ a walk-up never renames an account (0123). The till asks the same question
 **Reinstating a lapsed or self-cancelled hold (D-118).** `POST
 /api/box-office/desk/reservations/[id]/reinstate` flips a booking straight back to `PENDING`,
 its tickets never having left the table, so the reference and the QR (D-108) are exactly what
-they always were. The eligible shape is `status = 'EXPIRED' OR (status = 'CANCELLED' AND
+they always were. The fresh `hold_expires_at` is `reinstatedHoldExpiresAt()`: the release if it is
+still ahead, otherwise curtain-up, and never less than 15 minutes away, so a hold brought back
+after its release is not lapsed again by the next sweep. The eligible shape is `status = 'EXPIRED' OR (status = 'CANCELLED' AND
 cancelled_by = 'CUSTOMER')`, carried on the same `UPDATE` that also re-checks capacity
 (`capacityAllows()`), so an officer deciding while the house fills loses the write rather than
 the seat (criterion 1, 0003). A staff cancellation is never eligible: D-116's own
@@ -1092,7 +1104,9 @@ the pass's own id: no dedicated column exists for it, and the field is documente
 for exactly this (0033). A buyer is chosen through `GET
 /api/box-office/desk/passes/buyers`, column allow-listed (name, email) and gated at
 `ticketing.write` rather than `accounts.read`, since an ordinary desk officer holds the first and
-not the second (K-123 criterion 1).
+not the second (K-123 criterion 1). Once chosen, `GET /api/box-office/desk/passes/buyers/{userId}`
+answers only `{ member }`, so the screen can show whether a member price point fits the buyer;
+the price itself defaults to the type's dearest, never its cheapest.
 
 **Requesting online, and fulfilling at the desk (criterion 3).** `POST /api/account/passes/request`
 writes a `pass_requests` row and nothing else: no capacity, no cap, no pass. One statement
@@ -1499,7 +1513,9 @@ refusal reason as two distinct pieces of information, not one column doing both 
 venue, via `/api/admin/age-checks/export` (E-119). A row can also come from `POST
 /api/till/sale`'s inline prompt (F-106): `performance_id` there is the till's own resolved
 authority, null when it spans more than one performance, and `product` names the basket's
-restricted lines rather than something staff types.
+restricted lines rather than something staff types. A refusal given on the till before the charge
+comes through `POST /api/tonight/age-checks` with the till's `venueId`, and is placed on the house a
+sale at that bar would be (`performanceForSale`, 0161).
 
 ### checklist_items
 `id` PK · `venue_id` → venues cascade · `phase` CHECK `PRE|POST` · `label` · `sort` · `required`
@@ -2676,16 +2692,21 @@ scrubbed on erasure alongside `notes`.
 
 **A marked register is corrected inside the edit window** (G-114). The window is
 `SESSION_EDIT_WINDOW_DAYS` and is counted from the held-on day, so lengthening it is a settings
-change rather than a deploy. A correction is one batch: every live record the session issued is
-revoked with a reason, the marks are restated, and the corrected set is inserted beside them, so
-there is no readable moment in which somebody has lost a record they are about to get back. The
-revoke runs first because the partial unique index counts only live rows. Nothing is deleted, and
+change rather than a deploy. A correction is one batch touching only the people whose mark moved
+(0241): the live records of somebody unmarked are revoked with a reason, scoped by one `json_each`
+parameter, the marks are restated, and records are inserted for somebody newly marked present.
+Each person moved is emailed `training.session.withdrawn` or `training.session.added`, keyed to the
+correction. The revoke runs first because the partial unique index counts only live rows. Nothing is deleted, and
 somebody dropped by a correction keeps their attendee row marked `ABSENT` as evidence. Past the
 window the only correction is an administrator's revocation and a fresh grant (G-122).
 
 **The freeze is releasable by the session's own trainer while no marks exist** (open question 6,
 answered 2 September). The release is conditional on `marked_at IS NULL`, so a release racing a
 submission cannot change what a mark is about to award.
+
+**The absentee email goes only to who was expected** (0241): somebody who signed up and held a
+place in the order as the register was marked, read before marking moves any status. `marks` may
+be empty once `confirmedAllAbsent` is sent, so a register nobody was on still closes.
 
 **Marking is the single act that awards.** Everything it does is one `db.batch`: the stamp, the
 attendee marks, the records, and the audit entry. Every statement after the stamp is guarded on
@@ -2836,9 +2857,13 @@ account having been written; the unique address settles two recorders racing (00
 an account holds or is pre-linked to is refused with the instruction to choose that account.
 Making the account needs `training.by-address` or a live lead of the module's department, never
 `accounts.create`, and nothing is sent to the address: A-116's claim is what hands it over.
-A lead holds no `accounts.read`, so the records screen's picker asks
-`GET /api/admin/training/people?search=` in its place, which answers an id and a name and nothing
-more, to `training.write` or a live lead appointment.
+A lead or a trainer holds no `accounts.read`, so the records screen's picker, a register's walk-in
+picker and the delivery log's picker ask `GET /api/admin/training/people?search=` in its place,
+which answers an id and a name and nothing more, to `training.write`, a live lead appointment or
+current trainer standing (0240). An award is refused for a draft module, and for a person already
+holding an unrevoked record of the module dated the same day; a revoke answers `stillHeld` when
+another current record of the module remains. A prerequisite must be an active module, and
+neither a certification nor a sign-off-only module is teachable at a session.
 
 A **retrospective delivery log** (G-118) is the third, at `POST /api/admin/training/deliveries`,
 with its dry-run at `POST /api/admin/training/deliveries/preview`. It writes one record per
@@ -2992,6 +3017,12 @@ day range), with `search` over `type` rather than an exact match, so `shift` now
 `id` PK · `user_id` cascade · `topic` CHECK `BOOKINGS|SHIFTS|TRAINING|ROOMS|ANNOUNCEMENTS` ·
 `type` · `subject` · `body` · `digest_log_id` NULL, no foreign key · `created_at`. Indexed on
 `(topic, user_id, digest_log_id)`.
+
+**`body` is JSON once written by `notify()`** (0206): `{ text, line, link, about }`, the message's
+full text, its one-line form, the one link that line leads to and the ids of the bookings, series
+or Students' Union requests it concerns. A plain-text body (held before 0206, or scrubbed by
+erasure) reads as its subject. A deciding message deletes unclaimed rows whose `about` shares an
+id with its own, so the row may go without ever being sent.
 
 **A row is written when `notify()` holds a message for its topic's digest instead of sending
 (H-104 criterion 1).** Unclaimed and topic-bearing is what qualifies; a claimed call (0048) or one

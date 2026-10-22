@@ -14,6 +14,11 @@ const deviceToken = useCookie<string | null>('nnt-backstage-token', { maxAge: 60
 // A phone whose cookie still works reopens its board rather than joining again as a second
 // device (issue 1313); until that answer comes, neither the form nor the board is drawn.
 const resuming = ref(Boolean(deviceToken.value))
+// Unavailable until six digits and a label are there; an edit clears the last refusal (0238).
+const joinReady = computed(() => boardJoinForm.safeParse(state).success)
+watch(() => [state.code, state.label], () => {
+  failure.value = null
+})
 
 // Typed explicitly (0053): inferring it from the route map alone has grown too deep for tsc.
 async function join(): Promise<void> {
@@ -277,6 +282,7 @@ function awaitsMyTick(message: { id: string, side: BoardSide }): boolean {
         <UButton
           type="submit"
           :loading="joining"
+          :disabled="!joinReady"
           data-test="board-join-submit"
           block
         >

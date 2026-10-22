@@ -6,6 +6,7 @@ import type { SessionFacts } from '#shared/utils/viewer-facts'
 export interface AccountSnapshot extends SessionFacts {
   signedIn: boolean
   user?: { id: string, name: string, email: string, verified: boolean }
+  authenticatorOwed?: boolean
 }
 
 // The account row is the source of truth, not the sealed cookie (0007), so this reads the route

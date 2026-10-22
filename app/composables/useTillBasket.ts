@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { saysMoney } from '#shared/utils/bar'
-import { MAX_BASKET_LINE_QTY, lineNeedsCheckId, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
+import { MAX_BASKET_LINE_QTY, lineNeedsCheckId, saysBasketLine, saysPouredLine, saysPouredLines } from '#shared/utils/sale'
 import { refusalText, writeFailureText } from '../utils/refusal'
 import type { ComputedRef, Ref } from 'vue'
 import { AGE_CHECK_PRODUCT_MAX } from '#shared/utils/age-checks'
@@ -55,7 +55,7 @@ export interface TillBasketDeps {
 
   // A refusal at the tap may never reach a sale, so it goes on the register on its own
   // (F-106 criterion 6).
-  recordAgeCheck: (body: { outcome: 'REFUSED', idType: null, reason: RefusalReason | null, description: string, notes: string | null, product: string | null, performanceId: null }) => Promise<unknown>
+  recordAgeCheck: (body: { outcome: 'REFUSED', idType: null, reason: RefusalReason | null, description: string, notes: string | null, product: string | null, performanceId: null, venueId: string | undefined }) => Promise<unknown>
 }
 
 export function useTillBasket(deps: TillBasketDeps) {
@@ -70,7 +70,7 @@ export function useTillBasket(deps: TillBasketDeps) {
 
   function addLine(productName: string, variant: SaleVariant, choiceItemId: string | null, choiceItemName: string | null): void {
     const existing = basket.value.find(line => line.variantId === variant.id && line.choiceItemId === choiceItemId)
-    const said = [productName, variant.label, choiceItemName].filter(Boolean).join(', ')
+    const said = saysBasketLine({ productName, variantLabel: variant.label, choiceItemName })
     if (existing) {
       lastAdded.value = existing.qty < MAX_BASKET_LINE_QTY ? { lineId: existing.id, said } : null
       incrementLine(existing)
@@ -272,6 +272,7 @@ export function useTillBasket(deps: TillBasketDeps) {
         // above still names every line.
         product: names ? names.slice(0, AGE_CHECK_PRODUCT_MAX) : null,
         performanceId: null,
+        venueId: venueId.value ?? undefined,
       })
     }
     catch (failed) {

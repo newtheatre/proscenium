@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { nightsWithTakings, outstandingNights, resolvedReaderPence, zReadingStatement } from '#server/utils/night-reconciliation'
 import { fromLondonWallClock } from '#shared/utils/london'
-import { expectedSheet, liveVariance, nightFromQuery, nightsNeedingYou, nightsWithin, reconciliationHref, recordZReadingForm, saysVariance, zNightQuery } from '#shared/utils/night-reconciliation'
-import type { NightExpected } from '#shared/utils/night-reconciliation'
+import { expectedSheet, liveVariance, nightFromQuery, nightsNeedingYou, nightsWithin, reconciliationHref, recordZReadingForm, replacedAnotherBar, saysReplacedBy, saysVariance, zNightQuery } from '#shared/utils/night-reconciliation'
+import type { NightExpected, ZReading } from '#shared/utils/night-reconciliation'
 import { FIRST_RECONCILED_NIGHT } from '#shared/utils/show-night'
 
 // I-104: the reader keys in what it shows; a variance needs a note before it can be recorded,
@@ -132,6 +132,38 @@ describe('the reconciliation screen\'s own arithmetic', () => {
         { night: '2026-09-12', says: 'Open variance' },
         { night: '2026-09-23', says: 'No reading' },
       ])
+  })
+
+  test('a replaced reading is listed once, and an open variance on the same night outranks it', () => {
+    expect(nightsNeedingYou({ missing: [], openVariance: [{ night: '2026-10-14' }], replaced: [{ night: '2026-10-14' }, { night: '2026-10-21' }] }))
+      .toEqual([
+        { night: '2026-10-14', says: 'Open variance' },
+        { night: '2026-10-21', says: 'Reading replaced' },
+      ])
+  })
+})
+
+// The 21 Oct process map: a test close at one bar replaced the live bar's reading with no trace.
+describe('the history says where each reading came from and what replaced it', () => {
+  const reading = (id: string, readerPence: number, venueName: string | null, supersedesId: string | null = null, writtenOff = false): ZReading => ({
+    id, night: '2026-10-21', readerPence, expectedPence: 24735, variancePence: readerPence - 24735, enteredBy: 'u',
+    enteredByName: 'Fen Front', note: null, supersedesId, writtenOff, createdAt: 0, venueName,
+  })
+  const clock = (): string => '21:32'
+
+  test('a till reading replaced by another bar\'s close names that bar', () => {
+    const history = [reading('a', 150, 'New Theatre'), reading('b', 24735, 'Union Hall', 'a')]
+    expect(saysReplacedBy(history[0]!, history, clock)).toBe('Replaced by the closing of the Union Hall till at 21:32')
+    expect(saysReplacedBy(history[1]!, history, clock)).toBeNull()
+    expect(replacedAnotherBar(history[1]!, history)?.id).toBe('a')
+  })
+
+  test('a reading recorded here, or the same bar again, or the same figure, is not flagged', () => {
+    const here = [reading('a', 150, 'New Theatre'), reading('b', 24735, null, 'a')]
+    expect(saysReplacedBy(here[0]!, here, clock)).toBe('Replaced by Fen Front\'s reading at 21:32')
+    expect(replacedAnotherBar(here[1]!, here)).toBeNull()
+    const sameFigure = [reading('a', 24735, 'New Theatre'), reading('b', 24735, 'Union Hall', 'a')]
+    expect(replacedAnotherBar(sameFigure[1]!, sameFigure)).toBeNull()
   })
 })
 

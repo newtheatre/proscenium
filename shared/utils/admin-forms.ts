@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MANUAL_ACTION_NAMES } from './audit-actions'
-import { londonDayField } from './membership'
+import { londonDay, londonDayField } from './membership'
+import { ROLES } from './roles'
 import type { AuditActionName } from './audit-actions'
 
 // One schema per admin form, validating the request and driving the form that sends it (0032).
@@ -31,12 +32,13 @@ export function wholeFromTyped(raw: string): number | null {
   return /^\d{1,9}$/.test(trimmed) ? Number(trimmed) : null
 }
 
+// Each field says what it wants, empty or not, rather than the house's last resort (0158).
 export const awardFellowship = z.object({
-  userId: accountId,
-  awardedOn: londonDayField,
+  userId: z.string('Choose who is being honoured').min(1, 'Choose who is being honoured').max(64),
+  awardedOn: londonDayField.refine(day => day <= londonDay(new Date()), 'Give the day it was resolved, today or earlier'),
   // The meeting, never an individual: the theatre awards this (0023).
-  awardedBy: z.string().trim().min(1, 'Name the meeting that resolved it').max(200),
-  citation: z.string().trim().min(1, 'The citation is the public wording').max(1000),
+  awardedBy: z.string('Name the meeting that resolved it').trim().min(1, 'Name the meeting that resolved it').max(200),
+  citation: z.string('Write the citation, the public wording').trim().min(1, 'Write the citation, the public wording').max(1000),
 })
 
 export const revokeFellowship = z.object({
@@ -48,8 +50,13 @@ export const recordMembership = z.object({
   startsOn: londonDayField,
   years: z.union([z.literal(1), z.literal(3)]),
   evidence: z.string().trim().max(200).optional(),
-  studentId: z.string().trim().max(32).optional(),
+  studentId: z.string().trim().max(32).optional()
+    .refine(value => !value || /^\d{6,12}$/.test(value), 'A student number is the 6 to 12 digits on the student card'),
 })
+
+// A role granted or revoked away from the screens names which role, or the entry says nothing.
+export const MANUAL_ROLE_ACTIONS: readonly string[] = ['manual.role.granted', 'manual.role.revoked']
+const isRole = (value: unknown): boolean => typeof value === 'string' && (ROLES as readonly string[]).includes(value)
 
 export const recordManualEntry = z.object({
   action: z.enum(MANUAL_ACTION_NAMES as [AuditActionName, ...AuditActionName[]]),
@@ -57,16 +64,20 @@ export const recordManualEntry = z.object({
   onBehalfOf: accountId,
   occurredAt: z.number().int().positive(),
   detail: z.record(z.string().max(60), z.union([z.string().max(120), z.number(), z.boolean(), z.null()])).default({}),
+}).refine(input => !MANUAL_ROLE_ACTIONS.includes(input.action) || isRole(input.detail.role), {
+  path: ['detail', 'role'], message: 'Say which role was granted or revoked',
 })
 
 // The form takes the day it happened; the endpoint takes the second that day began. Stated as its
 // own object rather than derived, because a derived one types as loosely as its loosest part.
 export const manualEntryForm = z.object({
   action: z.enum(MANUAL_ACTION_NAMES as [AuditActionName, ...AuditActionName[]]),
-  target: accountId,
-  onBehalfOf: accountId,
-  occurredOn: londonDayField,
-})
+  target: z.string('Choose who it was about').min(1, 'Choose who it was about').max(64),
+  onBehalfOf: z.string('Choose who decided it').min(1, 'Choose who decided it').max(64),
+  // Checked here as well as by the route, so a future date is refused before a second factor is asked.
+  occurredOn: londonDayField.refine(day => day <= londonDay(new Date()), 'That date has not happened yet'),
+  role: z.enum(ROLES, 'Choose which role').optional(),
+}).refine(input => !MANUAL_ROLE_ACTIONS.includes(input.action) || input.role !== undefined, { path: ['role'], message: 'Choose which role' })
 
 export type ManualEntryForm = z.output<typeof manualEntryForm>
 

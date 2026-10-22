@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonDaysFrom, londonToday } from '#tests/helpers/london-day'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, openView, readTime, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -77,15 +78,11 @@ const PHONE = { width: 390, height: 844 }
 
 // A booking inside the week the calendar opens on, whatever day the suite runs.
 function todayAt(hour: number): Date {
-  const when = new Date()
-  when.setUTCHours(hour, 0, 0, 0)
-  return when
+  return new Date(`${londonToday()}T${String(hour).padStart(2, '0')}:00:00Z`)
 }
 
 // The London day after today, as the grid's slots name it.
-function tomorrow(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(new Date(Date.now() + 86_400_000))
-}
+const tomorrow = (): string => londonDaysFrom(1)
 
 // One browser backs every view, so a signed-in session has to be ended before another begins.
 async function signInOn(view: Bun.WebView, email: string, password: string): Promise<void> {
@@ -258,6 +255,8 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
 
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
+      // The view is in the address, so Back from the form and a shared link both land on it.
+      await waitFor(view, `new URLSearchParams(location.search).get('view') === 'day'`, 30_000)
       const free = await view.evaluate<number>(`[...document.querySelectorAll('[data-test^="slot-"]')].filter(button => !button.disabled).length`)
       expect(free).toBeGreaterThan(0)
     }
@@ -308,6 +307,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await waitFor(view, `document.querySelector('[data-test="read-failure"]')`, 30_000)
 
       expect(await textOf(view, '[data-test="read-failure"]')).toContain('shorter')
+      expect(await textOf(view, 'body')).not.toContain('No rooms can be booked yet')
       expect(await textOf(view, 'body')).not.toContain('No rooms are bookable yet')
     }
     finally {
@@ -366,8 +366,6 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
     const lander = await registerMember(app, 'lander', password)
     giveMembership(lander.id)
     const room = await makeRoom()
-    const day = new Date()
-    day.setDate(day.getDate() + 21)
 
     const view = await openSignedOutView(app.baseURL)
     try {
@@ -377,7 +375,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await click(view, 'form button[type="submit"]')
       await waitFor(view, `document.querySelector('[data-test="account-menu"]')`)
 
-      const at = day.toISOString().slice(0, 10)
+      const at = londonDaysFrom(21)
       await visit(view, `${app.baseURL}/rooms/book?room=${room}&day=${at}&at=14:00&until=15:00&purpose=REHEARSAL`, '[data-test="booking-form"]')
       await fill(view, '[data-test="booking-title"]', 'Read through')
       await click(view, '[data-test="booking-submit"]')

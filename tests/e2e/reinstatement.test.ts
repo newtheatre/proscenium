@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { sqliteTarget } from '#tests/helpers/database'
-import { adminSession, finishSignIn, grantRole, registerMember } from '#tests/helpers/accounts'
+import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -30,6 +30,8 @@ beforeAll(async () => {
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
+  // Refunding asks for a fresh session (0171); this suite's sessions must outlast the default.
+  await request(app, 'PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: 120 }, officer.cookie)
 
   venueId = venue()
 }, BOOT_TIMEOUT_MS)
@@ -71,6 +73,17 @@ function backdateHold(reservationId: string, at: number): void {
   const database = new Database(app.databaseFile)
   try {
     database.prepare('UPDATE reservations SET hold_expires_at = ? WHERE id = ?').run(at, reservationId)
+  }
+  finally {
+    database.close()
+  }
+}
+
+// Direct SQL for the same reason: brings curtain up to just past the release, as a late booker meets it.
+function movePerformance(performanceId: string, startsAt: number): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.prepare('UPDATE performances SET starts_at = ? WHERE id = ?').run(startsAt, performanceId)
   }
   finally {
     database.close()
@@ -153,6 +166,27 @@ describe.skipIf(skip !== null)('reinstating an expired or customer-cancelled hol
     expect(row.status).toBe('PENDING')
     expect(row.reference).toBe(booked.reference)
     expect(row.holdExpiresAt).toBeGreaterThan(before.holdExpiresAt)
+  }, CASE_TIMEOUT_MS)
+
+  test('a hold reinstated after its release time is not lapsed again by the next sweep', async () => {
+    const { performanceId, ticketTypeId } = await bookableShow()
+    const booked = await expiredReservation(performanceId, ticketTypeId)
+    const now = Math.floor(Date.now() / 1000)
+    movePerformance(performanceId, now + 10 * 60)
+
+    const reinstated = await send('POST', `/api/box-office/desk/reservations/${booked.id}/reinstate`, {
+      reason: 'Booker arrived after the release',
+    })
+    expect(reinstated.status).toBe(200)
+    const { holdExpiresAt } = await reinstated.json() as { holdExpiresAt: number }
+    expect(holdExpiresAt).toBeGreaterThanOrEqual(now + 15 * 60)
+
+    await runReleaseTask()
+    const row = query<{ status: string, holdExpiresAt: number }>(
+      'SELECT status, hold_expires_at AS holdExpiresAt FROM reservations WHERE id = ?', booked.id,
+    )!
+    expect(row.status).toBe('PENDING')
+    expect(row.holdExpiresAt).toBe(holdExpiresAt)
   }, CASE_TIMEOUT_MS)
 
   test('a customer\'s own cancellation is reinstated', async () => {

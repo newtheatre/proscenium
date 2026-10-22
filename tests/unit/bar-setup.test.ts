@@ -299,10 +299,24 @@ describe('one payload per shape, validated before anything is written (F-127 cri
     expect(parsed.success).toBe(false)
   })
 
-  test('a serving cannot pour more than the container holds', () => {
-    expect(aMeasured({
+  test('a serving cannot pour more than the container holds, and the refusal names the size', () => {
+    const refused = aMeasured({
       sizes: [{ servingKind: 'bottle', label: 'Magnum', qty: 1500, pricePence: 2800 }],
-    }).success).toBe(false)
+    })
+    expect(refused.success).toBe(false)
+    expect(refused.error?.issues.map(issue => issue.message)).toContain('Magnum pours 1500 ml, more than the 750 ml container holds')
+  })
+
+  // The process map's Lager: a draught preset over a keg counted in whole items poured 568 kegs a pint.
+  test('a measure is refused on a stocked item counted in whole items', () => {
+    const refused = productSetupForm.safeParse({
+      shape: 'MEASURED',
+      product: aProduct,
+      item: { mode: 'NEW', item: { name: 'Lager keg', unit: 'ITEM' } },
+      sizes: [{ servingKind: 'pint', label: 'Pint', qty: 568 }, { servingKind: 'half', label: 'Half', qty: 284 }],
+    })
+    expect(refused.success).toBe(false)
+    expect(refused.error?.issues.map(issue => issue.message)).toContain('Pint pours a measure, so Lager keg needs counting in millilitres, not whole items')
   })
 
   test('a whole thing still sets up with no serving stated at all', () => {

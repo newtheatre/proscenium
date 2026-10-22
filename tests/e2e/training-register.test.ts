@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
-import { londonParts } from '#shared/utils/london'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -83,11 +83,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
   })
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 async function addModule(over: Record<string, unknown> = {}): Promise<string> {
   const id = `REG-${suffix()}`
@@ -339,6 +334,36 @@ describe.skipIf(skip !== null)('marking is the single act that awards (G-116)', 
       marks: [{ userId: member.id, mark: 'ABSENT' }],
       confirmedAllAbsent: true,
     })).status).toBe(200)
+  })
+
+  // 0241: nobody signed up and every walk-in refused still has to close.
+  test('an empty register closes once its emptiness is confirmed', async () => {
+    const session = await sessionToday([await addModule()])
+    await openRegister(session)
+
+    expect((await mark(session, { marks: [] })).status).toBe(400)
+    expect((await mark(session, { marks: [], confirmedAllAbsent: true })).status).toBe(200)
+    expect(read<{ status: string }>('SELECT status FROM training_sessions WHERE id = ?', session)?.status).toBe('DELIVERED')
+  })
+
+  // 0241: a place is what a "we missed you" is about, so the waiting list is never told it.
+  test('only somebody who had a place is told they were missed', async () => {
+    const module = await addModule()
+    const session = await sessionToday([module])
+    write('UPDATE training_sessions SET capacity = 1 WHERE id = ?', session)
+    const placed = await adminSession(app, { roles: [] })
+    const waiting = await adminSession(app, { roles: [] })
+    signUp(session, placed.id, Math.floor(Date.now() / 1000) - 100)
+    signUp(session, waiting.id, Math.floor(Date.now() / 1000))
+    await openRegister(session)
+
+    expect((await mark(session, {
+      marks: [{ userId: placed.id, mark: 'ABSENT' }, { userId: waiting.id, mark: 'ABSENT' }],
+      confirmedAllAbsent: true,
+    })).status).toBe(200)
+    expect(all<{ userId: string }>(
+      `SELECT user_id userId FROM notification_log WHERE type = 'training.session.absent' AND session_id = ?`, session,
+    ).map(row => row.userId)).toEqual([placed.id])
   })
 
   // Criterion 4's named case, through the real routes rather than the harness.

@@ -125,9 +125,9 @@ describe('a refused screen names who can help tonight (issue 1304)', () => {
     ])).toBe('Ask Rowan, tonight\'s duty manager.')
   })
 
-  test('an unfilled or unknown duty manager is still named by the job', () => {
-    expect(whoCanHelpTonight([{ role: 'DUTY_MANAGER', filled: false, name: null }])).toBe('Ask tonight\'s duty manager.')
-    expect(whoCanHelpTonight(null)).toBe('Ask tonight\'s duty manager.')
+  test('with no duty manager on, the Front of House Manager is named', () => {
+    expect(whoCanHelpTonight([{ role: 'DUTY_MANAGER', filled: false, name: null }])).toBe('Nobody is on as duty manager tonight: ask the Front of House Manager.')
+    expect(whoCanHelpTonight(null)).toBe('Ask tonight\'s duty manager, or the Front of House Manager.')
   })
 })
 

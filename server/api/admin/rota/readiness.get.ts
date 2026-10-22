@@ -1,5 +1,5 @@
-// What a show night needs set up, for the rota's owner: the gating module each role names, what
-// each venue we run still lacks, and the board's calls (issue 1318). Read-only, so no audit row.
+// What a show night needs set up, for the rota's owner: the gating module each role names, who
+// holds it, what each venue still lacks and the board's calls (issue 1318, 0210). No audit row.
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rota.read')
 
@@ -9,5 +9,7 @@ export default defineEventHandler(async (event) => {
     boardReadiness(),
   ])
 
-  return { eligibility, venues, board }
+  const qualified = await qualifiedCounts(eligibility)
+
+  return { eligibility, qualified, venues, board }
 })

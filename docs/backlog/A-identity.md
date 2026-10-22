@@ -473,8 +473,9 @@ Open questions for the committee:
 - Acceptance criteria:
   1. An administrator records an award against an account with the date, the meeting that
      resolved it and the citation; the citation is public wording and is displayed as written.
-  2. A person can hold at most one fellowship, enforced by a unique constraint rather than by the
-     form.
+  2. A person can hold at most one standing fellowship, enforced by a unique constraint rather
+     than by the form. Amended 22 October 2026 (0159): a revoked fellowship stays as history and a
+     fresh award may follow it.
   3. Awarding issues the lifetime entitlement in the same batch as the record, so a Fellow can
      never exist without one or an entitlement without an award (0023). Amended 30 August 2026: the
      roll was recorded first and the entitlement issued once the pass model existed; wired in the

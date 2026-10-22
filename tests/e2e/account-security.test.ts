@@ -171,6 +171,7 @@ describe.skipIf(skip !== null)('managing a second factor on the account (A-109, 
 
       await visit(view, `${app.baseURL}/account/security`)
       await click(view, '[data-test="regenerate"]')
+      await click(view, '[data-test="confirm-regenerate-codes-verb"]')
       await waitFor(view, 'document.querySelector(\'[data-test="recovery-codes"]\')')
 
       const second = await view.evaluate<string[]>(
@@ -278,6 +279,45 @@ describe.skipIf(skip !== null)('the security page leads with the viewer\'s next 
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="next-step"] [data-test="begin"]'))`)).toBe(true)
       expect(await view.evaluate<boolean>(before('[data-test="methods"]', '[data-test="next-step"]'))).toBe(true)
       expect(await view.evaluate<boolean>(`!document.querySelector('[data-test="next-step"]')?.innerText.includes('Add a passkey')`)).toBe(true)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // A role owing its authenticator refuses only what it adds, and sign-in sends its holder to set one up (0152).
+  test('a treasurer on the committee without an authenticator keeps the committee screens, and lands on Security', async () => {
+    const { email, view } = await registerAndSignIn('owing')
+    try {
+      const database = new Database(app.databaseFile)
+      try {
+        const { id } = database.query('SELECT id FROM users WHERE email = ?').get(email) as { id: string }
+        for (const role of ['COMMITTEE', 'TREASURER']) {
+          database.query('INSERT INTO role_grants (id, user_id, role) VALUES (?, ?, ?)').run(crypto.randomUUID().replaceAll('-', ''), id, role)
+        }
+      }
+      finally {
+        database.close()
+      }
+
+      const answered = await fetch(`${app.baseURL}/api/auth/sign-in`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const session = (answered.headers.get('set-cookie') ?? '').split(';')[0]!
+      const reports = await fetch(`${app.baseURL}/api/admin/reports/incidents?kind=YEAR&year=2026`, { headers: { cookie: session } })
+      expect(reports.status).toBe(200)
+      const money = await fetch(`${app.baseURL}/api/admin/finance/periods`, { headers: { cookie: session } })
+      expect(money.status).toBe(403)
+
+      // The account menu can re-render under the click here (seen on CI), so the session ends directly.
+      expect(await view.evaluate<number>(`fetch('/api/auth/sign-out', { method: 'POST' }).then(response => response.status)`)).toBe(200)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', email)
+      await fill(view, 'form input[type="password"]', password)
+      await click(view, 'form button[type="submit"]')
+      await waitFor(view, `location.pathname === '/account/security'`, 30_000)
     }
     finally {
       view.close()

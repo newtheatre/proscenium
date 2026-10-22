@@ -32,6 +32,11 @@ export const restoreDrillForm = z.object({
 
 export type RestoreDrillForm = z.infer<typeof restoreDrillForm>
 
+// An unticked box is a finding, so the form starts both at false: undefined would fail z.boolean().
+export function blankRestoreDrill(): Partial<RestoreDrillForm> {
+  return { rowCountsMatch: false, moneyTotalsMatch: false }
+}
+
 // No cadence configured answers nothing rather than guessing one (0019); no drill ever run is
 // always overdue once a cadence exists (J-107 criterion 4).
 export function isDrillOverdue(lastDrillAt: string | null, intervalDays: number | null, now: string): boolean {

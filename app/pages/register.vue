@@ -30,6 +30,15 @@ const fields: AuthFormField[] = [
 const message = ref('')
 const done = ref(false)
 const notice = ref<string | null>(null)
+const working = ref(false)
+const registered = ref('')
+const resent = ref<string | null>(null)
+
+// A click before the page hydrates would be lost without a word, so the button waits for it.
+const hydrated = ref(false)
+onMounted(() => {
+  hydrated.value = true
+})
 
 // One rule for the browser and the server: the same function decides both (0012).
 function checkPassword(state: Partial<z.output<typeof schema>>): FormError[] {
@@ -39,14 +48,34 @@ function checkPassword(state: Partial<z.output<typeof schema>>): FormError[] {
 
 async function register(payload: FormSubmitEvent<z.output<typeof schema>>): Promise<void> {
   notice.value = null
+  working.value = true
   try {
     // The confirmation link returns to where the visitor set out from (0103).
     const result = await $fetch('/api/auth/register', { method: 'POST', body: { ...payload.data, next: route.query.next } })
     message.value = result.message
+    registered.value = payload.data.email
     done.value = true
   }
   catch (error) {
     notice.value = refusalText(error)
+  }
+  finally {
+    working.value = false
+  }
+}
+
+// A lost or slow message is the commonest dead end here, so the page offers another (A-102).
+async function sendAgain(): Promise<void> {
+  working.value = true
+  try {
+    const result = await $fetch('/api/auth/verify/resend', { method: 'POST', body: { email: registered.value, next: route.query.next } })
+    resent.value = result.message
+  }
+  catch (error) {
+    resent.value = refusalText(error)
+  }
+  finally {
+    working.value = false
   }
 }
 
@@ -70,7 +99,7 @@ useSeoMeta({ title: 'Create an account' })
       :schema="schema"
       :fields="fields"
       :validate="checkPassword"
-      :submit="{ label: 'Create my account' }"
+      :submit="{ label: 'Create my account', disabled: !hydrated, loading: working }"
       @submit="register"
     >
       <template #title>
@@ -101,8 +130,24 @@ useSeoMeta({ title: 'Create an account' })
         {{ message }}
       </p>
       <p class="text-sm text-muted">
-        Follow the link in the message to confirm your address. Opened in this browser, it signs you
-        in as well.
+        Follow the link in the message to confirm your address. Open it on this device and you are
+        signed in straight away.
+      </p>
+      <UButton
+        variant="link"
+        class="min-h-11 justify-start px-0"
+        data-test="resend-verification"
+        :loading="working"
+        @click="sendAgain"
+      >
+        Nothing arrived? Send the link again
+      </UButton>
+      <p
+        v-if="resent"
+        data-test="resent"
+        class="text-sm text-muted"
+      >
+        {{ resent }}
       </p>
     </div>
   </WayIn>

@@ -5,7 +5,7 @@ import { adminSession, grantCommitteeRole, grantRole, registerMember } from '#te
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { letters, skipReason, startApp } from '#tests/helpers/webview'
 import { committeeYearOf } from '#shared/utils/london'
 import { OFFICER_BYPASS_ACTION } from '#shared/utils/night-authority'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -17,6 +17,7 @@ import type { TestMember } from '#tests/helpers/accounts'
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
 const CASE_TIMEOUT_MS = 120_000
+const SUITE_REAUTH_MINUTES = 120
 
 let app: AppUnderTest
 let officer: TestMember
@@ -32,6 +33,8 @@ beforeAll(async () => {
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
 
   venueId = venue()
+  // Refunding asks for a fresh session (0171); this suite's sessions must outlast the default.
+  expect((await send('PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: SUITE_REAUTH_MINUTES }, officer.cookie)).status).toBe(200)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
@@ -79,7 +82,7 @@ const named = (prefix: string): string => `${prefix} ${crypto.randomUUID().slice
 const slugged = (title: string): string => title.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 const weekOffsetSeconds = 7 * 86_400
 
-async function collectedBooking(price = 900): Promise<{ reservationId: string, ticketId: string, performanceId: string }> {
+async function collectedBooking(price = 900): Promise<{ reservationId: string, ticketId: string, performanceId: string, email: string, qrToken: string }> {
   const title = named('The Seagull')
   const show = await send('POST', '/api/admin/shows', { title, slug: slugged(title) }, officer.cookie)
   const showId = (await show.json() as { id: string }).id
@@ -93,12 +96,13 @@ async function collectedBooking(price = 900): Promise<{ reservationId: string, t
 
   expect((await send('POST', `/api/admin/shows/${showId}/publish`, { published: true, cascadePerformances: true }, officer.cookie)).status).toBe(200)
 
+  const email = registrableAddress('guest')
   const answered = await send('POST', '/api/reservations', {
     performanceId,
     lines: [{ ticketTypeId, quantity: 1 }],
-    guest: { name: 'Refund Tester', email: registrableAddress('guest') },
+    guest: { name: 'Refund Tester', email },
   }, '')
-  const { reference } = await answered.json() as { reference: string }
+  const { reference, qrToken } = await answered.json() as { reference: string, qrToken: string }
   const reservationId = query<{ id: string }>('SELECT id FROM reservations WHERE reference = ?', reference)!.id
 
   const collected = await send('POST', `/api/box-office/desk/reservations/${reservationId}/collect`, {
@@ -108,7 +112,7 @@ async function collectedBooking(price = 900): Promise<{ reservationId: string, t
   expect(collected.status).toBe(200)
 
   const ticketId = query<{ id: string }>('SELECT id FROM tickets WHERE reservation_id = ?', reservationId)!.id
-  return { reservationId, ticketId, performanceId }
+  return { reservationId, ticketId, performanceId, email, qrToken }
 }
 
 // A confirmed shift, not a standing grant (0009, 0044): the direct-insert pattern every e2e
@@ -120,6 +124,27 @@ function confirmDutyManagerTonight(userId: string, performanceId: string): void 
   )
   grantCommitteeRole(app, userId)
 }
+
+// The process map of 21 October: the booker heard nothing when the desk took their money or
+// handed it back, and their page said only "Cancelled by the box office".
+describe.skipIf(skip !== null)('the booker is told when the desk takes or hands back money', () => {
+  test('collecting emails a paid confirmation, and a full refund emails the amount and shows on the page', async () => {
+    const { reservationId, ticketId, email, qrToken } = await collectedBooking(900)
+    const said = (await letters(app)).filter(text => text.includes(email))
+    expect(said.some(text => text.includes('£9.00, paid at the box office'))).toBe(true)
+
+    expect((await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })).status).toBe(200)
+    expect((await send('POST', `/api/box-office/desk/reservations/${reservationId}/cancel`)).status).toBe(200)
+
+    const told = (await letters(app)).filter(text => text.includes(email))
+    expect(told.some(text => text.includes('£9.00 was refunded to your card at the box office') && text.includes('it is cancelled'))).toBe(true)
+
+    const opened = await fetch(`${app.baseURL}/qr/${qrToken}`, { redirect: 'manual' })
+    const cookie = (opened.headers.get('set-cookie') ?? '').split(';')[0]!
+    const page = await (await send('GET', '/api/qr/current', undefined, cookie)).json() as { status: string, refunded: string | null }
+    expect(page).toMatchObject({ status: 'CANCELLED', refunded: '£9.00' })
+  }, CASE_TIMEOUT_MS)
+})
 
 describe.skipIf(skip !== null)('a refund is money handed back in person, one ticket at a time (criteria 1, 3)', () => {
   test('a matching figure refunds the ticket, posts a negative ledger line and frees the seat', async () => {
@@ -192,6 +217,30 @@ describe.skipIf(skip !== null)('a refund is money handed back in person, one tic
 
     const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
     expect(refused.status).toBe(409)
+  }, CASE_TIMEOUT_MS)
+})
+
+// 0171: money goes back out, so a stale session confirms itself, and the desk asks before the reader.
+describe.skipIf(skip !== null)('a refund asks that it is still you', () => {
+  test('a stale session is refused on the readiness check and the refund alike, and nothing is refunded', async () => {
+    const { reservationId, ticketId } = await collectedBooking(900)
+    await send('PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: 1 }, officer.cookie)
+    try {
+      await Bun.sleep(61_000)
+
+      const ready = await send('GET', '/api/box-office/desk/refunds/ready')
+      expect(ready.status).toBe(401)
+      expect((await ready.json() as { data: { reauthenticate?: boolean } }).data.reauthenticate).toBe(true)
+
+      const refused = await send('POST', `/api/box-office/desk/reservations/${reservationId}/tickets/${ticketId}/refund`, { expectedTotalPence: 900 })
+      expect(refused.status).toBe(401)
+      expect(query<{ refundedAt: number | null }>('SELECT refunded_at AS refundedAt FROM tickets WHERE id = ?', ticketId)?.refundedAt).toBeNull()
+    }
+    finally {
+      await send('PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: SUITE_REAUTH_MINUTES }, officer.cookie)
+    }
+
+    expect((await send('GET', '/api/box-office/desk/refunds/ready')).status).toBe(200)
   }, CASE_TIMEOUT_MS)
 })
 

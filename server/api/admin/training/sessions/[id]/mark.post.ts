@@ -57,6 +57,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 409, statusMessage: 'This session teaches nothing, so there is nothing to award' })
   }
 
+  const expected = await expectedOn(id)
+
   // Criteria 3, 4 and 5. One batch, guarded on the register still being unmarked, and every record
   // dated to the day of the session rather than the day it was marked.
   const marked = await markRegister({
@@ -75,6 +77,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await tellAbsentees(event, id, session.heldOn, input.marks)
+  await tellAbsentees(event, id, session.heldOn, input.marks, expected, modules)
   return { ok: true, awarded: marked.awarded, present: present.length, absent: input.marks.length - present.length }
 })

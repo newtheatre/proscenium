@@ -13,6 +13,7 @@ import { isCurrent, londonDay } from '#shared/utils/membership'
 import type { AuditRow } from '#shared/utils/audit'
 import type { BookingStatus, Conflict } from '#shared/utils/bookings'
 import type { ShiftOffsets } from '#shared/utils/rota-times'
+import type { Permission } from '#shared/utils/roles'
 import type { H3Event } from 'h3'
 import type { SQL } from 'drizzle-orm'
 
@@ -153,7 +154,7 @@ export function lapseStatement(id: string, createdAt: number, now: number): SQL 
     UPDATE room_bookings
     SET status = 'REJECTED', rejection_reason = 'Nobody answered this in time, so it lapsed.', updated_at = ${now}
     WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt}
-    RETURNING title, starts_at AS startsAt
+    RETURNING title, starts_at AS startsAt, ends_at AS endsAt
   `
 }
 
@@ -162,7 +163,7 @@ export function chaseStatement(id: string, createdAt: number, now: number): SQL 
     UPDATE room_bookings
     SET escalated_at = ${now}
     WHERE id = ${id} AND status = 'PENDING_APPROVAL' AND created_at = ${createdAt} AND escalated_at IS NULL
-    RETURNING title, starts_at AS startsAt
+    RETURNING title, starts_at AS startsAt, ends_at AS endsAt
   `
 }
 
@@ -279,6 +280,12 @@ export async function hasCurrentMembership(event: H3Event, userId: string, now: 
   const term = await longestTerm(userId)
   if (!term) return false
   return isCurrent(term, londonDay(now), await configValue(event, 'MEMBERSHIP_GRACE_DAYS'))
+}
+
+// Whoever runs the estate books for productions rather than for themselves, so the permission
+// stands in for a personal membership (0200). Anybody else needs a current one.
+export async function mayBookRooms(event: H3Event, userId: string, permissions: Set<Permission>, now: Date): Promise<boolean> {
+  return permissions.has('rooms.write') || await hasCurrentMembership(event, userId, now)
 }
 
 // A claim its caller batched with other writes, and lost, disambiguated as claimSlot's own is (0003).

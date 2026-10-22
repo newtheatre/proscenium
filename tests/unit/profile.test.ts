@@ -69,6 +69,14 @@ describe('a name is required, because everything else refers to it', () => {
     expect(profileForm.safeParse({ name: '   ' }).success).toBe(false)
   })
 
+  // Somebody rings it on the night, so words are refused where they would be read out (0154).
+  test('a phone number must be one', () => {
+    expect(profileForm.safeParse({ name: 'Imogen Hart', phone: 'not a phone' }).success).toBe(false)
+    expect(profileForm.safeParse({ name: 'Imogen Hart', phone: '123' }).success).toBe(false)
+    expect(profileForm.safeParse({ name: 'Imogen Hart', phone: '+44 (0)115 951 5151' }).success).toBe(true)
+    expect(profileForm.safeParse({ name: 'Imogen Hart', emergencyName: 'Her Mother', emergencyPhone: 'ring her' }).success).toBe(false)
+  })
+
   test('a phone number is optional and kept as given', () => {
     expect(profileForm.parse({ name: 'Imogen Hart', phone: '07700 900000' }).phone).toBe('07700 900000')
     expect(profileForm.parse({ name: 'Imogen Hart' }).phone).toBeNull()

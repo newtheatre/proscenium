@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ID_TYPES, REFUSAL_REASONS, saysIdType, saysRefusalReason } from '#shared/utils/age-checks'
+import { ID_TYPES, NAME_WARNING, REFUSAL_REASONS, looksLikeName, saysIdType, saysRefusalReason } from '#shared/utils/age-checks'
 import type { IdType, InlineAgeCheckInput, RefusalReason } from '#shared/utils/age-checks'
 
 export type AgeCheckStep = 'closed' | 'choose' | 'refuse'
@@ -135,6 +135,13 @@ function refuse(): void {
           placeholder="Describe who you checked, never by name"
           data-test="age-check-description"
         />
+        <p
+          v-if="looksLikeName(description)"
+          class="text-sm text-warning"
+          data-test="age-check-name-warning"
+        >
+          {{ NAME_WARNING }}
+        </p>
         <UAlert
           v-if="error"
           data-test="age-check-error"

@@ -5,8 +5,12 @@ import { tillScopeForm } from '#shared/utils/till'
 export default defineEventHandler(async (event) => {
   const scope = await getValidatedQueryOrThrow(event, tillScopeForm)
   const resolved = await requireNightAuthority(event, 'BAR', scope)
-  const session = await openSessionFor(resolved.venueId, resolved.night)
+  const [session, venueName, lastClosed] = await Promise.all([
+    openSessionFor(resolved.venueId, resolved.night),
+    venueNameOf(resolved.venueId),
+    lastClosedTonight(resolved.venueId, resolved.night),
+  ])
 
   // Whether the hand-off is configured, never the keys themselves (F-124 criterion 1).
-  return { night: resolved.night, venueId: resolved.venueId, session, sumupEnabled: sumupEnabled(useRuntimeConfig(event).sumup) }
+  return { night: resolved.night, venueId: resolved.venueId, venueName, session, lastClosed, sumupEnabled: sumupEnabled(useRuntimeConfig(event).sumup) }
 })

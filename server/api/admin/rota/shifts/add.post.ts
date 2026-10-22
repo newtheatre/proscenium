@@ -1,6 +1,6 @@
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
-import { MAX_SLOT_COUNT, addShiftForm, saysShiftRole } from '#shared/utils/rota'
+import { MAX_SLOT_COUNT, addShiftForm, clashRefusal, saysShiftRole } from '#shared/utils/rota'
 
 // An ad hoc shift on a performance, outside the venue template (E-107 criterion 5, issue 933):
 // the role is the officer's choice, the slot the next free one, an optional person confirms it.
@@ -43,7 +43,12 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 409, statusMessage: `This performance already has ${MAX_SLOT_COUNT} ${saysShiftRole(input.role)} shifts, the most it can hold` })
     }
     if (input.userId && subject) {
-      throw ineligibleRefusal(input.role, (await shiftEligibilities(event, input.userId, today))[input.role], subject.name)
+      const again = (await shiftEligibilities(event, input.userId, today))[input.role]
+      if (!again.eligible) throw ineligibleRefusal(input.role, again, subject.name)
+      // Eligible, so what refused the insert is a shift they already hold on this performance (0210)
+      // or one elsewhere at the same time (0211).
+      const onIt = await holdsShiftOn(input.performanceId, input.userId)
+      throw createError({ statusCode: 409, statusMessage: onIt ? 'That member already holds a shift on this performance' : clashRefusal(subject.name, null) })
     }
     throw noSuch('performance')
   }

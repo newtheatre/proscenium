@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysNoSuch } from '#shared/utils/no-such'
+import { saysNotFoundYet } from '#shared/utils/no-such'
 import { saysWhenLong } from '#shared/utils/when'
 import { MAX_PARTY_SIZE, waitingListGuestJoinForm, waitingListPartyForm } from '#shared/utils/waiting-list'
 import type { SaleRefusalReason } from '#shared/utils/programme'
@@ -23,7 +23,7 @@ const { account } = useAccount()
 const { data } = await useFetch<BookingInfo>(() => `/api/performances/${performanceId.value}/booking`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: saysNoSuch('performance', 'Go back to what is on and choose another'), fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNotFoundYet('performance', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const when = computed(() => saysWhenLong(data.value!.performance.startsAt))

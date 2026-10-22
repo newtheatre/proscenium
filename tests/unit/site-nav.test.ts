@@ -17,6 +17,7 @@ const NOT_IN_THE_NAV = new Set([
   'app/pages/bar/stock/stocktakes/[id].vue',
   'app/pages/box-office/shows/[id].vue',
   'app/pages/people/accounts/[id].vue',
+  'app/pages/reports/night/[performanceId].vue',
   'app/pages/comms/operations/accounts/[id].vue',
   'app/pages/training/manage/sessions/[id].vue',
   'app/pages/admin/[...legacy].vue',
@@ -304,6 +305,15 @@ describe('the middleware and the sidebar read the same declaration', () => {
 })
 
 // A queue nobody can see from the screen they are on is a queue nobody works (A-130 criterion 11).
+// Others read the People screens; a refusal there also says who changes them (0157).
+describe('the People screens the IT Manager alone changes say so', () => {
+  test('each entry carries the flag the refusal reads', () => {
+    for (const to of ['/people/accounts', '/people/roles', '/people/members', '/people/fellows']) {
+      expect(`${to}: ${entryFor(to)?.changedByItManager}`).toBe(`${to}: true`)
+    }
+  })
+})
+
 describe('a waiting count rides the entry that opens it', () => {
   const people = CONSOLE_NAV.find(group => group.key === 'people')!
 

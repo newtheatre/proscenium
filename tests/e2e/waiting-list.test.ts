@@ -175,7 +175,11 @@ describe.skipIf(skip !== null)('a claimed offer opens the booking it made (crite
     const view = await openSignedOutView(app.baseURL)
     try {
       await visit(view, entryUrl!, '[data-test="waiting-list-offered"]')
+      expect(await textOf(view, '[data-test="waiting-list-offered"]')).toContain('A seat is free')
+      expect(await textOf(view, '[data-test="waiting-list-claim-count"]')).toContain('Choose 1 more')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="waiting-list-claim-submit"]').disabled`)).toBe(true)
       await fillNumber(view, '[data-test^="quantity-"]', '1')
+      await waitFor(view, `!document.querySelector('[data-test="waiting-list-claim-submit"]').disabled`)
       await click(view, '[data-test="waiting-list-claim-submit"]')
       await waitFor(view, `document.querySelector('[data-test="booking-made"]')`)
       expect(await view.evaluate<string>('location.pathname')).toBe('/qr')
@@ -424,6 +428,34 @@ describe.skipIf(skip !== null)('an exchange offers the seats it frees to the wai
     const sent = await letters(app)
     expect(sent.some(text => text.includes(waiter) && text.includes('first refusal'))).toBe(true)
     expect(sent.some(text => text.includes(mover) && text.includes('/qr/'))).toBe(true)
+  }, CASE_TIMEOUT_MS)
+})
+
+// Giving seats back with Change tickets frees them as a cancel does, so the list is offered them
+// before the public can book them.
+describe.skipIf(skip !== null)('giving seats back offers them to the waiting list (criterion 2)', () => {
+  test('changing a booking from two seats to one offers the freed seat to the list', async () => {
+    const { first, ticketTypeId } = await twoNightShow()
+    seatHouse(first, 2)
+    const booked = await send('POST', '/api/reservations', {
+      performanceId: first, lines: [{ ticketTypeId, quantity: 2 }], guest: { name: 'Ada Giver', email: registrableAddress('giver') },
+    }, '')
+    expect(booked.status).toBe(200)
+    const { reference, qrToken } = await booked.json() as { reference: string, qrToken: string }
+
+    const waiter = registrableAddress('waiter')
+    expect((await send('POST', `/api/performances/${first}/waiting-list`, {
+      performanceId: first, partySize: 1, guest: { name: 'Ada Waiter', email: waiter },
+    }, '')).status).toBe(200)
+    expect(entriesFor(first)[0]?.status).toBe('WAITING')
+
+    const opened = await fetch(`${app.baseURL}/qr/${qrToken}`, { redirect: 'manual' })
+    const cookie = (opened.headers.get('set-cookie') ?? '').split(';')[0]!
+    const changed = await send('PUT', '/api/qr/tickets', { lines: [{ ticketTypeId, quantity: 1 }], reference }, cookie)
+    expect(changed.status).toBe(200)
+
+    expect(entriesFor(first)[0]?.status).toBe('OFFERED')
+    expect((await letters(app)).some(text => text.includes(waiter) && text.includes('first refusal'))).toBe(true)
   }, CASE_TIMEOUT_MS)
 })
 

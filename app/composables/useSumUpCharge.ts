@@ -5,6 +5,7 @@ import { useSumUp } from './useSumUp'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import type { SaleReceipt, TillBooking } from '#shared/utils/sale'
+import { saysAnswered } from '#shared/utils/sumup'
 import type { ResolveOutcome, SumupAttemptKind, SumupAttemptStatus, SumupAttemptView } from '#shared/utils/sumup'
 import type { TillSession } from '#shared/utils/till'
 import type { BasketLine, WalkUpLine } from './useTillBasket'
@@ -234,11 +235,15 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     })
   }
 
+  // What became of a listed charge just answered, so its row does not simply vanish (bar review, T7).
+  const answeredNotice = ref<string | null>(null)
+
   // "Did it go through?" (criterion 5), or Reader took it and Card declined (0096), for the attempt
   // this screen started or one listed below.
   async function resolveAttempt(id: string, outcome: ResolveOutcome, note: string | null = null): Promise<void> {
     resolving.value = true
     waitingFailure.value = null
+    answeredNotice.value = null
     try {
       const answered = await request<{ status: SumupAttemptStatus, error: string | null, receipt?: SaleReceipt | null }>(`/api/till/payments/${id}/resolve`, {
         method: 'POST',
@@ -252,6 +257,8 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
         settleAttempt(answered.status, pending, answered.receipt ?? null)
       }
       else {
+        const listed = listedAttempts.value.find(attempt => attempt.id === id)
+        if (listed) answeredNotice.value = saysAnswered(answered.status, listed.expectedTotalPence)
         await refreshOpenAttempts()
       }
       if (answered.status === 'MISMATCH') waitingFailure.value = answered.error
@@ -300,6 +307,7 @@ export function useSumUpCharge(deps: SumUpChargeDeps) {
     resolveAttempt,
     refreshOpenAttempts,
     rememberAttempt,
+    answeredNotice,
     resume,
     returnToTab,
   }

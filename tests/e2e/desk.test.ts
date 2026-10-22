@@ -33,6 +33,8 @@ beforeAll(async () => {
   boxOfficePassword = generatePassword()
   boxOffice = await registerMember(app, 'boxoffice', boxOfficePassword)
   await grantRole(app, boxOffice, 'FOH_MANAGER', officer.cookie)
+  // Refunding asks for a fresh session (0171); this suite's sessions must outlast the default.
+  await request(app, 'PUT', '/api/admin/config/REAUTH_WINDOW_MINUTES', { value: 120 }, officer.cookie)
 
   // Both roles, plus MFA: ADMIN is privileged (0037/A-112). ticketing.manage, the IT Manager's alone
   // (0113), is what decides a comp request rather than what collects one (D-117).
@@ -716,6 +718,54 @@ describe.skipIf(skip !== null)('what a walk-up may be sold as at the desk (D-115
   }, CASE_TIMEOUT_MS)
 })
 
+// 0190: a comp turned on for one night was booked online at £0.00 by a guest.
+describe.skipIf(skip !== null)('a box-office-only type is sold at the desk and never online (0190)', () => {
+  test('the desk is offered it, the booking form and a reservation are not, and it swaps back on Edit', async () => {
+    const { performanceId } = await bookableShow(1100)
+    const comp = await send('POST', '/api/admin/ticket-types', { name: named('Complimentary'), price: 0, activeByDefault: false, restrictedTo: 'DESK' }, officer.cookie)
+    expect(comp.status).toBe(200)
+    const compId = (await comp.json() as { id: string }).id
+    try {
+      const priced = await send('PUT', `/api/admin/performances/${performanceId}/prices`, { overrides: [{ ticketTypeId: compId, price: null, active: true }] }, officer.cookie)
+      expect(priced.status).toBe(200)
+
+      const desk = await (await send('GET', `/api/box-office/desk/ticket-types?performanceId=${performanceId}`)).json() as { options: { id: string }[] }
+      expect(desk.options.map(one => one.id)).toContain(compId)
+
+      const online = await (await send('GET', `/api/performances/${performanceId}/booking`, undefined, '')).json() as { ticketTypes: { id: string }[] }
+      expect(online.ticketTypes.map(one => one.id)).not.toContain(compId)
+
+      const booked = await send('POST', '/api/reservations', {
+        performanceId,
+        lines: [{ ticketTypeId: compId, quantity: 1 }],
+        guest: { name: 'Free Seat', email: registrableAddress('comp') },
+      }, '')
+      expect(booked.status).toBe(400)
+
+      const opened = await send('PUT', `/api/admin/ticket-types/${compId}`, { name: named('Complimentary'), price: 0, activeByDefault: false, restrictedTo: null }, officer.cookie)
+      expect(opened.status).toBe(200)
+      const after = await (await send('GET', `/api/performances/${performanceId}/booking`, undefined, '')).json() as { ticketTypes: { id: string }[] }
+      expect(after.ticketTypes.map(one => one.id)).toContain(compId)
+    }
+    finally {
+      await send('POST', `/api/admin/ticket-types/${compId}/archive`, { archived: true }, officer.cookie)
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a members-only type cannot be made open or box office only on Edit', async () => {
+    const member = await send('POST', '/api/admin/ticket-types', { name: named('Member'), price: 500, activeByDefault: false, restrictedTo: 'MEMBER' }, officer.cookie)
+    const memberId = (await member.json() as { id: string }).id
+    try {
+      const answered = await send('PUT', `/api/admin/ticket-types/${memberId}`, { name: named('Member'), price: 500, activeByDefault: false, restrictedTo: 'DESK' }, officer.cookie)
+      expect(answered.status).toBe(400)
+      expect((await answered.json() as { message: string }).message).toContain('members-only')
+    }
+    finally {
+      await send('POST', `/api/admin/ticket-types/${memberId}/archive`, { archived: true }, officer.cookie)
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
 describe.skipIf(skip !== null)('selling a walk-up from the desk screen (D-115 criterion 7)', () => {
   test('the total is read out, the sale lands as a door booking and the tiles move', async () => {
     const { performanceId, ticketTypeId, title } = await bookableShow(1100, twoHoursSeconds)
@@ -767,6 +817,71 @@ describe.skipIf(skip !== null)('an empty results card says which kind of empty i
       await fill(view, '[data-test="desk-search"]', 'Nobody At All')
       await click(view, '[data-test="desk-search-submit"]')
       await waitFor(view, `document.querySelector('[data-test="desk-empty"]')?.innerText.includes('No booking matches')`, 15_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+// The process map of 21 October: a booking for another performance opened on tonight's desk with
+// no date, and the pills filtered within a search nothing named.
+describe.skipIf(skip !== null)('the desk says what it is showing', () => {
+  test('a booking scanned for another performance says which, in amber', async () => {
+    const here = await bookableShow(900, twoHoursSeconds)
+    const elsewhere = await bookableShow(900, twoHoursSeconds + 3_600)
+    const { reference } = await bookedReservation(elsewhere.performanceId, elsewhere.ticketTypeId)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await atTheDesk(view, here.title)
+      await fill(view, '[data-test="desk-scan"]', reference)
+      await click(view, '[data-test="desk-scan-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-other-performance"]')`, 15_000)
+      expect(await textOf(view, '[data-test="desk-other-performance"]')).toContain(`This booking is for ${elsewhere.title}`)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a search is named under the pills, and clearing it lists the house again', async () => {
+    const { performanceId, ticketTypeId, title } = await bookableShow(900, twoHoursSeconds)
+    const { reference } = await bookedReservation(performanceId, ticketTypeId)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await atTheDesk(view, title)
+      await fill(view, '[data-test="desk-search"]', 'Nobody At All')
+      await click(view, '[data-test="desk-search-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-searched-for"]')?.innerText.includes('Nobody At All')`, 15_000)
+
+      await click(view, '[data-test="desk-search-clear"]')
+      await waitFor(view, `document.querySelector('[data-test="desk-results"]')?.innerText.includes(${JSON.stringify(reference)})`, 15_000)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="desk-searched-for"]'))`)).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
+// D-113 criterion 5's routes had no screen: the desk shows the performance's list and offers by hand.
+describe.skipIf(skip !== null)('the desk shows the waiting list for the performance on screen', () => {
+  test('a waiting party is listed with its size, and the desk can offer by hand', async () => {
+    const { performanceId, title } = await bookableShow(900, twoHoursSeconds, 0)
+    const joined = await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 2, guest: { name: 'Wanda Waiting', email: registrableAddress('waiter') },
+    }, '')
+    expect(joined.status).toBe(200)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await atTheDesk(view, title)
+      await waitFor(view, `document.querySelector('[data-test="desk-waiting-list"]')?.innerText.includes('Wanda Waiting')`, 30_000)
+      expect(await textOf(view, '[data-test="desk-waiting-list"]')).toContain('party of 2')
+      await click(view, '[data-test="desk-waiting-list-offer"]')
+      await waitFor(view, `document.body.innerText.includes('Nothing offered')`, 15_000)
     }
     finally {
       view.close()

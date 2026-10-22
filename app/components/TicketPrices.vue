@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { priceOverridesForm, saysPrice, saysPriceSource } from '#shared/utils/ticket-types'
+import { priceOverridesForm, saysPrice, saysPriceSource, saysRestriction } from '#shared/utils/ticket-types'
 import type { PriceSource } from '#shared/utils/ticket-types'
 
 // One level of the price chain, with every level shown beside it so an operator can see why a
@@ -8,6 +8,8 @@ import type { PriceSource } from '#shared/utils/ticket-types'
 export interface PricedType {
   ticketTypeId: string
   name: string
+  accessKind: string | null
+  restrictedTo: string | null
   archived: boolean
   basePrice: number
   activeByDefault: boolean
@@ -117,6 +119,15 @@ function resolvedNow(item: PricedType): { price: number, source: PriceSource, ac
   return resolvedByType.value.get(item.ticketTypeId) ?? { price: item.basePrice, source: 'BASE', active: item.activeByDefault }
 }
 
+// A free type open to anyone and on sale is a free seat on the public booking page (0190).
+const freeToThePublic = computed(() => data.value.items
+  .filter(item => item.accessKind === null && item.restrictedTo === null)
+  .filter((item) => {
+    const resolved = resolvedNow(item)
+    return resolved.active && resolved.price === 0
+  })
+  .map(item => item.name))
+
 async function save(): Promise<void> {
   failure.value = priceRefusal.value
   if (failure.value) return
@@ -166,6 +177,16 @@ async function save(): Promise<void> {
         :description="failure"
       />
 
+      <UAlert
+        v-if="freeToThePublic.length > 0"
+        data-test="prices-free-warning"
+        color="warning"
+        variant="subtle"
+        icon="i-lucide-triangle-alert"
+        title="Anyone could book these free online"
+        :description="`${freeToThePublic.join(', ')} ${freeToThePublic.length === 1 ? 'is' : 'are'} on sale at £0.00 and open to anyone, so the public booking page offers ${freeToThePublic.length === 1 ? 'it' : 'them'}. For a comp, make the type Box office only under Ticket types.`"
+      />
+
       <p class="text-sm text-muted">
         A price resolves this performance, then the show, then the ticket type. Leave a field empty
         to inherit; an explicit nought is a free ticket and not an absence. A figure that is not a
@@ -200,6 +221,14 @@ async function save(): Promise<void> {
               size="sm"
             >
               Archived
+            </UBadge>
+            <UBadge
+              v-if="saysRestriction(item.restrictedTo)"
+              color="warning"
+              variant="subtle"
+              size="sm"
+            >
+              {{ saysRestriction(item.restrictedTo) }}
             </UBadge>
             <span class="text-xs text-muted">Base {{ saysPrice(item.basePrice) }}</span>
             <span

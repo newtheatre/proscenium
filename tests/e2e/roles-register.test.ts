@@ -91,6 +91,7 @@ interface Holder {
   note: string | null
   live: boolean
   disabled: boolean
+  waitsOnFactor: boolean
 }
 
 interface Register {
@@ -127,9 +128,9 @@ describe.skipIf(skip !== null)('the role register answers who holds what (A-131 
     const holder = await person('counted')
     expect((await send('POST', '/api/admin/roles', { userId: holder.id, role: 'PRESIDENT' }, cookie)).status).toBe(200)
 
+    // Without an authenticator the privileged grant is listed as waiting, not counted (0157).
     const listing = await register('?role=is:PRESIDENT')
-    expect(listing.items.map(item => item.email)).toContain(holder.email)
-    expect(listing.counts.PRESIDENT).toBeGreaterThanOrEqual(1)
+    expect(listing.items.find(item => item.email === holder.email)?.waitsOnFactor).toBe(true)
     expect(listing.counts.ADMIN).toBeGreaterThanOrEqual(1)
     expect(listing).toMatchObject({ page: 1 })
     expect(Object.keys(listing.counts).every(role => (ROLES as readonly string[]).includes(role))).toBe(true)

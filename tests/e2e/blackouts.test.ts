@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonWeekdayFrom } from '#tests/helpers/london-day'
 import { adminSession, registerMember } from '#tests/helpers/accounts'
 import { generatePassword } from '#tests/helpers/seed'
 import { skipReason, startApp } from '#tests/helpers/webview'
@@ -297,10 +298,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
     const room = await makeRoom()
     await send('PUT', '/api/admin/config/ROOM_ACTIVE_BOOKINGS_PER_MEMBER', { value: 500 }, officer)
 
-    const startsOn = new Date()
-    startsOn.setUTCDate(startsOn.getUTCDate() + 50)
-    while (startsOn.getUTCDay() !== 1) startsOn.setUTCDate(startsOn.getUTCDate() + 1)
-    const day = startsOn.toISOString().slice(0, 10)
+    const day = londonWeekdayFrom(50, 1)
 
     const answered = await send('POST', '/api/rooms/series', {
       roomId: room,
@@ -334,9 +332,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
 
   test('a series whose head is closed over promotes the next occurrence', async () => {
     const room = await makeRoom()
-    const startsOn = new Date()
-    startsOn.setUTCDate(startsOn.getUTCDate() + 60)
-    while (startsOn.getUTCDay() !== 2) startsOn.setUTCDate(startsOn.getUTCDate() + 1)
+    const startsOn = londonWeekdayFrom(60, 2)
 
     const answered = await send('POST', '/api/rooms/series', {
       roomId: room,
@@ -344,7 +340,7 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
       purpose: 'REHEARSAL',
       frequency: 'WEEKLY',
       weekdays: [2],
-      startsOn: startsOn.toISOString().slice(0, 10),
+      startsOn,
       from: '14:00',
       to: '16:00',
       occurrences: 3,
@@ -368,14 +364,10 @@ describe.skipIf(skip !== null)('closing over existing bookings (criterion 3)', (
 
   test('a series may skip its blacked-out weeks and book the rest', async () => {
     const room = await makeRoom()
-    const startsOn = new Date()
-    startsOn.setUTCDate(startsOn.getUTCDate() + 70)
-    while (startsOn.getUTCDay() !== 3) startsOn.setUTCDate(startsOn.getUTCDate() + 1)
-    const day = startsOn.toISOString().slice(0, 10)
+    const day = londonWeekdayFrom(70, 3)
 
     // The first Wednesday is shut, so the whole term is refused until it is left out.
-    const shutFrom = new Date(startsOn)
-    shutFrom.setUTCHours(13, 0, 0, 0)
+    const shutFrom = new Date(`${day}T13:00:00Z`)
     await closeRoom(room, {
       startsAt: shutFrom.toISOString(),
       endsAt: new Date(shutFrom.getTime() + 5 * 3_600_000).toISOString(),

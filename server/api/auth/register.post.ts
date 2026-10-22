@@ -1,11 +1,15 @@
+import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { RESERVED_DOMAIN_REFUSAL, hasReservedDomain } from '#shared/utils/deliverability'
 import { nextField, withNext } from '#shared/utils/sign-in'
 
 // The schema guards shape and the outer limit; the length policy lives in passwordProblem so
 // there is one place to change it and no second copy to drift (0012).
 const body = z.object({
   // 320 is the longest address RFC 5321 permits: 64 local, an @, 255 domain.
-  email: z.string().email('That does not look like an email address. Check it and try again.').max(320, 'That does not look like an email address. Check it and try again.'),
+  email: z.string().email('That does not look like an email address. Check it and try again.').max(320, 'That does not look like an email address. Check it and try again.')
+    // Said rather than swallowed: a mistyped domain otherwise waits for an email that never comes.
+    .refine(email => !hasReservedDomain(email), RESERVED_DOMAIN_REFUSAL),
   name: z.string().trim().min(1, 'Type your name').max(200, 'That is too long'),
   password: z.string().min(1, 'Choose a password').max(ABSOLUTE_PASSWORD_LIMIT, 'That is too long'),
   next: nextField,
@@ -25,13 +29,29 @@ export default defineEventHandler(async (event) => {
   // Whatever branch runs below, so the cookie says no more than the answer does (0103).
   await rememberRegistration(event, email)
 
-  // An address no message could ever reach gets the ordinary answer and no account: a row that
+  // A placeholder no message could ever reach gets the ordinary answer and no account: a row that
   // can never verify is a dead account, not a courtesy (A-101 criterion 3).
   if (undeliverableReason({ email, anonymisedAt: null })) return accepted()
 
   // Enumeration safety: an address already registered gets the same answer as a new one, and
   // learns it is taken through the email it would already be able to read (A-101 criterion 2).
-  const existing = await findByEmail(email)
+  let existing = await findByEmail(email)
+  if (existing && !existing.verified && existing.password !== null) {
+    // Nobody has proved this mailbox, so a password set here is a stranger's as likely as the
+    // owner's: it goes, and the claim link below lets the mailbox's owner choose one (0153).
+    await db.batch([
+      db.update(schema.users)
+        .set({ password: null, sessionEpoch: sql`${schema.users.sessionEpoch} + 1` })
+        .where(eq(schema.users.id, existing.id)),
+      db.insert(schema.auditLog).values(auditEntry({
+        actorId: null,
+        action: 'password.cleared',
+        target: `user:${existing.id}`,
+        detail: { verified: false, sessions: 'all' },
+      })),
+    ])
+    existing = { ...existing, password: null }
+  }
   if (existing && await hasNoWayIn(existing)) {
     // A guest or an imported row has no way in, so "sign in as usual" is a dead end: the claim
     // link is the way onto the account already holding their bookings (A-116 criterion 2).
@@ -41,6 +61,7 @@ export default defineEventHandler(async (event) => {
       userId: existing.id,
       context: {
         name: existing.name,
+        unconfirmed: !existing.verified,
         url: withNext(`${useRuntimeConfig(event).public.baseURL}/reset?token=${plaintext}&kind=set`, input.next),
         expiresAt,
       },

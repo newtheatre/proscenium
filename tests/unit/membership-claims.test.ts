@@ -56,6 +56,16 @@ describe('what a claim carries (A-130 criterion 1)', () => {
     expect(membershipClaimForm.safeParse({ ...good, startsOn: '2026-02-31' }).success).toBe(false)
   })
 
+  // Digits only, as the SU's list holds them, and never a term already over (0155).
+  test('a student number is digits, and a term already over is refused', () => {
+    expect(membershipClaimForm.safeParse({ ...good, studentId: 'abc' }).success).toBe(false)
+    expect(membershipClaimForm.safeParse({ ...good, studentId: '12345' }).success).toBe(false)
+    const ended = membershipClaimForm.safeParse({ ...good, startsOn: daysAfter(today, -400), term: 1 })
+    expect(ended.success).toBe(false)
+    expect(ended.error?.issues[0]?.message).toContain('That membership ended on')
+    expect(membershipClaimForm.safeParse({ ...good, startsOn: daysAfter(today, -400), term: 3 }).success).toBe(true)
+  })
+
   test('the term is one or three, never anything the SU does not sell', () => {
     for (const term of [0, 2, 4, '1', undefined]) {
       expect(membershipClaimForm.safeParse({ ...good, term }).success).toBe(false)

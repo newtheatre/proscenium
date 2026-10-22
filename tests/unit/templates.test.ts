@@ -19,6 +19,7 @@ const flat = (part: string): string => part.replace(/\s+/g, ' ')
 // `render` refuses any part that came out holding `undefined`.
 const EVERYTHING: TemplateContext = {
   name: 'Ada',
+  taught: 'Working at height',
   url: 'https://newtheatre.org.uk/reset/abc',
   signInUrl: 'https://newtheatre.org.uk/sign-in',
   securityUrl: 'https://newtheatre.org.uk/account/access',
@@ -35,6 +36,8 @@ const EVERYTHING: TemplateContext = {
   rolesUrl: 'https://newtheatre.org.uk/people/accounts',
   entryUrl: 'https://newtheatre.org.uk/waiting-list/entry/tok',
   termsUrl: 'https://newtheatre.org.uk/policies/booking',
+  valid: '21 Oct to 18 Apr',
+  shows: 'The Seagull, Small Hours',
   imageUrl: 'https://newtheatre.org.uk/qr/r-1.sig/image.png',
   expiresAt: new Date('2026-10-02T18:30:00Z'),
   method: 'Google',
@@ -50,6 +53,8 @@ const EVERYTHING: TemplateContext = {
   venue: 'The Nottingham New Theatre',
   venueName: 'The Nottingham New Theatre',
   oldVenue: 'The Studio',
+  was: 'Thursday 1 October 2026 at 19:30',
+  wasVenue: 'The Studio',
   newVenue: 'The Green Room',
   role: 'door',
   severity: 'serious',
@@ -57,6 +62,8 @@ const EVERYTHING: TemplateContext = {
   path: '/docs/communications/send-log',
   reportedByName: 'Bea Stone',
   signedByName: 'Bea Stone',
+  signedByFirstName: 'Bea',
+  figures: ['Sold: 40 seats', 'Box office: £120.00'],
   addedByName: 'Bea Stone',
   closingNote: 'A quiet house.',
   note: 'The interval ran long.',
@@ -72,6 +79,7 @@ const EVERYTHING: TemplateContext = {
   position: 2,
   first: 'Friday 2 October 2026',
   last: 'Friday 20 November 2026',
+  times: '19:30 to 21:30',
   preApprovalAt: 3,
   underPreApproval: false,
   formIsIn: true,
@@ -82,6 +90,7 @@ const EVERYTHING: TemplateContext = {
   reference: 'K7M4PQ',
   totalDue: '£9.00',
   paid: '£9.00',
+  refunded: '£9.00',
   passType: 'Season pass',
   priceLabel: '£25.00',
   qrWidth: 165,
@@ -98,6 +107,7 @@ const EVERYTHING: TemplateContext = {
   refused: 0,
   wouldAnonymise: 1,
   anonymisationsCappedAt: null,
+  unconfirmed: false,
   subject: 'The get-in moves to Sunday',
   body: 'The get-in moves to Sunday.',
   noun: 'room booking update',
@@ -117,7 +127,7 @@ const EVERYTHING: TemplateContext = {
 function everything(): { name: string, subject: string, html: string, text: string }[] {
   const variants = [
     {},
-    { settled: false, underPreApproval: true, formIsIn: false, officerBypass: true, armed: false, partySize: 1 },
+    { unconfirmed: true, settled: false, underPreApproval: true, formIsIn: false, officerBypass: true, armed: false, partySize: 1 },
     { bookings: [], days: [], modules: [], roles: [], permanent: [], expiring: [], expired: [], lapsed: [], performances: [], offered: null, moved: null },
   ]
   const rendered: { name: string, subject: string, html: string, text: string }[] = []
@@ -213,6 +223,10 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(render('account-claim', EVERYTHING).html).toContain('We already know this address, from a booking or from our old records')
   })
 
+  test('account-claim on an unconfirmed registration says why a password is asked for again (0153)', () => {
+    expect(render('account-claim', { ...EVERYTHING, unconfirmed: true }).html).toContain('it was never confirmed, so we cannot tell whether the password chosen was yours')
+  })
+
   test('role-expiring says our year, and names the IT Manager', () => {
     const { html } = render('role-expiring', EVERYTHING)
     expect(flat(html)).toContain('Committee roles run to the end of our year')
@@ -274,10 +288,31 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     }
   })
 
+  // 0170: a guest typed this account's address in another name, so the owner learns and can cancel.
+  test('a booking made with the address in another name tells the owner how to undo it', () => {
+    const { html, text } = render('reservation-confirmed', { ...EVERYTHING, bookedAs: 'Zed <Zane>' })
+    expect(flat(text)).toContain('This booking was made online with your email address in the name Zed <Zane>. If that was not you, open your booking and cancel it.')
+    expect(html).toContain('in the name Zed &lt;Zane&gt;')
+    expect(flat(render('reservation-confirmed', EVERYTHING).text)).not.toContain('in the name')
+  })
+
   // D-115 criterion 6: the desk's walk-up sends the till's confirmation, naming where it was paid.
   test('a walk-up paid at the desk says the box office, and one at the bar says the bar', () => {
     expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'DESK' }).text)).toContain('paid at the box office')
     expect(flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'BAR' }).text)).toContain('paid at the bar')
+  })
+
+  test('a comp collected at the desk says it was given, not paid', () => {
+    const text = flat(render('reservation-walk-up-paid', { ...EVERYTHING, paidAt: 'DESK', comp: true }).text)
+    expect(text).toContain('complimentary, given at the box office')
+    expect(text).not.toContain('paid at')
+  })
+
+  test('a refund names the amount and whether the booking still stands', () => {
+    const part = render('reservation-refunded', { ...EVERYTHING, refunded: '£6.00', cancelled: false })
+    expect(part.subject).toBe('£6.00 refunded on your booking for The Tempest')
+    expect(flat(part.text)).toContain('The rest of the booking stands')
+    expect(flat(render('reservation-refunded', { ...EVERYTHING, refunded: '£6.00', cancelled: true }).text)).toContain('it is cancelled')
   })
 
   // D-121 criterion 5: every holder is told, and a paid one where the money comes back (D-116).
@@ -293,6 +328,21 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(flat(text)).toContain('Nothing was charged')
     expect(flat(text)).not.toContain('refunded at the box office')
     expect(flat(text)).not.toContain('The room is closed that week')
+  })
+
+  // 0191: a moved performance says from what to what, and that the booking still stands.
+  test('a moved performance names the old and new time and place, and keeps the booking', () => {
+    const { subject, text } = render('reservation-performance-moved', { ...EVERYTHING, collected: false })
+    expect(subject).toBe('The Tempest has moved: now Friday 2 October 2026 at 19:30')
+    expect(flat(text)).toContain('from Thursday 1 October 2026 at 19:30 at The Studio to Friday 2 October 2026 at 19:30 at The Nottingham New Theatre')
+    expect(flat(text)).toContain('still stands')
+    expect(flat(text)).toContain('nothing has been charged')
+  })
+
+  test('a moved performance at the same venue names the venue once, and a paid holder is sent to the box office', () => {
+    const { text } = render('reservation-performance-moved', { ...EVERYTHING, wasVenue: EVERYTHING.venue, collected: true })
+    expect(flat(text)).toContain('to Friday 2 October 2026 at 19:30, at The Nottingham New Theatre.')
+    expect(flat(text)).toContain('bring this reference to the box office')
   })
 
   test('the cancellation is a booking that was still unpaid', () => {
@@ -365,6 +415,14 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(html).not.toContain('<code>')
   })
 
+  // The 21 Oct process map: one click told the IT Manager a page was stale, and nothing about how.
+  test('a drift report carries what the reader said is wrong, escaped, and reads whole without it', () => {
+    const noted = render('docs-drift-reported', { ...EVERYTHING, note: 'The <b>Week</b> label changed' })
+    expect(noted.text).toContain('What they said is out of date: The <b>Week</b> label changed')
+    expect(noted.html).toContain('The &lt;b&gt;Week&lt;/b&gt; label changed')
+    expect(render('docs-drift-reported', { ...EVERYTHING, note: '' }).text).not.toContain('What they said')
+  })
+
   test('an unsigned night report says so in words', () => {
     expect(render('night-report-auto-closed', EVERYTHING).subject)
       .toBe('Nobody signed off the night report: The Nottingham New Theatre, Friday 2 October 2026')
@@ -377,9 +435,15 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   })
 
   test('a missed session says what it is, and reassures once', () => {
-    const { subject, html } = render('training-session-absent', EVERYTHING)
-    expect(subject).toBe('The session on Friday 2 October 2026: no record yet')
+    const { subject, html } = render('training-session-absent', { ...EVERYTHING, taught: 'Sound basics' })
+    expect(subject).toBe('Sound basics on Friday 2 October 2026: no record yet')
     expect(html).toContain('Nothing on your record has changed; the module is still outstanding.')
+  })
+
+  test('a correction says which way it moved somebody\'s record (0241)', () => {
+    const context = { ...EVERYTHING, taught: 'Sound basics' }
+    expect(render('training-session-withdrawn', context).subject).toBe('Your record for Sound basics has been withdrawn')
+    expect(flat(render('training-session-added', context).html)).toContain('If we told you before that you were missed, this replaces that.')
   })
 
   test('the expiry window subject says what it is, and the splice is gone', () => {
@@ -396,6 +460,13 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   test('a series is booked in bookings, not rehearsals', () => {
     expect(render('room-series-booked', EVERYTHING).subject).toBe('Booked: 3 bookings in The Studio')
     expect(render('room-series-requested', EVERYTHING).subject).toBe('Asked for: 3 bookings in The Studio')
+  })
+
+  test('a series says its times once, for every week', () => {
+    expect(flat(render('room-series-booked', EVERYTHING).text))
+      .toContain('from Friday 2 October 2026 to Friday 20 November 2026, 19:30 to 21:30 each time.')
+    expect(flat(render('room-series-requested', EVERYTHING).html))
+      .toContain('from Friday 2 October 2026 to Friday 20 November 2026, 19:30 to 21:30 each time, is waiting')
   })
 
   test('a relisted request matches its siblings', () => {
@@ -576,6 +647,84 @@ describe('the shared labels (item 8)', () => {
   })
 })
 
+// The rooms findings of 21 October 2026: what each rooms email says about the slot and the reason.
+describe('the rooms emails (process map, rooms)', () => {
+  const studio = { room: 'The Studio', title: 'Line run', when: 'Friday 2 October 2026, 19:30 to 21:30' }
+
+  test('an approval into another room agrees in number', () => {
+    const one = render('room-approved', { ...EVERYTHING, bookings: [studio], moved: 'The Studio' })
+    expect(flat(one.text)).toContain('Your request has been approved. It is in The Studio, which is not the room asked for.')
+    const two = render('room-approved', { ...EVERYTHING, bookings: [studio, studio], moved: 'The Studio' })
+    expect(flat(two.text)).toContain('Your requests have been approved. They are in The Studio')
+  })
+
+  test('a reason that already ends a sentence gets no second full stop', () => {
+    for (const reason of ['short notice.', 'short notice']) {
+      const bumped = render('room-bumped', { ...EVERYTHING, reason })
+      const closed = render('room-blackout-cancelled', { ...EVERYTHING, reason, bookings: [studio] })
+      for (const part of [bumped.html, bumped.text, closed.html, closed.text]) {
+        expect(flat(part)).toContain('short notice.')
+        expect(part).not.toContain('short notice..')
+      }
+    }
+  })
+
+  test('a closure says asked for to somebody who only asked, and both to somebody who did both', () => {
+    const booked = render('room-blackout-cancelled', { ...EVERYTHING, bookings: [studio] })
+    expect(flat(booked.text)).toContain('A room you booked has been closed: The room is closed that week.')
+    expect(flat(booked.text)).toContain('This booking is cancelled.')
+
+    const asked = render('room-blackout-cancelled', { ...EVERYTHING, bookings: [{ ...studio, asked: true }] })
+    expect(flat(asked.text)).toContain('A room you asked for has been closed')
+    expect(flat(asked.text)).toContain('This request is cancelled.')
+    expect(asked.text).not.toContain('you booked')
+
+    const both = render('room-blackout-cancelled', { ...EVERYTHING, bookings: [studio, { ...studio, asked: true }] })
+    expect(both.subject).toBe('Cancelled: 2 bookings and requests')
+    expect(flat(both.text)).toContain('Rooms you booked or asked for have been closed')
+    expect(flat(both.text)).toContain('These bookings and requests are cancelled.')
+  })
+
+  test('a turned down request carries its reason on its digest line', () => {
+    const { subject, line } = render('room-rejected', { ...EVERYTHING, bookings: [studio], reason: 'Too short notice' })
+    expect(line).toBe(`${subject}. Why: Too short notice.`)
+  })
+})
+
+describe('the rooms digest is a line per change (0206)', () => {
+  const entries = [
+    { subject: 'Turned down: The Studio, Friday 2 October 2026, 19:30 to 21:30', body: 'Hello Ada, a whole message', line: 'Turned down: The Studio. Why: Short notice.' },
+    { subject: 'Asked for: Green Room, Saturday 3 October 2026, 10:00 to 11:00', body: 'Hello Ada, another whole message' },
+  ]
+  const link = { url: ROOMS_URL, says: 'See your bookings' }
+
+  test('the subject names the lead change and counts the rest', () => {
+    const { subject } = render('notification-digest', { ...EVERYTHING, inLines: true, entries, link })
+    expect(subject).toBe('Turned down: The Studio, Friday 2 October 2026, 19:30 to 21:30, and 1 more room booking update')
+    expect(render('notification-digest', { ...EVERYTHING, inLines: true, entries: [entries[1]], link }).subject)
+      .toBe('Asked for: Green Room, Saturday 3 October 2026, 10:00 to 11:00')
+  })
+
+  test('one greeting, one line each, one link, and no message nested inside another', () => {
+    const { html, text } = render('notification-digest', { ...EVERYTHING, inLines: true, entries, link })
+    for (const part of [html, text]) {
+      expect(part.match(/Hello Ada/g)).toHaveLength(1)
+      expect(part).toContain('Turned down: The Studio. Why: Short notice.')
+      expect(part).toContain('Asked for: Green Room, Saturday 3 October 2026, 10:00 to 11:00')
+      expect(part).not.toContain('a whole message')
+      expect(part.match(/The Nottingham New Theatre/g)).toHaveLength(1)
+    }
+    expect(html.match(/<a /g)).toHaveLength(1)
+    expect(text).toContain(`See your bookings: ${ROOMS_URL}`)
+  })
+
+  test('another topic still nests each message whole', () => {
+    const { subject, text } = render('notification-digest', { ...EVERYTHING, entries, noun: 'shift update' })
+    expect(subject).toBe('2 Shift updates')
+    expect(text).toContain('a whole message')
+  })
+})
+
 // A guest's name or a member's display name is text in the HTML part, never markup, in an email
 // the theatre sends from its own domain (issue 1391, 0011).
 const MARKUP = `<b>&"'`
@@ -624,6 +773,14 @@ describe('every typed value is escaped in the HTML part, and only there (issue 1
     })
   }
 
+  // The show, a British date and who signed lead the subject, and the figures lead the body (0239).
+  test('the signed-off report names the show and carries the figures', () => {
+    const rendered = render('night-report-signed', { ...EVERYTHING, night: 'Wed 21 Oct' })
+    expect(rendered.subject).toBe('Night report: The Tempest, Wed 21 Oct, signed off by Bea')
+    expect(rendered.text).toContain('Sold: 40 seats\nBox office: £120.00')
+    expect(rendered.html).toContain('<li>Sold: 40 seats</li>')
+  })
+
   test('a link keeps its address, escaped for the attribute it sits in', () => {
     const rendered = render('membership-expiring', { ...EVERYTHING, purchaseUrl: 'https://su.example.invalid/buy?a=1&b=2' })
     expect(rendered.html).toContain('href="https://su.example.invalid/buy?a=1&amp;b=2"')
@@ -641,6 +798,10 @@ describe('the pass email follows the ticket terms (D-137)', () => {
 
   test('it says turning up without booking is subject to space', () => {
     for (const part of [html, text]) expect(flat(part)).toContain('You can also just turn up, subject to space on the night.')
+  })
+
+  test('it says when the pass is valid and which shows it covers, in both parts', () => {
+    for (const part of [html, text]) expect(flat(part)).toContain('It is valid 21 Oct to 18 Apr. It covers The Seagull, Small Hours.')
   })
 
   test('it links the ticket and pass terms in both parts', () => {

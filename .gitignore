@@ -25,3 +25,6 @@ migration/out/
 .claude/worktrees/
 
 ../../../tmp/nnt-e2e-3101
+
+# ESLint cache, which holds absolute paths
+.eslintcache

@@ -41,5 +41,26 @@ export default defineEventHandler(async (event) => {
 
   const result = await collect({ ...input, reservationId: id }, resolved.account.id, reservation.tickets, reservation.performanceId, compRequest, expiryMinutes)
 
+  // The booker hears it is paid, as a walk-up's does; the collection has committed, so a failed
+  // send never uncollects it (0003).
+  const bookerId = await reservationBookerId(id)
+  if (bookerId) {
+    try {
+      await sendWalkUpPaid(event, {
+        userId: bookerId,
+        reference: reservation.reference,
+        showTitle: reservation.showTitle,
+        startsAt: reservation.startsAt,
+        paidPence: dueNow,
+        qrToken: await qrTokenFor(id),
+        paidAt: 'DESK',
+        comp: input.tender === 'COMP',
+      })
+    }
+    catch (error) {
+      console.error('[desk] booking collected but the paid confirmation could not be sent', error)
+    }
+  }
+
   return { ok: true, ...result }
 })

@@ -80,3 +80,29 @@ describe('a missing date asks for one, on every form that shares the day field',
     expect(messageAt(manualEntryForm, { action: MANUAL_ACTION_NAMES[0], target: 'u1', onBehalfOf: 'u2' }, 'occurredOn')).toBe('Choose a date')
   })
 })
+
+// The 21 Oct process map: the audit form said only "Something on this form needs another look",
+// and asked for a password and code before saying the date was in the future.
+describe('the hand-recorded audit form says what is missing before anything is signed', () => {
+  const messageAt = (schema: ZodType, input: unknown, path: string): string | undefined => {
+    const result = schema.safeParse(input)
+    return result.success ? undefined : result.error.issues.find(issue => issue.path.join('.') === path)?.message
+  }
+
+  test('each person it needs is asked for by name', () => {
+    expect(messageAt(manualEntryForm, { action: 'manual.account.disabled', occurredOn: '2026-10-07' }, 'target')).toBe('Choose who it was about')
+    expect(messageAt(manualEntryForm, { action: 'manual.account.disabled', occurredOn: '2026-10-07' }, 'onBehalfOf')).toBe('Choose who decided it')
+  })
+
+  test('a date after today is refused on the form', () => {
+    expect(messageAt(manualEntryForm, { action: 'manual.account.disabled', target: 'u1', onBehalfOf: 'u2', occurredOn: '2999-12-30' }, 'occurredOn'))
+      .toBe('That date has not happened yet')
+  })
+
+  test('a role granted or revoked names which role', () => {
+    const base = { action: 'manual.role.granted', target: 'u1', onBehalfOf: 'u2', occurredOn: '2026-10-07' }
+    expect(messageAt(manualEntryForm, base, 'role')).toBe('Choose which role')
+    expect(manualEntryForm.safeParse({ ...base, role: 'TREASURER' }).success).toBe(true)
+    expect(manualEntryForm.safeParse({ ...base, action: 'manual.account.disabled' }).success).toBe(true)
+  })
+})

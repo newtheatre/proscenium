@@ -28,6 +28,8 @@ export default defineEventHandler(async (event) => {
     targetAt: sql<number | null>`${auditTargetAt}`,
     targetNight: sql<string | null>`${auditTargetNight}`,
     detail: schema.auditLog.detail,
+    // A hand-recorded entry names who decided it by id in its detail; the screen says their name.
+    onBehalfOfName: sql<string | null>`(SELECT u.name FROM users u WHERE u.id = substr(json_extract(${schema.auditLog.detail}, '$.onBehalfOf'), 6))`,
     createdAt: schema.auditLog.createdAt,
   })
     .from(schema.auditLog)

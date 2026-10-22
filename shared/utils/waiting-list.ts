@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { guestDetailsForm, reservationLineForm } from './reservations'
+import { plural } from './text'
+import { saysClock } from './when'
 
 // The waiting list for a sold-out performance (D-113): join with a party size, get offered seats
 // in join order as they free, claim through the same write path an ordinary booking uses.
@@ -55,6 +57,24 @@ export function offerExpiresAt(now: number, windowMinutes: number, closesAt: num
 // reconsider rather than offered and immediately lapsed.
 export function offerWouldBeBornExpired(expiresAt: number, now: number): boolean {
   return expiresAt <= now
+}
+
+// An offer's heading counts its seats: "A seat is free" read wrong over a party of two.
+export function saysSeatsFree(partySize: number): string {
+  return partySize === 1 ? 'A seat is free' : `${partySize} seats are free`
+}
+
+// What stands between the choice and a claim, beside the disabled button; null once it matches.
+export function claimShortfallSays(requested: number, partySize: number): string | null {
+  if (requested === partySize) return null
+  return requested < partySize ? `Choose ${partySize - requested} more` : `Choose ${requested - partySize} fewer`
+}
+
+// One line of the desk's list: the party, and an offer's deadline while it stands.
+export function saysWaitingListEntry(entry: { partySize: number, status: string, offerExpiresAt: number | null }): string {
+  const party = `party of ${entry.partySize}`
+  if (entry.status === 'OFFERED' && entry.offerExpiresAt) return `${party} · offered until ${saysClock(entry.offerExpiresAt)}`
+  return `${party} · ${plural(entry.partySize, 'seat')} wanted`
 }
 
 // Criterion 2's claim commits to the party size the offer was extended for, not a lesser or

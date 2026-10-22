@@ -72,10 +72,17 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
-describe.skipIf(skip !== null)('who may export tickets (D-129 criterion 3, ticketing.export)', () => {
+describe.skipIf(skip !== null)('who may export tickets (D-129 criterion 3, ticketing.export or finance.export)', () => {
   test('box office can export', async () => {
     const answered = await send('GET', '/api/admin/tickets/export', undefined, boxOffice.cookie)
     expect(answered.status).toBe(200)
+  })
+
+  // 0171: the Treasurer reconciles against the same file, from Money, Exports.
+  test('the Treasurer can export too', async () => {
+    const treasurer = await registerMember(app, 'export-treasurer', generatePassword())
+    await grantRole(app, treasurer, 'TREASURER', admin.cookie)
+    expect((await send('GET', '/api/admin/tickets/export', undefined, treasurer.cookie)).status).toBe(200)
   })
 
   test('the committee role cannot: this is a box office duty, not a general one', async () => {

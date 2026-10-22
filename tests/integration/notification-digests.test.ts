@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { createTestDatabase, rows } from '#tests/helpers/database'
+import { heldBody, inDigestOrder, readHeld, supersedeStatement } from '#server/utils/digest-entries'
+import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import type { TestDatabase } from '#tests/helpers/database'
 
 // H-104. The statements the digest sweep runs, against the real migrated schema: the hold insert,
@@ -224,5 +225,122 @@ describe('an entry outlives its own send only as long as the log row does (crite
       expect(rows(database, `SELECT id FROM notification_digest_entries WHERE id = ?`, claimed)).toEqual([])
       expect(rows(database, `SELECT id FROM notification_digest_entries WHERE id = ?`, untouched)).toEqual([{ id: untouched }])
     })
+  })
+})
+
+// 0206: a decision drops what is still held about the same record, before the digest sends.
+describe('a later decision drops the stale entries it settles (0206)', () => {
+  function holdAbout(database: TestDatabase, id: string, type: string, about: string[], userId = 'u1'): void {
+    const body = heldBody({ subject: id, text: `${id} in full` }, { roomsUrl: 'https://newtheatre.org.uk/rooms/mine' }, about)
+    database.raw.prepare(
+      `INSERT INTO notification_digest_entries (id, user_id, topic, type, subject, body, created_at)
+       VALUES (?, ?, 'ROOMS', ?, ?, ?, ?)`,
+    ).run(id, userId, type, id, body, NOW - 600)
+  }
+
+  function supersede(database: TestDatabase, about: string[]): void {
+    const [query, ...parameters] = boundStatement(database, supersedeStatement('ROOMS', about))
+    database.raw.prepare(query).run(...parameters as never[])
+  }
+
+  const held = (database: TestDatabase): string[] =>
+    rows<{ id: string }>(database, `SELECT id FROM notification_digest_entries ORDER BY id`).map(row => row.id)
+
+  test('the approval of a request drops its "asked for", for the member and every approver', async () => {
+    await withDatabase((database) => {
+      seedUser(database, 'u1')
+      seedUser(database, 'u2')
+      holdAbout(database, 'asked', 'room.request.received', ['b-1'])
+      holdAbout(database, 'chased', 'room.request.waiting', ['b-1'], 'u2')
+      holdAbout(database, 'other', 'room.request.received', ['b-2'])
+      supersede(database, ['b-1'])
+      expect(held(database)).toEqual(['other'])
+    })
+  })
+
+  test('a series request is dropped by a decision on any of its weeks', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      holdAbout(database, 'term', 'room.series.requested', ['s-1'])
+      supersede(database, ['b-7', 's-1'])
+      expect(held(database)).toEqual([])
+    })
+  })
+
+  test('the same decision told to a second approver keeps the first one\'s entry', async () => {
+    await withDatabase((database) => {
+      seedUser(database, 'u1')
+      seedUser(database, 'u2')
+      holdAbout(database, 'first', 'external.request.withdrawn', ['x-1'], 'u1')
+      supersede(database, ['x-1'])
+      expect(held(database)).toEqual(['first'])
+    })
+  })
+
+  // Review of 22 October: the weeks of one series share its id, so approving the rest of a term
+  // once dropped the held refusal of week 2 and the member never heard it.
+  test('a decision on one week of a series keeps a decision held about another week', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      holdAbout(database, 'refused', 'room.request.rejected', ['b-2', 's-1'])
+      holdAbout(database, 'lapsed', 'room.request.expired', ['b-3', 's-1'])
+      holdAbout(database, 'term', 'room.series.requested', ['s-1'])
+      supersede(database, ['b-1', 's-1'])
+      expect(held(database)).toEqual(['lapsed', 'refused'])
+    })
+  })
+
+  test('an entry already claimed into a digest, or written as plain text, is left alone', async () => {
+    await withDatabase((database) => {
+      seedUser(database)
+      holdAbout(database, 'sent', 'room.request.received', ['b-1'])
+      database.raw.prepare(`UPDATE notification_digest_entries SET digest_log_id = 'digest-1' WHERE id = 'sent'`).run()
+      hold(database, { id: 'plain', type: 'room.request.received' })
+      supersede(database, ['b-1'])
+      expect(held(database)).toEqual(['plain', 'sent'])
+    })
+  })
+
+  test('a hundred and fifty records are still one statement with the same parameters (0006)', async () => {
+    await withDatabase((database) => {
+      const many = Array.from({ length: 150 }, (_, index) => `b-${index}`)
+      expect(boundStatement(database, supersedeStatement('ROOMS', many))).toHaveLength(4)
+    })
+  })
+})
+
+describe('what the digest reads back from an entry (0206)', () => {
+  test('a held body carries its line, its link and what it is about', () => {
+    const body = heldBody(
+      { subject: 'Turned down: The Studio', text: 'Hello,\nin full', line: 'Turned down: The Studio. Why:\nShort notice.' },
+      { queueUrl: 'https://newtheatre.org.uk/rooms/manage/requests' },
+      ['b-1'],
+    )
+    expect(readHeld('Turned down: The Studio', body)).toEqual({
+      text: 'Hello,\nin full',
+      line: 'Turned down: The Studio. Why: Short notice.',
+      link: { url: 'https://newtheatre.org.uk/rooms/manage/requests', says: 'Open the queue' },
+      about: ['b-1'],
+    })
+  })
+
+  test('a plain-text body from before, or one erasure scrubbed, reads as its subject', () => {
+    expect(readHeld('A change', 'It changed.')).toEqual({ text: 'It changed.', line: 'A change', link: null, about: [] })
+    expect(readHeld('Erased entry', '')).toEqual({ text: '', line: 'Erased entry', link: null, about: [] })
+  })
+
+  test('decisions lead, then everything else, each oldest first', () => {
+    const ordered = inDigestOrder([
+      { type: 'room.request.received', createdAt: 1 },
+      { type: 'room.request.rejected', createdAt: 3 },
+      { type: 'room.request.waiting', createdAt: 2 },
+      { type: 'external.request.assigned', createdAt: 2 },
+    ])
+    expect(ordered.map(entry => entry.type)).toEqual([
+      'external.request.assigned',
+      'room.request.rejected',
+      'room.request.received',
+      'room.request.waiting',
+    ])
   })
 })

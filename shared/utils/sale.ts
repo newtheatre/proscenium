@@ -75,6 +75,12 @@ export function sameBookerName(held: string | null, typed: string): boolean {
   return held !== null && nameKey(held) !== '' && nameKey(held) === nameKey(typed)
 }
 
+// The name an online guest typed for an address whose account holds another, which only its owner
+// is told (0170); null when the names agree, so the confirmation reads as it always did.
+export function bookedInAnotherName(held: string | null, typed: string): string | null {
+  return sameBookerName(held, typed) ? null : typed.trim().replace(/\s+/g, ' ')
+}
+
 export const EXISTING_ACCOUNT_SAYS = 'That email address belongs to an account in another name. Check the address with the booker. If the account is theirs, tick "It is their account" and sell again. Nothing has been charged.'
 
 // The screen's own belief of the total (0004, F-104 criterion 1), an inline Challenge 25 outcome
@@ -126,6 +132,13 @@ type PouredLine = Pick<PricedLine, 'productName' | 'choiceItemName'>
 
 export function saysPouredLine(line: PouredLine): string {
   return line.choiceItemName ? `${line.productName} with ${line.choiceItemName}` : line.productName
+}
+
+// A basket line as the till says it: a lone "Each" names no size, so it is left out, and a
+// choice reads "with" it, as the Challenge 25 prompt says it (bar review, C2).
+export function saysBasketLine(line: PouredLine & { variantLabel: string }): string {
+  const sized = line.variantLabel.trim().toLowerCase() === 'each' ? line.productName : `${line.productName}, ${line.variantLabel}`
+  return line.choiceItemName ? `${sized} with ${line.choiceItemName}` : sized
 }
 
 export function pouredNames(lines: readonly PouredLine[]): string[] {

@@ -7,7 +7,8 @@ import { remainingSeats, saleRefusal } from '#shared/utils/programme'
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const performance = await performanceById(id)
-  if (!performance) throw noSuch('performance')
+  // A draft show's night answers exactly as a missing one does, as its show page does (D-101 criterion 1).
+  if (!performance || performance.showStatus !== 'PUBLISHED') throw noSuch('performance')
 
   // The same cut-off the write path refuses at, so the form is refused up front (D-112 criterion 1).
   const holdReleaseMinutes = await holdReleaseMinutesFor(event, performance)
@@ -45,8 +46,9 @@ export default defineEventHandler(async (event) => {
   // Offered automatically (D-125 criterion 1), same gate an ordinary ticket type sits behind:
   // nothing is offered against a performance that is not on sale in the first place.
   const redeemablePass = !refusal && account ? (await redeemablePassFor(account.id, id, performance.showId, now)) ?? null : null
+  const usedPass = !redeemablePass && account ? (await usedPassFor(account.id, id)) ?? null : null
   // D-133: a holder is offered the pass they hold, never asked to buy another one.
-  const passOffersHere = refusal || redeemablePass ? [] : await passOffers(performance.showId, account?.id ?? null, now)
+  const passOffersHere = refusal || redeemablePass || usedPass ? [] : await passOffers(performance.showId, account?.id ?? null, now)
 
   // Allow-listed, and only what the form's own heading and summary read back: what a visitor is
   // about to book, so the page never has to fetch the show again to name it (D-104).
@@ -70,6 +72,7 @@ export default defineEventHandler(async (event) => {
     ticketTypes: visible,
     accessEntitlement: remaining,
     redeemablePass,
+    usedPass,
     passOffers: passOffersHere,
   }
 })

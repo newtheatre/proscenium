@@ -1,13 +1,13 @@
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
-import { reassignRefusal, saysShiftRole, shiftAssignForm } from '#shared/utils/rota'
+import { clashRefusal, reassignRefusal, saysShiftRole, shiftAssignForm } from '#shared/utils/rota'
 
 // Assign an eligible member to an open shift, or replace whoever holds it: confirmed by
 // definition, so it never joins the E-105 queue (E-107 criterion 3).
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id') ?? ''
   const resolved = await requirePermission(event, 'rota.write')
-  const { userId } = await readValidatedBodyOrThrow(event, shiftAssignForm)
+  const { userId, move } = await readValidatedBodyOrThrow(event, shiftAssignForm)
 
   const held = await shiftDetail(id)
   if (!held) throw noSuch('shift')
@@ -27,18 +27,22 @@ export default defineEventHandler(async (event) => {
     actorId: resolved.account.id,
     action: 'shift.reassigned',
     target: `shift:${id}`,
-    detail: changes({ userId: [held.userId, userId], status: [held.status, 'CONFIRMED'] }),
+    detail: { ...changes({ userId: [held.userId, userId], status: [held.status, 'CONFIRMED'] }), ...(move ? { movedOffOtherShift: true } : {}) },
   })
 
+  // A move lets go of their other shift on the performance only behind this write's audit row (0211).
+  const moveOff = move ? [db.run(moveOffStatement(id, userId, entryLanded(entry)))] : []
   // One UPDATE on the row that already exists, so replacing a duty manager never puts a second
   // CONFIRMED row on the performance for the index to arbitrate (E-107 criterion 4).
-  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(assignShiftStatement(id, userId, resolved.account.id, gate)), entry))
+  const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(assignShiftStatement(id, userId, resolved.account.id, gate, move)), entry, ...moveOff))
 
   if (!applied) {
     const now = await shiftDetail(id)
     // The gate on the write refused a record or a role that lapsed after the check above (#1302).
     const again = now && now.status !== 'CANCELLED' ? (await shiftEligibilities(event, userId, today))[held.role] : null
     if (again && !again.eligible) throw ineligibleRefusal(held.role, again, subject.name)
+    const clash = now && now.status !== 'CANCELLED' ? await clashingShift(userId, id) : null
+    if (clash) throw createError({ statusCode: 409, statusMessage: clashRefusal(subject.name, clash) })
     throw createError({ statusCode: 409, statusMessage: reassignRefusal(now?.status ?? held.status) })
   }
 

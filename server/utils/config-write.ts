@@ -20,6 +20,11 @@ export function currentValue(key: ConfigKey, overrides: Map<string, unknown>): u
   return hasDefault(key) ? (CONFIG_KEYS[key] as { default: unknown }).default : undefined
 }
 
+// A save that would not change the value writes nothing and audits nothing: "365 → 365" is noise.
+export async function isUnchanged(event: H3Event, key: ConfigKey, value: unknown): Promise<boolean> {
+  return JSON.stringify(currentValue(key, await configOverrides(event))) === JSON.stringify(value)
+}
+
 // A second writer would be overwritten by the next sync without a word, so there is none (0092).
 export function refuseSynced(key: ConfigKey): void {
   if (!isSynced(key)) return

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { sqliteTarget } from '#tests/helpers/database'
-import { londonParts } from '#shared/utils/london'
 import { showNightOf } from '#shared/utils/show-night'
 import { committeeShiftRefusal } from '#shared/utils/night-authority'
 import { adminSession, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
@@ -50,11 +50,6 @@ const send = (method: string, path: string, body?: unknown, as = admin.cookie): 
 
 const refusal = async (answered: Response): Promise<{ statusMessage: string, data?: { declineReason?: string } }> =>
   await answered.json() as { statusMessage: string, data?: { declineReason?: string } }
-
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 function write(statement: string, ...parameters: unknown[]): void {
   const database = new Database(app.databaseFile)

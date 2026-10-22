@@ -105,6 +105,20 @@ export function removeOpeningShiftStatement(slotId: string): SQL {
   `
 }
 
+// A planned opening at the venue whose hours overlap these, read only to warn before planning (0215).
+export function overlappingOpeningQuery(venueId: string, startsAt: number, endsAt: number): SQL {
+  return sql`
+    SELECT label, starts_at AS startsAt, ends_at AS endsAt FROM bar_openings
+    WHERE venue_id = ${venueId} AND status = 'PLANNED' AND starts_at < ${endsAt} AND ends_at > ${startsAt}
+    ORDER BY starts_at LIMIT 1
+  `
+}
+
+export async function overlappingOpening(venueId: string, startsAt: number, endsAt: number): Promise<{ label: string, startsAt: number, endsAt: number } | null> {
+  const [row] = await db.all<{ label: string, startsAt: number, endsAt: number }>(overlappingOpeningQuery(venueId, startsAt, endsAt))
+  return row ?? null
+}
+
 // How many slots an opening still staffs, read only to explain a refused removal.
 export async function openingSlotsRemaining(openingId: string): Promise<number> {
   const [row] = await db.all<{ n: number }>(sql`
@@ -306,6 +320,7 @@ export interface MyOpeningShiftRow {
   venueName: string
   startsAt: number
   endsAt: number
+  declineReason: string | null
 }
 
 // A member's own opening slots from tonight on, kept until 04:00 as a performance shift is (0094),
@@ -313,7 +328,8 @@ export interface MyOpeningShiftRow {
 export function myOpeningShiftsQuery(userId: string, now: number): SQL {
   return sql`
     SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, s.status AS status,
-           o.label AS label, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt
+           o.label AS label, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt,
+           s.decline_reason AS declineReason
     FROM bar_opening_shifts s
     JOIN bar_openings o ON o.id = s.opening_id
     JOIN venues v ON v.id = o.venue_id

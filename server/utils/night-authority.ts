@@ -29,7 +29,7 @@ interface NightCoverage { venueId: string, performanceIds: string[], venuePerfor
 // nobody asked about. Shared, so both branches refuse it the same way (E-127 criterion 1).
 function refuseAmbiguousVenue(venues: string[]): void {
   if (venues.length > 1) {
-    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance' })
+    throw createError({ statusCode: 400, statusMessage: 'More than one venue is running tonight: name the venue or the performance', data: { chooseVenue: true } })
   }
 }
 
@@ -133,7 +133,9 @@ async function shiftHeldTonight(
 // Tolerates the conflict rather than reading first: the partial unique index is what holds "once
 // per officer per night, venue and role", so two simultaneous first requests write one row (0044).
 async function recordOfficerBypass(actorId: string, night: string, covered: NightCoverage, role: NightRole): Promise<void> {
-  const entry = officerBypassEntry(actorId, night, covered.venueId, role, covered.venuePerformanceIds, covered.openingId)
+  // The rota as it stands when the officer acts, so a later change cannot rewrite the report (0231).
+  const confirmed = await performancesWithConfirmedRole(role, covered.venueId, night)
+  const entry = officerBypassEntry(actorId, night, covered.venueId, role, covered.venuePerformanceIds, covered.openingId, confirmed)
   await db.insert(schema.auditLog).values(entry).onConflictDoNothing()
 }
 

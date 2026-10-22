@@ -3,7 +3,8 @@ import { h, resolveComponent } from 'vue'
 import { can, manageEmergencyCard } from '#shared/utils/abilities'
 import { saysWhen } from '#shared/utils/when'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
-import { cardAddressDraft } from '#shared/utils/venue-emergency'
+import { NO_VENUE_ADDRESS_HINT, cardAddressDraft, emergencyCardProblems } from '#shared/utils/venue-emergency'
+import type { Page } from '#shared/utils/pagination'
 import type { TableColumn } from '@nuxt/ui'
 
 definePageMeta({ layout: 'console', title: 'Emergency cards', middleware: 'console', docs: '/docs/rota/emergency-cards' })
@@ -100,9 +101,31 @@ function edit(venue: VenueCard): void {
   open.value = true
 }
 
+// Checked as the officer types, so a mistake shows by its field rather than after a round trip (0217).
+const problems = computed(() => emergencyCardProblems(state))
+const invalid = computed(() => Object.keys(problems.value).length > 0)
+const startsBlank = computed(() => editing.value !== null && editing.value.address === null && !editing.value.venueAddress)
+
+// Every earlier version, newest first: the card is append-only, so nothing filed is lost (0217).
+const history = ref<VenueCard | null>(null)
+const historyPage = ref(1)
+const { data: versions, status: versionsStatus, error: versionsError } = await useAsyncData(
+  'emergency-card-versions',
+  () => (history.value
+    ? request<Page<VenueCard>>(`/api/admin/venues/${history.value.venueId}/emergency-versions`, { query: { page: historyPage.value } })
+    : Promise.resolve(null)),
+  { watch: [history, historyPage], default: () => null },
+)
+const versionRows = computed(() => versions.value?.items ?? [])
+
+function showHistory(venue: VenueCard): void {
+  historyPage.value = 1
+  history.value = venue
+}
+
 async function save(): Promise<void> {
   const venue = editing.value
-  if (!venue) return
+  if (!venue || invalid.value) return
   saving.value = true
   failure.value = null
   try {
@@ -124,8 +147,9 @@ async function save(): Promise<void> {
   }
 }
 
-function asOf(at: number | null): string {
-  return at === null ? 'Never set' : saysWhen(at)
+function filedBy(card: { updatedAt: number | null, updatedByName: string | null }): string {
+  if (card.updatedAt === null) return 'Never set'
+  return `${saysWhen(card.updatedAt)}, by ${card.updatedByName ?? 'a former member'}`
 }
 
 const columns: TableColumn<VenueCard>[] = [
@@ -136,7 +160,7 @@ const columns: TableColumn<VenueCard>[] = [
       h('div', {}, row.original.venueName),
       // Below sm the address and the filing date are hidden: shown here instead, so a phone keeps
       // the assembly point and the row's action in view (issue 922).
-      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.address ?? 'Not filed'}, as of ${asOf(row.original.updatedAt)}`),
+      h('div', { class: 'sm:hidden text-xs text-muted' }, `${row.original.address ?? 'Not filed'}, as of ${filedBy(row.original)}`),
     ]),
   },
   {
@@ -154,19 +178,28 @@ const columns: TableColumn<VenueCard>[] = [
     id: 'asOf',
     header: 'As of',
     meta: { class: { th: HIDE_BELOW_SM, td: `${HIDE_BELOW_SM} whitespace-nowrap` } },
-    cell: ({ row }) => asOf(row.original.updatedAt),
+    cell: ({ row }) => h('span', { 'data-test': `filed-by-${row.original.venueId}` }, filedBy(row.original)),
   },
   {
     id: 'act',
     header: ACTIONS_HEADER,
     meta: ACTIONS_COLUMN,
-    cell: ({ row }) => (writes.value === false
-      ? null
-      : h(UButton, {
-          'size': 'sm', 'color': 'neutral', 'variant': 'ghost',
-          'data-test': `edit-emergency-${row.original.venueId}`,
-          'onClick': () => edit(row.original),
-        }, () => (row.original.id ? 'Edit' : 'Set up the card'))),
+    cell: ({ row }) => h('div', { class: 'flex justify-end gap-1' }, [
+      row.original.id
+        ? h(UButton, {
+            'size': 'sm', 'color': 'neutral', 'variant': 'ghost',
+            'data-test': `history-emergency-${row.original.venueId}`,
+            'onClick': () => showHistory(row.original),
+          }, () => 'Versions')
+        : null,
+      writes.value === false
+        ? null
+        : h(UButton, {
+            'size': 'sm', 'color': 'neutral', 'variant': 'ghost',
+            'data-test': `edit-emergency-${row.original.venueId}`,
+            'onClick': () => edit(row.original),
+          }, () => (row.original.id ? 'Edit' : 'Set up the card')),
+    ]),
   },
 ]
 </script>
@@ -256,7 +289,9 @@ const columns: TableColumn<VenueCard>[] = [
 
           <UFormField
             label="Address to read to 999"
-            description="Read aloud to a 999 call handler, or to whoever the card rings first, the postcode included. A new card starts from the venue's address for audiences."
+            :description="startsBlank ? NO_VENUE_ADDRESS_HINT : 'Read aloud to a 999 call handler, or to whoever the card rings first, the postcode included. A new card starts from the venue\'s address for audiences.'"
+            :error="problems.address"
+            data-test="field-address-wrap"
           >
             <UTextarea
               v-model="state.address"
@@ -271,6 +306,7 @@ const columns: TableColumn<VenueCard>[] = [
             label="Ring first"
             hint="Optional"
             description="Who to call before 999, such as estates security at a campus venue. Leave both blank to call 999 first."
+            :error="problems.firstCallName"
           >
             <UInput
               v-model="state.firstCallName"
@@ -283,6 +319,8 @@ const columns: TableColumn<VenueCard>[] = [
             label="Their number"
             hint="Optional"
             description="A desk or service line as you would dial it, spaces allowed, never somebody's own mobile. The card keeps Call 999 beside it."
+            :error="problems.firstCallPhone"
+            data-test="field-first-call-phone-wrap"
           >
             <UInput
               v-model="state.firstCallPhone"
@@ -390,6 +428,7 @@ const columns: TableColumn<VenueCard>[] = [
             <UButton
               type="submit"
               :loading="saving"
+              :disabled="invalid"
               data-test="emergency-submit"
             >
               Save as a new version
@@ -403,6 +442,64 @@ const columns: TableColumn<VenueCard>[] = [
             </UButton>
           </div>
         </form>
+      </template>
+    </UModal>
+
+    <UModal
+      :open="history !== null"
+      :title="history ? `Card versions: ${history.venueName}` : ''"
+      description="Every version filed, newest first. Nothing is ever rewritten."
+      @update:open="value => { if (!value) history = null }"
+    >
+      <template #body>
+        <UAlert
+          v-if="versionsError"
+          color="error"
+          variant="subtle"
+          description="The earlier versions could not be read."
+        />
+        <ol
+          v-else
+          class="space-y-4"
+          data-test="emergency-versions"
+        >
+          <li
+            v-for="(version, index) in versionRows"
+            :key="version.id ?? index"
+            class="space-y-1 text-sm"
+            data-test="emergency-version"
+          >
+            <p class="font-medium">
+              {{ filedBy(version) }}{{ index === 0 && historyPage === 1 ? ' (current)' : '' }}
+            </p>
+            <p>{{ version.address ?? 'No address' }}</p>
+            <p
+              v-if="version.assemblyPoint"
+              class="text-muted"
+            >
+              Assembly point: {{ version.assemblyPoint }}
+            </p>
+            <p
+              v-if="version.firstCallName"
+              class="text-muted"
+            >
+              Ring first: {{ version.firstCallName }}, {{ version.firstCallPhone }}
+            </p>
+          </li>
+        </ol>
+        <p
+          v-if="versionsStatus === 'pending'"
+          class="text-sm text-muted"
+        >
+          Reading the versions…
+        </p>
+        <UPagination
+          v-if="versions && versions.pages > 1"
+          v-model:page="historyPage"
+          class="mt-4"
+          :total="versions.total"
+          :items-per-page="versions.pageSize"
+        />
       </template>
     </UModal>
   </ReadGate>

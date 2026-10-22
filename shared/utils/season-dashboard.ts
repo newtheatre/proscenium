@@ -11,7 +11,7 @@ export type PeriodKind = (typeof PERIOD_KINDS)[number]
 
 const PERIOD_KIND_WORDS: Record<PeriodKind, string> = {
   DAY: 'Day',
-  WEEK: 'Week',
+  WEEK: '7 days from',
   MONTH: 'Month',
   TERM: 'Term',
   SEASON: 'Season',

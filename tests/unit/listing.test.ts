@@ -1,13 +1,14 @@
 import { describe, expect, test } from 'bun:test'
-import { listingFlag, posterGlyph, posterTint } from '#shared/utils/listing'
+import { listingFlag, posterGlyph, posterTint, soldOutNightsSays } from '#shared/utils/listing'
+import { saysDay } from '#shared/utils/when'
 import type { Availability, ListedPerformance, ListedShow } from '#shared/utils/programme'
 
 // A run, reduced to the one word a card puts on it, and the colours an artless frame is given.
 
-function night(availability: Availability, cancelled = false): ListedPerformance {
+function night(availability: Availability, cancelled = false, startsAt = 0): ListedPerformance {
   return {
     id: crypto.randomUUID(),
-    startsAt: 0,
+    startsAt,
     doorsAt: null,
     durationMinutes: 120,
     intervalCount: 0,
@@ -57,6 +58,27 @@ describe('what a listing card says about a run (#918)', () => {
     expect(listingFlag(run())).toBeNull()
     expect(listingFlag(run(night('AVAILABLE', true)))).toBeNull()
     expect(listingFlag(run(night('AVAILABLE')))).toBeNull()
+  })
+})
+
+describe('the nights already full in a run still selling', () => {
+  const thursday = Date.UTC(2026, 9, 22, 18, 30) / 1000
+  const friday = Date.UTC(2026, 9, 23, 18, 30) / 1000
+
+  // Through saysDay itself, so the year it adds outside the committee year never dates the test.
+  test('a sold-out last night is named while an earlier one sells', () => {
+    expect(soldOutNightsSays(run(night('AVAILABLE', false, thursday), night('SOLD_OUT', false, friday)))).toBe(`Sold out ${saysDay(friday)}`)
+  })
+
+  test('several full nights are named soonest first', () => {
+    expect(soldOutNightsSays(run(night('SOLD_OUT', false, friday), night('SOLD_OUT', false, thursday), night('LIMITED', false, friday + 86_400))))
+      .toBe(`Sold out ${saysDay(thursday)}, ${saysDay(friday)}`)
+  })
+
+  test('nothing is said when no night is full, or when no other night is on sale', () => {
+    expect(soldOutNightsSays(run(night('AVAILABLE'), night('LIMITED')))).toBeNull()
+    expect(soldOutNightsSays(run(night('SOLD_OUT'), night('BOOKING_CLOSED')))).toBeNull()
+    expect(soldOutNightsSays(run(night('SOLD_OUT', true), night('AVAILABLE')))).toBeNull()
   })
 })
 

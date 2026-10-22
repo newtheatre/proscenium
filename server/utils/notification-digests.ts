@@ -3,8 +3,10 @@ import { sql } from 'drizzle-orm'
 // Named rather than taken from Nitro's auto-imports, because `tests/` typechecks this file under
 // Bun, where nothing is auto-imported (CONTRIBUTING).
 import { configValue } from './configuration'
+import { inDigestOrder, readHeld } from './digest-entries'
 import { notify } from './notify'
-import { DIGEST_TOPIC_NOUN, DIGEST_TYPE_FOR_TOPIC, NOTIFICATION_TOPICS } from '#shared/utils/notifications'
+import { DIGEST_IN_LINES, DIGEST_TOPIC_NOUN, DIGEST_TYPE_FOR_TOPIC, NOTIFICATION_TOPICS } from '#shared/utils/notifications'
+import type { ClaimedEntry } from './digest-entries'
 import type { NotificationTopic } from '#shared/utils/senders'
 import type { H3Event } from 'h3'
 
@@ -30,15 +32,13 @@ async function dueUsers(topic: NotificationTopic, windowMinutes: number, nowEpoc
   return rows.map(row => row.userId)
 }
 
-interface ClaimedEntry { subject: string, body: string }
-
 // The claim: every unclaimed entry for this topic and person moves under one digest id at once,
 // so a second overlapping run finds nothing left to claim (0003, 0048).
 async function claimEntries(topic: NotificationTopic, userId: string, digestLogId: string): Promise<ClaimedEntry[]> {
   return db.all<ClaimedEntry>(sql`
     UPDATE notification_digest_entries SET digest_log_id = ${digestLogId}
     WHERE topic = ${topic} AND user_id = ${userId} AND digest_log_id IS NULL
-    RETURNING subject, body
+    RETURNING subject, body, type, created_at AS createdAt
   `)
 }
 
@@ -55,6 +55,22 @@ async function windowMinutes(event: H3Event | undefined): Promise<Record<Notific
   return { BOOKINGS, SHIFTS, TRAINING, ROOMS, ANNOUNCEMENTS }
 }
 
+export interface WaitingDigest { topic: NotificationTopic, messages: number, dueAt: number }
+
+// What one person has held for a digest, by topic and count only, never a subject or a body
+// (H-106 criterion 3): the send log has no row for it until the digest goes.
+export async function waitingForDigest(event: H3Event | undefined, userId: string): Promise<WaitingDigest[]> {
+  const [rows, windows] = await Promise.all([
+    db.all<{ topic: NotificationTopic, messages: number, firstAt: number }>(sql`
+      SELECT topic, count(*) AS messages, min(created_at) AS firstAt FROM notification_digest_entries
+      WHERE user_id = ${userId} AND digest_log_id IS NULL
+      GROUP BY topic ORDER BY firstAt
+    `),
+    windowMinutes(event),
+  ])
+  return rows.map(row => ({ topic: row.topic, messages: row.messages, dueAt: row.firstAt + windows[row.topic] * 60 }))
+}
+
 export async function sendDueDigests(event: H3Event | undefined, now = new Date()): Promise<number> {
   const nowEpoch = Math.floor(now.getTime() / 1000)
   const windows = await windowMinutes(event)
@@ -63,14 +79,22 @@ export async function sendDueDigests(event: H3Event | undefined, now = new Date(
   for (const topic of NOTIFICATION_TOPICS) {
     for (const userId of await dueUsers(topic, windows[topic], nowEpoch)) {
       const digestLogId = crypto.randomUUID().replaceAll('-', '')
-      const entries = await claimEntries(topic, userId, digestLogId)
-      if (entries.length === 0) continue
+      const claimed = await claimEntries(topic, userId, digestLogId)
+      if (claimed.length === 0) continue
 
+      const held = inDigestOrder(claimed).map(entry => ({ subject: entry.subject, ...readHeld(entry.subject, entry.body) }))
       await notify(event, {
         id: digestLogId,
         type: DIGEST_TYPE_FOR_TOPIC[topic],
         userId,
-        context: { name: '', noun: DIGEST_TOPIC_NOUN[topic], entries },
+        context: {
+          name: '',
+          noun: DIGEST_TOPIC_NOUN[topic],
+          inLines: DIGEST_IN_LINES[topic],
+          entries: held.map(entry => ({ subject: entry.subject, body: entry.text, line: entry.line })),
+          // The lead entry's, so the one link goes where the most important change is read.
+          link: held.find(entry => entry.link)?.link ?? null,
+        },
       })
       sent += 1
     }

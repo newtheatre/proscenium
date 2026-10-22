@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { REASONS_BY_KIND, REVERSIBLE_KINDS, says, saysDeliveryCost, saysMovementSource, saysQuantity } from '#shared/utils/bar'
+import { REASONS_BY_KIND, REVERSIBLE_KINDS, says, saysDeliveryCost, saysMovementReason, saysMovementSource, saysQuantity } from '#shared/utils/bar'
 import { saysWhen } from '#shared/utils/when'
 import { barMovementsList } from '#shared/utils/bar-movements-list'
 import type { FilterOption } from '#shared/utils/list-filters'
@@ -107,7 +107,7 @@ const columns: TableColumn<StockMovement>[] = [
     header: 'Movement',
     cell: ({ row }) => h('div', { class: 'flex flex-wrap items-center gap-2' }, [
       h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => says(row.original.kind)),
-      row.original.reason ? h('span', { class: 'text-xs text-muted' }, says(row.original.reason)) : null,
+      saysMovementReason(row.original) ? h('span', { class: 'text-xs text-muted' }, saysMovementReason(row.original) ?? '') : null,
     ]),
   },
   {

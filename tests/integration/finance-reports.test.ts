@@ -72,6 +72,27 @@ describe('foregone value by show (criterion 1)', () => {
   })
 })
 
+// The 21 Oct process map: a show's bar discounts read as if they were its ticket discounts.
+describe('foregone value says how much of it was rung up at the bar', () => {
+  test('a till comp and a till discount are counted apart from the desk\'s', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      entry(database, 'e-desk-comp', 'COMP', tonight.startsAt, '2026-09-10')
+      compLine(database, 'l-desk-comp', 'e-desk-comp', tonight.performanceId, 900)
+      entry(database, 'e-bar-comp', 'COMP', tonight.startsAt, '2026-09-10', 'TILL')
+      compLine(database, 'l-bar-comp', 'e-bar-comp', tonight.performanceId, 350)
+      entry(database, 'e-bar-discount', 'CARD', tonight.startsAt, '2026-09-10', 'TILL')
+      discountLine(database, 'l-bar-discount', 'e-bar-discount', tonight.performanceId, 300, 50)
+
+      const [row] = read<Record<string, number>>(database, foregoneQuery({ scope: 'SHOW', showId: tonight.showId }))
+      expect(row).toMatchObject({
+        compsPence: 1250, compCount: 2, barCompsPence: 350, barCompCount: 1,
+        discountsPence: 50, discountCount: 1, barDiscountsPence: 50, barDiscountCount: 1,
+      })
+    })
+  })
+})
+
 describe('foregone value by period (criterion 1)', () => {
   test('sums across the whole ledger inside the London range, whichever show or module posted it', async () => {
     await withDatabase(async (database) => {

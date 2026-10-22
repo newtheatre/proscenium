@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { formatLondon, londonParts, startOfLondonDay } from '#shared/utils/london'
+import { formatLondon, startOfLondonDay } from '#shared/utils/london'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, fillDate, fillNumber, fillPin, fillTime, menuOptions, openSignedOutView, pickOptions, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -101,12 +102,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
   })
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-// London days: a session date is a wall-clock day, not an offset from a UTC instant (0014).
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
 
 // What a screen shows for a session's day: the short London form the member pages already use.
 const shortDay = (heldOn: string): string =>
@@ -246,6 +241,13 @@ describe.skipIf(skip !== null)('a session is scheduled (G-112)', () => {
     )
     expect(held).toMatchObject({ starts: '19:00', capacity: 20, status: 'OPEN' })
     expect(read<{ n: number }>('SELECT count(*) n FROM session_modules WHERE session_id = ?', id)?.n).toBe(1)
+  })
+
+  test('a certification is signed off, so a session teaching one is refused (0240)', async () => {
+    const certification = await addModule({ kind: 'CERTIFICATION' })
+    const refused = await schedule({ moduleIds: [certification] })
+    expect(refused.status).toBe(422)
+    expect(await said(refused)).toContain('cannot be taught at a session')
   })
 
   test('a capacity outside one to sixty is refused', async () => {
@@ -598,6 +600,19 @@ describe.skipIf(skip !== null)('the trainer screen (G-112)', () => {
       view.close()
     }
   }, CASE_TIMEOUT_MS)
+})
+
+// 0240: a trainer on the door holds no accounts.read, and still has to find a known walk-in.
+describe.skipIf(skip !== null)('a trainer finds people for a register or a log', () => {
+  test('by name, answered with an id and a name and nothing more', async () => {
+    const teacher = await adminSession(app, { roles: [] })
+    award(teacher.id, trainerCert)
+    const found = await send('GET', `/api/admin/training/people?search=${encodeURIComponent(trainer.name)}`, undefined, teacher.cookie)
+    expect(found.status).toBe(200)
+    const { items } = await found.json() as { items: Record<string, unknown>[] }
+    expect(items.map(item => item.name)).toContain(trainer.name)
+    expect(items.every(item => Object.keys(item).sort().join(',') === 'id,name')).toBe(true)
+  })
 })
 
 // Issue 1336, G-112 as amended: whoever schedules a session names who teaches it, and the named

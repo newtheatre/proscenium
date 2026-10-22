@@ -35,3 +35,10 @@ export function undeliverableReason(recipient: Recipient): Undeliverable | null 
 export function isDeliverable(recipient: Recipient): boolean {
   return undeliverableReason(recipient) === null
 }
+
+// A reserved domain is a fact about the address, never about an account, so a form may say so.
+export const RESERVED_DOMAIN_REFUSAL = 'That address cannot receive email. Check the part after the @.'
+
+export function hasReservedDomain(email: string): boolean {
+  return undeliverableReason({ email, anonymisedAt: null }) === 'undeliverable-domain'
+}

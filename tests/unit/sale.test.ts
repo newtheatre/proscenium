@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { EXISTING_ACCOUNT_SAYS, MAX_BASKET_LINES, saysTillParty, MAX_BASKET_LINE_QTY, basketForm, basketLineForm, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, sameBookerName, saysNoChoice, saysPouredLine, saysPouredLines, walkUpGuestForm } from '#shared/utils/sale'
+import { basketForm, basketLineForm, bookedInAnotherName, checkIdFor, lineNeedsCheckId, needsTheReader, pouredNames, saleForm, sameBookerName, saysBasketLine, saysNoChoice, saysPouredLine, saysPouredLines, saysTillParty, walkUpGuestForm, EXISTING_ACCOUNT_SAYS, MAX_BASKET_LINES, MAX_BASKET_LINE_QTY } from '#shared/utils/sale'
 import type { SaleProduct } from '#shared/utils/sale'
 
 const aLine = { variantId: 'var-1', qty: 1 }
@@ -264,6 +264,13 @@ describe('a walk-up booker is the same person when the names agree', () => {
     expect(sameBookerName(null, 'Ada Kowalski')).toBe(false)
   })
 
+  // 0170: online, the account's owner is told the name somebody else typed for their address.
+  test('an online guest in another name is named back to the owner, tidied; the same name is not', () => {
+    expect(bookedInAnotherName('Ada Kowalski', '  Zed   Zane ')).toBe('Zed Zane')
+    expect(bookedInAnotherName('Ada Kowalski', 'ada  kowalski')).toBeNull()
+    expect(bookedInAnotherName(null, 'Zed Zane')).toBe('Zed Zane')
+  })
+
   test('the guest form carries the desk\'s say-so, off unless sent', () => {
     expect(walkUpGuestForm.parse({ name: 'Ada', email: 'ada@example.com' }).existingAccount).toBe(false)
     expect(walkUpGuestForm.parse({ name: 'Ada', email: 'ada@example.com', existingAccount: true }).existingAccount).toBe(true)
@@ -289,5 +296,16 @@ describe('a season pass on the till', () => {
 
   test('the buyer is named by a real email address', () => {
     expect(saleForm.safeParse({ lines: [], expectedTotalPence: 4500, pass: { ...pass, email: 'not an address' } }).success).toBe(false)
+  })
+})
+
+describe('a basket line names its size only where there is one (bar review, C2)', () => {
+  test('a lone Each is left out, and a choice reads with it', () => {
+    expect(saysBasketLine({ productName: 'Rum and mixer', variantLabel: 'Each', choiceItemName: 'Coke' })).toBe('Rum and mixer with Coke')
+    expect(saysBasketLine({ productName: 'Crisps', variantLabel: 'Each', choiceItemName: null })).toBe('Crisps')
+  })
+
+  test('a real size stays', () => {
+    expect(saysBasketLine({ productName: 'Gin', variantLabel: 'Double', choiceItemName: 'Tonic' })).toBe('Gin, Double with Tonic')
   })
 })

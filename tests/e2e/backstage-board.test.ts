@@ -323,6 +323,7 @@ describe.skipIf(skip !== null)('the wings read the board the way front of house 
       await visit(view, `${app.baseURL}/board`, '[data-test="board-join-form"]')
       await fill(view, '[data-test="board-code-input"]', code)
       await fill(view, '[data-test="board-label-input"]', 'Prompt desk screen')
+      await waitFor(view, `!document.querySelector('[data-test="board-join-submit"]')?.disabled`)
       await click(view, '[data-test="board-join-submit"]')
       await waitFor(view, `document.querySelector('[data-test="board-joined"]')`, 30_000)
 
@@ -398,6 +399,7 @@ describe.skipIf(skip !== null)('the current state fits the column it is given (i
         await visit(wings, `${app.baseURL}/board`, '[data-test="board-join-form"]')
         await fill(wings, '[data-test="board-code-input"]', code)
         await fill(wings, '[data-test="board-label-input"]', 'Wide wings screen')
+        await waitFor(wings, `!document.querySelector('[data-test="board-join-submit"]')?.disabled`)
         await click(wings, '[data-test="board-join-submit"]')
       }
       await waitFor(wings, BOTH_CALLS, 30_000)

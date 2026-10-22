@@ -84,7 +84,7 @@ describe('neighbouringNightsQuery skips the nights with nothing on', () => {
   })
 })
 
-describe('deskSearchQuery scopes to one performance and matches reference or name (criterion 1)', () => {
+describe('deskSearchQuery scopes to one performance and matches reference, email or name (criterion 1)', () => {
   test('a reference is an exact, whole match', async () => {
     await withDatabase((database) => {
       const seeded = tonightsPerformance(database)
@@ -104,6 +104,48 @@ describe('deskSearchQuery scopes to one performance and matches reference or nam
 
       const found = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, 'booker', 'ALL', 10, 0))
       expect(found.map(row => row.id)).toEqual(['r-1'])
+    })
+  })
+
+  test('an email address finds its booker\'s bookings, whatever its case', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
+      user(database, 'u-2', 'sam@example.invalid', 'Sam Other')
+      reservation(database, 'r-1', seeded.performanceId, 'u-1')
+      reservation(database, 'r-2', seeded.performanceId, 'u-2', 'PENDING', 'GHJKLM')
+
+      const found = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, ' Alex@Example.invalid ', 'ALL', 10, 0))
+      expect(found.map(row => row.id)).toEqual(['r-1'])
+    })
+  })
+
+  test('the start of a reference finds it', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
+      reservation(database, 'r-1', seeded.performanceId, 'u-1')
+      reservation(database, 'r-2', seeded.performanceId, 'u-1', 'PENDING', 'GHJKLM')
+
+      const found = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, 'abcd', 'ALL', 10, 0))
+      expect(found.map(row => row.id)).toEqual(['r-1'])
+    })
+  })
+
+  test('"walk-up" finds the bookings with no name', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      user(database, 'u-1', 'alex@example.invalid', 'Alex Booker')
+      reservation(database, 'r-1', seeded.performanceId, 'u-1')
+      database.batch([[
+        'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, NULL, ?, ?)',
+        'r-2', 'GHJKLM', seeded.performanceId, 'COLLECTED', 'DESK',
+      ]])
+
+      for (const asked of ['Walk-up', 'walkup', 'walk ups']) {
+        const found = read<{ id: string }>(database, deskSearchQuery(seeded.performanceId, asked, 'ALL', 10, 0))
+        expect(found.map(row => row.id)).toEqual(['r-2'])
+      }
     })
   })
 

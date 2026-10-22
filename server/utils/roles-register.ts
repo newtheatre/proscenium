@@ -144,18 +144,27 @@ export function grantsClause(query: RolesQuery, now: number): RolesClause {
   }
 }
 
+// A privileged grant on a password account with no confirmed authenticator does nothing yet
+// (A-112 criterion 7), so it is shown as waiting and not counted as a holder (0157).
+export function waitsOnFactor(privileged: readonly string[]): SQL {
+  return sql`(${schema.roleGrants.role} in (select value from json_each(${JSON.stringify(privileged)}))
+    and ${schema.users.password} is not null
+    and not exists (select 1 from ${schema.totpSecrets}
+      where ${schema.totpSecrets.userId} = ${schema.users.id} and ${schema.totpSecrets.confirmedAt} is not null))`
+}
+
 // One grouped statement for every role at once: a count per role would bind a parameter per row
 // of a table it walks, which scales the way an `IN` list does (0006).
-export function holderCountsStatement(now: number): SQL {
+export function holderCountsStatement(now: number, privileged: readonly string[] = []): SQL {
   return sql`select ${schema.roleGrants.role} as role, count(*) as holders
     from ${schema.roleGrants}
     join ${schema.users} on ${schema.users.id} = ${schema.roleGrants.userId}
-    where ${held()} and ${live(now)}
+    where ${held()} and ${live(now)} and not ${waitsOnFactor(privileged)}
     group by ${schema.roleGrants.role}`
 }
 
-export async function holderCounts(now: number): Promise<Record<string, number>> {
-  const counted = await db.all<{ role: string, holders: number }>(holderCountsStatement(now))
+export async function holderCounts(now: number, privileged: readonly string[] = []): Promise<Record<string, number>> {
+  const counted = await db.all<{ role: string, holders: number }>(holderCountsStatement(now, privileged))
   return Object.fromEntries(counted.map(row => [row.role, Number(row.holders)]))
 }
 

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { londonDaysFrom } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, openView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
@@ -202,6 +203,19 @@ describe.skipIf(skip !== null)('prerequisites are direct edges (G-108)', () => {
     expect(read<{ kind: string }>('SELECT kind FROM modules WHERE id = ?', gate)?.kind).toBe('MODULE')
   })
 
+  // 0240: nobody can obtain a draft or a retired module, so nothing may wait on one.
+  test('a draft or a retired module cannot be required', async () => {
+    const draft = await addModule({ status: 'DRAFT' })
+    const retired = await addModule({ status: 'RETIRED' })
+    const advanced = await addModule()
+
+    const unpublished = await needs(advanced, draft)
+    expect(unpublished.status).toBe(409)
+    expect((await unpublished.json() as { statusMessage?: string }).statusMessage ?? '').toContain('still a draft')
+    expect((await needs(advanced, retired)).status).toBe(409)
+    expect(read<{ n: number }>('SELECT count(*) n FROM module_prerequisites WHERE module_id = ?', advanced)?.n).toBe(0)
+  })
+
   test('an edge is withdrawn without touching what was earned under it', async () => {
     const gate = await addModule()
     const advanced = await addModule()
@@ -296,7 +310,7 @@ describe.skipIf(skip !== null)('the catalogue a member browses (G-103)', () => {
     await needs(advanced, expiring)
     await needs(advanced, expired)
 
-    const soon = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10)
+    const soon = londonDaysFrom(10)
     write(
       `INSERT INTO training_records (id, user_id, module_id, awarded_on, expires_on, source)
        VALUES (?, ?, ?, '2026-09-01', ?, 'SIGNOFF')`,

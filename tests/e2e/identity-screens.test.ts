@@ -222,6 +222,50 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
     }
   }, CASE_TIMEOUT_MS)
 
+  // A second registration on an unconfirmed address clears the first password and sends a link to
+  // choose one, so a stranger who registered first cannot keep a way in (0153).
+  test('registering again on an address never confirmed asks the mailbox to choose a password', async () => {
+    const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+    const email = address('again')
+    const strangers = generatePassword()
+    await send('POST', '/api/auth/register', { email, name: person.name, password: strangers })
+    const verify = await linkSentTo(email, '/verify')
+    await send('POST', '/api/auth/register', { email, name: person.name, password })
+
+    const claim = await linkSentTo(email, '/reset')
+    expect(claim).toContain('kind=set')
+    expect(withDatabase(database => database.query('SELECT password FROM users WHERE email = ?').get(email) as { password: string | null }).password).toBeNull()
+    expect(withDatabase(database => database.query(`
+      SELECT count(*) n FROM audit_log l JOIN users u ON l.target = 'user:' || u.id
+      WHERE u.email = ? AND l.action = 'password.cleared'`).get(email) as { n: number }).n).toBe(1)
+    expect((await letters(app)).some(letter => letter.startsWith(`To: ${email}`) && letter.includes('You already have an account'))).toBe(false)
+
+    // Confirming from the first email still leaves the stranger's password refused.
+    const token = new URL(verify, app.baseURL).searchParams.get('token')
+    expect((await send('POST', '/api/auth/verify', { token })).status).toBe(200)
+    expect((await send('POST', '/api/auth/sign-in', { email, password: strangers })).status).toBe(401)
+  }, CASE_TIMEOUT_MS)
+
+  test('the check-your-email screen sends the link again on request', async () => {
+    const view = await openSignedOutView(app.baseURL)
+    try {
+      const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
+      const email = address('resend')
+      await visit(view, `${app.baseURL}/register`)
+      await waitFor(view, 'document.querySelector(\'form button[type="submit"]:not([disabled])\')', 30_000)
+      await fill(view, 'form input[type="text"]', person.name)
+      await fill(view, SIGN_IN_FORM, email)
+      await fill(view, PASSWORD_FIELD, password)
+      await click(view, SUBMIT)
+      await waitFor(view, 'document.querySelector(\'[data-test="resend-verification"]\')', 30_000)
+      await click(view, '[data-test="resend-verification"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="resent"]\')', 30_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
   // A dead end is the failure this page exists to prevent (A-102 criterion 3).
   // A sign-in link confirms the address as it signs in, so it is the fresh send (0103).
   test('an expired verification link offers a sign-in link rather than a dead end', async () => {
@@ -596,7 +640,7 @@ describe.skipIf(skip !== null)('the registering browser\'s cookie (0103)', () =>
       registrationCookie(await register(address('cookie-new'))),
       registrationCookie(await register(existing)),
       registrationCookie(await register(guestAddress)),
-      registrationCookie(await register(`cookie-${Math.random().toString(36).slice(2)}@example.com`)),
+      registrationCookie(await register(address('deleted-cookie'))),
     ]
 
     for (const line of lines) {

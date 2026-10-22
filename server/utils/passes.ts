@@ -200,6 +200,8 @@ export interface PassCurrentState {
   priceLabel: string
   pricePaid: number
   status: string
+  validFrom: number
+  validUntil: number
 }
 
 // What the QR answers when it is presented, read live rather than from anything saved earlier,
@@ -207,7 +209,8 @@ export interface PassCurrentState {
 export function passCurrentStateQuery(id: string): SQL {
   return sql`
     SELECT p.id AS id, p.reference AS reference, p.user_id AS userId, t.name AS passTypeName,
-           pr.label AS priceLabel, p.price_paid AS pricePaid, p.status AS status
+           pr.label AS priceLabel, p.price_paid AS pricePaid, p.status AS status,
+           t.valid_from AS validFrom, t.valid_until AS validUntil
     FROM passes p
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN pass_type_prices pr ON pr.id = p.pass_type_price_id

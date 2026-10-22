@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { can, nameTrainers, viewTrainingCatalogue } from '#shared/utils/abilities'
+import { can, nameTrainers, viewAccounts, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { fromLondonWallClock, londonParts } from '#shared/utils/london'
 import { saysDay } from '#shared/utils/when'
 import { addDays } from '#shared/utils/series'
@@ -23,6 +23,7 @@ interface Session {
   capacity: number
   opensAt: number | null
   status: string
+  registerOpenedAt: number | null
   trainerName: string
   modules: { id: string, name: string }[]
 }
@@ -79,6 +80,8 @@ const listFailure = useListFailure(error, 'The sessions could not be read.')
 // A trainer with no role cannot read the admin catalogue, so reads the member one narrowed to what
 // they hold, which is all they may teach (G-112 criterion 4 answer, issue 1336).
 const readsCatalogue = computed(() => can(useViewer().value, viewTrainingCatalogue))
+// A trainer holds no accounts.read, so their picker asks the route that answers ids and names (0240).
+const pickerEndpoint = can(useViewer().value, viewAccounts) ? undefined : '/api/admin/training/people'
 const { data: catalogue } = await useAsyncData(
   'training-sessions-modules',
   () => teachingCatalogue(request, readsCatalogue.value),
@@ -406,10 +409,10 @@ const columns: TableColumn<Session>[] = [
     id: 'status',
     header: 'Status',
     cell: ({ row }) => h(UBadge, {
-      color: row.original.status === 'OPEN' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
+      color: row.original.registerOpenedAt === null && row.original.status === 'OPEN' ? 'success' : row.original.status === 'CANCELLED' ? 'error' : 'neutral',
       variant: 'subtle',
       size: 'sm',
-    }, () => saysSessionStatus(row.original.status)),
+    }, () => saysSessionStatus(row.original.status, row.original.registerOpenedAt)),
   },
   {
     id: 'open',
@@ -778,6 +781,7 @@ const columns: TableColumn<Session>[] = [
                 <PersonPicker
                   v-model="person"
                   data-test="delivery-person"
+                  :endpoint="pickerEndpoint"
                   class="w-full sm:w-96"
                   @chosen="value => picked = value"
                 />

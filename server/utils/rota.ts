@@ -273,10 +273,15 @@ export function stampPerformanceStatement(performanceId: string, defaults: Shift
   return stampStatement(sql`p.id = ${performanceId}`, defaults)
 }
 
+// Tonight's stamp reaches from 04:00, but a performance whose curtain is already down has no work
+// left in it to staff (0211).
+const notYetOver = sql`p.starts_at
+  + (coalesce(p.duration_minutes, 0) + coalesce(p.interval_count, 0) * coalesce(p.interval_minutes, 0)) * 60 >= unixepoch()`
+
 // The backfill: every performance at a venue whose night has not started yet. Running it twice
 // stamps nothing the second time, held by the uniqueness rule (E-102 criterion 2).
 export function backfillVenueStatement(venueId: string, from: number, defaults: ShiftOffsets): SQL {
-  return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}`, defaults)
+  return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from} AND ${notYetOver}`, defaults)
 }
 
 // The seven-day digest's rows (E-108) at the run's instant `from`: an open or declined shift, a duty
@@ -303,7 +308,7 @@ export function unstaffedPerformancesQuery(from: number, to: number): SQL {
 // Saving a template reaches the diary it was missing: every performance at the venue from `from`
 // holding no live shift. One holding a live shift, even by hand, is left alone (issue 1319, E-101).
 export function stampUnstampedStatement(venueId: string, from: number, defaults: ShiftOffsets): SQL {
-  return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from}
+  return stampStatement(sql`p.venue_id = ${venueId} AND p.starts_at >= ${from} AND ${notYetOver}
     AND NOT EXISTS (SELECT 1 FROM shifts held WHERE held.performance_id = p.id AND held.status <> 'CANCELLED')`, defaults)
 }
 
@@ -401,6 +406,53 @@ export async function withShiftConstraints<T>(write: () => Promise<T>): Promise<
   }
 }
 
+// Another claimed or confirmed shift the person holds at a different venue whose window overlaps
+// this one: one person cannot be in two buildings (0211). A shift with no window clashes with nothing.
+export function clashesWith(userId: string | SQL, startsAt: SQL, endsAt: SQL, venueId: SQL): SQL {
+  return sql`EXISTS (
+    SELECT 1 FROM shifts clash
+    JOIN performances clash_p ON clash_p.id = clash.performance_id
+    WHERE clash.user_id = ${userId} AND clash.status IN ('CLAIMED', 'CONFIRMED')
+      AND clash_p.venue_id <> ${venueId}
+      AND clash.starts_at < ${endsAt} AND clash.ends_at > ${startsAt}
+  )`
+}
+
+const targetVenue = sql`(SELECT venue_id FROM performances WHERE id = target.performance_id)`
+
+// The shift that clashes, for the refusal to name, read only once a write has been refused.
+export async function clashingShift(userId: string, shiftId: string): Promise<{ showTitle: string, venueName: string } | null> {
+  const [row] = await db.all<{ showTitle: string, venueName: string }>(sql`
+    SELECT sh.title AS showTitle, v.name AS venueName
+    FROM shifts target
+    JOIN shifts clash ON clash.user_id = ${userId} AND clash.status IN ('CLAIMED', 'CONFIRMED')
+      AND clash.starts_at < target.ends_at AND clash.ends_at > target.starts_at
+    JOIN performances clash_p ON clash_p.id = clash.performance_id AND clash_p.venue_id <> ${targetVenue}
+    JOIN venues v ON v.id = clash_p.venue_id
+    JOIN shows sh ON sh.id = clash_p.show_id
+    WHERE target.id = ${shiftId}
+    LIMIT 1
+  `)
+  return row ?? null
+}
+
+// A performance shift is offered and claimed only once its show is published: a draft has no
+// public page, so a volunteer would be signing up for a night nobody has announced (0211).
+const showPublished = (performance: SQL): SQL =>
+  sql`EXISTS (SELECT 1 FROM performances pub_p JOIN shows pub_s ON pub_s.id = pub_p.show_id
+    WHERE pub_p.id = ${performance} AND pub_s.status = 'PUBLISHED')`
+
+export async function holdsShiftOn(performanceId: string, userId: string): Promise<boolean> {
+  const [row] = await db.all<{ held: number }>(sql`SELECT EXISTS (SELECT 1 FROM shifts WHERE performance_id = ${performanceId}
+    AND user_id = ${userId} AND status IN ('CLAIMED', 'CONFIRMED')) AS held`)
+  return row?.held === 1
+}
+
+export async function showIsPublished(performanceId: string): Promise<boolean> {
+  const [row] = await db.all<{ published: number }>(sql`SELECT ${showPublished(sql`${performanceId}`)} AS published`)
+  return row?.published === 1
+}
+
 // The open-shift list (E-103). Two bound parameters at most beyond the filters themselves,
 // whatever the page holds: nothing here binds per shift or per performance (0003, 0006).
 const where = (terms: SQL[]): SQL => (terms.length ? sql` WHERE ${sql.join(terms, sql` AND `)}` : sql``)
@@ -422,6 +474,7 @@ function openShiftTerms(filters: OpenShiftFilters, now: number): SQL[] {
     sql`p.status <> 'CANCELLED'`,
     // A shift already past cannot be claimed, whatever range was asked for.
     sql`p.starts_at >= ${Math.max(now, filters.from ?? now)}`,
+    showPublished(sql`s.performance_id`),
   ]
   if (filters.role) terms.push(sql`s.role = ${filters.role}`)
   if (filters.roles) {
@@ -432,6 +485,8 @@ function openShiftTerms(filters: OpenShiftFilters, now: number): SQL[] {
       SELECT 1 FROM shifts worked WHERE worked.performance_id = s.performance_id
         AND worked.user_id = ${filters.notWorkedBy} AND worked.status IN ('CLAIMED', 'CONFIRMED')
     )`)
+    // Nor one that overlaps a shift they hold at another venue, which the claim would refuse (0211).
+    terms.push(sql`NOT ${clashesWith(filters.notWorkedBy, sql`s.starts_at`, sql`s.ends_at`, sql`p.venue_id`)}`)
   }
   if (filters.to !== undefined) terms.push(sql`p.starts_at <= ${filters.to}`)
   return terms
@@ -492,6 +547,8 @@ export interface MyShiftRow {
   // The shift's own window, null where it was stamped before shifts carried one (0078).
   windowStartsAt: number | null
   windowEndsAt: number | null
+  // The officer's words on a declined claim, the member's own to read again on Rota (0213).
+  declineReason: string | null
 }
 
 // A member's own shifts from tonight on, not cancelled. Bounded by LIMIT rather than paged: nobody
@@ -500,7 +557,7 @@ export function myShiftsQuery(userId: string, now: number): SQL {
   return sql`
     SELECT s.id AS shiftId, s.role AS role, s.status AS status, p.id AS performanceId,
            v.name AS venueName, sh.title AS showTitle, p.starts_at AS startsAt,
-           s.starts_at AS windowStartsAt, s.ends_at AS windowEndsAt
+           s.starts_at AS windowStartsAt, s.ends_at AS windowEndsAt, s.decline_reason AS declineReason
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
     JOIN venues v ON v.id = p.venue_id
@@ -587,7 +644,9 @@ export function claimSlotStatement(scope: ClaimScope, slotId: string, userId: st
           AND other.user_id = ${userId}
           AND other.status IN ('CLAIMED', 'CONFIRMED')
       )
-      AND ${holdsGate(gate, userId)}
+      AND ${holdsGate(gate, userId)}${scope === SHIFT_CLAIM_SCOPE
+        ? sql` AND NOT ${clashesWith(userId, sql`target.starts_at`, sql`target.ends_at`, targetVenue)} AND ${showPublished(sql`target.performance_id`)}`
+        : sql``}
     RETURNING id
   `
 }
@@ -649,22 +708,37 @@ export function dismissShiftStatement(shiftId: string, userId: string): SQL {
 
 // An officer's assignment, onto an open shift or over an existing holder: confirmed by definition,
 // one UPDATE on the row that already exists, the member's training gate on it (criteria 3, 4, #1302).
-export function assignShiftStatement(shiftId: string, userId: string, actorId: string, gate: TrainingGate): SQL {
-  return sql`
-    UPDATE shifts AS target
-    SET user_id = ${userId}, status = 'CONFIRMED', assigned_by = ${actorId},
-        claimed_at = unixepoch(), confirmed_at = unixepoch(), decline_reason = NULL
-    WHERE target.id = ${shiftId}
-      AND target.status <> 'CANCELLED'
-      AND NOT EXISTS (
+export function assignShiftStatement(shiftId: string, userId: string, actorId: string, gate: TrainingGate, move = false): SQL {
+  // A move waives one-per-performance here alone; `moveOffStatement` reopens the other shift (0211).
+  const onePerPerformance = move
+    ? sql``
+    : sql` AND NOT EXISTS (
         SELECT 1 FROM shifts AS other
         WHERE other.performance_id = target.performance_id
           AND other.id <> target.id
           AND other.user_id = ${userId}
           AND other.status IN ('CLAIMED', 'CONFIRMED')
-      )
+      )`
+  return sql`
+    UPDATE shifts AS target
+    SET user_id = ${userId}, status = 'CONFIRMED', assigned_by = ${actorId},
+        claimed_at = unixepoch(), confirmed_at = unixepoch(), decline_reason = NULL
+    WHERE target.id = ${shiftId}
+      AND target.status <> 'CANCELLED'${onePerPerformance}
+      AND NOT ${clashesWith(userId, sql`target.starts_at`, sql`target.ends_at`, targetVenue)}
       AND ${holdsGate(gate, userId)}
     RETURNING id
+  `
+}
+
+// The other half of a move: the person's other shifts on the performance go back to open, only
+// once the assignment's own audit row has landed, so a refused assignment moves nobody (0049).
+export function moveOffStatement(shiftId: string, userId: string, landed: SQL): SQL {
+  return sql`
+    UPDATE shifts SET status = 'OPEN', user_id = NULL, assigned_by = NULL, claimed_at = NULL, confirmed_at = NULL
+    WHERE performance_id = (SELECT performance_id FROM shifts WHERE id = ${shiftId})
+      AND id <> ${shiftId} AND user_id = ${userId} AND status IN ('CLAIMED', 'CONFIRMED')
+      AND ${landed}
   `
 }
 
@@ -672,8 +746,14 @@ export function assignShiftStatement(shiftId: string, userId: string, actorId: s
 // criterion 5); with none named it takes the next (0140), never past MAX_SLOT_COUNT.
 export function addShiftStatement(shiftId: string, input: AddShiftInput, actorId: string, defaults: ShiftOffsets, gate: TrainingGate): SQL {
   const confirmed = input.userId !== undefined
-  // Somebody named is confirmed at once, as an assignment is, so the training gate rides the insert (#1302).
-  const trained = input.userId === undefined ? sql`` : sql` AND ${holdsGate(gate, input.userId)}`
+  // Somebody named is confirmed at once, as an assignment is, so the training gate rides the insert (#1302)
+  // and one shift per performance holds for them as an assignment's does (0210).
+  const trained = input.userId === undefined
+    ? sql``
+    : sql` AND ${holdsGate(gate, input.userId)} AND NOT EXISTS (
+        SELECT 1 FROM shifts other
+        WHERE other.performance_id = p.id AND other.user_id = ${input.userId} AND other.status IN ('CLAIMED', 'CONFIRMED')
+      ) AND NOT ${clashesWith(input.userId, windowStart(defaults), windowEnd(defaults), sql`p.venue_id`)}`
   // The window comes from the performance and the template the same way a stamp's does: a shift
   // added by hand with no window would hold authority for the whole night (0078).
   return sql`
@@ -731,6 +811,7 @@ export interface RosterPerformanceRow {
   isExternal: number
   hasTemplate: number
   isRetired: number
+  isPublished: number
 }
 
 export interface RosterShiftRow {
@@ -779,6 +860,7 @@ export function rosterPerformancesQuery(scope: RosterScope): SQL {
   return sql`
     SELECT p.id AS performanceId, sh.title AS showTitle, v.id AS venueId, v.name AS venueName,
            p.starts_at AS startsAt, v.is_external AS isExternal, v.archived AS isRetired,
+           (sh.status = 'PUBLISHED') AS isPublished,
            (v.is_external = 0 AND EXISTS (SELECT 1 FROM shift_templates t WHERE t.venue_id = v.id)) AS hasTemplate
     FROM performances p
     JOIN shows sh ON sh.id = p.show_id
@@ -929,6 +1011,24 @@ export function tonightShiftWindowsQuery(userId: string, from: number, to: numbe
       AND o.starts_at >= ${from} AND o.starts_at < ${to}
       AND u.disabled = 0 AND u.anonymised_at IS NULL
   `
+}
+
+// The venue's performances tonight with this role confirmed on the rota, for the officer bypass
+// row (0231). Scoped by the venue and the night, never by a list of ids (0006).
+export function performancesWithConfirmedRoleQuery(role: ShiftRole, venueId: string, night: string): SQL {
+  const { from, to } = showNightBounds(night)
+  return sql`
+    SELECT DISTINCT p.id AS performanceId
+    FROM shifts s
+    JOIN performances p ON p.id = s.performance_id
+    WHERE s.role = ${role} AND s.status = 'CONFIRMED' AND p.venue_id = ${venueId}
+      AND p.starts_at >= ${Math.floor(from.getTime() / 1000)} AND p.starts_at < ${Math.floor(to.getTime() / 1000)}
+    ORDER BY p.id
+  `
+}
+
+export async function performancesWithConfirmedRole(role: ShiftRole, venueId: string, night: string): Promise<string[]> {
+  return (await db.all<{ performanceId: string }>(performancesWithConfirmedRoleQuery(role, venueId, night))).map(row => row.performanceId)
 }
 
 // Inside a confirmed shift's own window with the guard's grace, read per request (0078, 0094).

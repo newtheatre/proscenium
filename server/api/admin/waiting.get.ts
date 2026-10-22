@@ -2,7 +2,8 @@
 // 1358). The sidebar and the overview both read this one answer, so they cannot disagree.
 export default defineEventHandler(async (event) => {
   const resolved = await authority(event)
-  await requireSecondFactorIfPrivileged(event, resolved)
+  // A role still owing its authenticator narrows this to what the other grants open (0152).
+  await requireSecondFactorIfPrivileged(event, resolved, [...resolved.permissions])
   // The demand board's own scope, so the count and the board it opens on agree (G-110).
   const leadOf = scopeToLeadOf(resolved)
   const leads = leadOf !== undefined && (await liveLeads(leadOf)).length > 0

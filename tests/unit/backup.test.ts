@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { isDrillOverdue, restoreDrillForm } from '#shared/utils/backup'
+import { blankRestoreDrill, isDrillOverdue, restoreDrillForm } from '#shared/utils/backup'
 
 // K-108 and J-107: the termly restore drill. Not "per term": no term dates exist anywhere in
 // the system (0034), so the cadence is a configured interval, exactly like the booking horizon.
@@ -27,6 +27,16 @@ describe('a drill\'s outcome is recorded, not merely claimed (K-108 criterion 3,
       notes: 'Z-reading total was short by one bar session',
     })
     expect(parsed.moneyTotalsMatch).toBe(false)
+  })
+
+  test('a failed drill with both boxes left unticked saves from a blank form', () => {
+    const parsed = restoreDrillForm.safeParse({
+      ...blankRestoreDrill(),
+      ranAt: '2026-10-20',
+      outcome: 'FAIL',
+      timeToRestoreMinutes: 40,
+    })
+    expect(parsed.success).toBe(true)
   })
 
   test('an outcome the estate does not use is refused', () => {

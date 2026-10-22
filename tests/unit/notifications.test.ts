@@ -312,6 +312,15 @@ describe('digest coalescing (H-104)', () => {
     expect(joinsDigest(onTopic, false, true)).toBe(false)
   })
 
+  // 0205: an approver hears of a new room request the moment it arrives, preference permitting.
+  test('an immediate type never waits for a digest, and new room requests are immediate', () => {
+    expect(joinsDigest({ ...onTopic, immediate: true }, false, false)).toBe(false)
+    expect(joinsDigest(messageType('room.request.raised'), false, false)).toBe(false)
+    expect(joinsDigest(messageType('external.request.raised'), false, false)).toBe(false)
+    expect(isTransactional(messageType('room.request.raised'))).toBe(false)
+    expect(joinsDigest(messageType('room.request.received'), false, false)).toBe(true)
+  })
+
   test('the digest window ships as sixty minutes for every topic', () => {
     for (const topic of NOTIFICATION_TOPICS) {
       expect(CONFIG_KEYS[DIGEST_WINDOW_KEY[topic]].default).toBe(60)

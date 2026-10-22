@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { isOpen, requireOpenSession } from '#server/utils/till'
 import { closeTillSessionForm } from '#shared/utils/reconciliation'
-import { TILL_VENUE_DEVICE_KEY, chargePaths, heldTillVenue, recallTillVenue, saysTillLeftOpen, tillRefusalStep, tillScopeForm, tillVenueExpires } from '#shared/utils/till'
+import { TILL_VENUE_DEVICE_KEY, chargePaths, heldTillVenue, recallTillVenue, saysCloseTill, saysClosedFirst, saysReopenNeedsAsking, saysTillClosed, saysTillLeftOpen, showsTillLine, tillRefusalStep, tillScopeForm, tillVenueExpires } from '#shared/utils/till'
 import type { TillSession } from '#shared/utils/till'
 
 // F-102's write-path rules over a session object, with no database beneath them: the schema's
@@ -179,18 +179,54 @@ describe('what the till does with the guard\'s refusal (F-125, issue 1257, issue
 // F-102 criterion 5, E-114 criterion 3, issue 1316: the close-night checklist says what the bar has
 // left open, tonight's till or an earlier night's, and who closes it.
 describe('the checklist line for the till', () => {
+  const bar = { hasBar: true, barStaffed: true }
+
   test('nothing left open is the line ticked, with nothing to say', () => {
-    expect(saysTillLeftOpen({ tonight: 0, earlier: 0, unanswered: 0 })).toBeNull()
+    expect(saysTillLeftOpen({ tonight: 0, earlier: 0, unanswered: 0, ...bar })).toBeNull()
   })
 
   test('tonight\'s till still open is the bar\'s to close', () => {
-    expect(saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0 })).toContain('Tonight\'s till is still open')
+    expect(saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0, ...bar })).toContain('whoever is on the bar closes it')
+  })
+
+  test('with nobody on tonight\'s bar, the Front of House Manager closes it (0236)', () => {
+    const said = saysTillLeftOpen({ tonight: 1, earlier: 0, unanswered: 0, hasBar: true, barStaffed: false })!
+    expect(said).toContain('nobody holds tonight\'s bar shift')
+    expect(said).toContain('Front of House Manager closes it')
+  })
+
+  test('a house with no bar shows the line only for what an earlier night left (0236)', () => {
+    const none = { tonight: 0, earlier: 0, unanswered: 0, hasBar: false, barStaffed: false }
+    expect(showsTillLine(none)).toBe(false)
+    expect(showsTillLine({ ...none, earlier: 1 })).toBe(true)
+    expect(showsTillLine({ ...none, hasBar: true })).toBe(true)
   })
 
   test('an earlier night\'s till or charge is the Front of House Manager\'s', () => {
-    const said = saysTillLeftOpen({ tonight: 0, earlier: 2, unanswered: 1 })!
+    const said = saysTillLeftOpen({ tonight: 0, earlier: 2, unanswered: 1, ...bar })!
     expect(said).toContain('2 tills from an earlier night')
     expect(said).toContain('1 card charge from an earlier night')
     expect(said).toContain('Front of House Manager')
+  })
+})
+
+// 0160: every place a close is confirmed or reported names the bar, and the loser of two closes is
+// told whose reading stands (issue 1581).
+describe('a close names its bar', () => {
+  // 21:30 London on 21 October 2026 (BST), as the review's own wrong close.
+  const closed = { closedAt: Date.UTC(2026, 9, 21, 20, 30) / 1000, closedByName: 'Fen Front', actualZPence: 150 }
+
+  test('the dialogue title and the closed line say which bar', () => {
+    expect(saysCloseTill('New Theatre')).toBe('Close the till at New Theatre')
+    expect(saysTillClosed('New Theatre', closed)).toBe('The till at New Theatre closed at 21:30, by Fen Front, with a Z of £1.50.')
+  })
+
+  test('a second session tonight is asked for by the bar and the time it closed', () => {
+    expect(saysReopenNeedsAsking('New Theatre', closed)).toContain('The till at New Theatre closed at 21:30 tonight.')
+  })
+
+  test('the loser of two closes is told who closed it, when and with what Z', () => {
+    expect(saysClosedFirst(closed)).toStartWith('Fen Front closed this session first, at 21:30, with a Z of £1.50')
+    expect(saysClosedFirst({ ...closed, closedByName: null })).toStartWith('Somebody else closed this session first')
   })
 })

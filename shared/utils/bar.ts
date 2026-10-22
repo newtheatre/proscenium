@@ -264,6 +264,18 @@ export const SERVING_KINDS = [
 ] as const
 export type ServingKind = (typeof SERVING_KINDS)[number]
 
+// Kinds that pour a measure, so the stock behind them is counted in millilitres, never whole items.
+export const MEASURE_KINDS: readonly ServingKind[] = ['pint', 'half', '125ml', '175ml', '250ml', 'single', 'double']
+
+// The set-up's two shape refusals, named by the size that breaks them (process map, 21 October 2026).
+export function saysMeasureOnWholeItems(kind: ServingKind, itemName: string): string {
+  return `${says(kind)} pours a measure, so ${itemName} needs counting in millilitres, not whole items`
+}
+
+export function saysPoursMoreThanContainer(label: string, qty: number, containerMl: number): string {
+  return `${label} pours ${qty} ml, more than the ${containerMl} ml container holds`
+}
+
 export const VARIANT_STATUSES = ['ACTIVE', 'RETIRED'] as const
 export type VariantStatus = (typeof VARIANT_STATUSES)[number]
 
@@ -637,8 +649,13 @@ export const productSetupForm = z.discriminatedUnion('shape', [
     if (unit === 'ML' && servings.some(serving => serving.servingKind === 'item')) {
       ctx.addIssue({ code: 'custom', message: 'A measured item sells by a measure: say the size and how much it pours', path: ['serving'] })
     }
-    if (containerMl && servings.some(serving => serving.qty > containerMl)) {
-      ctx.addIssue({ code: 'custom', message: 'A serving cannot pour more than the container holds', path: ['serving'] })
+    const overflowing = containerMl ? servings.find(serving => serving.qty > containerMl) : undefined
+    if (overflowing && containerMl) {
+      ctx.addIssue({ code: 'custom', message: saysPoursMoreThanContainer(overflowing.label, overflowing.qty, containerMl), path: ['serving'] })
+    }
+    const measured = unit === 'ITEM' ? servings.find(serving => MEASURE_KINDS.includes(serving.servingKind)) : undefined
+    if (measured) {
+      ctx.addIssue({ code: 'custom', message: saysMeasureOnWholeItems(measured.servingKind, value.item.item.name), path: ['item'] })
     }
   }
   if (value.shape === 'RECIPE') {
@@ -854,6 +871,8 @@ export interface StockMovement extends DeliveryCost {
   refTable: string | null
   refId: string | null
   reversesId: string | null
+  // What a reversal undid: a sale's stock comes back only through a tab charge's void.
+  reversesKind: StockMovementKind | null
   actorId: string | null
   createdAt: number
   // Whether a later movement cancels this one, so a screen does not offer to reverse it twice.
@@ -911,6 +930,21 @@ export function effectivePriceRow<T extends { effectiveFrom: string, createdAt: 
     if (price.createdAt !== winner.createdAt) return price.createdAt > winner.createdAt ? price : winner
     return price.seq > winner.seq ? price : winner
   })
+}
+
+// Where a price just set stands today, read back from the series rather than from its date alone:
+// a backdated row behind a later one is history, not in force (process map, 21 October 2026).
+export type PriceStanding = 'NOW' | 'LATER' | 'BEHIND'
+
+export function priceStanding(history: { id: string, effective: boolean }[], id: string, effectiveFrom: string, on: string): { effectiveNow: boolean, standing: PriceStanding, first: boolean } {
+  const standing: PriceStanding = effectiveFrom > on ? 'LATER' : history.some(row => row.id === id && row.effective) ? 'NOW' : 'BEHIND'
+  return { effectiveNow: standing === 'NOW', standing, first: history.length === 1 }
+}
+
+export function saysPriceSet(what: 'Price' | 'Default', set: { standing: PriceStanding, first: boolean }): { title: string, description?: string } {
+  if (set.standing === 'BEHIND') return { title: `${what} recorded from its date`, description: 'A later price is in force today, so this one is kept in the history only.' }
+  const title = set.standing === 'NOW' ? `${what} set, and in force now` : `${what} set, and waiting for its date`
+  return set.first ? { title } : { title, description: 'The price before this one stays readable, dated as it was.' }
 }
 
 export function measurePreset(id: MeasurePresetId): MeasurePreset | null {
@@ -1040,6 +1074,12 @@ export const MOVEMENT_SOURCE_TABLES = ['ledger_lines', 'stocktake_lines'] as con
 const MOVEMENT_SOURCE_WORDING: Record<string, string> = {
   ledger_lines: 'a sale',
   stocktake_lines: 'a stock count',
+}
+
+// A void's stock return reads as what it is, not as the count correction its reason column holds.
+export function saysMovementReason(movement: Pick<StockMovement, 'kind' | 'reason' | 'reversesKind'>): string | null {
+  if (movement.kind === 'REVERSAL' && movement.reversesKind === 'SALE') return 'Tab charge voided'
+  return movement.reason ? says(movement.reason) : null
 }
 
 export function saysMovementSource(table: string): string {

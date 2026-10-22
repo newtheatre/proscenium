@@ -3,7 +3,7 @@ title: Reports
 description: Incident trends and each performance's attendance and staffing across any period, with a CSV export of each.
 module: Show night
 audience: committee
-updatedOn: 2026-10-14
+updatedOn: 2026-10-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -73,6 +73,14 @@ held**, so the money is on a report until it is refunded.
   the next day.
 
 On a phone, the last four columns are hidden; the export carries them all.
+
+### Opening a signed report
+
+Once a performance is signed off (or closed automatically), its title is a link to the report
+exactly as it was frozen: the figures, incidents, staffing, closing note, any corrections, and
+who it was emailed to and when. The report carries the night's incidents in full, so the link is
+there only for the Front of House Manager, the Theatre Manager, the President and the IT Manager. The Front of House Manager can add a correction underneath it from the same page; a signed
+report itself never changes, and the correction is emailed the same way the report was.
 
 ### Officers standing in with no performance
 

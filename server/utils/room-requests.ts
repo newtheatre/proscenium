@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, inArray, sql } from 'drizzle-orm'
 import { dueToEscalate, dueToExpire } from '#shared/utils/requests'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 import type { H3Event } from 'h3'
 
 // A request nobody answers is told about once, and then lapses. The old app had neither, so one
@@ -40,6 +40,7 @@ export async function sweepExternalRequests(event: H3Event | undefined, at = new
     who: schema.users.name,
     title: schema.externalRequests.title,
     startsAt: schema.externalRequests.startsAt,
+    endsAt: schema.externalRequests.endsAt,
     status: schema.externalRequests.status,
     createdAt: schema.externalRequests.createdAt,
     escalatedAt: schema.externalRequests.escalatedAt,
@@ -67,6 +68,7 @@ export async function sweepExternalRequests(event: H3Event | undefined, at = new
       await notify(event, {
         type: 'external.request.waiting',
         userId: approver.id,
+        about: [request.id],
         context: {
           name: approver.name,
           who: request.who,
@@ -118,7 +120,7 @@ export async function sweepRequests(event: H3Event | undefined, at = new Date())
 }
 
 type Waiting = { id: string, userId: string, room: string, createdAt: number }
-type Asked = { title: string, startsAt: number }
+type Asked = { title: string, startsAt: number, endsAt: number }
 
 async function expire(event: H3Event | undefined, request: Waiting, now: number): Promise<boolean> {
   // A decision or a clock-restarting edit landing since the read wins (0006); the title and time
@@ -138,6 +140,7 @@ async function expire(event: H3Event | undefined, request: Waiting, now: number)
   await notify(event, {
     type: 'room.request.expired',
     userId: request.userId,
+    about: [request.id],
     context: { name: '', room: request.room, title: lapsed.title, when: whenOf(lapsed) },
   })
   return true
@@ -151,6 +154,7 @@ async function escalate(event: H3Event | undefined, request: Waiting, now: numbe
     await notify(event, {
       type: 'room.request.waiting',
       userId: approver.id,
+      about: [request.id],
       context: {
         name: approver.name,
         room: request.room,
@@ -163,6 +167,6 @@ async function escalate(event: H3Event | undefined, request: Waiting, now: numbe
   return true
 }
 
-function whenOf(request: { startsAt: number }): string {
-  return formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })
+function whenOf(request: { startsAt: number, endsAt: number }): string {
+  return saysRoomSpan(request.startsAt, request.endsAt)
 }

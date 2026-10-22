@@ -524,6 +524,13 @@ own session's figure; the night report and I-104's whole-night figure pass no sc
 read the estate's whole night. An entry naming no session, the desk's own money included, is
 outside every scope and counts only in the unscoped figure.
 
+Each Z reading answers with the venue of the till session that closed it (`venueName`, null for a
+finance reading). `GET /api/admin/finance/reconciliation` also answers `openTills`, the sessions
+still open on the night, and `GET .../outstanding` answers `replaced` beside the missing and
+variance nights: nights where one bar's close superseded another bar's reading with a different
+reader total, once every till is closed. Nights needing you lists one until a later reading, such
+as the Treasurer's, stands over it (0180).
+
 The expected figure is shown in its parts, never as one bar line: drinks on card, tickets sold on
 the till (`ticketsAtTheBarQuery`), tab settlements and the desk (`expectedSheet()` in
 `shared/utils/night-reconciliation.ts`, `readerExpectation()` in `shared/utils/reconciliation.ts`).
@@ -787,10 +794,15 @@ its topic instead: `notify()` writes a `notification_digest_entries` row and ret
 The inbox entry above already went out, so nothing about criterion 4 depends on this branch. A
 claimed call (already its own batch, 0048) and a message carrying an attachment (nothing to
 reattach later, the same reasoning 0056 gives for a retry) bypass the hold and send as before.
-`joinsDigest()` in `shared/utils/notifications.ts` is where those three conditions live, so a new
+What a person has waiting is read by `waitingForDigest()` (`server/utils/notification-digests.ts`):
+`GET /api/admin/comms/accounts/[id]/history` answers it as `waiting`, each topic with its message
+count and when the next run will send it, and the account page shows it above the send log.
+`joinsDigest()` in `shared/utils/notifications.ts` is where those conditions live, so a new
 call site never has to re-derive them: transactional (`topic: null`) never coalesces at all,
 because that is what marks a deadline a digest interval would consume, such as a hold expiring or
-an offer waiting to be claimed before it lapses to the next entry (D-113).
+an offer waiting to be claimed before it lapses to the next entry (D-113). A type marked
+`immediate` keeps its topic preference but never coalesces either: a new room request reaches
+approvers at once (0205).
 
 `notifications:digest` claims every topic-and-person pair whose window has passed with one
 conditional `UPDATE ... WHERE digest_log_id IS NULL`, the same claim-before-send shape the retry
@@ -800,6 +812,14 @@ type carrying the pre-claimed id. The digest types (`digest.bookings`, `digest.s
 digest can never hold itself for the next one and never duplicates the inbox. The window is five
 scalar keys, `NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, shipped at 60 minutes each, and it
 opens at the earliest still-unclaimed entry, not the latest.
+
+A held entry's `body` is JSON (`server/utils/digest-entries.ts`): the full text, one line, one
+link and `about`, the record ids the message concerns; a plain-text body reads as its subject. A
+type marked `decides`, sent with `about`, first deletes every unclaimed entry in its topic that
+shares an id, other than one of its own type, by one statement whose ids are a single `json_each`
+parameter (0006). The sweep orders what it claimed with decisions first, and a topic set in
+`DIGEST_IN_LINES` (rooms only) renders one greeting, a line per entry and one link, under the lead
+entry's subject (0206).
 
 An entry survives exactly as long as the `notification_log` row it was claimed into, so "was I
 told about X" is answerable from the entry until the send itself ages out (H-105 criterion 5).
@@ -877,7 +897,9 @@ criterion 3 asks of an in-app edit, being audited, has nothing to audit until th
 **Reporting drift is real.** Every page carries the action, `POST /api/docs/report-drift`
 (`server/api/docs/report-drift.post.ts`): a `docs.drift-reported` audit entry naming the page, and
 a transactional notification to every live `ADMIN` (`liveAdmins()`, the same audience
-`health:watch` already reaches) through the same `notify()` every other message goes through. There
+`health:watch` already reaches) through the same `notify()` every other message goes through. The
+page asks before it sends and takes an optional `note` (up to 500 characters), which goes in the
+email only and never in the audit detail, since it is free text (0011). There
 is no open-items list yet; today "visible to the IT Manager" means an immediate notification and a
 permanent line in the trail, not a triaged, closeable queue (criterion 4, `known-issues.md`).
 
@@ -890,7 +912,11 @@ requests it saw fail (`app/plugins/recent-failures.client.ts`), ray ids included
 be found in the worker's logs. The worker never talks to the tracker: a daily triage run outside
 it reads `NEW` rows through the database connector, opens one issue per report and writes the
 outcome back conditionally (`docs/operations.md`, Feedback reports). The drift report above stays
-its own path.
+its own path. The IT Manager reads the queue at `/admin/feedback` through `GET /api/admin/feedback`
+under `feedback.read`, which only `ADMIN` holds: paged in SQL with the `Paginated<T>` envelope
+(0005), searchable and filterable by kind and status. `feedbackForm` refuses a `path` that
+`localPath()` does not accept, because that screen links it, and the screen links only a local
+path or a GitHub issue URL, so a row written before the check cannot become a script link.
 
 ## Settings, and a wide-blast-radius save (J-104, J-105)
 
@@ -942,7 +968,9 @@ tie, the way `bar.ts`'s own effective-price lookups already do. A sensitive key'
 a hash pair (0024), which cannot be reverted to, and priorConfigValue says so (409) rather than
 guessing. A save and a revert are one write path, `writeConfigValue()`
 (`server/utils/config-write.ts`): both run the digest gate and the pair rules, so a revert cannot
-bypass what a save must satisfy.
+bypass what a save must satisfy. A `PUT` of the value a key already holds (`isUnchanged()`) writes
+nothing and audits nothing and answers `{ unchanged: true }`, after the synced-key refusal, so the
+screen can say nothing changed.
 
 **A synced key is never written by a person** (0092). `synced: true` on its `CONFIG_KEYS` entry
 (today only `BANK_HOLIDAYS`) makes `refuseSynced()` 409 both a save and a revert before anything is
@@ -1240,7 +1268,7 @@ queue is not a list of its own any more: it is the rota board's "Waiting for con
 `GET /api/admin/rota/shifts/board?waiting=true`, which reads every performance holding a claim
 from the start of tonight's show night on, whatever the window, and carries the count (a claim
 on a night already past can no longer be staffed, so it waits on nobody), and
-`/rota/manage/approvals` forwards there (issue 1365). Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
+`/rota/manage/approvals` forwards there (issue 1365), before any guard. The board page reads its window from `?from=&to=` (or `until`) through `boardWindowFromQuery()` and writes changes back, so a span can be linked (0214). Approving and declining both ride the same `changes() = 1` shape. Approving also re-runs E-104's
 eligibility gate on the confirming `UPDATE` itself: the role's `SHIFT_ELIGIBILITY_*_MODULE` and
 London's today are bound into an `EXISTS` over the claimant's unrevoked, unexpired
 `training_records` (the SQL twin of `heldNow`), so a claimant whose record lapsed after claiming is
@@ -1266,6 +1294,11 @@ a subquery on `bar_openings.starts_at` like the performances' (0006), and are sh
 links to its night on `/rota/manage/openings`, and nothing on the board acts on an opening or
 derives anything from one (0077).
 
+`POST /api/rota/openings` refuses an opening a day or longer (`MAX_BAR_OPENING_SECONDS`), which is
+what equal opening and closing times would make. It answers 409 with `data.overlap` when a
+`PLANNED` opening at the venue overlaps (`overlappingOpeningQuery`), and plans it when resent with
+`overlapping: true`: a warning, read before the write, not a rule on it (0215).
+
 ### Release and reassignment (E-107)
 
 `POST /api/rota/shifts/[id]/release` is a holder's own release, up to the start of the shift's
@@ -1282,18 +1315,28 @@ new holder and `CONFIRMED` in the same statement. Replacing a confirmed duty man
 atomic for free: the partial unique index that allows only one `CONFIRMED` `DUTY_MANAGER` row per
 performance never sees a second row appear, because there was never a second row to begin with
 (E-107 criterion 4). The predicate is the same `NOT EXISTS` claiming uses, so a member cannot be
-assigned onto a second shift on a performance they already hold one on; the assignment re-checks
+assigned onto a second shift on a performance they already hold one on, unless the body says
+`move: true`, when `moveOffStatement` reopens their other shift there in the same batch, gated on
+the assignment's audit row (0211); nor onto one overlapping a shift they hold at another venue
+(`clashesWith()`, 0211). The candidate search marks a person locked only by the performance as
+`movable`. The assignment re-checks
 the same live eligibility gate self-claiming does, carries the same `holdsGate` predicate on its
 own UPDATE (issue 1302), and refuses the same way a self-claim would. An ad hoc shift
 (`POST /api/admin/rota/shifts/add`, `addShiftStatement`) takes the role's next slot number inside
 its own `INSERT` when the body names none, and its audit row reads the number back from the row
-(0140). One that names somebody is confirmed at once in the same way, so its `INSERT ... SELECT` carries `holdsGate` whenever a person is named, and an insert that
-matches nothing answers the same 403; a shift naming nobody is added open with no gate.
+(0140). One that names somebody is confirmed at once in the same way, so its `INSERT ... SELECT` carries `holdsGate` whenever a person is named, with the same
+`NOT EXISTS` an assignment carries, so the person holds no other claimed or confirmed shift on the
+performance (0210), and `clashesWith()`, so they hold no overlapping shift at another venue
+(0211). An insert that matches nothing answers the same 403 for a training gap, or the
+assignment's 409 "That member already holds a shift on this performance"; a shift naming nobody is
+added open with no gate.
 A disabled account is refused before either check runs: a training gap and a disabled account are
 different reasons, and the route names the one that actually applies (0009). Both the outgoing and
 the incoming holder are emailed (`shift.removed`, `shift.assigned`), and
 `GET /api/admin/rota/shifts/[id]/candidates?search=` is the narrow, `rota.write`-scoped member
-search the assignment screen picks a name from, distinct from the account directory that
+search the assignment screen picks a name from (each match carries `reason`, why it is locked,
+from `candidateLock()`: committee role, training, then already on the performance, 0210), distinct
+from the account directory that
 `accounts.read` gates (E-107 criterion 5); its search term is escaped against `%` and `_` before
 it reaches `LIKE`, the same guard every other search route in the app applies.
 
@@ -1319,13 +1362,16 @@ week of the Sunday night it belongs to. Each locked row carries the module id an
 member can act on is named: no module, or one that is a draft, retired or not in the catalogue
 (criterion 2). Where any role is in that state the list also carries `officers`, the names of the
 live Front of House Manager grants (at most three), which the screen names as the person to ask.
+Every list and every claim offers only a shift whose show is published (`showPublished`, 0211).
 `claimable=true` is what Rota asks for (issue 1335): only the roles the caller qualifies for
 (`roles` on `openShiftTerms`, bound once per role) and never a performance or bar opening they
-already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT EXISTS`); it
+already hold a claimed or confirmed shift on (`notWorkedBy`, one correlated `NOT EXISTS`), nor one
+overlapping a shift they hold at another venue (0211); it
 holds no locked role, so its `officers` is always empty. The
 roles they do not qualify for come from `GET /api/rota/roles`, one card each with the open count
 (`openShiftCountsByRoleQuery`, plus bar opening slots for the bar), the published module and its
-one training action. `GET /api/rota/mine` is a member's own shifts and opening slots from the start
+one training action, and `committeeOnly`, the roles whose training the member holds but whose
+committee role they lack, so Rota says why no duty manager shift is offered (0210). `GET /api/rota/mine` is a member's own shifts and opening slots, each with its own `declineReason` (0213), from the start
 of the current show night on, so tonight's shift stays on the list until 04:00 rather than dropping
 at its curtain, each performance shift with its own window (`windowStartsAt`, `windowEndsAt`). It
 adds `dutyManagers`, keyed by performance, for the member's confirmed non-duty-manager shifts
@@ -1348,8 +1394,12 @@ same thing.
 `GET /api/admin/rota/readiness` (`rota.read`) answers the readiness card on **Shift templates**
 from `server/utils/rota-readiness.ts`: each role's gating module with its standing (`SET`, `UNSET`,
 `DRAFT`, `RETIRED` or `MISSING`, from `shared/utils/rota-readiness.ts`), every venue we run (not
-external, not retired) with its template's slot count, the active system checks on its checklist
-and whether its emergency card is filed, and the board's active preset and milestone counts. The
+external, not retired) with its template's slot count, the active system checks on its post-show
+checklist (one on the pre-show list could never tick, so it does not count, 0216) and whether its emergency card is filed, and the board's active preset and milestone counts.
+`qualified` counts, per role, the usable accounts the role's confirming write would admit now
+(`qualifiedCountQuery`, the same `holdsGate` with the committee role for a duty manager), so the
+card reads **Closed** and says what to do when nobody could be put on the shift, which is where a
+new install starts; the console's set-up list carries the same line (0210). The
 same standings are `/api/health`'s `shiftEligibility` line, `{ ok, roles }`, reported beside `ok`
 and never failing it, as the bank holiday coverage is: the line names no module, since the route
 is public. `shiftRoleRules()` and `gatingModules()` there are the one reader of the three keys and
@@ -1619,7 +1669,9 @@ have created it) and `supersedeAgeCheck(checkedBy, entryId, input, id)` for a co
 predicated `WHERE EXISTS (that entry) AND NOT EXISTS (a correction of it already)` and decided
 from the statement's own `RETURNING` via `auditedWrite()` (0049, read onto an INSERT rather than
 an UPDATE). The partial unique index `age_checks_one_correction` is the same guarantee a second
-time, in case a future caller ever bypasses the predicate.
+time, in case a future caller ever bypasses the predicate. `looksLikeName()` in
+`shared/utils/age-checks.ts` flags a description that may name somebody, on the forms as it is
+typed and on the register; it never refuses one (0218).
 
 `recordAgeCheck()` is what F-106 is waited on for (build-order.md's own seam): it returns
 `{ id, statement }`, the same shape `postEntry()` returns, so a till sale and its inline age
@@ -1635,7 +1687,9 @@ officer on a shift resolves as that shift and records no bypass (0044, 0098), an
 as the single-role guard does. A signed-out caller is told that once, before any role is tried.
 When every role refuses, the most specific refusal wins (`mostSpecificRefusal`): the hours of a
 shift held, then a refusal about the request or an officer's own standing, then a claim waiting,
-then no shift, and among equals the first role asked.
+then no shift, and among equals the first role asked. A body naming a `venueId` (the till's own
+refusal, 0161) is asked of the BAR guard for that venue instead, so an officer on a night running
+two houses is placed rather than refused.
 
 The officer bypass still resolves against `coverage()`, which needs a venue running something
 tonight; an age check's own `performance_id` may be null regardless of what authority resolved
@@ -1836,7 +1890,8 @@ grouped a person and read against a current record of `FIRST_AID_MODULE` (read w
 committee's own `firstAiders` line (`saysFirstAiders`). A GET records no bypass (0098). `PUT
 /api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
 `emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`, and
-to `THEATRE_MANAGER` for fire training (0112).
+to `THEATRE_MANAGER` for fire training (0112). `GET /api/admin/venues/[id]/emergency-versions`
+pages every version of one venue's card, newest first, under `emergency-card.read` (0217).
 `GET /api/admin/venues/emergency`, the committee's overview, filters by venue name and by
 `filed` through `shared/utils/emergency-cards-list.ts` (K-129); the `venues` envelope it answers
 also carries paging, though a venue with no card yet still lists.
@@ -1991,7 +2046,7 @@ real SQL:
 
 | Section | Reads | Note |
 | --- | --- | --- |
-| Attendance | `reservations`, `tickets`, `pass_admissions`, `passes`, `pass_types` | Every line counts unrefunded seats, as sold does (issue 1326): sold rides `heldSeatsSubquery` (D-105), in `admittedSeatsSubquery`, walk-ups `admittedWalkUpSeatsSubquery` (admitted seats on a door-source booking), no-shows `noShowSeatsSubquery` (unrefunded seats on a `COLLECTED` booking at compile time, or on a self-served pass booking nobody admitted, derived and never written, issue 1296, or on one the old estate imported as `NO_SHOW`). Pass and Fellowship admissions (`passAdmittedSeatsSubquery`, `fellowshipAdmittedSeatsSubquery`) are unrefunded seats on an admitted booking with a pass admission, subsets of in. At close, sold is in, plus no-shows, plus the unpaid seats still held. |
+| Attendance | `reservations`, `tickets`, `pass_admissions`, `passes`, `pass_types` | Every line counts unrefunded seats, as sold does (issue 1326): sold rides `heldSeatsSubquery` (D-105), in `admittedSeatsSubquery`, walk-ups `soldWalkUpSeatsSubquery` (seats still held on a door-source booking, admitted or not, leaving out a pass admitted on the spot, which is its own line, 0239), no-shows `noShowSeatsSubquery` (unrefunded seats on a `COLLECTED` booking at compile time, or on a self-served pass booking nobody admitted, derived and never written, issue 1296, or on one the old estate imported as `NO_SHOW`). Pass and Fellowship admissions (`passAdmittedSeatsSubquery`, `fellowshipAdmittedSeatsSubquery`) are unrefunded seats on an admitted booking with a pass admission, subsets of in. At close, sold is in, plus no-shows, plus the unpaid seats still held. |
 | Takings | `ledger_entries`, `ledger_lines` | Grouped by tender, summed from `ll.amount_pence` on the lines matched to this performance, never `le.total_pence`, which can span more than one performance or product in a single entry. A reversal's negative line nets against what it reverses in the same sum; nothing is filtered by `void_of_entry_id`, which marks a tab-charge reversal, not something to exclude (0031). |
 | Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
@@ -2045,6 +2100,10 @@ not hold the report back. Automatic retry until delivered and the operations-das
 criterion 4 also asks for are H-105 and H-106's own scope, not this route's: distribution is not
 yet wired to `notify()` (`docs/known-issues.md`), so a failed send here stops after the one
 attempt, recorded as `FAILED` rather than retried.
+
+`GET /api/admin/night-reports/[performanceId]` reopens a frozen report after its night, from
+`/reports/night/[performanceId]`: the snapshot verbatim with its addenda and delivery outcomes,
+guarded by `night.manage` or `safety.read` since it carries incident bodies (0239).
 
 An addendum (`POST /api/admin/night-reports/addenda`) is not shift-scoped: a correction can be found
 days after the night ends, when nobody holds a live shift on it any more, so the guard is the
@@ -2201,8 +2260,8 @@ parameters, or three when narrowed by venue, however many performances the night
 
 ### Ticket export (D-129)
 
-`GET /api/admin/tickets/export`, gated on `ticketing.export`, is the box office's own copy of
-ticket sales: one row per seat, filtered by show, performance, date range or year, and source.
+`GET /api/admin/tickets/export`, gated on `ticketing.export` or `finance.export` (0171), is the box
+office's and the Treasurer's copy of ticket sales: one row per seat, filtered by show, performance, date range or year, and source.
 `ticketExportQuery()` (`server/utils/ticket-export.ts`) fetches one row over the 20,000-row cap
 (`TICKET_EXPORT_CAP`), so the route can tell "exactly full" from "more exists" without a separate
 count; over the cap it 400s naming the guidance to narrow the filter, rather than truncating

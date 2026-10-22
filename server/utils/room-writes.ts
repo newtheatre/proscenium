@@ -140,6 +140,6 @@ export function seriesCancelStatements(seriesId: string, userId: string, now: nu
       WHERE ours.n + theirs.n > 0
     `,
     ours: sql`UPDATE room_bookings SET status = 'CANCELLED', updated_at = ${now} WHERE ${ours} RETURNING id, starts_at AS startsAt, ends_at AS endsAt`,
-    theirs: sql`UPDATE external_requests SET status = 'CANCELLED', updated_at = ${now} WHERE ${theirs} RETURNING id, starts_at AS startsAt`,
+    theirs: sql`UPDATE external_requests SET status = 'CANCELLED', updated_at = ${now} WHERE ${theirs} RETURNING id, starts_at AS startsAt, ends_at AS endsAt, 1 AS external`,
   }
 }

@@ -418,6 +418,19 @@ describe.skipIf(skip !== null)('a batch (criterion 4)', () => {
     expect(answered.status).toBe(403)
     expect(statusOf(id)).toBe('PENDING_APPROVAL')
   })
+
+  test('an officer cannot approve their own request, though they may turn it down (0201)', async () => {
+    const room = await makeRoom()
+    const id = placeRequest(room, officerId, soon(43))
+    const answered = await send('POST', '/api/admin/rooms/requests/decide', { ids: [id], action: 'APPROVE' }, officer)
+    const body = await answered.json() as { ok: boolean, outcomes: { why: string, says: string }[] }
+    expect(body.ok).toBe(false)
+    expect(body.outcomes[0]).toMatchObject({ why: 'own', says: 'That request is yours, so somebody else decides it' })
+    expect(statusOf(id)).toBe('PENDING_APPROVAL')
+
+    await send('POST', '/api/admin/rooms/requests/decide', { ids: [id], action: 'REJECT', reason: 'Not needed after all' }, officer)
+    expect(statusOf(id)).toBe('REJECTED')
+  })
 })
 
 describe.skipIf(skip !== null)('the trail (criterion 6)', () => {

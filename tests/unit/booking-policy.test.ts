@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { REFUSALS, judge, resolvePolicy, spanMinutes } from '#shared/utils/booking-policy'
+import { REFUSALS, judge, resolvePolicy, saysLimits, spanMinutes } from '#shared/utils/booking-policy'
 import type { EstatePolicy, Proposal } from '#shared/utils/booking-policy'
 
 // C-106. The published policy and the enforced policy are the same document, and every rule has a
@@ -214,5 +214,22 @@ describe('a span is measured in London, not in milliseconds', () => {
     const evening = { startsAt: new Date('2026-03-29T21:00:00Z'), endsAt: new Date('2026-03-29T22:00:00Z') }
     expect(judge(evening, policy(), { ...ROOM, hours: [{ weekday: 0, opens: '09:00', closes: '23:59' }] }, CONTEXT)
       .failures.map(failure => failure.reason)).not.toContain('ROOM_CLOSED')
+  })
+})
+
+describe('the limits are said before they are met', () => {
+  test('the house numbers, and how many of the cap the member already holds', () => {
+    expect(saysLimits(policy(), 9, false))
+      .toBe('Bookings run 30 minutes to 4 hours, made 48 hours to 12 weeks ahead. You hold 9 of your 10.')
+  })
+
+  test('a room with no notice says only how far ahead', () => {
+    expect(saysLimits(policy({ noticeHours: 0, maxBookingHours: 1 }), 0, false))
+      .toBe('Bookings run 30 minutes to 1 hour, made up to 12 weeks ahead. You hold 0 of your 10.')
+  })
+
+  test('an officer exempt from the longest is not told it', () => {
+    expect(saysLimits(policy(), 1, true))
+      .toBe('Bookings run at least 30 minutes, made 48 hours to 12 weeks ahead. You hold 1 of your 10.')
   })
 })

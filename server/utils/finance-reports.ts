@@ -35,7 +35,11 @@ export function foregoneQuery(scope: FinanceScopeInput): SQL {
       coalesce(sum(CASE WHEN le.tender = 'COMP' THEN ll.unit_price_pence * ll.qty ELSE 0 END), 0) AS compsPence,
       coalesce(sum(CASE WHEN le.tender = 'COMP' THEN 1 ELSE 0 END), 0) AS compCount,
       coalesce(sum(ll.discount_pence), 0) AS discountsPence,
-      coalesce(sum(CASE WHEN ll.discount_pence > 0 THEN 1 ELSE 0 END), 0) AS discountCount
+      coalesce(sum(CASE WHEN ll.discount_pence > 0 THEN 1 ELSE 0 END), 0) AS discountCount,
+      coalesce(sum(CASE WHEN le.tender = 'COMP' AND le.source = 'TILL' THEN ll.unit_price_pence * ll.qty ELSE 0 END), 0) AS barCompsPence,
+      coalesce(sum(CASE WHEN le.tender = 'COMP' AND le.source = 'TILL' THEN 1 ELSE 0 END), 0) AS barCompCount,
+      coalesce(sum(CASE WHEN le.source = 'TILL' THEN ll.discount_pence ELSE 0 END), 0) AS barDiscountsPence,
+      coalesce(sum(CASE WHEN le.source = 'TILL' AND ll.discount_pence > 0 THEN 1 ELSE 0 END), 0) AS barDiscountCount
     FROM ledger_lines ll
     JOIN ledger_entries le ON le.id = ll.entry_id
     WHERE ${lineScope(scope)}
@@ -44,7 +48,7 @@ export function foregoneQuery(scope: FinanceScopeInput): SQL {
 
 export async function foregone(scope: FinanceScopeInput): Promise<ForegoneReport> {
   const [row] = await db.all<ForegoneReport>(foregoneQuery(scope))
-  return row ?? { compsPence: 0, compCount: 0, discountsPence: 0, discountCount: 0 }
+  return row ?? { compsPence: 0, compCount: 0, discountsPence: 0, discountCount: 0, barCompsPence: 0, barCompCount: 0, barDiscountsPence: 0, barDiscountCount: 0 }
 }
 
 // Counts and value only, never a need or a name (criterion 3): the join stops at the ticket

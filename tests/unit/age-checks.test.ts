@@ -5,6 +5,8 @@ import {
   ageCheckForm,
   ageCheckReady,
   inlineAgeCheckForm,
+  looksLikeName,
+  NAME_WARNING,
   saysIdType,
   saysOutcome,
   saysRefusalReason,
@@ -176,5 +178,23 @@ describe('when the register has what it needs (E-118 criterion 1)', () => {
 
   test('a description of whitespace is no description at all', () => {
     expect(ageCheckReady({ ...accepted, description: '   ' })).toBe(false)
+  })
+})
+
+describe('a description that reads like a name is flagged, never refused (0218)', () => {
+  test('a first name and surname, or a title, is flagged', () => {
+    expect(looksLikeName('Harry Holloway')).toBe(true)
+    expect(looksLikeName('tall, said he was Harry Holloway')).toBe(true)
+    expect(looksLikeName('Ms Patel')).toBe(true)
+  })
+
+  test('a plain description is not', () => {
+    expect(looksLikeName('Tall man, grey coat')).toBe(false)
+    expect(looksLikeName('woman with red scarf, glasses')).toBe(false)
+    expect(looksLikeName('')).toBe(false)
+  })
+
+  test('the warning says why a name does not belong', () => {
+    expect(NAME_WARNING).toContain('inspectors')
   })
 })

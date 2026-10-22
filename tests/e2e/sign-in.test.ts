@@ -89,9 +89,16 @@ describe.skipIf(skip !== null)('registering and signing in (A-101, A-103, 0007)'
 
   test('a password under the configured minimum is refused, quoting the rule', async () => {
     const other = syntheticPerson(888_888)
-    const response = await post('/api/auth/register', { email: other.email, name: other.name, password: 'short' })
+    const response = await post('/api/auth/register', { email: registrableAddress('short'), name: other.name, password: 'short' })
     expect(response.status).toBe(400)
     expect((await response.json()).statusMessage ?? '').toMatch(/at least \d+ characters/)
+  })
+
+  test('an address on a reserved domain is refused, saying so, and no account is made (0181)', async () => {
+    const other = syntheticPerson(888_889)
+    const response = await post('/api/auth/register', { email: other.email, name: other.name, password: generatePassword() })
+    expect(response.status).toBe(400)
+    expect(JSON.stringify(await response.json())).toContain('cannot receive email')
   })
 
   // K-128 criterion 2: no validation-library wording reaches a person.
@@ -187,10 +194,15 @@ describe.skipIf(skip !== null)('an unverified address cannot sign in (0026)', ()
     const wrong = await signIn(person.email, 'not the password')
     const unknown = await signIn(registrableAddress('nobody'))
 
-    expect(refused.status).toBe(401)
-    const body = await refused.text()
-    expect(await wrong.text()).toBe(body)
-    expect(await unknown.text()).toBe(body)
+    // The dev server appends a stack trace that differs by path, so what a caller reads is compared.
+    const said = async (answer: Response) => {
+      const { statusCode, statusMessage, message, data } = await answer.json() as Record<string, unknown>
+      return { status: answer.status, statusCode, statusMessage, message, data }
+    }
+    const body = await said(refused)
+    expect(body.status).toBe(401)
+    expect(await said(wrong)).toEqual(body)
+    expect(await said(unknown)).toEqual(body)
   })
 
   // Each of the four routes to a verified address is a way back for somebody who never got the
@@ -281,6 +293,7 @@ describe.skipIf(skip !== null)('registering on an address that already booked as
 
   test('an address that can already sign in is told it exists, and gets no token', async () => {
     const email = await unproven('already-registered')
+    markVerified(app, email)
 
     expect((await post('/api/auth/register', { email, name: 'Twice (test)', password })).status).toBe(200)
 
@@ -317,7 +330,7 @@ describe.skipIf(skip !== null)('the way in reads as one journey (A-103, A-112)',
   }, 90_000)
 
   // An absolute URL in `next` would make the link an open redirect, so only a path on this site
-  // is followed and anything else lands on the home page.
+  // is followed and anything else lands on My NNT.
   test('a sign-in link refuses to leave the site', async () => {
     const email = await unproven('magic-offsite')
     markVerified(app, email)
@@ -327,7 +340,7 @@ describe.skipIf(skip !== null)('the way in reads as one journey (A-103, A-112)',
     const view = await openSignedOutView(app.baseURL)
     try {
       await view.navigate(`${app.baseURL}/magic?token=${token}&next=https%3A%2F%2Fexample.invalid%2F`)
-      await waitFor(view, `location.pathname === '/'`, 30_000)
+      await waitFor(view, `location.pathname === '/my'`, 30_000)
       expect(await view.evaluate<string>('location.host')).toBe(new URL(app.baseURL).host)
     }
     finally {

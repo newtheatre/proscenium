@@ -115,8 +115,11 @@ async function merge(database: TestDatabase, winnerId: string, loserId: string):
     FROM training_records WHERE user_id = ?
   `, loserId).map(record => ({ ...record, expiryOverridden: Boolean(record.expiryOverridden) }))
 
+  const loserStudentId = rows<{ studentId: string | null }>(database,
+    'SELECT student_id AS studentId FROM users WHERE id = ?', loserId)[0]?.studentId ?? null
+
   const { moves, retireCredentials, tombstone } = mergeStatements({
-    winnerId, loserId, actorId: 'u-admin', grantPlan, trainingRecords, now,
+    winnerId, loserId, actorId: 'u-admin', grantPlan, trainingRecords, loserStudentId, now,
   })
 
   database.batch([
@@ -168,6 +171,30 @@ describe('merging duplicate accounts (A-123)', () => {
       expect(theatreManager).toHaveLength(1)
 
       expect(rows(database, 'SELECT id FROM role_grants WHERE user_id = ?', loserId)).toHaveLength(0)
+    })
+  })
+
+  test('the loser\'s student number lands on a winner that holds none, so the SU can still find them (0155)', async () => {
+    await withDatabase(async (database) => {
+      const { winnerId, loserId } = seedDuplicate(database)
+      database.batch([['UPDATE users SET student_id = ? WHERE id = ?', '20412345', loserId]])
+      await merge(database, winnerId, loserId)
+
+      expect(rows(database, 'SELECT student_id AS studentId FROM users WHERE id = ?', winnerId)[0]).toEqual({ studentId: '20412345' })
+      expect(rows(database, 'SELECT student_id AS studentId FROM users WHERE id = ?', loserId)[0]).toEqual({ studentId: null })
+    })
+  })
+
+  test('a winner\'s own student number is never overwritten by the loser\'s', async () => {
+    await withDatabase(async (database) => {
+      const { winnerId, loserId } = seedDuplicate(database)
+      database.batch([
+        ['UPDATE users SET student_id = ? WHERE id = ?', '20400001', winnerId],
+        ['UPDATE users SET student_id = ? WHERE id = ?', '20400002', loserId],
+      ])
+      await merge(database, winnerId, loserId)
+
+      expect(rows(database, 'SELECT student_id AS studentId FROM users WHERE id = ?', winnerId)[0]).toEqual({ studentId: '20400001' })
     })
   })
 

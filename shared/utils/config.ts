@@ -691,8 +691,9 @@ export const CONFIG_KEYS = {
   // the report without anybody editing this (E-124 criterion 3, 0009, issue 1356).
   NIGHT_REPORT_ROLES: {
     schema: z.array(z.enum(ROLES)),
+    default: ['FOH_MANAGER', 'THEATRE_MANAGER'],
     workshop: 'people-and-communications',
-    describes: 'Roles whose holders are emailed every end-of-night report, alongside whoever closed the night. Read when the report goes, so a grant that has lapsed receives nothing. Naming the Committee includes every post role. The roles are confirmed in the workshop.',
+    describes: 'Roles whose holders are emailed every end-of-night report, alongside whoever closed the night. Read when the report goes, so a grant that has lapsed receives nothing. Naming the Committee includes every post role. Until the workshop confirms the list, the Front of House Manager and the Theatre Manager receive it.',
   },
 
   // Which training module gates each shift role, as the committee named them (issue 1318). Null

@@ -110,7 +110,7 @@ export const membershipClaims = sqliteTable('membership_claims', {
 // difference, so deleting somebody cannot quietly unmake an award (0023, A-127).
 export const fellowships = sqliteTable('fellowships', {
   id: id(),
-  userId: text('user_id').notNull().unique().references(() => users.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   // A London date, not an instant: what is recorded is the day the committee resolved it.
   awardedOn: text('awarded_on').notNull(),
   // The meeting that resolved it, never an individual: the theatre awards this, not a person.
@@ -123,6 +123,8 @@ export const fellowships = sqliteTable('fellowships', {
   createdAt: integer('created_at').notNull().default(now),
 }, table => [
   index('fellowships_revoked_at').on(table.revokedAt),
+  // One standing fellowship each; a revoked one stays as history and a fresh award may follow (0159).
+  uniqueIndex('fellowships_one_standing').on(table.userId).where(sql`revoked_at IS NULL`),
 ])
 
 export const roleGrants = sqliteTable('role_grants', {

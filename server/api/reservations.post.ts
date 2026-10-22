@@ -1,5 +1,6 @@
 import { accessEntitlementRefusal, isEntitledToAccessTickets } from '#shared/utils/access-profiles'
 import { saleRefusal } from '#shared/utils/programme'
+import { bookedInAnotherName } from '#shared/utils/sale'
 import {
   RESERVATION_EMAIL_LIMIT,
   RESERVATION_EMAIL_WINDOW_MINUTES,
@@ -70,7 +71,7 @@ export default defineEventHandler(async (event) => {
 
   const lines = input.lines.map((line) => {
     const type = resolved.get(line.ticketTypeId)
-    if (!type) throw createError({ statusCode: 400, statusMessage: saysNoSuch('ticket type', 'Choose one of the ticket types this performance offers') })
+    if (!type) throw createError({ statusCode: 400, statusMessage: 'That ticket type is not on sale for this performance. Choose one of the ticket types it offers.' })
     return { ticketTypeId: type.id, quantity: line.quantity, pricePaid: type.price, priceSource: type.source, accessKind: type.accessKind }
   })
 
@@ -86,7 +87,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const capacity = effectiveCapacity(performance)
-  const booker = account ? { id: account.id } : await guestAccount(email, name)
+  const guest = account ? null : await guestAccount(email, name)
+  const booker = account ? { id: account.id } : guest!
+  // Only the tickets join an account typed in another name; its owner hears so, the visitor does not (0170).
+  const bookedAs = guest ? bookedInAnotherName(guest.heldName, name) : null
 
   const result = await writeReservation({
     performanceId: input.performanceId,
@@ -118,6 +122,7 @@ export default defineEventHandler(async (event) => {
     startsAt: performance.startsAt,
     totalPence: result.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0),
     qrToken,
+    ...(bookedAs ? { bookedAs } : {}),
   })
 
   return {

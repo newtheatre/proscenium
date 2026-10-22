@@ -1,4 +1,6 @@
-import { holdsTheClose, nightSignOffForm, saysIncidentsMoved, signOffTooEarly } from '#shared/utils/night-signoff'
+import { firstNameOf } from '#shared/utils/night-hub'
+import { holdsTheClose, nightSignOffForm, saysIncidentsMoved, saysReportFigures, signOffTooEarly, tenderTotalPence } from '#shared/utils/night-signoff'
+import { saysDay } from '#shared/utils/when'
 
 // Sign off and close (issue 1315, E-124, E-114 criteria 3 and 4): the gate, then one batch that
 // freezes the report, closes the checklist and reviews its incidents, race-safe by predicate (0006).
@@ -68,13 +70,25 @@ export default defineEventHandler(async (event) => {
   if (!row) return { ok: true, report: null, notice: 'The sign-off was recorded. Reload the page to see it.' }
 
   const venue = (await venueName(resolved.venueId)) ?? 'the venue'
+  const show = (await tonightPerformance(target))?.showTitle ?? 'tonight\'s performance'
+  const { attendance, takings, incidents } = row.report
   const message = render('night-report-signed', {
     name: '',
     venueName: venue,
-    night: row.night,
-    signedByName: row.signedByName,
+    show,
+    night: saysDay(row.night),
+    signedByName: row.signedByName ?? 'a former member',
+    signedByFirstName: firstNameOf(row.signedByName) ?? 'a former member',
     officerBypass: resolved.via === 'OFFICER',
     closingNote: row.closingNote,
+    figures: saysReportFigures({
+      sold: attendance.sold,
+      admitted: attendance.admitted,
+      noShows: attendance.noShows,
+      incidents: incidents.length,
+      boxOfficePence: tenderTotalPence(takings.desk.tenders),
+      barPence: tenderTotalPence(takings.bar.tenders),
+    }),
   })
   await distributeReport(event, row.id, null, resolved.account.email, message)
 

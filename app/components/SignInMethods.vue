@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysDay } from '#shared/utils/when'
-import { refusalToAddPassword, securityNextStep } from '#shared/utils/sign-in-methods'
+import { guessPasskeyLabel, passkeyLabelProblem, refusalToAddPassword, securityNextStep } from '#shared/utils/sign-in-methods'
 import type { SignInMethod } from '#shared/utils/sign-in-methods'
 
 // What this account can sign in with. A removal the server would refuse is never offered: the
@@ -53,6 +53,7 @@ function retryAfterReauthentication(): void {
 // 0008: a Workspace address holds no password by any path, so the field is not offered on one.
 const passwordRefusal = computed(() => refusalToAddPassword({ email: account.value.user?.email ?? '' }))
 const wantedPassword = ref('')
+const signOutOthers = ref(true)
 const settingPassword = ref(false)
 
 async function setPassword(): Promise<void> {
@@ -60,10 +61,15 @@ async function setPassword(): Promise<void> {
   try {
     const answer = await $fetch<{ added: boolean }>('/api/account/password', {
       method: 'PUT',
-      body: { password: wantedPassword.value },
+      body: { password: wantedPassword.value, signOutOthers: signOutOthers.value },
     })
     wantedPassword.value = ''
-    toast.add({ title: answer.added ? 'Password added' : 'Password changed', icon: 'i-lucide-key-round', color: 'success' })
+    toast.add({
+      title: answer.added ? 'Password added' : 'Password changed',
+      description: signOutOthers.value ? 'Your other devices are signed out.' : undefined,
+      icon: 'i-lucide-key-round',
+      color: 'success',
+    })
     await load()
     emit('changed')
   }
@@ -98,10 +104,14 @@ async function addPasskey(): Promise<void> {
   try {
     // The address is sent for the authenticator's own display only; the endpoint ignores it and
     // enrols for whoever holds the session (A-105 criterion 3).
+    const before = new Set(methods.value.map(method => method.id))
     await register({ userName: account.value.user?.email ?? '', displayName: account.value.user?.name })
     toast.add({ title: 'Passkey added', icon: 'i-lucide-fingerprint', color: 'success' })
     await load()
     emit('changed')
+    // Named straight away, while the owner still knows which device they are holding.
+    const added = methods.value.find(method => method.kind === 'passkey' && !before.has(method.id))
+    if (added) askToName(added, guessPasskeyLabel(navigator.userAgent))
   }
   catch (error) {
     if (needsReauthentication(error)) {
@@ -114,6 +124,40 @@ async function addPasskey(): Promise<void> {
   }
   finally {
     enrolling.value = false
+  }
+}
+
+const naming = ref<SignInMethod | null>(null)
+const wantedLabel = ref('')
+const nameFailure = ref<string | null>(null)
+const namingOpen = computed({
+  get: () => naming.value !== null,
+  set: (value) => { if (!value && working.value === '') naming.value = null },
+})
+
+function askToName(method: SignInMethod, suggested = method.label): void {
+  nameFailure.value = null
+  wantedLabel.value = suggested
+  naming.value = method
+}
+
+async function saveName(): Promise<void> {
+  const method = naming.value
+  if (!method) return
+  nameFailure.value = passkeyLabelProblem(wantedLabel.value)
+  if (nameFailure.value) return
+  working.value = method.id
+  try {
+    await $fetch(`/api/account/methods/${method.id}`, { method: 'PATCH', body: { label: wantedLabel.value } })
+    naming.value = null
+    toast.add({ title: 'Passkey named', icon: 'i-lucide-check', color: 'success' })
+    await load()
+  }
+  catch (error) {
+    nameFailure.value = refusalText(error)
+  }
+  finally {
+    working.value = ''
   }
 }
 
@@ -203,6 +247,16 @@ onMounted(load)
         </div>
 
         <UButton
+          v-if="method.kind === 'passkey'"
+          size="sm"
+          color="neutral"
+          variant="subtle"
+          :data-test="`name-method-${method.id}`"
+          @click="askToName(method)"
+        >
+          Rename
+        </UButton>
+        <UButton
           v-if="method.removable"
           size="sm"
           color="error"
@@ -251,6 +305,13 @@ onMounted(load)
             Save the password
           </UButton>
         </div>
+        <UCheckbox
+          v-model="signOutOthers"
+          class="mt-3"
+          label="Sign out my other devices"
+          description="Do this if you think somebody else knows the old password."
+          data-test="sign-out-others"
+        />
       </UFormField>
       <p
         v-else
@@ -309,6 +370,39 @@ onMounted(load)
     :failure="removeFailure"
     @confirm="removing && remove(removing)"
   />
+
+  <UModal
+    v-model:open="namingOpen"
+    title="Name this passkey"
+    description="A name tells your devices apart, if you ever need to remove one."
+  >
+    <template #body>
+      <form
+        class="space-y-4"
+        data-test="name-passkey"
+        @submit.prevent="saveName"
+      >
+        <UFormField
+          label="Name"
+          :error="nameFailure ?? undefined"
+        >
+          <UInput
+            v-model="wantedLabel"
+            class="w-full"
+            data-test="passkey-label"
+            autofocus
+          />
+        </UFormField>
+        <UButton
+          type="submit"
+          :loading="working !== ''"
+          data-test="save-passkey-label"
+        >
+          Save the name
+        </UButton>
+      </form>
+    </template>
+  </UModal>
 
   <ReauthenticateModal
     v-model:open="reauthenticating"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PASS_TERMS_PATH, saysPassStatus } from '#shared/utils/passes'
 import { withNext } from '#shared/utils/sign-in'
+import { saysDayRange } from '#shared/utils/when'
 import type { PassStatus } from '#shared/utils/passes'
 
 type Outcome = 'working' | 'found' | 'refused'
@@ -11,6 +12,8 @@ interface Pass {
   priceLabel: string
   pricePaid: string
   status: PassStatus
+  validFrom: number
+  validUntil: number
   qrSvg: string
   coveredShows: { title: string, slug: string }[]
 }
@@ -74,6 +77,12 @@ useSeoMeta({
         </p>
         <p class="text-sm text-muted">
           Reference {{ pass.reference }}
+        </p>
+        <p
+          class="text-sm"
+          data-test="pass-valid"
+        >
+          Valid {{ saysDayRange(pass.validFrom, pass.validUntil) }}
         </p>
         <UBadge
           data-test="pass-status"

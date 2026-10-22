@@ -133,7 +133,8 @@ interface SizeRow {
 
 const preset = ref<MeasurePresetId | null>(null)
 const sizes = ref<SizeRow[]>([])
-const components = ref<{ itemId: string, qty?: number }[]>([{ itemId: '', qty: 25 }])
+// Blank rather than a guess: a default 25 on a can of tonic sold 25 cans a serve.
+const components = ref<{ itemId: string, qty?: number }[]>([{ itemId: '', qty: undefined }])
 const choice = reactive({ offered: false, name: '', includedInPrice: false, optional: false, qty: 1 as number | undefined })
 const choiceOptions = ref<{ itemId: string, qty?: number }[]>([{ itemId: '', qty: 1 }])
 const opening = reactive({ offered: false, qty: 1 as number | undefined, costPence: undefined as number | undefined })
@@ -219,7 +220,8 @@ function fillFrom(id: MeasurePresetId | null): void {
       pricePence: defaults.value.get(size.servingKind),
       chosen: shape.value !== 'SIMPLE' || size.servingKind === packagedKind.value,
     }))
-    if (chosen && itemMode.value === 'NEW' && !itemNamedByHand.value) {
+    // The preset decides how its stock is counted, whatever was typed for the item's name first.
+    if (chosen && itemMode.value === 'NEW') {
       newItem.unit = shape.value === 'SIMPLE' ? 'ITEM' : chosen.unit
       newItem.containerMl = shape.value === 'SIMPLE' ? undefined : chosen.containerMl ?? undefined
     }
@@ -1015,7 +1017,7 @@ function moveFocus(step: number): void {
             variant="subtle"
             icon="i-lucide-plus"
             data-test="add-component"
-            @click="components.push({ itemId: '', qty: 25 })"
+            @click="components.push({ itemId: '', qty: undefined })"
           >
             Add an ingredient
           </UButton>

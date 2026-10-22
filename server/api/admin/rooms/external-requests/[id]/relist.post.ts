@@ -2,7 +2,7 @@ import { judge, resolvePolicy } from '#shared/utils/booking-policy'
 import { bookingTier } from '#shared/utils/bookings'
 import { refusalToRelist } from '#shared/utils/external-requests'
 import { relistForm } from '#shared/utils/approvals'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Move a request into one of our rooms, which claims the slot and so can fail.
 export default defineEventHandler(async (event) => {
@@ -31,7 +31,8 @@ export default defineEventHandler(async (event) => {
       now,
       isAdmin: false,
       hasMembership: await hasCurrentMembership(event, request.userId, now),
-      activeBookings: 0,
+      // Counted as the booking form counts it, or a move would be a way round the cap.
+      activeBookings: await activeBookingsFor(request.userId, Math.floor(now.getTime() / 1000)),
       underPreApproval: await underPreApproval(event, request.userId, now),
     },
   )
@@ -83,12 +84,13 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'external.request.relisted',
     userId: request.userId,
+    about: [id, claimId],
     context: {
       name: request.who,
       title: request.title,
       room: room.name,
       settled: !verdict.needsApproval,
-      when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(request.startsAt, request.endsAt),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
   })

@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { londonDaysFrom as daysFrom } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
-import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, menuOptions, openSignedOutView, openView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -76,13 +76,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
 
-// London days, because that is what an award date is (0014). Adding to a UTC instant is not the
-// same thing: at 23:30 BST, "tomorrow in UTC" is already today in London.
-function daysFrom(days: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day + days)).toISOString().slice(0, 10)
-}
-
 const today = (): string => daysFrom(0)
 
 async function addModule(over: Record<string, unknown> = {}, into = department): Promise<string> {
@@ -151,6 +144,38 @@ describe.skipIf(skip !== null)('a lead signs off their own department (G-120)', 
     const brief = await addModule({ kind: 'BRIEF' })
     expect((await signOff({ userId: memberId, moduleId: retired, awardedOn: today() })).status).toBe(409)
     expect((await signOff({ userId: memberId, moduleId: brief, awardedOn: today() })).status).toBe(409)
+  })
+})
+
+describe.skipIf(skip !== null)('only a published module is awarded, once a day (0240)', () => {
+  test('a draft is refused, and nothing is written', async () => {
+    const draft = await addModule({ status: 'DRAFT' })
+    const refused = await signOff({ userId: memberId, moduleId: draft, awardedOn: today() })
+    expect(refused.status).toBe(409)
+    expect(await said(refused)).toContain('draft')
+    expect(read<{ n: number }>('SELECT count(*) n FROM training_records WHERE module_id = ?', draft)?.n).toBe(0)
+  })
+
+  test('a second sign-off on the same day is refused, and one record stands', async () => {
+    const module = await addModule()
+    expect((await signOff({ userId: memberId, moduleId: module, awardedOn: today() })).status).toBe(200)
+    const again = await signOff({ userId: memberId, moduleId: module, awardedOn: today() })
+    expect(again.status).toBe(409)
+    expect(await said(again)).toContain('already hold this')
+    expect(read<{ n: number }>('SELECT count(*) n FROM training_records WHERE module_id = ?', module)?.n).toBe(1)
+  })
+
+  test('revoking says whether another current record still holds the module', async () => {
+    const module = await addModule()
+    const earlier = await signOff({ userId: memberId, moduleId: module, awardedOn: daysFrom(-3) })
+    const later = await signOff({ userId: memberId, moduleId: module, awardedOn: today() })
+    const laterId = (await later.json() as { id: string }).id
+    const earlierId = (await earlier.json() as { id: string }).id
+
+    const first = await send('POST', `/api/admin/training/records/${laterId}/revoke`, { reason: 'Recorded twice' })
+    expect(await first.json()).toMatchObject({ ok: true, stillHeld: true })
+    const last = await send('POST', `/api/admin/training/records/${earlierId}/revoke`, { reason: 'Not competent' })
+    expect(await last.json()).toMatchObject({ ok: true, stillHeld: false })
   })
 })
 

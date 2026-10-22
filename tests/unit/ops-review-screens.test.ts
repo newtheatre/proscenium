@@ -136,7 +136,8 @@ describe('people and admin polish', () => {
   test('a membership source reads in words', async () => {
     expect(saysMembershipSource('ROSTER')).toBe('SU roster')
     expect(saysMembershipSource('MANUAL')).toBe('Recorded by hand')
-    expect(await read('app/pages/people/members.vue')).toContain('saysMembershipSource(row.original.source)')
+    expect(saysMembershipSource('MANUAL', true)).toBe('From a claim')
+    expect(await read('app/pages/people/members.vue')).toContain('saysMembershipSource(row.original.source, row.original.fromClaim === 1)')
   })
 
   test('a role line keeps the space before until', async () => {

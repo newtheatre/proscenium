@@ -7,6 +7,7 @@ import {
   saysChecklistReadiness,
   saysEligibility,
   saysNotOpenYet,
+  saysQualified,
   venueReady,
 } from '#shared/utils/rota-readiness'
 import type { RoleEligibility, VenueReadiness } from '#shared/utils/rota-readiness'
@@ -123,5 +124,33 @@ describe('a venue we run is ready once staffed, checked and carded (E-101, E-113
     expect(missingSystemChecks(['INCIDENTS_REVIEWED'])).toEqual(['NO_SHOW_HOLDS_RELEASED'])
     expect(saysChecklistReadiness(['INCIDENTS_REVIEWED'])).toContain('Unpaid holds released')
     expect(saysChecklistReadiness(ready.systemChecks)).toBe('Both system checks are on the post-show checklist.')
+  })
+})
+
+// 0210: the card counts who could take each role, and for nobody says what would change that.
+describe('who could take each role now', () => {
+  const dm: RoleEligibility = { role: 'DUTY_MANAGER', moduleId: 'ADMN-201', moduleName: 'Committee Operations', standing: 'SET' }
+  const bar: RoleEligibility = { role: 'BAR', moduleId: 'ADMN-102', moduleName: 'Selling Alcohol', standing: 'SET' }
+
+  test('the duty manager line names the committee role beside its module', () => {
+    expect(saysEligibility(dm)).toBe('Unlocked by Committee Operations (ADMN-201) and a committee role.')
+    expect(saysEligibility(bar)).toBe('Unlocked by Selling Alcohol (ADMN-102).')
+  })
+
+  test('a count reads as people', () => {
+    expect(saysQualified(bar, 1)).toBe('1 person can take one now.')
+    expect(saysQualified(dm, 3)).toBe('3 people can take one now.')
+  })
+
+  test('nobody for a duty manager says both halves and both ways to meet them', () => {
+    expect(saysQualified(dm, 0)).toBe('Nobody can take one yet: nobody holds both ADMN-201 and a committee role. Sign off ADMN-201 for a committee member, or give a committee role to somebody who holds it.')
+  })
+
+  test('nobody for another role names the module to sign off', () => {
+    expect(saysQualified(bar, 0)).toBe('Nobody holds Selling Alcohol (ADMN-102) yet, so nobody can take one. Sign it off for somebody in Training.')
+  })
+
+  test('a role whose module is not set says nothing more', () => {
+    expect(saysQualified({ ...dm, standing: 'UNSET', moduleId: null }, 0)).toBeNull()
   })
 })

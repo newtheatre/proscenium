@@ -40,6 +40,13 @@ const { data, status: loading, error, refresh } = await useAsyncData(
 const unknownKeys = computed(() => unknownEntriesKeys(route.query))
 const listFailure = useListFailure(error, 'The entries could not be read.')
 const entriesFailure = computed(() => (unknownKeys.value.length === 0 ? listFailure.value : null))
+// A search is held to the When range, today by default: an older reference needs every day.
+const searched = computed(() => active.value.some(chip => chip.key === 'search'))
+const allDates = computed(() => `before:${londonDay(new Date(Date.now() + 86_400_000))}`)
+function searchAllDates(): void {
+  void navigateTo({ query: { ...route.query, happenedAt: allDates.value, page: undefined } })
+}
+
 function removeUnknownKeys(): void {
   const kept = Object.fromEntries(Object.entries(route.query).filter(([key]) => !unknownKeys.value.includes(key)))
   void navigateTo({ query: kept }, { replace: true })
@@ -199,19 +206,33 @@ const lineColumns: TableColumn<LedgerEntryLine>[] = [
     </AdminToolbar>
 
     <UTable
+      v-if="unknownKeys.length === 0"
       :data="data.items"
       :columns="columns"
       :loading="loading === 'pending'"
       data-test="entries-table"
     >
       <template #empty>
-        <p class="py-6 text-center text-sm text-muted">
-          {{ saysNoEntries(conditions, active.some(chip => chip.key === 'search')) }}
-        </p>
+        <div class="space-y-2 py-6 text-center text-sm text-muted">
+          <p>{{ saysNoEntries(conditions, searched) }}</p>
+          <UButton
+            v-if="searched && route.query.happenedAt !== allDates"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            data-test="search-all-dates"
+            @click="searchAllDates"
+          >
+            Search all dates
+          </UButton>
+        </div>
       </template>
     </UTable>
 
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div
+      v-if="unknownKeys.length === 0"
+      class="flex flex-wrap items-center justify-between gap-3"
+    >
       <p
         data-test="entries-total"
         class="text-sm text-muted"

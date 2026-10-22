@@ -39,6 +39,9 @@ export function saysStatus(status: string): string {
   return STATUS_WORDING[status] ?? 'settled'
 }
 
+// Nobody approves what they asked for themselves, whatever their role (0116, 0201).
+export const OWN_REQUEST = 'That request is yours, so somebody else decides it'
+
 // One refusal per reason, phrased for the officer rather than the requester.
 export function refusalToDecide(booking: { status: string }): string | null {
   if (booking.status === 'PENDING_APPROVAL') return null

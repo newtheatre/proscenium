@@ -64,9 +64,11 @@ describe('on shift means inside a confirmed shift\'s own window, with its grace 
 })
 
 describe('sign-in lands on tonight in the window, and an explicit next always wins (0094)', () => {
-  test('no next: tonight for somebody on shift, the home page otherwise', () => {
+  test('no next: tonight for somebody on shift, Security for an owed authenticator, My NNT otherwise (0152)', () => {
     expect(landingAfterSignIn(undefined, true)).toBe('/tonight')
-    expect(landingAfterSignIn(undefined, false)).toBe('/')
+    expect(landingAfterSignIn(undefined, true, true)).toBe('/tonight')
+    expect(landingAfterSignIn(undefined, false, true)).toBe('/account/security')
+    expect(landingAfterSignIn(undefined, false)).toBe('/my')
   })
 
   test('an explicit next wins, the home page included', () => {
@@ -76,13 +78,13 @@ describe('sign-in lands on tonight in the window, and an explicit next always wi
 
   test('a next that is not a path on this site is no next at all', () => {
     expect(landingAfterSignIn('//evil.example/', true)).toBe('/tonight')
-    expect(landingAfterSignIn('https://evil.example/', false)).toBe('/')
-    expect(landingAfterSignIn(['/rooms'], false)).toBe('/')
+    expect(landingAfterSignIn('https://evil.example/', false)).toBe('/my')
+    expect(landingAfterSignIn(['/rooms'], false)).toBe('/my')
   })
 
   // A browser reads a backslash as a slash and drops a tab, so both reach another origin (WHATWG URL).
   test('a backslash or a tab that makes a path another origin is no next either', () => {
-    expect(landingAfterSignIn('/\\evil.example', false)).toBe('/')
+    expect(landingAfterSignIn('/\\evil.example', false)).toBe('/my')
     expect(landingAfterSignIn('/\t/evil.example', true)).toBe('/tonight')
   })
 })

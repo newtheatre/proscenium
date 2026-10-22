@@ -103,6 +103,9 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
         venueName: 'Main Hall',
         showTitle: 'A Show',
         startsAt: Math.floor(tonight.getTime() / 1000),
+        windowStartsAt: null,
+        windowEndsAt: null,
+        moreThatNight: 0,
       },
     })
     expect(summary.onShiftTonight).toBe(true)
@@ -114,7 +117,7 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     const summary = assembleMySummary({
       ...BASE,
       now: tonight,
-      shift: { shiftId: 's4', role: 'DOOR', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: Math.floor(tonight.getTime() / 1000) },
+      shift: { shiftId: 's4', role: 'DOOR', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: Math.floor(tonight.getTime() / 1000), windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
     })
     expect(summary.onShiftTonight).toBe(false)
     expect(summary.shift?.status).toBe('CLAIMED')
@@ -129,7 +132,7 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
       ...BASE,
       now: tonight,
       onShiftTonight: true,
-      shift: { shiftId: 's5', role: 'DOOR', status: 'CONFIRMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: nextWeek },
+      shift: { shiftId: 's5', role: 'DOOR', status: 'CONFIRMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: nextWeek, windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
     })
     expect(summary.onShiftTonight).toBe(true)
     expect(summary.shiftIsTonight).toBe(false)
@@ -140,7 +143,7 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     const summary = assembleMySummary({
       ...BASE,
       now: tonight,
-      shift: { shiftId: 's6', role: 'DOOR', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: Math.floor(tonight.getTime() / 1000) },
+      shift: { shiftId: 's6', role: 'DOOR', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: Math.floor(tonight.getTime() / 1000), windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
     })
     expect(summary.shiftIsTonight).toBe(true)
   })
@@ -149,7 +152,7 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     const nextWeek = Math.floor(new Date('2026-09-22T20:00:00Z').getTime() / 1000)
     const summary = assembleMySummary({
       ...BASE,
-      shift: { shiftId: 's2', role: 'FRONT_OF_HOUSE', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: nextWeek },
+      shift: { shiftId: 's2', role: 'FRONT_OF_HOUSE', status: 'CLAIMED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: nextWeek, windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
     })
     expect(summary.onShiftTonight).toBe(false)
   })
@@ -159,7 +162,7 @@ describe('assembleMySummary (K-127 criterion 1)', () => {
     const summary = assembleMySummary({
       ...BASE,
       now: new Date('2026-09-15T12:00:00Z'),
-      shift: { shiftId: 's3', role: 'FRONT_OF_HOUSE', status: 'DECLINED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: tonight },
+      shift: { shiftId: 's3', role: 'FRONT_OF_HOUSE', status: 'DECLINED', venueName: 'Main Hall', showTitle: 'A Show', startsAt: tonight, windowStartsAt: null, windowEndsAt: null, moreThatNight: 0 },
     })
     expect(summary.onShiftTonight).toBe(false)
   })

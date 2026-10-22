@@ -131,13 +131,22 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
     }
   })
 
+  // The 21 Oct process map: a dropped invalid input saved the standing value and audited "365 → 365".
+  test('saving the value a setting already stands at writes and audits nothing', async () => {
+    const standing = CONFIG_KEYS.ROOM_NO_SHOW_WINDOW_DAYS.default
+    const saved = await send('PUT', '/api/admin/config/ROOM_NO_SHOW_WINDOW_DAYS', { value: standing }, cookie)
+    expect(await saved.json()).toMatchObject({ ok: true, unchanged: true })
+    expect(auditFor('ROOM_NO_SHOW_WINDOW_DAYS')).toBeNull()
+    expect((await settingFor('ROOM_NO_SHOW_WINDOW_DAYS')).set).toBe(false)
+  })
+
   // A role identifies nobody, so the night report's roles are audited as themselves (0024, issue 1356).
   test('the night report goes to roles, taking no address, audited with the roles', async () => {
     try {
       expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_ROLES', { value: ['duty@newtheatre.org.uk'] }, cookie)).status).toBe(400)
-      expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_ROLES', { value: ['FOH_MANAGER', 'THEATRE_MANAGER'] }, cookie)).status).toBe(200)
+      expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_ROLES', { value: ['FOH_MANAGER', 'TREASURER'] }, cookie)).status).toBe(200)
       expect(JSON.parse(auditFor('NIGHT_REPORT_ROLES')!.detail))
-        .toMatchObject({ changes: { value: { to: ['FOH_MANAGER', 'THEATRE_MANAGER'] } } })
+        .toMatchObject({ changes: { value: { to: ['FOH_MANAGER', 'TREASURER'] } } })
       expect((await send('PUT', '/api/admin/config/NIGHT_REPORT_RECIPIENTS', { value: [] }, cookie)).status).toBe(404)
     }
     finally {
@@ -175,8 +184,8 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
   })
 
   test('an unset key can be set, which is what the workshops are for', async () => {
-    expect((await settingFor('NIGHT_REPORT_ROLES')).set).toBe(false)
-    expect((await settingFor('NIGHT_REPORT_ROLES')).default).toBeNull()
+    expect((await settingFor('MEMBERSHIP_PURCHASE_URL')).set).toBe(false)
+    expect((await settingFor('MEMBERSHIP_PURCHASE_URL')).default).toBeNull()
   })
 
   test('a value the rules refuse is never stored, and the refusal names the rule', async () => {

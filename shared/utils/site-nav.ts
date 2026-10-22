@@ -21,6 +21,7 @@ import {
   viewChecklist,
   viewCommsOperations,
   viewEmergencyCard,
+  viewFeedback,
   viewFellows,
   viewFinanceReports,
   viewMembers,
@@ -56,6 +57,8 @@ export interface NavEntry {
   group?: PublicGroup
   // A queue waiting behind this entry, counted on the sidebar so it is seen from any screen.
   count?: NavCount
+  // Where others read but only the IT Manager changes anything, a refusal says so (0157).
+  changedByItManager?: boolean
 }
 
 export const NAV_COUNTS = ['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests'] as const
@@ -212,10 +215,10 @@ export const CONSOLE_NAV: NavGroup[] = [
     icon: 'i-lucide-users',
     prefix: '/people',
     items: [
-      { label: 'Accounts', icon: 'i-lucide-user-round', to: '/people/accounts', ability: viewAccounts },
-      { label: 'Roles', icon: 'i-lucide-shield', to: '/people/roles', ability: viewAccounts },
-      { label: 'Members', icon: 'i-lucide-badge-check', to: '/people/members', ability: viewMembers, count: 'membership-claims' },
-      { label: 'Fellows', icon: 'i-lucide-award', to: '/people/fellows', ability: viewFellows },
+      { label: 'Accounts', icon: 'i-lucide-user-round', to: '/people/accounts', ability: viewAccounts, changedByItManager: true },
+      { label: 'Roles', icon: 'i-lucide-shield', to: '/people/roles', ability: viewAccounts, changedByItManager: true },
+      { label: 'Members', icon: 'i-lucide-badge-check', to: '/people/members', ability: viewMembers, count: 'membership-claims', changedByItManager: true },
+      { label: 'Fellows', icon: 'i-lucide-award', to: '/people/fellows', ability: viewFellows, changedByItManager: true },
     ],
   },
 
@@ -272,6 +275,7 @@ export const CONSOLE_NAV: NavGroup[] = [
 
       // Module K: platform
       { label: 'Backups', icon: 'i-lucide-database-backup', to: '/admin/backups', ability: viewBackups },
+      { label: 'Problem reports', icon: 'i-lucide-message-square-warning', to: '/admin/feedback', ability: viewFeedback },
 
     ],
   },

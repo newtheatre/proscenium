@@ -1,6 +1,7 @@
 import { saysMoney } from './bar'
 import { showNightBounds } from './show-night'
 import { plural } from './text'
+import { saysClock } from './when'
 import { z } from 'zod'
 import type { NightCacheStore } from './night-cache'
 import type { SumupAttemptView } from './sumup'
@@ -32,6 +33,39 @@ export const tillScopeForm = z.object({
 
 export type TillScopeInput = z.output<typeof tillScopeForm>
 
+// Opening after tonight's close starts a second session, so it is asked for by name (0160).
+export const openTillForm = tillScopeForm.extend({
+  reopen: z.boolean().optional(),
+})
+
+// This bar's latest close tonight, so the till says it closed rather than that it never opened.
+export interface ClosedTill {
+  closedAt: number
+  closedByName: string | null
+  actualZPence: number | null
+}
+
+// Every place a close is confirmed or reported names the bar, so nobody closes the wrong one (0160).
+export function saysCloseTill(venueName: string): string {
+  return `Close the till at ${venueName}`
+}
+
+export function saysTillClosed(venueName: string, closed: ClosedTill): string {
+  const by = closed.closedByName ? `, by ${closed.closedByName}` : ''
+  const z = closed.actualZPence === null ? '' : `, with a Z of ${saysMoney(closed.actualZPence)}`
+  return `The till at ${venueName} closed at ${saysClock(closed.closedAt)}${by}${z}.`
+}
+
+// The loser of two closes had their reading thrown away, so they are told whose stands (issue 1581).
+export function saysClosedFirst(closed: ClosedTill): string {
+  const z = closed.actualZPence === null ? '' : `, with a Z of ${saysMoney(closed.actualZPence)}`
+  return `${closed.closedByName ?? 'Somebody else'} closed this session first, at ${saysClock(closed.closedAt)}${z}, so this reading was not recorded. Read the till before recording anything.`
+}
+
+export function saysReopenNeedsAsking(venueName: string, closed: ClosedTill): string {
+  return `The till at ${venueName} closed at ${saysClock(closed.closedAt)} tonight. Open it again only if this bar is serving again.`
+}
+
 // One row of the picker the till shows when the scope names no venue: what the evening is there,
 // so a volunteer chooses by show or by the opening's label rather than by a database id (F-125).
 export interface TillVenueOption {
@@ -56,13 +90,28 @@ export interface TillLeftOpen {
   tonight: number
   earlier: number
   unanswered: number
+  // A bar row in the venue's template, or a till opened there tonight: a house with neither has
+  // no till of its own to close, so the line speaks only for earlier nights (0236).
+  hasBar: boolean
+  // A confirmed bar shift tonight, so the line can say who closes the till when nobody holds one.
+  barStaffed: boolean
+}
+
+// Whether the checklist shows the till line at all: a house with no bar shows it only for what an
+// earlier night left, which any house's close should hear about (0236).
+export function showsTillLine(left: TillLeftOpen): boolean {
+  return left.hasBar || left.earlier > 0 || left.unanswered > 0
 }
 
 // Null is the line ticked. Only the bar closes a till, so the line says who does, and it never
 // holds the duty manager's close (F-102 criterion 5).
 export function saysTillLeftOpen(left: TillLeftOpen): string | null {
   const said: string[] = []
-  if (left.tonight > 0) said.push('Tonight\'s till is still open: whoever is on the bar closes it from the till.')
+  if (left.tonight > 0) {
+    said.push(left.barStaffed
+      ? 'Tonight\'s till is still open: whoever is on the bar closes it from the till.'
+      : 'Tonight\'s till is still open and nobody holds tonight\'s bar shift: the Front of House Manager closes it from the till.')
+  }
   const earlier = [
     left.earlier > 0 ? `${plural(left.earlier, 'till')} from an earlier night left open` : null,
     left.unanswered > 0 ? `${plural(left.unanswered, 'card charge')} from an earlier night left unanswered` : null,

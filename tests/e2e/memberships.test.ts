@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
-import { endOfTerm, londonDay } from '#shared/utils/membership'
+import { endOfTerm } from '#shared/utils/membership'
+import { londonDaysFrom, londonToday, londonWeekdayFrom } from '#tests/helpers/london-day'
 import { forgetSpentStep, markVerified, registerMember } from '#tests/helpers/accounts'
 import { expectOneWinner, race } from '#tests/helpers/race'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
@@ -68,7 +69,7 @@ function write(sql: string, ...parameters: unknown[]): void {
   }
 }
 
-const today = londonDay(new Date())
+const today = londonToday()
 
 const grant = (userId: string, extra: Record<string, unknown> = {}): Promise<Response> =>
   send('POST', '/api/admin/memberships', { userId, startsOn: today, years: 1, ...extra }, cookie)
@@ -143,7 +144,7 @@ describe.skipIf(skip !== null)('recording a membership (A-117, 0031)', () => {
 
   test('a purchase date in the future and an erased account are both refused', async () => {
     const member = await registerMember(app, 'future-buy', password, { signIn: false })
-    const ahead = londonDay(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+    const ahead = londonDaysFrom(7)
     expect((await grant(member.id, { startsOn: ahead })).status).toBe(400)
 
     const gone = await registerMember(app, 'erased-member', password)
@@ -160,7 +161,7 @@ describe.skipIf(skip !== null)('recording a membership (A-117, 0031)', () => {
     // Both dates move: the schema refuses a term that ends before it starts, which is the point
     // of the constraint.
     const grace = (await register()).graceDays
-    const daysAgo = (days: number): string => londonDay(new Date(Date.now() - days * 24 * 60 * 60 * 1000))
+    const daysAgo = (days: number): string => londonDaysFrom(-days)
 
     write('UPDATE memberships SET starts_on = ?, expires_on = ? WHERE id = ?', daysAgo(400), daysAgo(grace - 1), id)
     expect((await register('?filter=current')).items.some(row => row.id === id)).toBe(true)
@@ -201,9 +202,9 @@ describe.skipIf(skip !== null)('reminding a membership that is running out (A-11
 
     const notice = 21
     write('UPDATE memberships SET expires_on = ? WHERE id = ?',
-      londonDay(new Date(Date.now() + (notice - 2) * 24 * 60 * 60 * 1000)), soonId)
+      londonDaysFrom(notice - 2), soonId)
     write('UPDATE memberships SET expires_on = ? WHERE id = ?',
-      londonDay(new Date(Date.now() + (notice + 60) * 24 * 60 * 60 * 1000)), laterId)
+      londonDaysFrom(notice + 60), laterId)
 
     expect((await fetch(`${app.baseURL}/_nitro/tasks/daily:sweeps`, { method: 'POST' })).status).toBe(200)
 
@@ -226,11 +227,7 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
   }
 
   // Three weeks out clears notice and short-notice checks, so NO_MEMBERSHIP is the one failure.
-  function threeWeeksMonday(): string {
-    const at = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)
-    while (at.getUTCDay() !== 1) at.setUTCDate(at.getUTCDate() + 1)
-    return londonDay(at)
-  }
+  const threeWeeksMonday = (): string => londonWeekdayFrom(21, 1)
 
   test('every member screen renders for a lapsed member, none hidden or redirected (0040)', async () => {
     const lapsed = await registerMember(app, 'no-membership', password)
@@ -278,8 +275,8 @@ describe.skipIf(skip !== null)('the viewer carries membership as a fact (A-129)'
     const none = await registerMember(app, 'menu-none', password, { signIn: false })
     const { id } = await (await grant(none.id)).json() as { id: string }
     write('UPDATE memberships SET starts_on = ?, expires_on = ? WHERE id = ?',
-      londonDay(new Date(Date.now() - 800 * 24 * 60 * 60 * 1000)),
-      londonDay(new Date(Date.now() - ((await register()).graceDays + 30) * 24 * 60 * 60 * 1000)),
+      londonDaysFrom(-800),
+      londonDaysFrom(-((await register()).graceDays + 30)),
       id)
 
     const view = await openSignedOutView(app.baseURL)

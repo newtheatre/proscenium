@@ -110,6 +110,14 @@ describe('a settled show-night read', () => {
     expect(refusalOf(settled)).toBeNull()
   })
 
+  // The 21 October process map: an unnamed venue left the board's controls up, all of them dead.
+  test('a 400 that asks for a venue is a refusal too', async () => {
+    const settled = await settleRead(async () => {
+      throw { statusCode: 400, data: { statusMessage: 'More than one venue is running tonight', data: { chooseVenue: true } } }
+    })
+    expect(refusalOf(settled)).toBe('More than one venue is running tonight')
+  })
+
   test('no answer at all takes the caller\'s fallback, which may be nothing', async () => {
     const settled = await settleRead(async () => {
       throw new TypeError('fetch failed')

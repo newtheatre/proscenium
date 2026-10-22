@@ -270,7 +270,10 @@ async function send(): Promise<void> {
       />
     </UFormField>
 
-    <UFormField label="Message">
+    <UFormField
+      label="Message"
+      description="Each email starts &quot;Hello&quot; and the recipient's own name for you, so the message need not greet anyone."
+    >
       <UTextarea
         v-model="body"
         data-test="announce-body"

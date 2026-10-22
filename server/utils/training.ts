@@ -71,6 +71,7 @@ export interface SessionRow {
   capacity: number
   opensAt: number | null
   status: string
+  registerOpenedAt: number | null
   trainerId: string
   trainerName: string
   modules: { id: string, name: string }[]
@@ -100,6 +101,7 @@ export async function listSessions(filter: { status?: string, trainerId?: string
     capacity: schema.trainingSessions.capacity,
     opensAt: schema.trainingSessions.opensAt,
     status: schema.trainingSessions.status,
+    registerOpenedAt: schema.trainingSessions.registerOpenedAt,
     trainerId: schema.trainingSessions.trainerId,
     trainerName: schema.users.name,
   })
@@ -507,6 +509,7 @@ export interface ModuleHeader {
   department: string
   name: string
   kind: string
+  status: string
   grantsTrainer: boolean
   grantsSupervisor: boolean
 }
@@ -532,6 +535,7 @@ export async function moduleById(id: string): Promise<ModuleHeader | undefined> 
     department: schema.trainingModules.department,
     name: schema.trainingModules.name,
     kind: schema.trainingModules.kind,
+    status: schema.trainingModules.status,
     grantsTrainer: schema.trainingModules.grantsTrainer,
     grantsSupervisor: schema.trainingModules.grantsSupervisor,
   }).from(schema.trainingModules).where(eq(schema.trainingModules.id, id)).limit(1)
@@ -605,6 +609,19 @@ export async function requireCatalogueAuthority(event: H3Event): Promise<Catalog
   return { ...resolved, leads }
 }
 
+// Whoever may award a record by any path: the Theatre Manager, a live lead, or a current trainer
+// at a register or a logged session (0240).
+export async function requireAwarder(event: H3Event): Promise<Authority> {
+  const resolved = await authority(event)
+  const awards = resolved.permissions.has('training.write')
+    || (await liveLeads(resolved.account.id)).length > 0
+    || (await trainerStandingOf(resolved.account.id, londonToday())).trainer
+  if (!awards) throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that' })
+
+  await requireSecondFactorIfPrivileged(event, resolved)
+  return resolved
+}
+
 // Editing a department's catalogue is the Theatre Manager's, or that department's live leads'.
 // Standing is read at the request and cached nowhere (G-110 criteria 2 and 4).
 export function assertStewards(resolved: CatalogueAuthority, department: string): void {
@@ -646,12 +663,28 @@ export async function assertAwardable(
   const policy = await modulePolicy(input.moduleId)
   if (!policy) throw noSuch('module')
   if (policy.status === 'RETIRED') throw createError({ statusCode: 409, statusMessage: refusals.retired })
+  if (policy.status === 'DRAFT') {
+    throw createError({ statusCode: 409, statusMessage: 'A draft module is awarded once it is published' })
+  }
   if (policy.kind === 'BRIEF') throw createError({ statusCode: 409, statusMessage: refusals.brief })
 
   // A future award would read as valid to every gate between now and then.
   const today = londonToday()
   if (input.awardedOn > today) {
     throw createError({ statusCode: 422, statusMessage: 'An award cannot be dated in the future' })
+  }
+
+  // A second award on the same day only hides the first behind it, so one revoke leaves it held (0240).
+  if (input.userId !== undefined) {
+    const [twin] = await db.select({ id: schema.trainingRecords.id }).from(schema.trainingRecords).where(and(
+      eq(schema.trainingRecords.userId, input.userId),
+      eq(schema.trainingRecords.moduleId, input.moduleId),
+      eq(schema.trainingRecords.awardedOn, input.awardedOn),
+      isNull(schema.trainingRecords.revokedAt),
+    )).limit(1)
+    if (twin) {
+      throw createError({ statusCode: 409, statusMessage: 'They already hold this, awarded on that day' })
+    }
   }
 
   // Expiring counts as held, and the refusal names the gaps. No acknowledgement path exists for
@@ -712,6 +745,7 @@ export async function assertTeachable(
     expiryMonths: schema.trainingModules.expiryMonths,
     status: schema.trainingModules.status,
     signoffRequired: schema.trainingModules.signoffRequired,
+    kind: schema.trainingModules.kind,
   }).from(schema.trainingModules)
     .where(inArray(schema.trainingModules.id, moduleIds))
     .orderBy(asc(schema.trainingModules.sort), asc(schema.trainingModules.id))
@@ -721,7 +755,9 @@ export async function assertTeachable(
     throw createError({ statusCode: 404, statusMessage: `There is no module called ${missing.join(', ')}` })
   }
 
-  const refused = taught.filter(module => module.status !== 'ACTIVE' || module.signoffRequired)
+  // A certification is signed off, never taught at a session (0240).
+  const refused = taught.filter(module =>
+    module.status !== 'ACTIVE' || module.signoffRequired || module.kind === 'CERTIFICATION')
   if (refused.length > 0) {
     throw createError({
       statusCode: 422,

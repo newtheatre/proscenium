@@ -228,10 +228,12 @@ export function curtainIsDown(performance: PerformanceTimes, at: number): boolea
   return at >= performanceEnd(performance)
 }
 
-// Who a refused volunteer turns to: tonight's duty manager, by first name where the rota has one.
+// Who a refused volunteer turns to: tonight's duty manager by first name where the rota has one,
+// and the Front of House Manager on a night with none, who can open any screen.
 export function whoCanHelpTonight(team: readonly { role: string, filled: boolean, name: string | null }[] | null): string {
   const first = firstNameOf(team?.find(member => member.role === 'DUTY_MANAGER' && member.filled)?.name)
-  return first ? `Ask ${first}, tonight's duty manager.` : 'Ask tonight\'s duty manager.'
+  if (first) return `Ask ${first}, tonight's duty manager.`
+  return team === null ? 'Ask tonight\'s duty manager, or the Front of House Manager.' : 'Nobody is on as duty manager tonight: ask the Front of House Manager.'
 }
 
 /** Two groups of three, so the backstage code can be read out over a headset. */
@@ -239,4 +241,14 @@ export function groupedBoardCode(code: string): string {
   const digits = code.replace(/\s+/g, '')
   if (digits.length !== 6) return code
   return `${digits.slice(0, 3)} ${digits.slice(3)}`
+}
+
+// The report tile's line: once the house is signed off it says by whom, rather than still asking
+// for the close (0239).
+export function reportTileHint(
+  close: { closedByName: string | null, automatic: boolean } | null,
+  curtainDown: boolean,
+): string {
+  if (close) return close.automatic ? 'Closed automatically' : `Signed off by ${firstNameOf(close.closedByName) ?? 'a former member'}`
+  return curtainDown ? 'Sign off and close' : 'The draft so far'
 }

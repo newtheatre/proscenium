@@ -13,6 +13,7 @@ import {
   stepperMax,
 } from '#shared/utils/reservations'
 import { registerForm } from '#shared/utils/sign-in'
+import { RESERVED_DOMAIN_REFUSAL } from '#shared/utils/deliverability'
 import { waitingListJoinRefusal } from '#shared/utils/waiting-list'
 
 // The public booking journey as the hands-on review of 13 October 2026 found it (D-104, D-108,
@@ -149,7 +150,7 @@ describe('the confirmation carries what somebody needs to arrive (D-106 criterio
     venue: 'The Portland Studio',
     venueAddress: 'University Park, Nottingham',
     doors: '19:00',
-    releasesAt: '19:10',
+    releasesAt: 'Thursday 22 October at 19:10',
     lines: [{ name: 'Standard', quantity: 2, total: '£14.00' }, { name: 'Concession', quantity: 1, total: '£5.00' }],
   }
 
@@ -159,7 +160,7 @@ describe('the confirmation carries what somebody needs to arrive (D-106 criterio
       expect(part).toContain('The Portland Studio')
       expect(part).toContain('University Park, Nottingham')
       expect(part).toContain('Doors open at 19:00')
-      expect(part).toContain('released at 19:10')
+      expect(part).toContain('released on Thursday 22 October at 19:10')
       expect(part).toContain('Standard × 2')
       expect(part).toContain('£14.00')
     }
@@ -253,6 +254,14 @@ describe('the account pages', () => {
     const malformed = registerForm.safeParse({ name: 'QA', email: 'qa.reg1@', password: 'x' }).error?.issues.map(issue => issue.message)
     expect(malformed).toEqual([HOUSE_ERROR.email])
     expect(await source(`${PAGES}/register.vue`)).toContain('registerForm')
+  })
+
+  // The 21 Oct process map: a .test address was told to check its email, and nothing ever came.
+  test('/register refuses an address on a reserved domain rather than waiting on an email that never comes', () => {
+    registerHouseErrors()
+    const reserved = registerForm.safeParse({ name: 'QA', email: 'mon.skip@nnt-trial.test', password: 'x' }).error?.issues.map(issue => issue.message)
+    expect(reserved).toEqual([RESERVED_DOMAIN_REFUSAL])
+    expect(registerForm.safeParse({ name: 'QA', email: 'mon@nnt-trial.co.uk', password: 'x' }).success).toBe(true)
   })
 
   test('/verify never shows a validator\'s words, and a used link is not called expired', async () => {

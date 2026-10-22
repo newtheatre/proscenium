@@ -123,6 +123,18 @@ function backdateHold(reservationId: string, at: number): void {
   }
 }
 
+// The booking made an hour ago, before the reminder window opened: one made inside it is never
+// reminded, since its confirmation has just said when it releases.
+function bookedAnHourAgo(reservationId: string): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.prepare('UPDATE reservations SET created_at = created_at - 3600 WHERE id = ?').run(reservationId)
+  }
+  finally {
+    database.close()
+  }
+}
+
 describe.skipIf(skip !== null)('an unpaid hold releases once past its own expiry (D-106)', () => {
   const STARTS_AT_OFFSET_MINUTES = 60
   const HOLD_RELEASE_MINUTES_BEFORE = 5
@@ -227,6 +239,7 @@ describe.skipIf(skip !== null)('a reminder sends once, inside its own window (D-
   test('the reminder opens the booking and carries its QR, and cancels nothing by itself', async () => {
     expect((await send('PUT', '/api/admin/config/HOLD_REMINDER_MINUTES_BEFORE', { value: 50 })).status).toBe(200)
     const { reservationId } = await bookedHold(HOLD_RELEASE_MINUTES_BEFORE, STARTS_AT_OFFSET_MINUTES)
+    bookedAnHourAgo(reservationId)
     const reference = query<{ reference: string }>('SELECT reference FROM reservations WHERE id = ?', reservationId)!.reference
 
     await runReleaseTask()
@@ -242,6 +255,7 @@ describe.skipIf(skip !== null)('a reminder sends once, inside its own window (D-
     // A fifty-minute window against a hold 45 minutes out already opened five minutes ago.
     expect((await send('PUT', '/api/admin/config/HOLD_REMINDER_MINUTES_BEFORE', { value: 50 })).status).toBe(200)
     const { reservationId } = await bookedHold(HOLD_RELEASE_MINUTES_BEFORE, STARTS_AT_OFFSET_MINUTES)
+    bookedAnHourAgo(reservationId)
 
     await runReleaseTask()
     await runReleaseTask()
@@ -251,5 +265,18 @@ describe.skipIf(skip !== null)('a reminder sends once, inside its own window (D-
       'reservation.hold-expiring', reservationId, 'SENT',
     )
     expect(sent?.total).toBe(1)
+  }, CASE_TIMEOUT_MS)
+
+  test('a hold booked inside the reminder window is not reminded', async () => {
+    expect((await send('PUT', '/api/admin/config/HOLD_REMINDER_MINUTES_BEFORE', { value: 50 })).status).toBe(200)
+    const { reservationId } = await bookedHold(HOLD_RELEASE_MINUTES_BEFORE, STARTS_AT_OFFSET_MINUTES)
+
+    await runReleaseTask()
+
+    const sent = query<{ total: number }>(
+      'SELECT count(*) AS total FROM notification_log WHERE type = ? AND record_id = ?',
+      'reservation.hold-expiring', reservationId,
+    )
+    expect(sent?.total).toBe(0)
   }, CASE_TIMEOUT_MS)
 })

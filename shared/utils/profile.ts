@@ -33,15 +33,25 @@ export const PROFILE_FIELDS: ProfileField[] = [
 const optionalText = (max: number) => z.string().trim().max(max).nullish()
   .transform(value => (value ?? '').trim() || null)
 
+// Somebody rings it on the night, so it must be a number: digits, with the spaces, brackets, dashes
+// and leading + people write them with, and as many digits as a UK or international number has.
+export const PHONE_PROBLEM = 'Enter a phone number, digits only, like 07700 900123'
+export function isPhoneNumber(value: string): boolean {
+  if (!/^\+?[\d\s()-]+$/.test(value)) return false
+  const digits = value.replace(/\D/g, '').length
+  return digits >= 7 && digits <= 15
+}
+const optionalPhone = optionalText(40).refine(value => value === null || isPhoneNumber(value), PHONE_PROBLEM)
+
 export const profileForm = z.object({
   name: z.string().trim().min(1, 'Enter your name').max(200),
   pronouns: optionalText(80),
-  phone: optionalText(40),
+  phone: optionalPhone,
   // Consent, not a fact recorded about somebody: whether tonight's team sees this phone number while
   // a shift is confirmed, on the team list and a duty manager's on the emergency card (E-112, A-114).
   shiftContactVisible: z.boolean().default(false),
   emergencyName: optionalText(200),
-  emergencyPhone: optionalText(40),
+  emergencyPhone: optionalPhone,
   emergencyRelation: optionalText(80),
 }).refine(
   profile => profile.emergencyPhone !== null || profile.emergencyName === null,

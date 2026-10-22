@@ -146,12 +146,26 @@ describe('every role is counted in one statement, never a query each (criterion 
     })
   })
 
+  test('a privileged grant still waiting on an authenticator is not yet a holder (0157)', async () => {
+    await withDatabase((database) => {
+      seed(database)
+      const counted = (privileged: string[]): Record<string, number> => {
+        const [text, ...parameters] = boundStatement(database, holderCountsStatement(NOW, privileged))
+        return Object.fromEntries(rows<{ role: string, holders: number }>(database, text, ...parameters).map(row => [row.role, Number(row.holders)]))
+      }
+      expect(counted(['FOH_MANAGER']).FOH_MANAGER).toBeUndefined()
+      database.batch([['INSERT INTO totp_secrets (user_id, secret, confirmed_at) VALUES (?, ?, ?)', 'bea', 'SECRET', NOW - 60]])
+      expect(counted(['FOH_MANAGER']).FOH_MANAGER).toBe(1)
+      expect(counted([]).ADMIN).toBe(1)
+    })
+  })
+
   test('one statement, and its parameter count does not grow with the roles there are', async () => {
     await withDatabase((database) => {
       seed(database)
       const [text, ...parameters] = boundStatement(database, holderCountsStatement(NOW))
       expect(text.toLowerCase()).toContain('group by')
-      expect(parameters.length).toBeLessThanOrEqual(2)
+      expect(parameters.length).toBeLessThanOrEqual(3)
     })
   })
 })

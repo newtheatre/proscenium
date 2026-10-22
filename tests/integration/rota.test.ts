@@ -26,7 +26,7 @@ import { venueInUseQuery } from '#server/utils/venues'
 import { auditEntry } from '#shared/utils/audit'
 import { daysAfter } from '#shared/utils/membership'
 import { shiftConstraintRefusal } from '#shared/utils/rota'
-import { currentShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOf, showNightOpensAt } from '#shared/utils/show-night'
 import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { applyTag } from '#tests/helpers/migrations'
 import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
@@ -375,9 +375,11 @@ describe('the backfill is idempotent (E-102 criterion 2)', () => {
 describe('a rota belongs to a performance', () => {
   test('a matinee and an evening at one venue each get their own rota', async () => {
     await withDatabase(async (database) => {
-      const matinee = tonightsPerformance(database, { suffix: 'a', curtainHoursAfterNightStart: 10.5 })
+      // A week ahead, since a matinee already over tonight is not stamped (0211).
+      const night = showNightOf(new Date(Date.now() + 7 * 86_400_000))
+      const matinee = tonightsPerformance(database, { suffix: 'a', night, curtainHoursAfterNightStart: 10.5 })
       const evening = tonightsPerformance(database, {
-        suffix: 'b', venueId: matinee.venueId, curtainHoursAfterNightStart: 15.5,
+        suffix: 'b', night, venueId: matinee.venueId, curtainHoursAfterNightStart: 15.5,
       })
       template(database, matinee.venueId)
 
@@ -1232,6 +1234,18 @@ describe('releasing a held shift (E-107 criterion 1)', () => {
 })
 
 describe('dismissing a declined claim (E-114)', () => {
+  // 0213: the member reads the officer's reason on their own card, not only in the email.
+  test('a member\'s own declined shift carries its reason', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'declined')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, decline_reason) VALUES (?, ?, ?, 1, ?, ?, ?)',
+        'shift-declined', tonight.performanceId, 'DOOR', who, 'DECLINED', 'Not eligible']])
+
+      expect(run(database, myShiftsQuery(who, tonight.startsAt))).toMatchObject([{ status: 'DECLINED', declineReason: 'Not eligible' }])
+    })
+  })
+
   test('a declined claim returns to OPEN, naming nobody, exactly as a release would', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)

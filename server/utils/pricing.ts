@@ -17,6 +17,7 @@ export interface PricedTicketType {
   description: string | null
   kind: string
   accessKind: string | null
+  restrictedTo: string | null
   archived: boolean
   basePrice: number
   activeByDefault: boolean
@@ -35,6 +36,7 @@ interface PriceRow {
   description: string | null
   kind: string
   accessKind: string | null
+  restrictedTo: string | null
   archived: number
   basePrice: number
   activeByDefault: number
@@ -73,6 +75,7 @@ const TYPE_COLUMNS = sql`
   t.description AS description,
   t.kind AS kind,
   t.access_kind AS accessKind,
+  t.restricted_to AS restrictedTo,
   t.archived AS archived,
   t.price AS basePrice,
   t.active_by_default AS activeByDefault,

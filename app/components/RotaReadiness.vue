@@ -2,14 +2,14 @@
 import { can, editSettings, viewBoardConfig, viewChecklist, viewEmergencyCard } from '#shared/utils/abilities'
 import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { saysShiftRole } from '#shared/utils/rota'
-import { ELIGIBILITY_KEYS, saysChecklistReadiness, saysEligibility, venueReady } from '#shared/utils/rota-readiness'
+import { ELIGIBILITY_KEYS, saysChecklistReadiness, saysEligibility, saysQualified, venueReady } from '#shared/utils/rota-readiness'
 import type { ShiftRole } from '#shared/utils/rota'
 import type { BoardReadiness, RoleEligibility, VenueReadiness } from '#shared/utils/rota-readiness'
 
 // What a show night needs set up, on one card for the rota's owner (issue 1318). Each role's gate
 // reads to anybody with the rota; only a settings editor gets a field to change it (0040).
 
-interface Readiness { eligibility: RoleEligibility[], venues: VenueReadiness[], board: BoardReadiness }
+interface Readiness { eligibility: RoleEligibility[], qualified: Partial<Record<ShiftRole, number>>, venues: VenueReadiness[], board: BoardReadiness }
 interface ModuleCandidate { id: string, name: string }
 
 const request = useRequestFetch()
@@ -27,7 +27,7 @@ const [{ data, error, refresh }, { data: modules }] = await Promise.all([
   useAsyncData(
     'rota-readiness',
     () => request<Readiness>('/api/admin/rota/readiness'),
-    { default: (): Readiness => ({ eligibility: [], venues: [], board: { presets: 0, milestones: 0 } }) },
+    { default: (): Readiness => ({ eligibility: [], qualified: {}, venues: [], board: { presets: 0, milestones: 0 } }) },
   ),
   // Every module is a candidate here, not the current page of some other table's search (K-129).
   useAsyncData(
@@ -59,6 +59,10 @@ async function saveEligibility(role: ShiftRole, next: string | null): Promise<vo
     saving.value = null
   }
 }
+
+// Open only once somebody could actually be put on the shift, not merely once a module is named (0210).
+const opens = (line: RoleEligibility): boolean => line.standing === 'SET' && (data.value.qualified[line.role] ?? 0) > 0
+const qualifiedLine = (line: RoleEligibility): string | null => saysQualified(line, data.value.qualified[line.role] ?? 0)
 
 const saysSlots = (venue: VenueReadiness): string => (venue.templateSlots === 0
   ? 'No template, so its performances show as unstaffed.'
@@ -94,18 +98,21 @@ const saysBoard = computed(() => `${plural(data.value.board.presets, 'preset cal
             class="flex flex-wrap items-center gap-x-3 gap-y-2 py-2"
           >
             <UBadge
-              :color="line.standing === 'SET' ? 'success' : 'warning'"
+              :color="opens(line) ? 'success' : 'warning'"
               variant="subtle"
               size="sm"
             >
-              {{ line.standing === 'SET' ? 'Open' : 'Closed' }}
+              {{ opens(line) ? 'Open' : 'Closed' }}
             </UBadge>
             <span class="font-medium">{{ saysShiftRole(line.role) }}</span>
-            <span
-              class="min-w-0 flex-1 text-sm text-muted"
-              :data-test="`readiness-eligibility-${line.role}`"
-            >
-              {{ saysEligibility(line) }}
+            <span class="min-w-0 flex-1 text-sm text-muted">
+              <span :data-test="`readiness-eligibility-${line.role}`">{{ saysEligibility(line) }}</span>
+              <span
+                v-if="qualifiedLine(line)"
+                class="block"
+                :class="opens(line) ? '' : 'text-warning'"
+                :data-test="`readiness-qualified-${line.role}`"
+              >{{ qualifiedLine(line) }}</span>
             </span>
             <USelectMenu
               v-if="edits"

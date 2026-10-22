@@ -55,3 +55,27 @@ export function noLongerOnCommittee(role: ShiftRole, claimantName: string): Laps
     declineReason: `A ${lower} shift is for committee members, and you no longer hold a committee role.`,
   }
 }
+
+export const ALREADY_ON_PERFORMANCE = 'Already on this performance'
+
+export interface CandidateFacts {
+  role: ShiftRole
+  moduleId: string | null
+  moduleName: string | null
+  held: ReadonlySet<string>
+  committee: boolean
+  onPerformance: boolean
+  // Holds a shift at another venue whose window overlaps this one (0211).
+  clashes?: boolean
+}
+
+// Why an officer cannot put somebody on a shift, read under their "Locked" badge, or null when
+// they can. The order is the gate's: committee role, then training, then the performance (0210).
+export function candidateLock(facts: CandidateFacts): string | null {
+  const refusal = eligibilityRefusal(facts.moduleId, facts.held)
+  if (refusal === UNCONFIGURED_ELIGIBILITY_RULE) return 'No training is named for this role yet'
+  if (needsCommitteeRole(facts.role) && !facts.committee) return 'Needs a committee role'
+  if (refusal !== null) return `Needs ${facts.moduleName ?? refusal}`
+  if (facts.onPerformance) return ALREADY_ON_PERFORMANCE
+  return facts.clashes ? 'On a shift at another venue at the same time' : null
+}

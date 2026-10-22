@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Database } from 'bun:sqlite'
 import { codeForStep, stepFor } from '#shared/utils/totp'
+import { londonToday as today, londonYearsFrom as yearsOn } from '#tests/helpers/london-day'
 import { adminSession, forgetSpentStep, markVerified } from '#tests/helpers/accounts'
-import { londonParts } from '#shared/utils/london'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
 import { click, fill, openSignedOutView, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -64,16 +64,6 @@ const send = (method: string, path: string, body?: unknown, as = cookie): Promis
   })
 
 const suffix = (): string => crypto.randomUUID().slice(0, 6).toUpperCase().replace(/[^A-Z0-9]/g, 'X')
-
-function today(): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year, now.month - 1, now.day)).toISOString().slice(0, 10)
-}
-
-function yearsOn(years: number): string {
-  const now = londonParts(new Date())
-  return new Date(Date.UTC(now.year + years, now.month - 1, now.day)).toISOString().slice(0, 10)
-}
 
 async function addModule(over: Record<string, unknown> = {}, into = department): Promise<string> {
   const id = `ADR-${suffix()}`

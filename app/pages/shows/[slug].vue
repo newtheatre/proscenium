@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysNoSuch } from '#shared/utils/no-such'
+import { saysNotFoundYet } from '#shared/utils/no-such'
 import { groupContentWarnings, saysAssessment } from '#shared/utils/content-warnings'
 import { saysClock, saysDay, saysWhenLong } from '#shared/utils/when'
 import { SAYS_BOOKING_HOLDS, SAYS_PAYMENT, TO_BE_CONFIRMED, saysHowToPay, saysLatecomers } from '#shared/utils/programme'
@@ -17,7 +17,7 @@ const slug = computed(() => String(route.params.slug))
 const { data } = await useFetch<ListedShow>(() => `/api/shows/${slug.value}`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: saysNoSuch('show', 'Go back to what is on and choose another'), fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNotFoundYet('show', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const show = computed(() => data.value!.show)
@@ -116,17 +116,17 @@ const from = computed(() => {
   return prices[0] === undefined ? null : saysPrice(prices[0])
 })
 
-// The run's distinct prices as one line: cheapest first, each carrying its restriction so
-// "£4.00 members" reads as the condition it is (show-page.png).
+// The run's distinct prices as one line, dearest first, each named and carrying its restriction,
+// so two equal figures never read as a duplicate (show-page.png).
 const tickets = computed(() => {
-  const seen = new Map<string, { price: number, restrictedTo: string | null }>()
+  const seen = new Map<string, { name: string, price: number, restrictedTo: string | null }>()
   for (const price of onOffer.value.flatMap(one => one.prices)) {
-    const key = `${price.price}:${price.restrictedTo ?? ''}`
-    if (!seen.has(key)) seen.set(key, { price: price.price, restrictedTo: price.restrictedTo })
+    const key = `${price.name}:${price.price}:${price.restrictedTo ?? ''}`
+    if (!seen.has(key)) seen.set(key, { name: price.name, price: price.price, restrictedTo: price.restrictedTo })
   }
   return [...seen.values()]
     .sort((a, b) => b.price - a.price)
-    .map(price => [saysPrice(price.price), saysRestriction(price.restrictedTo)].filter(Boolean).join(' '))
+    .map(price => [`${price.name} ${saysPrice(price.price)}`, saysRestriction(price.restrictedTo)?.toLowerCase()].filter(Boolean).join(', '))
 })
 
 function saysInterval(performance: ListedPerformance): string {

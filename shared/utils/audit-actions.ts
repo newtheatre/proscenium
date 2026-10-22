@@ -66,6 +66,7 @@ const CATALOGUE = {
 
   'password.set': { label: 'First password set', module: 'identity', self: true },
   'password.reset': { label: 'Password reset', module: 'identity', self: true },
+  'password.cleared': { label: 'Unconfirmed password cleared on registering again', module: 'identity' },
 
   'mfa.challenged': { label: 'Second factor requested', module: 'identity', self: true },
   'mfa.confirmed': { label: 'Authenticator enrolled', module: 'identity', self: true },
@@ -90,11 +91,13 @@ const CATALOGUE = {
   'membership.granted': { label: 'Membership recorded', module: 'identity' },
   'membership.confirmed': { label: 'Membership confirmed', module: 'identity' },
   // Both name the claim and never the number or the reason (A-130 criterion 5, 0011).
+  'membership.claim.sent': { label: 'Membership claim sent', module: 'identity' },
   'membership.claim.recorded': { label: 'Membership claim recorded', module: 'identity' },
   'membership.claim.declined': { label: 'Membership claim declined', module: 'identity' },
   'membership.claim.withdrawn': { label: 'Membership claim withdrawn', module: 'identity' },
   'account.method.added': { label: 'Sign-in method added', module: 'identity', self: true },
   'account.method.removed': { label: 'Sign-in method removed', module: 'identity', self: true },
+  'account.method.renamed': { label: 'Passkey renamed', module: 'identity', self: true },
   'account.email.changed': { label: 'Email address changed', module: 'identity', self: true },
   'account.email.changed.admin': { label: 'Email address changed by an officer', module: 'identity' },
   'account.profile.updated': { label: 'Profile updated', module: 'identity', self: true },

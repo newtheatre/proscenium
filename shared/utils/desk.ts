@@ -6,7 +6,8 @@ import { walkUpGuestForm } from './sale'
 import { saysPrice } from './ticket-types'
 import { saysReservationStatus } from './capacity'
 import { showNightOf } from './show-night'
-import { saysDay } from './when'
+import { activePerformanceId } from './tonight'
+import { saysClock, saysDay, saysWhen } from './when'
 
 // D-114: finding a booking at the desk and taking payment for it. Collection is the payment
 // boundary (criterion 2); this file is the pure shape of what crosses it.
@@ -200,6 +201,27 @@ export function saysDeskNight(night: string, now: Date = new Date()): string {
   return night === showNightOf(now) ? `Tonight, ${day}` : day
 }
 
+// Tonight opens on the performance running now, as the door does, never a matinee long over that
+// sorts first; another night opens on its first.
+export function deskOpeningPerformanceId(performances: readonly { id: string, startsAt: number }[], isTonight: boolean, now: number): string | undefined {
+  if (!isTonight) return performances[0]?.id
+  return activePerformanceId(performances.map(one => ({ performanceId: one.id, startsAt: one.startsAt, doorsAt: null })), now) ?? undefined
+}
+
+// A booking opened from a scan or a reference can be for another night or show: said, never assumed.
+export function otherPerformanceSays(booking: { performanceId: string, showTitle: string, startsAt: number }, onScreen: string | undefined): string | null {
+  if (!onScreen || booking.performanceId === onScreen) return null
+  return `This booking is for ${booking.showTitle}, ${saysWhen(booking.startsAt)}, not the performance on screen. Check the night with the booker before taking money or admitting anyone.`
+}
+
+// Past the release, unpaid holds stay unpaid until the next sweep: the desk says so, not the past time.
+export function unpaidReleaseSays(releaseAt: number, now: number): string {
+  if (now < releaseAt) return `Unpaid bookings release at ${saysClock(releaseAt)}, and their seats go back on sale.`
+  return `Unpaid bookings passed their ${saysClock(releaseAt)} release and are being let go within the next few minutes. Collect one now if its booker is here.`
+}
+
+export const DESK_CASH_SAYS = 'Card on the SumUp reader only: the theatre does not take cash.'
+
 export interface WalkUpLine {
   pricePence: number
   quantity: number
@@ -244,7 +266,7 @@ export function walkUpShortSays(remaining: number): string {
 // The card searches on its own as soon as a performance is chosen, so an empty table is either
 // a search nobody has run or one that matched nothing, and the two read differently.
 export function deskEmptySays(state: { searched: boolean, narrowed: boolean }): string {
-  if (!state.searched) return 'Scan a booking\'s code, or search by reference or name.'
+  if (!state.searched) return 'Scan a booking\'s code, or search by reference, name or email.'
   if (state.narrowed) return 'No booking matches that. Check the reference, or search by part of the booker\'s name.'
   return 'No bookings on this performance. A walk-up sold here is the first one.'
 }

@@ -8,9 +8,9 @@ import { z } from 'zod'
 export const TICKET_TYPE_KINDS = ['SINGLE', 'PASS_ADMISSION'] as const
 export const PASS_ADMISSION_TICKET_TYPE_NAME = 'Pass admission'
 export const TICKET_TYPE_ACCESS_KINDS = ['ACCESS', 'COMPANION'] as const
-// Concession has no committee-agreed eligibility evidence yet (docs/backlog/D-ticketing.md open
-// questions), so it is not a value here: it stays an ordinary, unrestricted type (D-109).
-export const TICKET_TYPE_RESTRICTIONS = ['MEMBER'] as const
+// Concession is not a value: it has no agreed eligibility evidence yet (D-109). DESK keeps a type
+// off every customer channel, such as a comp the house gives away (0190).
+export const TICKET_TYPE_RESTRICTIONS = ['MEMBER', 'DESK'] as const
 
 export type TicketTypeKind = (typeof TICKET_TYPE_KINDS)[number]
 export type TicketTypeAccessKind = (typeof TICKET_TYPE_ACCESS_KINDS)[number]
@@ -46,6 +46,16 @@ export const newTicketTypeForm = ticketTypeForm.extend({
   input => input.accessKind !== 'COMPANION' || input.price === 0,
   { message: 'A companion ticket is always free', path: ['price'] },
 )
+
+// Members-only is fixed at creation (D-109); open and box office only swap either way (0190).
+export const editTicketTypeForm = ticketTypeForm.extend({
+  restrictedTo: z.enum(TICKET_TYPE_RESTRICTIONS).nullable().optional(),
+})
+
+export function restrictionChangeRefusal(held: TicketTypeRestriction | null, wanted: TicketTypeRestriction | null): string | null {
+  if (held === wanted || (held !== 'MEMBER' && wanted !== 'MEMBER')) return null
+  return 'Who may book a members-only type is set when it is added, and not changed afterwards'
+}
 
 export const archiveTicketTypeForm = z.object({
   archived: z.boolean(),
@@ -110,8 +120,20 @@ export function saysAccessKind(accessKind: string | null): string | null {
   return null
 }
 
+// The warning when verifying an access profile would entitle its holder to nothing (or to no
+// companion): null once both kinds have a ticket type on offer.
+export function saysAccessKindsMissing(kinds: { access: boolean, companion: boolean }): string | null {
+  const missing = [kinds.access ? null : 'Access', kinds.companion ? null : 'Companion'].filter(Boolean)
+  if (missing.length === 0) return null
+  return `There is no ${missing.join(' or ')} ticket type, so a verified access profile cannot book one. Add it under Ticket types, choosing it in Access or companion.`
+}
+
+export const SAYS_ANYONE = 'Anyone'
+
 export function saysRestriction(restrictedTo: string | null): string | null {
-  return restrictedTo === 'MEMBER' ? 'Current members only' : null
+  if (restrictedTo === 'MEMBER') return 'Current members only'
+  if (restrictedTo === 'DESK') return 'Box office only'
+  return null
 }
 
 // Pence in, pounds out, unprefixed: the figure a machine reads, such as a schema.org offer.

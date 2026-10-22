@@ -38,6 +38,13 @@ export function looksLikeReference(value: string): boolean {
   return REFERENCE_SHAPE.test(value.toUpperCase())
 }
 
+// The start of a reference, as a booker reads part of one out: three characters up, never whole.
+const REFERENCE_PREFIX_SHAPE = new RegExp(`^[${REFERENCE_ALPHABET}]{3,${RESERVATION_REFERENCE_LENGTH - 1}}$`)
+
+export function looksLikeReferencePrefix(value: string): boolean {
+  return REFERENCE_PREFIX_SHAPE.test(value.toUpperCase())
+}
+
 // A structural ceiling only, well above anything a real order asks for: the actual cap is
 // `PUBLIC_ORDER_SEAT_CAP`, read at request time because it is configuration (0019).
 const MAX_LINE_QUANTITY = 999
@@ -92,6 +99,15 @@ export function resolveHoldReleaseMinutes(performanceOverride: number | null, de
 // across a wall clock, so the clocks changing does not move it relative to the performance (0014).
 export function holdExpiresAt(startsAt: number, minutesBefore: number): number {
   return startsAt - minutesBefore * 60
+}
+
+// A hold reinstated after its release would be born expired and lapse at the next sweep, so past
+// the release it runs to curtain, and never less than this long from the reinstatement.
+export const REINSTATED_HOLD_MINUTES = 15
+
+export function reinstatedHoldExpiresAt(startsAt: number, minutesBefore: number, now: number): number {
+  const release = holdExpiresAt(startsAt, minutesBefore)
+  return Math.max(release > now ? release : startsAt, now + REINSTATED_HOLD_MINUTES * 60)
 }
 
 // D-107 criterion 2: keyed on the expiry it warns about, not the reservation alone, so a hold
@@ -237,6 +253,18 @@ export function saysExchangeNight(night: { startsAt: number, venueName: string, 
   }
 }
 
+// A night whose unpaid hold would release within this many minutes is not offered to move to:
+// the exchanged booking would lapse before anyone could reach the desk to pay.
+export const EXCHANGE_MIN_HOLD_MINUTES = 30
+
+export function exchangeTooSoon(bookingClosesAt: number, now: number): boolean {
+  return bookingClosesAt - now < EXCHANGE_MIN_HOLD_MINUTES * 60
+}
+
+export function saysExchangeTooSoon(bookingClosesAt: number): string {
+  return `Unpaid bookings release at ${saysClock(bookingClosesAt)}, too soon to move to`
+}
+
 // Criterion 3: cancellation this close to curtain has nowhere useful to send the freed seats.
 export function pastCurtainReason(startsAt: number, now: number): string | null {
   if (startsAt > now) return null
@@ -314,6 +342,7 @@ export function qrStatusDisplay(
   cancelledBy: string | null,
   totalDue: string | null,
   exchangedTo: QrExchangedTo | null = null,
+  refunded: string | null = null,
 ): QrStatusDisplay {
   switch (status) {
     case 'PENDING':
@@ -321,7 +350,7 @@ export function qrStatusDisplay(
         ? { headline: 'Unpaid', detail: `${totalDue} due at the box office on the night.` }
         : { headline: 'Booked', detail: 'Nothing is due.' }
     case 'COLLECTED':
-      return { headline: 'Paid', detail: 'You paid for this at the box office.' }
+      return { headline: 'Paid', detail: refunded ? `You paid for this at the box office. ${refunded} of it was refunded.` : 'You paid for this at the box office.' }
     case 'DOOR':
       return { headline: 'Admitted', detail: 'Already checked in at the door.' }
     case 'EXPIRED':
@@ -335,7 +364,9 @@ export function qrStatusDisplay(
       }
       return {
         headline: 'Cancelled',
-        detail: cancelledBy === 'CUSTOMER' ? 'Cancelled by the booker.' : 'Cancelled by the box office.',
+        detail: cancelledBy === 'CUSTOMER'
+          ? 'Cancelled by the booker.'
+          : refunded ? `Cancelled by the box office. ${refunded} was refunded.` : 'Cancelled by the box office.',
       }
     case 'NO_SHOW':
       return { headline: 'No-show', detail: 'Recorded as not attended.' }

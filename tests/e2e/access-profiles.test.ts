@@ -15,6 +15,7 @@ import type { OwnAccessProfile } from '#shared/utils/access-profiles'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+const CASE_TIMEOUT_MS = 120_000
 
 let app: AppUnderTest
 let admin: TestMember
@@ -501,4 +502,28 @@ describe.skipIf(skip !== null)('the screens', () => {
     expect(await view.evaluate<boolean>(ticked('standing'))).toBe(false)
     view.close()
   }, 120_000)
+})
+
+// A fresh install has no access type, so verifying a profile entitles nobody to anything; the
+// screens say so, and the Secretary who verifies may read it holding no ticketing permission.
+describe.skipIf(skip !== null)('the screens say when no access ticket type exists', () => {
+  test('the Secretary reads which kinds exist, and an added Access and Companion type turn both on', async () => {
+    const before = await withoutSecondFactor(() => send('GET', '/api/admin/ticket-types/access-kinds', undefined, secretary.cookie))
+    expect(before.status).toBe(200)
+    expect(Object.keys(await before.json() as object).sort()).toEqual(['access', 'companion'])
+
+    const suffix = crypto.randomUUID().slice(0, 8)
+    expect((await send('POST', '/api/admin/ticket-types', { name: `Access ${suffix}`, price: 900, accessKind: 'ACCESS' }, admin.cookie)).status).toBe(200)
+    expect((await send('POST', '/api/admin/ticket-types', { name: `Companion ${suffix}`, price: 0, accessKind: 'COMPANION' }, admin.cookie)).status).toBe(200)
+
+    const after = await withoutSecondFactor(() => send('GET', '/api/admin/ticket-types/access-kinds', undefined, secretary.cookie))
+    expect(await after.json()).toEqual({ access: true, companion: true })
+    expect((await send('GET', '/api/admin/ticket-types/access-kinds', undefined, patron.cookie)).status).toBe(403)
+  }, CASE_TIMEOUT_MS)
+
+  test('a declaration with no need, no companion and no words is refused before it reaches the Secretary', async () => {
+    const answered = await declare(patron, { flags: BLANK_FLAGS, companions: 0, requesterNote: null })
+    expect(answered.status).toBe(400)
+    expect(await answered.text()).toContain('Tick at least one need')
+  }, CASE_TIMEOUT_MS)
 })

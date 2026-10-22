@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { saysMoney } from '#shared/utils/bar'
+import { saysBasketLine } from '#shared/utils/sale'
 import type { Discount } from '#shared/utils/discounts'
 import type { PricedBasket, SaleProduct, TillBooking } from '#shared/utils/sale'
 import type { TabHolder } from '~/composables/useTillCatalogue'
@@ -148,7 +149,7 @@ function productFor(line: BasketLine): SaleProduct | undefined {
     >
       <div class="min-w-0">
         <p class="truncate text-sm font-medium">
-          {{ line.productName }}, {{ line.variantLabel }}<span v-if="line.choiceItemName">, {{ line.choiceItemName }}</span>
+          {{ saysBasketLine(line) }}
         </p>
         <p
           class="text-xs text-muted"

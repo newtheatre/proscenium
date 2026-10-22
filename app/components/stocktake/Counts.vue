@@ -263,11 +263,13 @@ const FIELD = {
 
             <div class="space-y-0.5 text-sm @3xl:text-right">
               <template v-if="!open || counted(line)">
+                <!-- Read back for every counted line, so a whole-item count reads as a container one does. -->
                 <p
-                  v-if="open && byContainer(line)"
+                  v-if="open"
                   class="text-muted"
+                  :data-test="`read-back-${line.itemId}`"
                 >
-                  {{ saysCount(drafts[line.itemId]!, line.unit, line.containerMl) }}
+                  {{ byContainer(line) ? saysCount(drafts[line.itemId]!, line.unit, line.containerMl) : `${saysCount(drafts[line.itemId]!, line.unit, line.containerMl)} counted` }}
                 </p>
                 <p
                   v-if="line.expectedQty !== null"

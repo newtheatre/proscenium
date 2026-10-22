@@ -52,9 +52,10 @@ export function saysLifecycle(status: string): string {
 export interface PlannerOption { label: string, value: string, disabled: boolean }
 
 // What a session can teach (G-112 c3), with a draft listed but not offered, so the planner says
-// why the module just added is missing rather than seeming not to have it (issue 1354).
-export function plannerModuleOptions(modules: readonly { id: string, name: string, status: string, signoffRequired: boolean }[]): PlannerOption[] {
-  const listed = modules.filter(module => !module.signoffRequired && (module.status === 'ACTIVE' || module.status === 'DRAFT'))
+// why the module just added is missing (issue 1354). A certification is signed off instead (0240).
+export function plannerModuleOptions(modules: readonly { id: string, name: string, status: string, signoffRequired: boolean, kind?: string }[]): PlannerOption[] {
+  const listed = modules.filter(module => !module.signoffRequired && module.kind !== 'CERTIFICATION'
+    && (module.status === 'ACTIVE' || module.status === 'DRAFT'))
   return [
     ...listed.filter(module => module.status === 'ACTIVE')
       .map(module => ({ label: `${module.id} ${module.name}`, value: module.id, disabled: false })),
@@ -495,7 +496,9 @@ export type SessionInput = z.output<typeof sessionForm>
 // "permission" or a read that "could not" happen (issue 1336, docs/copy-style.md section 6).
 export const NOT_YOUR_SESSION = `This session is taught by somebody else. The ${saysRole('THEATRE_MANAGER')} can make you its trainer.`
 
-export function saysSessionStatus(status: string): string {
+// An opened register closes sign-up whatever the stored badge still says (0241).
+export function saysSessionStatus(status: string, registerOpenedAt: number | null = null): string {
+  if (registerOpenedAt !== null && (status === 'OPEN' || status === 'FULL')) return 'Register open'
   if (status === 'OPEN') return 'Open for sign-up'
   if (status === 'FULL') return 'Full'
   if (status === 'DELIVERED') return 'Delivered'
@@ -685,21 +688,28 @@ export const sessionCancelForm = z.object({
 
 export type SessionCancelInput = z.output<typeof sessionCancelForm>
 
-export const markForm = z.object({
+const markShape = {
   marks: z.array(z.object({
     userId: z.string().trim().min(1, 'Say which person you mean').max(64),
     mark: z.enum(ATTENDANCE_MARKS),
-  })).min(1, 'Mark at least one person').max(120),
+  })).max(120),
   // Criterion 2. Everybody absent is a real answer and a suspicious one, so it is confirmed
-  // rather than refused.
+  // rather than refused, and an empty register closes the same way (0241).
   confirmedAllAbsent: z.boolean().optional(),
+}
+
+export const markForm = z.object(markShape).refine(input => input.marks.length > 0 || input.confirmedAllAbsent === true, {
+  message: 'Mark at least one person, or confirm that nobody came',
+  path: ['marks'],
 })
 
 export type MarkInput = z.output<typeof markForm>
 
 // A correction is the marks again, with a reason that goes onto every record it revokes so the
 // history says why it moved (G-114 criterion 2, G-122 criterion 2).
-export const correctionForm = markForm.extend({
+export const correctionForm = z.object({
+  ...markShape,
+  marks: markShape.marks.min(1, 'Mark at least one person'),
   reason: z.string().trim().min(1, 'Say what the correction changes').max(500).default('The register was corrected inside its edit window'),
 })
 

@@ -13,6 +13,8 @@ interface Cell {
 const toast = useToast()
 const loading = ref(true)
 const saving = ref('')
+const saved = ref('')
+let fading: ReturnType<typeof setTimeout> | undefined
 const topics = ref<Cell[]>([])
 
 async function load(): Promise<void> {
@@ -22,12 +24,17 @@ async function load(): Promise<void> {
   loading.value = false
 }
 
-// The switch is the confirmation: a saved change raises nothing of its own (H-104 criterion 7).
+// No toast for a saved change (H-104 criterion 7), but a quiet tick beside the switch says it kept.
 async function save(cell: Cell, wanted: boolean): Promise<void> {
   saving.value = cell.topic
   try {
     await $fetch('/api/account/notifications', { method: 'PUT', body: { topic: cell.topic, email: wanted, push: cell.push } })
     cell.email = wanted
+    saved.value = cell.topic
+    clearTimeout(fading)
+    fading = setTimeout(() => {
+      saved.value = ''
+    }, 2500)
   }
   catch (error) {
     toast.add({ title: refusalText(error), color: 'error' })
@@ -38,6 +45,7 @@ async function save(cell: Cell, wanted: boolean): Promise<void> {
 }
 
 onMounted(load)
+onBeforeUnmount(() => clearTimeout(fading))
 
 useSeoMeta({ title: 'Email settings' })
 </script>
@@ -65,16 +73,29 @@ useSeoMeta({ title: 'Email settings' })
         class="space-y-5"
         data-test="preference-matrix"
       >
-        <USwitch
+        <div
           v-for="cell in topics"
           :key="cell.topic"
-          :model-value="cell.email"
-          :label="TOPIC_LABELS[cell.topic]"
-          :description="TOPIC_DESCRIPTIONS[cell.topic]"
-          :loading="saving === cell.topic"
-          :data-test="`email-${cell.topic}`"
-          @update:model-value="value => save(cell, value)"
-        />
+          class="flex items-start justify-between gap-3"
+        >
+          <USwitch
+            :model-value="cell.email"
+            :label="TOPIC_LABELS[cell.topic]"
+            :description="TOPIC_DESCRIPTIONS[cell.topic]"
+            :loading="saving === cell.topic"
+            :data-test="`email-${cell.topic}`"
+            @update:model-value="value => save(cell, value)"
+          />
+          <span
+            v-if="saved === cell.topic"
+            class="flex shrink-0 items-center gap-1 text-sm text-success"
+            role="status"
+            :data-test="`saved-${cell.topic}`"
+          >
+            <UIcon name="i-lucide-check" />
+            Saved
+          </span>
+        </div>
 
         <ULink
           to="/my/notifications"

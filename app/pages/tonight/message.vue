@@ -94,6 +94,8 @@ const previewing = ref(false)
 const sending = ref(false)
 const preview = ref<{ count: number, rendered: { subject: string, text: string } } | null>(null)
 const sent = ref<NightMessageOutcome | null>(null)
+// What went out, kept apart from the form, so the words stay on screen exactly as sent (0238).
+const sentCopy = ref<{ subject: string, text: string } | null>(null)
 // One draft, one copy a person: Send pressed again after a dropped connection reaches only those
 // not yet reached, and any change makes a new draft (0048).
 const draftKey = ref(crypto.randomUUID())
@@ -105,7 +107,7 @@ const message = computed(() => ({ performanceId: performanceId.value, audience: 
 // sent notice above words that did not go is worse still.
 watch([performanceId, audience, subject, body], () => {
   preview.value = null
-  sent.value = null
+  if (!sentCopy.value) sent.value = null
   draftKey.value = crypto.randomUUID()
 })
 
@@ -131,6 +133,7 @@ async function send(): Promise<void> {
   try {
     const result = await $fetch<NightMessageOutcome>('/api/tonight/message', { method: 'POST', body: message.value })
     sent.value = result
+    if (preview.value) sentCopy.value = { subject: preview.value.rendered.subject, text: preview.value.rendered.text }
     // A copy still in flight keeps Send on screen, so the same draft can be pressed again (0108).
     if (!result.stillSending) preview.value = null
     toast.add({ title: saysNightMessageSent(result), icon: 'i-lucide-send', color: result.stillSending ? 'warning' : 'success' })
@@ -144,9 +147,11 @@ async function send(): Promise<void> {
 }
 
 function startAnother(): void {
+  sentCopy.value = null
   subject.value = ''
   body.value = ''
   sent.value = null
+  preview.value = null
   draftKey.value = crypto.randomUUID()
 }
 </script>
@@ -215,7 +220,27 @@ function startAnother(): void {
         </template>
       </UAlert>
 
-      <UFormField label="Subject">
+      <NightBlock
+        v-if="sentCopy"
+        title="What went out"
+      >
+        <div
+          class="space-y-2"
+          data-test="night-message-sent-copy"
+        >
+          <p class="font-semibold">
+            {{ sentCopy.subject }}
+          </p>
+          <p class="whitespace-pre-line text-sm">
+            {{ sentCopy.text }}
+          </p>
+        </div>
+      </NightBlock>
+
+      <UFormField
+        v-if="!sentCopy"
+        label="Subject"
+      >
         <UInput
           v-model="subject"
           size="xl"
@@ -224,7 +249,10 @@ function startAnother(): void {
         />
       </UFormField>
 
-      <UFormField label="Message">
+      <UFormField
+        v-if="!sentCopy"
+        label="Message"
+      >
         <UTextarea
           v-model="body"
           :rows="5"
@@ -242,7 +270,7 @@ function startAnother(): void {
       />
 
       <NightBlock
-        v-if="preview"
+        v-if="preview && !sentCopy"
         title="What they will get"
       >
         <div
@@ -272,7 +300,7 @@ function startAnother(): void {
         @press="send"
       />
       <NightAction
-        v-else
+        v-else-if="!sentCopy"
         label="Preview"
         icon="i-lucide-eye"
         color="neutral"

@@ -23,6 +23,7 @@ interface MyShift {
   startsAt: number
   windowStartsAt: number | null
   windowEndsAt: number | null
+  declineReason: string | null
 }
 
 interface DutyManagerToTell { firstName: string, phone: string | null }
@@ -40,6 +41,7 @@ interface MyOpeningShift {
   venueName: string
   startsAt: number
   endsAt: number
+  declineReason: string | null
 }
 
 interface OpenOpeningShift {
@@ -101,8 +103,8 @@ const nights = computed(() => byNight(data.value.items))
 interface RoleCard { role: ShiftRole, openShifts: number, module: { id: string, name: string } | null, action: TrainingAction | null }
 
 // Said once per role rather than on every locked row: what opens it, and the one thing to do.
-const { data: locked, refresh: refreshRoles } = await useFetch<{ roles: RoleCard[], officers: string[] }>('/api/rota/roles', {
-  default: () => ({ roles: [] as RoleCard[], officers: [] as string[] }),
+const { data: locked, refresh: refreshRoles } = await useFetch<{ roles: RoleCard[], officers: string[], committeeOnly: ShiftRole[] }>('/api/rota/roles', {
+  default: () => ({ roles: [] as RoleCard[], officers: [] as string[], committeeOnly: [] as ShiftRole[] }),
 })
 
 const notOpenYet = computed(() => saysNotOpenYet(locked.value.officers))
@@ -124,9 +126,9 @@ function releasable(held: Pick<MyShift, 'status' | 'startsAt'>): boolean {
   return (held.status === 'CLAIMED' || held.status === 'CONFIRMED') && releaseStillOpen(held.startsAt, nowSeconds)
 }
 
-// A release is asked first, the same for a shift and a slot on an opening (E-107 criterion 8); a
-// refusal stays in the dialogue that asked.
-interface Releasing { id: string, route: string, says: string }
+// A release is asked first, for a shift and an opening slot alike (E-107 criterion 8); a waiting
+// claim is withdrawn rather than released, since nobody confirmed it (0213).
+interface Releasing { id: string, route: string, says: string, withdraw: boolean }
 const releasingOne = ref<Releasing | null>(null)
 const releaseFailure = ref<string | null>(null)
 const releaseOpen = computed({
@@ -143,12 +145,14 @@ const askToReleaseShift = (shift: MyShift): void => askToRelease({
   id: shift.shiftId,
   route: `/api/rota/shifts/${shift.shiftId}/release`,
   says: `${saysShiftRole(shift.role)} for ${shift.showTitle}, ${saysWhenLong(shift.startsAt)}`,
+  withdraw: shift.status === 'CLAIMED',
 })
 
 const askToReleaseSlot = (slot: MyOpeningShift): void => askToRelease({
   id: slot.slotId,
   route: `/api/rota/openings/shifts/${slot.slotId}/release`,
   says: `${slot.label} at ${slot.venueName}, ${saysWhenLong(slot.startsAt)}`,
+  withdraw: slot.status === 'CLAIMED',
 })
 
 async function release(): Promise<void> {
@@ -160,7 +164,7 @@ async function release(): Promise<void> {
     await $fetch(one.route, { method: 'POST' })
     releasingOne.value = null
     toast.add({
-      title: 'Released',
+      title: one.withdraw ? 'Claim withdrawn' : 'Released',
       description: `${one.says} is back on the open list.`,
       icon: 'i-lucide-check',
       color: 'success',
@@ -175,11 +179,14 @@ async function release(): Promise<void> {
   }
 }
 
+const DISMISSED = 'It is off your list, and the shift is back on offer to anyone who qualifies.'
+
 // A declined claim is a member's own to clear off "what you hold" (E-114).
 async function dismiss(shift: MyShift): Promise<void> {
   dismissing.value = shift.shiftId
   try {
     await $fetch(`/api/rota/shifts/${shift.shiftId}/dismiss`, { method: 'POST' })
+    toast.add({ title: 'Dismissed', description: DISMISSED, icon: 'i-lucide-check', color: 'success' })
     await Promise.all([refresh(), refreshMine()])
   }
   catch (error) {
@@ -194,6 +201,7 @@ async function dismissOpening(slot: MyOpeningShift): Promise<void> {
   dismissing.value = slot.slotId
   try {
     await $fetch(`/api/rota/openings/shifts/${slot.slotId}/dismiss`, { method: 'POST' })
+    toast.add({ title: 'Dismissed', description: DISMISSED, icon: 'i-lucide-check', color: 'success' })
     await Promise.all([refresh(), refreshMine()])
   }
   catch (error) {
@@ -347,6 +355,11 @@ useSeoMeta({ title: 'Rota' })
             <p class="text-sm">
               {{ shift.showTitle }}
             </p>
+            <DeclinedNote
+              v-if="shift.status === 'DECLINED'"
+              :reason="shift.declineReason"
+              :data-test="`declined-${shift.shiftId}`"
+            />
             <!-- Tonight's confirmed shift: its own screen, and who to tell in place of a release. -->
             <div
               v-if="shift.status === 'CONFIRMED' && isTonight(shift.startsAt)"
@@ -395,7 +408,7 @@ useSeoMeta({ title: 'Rota' })
             :data-test="`release-${shift.shiftId}`"
             @click="askToReleaseShift(shift)"
           >
-            Release the shift
+            {{ shift.status === 'CLAIMED' ? 'Withdraw my claim' : 'Release the shift' }}
           </UButton>
           <UButton
             v-else-if="shift.status === 'DECLINED'"
@@ -432,6 +445,11 @@ useSeoMeta({ title: 'Rota' })
             <p class="text-sm">
               {{ slot.label }}
             </p>
+            <DeclinedNote
+              v-if="slot.status === 'DECLINED'"
+              :reason="slot.declineReason"
+              :data-test="`declined-opening-${slot.slotId}`"
+            />
             <UButton
               v-if="slot.status === 'CONFIRMED' && isTonight(slot.startsAt)"
               :to="tonightToolFor('BAR').to"
@@ -452,7 +470,7 @@ useSeoMeta({ title: 'Rota' })
             :data-test="`release-opening-${slot.slotId}`"
             @click="askToReleaseSlot(slot)"
           >
-            Release the shift
+            {{ slot.status === 'CLAIMED' ? 'Withdraw my claim' : 'Release the shift' }}
           </UButton>
           <UButton
             v-else-if="slot.status === 'DECLINED'"
@@ -516,8 +534,8 @@ useSeoMeta({ title: 'Rota' })
         data-test="open-shifts-empty"
       >
         Nothing you can take {{ week === 'ALL' ? 'is open' : `is open ${saysRotaWeek(week).toLowerCase()}` }}. A shift
-        appears here as soon as one is put up for a role you hold the training for, and a night you
-        already work is left out.
+        appears here as soon as one is put up for a role you hold the training for. A performance you
+        already work is left out, and so is one that overlaps a shift you hold at another venue.
       </p>
 
       <div
@@ -622,17 +640,34 @@ useSeoMeta({ title: 'Rota' })
     </section>
 
     <section
-      v-if="locked.roles.length > 0"
+      v-if="locked.roles.length > 0 || locked.committeeOnly.length > 0"
       class="mt-10"
       data-test="roles-you-could-take"
     >
       <h2 class="text-lg font-semibold">
         Roles you could take
       </h2>
-      <p class="mt-1 text-sm text-muted">
+      <p
+        v-if="locked.roles.length > 0"
+        class="mt-1 text-sm text-muted"
+      >
         Each needs a piece of training you do not hold yet. Doing it opens every shift of that role.
       </p>
-      <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      <UAlert
+        v-for="role in locked.committeeOnly"
+        :key="role"
+        class="mt-4"
+        color="neutral"
+        variant="subtle"
+        icon="i-lucide-info"
+        :title="`${saysShiftRole(role)} shifts are for committee members`"
+        description="You hold the training, but these shifts also need a committee role, so none are offered to you. If you have joined the committee, ask the IT Manager to record your role."
+        :data-test="`committee-only-${role}`"
+      />
+      <div
+        v-if="locked.roles.length > 0"
+        class="mt-4 grid gap-4 sm:grid-cols-2"
+      >
         <UPageCard
           v-for="card in locked.roles"
           :key="card.role"
@@ -672,9 +707,11 @@ useSeoMeta({ title: 'Rota' })
     <ConfirmModal
       v-model:open="releaseOpen"
       name="release-shift"
-      title="Release the shift"
-      verb="Release the shift"
-      :consequence="releasingOne ? `${releasingOne.says} goes back on the open list for anyone who qualifies. Having it back means claiming it again, if it is still free.` : undefined"
+      :title="releasingOne?.withdraw ? 'Withdraw my claim' : 'Release the shift'"
+      :verb="releasingOne?.withdraw ? 'Withdraw my claim' : 'Release the shift'"
+      :consequence="releasingOne ? (releasingOne.withdraw
+        ? `Your claim on ${releasingOne.says} is taken back before anyone confirms it, and the shift stays open for anyone who qualifies.`
+        : `${releasingOne.says} goes back on the open list for anyone who qualifies. Having it back means claiming it again, if it is still free.`) : undefined"
       :loading="releasing !== null"
       :failure="releaseFailure"
       @confirm="release"

@@ -93,7 +93,8 @@ export function performanceReportsQuery(fromAt: number, toAt: number, filter: Pe
         SELECT 1 FROM audit_log a, json_each(a.detail, '$.performanceIds') pids
         WHERE a.action = ${OFFICER_BYPASS_ACTION} AND pids.value = p.id
       ) AS officerBypass,
-      EXISTS (SELECT 1 FROM night_reports nr WHERE nr.performance_id = p.id AND nr.signed_via = 'SYSTEM') AS autoClosed
+      EXISTS (SELECT 1 FROM night_reports nr WHERE nr.performance_id = p.id AND nr.signed_via = 'SYSTEM') AS autoClosed,
+      EXISTS (SELECT 1 FROM night_reports nr WHERE nr.performance_id = p.id) AS signedOff
     FROM performances p
     JOIN venues v ON v.id = p.venue_id
     JOIN shows s ON s.id = p.show_id
@@ -111,10 +112,10 @@ export function performanceReportsCountQuery(fromAt: number, toAt: number, filte
   `
 }
 
-type PerformanceReportSqlRow = Omit<PerformanceReportRow, 'officerBypass' | 'autoClosed' | 'cancelled'> & { officerBypass: number, autoClosed: number, cancelled: number }
+type PerformanceReportSqlRow = Omit<PerformanceReportRow, 'officerBypass' | 'autoClosed' | 'cancelled' | 'signedOff'> & { officerBypass: number, autoClosed: number, cancelled: number, signedOff: number }
 
 function readBooleans(row: PerformanceReportSqlRow): PerformanceReportRow {
-  return { ...row, officerBypass: Boolean(row.officerBypass), autoClosed: Boolean(row.autoClosed), cancelled: Boolean(row.cancelled) }
+  return { ...row, officerBypass: Boolean(row.officerBypass), autoClosed: Boolean(row.autoClosed), cancelled: Boolean(row.cancelled), signedOff: Boolean(row.signedOff) }
 }
 
 export async function performanceReports(fromAt: number, toAt: number, filter: PerformanceReportFilter, limit: number, offset: number): Promise<{ items: PerformanceReportRow[], total: number }> {

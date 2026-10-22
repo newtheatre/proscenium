@@ -39,12 +39,16 @@ const empty = (): Listing => ({ items: [], total: 0, pageSize: 0, pages: 1 })
 // Search, filters, sort and page live in the URL (K-129).
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(barItemsList)
 
+// Retired items stay out until the Retired filter asks for them, as nobody stocks them any more.
+const hidesRetired = computed(() => !('retired' in query.value))
+const listed = computed(() => (hidesRetired.value ? { ...query.value, retired: 'false' } : query.value))
+
 // How many live items still have no allergen answer, whatever the page shows (issue 1348).
 const [{ data, status, error, refresh }, { data: unanswered, refresh: recount }] = await Promise.all([
   useAsyncData(
     'bar-items',
-    () => request<Listing>('/api/admin/bar/items', { query: query.value }),
-    { watch: [query], default: empty },
+    () => request<Listing>('/api/admin/bar/items', { query: listed.value }),
+    { watch: [listed], default: empty },
   ),
   useAsyncData(
     'bar-items-unanswered',
@@ -449,6 +453,10 @@ const allColumns: TableColumn<StockItem>[] = [
         ...(row.original.status === 'ACTIVE'
           ? [{ label: 'Adjust the count', onSelect: () => moveStock(row.original, 'ADJUST') }]
           : []),
+        // A wrong delivery is reversed, not counted away, so its cost leaves gross profit too.
+        ...(row.original.hasMovements
+          ? [{ label: 'Fix a wrong delivery', to: `/bar/stock/movements?itemId=${row.original.id}&kind=DELIVERY` }]
+          : []),
         {
           label: row.original.status === 'RETIRED' ? 'Bring back' : 'Retire',
           onSelect: () => {
@@ -534,6 +542,14 @@ const columns = computed(() => (data.value.items.some(item => item.category)
         </UButton>
       </template>
     </AdminToolbar>
+
+    <p
+      v-if="hidesRetired"
+      class="text-xs text-muted"
+      data-test="retired-hidden"
+    >
+      Retired items are not listed. Filter by Retired to see them.
+    </p>
 
     <UTable
       :data="data.items"

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   PHASES,
   SYSTEM_CHECKS,
+  SYSTEM_CHECK_PHASE_REFUSAL,
   checklistEntryDone,
   checklistItemForm,
   checklistScopeForm,
@@ -25,8 +26,13 @@ describe('a checklist item names a venue, a phase, a label and an order (criteri
   })
 
   test('a system-verified item names which check', () => {
-    const parsed = checklistItemForm.safeParse({ ...base, systemCheck: 'INCIDENTS_REVIEWED' })
+    const parsed = checklistItemForm.safeParse({ ...base, phase: 'POST', systemCheck: 'INCIDENTS_REVIEWED' })
     expect(parsed.success).toBe(true)
+  })
+
+  test('a system check before the show is refused, since it reads what the night did (0216)', () => {
+    const parsed = checklistItemForm.safeParse({ ...base, phase: 'PRE', systemCheck: 'NO_SHOW_HOLDS_RELEASED' })
+    expect(parsed.error?.issues.map(issue => issue.message)).toEqual([SYSTEM_CHECK_PHASE_REFUSAL])
   })
 
   test('an empty label is refused', () => {

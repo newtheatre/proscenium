@@ -7,6 +7,8 @@ export default defineEventHandler(async (event) => {
   const resolved = await requirePermission(event, 'ticketing.write')
   // Criterion 2: the refunder's own money.refund is the approval, on any day (0102).
   await requireRefundApproval(event, resolved)
+  // Money goes back out, so the refunder proves it is still them, as a comp approver does (0171).
+  await requireFreshSession(event)
   const id = getRouterParam(event, 'id') ?? ''
   const ticketId = getRouterParam(event, 'ticketId') ?? ''
   const input = await readValidatedBodyOrThrow(event, refundTicketForm)
@@ -39,6 +41,22 @@ export default defineEventHandler(async (event) => {
   })
   if (!result.applied) {
     throw createError({ statusCode: 409, statusMessage: 'This ticket has already been refunded' })
+  }
+
+  // The last ticket refunded leaves nothing owed, and the desk cancels the booking straight after.
+  const bookerId = await reservationBookerId(id)
+  if (bookerId) {
+    try {
+      await sendReservationRefunded(event, {
+        userId: bookerId,
+        reservationId: id,
+        refundedPence: ticket.pricePaid,
+        cancelled: reservation.tickets.length === 1,
+      })
+    }
+    catch (error) {
+      console.error('[desk] ticket refunded but the booker could not be told', error)
+    }
   }
 
   // Frees a seat (D-113 criterion 2): offer it on, the same as an expiry or a self-cancel.

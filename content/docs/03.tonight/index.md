@@ -3,7 +3,7 @@ title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
 audience: member
-updatedOn: 2026-09-29
+updatedOn: 2026-10-22
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -31,7 +31,8 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 
 - **"This needs a confirmed door shift on one of tonight's performances, or the Front of House
   Manager's role"** (or the same for a bar shift, or for a duty manager shift): nothing tonight gives you this screen. It shows as one card in place of the screen,
-  naming tonight's duty manager to ask, with **Back to tonight**; none of the screen's own buttons is
+  naming tonight's duty manager to ask, or the Front of House Manager on a night with no duty
+  manager on, with **Back to tonight**; none of the screen's own buttons is
   left to press. Find the person named, or ask the officer to assign you the shift on the rota. The
   IT Manager is never offered as the answer to a rota that is wrong. At the door the refusal also
   says tonight's duty manager can open it for their own performance, by first name if you hold a
@@ -102,7 +103,8 @@ desk, on any day: take the person's booking reference and pass it to the Front o
 Each tile appears where your own shift or role opens it, and your own job comes first, in gold:
 **Door** on a door shift, **Till** on a bar shift, **Tonight at a glance** for the duty manager
 until the curtain comes down on the performance you are looking at, and **Night report** after it,
-reading **Sign off and close**, since that is where the night ends. The rest follow in the order
+reading **Sign off and close**, since that is where the night ends; once it is signed off it reads
+**Signed off by** and the signer's first name. The rest follow in the order
 they are pressed on a night: **Door**, **Till**, **Tonight at a glance**, **Checklist**, **Night
 report**, **Challenge 25**, **Backstage**, **Contacts and incidents**, **Message tonight's
 audience** (the duty manager's), and **Emergency**, always there and always last. While a stocktake
@@ -123,7 +125,9 @@ waiting, with its value, who asked and **Approve** or **Decline**, the same queu
 where the duty manager already is.
 
 From house open (doors, or curtain where no doors time is set) the hub shows a warning naming any
-required pre-show checklist item that is still not done.
+required pre-show checklist item that is still not done. When nobody holds tonight's duty manager
+shift, every shift sees **Nobody is working the checklist** instead, and should tell the Front of
+House Manager.
 
 ## The screens
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { compsCountQuery, compsReportQuery, discountsReportQuery, gpDepletionQuery, gpRevenueQuery, gpUncostedQuery, gpUnpouredQuery, varianceCountQuery, varianceQuery, varianceTotalQuery, wastageQuery } from '#server/utils/bar-reports'
+import { compsCountQuery, compsReportQuery, discountsReportQuery, gpDepletionQuery, gpRevenueQuery, gpUncostedQuery, gpUnpouredQuery, salesQuery, varianceCountQuery, varianceQuery, varianceTotalQuery, wastageQuery } from '#server/utils/bar-reports'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -496,6 +496,40 @@ describe('gross profit names what it could not cost (F-119 criterion 1)', () => 
 
       expect(read(database, gpUnpouredQuery(FROM_AT, TO_AT))).toEqual([])
       expect(read(database, gpUncostedQuery(FROM_AT, TO_AT))).toEqual([])
+    })
+  })
+})
+
+// A void keeps the charge's positive quantity beside its negative amount (tab-settlement.ts), so
+// the sales section takes the quantity away as it takes the money (process map, 21 October 2026).
+describe('a voided tab charge cancels its quantity as well as its money', () => {
+  function aSize(database: TestDatabase): string {
+    insert(database, 'bar_categories', { id: 'cat-1', name: 'Wine' })
+    insert(database, 'bar_products', { id: 'prod-1', category_id: 'cat-1', name: 'House red' })
+    insert(database, 'product_variants', { id: 'var-1', product_id: 'prod-1', serving_kind: 'BOTTLE', label: 'Bottle' })
+    return 'var-1'
+  }
+
+  function sizedLine(database: TestDatabase, id: string, entryId: string, amountPence: number): string {
+    insert(database, 'ledger_lines', { id, entry_id: entryId, kind: 'BAR_ITEM', amount_pence: amountPence, qty: 1, unit_price_pence: Math.abs(amountPence), product_variant_id: 'var-1' })
+    return id
+  }
+
+  test('one bottle sold and one charged then voided is one bottle and its price', async () => {
+    await withDatabase((database) => {
+      const itemId = bottle(database)
+      delivery(database, 'd-1', itemId, 2100, PENCE_PER_ML)
+      aSize(database)
+      depletion(database, 'm-sold', itemId, 750, 'SALE', sizedLine(database, 'l-sold', entry(database, 'e-sold', INSIDE), 1800), INSIDE)
+      depletion(database, 'm-tab', itemId, 750, 'SALE', sizedLine(database, 'l-tab', entry(database, 'e-tab', INSIDE), 1800), INSIDE)
+      insert(database, 'ledger_entries', { id: 'e-void', happened_at: INSIDE + 60, london_day: '2026-09-15', source: 'TILL', tender: 'TAB', total_pence: 0, void_of_entry_id: 'e-tab', void_reason: 'Rang up twice' })
+      sizedLine(database, 'l-void', 'e-void', -1800)
+      reversePour(database, 'r-tab', itemId, 750, 'm-tab', INSIDE + 60)
+
+      const sales = read<{ productName: string, qty: number, revenuePence: number }>(database, salesQuery(FROM_AT, TO_AT))
+      expect(sales).toEqual([expect.objectContaining({ productName: 'House red', qty: 1, revenuePence: 1800 })])
+      // The void's credit poured nothing by design, so it is not named as a sale with no recipe.
+      expect(read<{ productName: string }>(database, gpUnpouredQuery(FROM_AT, TO_AT))).toEqual([])
     })
   })
 })

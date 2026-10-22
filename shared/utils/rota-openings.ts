@@ -14,14 +14,32 @@ export type BarOpeningStatus = (typeof BAR_OPENING_STATUSES)[number]
 // A label stands in for a show title on the rota, so it says what the evening is.
 export const BAR_OPENING_LABEL_LIMIT = 120
 
+// Shorter than a day, so a closing time typed the same as the opening time is refused (0215).
+export const MAX_BAR_OPENING_SECONDS = 86_400
+export const SAME_TIME_REFUSAL = 'The bar closes at the time it opens. Give a closing time after the opening time'
+
+// What an officer is told before planning a second opening over one already at the venue (0215).
+export function openingOverlapWarning(other: { label: string, opens: string, closes: string }, venueName: string): string {
+  return `${other.label} is already planned at ${venueName} from ${other.opens} to ${other.closes}, and this overlaps it. Plan the opening anyway, or change the times.`
+}
+
+// Removing the only slot is refused on the write, so the button says why rather than offering it (0215).
+export const ONLY_SLOT_HINT = 'The only slot: cancel the opening instead'
+
 export const barOpeningForm = z.object({
   venueId: z.string().min(1, 'Say which venue is opening').max(64),
   night: londonDayField,
   label: z.string().trim().min(1, 'Name the opening: it stands in for a show title on the rota').max(BAR_OPENING_LABEL_LIMIT),
   startsAt: z.number().int(),
   endsAt: z.number().int(),
+  // Set when the officer has been told it overlaps another opening at the venue and goes ahead (0215).
+  overlapping: z.boolean().optional(),
 }).refine(input => input.endsAt > input.startsAt, {
   message: 'A bar opening closes after it opens',
+  path: ['endsAt'],
+// Equal times on the form read as a whole day; nobody plans a 24-hour bar on purpose (0215).
+}).refine(input => input.endsAt - input.startsAt < MAX_BAR_OPENING_SECONDS, {
+  message: SAME_TIME_REFUSAL,
   path: ['endsAt'],
 // The night is what the list filters and what authority resolves against, so one disagreeing
 // with the opening's own clock would file under one night and let people in on another (0014).

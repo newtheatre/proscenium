@@ -2,10 +2,13 @@ import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { roleHoldersQuery } from './announcements'
 import { configValue } from './configuration'
+import { holdsGate, shiftGate } from './rota'
 import { cardFiled } from './venue-emergency'
+import { londonParts } from '#shared/utils/london'
 import { SHIFT_ROLES } from '#shared/utils/rota'
 import { eligibilityStanding } from '#shared/utils/rota-readiness'
 import type { SystemCheck } from '#shared/utils/checklist'
+import type { TrainingGate } from './rota'
 import type { ShiftRole } from '#shared/utils/rota'
 import type { BoardReadiness, RoleEligibility, VenueReadiness } from '#shared/utils/rota-readiness'
 import type { ModuleLifecycle } from '#shared/utils/training'
@@ -58,13 +61,33 @@ export async function roleEligibilities(event?: H3Event): Promise<RoleEligibilit
   })
 }
 
+// Usable accounts the role's confirming write would admit now, training and committee role alike,
+// so the card reads 0 exactly when nobody could be put on the shift (0115, 0210).
+export function qualifiedCountQuery(gate: TrainingGate): SQL {
+  return sql`
+    SELECT count(*) AS total FROM users u
+    WHERE u.anonymised_at IS NULL AND u.disabled = 0 AND ${holdsGate(gate, sql`u.id`)}
+  `
+}
+
+export async function qualifiedCounts(lines: readonly RoleEligibility[]): Promise<Record<ShiftRole, number>> {
+  const { year, month, day } = londonParts(new Date())
+  const today = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const now = Math.floor(Date.now() / 1000)
+  const counts = await Promise.all(lines.map(async (line) => {
+    const [row] = await db.all<{ total: number }>(qualifiedCountQuery(shiftGate(line.role, line.moduleId, today, now)))
+    return [line.role, row?.total ?? 0] as const
+  }))
+  return Object.fromEntries(counts) as Record<ShiftRole, number>
+}
+
 // Our own venues only: an external one is staffed by hand and a retired one takes no new night.
 export function venueReadinessQuery(): SQL {
   return sql`
     SELECT v.id AS venueId, v.name AS venueName,
       (SELECT coalesce(sum(t."count"), 0) FROM shift_templates t WHERE t.venue_id = v.id) AS templateSlots,
       (SELECT group_concat(DISTINCT ci.system_check) FROM checklist_items ci
-        WHERE ci.venue_id = v.id AND ci.active = 1 AND ci.system_check IS NOT NULL) AS systemChecks,
+        WHERE ci.venue_id = v.id AND ci.active = 1 AND ci.system_check IS NOT NULL AND ci.phase = 'POST') AS systemChecks,
       ${cardFiled('v')} AS emergencyFiled
     FROM venues v
     WHERE v.is_external = 0 AND v.archived = 0

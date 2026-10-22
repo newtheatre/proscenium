@@ -19,6 +19,11 @@ describe('the planner offers what can be taught, and says why a draft cannot', (
     expect(plannerModuleOptions([module('OLD-101', 'RETIRED'), module('EXP-101', 'ACTIVE', true), module('EXP-102', 'DRAFT', true)])).toEqual([])
   })
 
+  test('a certification is signed off, so it is never offered to a session (0240)', () => {
+    expect(plannerModuleOptions([{ ...module('TECH-301', 'ACTIVE'), kind: 'CERTIFICATION' }, { ...module('TECH-101', 'ACTIVE'), kind: 'MODULE' }])
+      .map(option => option.value)).toEqual(['TECH-101'])
+  })
+
   test('what can be scheduled comes before what cannot', () => {
     expect(plannerModuleOptions([module('A-101', 'DRAFT'), module('B-101', 'ACTIVE')]).map(option => option.value)).toEqual(['B-101', 'A-101'])
   })

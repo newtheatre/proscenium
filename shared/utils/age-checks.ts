@@ -41,10 +41,20 @@ export function saysRefusalReason(reason: RefusalReason): string {
 }
 
 const DESCRIPTION_LIMIT = 200
+
+// Two capitalised words in a row, or a title before one, is how a name usually reads. A warning
+// only, since "Blue Nike hoodie" trips it too; the register is exported to inspectors (0218).
+const NAME_LIKE = /\b(?:Mr|Mrs|Ms|Miss|Mx|Dr)\.?\s+[A-Z]|\b[A-Z][a-z'’-]+\s+[A-Z][a-z'’-]+/
+
+export function looksLikeName(description: string): boolean {
+  return NAME_LIKE.test(description)
+}
+
+export const NAME_WARNING = 'That may be a name. Describe them instead, such as tall, grey coat: the register goes to licensing inspectors and never names anybody.'
 const NOTES_LIMIT = 1000
 
-// The description is guidance, not enforcement: nothing here can tell a name from a description,
-// so the form's own copy is what keeps one out (E-118 criterion 2). Empty only on NOT_REQUIRED.
+// The description is guidance, not enforcement: looksLikeName only warns, so the form's copy and
+// that warning are what keep a name out (E-118 criterion 2). Empty only on NOT_REQUIRED.
 const outcomeFields = {
   outcome: z.enum(AGE_CHECK_OUTCOMES),
   idType: z.enum(ID_TYPES).nullish().transform(value => value ?? null),
@@ -87,6 +97,8 @@ export const AGE_CHECK_PRODUCT_MAX = 200
 
 export const ageCheckForm = shaped(z.object({
   performanceId: z.string().min(1, 'Say which performance you mean').nullish().transform(value => value ?? null),
+  // The till's bar, so an officer on a night running two houses is placed as a sale would be (0161).
+  venueId: z.string().trim().min(1, 'Say which venue you mean').optional(),
   ...outcomeFields,
   product: z.string().trim().max(AGE_CHECK_PRODUCT_MAX).nullish().transform(value => (value ?? '').trim() || null),
 }))

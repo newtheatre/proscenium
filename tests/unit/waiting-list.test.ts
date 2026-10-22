@@ -5,7 +5,10 @@ import {
   joinWaitingListForm,
   offerExpiresAt,
   offerWouldBeBornExpired,
+  claimShortfallSays,
   partySizeMismatchReason,
+  saysSeatsFree,
+  saysWaitingListEntry,
   waitingListGuestJoinForm,
   waitingListPartyForm,
 } from '#shared/utils/waiting-list'
@@ -116,5 +119,25 @@ describe('the join screen validates before it asks (criterion 1)', () => {
 
   test('a signed-in booker gives a party size and nothing else', () => {
     expect(waitingListPartyForm.safeParse({ partySize: 3 }).success).toBe(true)
+  })
+})
+
+// The process map of 21 October: "A seat is free" over a two-seat offer, a claim button that
+// refused only after the press, and a desk with no view of the list.
+describe('an offer says how many seats, and what is left to choose', () => {
+  test('the heading counts the seats', () => {
+    expect(saysSeatsFree(1)).toBe('A seat is free')
+    expect(saysSeatsFree(2)).toBe('2 seats are free')
+  })
+
+  test('the shortfall says more or fewer, and nothing once it matches', () => {
+    expect(claimShortfallSays(1, 2)).toBe('Choose 1 more')
+    expect(claimShortfallSays(4, 2)).toBe('Choose 2 fewer')
+    expect(claimShortfallSays(2, 2)).toBeNull()
+  })
+
+  test('the desk line names the party, and an offer its deadline', () => {
+    expect(saysWaitingListEntry({ partySize: 3, status: 'WAITING', offerExpiresAt: null })).toBe('party of 3 · 3 seats wanted')
+    expect(saysWaitingListEntry({ partySize: 1, status: 'OFFERED', offerExpiresAt: 1_800_000_000 })).toContain('offered until')
   })
 })

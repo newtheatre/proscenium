@@ -32,13 +32,15 @@ const shown = computed(() => {
   }
   // A signed-in refusal names who the screen is for, never the IT Manager (issue 1304, K-133).
   if (props.error.statusCode === 403) {
-    const says = forRoles.value ? `${saysScreenIsFor(forRoles.value)} Ask them if you need something from it.` : saysScreenIsFor([])
+    const asked = forRoles.value ? `${saysScreenIsFor(forRoles.value)} Ask them if you need something from it.` : saysScreenIsFor([])
+    const says = refusalData.value?.changedByItManager === true ? `${asked} The IT Manager makes every change on it.` : asked
     return { title: 'That is not yours to open', says }
   }
   // A page that knows what was missing says so, as /qr does for a bad link (0121); the router's
   // own unknown-address 404 keeps the generic words.
   if (props.error.statusCode === 404 && isNoSuchMessage(props.error.statusMessage)) {
-    return { title: 'That link does not lead anywhere now', says: props.error.statusMessage }
+    const hidden = props.error.statusMessage.startsWith('We cannot find')
+    return { title: hidden ? 'There is nothing here' : 'That link does not lead anywhere now', says: props.error.statusMessage }
   }
   return SAYS[props.error.statusCode ?? 0] ?? {
     title: 'Something went wrong',
@@ -48,9 +50,11 @@ const shown = computed(() => {
 
 // The roles a console refusal carries, read defensively: a server-rendered error's data arrives
 // as text.
+const refusalData = computed(() => (typeof props.error.data === 'string' ? safeParse(props.error.data) : props.error.data) as
+  { roles?: unknown, changedByItManager?: unknown } | null | undefined)
+
 const forRoles = computed<Role[] | null>(() => {
-  const data = typeof props.error.data === 'string' ? safeParse(props.error.data) : props.error.data
-  const roles = (data as { roles?: unknown } | null | undefined)?.roles
+  const roles = refusalData.value?.roles
   return Array.isArray(roles) && roles.length > 0 ? roles as Role[] : null
 })
 

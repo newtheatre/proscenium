@@ -18,6 +18,7 @@ import type { ReservationSource, TicketTypeCount } from '#shared/utils/reservati
 import type { PriceSource, TicketTypeAccessKind, TicketTypeRestriction } from '#shared/utils/ticket-types'
 import type { AuditRow } from '#shared/utils/audit'
 import type { SQL } from 'drizzle-orm'
+import type { SalesChannel } from '#shared/utils/programme'
 import type { H3Event } from 'h3'
 
 // Resolving what a performance may sell and writing what it sold (D-104). The predicate that
@@ -56,10 +57,11 @@ export interface BookableTicketType {
 const readFlag = (value: number | null): boolean | null => (value === null ? null : value === 1)
 
 // Resolved down the same chain the listing reads, so a quoted price never differs from the
-// write path's. A member-restricted type is dropped for a caller who is not one (D-109 criterion 1).
-export function readBookableTicketTypes(rows: BookableTicketTypeRow[], isMember: boolean): BookableTicketType[] {
+// write path's. Member-only types need a member (D-109); box-office-only ones the desk (0190).
+export function readBookableTicketTypes(rows: BookableTicketTypeRow[], isMember: boolean, channel: SalesChannel = 'CUSTOMER'): BookableTicketType[] {
   return rows.flatMap((row) => {
     if (row.restrictedTo === 'MEMBER' && !isMember) return []
+    if (row.restrictedTo === 'DESK' && channel !== 'DESK') return []
     const resolved = resolvePrice(
       { price: row.basePrice, activeByDefault: row.activeByDefault === 1 },
       row.showPrice === null && row.showActive === null ? null : { price: row.showPrice, active: readFlag(row.showActive) },
@@ -92,8 +94,14 @@ export function bookableTicketTypesQuery(performanceId: string, showId: string, 
   `
 }
 
-export async function bookableTicketTypes(performanceId: string, showId: string, isMember: boolean, includeAccessTypes = false): Promise<BookableTicketType[]> {
-  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId, includeAccessTypes)), isMember)
+export async function bookableTicketTypes(
+  performanceId: string,
+  showId: string,
+  isMember: boolean,
+  includeAccessTypes = false,
+  channel: SalesChannel = 'CUSTOMER',
+): Promise<BookableTicketType[]> {
+  return readBookableTicketTypes(await db.all<BookableTicketTypeRow>(bookableTicketTypesQuery(performanceId, showId, includeAccessTypes)), isMember, channel)
 }
 
 export interface HeldAccessCounts {
@@ -164,13 +172,15 @@ export interface WriteReservationResult {
 export interface GuestAccountResult {
   id: string
   created: boolean
+  // The account's own name, which a reused address keeps whatever the booker typed (0170).
+  heldName: string | null
 }
 
 // An existing address, guest or full, is reused as it stands; a new one is a claimable guest
 // account (D-104 criteria 1, 6). The reservation succeeds identically either way (enumeration-safe).
 export async function guestAccount(email: string, name: string): Promise<GuestAccountResult> {
   const existing = await findByEmail(email)
-  if (existing) return { id: existing.id, created: false }
+  if (existing) return { id: existing.id, created: false, heldName: existing.name }
 
   const normalised = normaliseEmail(email)
   const id = newId()
@@ -186,11 +196,11 @@ export async function guestAccount(email: string, name: string): Promise<GuestAc
     `),
     entry,
   )
-  if (created) return { id, created: true }
+  if (created) return { id, created: true, heldName: name.trim() }
 
   // Lost the race: somebody else's checkout won between the read above and this insert.
   const winner = await findByEmail(email)
-  return { id: winner!.id, created: false }
+  return { id: winner!.id, created: false, heldName: winner!.name }
 }
 
 // An address already held in another name is never filed under silently (0123): the desk and the

@@ -539,8 +539,8 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
   // 0096 writes a card sale only once the reader answers, so a refusal given at the charge cannot
   // ride the sale: it is on the register at once, and a declined card leaves it there.
 
-  // Skipped until #1582: an officer's refusal names no venue, and two venues are running tonight.
-  test.skip('a refusal given at the charge stays on the register when the card is then declined', async () => {
+  // An officer on a night running two houses names the till's bar, so the refusal lands (0161).
+  test('a refusal given at the charge stays on the register when the card is then declined', async () => {
     const { venueId, restrictedProductId, ordinaryProductId, restrictedProductName } = await aMixedBasketSetup()
     const view = await atTheTill(venueId, `[data-test="product-${ordinaryProductId}"]`)
 
@@ -573,8 +573,8 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     view.close()
   }, 120_000)
 
-  // Skipped until #1582: an officer's refusal names no venue, and two venues are running tonight.
-  test.skip('the refusal is on the register before the rest of the basket is charged (F-106 criterion 6)', async () => {
+  // An officer on a night running two houses names the till's bar, so the refusal lands (0161).
+  test('the refusal is on the register before the rest of the basket is charged (F-106 criterion 6)', async () => {
     const { venueId, restrictedProductId, restrictedProductName } = await aMixedBasketSetup()
     const view = await atTheTill(venueId, `[data-test="product-${restrictedProductId}"]`)
 
@@ -591,6 +591,8 @@ describe.skipIf(skip !== null)('the screen asks before the drink is poured', () 
     const row = latestAgeCheck()
     expect(row).toMatchObject({ outcome: 'REFUSED', reason: 'NO_ID_SHOWN', id_type: null })
     expect(row?.product).toContain(restrictedProductName)
+    // Placed on the house a sale at this bar would be, not on no house at all (0161).
+    expect(row?.performance_id).toBeTruthy()
     view.close()
   }, 120_000)
 

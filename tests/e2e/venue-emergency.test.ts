@@ -104,6 +104,17 @@ describe.skipIf(skip !== null)('committee configuration (E-113 criterion 1)', ()
     expect(venues.find(venue => venue.venueId === house.venueId)?.assemblyPoint).toBe('Second version')
   })
 
+  test('every version is listed, newest first, with who filed it (0217)', async () => {
+    const answered = await send('GET', `/api/admin/venues/${house.venueId}/emergency-versions`)
+    expect(answered.status).toBe(200)
+    const { items, total } = await answered.json() as { items: { assemblyPoint: string | null, updatedByName: string }[], total: number }
+    expect(total).toBeGreaterThanOrEqual(2)
+    expect(items.slice(0, 2).map(item => item.assemblyPoint)).toEqual(['Second version', 'First version'])
+    expect(items[0]?.updatedByName).toBeTruthy()
+    expect((await send('GET', `/api/admin/venues/${house.venueId}/emergency-versions`, undefined, foh.cookie)).status).toBe(200)
+    expect((await send('GET', '/api/admin/venues/no-such-venue/emergency-versions')).status).toBe(404)
+  })
+
   test('editing a missing venue 404s', async () => {
     expect((await send('PUT', '/api/admin/venues/no-such-venue/emergency', { address: 'x', assemblyPoint: 'x' })).status).toBe(404)
   })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saysDay, saysDayRange, saysClock, saysDayLong } from '#shared/utils/when'
-import { defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
+import { boardWindowFromQuery, defaultBoardWindow, openingsOnNightHref, saysStaffing } from '#shared/utils/rota-board'
 import { SHIFT_ROLES, saysShiftRole, saysShiftStatus, saysStamped } from '#shared/utils/rota'
 import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { BoardEntry } from '#shared/utils/rota-board'
@@ -25,6 +25,7 @@ interface RosterPerformance {
   isExternal: boolean
   hasTemplate: boolean
   isRetired: boolean
+  isPublished: boolean
   shifts: RosterShift[]
 }
 
@@ -41,19 +42,23 @@ interface RosterOpening {
 
 type Board = { items: BoardEntry<RosterPerformance, RosterOpening>[], waiting: number }
 
-interface Candidate { id: string, name: string, email: string, eligible: boolean }
+interface Candidate { id: string, name: string, email: string, eligible: boolean, reason: string | null, movable?: boolean }
 
 const request = useRequestFetch()
 const toast = useToast()
 const failure = ref<string | null>(null)
 
-// A span the officer is working on rather than a filter over a fixed set of rows, so it is a
-// pair of date fields and not a K-129 condition, as the utilisation report's span is.
-const window = reactive(defaultBoardWindow(new Date()))
-
 // The approvals queue is this filter, and it lives in the URL so the old address can land on it
 // (E-105 criterion 2). It reads every claim to confirm from tonight on, whatever the window.
 const route = useRoute()
+
+// A span, not a K-129 condition, read from and kept in the address so it can be linked (0214).
+const window = reactive(boardWindowFromQuery(route.query, new Date()))
+watch(() => [window.from, window.to], ([from, to]) => {
+  const opened = defaultBoardWindow(new Date())
+  const shown = from === opened.from && to === opened.to ? { from: undefined, to: undefined } : { from, to }
+  void navigateTo({ query: { ...route.query, ...shown, until: undefined } }, { replace: true })
+})
 const waiting = computed<boolean>({
   get: () => route.query.waiting === 'true',
   set: (on) => {
@@ -145,7 +150,7 @@ const candidateSettled = useDebounced(candidateSearch, 250)
 const chosen = ref<Candidate | null>(null)
 
 const { data: candidateData, status: candidateStatus } = await useAsyncData(
-  () => `shift-candidates-${assigning.value?.shiftId ?? adding.value?.role ?? 'none'}-${candidateSettled.value}`,
+  () => `shift-candidates-${assigning.value?.shiftId ?? `${adding.value?.performanceId}-${adding.value?.role}`}-${candidateSettled.value}`,
   () => {
     const term = candidateSettled.value.trim()
     if (term.length < 2) return Promise.resolve({ items: [] as Candidate[] })
@@ -153,7 +158,7 @@ const { data: candidateData, status: candidateStatus } = await useAsyncData(
       return request<{ items: Candidate[] }>(`/api/admin/rota/shifts/${assigning.value.shiftId}/candidates`, { query: { search: term } })
     }
     if (adding.value?.role) {
-      return request<{ items: Candidate[] }>('/api/admin/rota/candidates', { query: { search: term, role: adding.value.role } })
+      return request<{ items: Candidate[] }>('/api/admin/rota/candidates', { query: { search: term, role: adding.value.role, performanceId: adding.value.performanceId } })
     }
     return Promise.resolve({ items: [] as Candidate[] })
   },
@@ -162,8 +167,18 @@ const { data: candidateData, status: candidateStatus } = await useAsyncData(
 
 const options = computed(() => candidateData.value.items.map(candidate => ({ ...candidate, value: candidate.id, label: candidate.name })))
 
+// Somebody on another shift of this performance can be moved onto this one, never doubled up (0211).
+const moving = ref(false)
+
+// A role's number is said only where the performance has more than one of it (0211).
+function saysRow(shifts: readonly RosterShift[], shift: RosterShift): string {
+  const role = saysShiftRole(shift.role)
+  return shifts.filter(one => one.role === shift.role).length > 1 ? `${role} ${shift.slot}` : role
+}
+
 function openAssign(shift: RosterShift): void {
   assigning.value = { shiftId: shift.shiftId, role: shift.role }
+  moving.value = false
   chosen.value = null
   candidateSearch.value = ''
   failure.value = null
@@ -178,7 +193,8 @@ async function submitAssign(): Promise<void> {
   if (!row || !chosen.value) return
   submitting.value = true
   try {
-    await $fetch(`/api/admin/rota/shifts/${row.shiftId}/assign`, { method: 'POST', body: { userId: chosen.value.id } })
+    const move = chosen.value.movable === true && moving.value
+    await $fetch(`/api/admin/rota/shifts/${row.shiftId}/assign`, { method: 'POST', body: { userId: chosen.value.id, move } })
     toast.add({ title: 'Assigned', icon: 'i-lucide-check', color: 'success' })
     assigning.value = null
     await refresh()
@@ -454,6 +470,16 @@ watch(modalOpen, (nowOpen) => {
               <p class="text-sm text-muted">
                 {{ entry.showTitle }}
               </p>
+              <UBadge
+                v-if="!entry.isPublished"
+                class="mt-1"
+                color="warning"
+                variant="subtle"
+                size="sm"
+                :data-test="`draft-${entry.performanceId}`"
+              >
+                Draft show: not offered to members yet
+              </UBadge>
             </div>
           </template>
 
@@ -467,7 +493,7 @@ watch(modalOpen, (nowOpen) => {
             >
               <div class="min-w-0">
                 <p class="text-xs text-muted">
-                  {{ saysShiftRole(shift.role) }}
+                  {{ saysRow(entry.shifts, shift) }}
                 </p>
                 <p class="font-medium">
                   {{ shift.holderName ?? 'Unfilled' }}
@@ -634,6 +660,11 @@ watch(modalOpen, (nowOpen) => {
                 >
                   {{ item.eligible ? 'Eligible' : 'Locked' }}
                 </UBadge>
+                <span
+                  v-if="item.reason"
+                  class="text-xs text-muted"
+                  data-test="candidate-reason"
+                >{{ item.reason }}</span>
               </span>
             </template>
             <template #empty>
@@ -643,8 +674,16 @@ watch(modalOpen, (nowOpen) => {
             </template>
           </UInputMenu>
 
+          <UCheckbox
+            v-if="chosen?.movable"
+            v-model="moving"
+            label="Move them off their other shift on this performance"
+            description="That shift goes back to open."
+            data-test="assign-move"
+          />
+
           <UButton
-            :disabled="!chosen || !chosen.eligible"
+            :disabled="!chosen || !(chosen.eligible || (chosen.movable && moving))"
             :loading="submitting"
             data-test="assign-submit"
             @click="submitAssign"
@@ -713,6 +752,11 @@ watch(modalOpen, (nowOpen) => {
                   >
                     {{ item.eligible ? 'Eligible' : 'Locked' }}
                   </UBadge>
+                  <span
+                    v-if="item.reason"
+                    class="text-xs text-muted"
+                    data-test="candidate-reason"
+                  >{{ item.reason }}</span>
                 </span>
               </template>
               <template #empty>

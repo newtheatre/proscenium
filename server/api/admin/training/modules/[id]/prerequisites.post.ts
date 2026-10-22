@@ -41,6 +41,16 @@ export default defineEventHandler(async (event) => {
     .limit(1)
   if (already) throw createError({ statusCode: 409, statusMessage: 'That module is already required' })
 
+  // Nobody can obtain a draft or a retired module, so a module needing one could never be held (0240).
+  if (required.status !== 'ACTIVE') {
+    throw createError({
+      statusCode: 409,
+      statusMessage: required.status === 'DRAFT'
+        ? `${required.id} ${required.name} is still a draft: publish it before anything needs it`
+        : `${required.id} ${required.name} is retired, so nobody could obtain it first`,
+    })
+  }
+
   // Criterion 2. The refusal names the loop, because "that would make a cycle" is not actionable
   // when the path runs through modules the officer is not looking at.
   const loop = await cyclePath(id, input.requiresId)

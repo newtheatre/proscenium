@@ -173,9 +173,9 @@ async function save(setting: Setting, value: unknown, confirmation?: string): Pr
   errors[setting.key] = ''
 
   try {
-    await $fetch(`/api/admin/config/${setting.key}`, { method: 'PUT', body: { value, confirmation } })
+    const answer = await $fetch<{ unchanged?: boolean }>(`/api/admin/config/${setting.key}`, { method: 'PUT', body: { value, confirmation } })
     await load()
-    notices[setting.key] = 'Saved'
+    notices[setting.key] = answer.unchanged ? `Nothing changed: it still stands at ${saysStanding(setting)}` : 'Saved'
   }
   catch (error) {
     errors[setting.key] = refusalText(error)
@@ -220,7 +220,7 @@ async function askToConfirm(setting: Setting, value: unknown, isRevert: boolean)
 }
 
 async function attemptSave(setting: Setting, value: unknown): Promise<void> {
-  if (!setting.wideBlastRadius) {
+  if (!setting.wideBlastRadius || JSON.stringify(value) === JSON.stringify(standing(setting))) {
     await save(setting, value)
     return
   }

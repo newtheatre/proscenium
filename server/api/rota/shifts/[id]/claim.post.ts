@@ -1,4 +1,5 @@
 import { changes } from '#shared/utils/audit'
+import { UNPUBLISHED_REFUSAL, clashRefusal } from '#shared/utils/rota'
 import { shiftClaimForm } from '#shared/utils/tonight'
 
 // Claim an open shift in one tap. Eligibility is re-checked live and availability rides the
@@ -42,6 +43,9 @@ export default defineEventHandler(async (event) => {
     if (now.status !== 'OPEN') throw createError({ statusCode: 409, statusMessage: 'That shift has already been taken' })
     const again = (await shiftEligibilities(event, account.id, today))[held.role]
     if (!again.eligible) throw ineligibleRefusal(held.role, again)
+    if (!(await showIsPublished(held.performanceId))) throw createError({ statusCode: 409, statusMessage: UNPUBLISHED_REFUSAL })
+    const clash = await clashingShift(account.id, id)
+    if (clash) throw createError({ statusCode: 409, statusMessage: clashRefusal(null, clash) })
     throw createError({ statusCode: 409, statusMessage: 'You already hold a shift on this performance' })
   }
 

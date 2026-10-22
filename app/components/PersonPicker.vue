@@ -24,7 +24,7 @@ const model = defineModel<string | undefined>()
 
 // The name as well as the id, for a screen building a list of people rather than holding one.
 // nobody carries the search that found no account, and null once one does (A-132's fallback).
-const emit = defineEmits<{ chosen: [{ id: string, name: string } | null], nobody: [string | null] }>()
+const emit = defineEmits<{ chosen: [{ id: string, name: string, email: string } | null], nobody: [string | null] }>()
 
 const props = withDefaults(defineProps<{
   placeholder?: string
@@ -99,7 +99,7 @@ const shown = computed<Item[]>(() =>
 function choose(item: Item | undefined): void {
   chosen.value = item ?? null
   model.value = item?.value
-  emit('chosen', item ? { id: item.value, name: item.label } : null)
+  emit('chosen', item ? { id: item.value, name: item.label, email: item.email } : null)
 }
 
 // A form that resets its state clears the name too, rather than showing the last person picked.
@@ -137,7 +137,12 @@ watch(model, (value) => {
               Erased
             </UBadge>
           </span>
-          <span class="font-mono text-xs text-muted">{{ item.hint ?? item.email }}</span>
+          <span class="text-xs text-muted">
+            <span class="font-mono">{{ item.email }}</span><span
+              v-if="item.hint"
+              class="font-mono"
+            > · {{ item.hint }}</span>
+          </span>
         </span>
       </template>
 
@@ -147,5 +152,14 @@ watch(model, (value) => {
         </span>
       </template>
     </UInputMenu>
+    <!-- Said in full under the field, since two people can share a first name and the first option
+         is a click away from the wrong one (0155). -->
+    <p
+      v-if="chosen && chosen.value === model"
+      class="mt-1 text-xs text-muted"
+      data-test="person-picker-chosen"
+    >
+      Chosen: <span class="text-default">{{ chosen.label }}</span>, {{ chosen.email }}<span v-if="chosen.hint">, student number {{ chosen.hint }}</span>
+    </p>
   </div>
 </template>

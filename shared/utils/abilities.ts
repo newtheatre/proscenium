@@ -38,6 +38,7 @@ export const reachConsole = defineAbility((viewer: Viewer) =>
 export const viewAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.read'))
 export const disableAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.disable'))
 export const createAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.create'))
+export const mergeAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.merge'))
 export const grantRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.grant'))
 export const revokeRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.revoke'))
 export const viewMembers = defineAbility((viewer: Viewer) => holds(viewer, 'members.read'))
@@ -162,6 +163,7 @@ export const sendAnnouncements = defineAbility((viewer: Viewer) => holds(viewer,
 
 // The send log, its daily counts and one person's history within it (H-106).
 export const viewCommsOperations = defineAbility((viewer: Viewer) => holds(viewer, 'comms.operations'))
+export const viewFeedback = defineAbility((viewer: Viewer) => holds(viewer, 'feedback.read'))
 
 // A confirmed shift in its window, read from the request and never held, or a night permission
 // (0044): the one fact every Tonight link is offered by (0094).
@@ -186,6 +188,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewAccounts: 'accounts.read',
   disableAccounts: 'accounts.disable',
   createAccounts: 'accounts.create',
+  mergeAccounts: 'accounts.merge',
   grantRoles: 'roles.grant',
   revokeRoles: 'roles.revoke',
   viewMembers: 'members.read',
@@ -240,4 +243,5 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   manageTonight: 'night.manage',
   sendAnnouncements: 'comms.announce',
   viewCommsOperations: 'comms.operations',
+  viewFeedback: 'feedback.read',
 }

@@ -1,3 +1,4 @@
+import { waitingForDigest } from '#server/utils/notification-digests'
 import { personHistoryFilters } from '#shared/utils/notification-log'
 
 // One person's send history: types, dates and outcomes, to answer "did the reminder go out"
@@ -11,9 +12,10 @@ export default defineEventHandler(async (event) => {
 
   const { page, pageSize, type } = await getValidatedQueryOrThrow(event, personHistoryFilters)
 
-  const [items, total] = await Promise.all([
+  const [items, total, waiting] = await Promise.all([
     personHistory(id, type, pageSize, offsetFor(page, pageSize)),
     countPersonHistory(id, type),
+    waitingForDigest(event, id),
   ])
 
   await db.insert(schema.auditLog).values(auditEntry({
@@ -26,5 +28,6 @@ export default defineEventHandler(async (event) => {
   return {
     account: { id: account.id, name: account.name },
     history: envelope(items, total, page, pageSize),
+    waiting,
   }
 })

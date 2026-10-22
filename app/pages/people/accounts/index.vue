@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
+import { can, createAccounts } from '#shared/utils/abilities'
 import { accountsList } from '#shared/utils/accounts-list'
 import { saysDay } from '#shared/utils/when'
 import { ROLES, saysRole } from '#shared/utils/roles'
@@ -11,6 +12,9 @@ definePageMeta({ layout: 'console', title: 'Accounts', middleware: 'console', do
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+
+// Adding someone is the IT Manager's; a reader is never offered a form that ends in a refusal (0157).
+const creates = computed(() => can(useViewer().value, createAccounts))
 
 interface Account {
   id: string
@@ -198,6 +202,7 @@ const columns: TableColumn<Account>[] = [
 
       <template #actions>
         <UButton
+          v-if="creates"
           data-test="invite"
           icon="i-lucide-user-plus"
           @click="inviting = true"

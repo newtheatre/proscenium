@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// Direct edges only, so this is a set rather than a tree (G-108 criterion 1). A brief never appears
-// as a candidate, because a brief gates nothing.
+// Direct edges only, so this is a set rather than a tree (G-108 criterion 1). A brief gates nothing,
+// and a draft or retired module cannot be obtained, so neither is ever a candidate (0240).
 
 interface Prerequisite { id: string, requiresId: string, requiresName: string }
-interface Candidate { id: string, name: string, kind: string }
+interface Candidate { id: string, name: string, kind: string, status: string }
 
 const props = defineProps<{
   moduleId: string
@@ -19,6 +19,7 @@ const working = ref(false)
 // already required stays on the list, because a multi-select needs its own value among the options.
 const options = computed(() => props.candidates
   .filter(candidate => candidate.id !== props.moduleId && candidate.kind !== 'BRIEF')
+  .filter(candidate => candidate.status === 'ACTIVE' || props.prerequisites.some(need => need.requiresId === candidate.id))
   .map(candidate => ({ label: `${candidate.id} ${candidate.name}`, value: candidate.id })))
 
 // Own copy, not a read of the prop: the parent's already-fetched module does not change while

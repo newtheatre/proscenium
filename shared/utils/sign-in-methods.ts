@@ -108,3 +108,35 @@ export function securityNextStep(standing: SecurityStanding): SecurityStep | nul
   if (standing.passkeySupported && !standing.holdsPasskey) return 'passkey'
   return null
 }
+
+// A name the owner gives a passkey, so two devices can be told apart when one is removed.
+export const PASSKEY_LABEL_MAX = 60
+
+export function passkeyLabelProblem(label: string): string | null {
+  const trimmed = label.trim()
+  if (!trimmed) return 'Give the passkey a name'
+  if (trimmed.length > PASSKEY_LABEL_MAX) return `Keep the name to ${PASSKEY_LABEL_MAX} characters`
+  return null
+}
+
+// A first guess from the browser, offered for the owner to keep or change: "Chrome on Android".
+export function guessPasskeyLabel(userAgent: string): string {
+  const browser = /Edg\//.test(userAgent)
+    ? 'Edge'
+    : /Firefox\//.test(userAgent)
+      ? 'Firefox'
+      : /Chrome\//.test(userAgent)
+        ? 'Chrome'
+        : /Safari\//.test(userAgent) ? 'Safari' : null
+  const device = /iPhone/.test(userAgent)
+    ? 'iPhone'
+    : /iPad/.test(userAgent)
+      ? 'iPad'
+      : /Android/.test(userAgent)
+        ? 'Android'
+        : /Mac OS X|Macintosh/.test(userAgent)
+          ? 'Mac'
+          : /Windows/.test(userAgent) ? 'Windows' : /Linux/.test(userAgent) ? 'Linux' : null
+  if (browser && device) return `${browser} on ${device}`
+  return browser ?? device ?? 'This device'
+}

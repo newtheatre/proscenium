@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { saysNoSuch } from '#shared/utils/no-such'
+import { saysNotFoundYet } from '#shared/utils/no-such'
 import { saysClock, saysWhen, saysWhenLong } from '#shared/utils/when'
 import { SAYS_PAYMENT, saysAvailability, saysNightLine } from '#shared/utils/programme'
 import { overCapReason, saysOrderCap, stepperMax } from '#shared/utils/reservations'
@@ -30,6 +30,12 @@ interface RedeemablePass {
   passTypeName: string
 }
 
+interface UsedPass {
+  reference: string
+  passTypeName: string
+  bookingReference: string
+}
+
 interface BookingInfo {
   performanceId: string
   showId: string
@@ -41,6 +47,7 @@ interface BookingInfo {
   ticketTypes: BookableTicketType[]
   accessEntitlement: AccessEntitlement | null
   redeemablePass: RedeemablePass | null
+  usedPass: UsedPass | null
   passOffers: PassOffer[]
 }
 
@@ -50,7 +57,7 @@ const performanceId = computed(() => String(route.params.performanceId))
 const { data } = await useFetch<BookingInfo>(() => `/api/performances/${performanceId.value}/booking`)
 
 if (!data.value) {
-  throw createError({ statusCode: 404, statusMessage: saysNoSuch('performance', 'Go back to what is on and choose another'), fatal: true })
+  throw createError({ statusCode: 404, statusMessage: saysNotFoundYet('performance', 'Go back to what is on and choose another'), fatal: true })
 }
 
 const { account } = useAccount()
@@ -65,12 +72,14 @@ const nights = computed(() => (run.value?.performances ?? []).filter(one => !one
 // already said it once (D-104 criterion 8).
 const acrossVenues = computed(() => new Set(nights.value.map(one => one.venueName)).size > 1)
 
-// A member price the server has not offered this caller, because they are signed out: the listing
+// A member price the server has not offered this caller, signed out or not a member: the listing
 // prices the whole run publicly, so the page can say it exists without ever quoting it (D-109).
-const memberPrice = computed(() => {
-  if (account.value.signedIn) return false
+const memberPrice = computed<'sign-in' | 'join' | null>(() => {
   const tonight = (run.value?.performances ?? []).find(one => one.id === performanceId.value)
-  return (tonight?.prices ?? []).some(price => price.restrictedTo === 'MEMBER')
+  const memberOnly = (tonight?.prices ?? []).filter(price => price.restrictedTo === 'MEMBER').map(price => price.name)
+  if (memberOnly.length === 0) return null
+  if (!account.value.signedIn) return 'sign-in'
+  return data.value?.ticketTypes.some(type => memberOnly.includes(type.name)) ? null : 'join'
 })
 
 const quantities = reactive<Record<string, number>>(
@@ -334,6 +343,24 @@ useSeoMeta({
           />
         </UCard>
 
+        <UCard
+          v-else-if="data!.usedPass"
+          data-test="used-pass"
+        >
+          <template #header>
+            <h2 class="font-semibold">
+              Your pass
+            </h2>
+          </template>
+          <p class="text-sm text-muted">
+            {{ data!.usedPass.passTypeName }} ({{ data!.usedPass.reference }}) is already used for this performance:
+            booking <NuxtLink
+              to="/qr"
+              class="text-primary underline"
+            >{{ data!.usedPass.bookingReference }}</NuxtLink>. A pass admits once to each performance.
+          </p>
+        </UCard>
+
         <PassOffer
           :offers="data!.passOffers"
           :signed-in="account.signedIn"
@@ -394,12 +421,23 @@ useSeoMeta({
               can book.
             </p>
             <UButton
+              v-if="memberPrice === 'sign-in'"
               :to="`/sign-in?next=${encodeURIComponent(`/book/${performanceId}`)}`"
               variant="subtle"
               size="sm"
               class="shrink-0"
             >
               Sign in for member prices
+            </UButton>
+            <UButton
+              v-else
+              to="/account/membership"
+              variant="subtle"
+              size="sm"
+              class="shrink-0"
+              data-test="member-prices-join"
+            >
+              Become a member
             </UButton>
           </div>
 

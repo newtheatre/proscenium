@@ -38,9 +38,10 @@ export async function enforce(event: H3Event, limit: Limit, now = new Date()): P
   if (outcome.allowed) return
 
   setResponseHeader(event, 'Retry-After', outcome.retryAfterSeconds)
+  const minutes = Math.max(1, Math.ceil(outcome.retryAfterSeconds / 60))
   throw createError({
     statusCode: 429,
-    statusMessage: 'Too many attempts. Try again shortly.',
+    statusMessage: `Too many attempts. Try again in ${minutes === 1 ? 'a minute' : `${minutes} minutes`}.`,
   })
 }
 

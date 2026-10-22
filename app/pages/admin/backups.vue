@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h } from 'vue'
 import { backupDrillsList } from '#shared/utils/backup-drills-list'
-import { restoreDrillForm } from '#shared/utils/backup'
+import { blankRestoreDrill, restoreDrillForm } from '#shared/utils/backup'
 import { saysDay } from '#shared/utils/when'
 import type { FormSubmitEvent, TableColumn } from '@nuxt/ui'
 import type { RestoreDrillForm } from '#shared/utils/backup'
@@ -48,7 +48,7 @@ const recording = ref(false)
 
 const toast = useToast()
 const drillForm = useTemplateRef('drillForm')
-const drill = reactive<Partial<RestoreDrillForm>>({})
+const drill = reactive<Partial<RestoreDrillForm>>(blankRestoreDrill())
 
 async function load(): Promise<void> {
   loading.value = true
@@ -75,12 +75,7 @@ async function record(event: FormSubmitEvent<RestoreDrillForm>): Promise<void> {
     await $fetch('/api/admin/backups/drills', { method: 'POST', body: event.data })
     toast.add({ title: 'Drill recorded', icon: 'i-lucide-database-backup', color: 'success' })
     recording.value = false
-    drill.ranAt = undefined
-    drill.outcome = undefined
-    drill.timeToRestoreMinutes = undefined
-    drill.rowCountsMatch = undefined
-    drill.moneyTotalsMatch = undefined
-    drill.notes = undefined
+    Object.assign(drill, { ranAt: undefined, outcome: undefined, timeToRestoreMinutes: undefined, notes: undefined }, blankRestoreDrill())
     page.value = 1
     await load()
   }

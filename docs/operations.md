@@ -629,9 +629,11 @@ Three things worth knowing before doing it:
 Anybody signed in to a console or show-night screen can report a problem or an idea from the
 megaphone button beside the help link. Each report is one `feedback_reports` row: the kind, the
 words, the screen, the shell, the browser and the last few requests that browser saw fail, ray
-ids included. The application does nothing further with it. There is no notification and no
-admin screen; a defect that takes the theatre down is `health:watch`'s job, and everything else
-waits for the daily run.
+ids included. The application sends no notification; a defect that takes the theatre down is
+`health:watch`'s job, and everything else waits for the daily run. The IT Manager can read every
+report, newest first, at **Console → System → Problem reports** (`/admin/feedback`, the
+`feedback.read` permission, which only `ADMIN` holds). A report's page must be a path on this site:
+the screen links it, so the form refuses anything else.
 
 **The daily triage run** is a scheduled assistant session started from the IT Manager's own
 account, not a workflow in this repository and not a task in the worker. Its instructions are
@@ -1174,6 +1176,12 @@ outcome there, never as a failure: chasing it is chasing something that correctl
 Opening one person's history from a row (`/comms/operations/accounts/[id]`) answers a support
 query with types, dates and outcomes only, never a message body; every such view writes a
 `notifications.history.viewed` audit entry regardless of what it finds.
+
+Two rooms rules explain a gap that is not a fault. A new room request, ours or the Students'
+Union's, is emailed to every approver at once and is in the log within the minute; it never waits
+for the rooms digest (0205). And a rooms message held for a digest is deleted, unsent, once the
+request it is about is decided: a member whose request was approved within the hour has an
+**Approved** row and no **Asked for** anywhere, which is intended (0206).
 
 ## The restore drill (J-107 criterion 5)
 
