@@ -175,7 +175,11 @@ describe.skipIf(skip !== null)('a claimed offer opens the booking it made (crite
     const view = await openSignedOutView(app.baseURL)
     try {
       await visit(view, entryUrl!, '[data-test="waiting-list-offered"]')
+      expect(await textOf(view, '[data-test="waiting-list-offered"]')).toContain('A seat is free')
+      expect(await textOf(view, '[data-test="waiting-list-claim-count"]')).toContain('Choose 1 more')
+      expect(await view.evaluate<boolean>(`document.querySelector('[data-test="waiting-list-claim-submit"]').disabled`)).toBe(true)
       await fillNumber(view, '[data-test^="quantity-"]', '1')
+      await waitFor(view, `!document.querySelector('[data-test="waiting-list-claim-submit"]').disabled`)
       await click(view, '[data-test="waiting-list-claim-submit"]')
       await waitFor(view, `document.querySelector('[data-test="booking-made"]')`)
       expect(await view.evaluate<string>('location.pathname')).toBe('/qr')

@@ -773,3 +773,26 @@ describe.skipIf(skip !== null)('an empty results card says which kind of empty i
     }
   }, CASE_TIMEOUT_MS)
 })
+
+// D-113 criterion 5's routes had no screen: the desk shows the performance's list and offers by hand.
+describe.skipIf(skip !== null)('the desk shows the waiting list for the performance on screen', () => {
+  test('a waiting party is listed with its size, and the desk can offer by hand', async () => {
+    const { performanceId, title } = await bookableShow(900, twoHoursSeconds, 0)
+    const joined = await send('POST', `/api/performances/${performanceId}/waiting-list`, {
+      performanceId, partySize: 2, guest: { name: 'Wanda Waiting', email: registrableAddress('waiter') },
+    }, '')
+    expect(joined.status).toBe(200)
+
+    const view = await signInAsBoxOffice(app.baseURL)
+    try {
+      await atTheDesk(view, title)
+      await waitFor(view, `document.querySelector('[data-test="desk-waiting-list"]')?.innerText.includes('Wanda Waiting')`, 30_000)
+      expect(await textOf(view, '[data-test="desk-waiting-list"]')).toContain('party of 2')
+      await click(view, '[data-test="desk-waiting-list-offer"]')
+      await waitFor(view, `document.body.innerText.includes('Nothing offered')`, 15_000)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+})
