@@ -5,6 +5,7 @@ import { admittedSeatsSubquery, heldSeatsSubquery, noShowSeatsSubquery, soldWalk
 import { cardSalesQuery } from './reconciliation'
 import { lateAdditionsQuery } from './late-charge'
 import { DOOR_COVER_ACTION, NIGHT_ROLES, OFFICER_BYPASS_ACTION, doorCoverTarget, officerBypassTarget } from '#shared/utils/night-authority'
+import { showNightBounds } from '#shared/utils/show-night'
 import type { ChecklistEntry } from '#shared/utils/checklist'
 import type { OfficerBypassLine } from '#shared/utils/night-authority'
 import type { LateAddition } from '#shared/utils/sumup'
@@ -146,25 +147,29 @@ export async function reportIncidents(performanceId: string): Promise<ReportInci
   return rows.map(row => ({ ...row, followUpRequired: Boolean(row.followUpRequired), followUpClosed: Boolean(row.followUpClosed) }))
 }
 
-export interface ReportAgeChecks { accepted: number, refused: number, notRequired: number }
+export interface ReportAgeChecks { accepted: number, refused: number, notRequired: number, unassigned: number }
 
 // Current entries only: a superseded outcome is not what actually happened, only the corrected
-// row is (E-118 criterion 3). Licensing evidence stays in the register itself; this is a count.
-export function reportAgeChecksQuery(performanceId: string): SQL {
+// row is (E-118 criterion 3). `unassigned` is the night's entries with no performance (0234).
+export function reportAgeChecksQuery(performanceId: string, night: string): SQL {
+  const { from, to } = showNightBounds(night)
+  const current = sql`id NOT IN (SELECT supersedes_id FROM age_checks WHERE supersedes_id IS NOT NULL)`
   return sql`
     SELECT
-      coalesce(sum(CASE WHEN outcome = 'ACCEPTED' THEN 1 ELSE 0 END), 0) AS accepted,
-      coalesce(sum(CASE WHEN outcome = 'REFUSED' THEN 1 ELSE 0 END), 0) AS refused,
-      coalesce(sum(CASE WHEN outcome = 'NOT_REQUIRED' THEN 1 ELSE 0 END), 0) AS notRequired
+      coalesce(sum(CASE WHEN performance_id = ${performanceId} AND outcome = 'ACCEPTED' THEN 1 ELSE 0 END), 0) AS accepted,
+      coalesce(sum(CASE WHEN performance_id = ${performanceId} AND outcome = 'REFUSED' THEN 1 ELSE 0 END), 0) AS refused,
+      coalesce(sum(CASE WHEN performance_id = ${performanceId} AND outcome = 'NOT_REQUIRED' THEN 1 ELSE 0 END), 0) AS notRequired,
+      coalesce(sum(CASE WHEN performance_id IS NULL THEN 1 ELSE 0 END), 0) AS unassigned
     FROM age_checks
-    WHERE performance_id = ${performanceId}
-      AND id NOT IN (SELECT supersedes_id FROM age_checks WHERE supersedes_id IS NOT NULL)
+    WHERE (performance_id = ${performanceId}
+      OR (performance_id IS NULL AND created_at >= ${Math.floor(from.getTime() / 1000)} AND created_at < ${Math.floor(to.getTime() / 1000)}))
+      AND ${current}
   `
 }
 
-export async function reportAgeChecks(performanceId: string): Promise<ReportAgeChecks> {
-  const [row] = await db.all<ReportAgeChecks>(reportAgeChecksQuery(performanceId))
-  return row ?? { accepted: 0, refused: 0, notRequired: 0 }
+export async function reportAgeChecks(performanceId: string, night: string): Promise<ReportAgeChecks> {
+  const [row] = await db.all<ReportAgeChecks>(reportAgeChecksQuery(performanceId, night))
+  return row ?? { accepted: 0, refused: 0, notRequired: 0, unassigned: 0 }
 }
 
 export interface ReportMilestone { id: string, label: string, composedAt: number, supersededBy: string | null }
@@ -327,7 +332,7 @@ export async function compileNightReport(performanceId: string, venueId: string,
     reportAttendance(performanceId),
     reportTakings(performanceId),
     reportIncidents(performanceId),
-    reportAgeChecks(performanceId),
+    reportAgeChecks(performanceId, night),
     reportMilestones(venueId, night),
     reportStaffing(performanceId),
     reportOfficerBypasses(performanceId, venueId, night),

@@ -352,8 +352,28 @@ describe('age checks (E-118)', () => {
         'a-4', tonight.performanceId, checker,
       ]])
 
-      const [row] = read<{ accepted: number, refused: number, notRequired: number }>(database, reportAgeChecksQuery(tonight.performanceId))
+      const [row] = read<{ accepted: number, refused: number, notRequired: number }>(database, reportAgeChecksQuery(tonight.performanceId, tonight.night))
       expect(row).toMatchObject({ accepted: 1, refused: 1, notRequired: 1 })
+    })
+  })
+
+  // The 21 October process map: a refusal at the till with no performance sat on the register,
+  // and the report still said nobody was refused (0234).
+  test('an entry tonight with no performance is counted apart, and another night\'s is not', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const checker = person(database, 'checker')
+      database.batch([[
+        `INSERT INTO age_checks (id, performance_id, checked_by, outcome, reason, description) VALUES (?, NULL, ?, 'REFUSED', 'NO_ID_SHOWN', 'Blue jacket')`,
+        'a-bar', checker,
+      ]])
+      database.batch([[
+        `INSERT INTO age_checks (id, performance_id, checked_by, outcome, reason, description, created_at) VALUES (?, NULL, ?, 'REFUSED', 'NO_ID_SHOWN', 'Red hat', 1000)`,
+        'a-old', checker,
+      ]])
+
+      const [row] = read<{ refused: number, unassigned: number }>(database, reportAgeChecksQuery(tonight.performanceId, tonight.night))
+      expect(row).toMatchObject({ refused: 0, unassigned: 1 })
     })
   })
 })
