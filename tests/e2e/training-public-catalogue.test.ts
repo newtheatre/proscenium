@@ -138,8 +138,8 @@ describe.skipIf(skip !== null)('the catalogue answers without an account (G-128)
   test('the catalogue names each module\'s earliest open session, from one grouped query (G-129)', async () => {
     const soon = await addModule({ name: 'Working the desk' })
     const untaught = await addModule({ name: 'Rigging a lantern' })
-    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-    const later = new Date(Date.now() + 172_800_000).toISOString().slice(0, 10)
+    const tomorrow = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
+    const later = new Date(Date.now() + 172_800_000).toLocaleDateString('en-CA', { timeZone: 'Europe/London' })
 
     // Two sessions teach the same module; the catalogue names the earlier one.
     await send('POST', '/api/admin/training/sessions', {
