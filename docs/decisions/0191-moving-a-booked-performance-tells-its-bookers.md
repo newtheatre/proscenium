@@ -28,6 +28,8 @@ cancelled night.
   move twice tells nobody twice, and a later move tells everybody again.
 - A doors, running time, capacity, booking window or notes change tells nobody: a booker's
   arrival is the curtain and the venue.
+- Nor does any edit to a cancelled performance, or one whose show night is over: that is a
+  correction to the record, and a cancelled night's holders were already told it is off.
 - The edit form warns before saving, when tickets are held and the day, curtain or venue has
   changed; the toast says how many bookings were emailed, and the route answers `bookingsTold`.
 

@@ -255,7 +255,8 @@ const SHOW_COUNTS = sql`
   (SELECT count(*) FROM show_content_warnings w WHERE w.show_id = s.id) AS warningCount,
   (SELECT count(*) FROM ticket_types t
      LEFT JOIN show_ticket_overrides so ON so.show_id = s.id AND so.ticket_type_id = t.id
-    WHERE t.archived = 0 AND coalesce(so.active, t.active_by_default) = 1) AS activePriceCount,
+    WHERE t.archived = 0 AND coalesce(t.restricted_to, '') <> 'DESK'
+      AND coalesce(so.active, t.active_by_default) = 1) AS activePriceCount,
   ${SHOW_HOUSE}
 `
 

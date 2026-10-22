@@ -463,6 +463,27 @@ describe.skipIf(skip !== null)('a performance is cancelled, never deleted, once 
     }
   })
 
+  test('correcting a cancelled performance\'s date tells its bookers nothing', async () => {
+    const id = await newShow()
+    const startsAt = nextWeek()
+    const performance = await addPerformance(id, { startsAt })
+    const database = new Database(app.databaseFile)
+    try {
+      database.run(
+        'INSERT INTO reservations (id, reference, performance_id, user_id, status, source) VALUES (?, ?, ?, ?, ?, ?)',
+        [`x-paid-${performance}`, crypto.randomUUID().slice(0, 6).toUpperCase(), performance, member.id, 'COLLECTED', 'WEB'],
+      )
+    }
+    finally {
+      database.close()
+    }
+    await send('POST', `/api/admin/performances/${performance}/cancel`)
+
+    const answered = await send('PUT', `/api/admin/performances/${performance}`, { venueId, startsAt: startsAt + 86_400, durationMinutes: 120, intervalCount: 0 })
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toMatchObject({ bookingsTold: 0 })
+  })
+
   test('a cancelled performance cannot be put back on sale by the sale action', async () => {
     const id = await newShow()
     const performance = await addPerformance(id)

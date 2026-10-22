@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { changes } from '#shared/utils/audit'
 import { formatLondon } from '#shared/utils/london'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import { capacityOverrideRefusal, performanceForm, runningTimeRefusal } from '#shared/utils/programme'
 import { COMMITTED_SHIFT_STATUSES, saysShiftRole } from '#shared/utils/rota'
 import type { ShiftRole } from '#shared/utils/rota'
@@ -181,7 +182,9 @@ export default defineEventHandler(async (event) => {
   }
 
   // A booker holds a seat at a time and a place, so a change to either is theirs to hear (0191).
-  const bookingsTold = moved || input.startsAt !== held.startsAt
+  // A cancelled or played night is a correction to the record: its holders were already told.
+  const live = held.status !== 'CANCELLED' && held.startsAt >= showNightOpensAt(currentShowNight())
+  const bookingsTold = live && (moved || input.startsAt !== held.startsAt)
     ? await tellBookersItMoved(event, { id, venueId: input.venueId, startsAt: input.startsAt, showTitle: held.showTitle, venueName: venue.name, was: held.startsAt, wasVenueName: held.venueName, when })
     : 0
 
