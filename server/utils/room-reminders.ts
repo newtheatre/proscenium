@@ -1,5 +1,6 @@
 import { and, asc, eq, gte, lt, sql } from 'drizzle-orm'
-import { formatLondon, fromLondonWallClock, londonParts } from '#shared/utils/london'
+import { fromLondonWallClock, londonParts } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 import { calendarFor } from '#shared/utils/ics'
 import type { H3Event } from 'h3'
 
@@ -101,7 +102,7 @@ export async function remindTomorrow(event: H3Event | undefined, at = new Date()
         bookings: held.map(booking => ({
           room: booking.room,
           title: booking.title,
-          when: formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+          when: saysRoomSpan(booking.startsAt, booking.endsAt),
         })),
         roomsUrl: `${base}/rooms/mine`,
       },

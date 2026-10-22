@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, inArray, lt, or, sql } from 'drizzle-orm'
 import { CANCELLABLE } from '#shared/utils/bookings'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 import { blackoutsList } from '#shared/utils/blackouts-list'
 import { conditionsOf } from '#shared/utils/list-filters'
 import { tableColumns, whereFrom, yesNo } from './list-filters'
@@ -63,6 +63,7 @@ export interface Stranded {
   startsAt: number
   endsAt: number
   seriesId: string | null
+  status: string
 }
 
 // What a new blackout would cancel. Read before writing so the answer can say how many, and read
@@ -76,6 +77,7 @@ export async function bookingsUnder(blackout: { roomId: string | null, startsAt:
     startsAt: schema.roomBookings.startsAt,
     endsAt: schema.roomBookings.endsAt,
     seriesId: schema.roomBookings.seriesId,
+    status: schema.roomBookings.status,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))
@@ -119,13 +121,15 @@ export async function tellStranded(event: H3Event | undefined, stranded: Strande
     await notify(event, {
       type: 'room.blackout.cancelled',
       userId,
+      about: theirs.map(booking => booking.id),
       context: {
         name: '',
         reason,
         bookings: theirs.map(booking => ({
           room: booking.room,
           title: booking.title,
-          when: formatLondon(new Date(booking.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+          when: saysRoomSpan(booking.startsAt, booking.endsAt),
+          asked: booking.status === 'PENDING_APPROVAL',
         })),
         roomsUrl: `${base}/rooms`,
       },

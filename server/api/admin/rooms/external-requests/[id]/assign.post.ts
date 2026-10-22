@@ -1,6 +1,6 @@
 import { assignForm, refusalToAct } from '#shared/utils/external-requests'
 import { blocksAssignment, noteFor, warningFor } from '#shared/utils/external-spaces'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Record the room we were given, which confirms the request.
 export default defineEventHandler(async (event) => {
@@ -60,12 +60,13 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'external.request.assigned',
     userId: request.userId,
+    about: [id],
     context: {
       name: request.who,
       title: request.title,
       room: space.name,
       where: [space.building, space.campus].filter(Boolean).join(', ') || 'somewhere on campus',
-      when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(request.startsAt, request.endsAt),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
   })

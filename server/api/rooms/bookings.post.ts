@@ -1,6 +1,6 @@
 import { bookingForm, bookingTier, maskConflicts, saysClash } from '#shared/utils/bookings'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Book a room.
 export default defineEventHandler(async (event) => {
@@ -95,10 +95,11 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'room.booking.confirmed',
     userId: account.id,
+    about: [claimed.id],
     context: {
       name: account.name,
       room: room.name,
-      when: formatLondon(startsAt, { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(startsAt, endsAt),
       title: input.title,
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },

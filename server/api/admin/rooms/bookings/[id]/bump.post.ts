@@ -1,5 +1,5 @@
 import { bumpForm, refusalToBump } from '#shared/utils/tiers'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Take a confirmed booking for a higher priority, with a reason and a replacement offer.
 export default defineEventHandler(async (event) => {
@@ -62,14 +62,15 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'room.booking.bumped',
     userId: displaced.userId,
+    about: [id],
     context: {
       name: displaced.who,
       room: displaced.room,
       title: displaced.title,
-      when: formatLondon(new Date(displaced.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(displaced.startsAt, displaced.endsAt),
       reason: input.reason,
       offered: outcome.offeredId && offer
-        ? `${offer.room}, ${formatLondon(new Date(offer.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' })}`
+        ? `${offer.room}, ${saysRoomSpan(offer.startsAt, offer.endsAt)}`
         : null,
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },

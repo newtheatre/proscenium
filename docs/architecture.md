@@ -797,10 +797,12 @@ reattach later, the same reasoning 0056 gives for a retry) bypass the hold and s
 What a person has waiting is read by `waitingForDigest()` (`server/utils/notification-digests.ts`):
 `GET /api/admin/comms/accounts/[id]/history` answers it as `waiting`, each topic with its message
 count and when the next run will send it, and the account page shows it above the send log.
-`joinsDigest()` in `shared/utils/notifications.ts` is where those three conditions live, so a new
+`joinsDigest()` in `shared/utils/notifications.ts` is where those conditions live, so a new
 call site never has to re-derive them: transactional (`topic: null`) never coalesces at all,
 because that is what marks a deadline a digest interval would consume, such as a hold expiring or
-an offer waiting to be claimed before it lapses to the next entry (D-113).
+an offer waiting to be claimed before it lapses to the next entry (D-113). A type marked
+`immediate` keeps its topic preference but never coalesces either: a new room request reaches
+approvers at once (0205).
 
 `notifications:digest` claims every topic-and-person pair whose window has passed with one
 conditional `UPDATE ... WHERE digest_log_id IS NULL`, the same claim-before-send shape the retry
@@ -810,6 +812,14 @@ type carrying the pre-claimed id. The digest types (`digest.bookings`, `digest.s
 digest can never hold itself for the next one and never duplicates the inbox. The window is five
 scalar keys, `NOTIFICATION_DIGEST_WINDOW_<TOPIC>_MINUTES`, shipped at 60 minutes each, and it
 opens at the earliest still-unclaimed entry, not the latest.
+
+A held entry's `body` is JSON (`server/utils/digest-entries.ts`): the full text, one line, one
+link and `about`, the record ids the message concerns; a plain-text body reads as its subject. A
+type marked `decides`, sent with `about`, first deletes every unclaimed entry in its topic that
+shares an id, other than one of its own type, by one statement whose ids are a single `json_each`
+parameter (0006). The sweep orders what it claimed with decisions first, and a topic set in
+`DIGEST_IN_LINES` (rooms only) renders one greeting, a line per entry and one link, under the lead
+entry's subject (0206).
 
 An entry survives exactly as long as the `notification_log` row it was claimed into, so "was I
 told about X" is answerable from the entry until the send itself ages out (H-105 criterion 5).

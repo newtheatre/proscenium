@@ -1,7 +1,7 @@
 import { requestForm } from '#shared/utils/requests'
 import { bookingTier, maskConflicts, saysClash } from '#shared/utils/bookings'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Ask for a slot the policy will not confirm on its own.
 export default defineEventHandler(async (event) => {
@@ -81,27 +81,29 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'room.request.received',
     userId: account.id,
+    about: [claimed.id],
     context: {
       name: account.name,
       room: room.name,
-      when: formatLondon(startsAt, { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(startsAt, endsAt),
       title: input.title,
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
   })
 
-  // Told on arrival, not only once it is stale. A muted approver's send is skipped and logged,
+  // Told on arrival, never held for a digest (0205). A muted approver's send is skipped and logged,
   // and the request still stands on the queue, so no inbox can orphan one (C-113 criterion 4).
   for (const approver of await approvers()) {
     await notify(event, {
       type: 'room.request.raised',
       userId: approver.id,
+      about: [claimed.id],
       context: {
         name: approver.name,
         who: account.name,
         room: room.name,
         title: input.title,
-        when: formatLondon(startsAt, { dateStyle: 'full', timeStyle: 'short' }),
+        when: saysRoomSpan(startsAt, endsAt),
         queueUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/manage/requests`,
       },
     })

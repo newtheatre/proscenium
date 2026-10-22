@@ -1,5 +1,5 @@
 import { refusalToAct, submitForm } from '#shared/utils/external-requests'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Record that the form is in.
 export default defineEventHandler(async (event) => {
@@ -38,10 +38,11 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'external.request.submitted',
     userId: request.userId,
+    about: [id],
     context: {
       name: request.who,
       title: request.title,
-      when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(request.startsAt, request.endsAt),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
   })

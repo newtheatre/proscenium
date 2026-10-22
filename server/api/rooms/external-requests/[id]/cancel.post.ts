@@ -1,5 +1,5 @@
 import { refusalToAct } from '#shared/utils/external-requests'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Withdraw a request for a room not listed here.
 export default defineEventHandler(async (event) => {
@@ -39,13 +39,14 @@ export default defineEventHandler(async (event) => {
       await notify(event, {
         type: 'external.request.withdrawn',
         userId: approver.id,
+        about: [id],
         context: {
           name: approver.name,
           who: request.who,
           title: request.title,
           room: request.assigned ?? request.preferred ?? 'no room yet',
           reference: request.suReference ?? 'none recorded',
-          when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+          when: saysRoomSpan(request.startsAt, request.endsAt),
         },
       })
     }

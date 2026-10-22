@@ -79,6 +79,7 @@ const EVERYTHING: TemplateContext = {
   position: 2,
   first: 'Friday 2 October 2026',
   last: 'Friday 20 November 2026',
+  times: '19:30 to 21:30',
   preApprovalAt: 3,
   underPreApproval: false,
   formIsIn: true,
@@ -456,6 +457,13 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(render('room-series-requested', EVERYTHING).subject).toBe('Asked for: 3 bookings in The Studio')
   })
 
+  test('a series says its times once, for every week', () => {
+    expect(flat(render('room-series-booked', EVERYTHING).text))
+      .toContain('from Friday 2 October 2026 to Friday 20 November 2026, 19:30 to 21:30 each time.')
+    expect(flat(render('room-series-requested', EVERYTHING).html))
+      .toContain('from Friday 2 October 2026 to Friday 20 November 2026, 19:30 to 21:30 each time, is waiting')
+  })
+
   test('a relisted request matches its siblings', () => {
     expect(render('request-relisted', EVERYTHING).subject).toBe('Asked for: The Studio, Friday 2 October 2026 at 19:30')
     expect(render('request-relisted', { ...EVERYTHING, settled: false }).subject)
@@ -631,6 +639,84 @@ describe('the shared labels (item 8)', () => {
   test('the retired box office role still names a person, not a desk', () => {
     expect(saysRole('BOX_OFFICE')).toBe('Box Office Manager')
     expect(saysRole('FRONT_OF_HOUSE')).toBe('Front of House')
+  })
+})
+
+// The rooms findings of 21 October 2026: what each rooms email says about the slot and the reason.
+describe('the rooms emails (process map, rooms)', () => {
+  const studio = { room: 'The Studio', title: 'Line run', when: 'Friday 2 October 2026, 19:30 to 21:30' }
+
+  test('an approval into another room agrees in number', () => {
+    const one = render('room-approved', { ...EVERYTHING, bookings: [studio], moved: 'The Studio' })
+    expect(flat(one.text)).toContain('Your request has been approved. It is in The Studio, which is not the room asked for.')
+    const two = render('room-approved', { ...EVERYTHING, bookings: [studio, studio], moved: 'The Studio' })
+    expect(flat(two.text)).toContain('Your requests have been approved. They are in The Studio')
+  })
+
+  test('a reason that already ends a sentence gets no second full stop', () => {
+    for (const reason of ['short notice.', 'short notice']) {
+      const bumped = render('room-bumped', { ...EVERYTHING, reason })
+      const closed = render('room-blackout-cancelled', { ...EVERYTHING, reason, bookings: [studio] })
+      for (const part of [bumped.html, bumped.text, closed.html, closed.text]) {
+        expect(flat(part)).toContain('short notice.')
+        expect(part).not.toContain('short notice..')
+      }
+    }
+  })
+
+  test('a closure says asked for to somebody who only asked, and both to somebody who did both', () => {
+    const booked = render('room-blackout-cancelled', { ...EVERYTHING, bookings: [studio] })
+    expect(flat(booked.text)).toContain('A room you booked has been closed: The room is closed that week.')
+    expect(flat(booked.text)).toContain('This booking is cancelled.')
+
+    const asked = render('room-blackout-cancelled', { ...EVERYTHING, bookings: [{ ...studio, asked: true }] })
+    expect(flat(asked.text)).toContain('A room you asked for has been closed')
+    expect(flat(asked.text)).toContain('This request is cancelled.')
+    expect(asked.text).not.toContain('you booked')
+
+    const both = render('room-blackout-cancelled', { ...EVERYTHING, bookings: [studio, { ...studio, asked: true }] })
+    expect(both.subject).toBe('Cancelled: 2 bookings and requests')
+    expect(flat(both.text)).toContain('Rooms you booked or asked for have been closed')
+    expect(flat(both.text)).toContain('These bookings and requests are cancelled.')
+  })
+
+  test('a turned down request carries its reason on its digest line', () => {
+    const { subject, line } = render('room-rejected', { ...EVERYTHING, bookings: [studio], reason: 'Too short notice' })
+    expect(line).toBe(`${subject}. Why: Too short notice.`)
+  })
+})
+
+describe('the rooms digest is a line per change (0206)', () => {
+  const entries = [
+    { subject: 'Turned down: The Studio, Friday 2 October 2026, 19:30 to 21:30', body: 'Hello Ada, a whole message', line: 'Turned down: The Studio. Why: Short notice.' },
+    { subject: 'Asked for: Green Room, Saturday 3 October 2026, 10:00 to 11:00', body: 'Hello Ada, another whole message' },
+  ]
+  const link = { url: ROOMS_URL, says: 'See your bookings' }
+
+  test('the subject names the lead change and counts the rest', () => {
+    const { subject } = render('notification-digest', { ...EVERYTHING, inLines: true, entries, link })
+    expect(subject).toBe('Turned down: The Studio, Friday 2 October 2026, 19:30 to 21:30, and 1 more room booking update')
+    expect(render('notification-digest', { ...EVERYTHING, inLines: true, entries: [entries[1]], link }).subject)
+      .toBe('Asked for: Green Room, Saturday 3 October 2026, 10:00 to 11:00')
+  })
+
+  test('one greeting, one line each, one link, and no message nested inside another', () => {
+    const { html, text } = render('notification-digest', { ...EVERYTHING, inLines: true, entries, link })
+    for (const part of [html, text]) {
+      expect(part.match(/Hello Ada/g)).toHaveLength(1)
+      expect(part).toContain('Turned down: The Studio. Why: Short notice.')
+      expect(part).toContain('Asked for: Green Room, Saturday 3 October 2026, 10:00 to 11:00')
+      expect(part).not.toContain('a whole message')
+      expect(part.match(/The Nottingham New Theatre/g)).toHaveLength(1)
+    }
+    expect(html.match(/<a /g)).toHaveLength(1)
+    expect(text).toContain(`See your bookings: ${ROOMS_URL}`)
+  })
+
+  test('another topic still nests each message whole', () => {
+    const { subject, text } = render('notification-digest', { ...EVERYTHING, entries, noun: 'shift update' })
+    expect(subject).toBe('2 Shift updates')
+    expect(text).toContain('a whole message')
   })
 })
 

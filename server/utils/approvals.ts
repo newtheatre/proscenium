@@ -30,6 +30,7 @@ export interface PendingRow {
   reason: string | null
   createdAt: number
   escalatedAt: number | null
+  seriesId: string | null
 }
 
 export type DecisionOutcome
@@ -60,6 +61,7 @@ async function selectPending(where: ReturnType<typeof eq>): Promise<PendingRow[]
     reason: schema.roomBookings.reason,
     createdAt: schema.roomBookings.createdAt,
     escalatedAt: schema.roomBookings.escalatedAt,
+    seriesId: schema.roomBookings.seriesId,
   })
     .from(schema.roomBookings)
     .innerJoin(schema.rooms, eq(schema.rooms.id, schema.roomBookings.roomId))

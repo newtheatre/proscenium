@@ -1,6 +1,6 @@
 import { externalRequestForm, judgeExternal } from '#shared/utils/external-requests'
 import { noteFor, warningFor } from '#shared/utils/external-spaces'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // Ask for a room not listed here, with an optional preference.
 export default defineEventHandler(async (event) => {
@@ -52,10 +52,11 @@ export default defineEventHandler(async (event) => {
     detail: { purpose, preferred: input.preferredSpaceId },
   }))
 
-  const when = formatLondon(startsAt, { dateStyle: 'full', timeStyle: 'short' })
+  const when = saysRoomSpan(startsAt, endsAt)
   await notify(event, {
     type: 'external.request.received',
     userId: account.id,
+    about: [id],
     context: { name: account.name, title: input.title, when, roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine` },
   })
 
@@ -63,6 +64,7 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       type: 'external.request.raised',
       userId: approver.id,
+      about: [id],
       context: {
         name: approver.name,
         who: account.name,

@@ -1,5 +1,5 @@
 import { refusalToAct, refuseAssignmentForm } from '#shared/utils/external-requests'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 
 // We were given something unsuitable, so we record it and ask again.
 export default defineEventHandler(async (event) => {
@@ -63,11 +63,12 @@ export default defineEventHandler(async (event) => {
   await notify(event, {
     type: 'external.request.reassigning',
     userId: request.userId,
+    about: [id],
     context: {
       name: request.who,
       title: request.title,
       room: space.name,
-      when: formatLondon(new Date(request.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+      when: saysRoomSpan(request.startsAt, request.endsAt),
       roomsUrl: `${useRuntimeConfig(event).public.baseURL}/rooms/mine`,
     },
   })
