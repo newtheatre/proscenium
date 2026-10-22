@@ -2,6 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   BAR_OPENING_STATUSES,
   barOpeningForm,
+  MAX_BAR_OPENING_SECONDS,
+  openingOverlapWarning,
+  SAME_TIME_REFUSAL,
   openingClaimRefusal,
   openingReleaseRefusal,
   openingSlotRemoveRefusal,
@@ -42,6 +45,19 @@ describe('what a planned opening names (E-130 criterion 1)', () => {
   test('the night and the opening time have to agree (0014)', () => {
     const nextNight = barOpeningForm.safeParse({ ...PLANNED, startsAt: PLANNED.startsAt + 24 * 3600, endsAt: PLANNED.endsAt + 24 * 3600 })
     expect(nextNight.success).toBe(false)
+  })
+
+  // Equal times on the form would make a whole day, so a day or longer is refused (0215).
+  test('an opening a day or longer is refused, with the reason the form gives', () => {
+    const allDay = barOpeningForm.safeParse({ ...PLANNED, endsAt: PLANNED.startsAt + MAX_BAR_OPENING_SECONDS })
+    expect(allDay.success).toBe(false)
+    expect(allDay.error?.issues.map(issue => issue.message)).toContain(SAME_TIME_REFUSAL)
+    expect(barOpeningForm.safeParse({ ...PLANNED, endsAt: PLANNED.startsAt + MAX_BAR_OPENING_SECONDS - 60 }).success).toBe(true)
+  })
+
+  test('an overlap warning names the other opening, its hours and the way on', () => {
+    const says = openingOverlapWarning({ label: 'Quiz night', opens: '19:00', closes: '23:00' }, 'New Theatre')
+    expect(says).toBe('Quiz night is already planned at New Theatre from 19:00 to 23:00, and this overlaps it. Plan the opening anyway, or change the times.')
   })
 
   test('an opening is planned or cancelled, and both have words', () => {

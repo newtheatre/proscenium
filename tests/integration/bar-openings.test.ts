@@ -14,6 +14,7 @@ import {
   declineOpeningShiftStatement,
   myOpeningShiftsQuery,
   openOpeningShiftsQuery,
+  overlappingOpeningQuery,
   releaseOpeningShiftStatement,
   removeOpeningShiftStatement,
   stampOpeningShiftsStatement,
@@ -151,6 +152,20 @@ describe('an opening records its own window and status (E-130 criterion 1)', () 
       expect(() => database.batch([['UPDATE bar_openings SET status = ? WHERE id = ?', 'OPEN', openingId]])).toThrow()
       expect(() => database.batch([['UPDATE bar_openings SET status = ? WHERE id = ?', 'CONFIRMED', openingId]])).toThrow()
       expect(() => database.batch([['UPDATE bar_openings SET status = ? WHERE id = ?', 'CANCELLED', openingId]])).not.toThrow()
+    })
+  })
+})
+
+describe('a second opening over one already planned at the venue is found, to warn (0215)', () => {
+  test('an overlap at the same venue is found, and one that only touches, elsewhere, or cancelled is not', async () => {
+    await withDatabase(async (database) => {
+      const { openingId, venueId } = opening(database)
+      const found = (venue: string, from: number, to: number) => run(database, overlappingOpeningQuery(venue, from, to))
+      expect(found(venueId, OPENS_AT + 3600, CLOSES_AT + 3600)).toEqual([{ label: 'Society social', startsAt: OPENS_AT, endsAt: CLOSES_AT }])
+      expect(found(venueId, CLOSES_AT, CLOSES_AT + 3600)).toEqual([])
+      expect(found('another-venue', OPENS_AT, CLOSES_AT)).toEqual([])
+      run(database, cancelOpeningStatement(openingId))
+      expect(found(venueId, OPENS_AT, CLOSES_AT)).toEqual([])
     })
   })
 })

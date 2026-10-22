@@ -1266,6 +1266,11 @@ a subquery on `bar_openings.starts_at` like the performances' (0006), and are sh
 links to its night on `/rota/manage/openings`, and nothing on the board acts on an opening or
 derives anything from one (0077).
 
+`POST /api/rota/openings` refuses an opening a day or longer (`MAX_BAR_OPENING_SECONDS`), which is
+what equal opening and closing times would make. It answers 409 with `data.overlap` when a
+`PLANNED` opening at the venue overlaps (`overlappingOpeningQuery`), and plans it when resent with
+`overlapping: true`: a warning, read before the write, not a rule on it (0215).
+
 ### Release and reassignment (E-107)
 
 `POST /api/rota/shifts/[id]/release` is a holder's own release, up to the start of the shift's
