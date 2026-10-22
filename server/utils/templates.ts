@@ -236,6 +236,53 @@ The Nottingham New Theatre`,
     }
   },
 
+  'authenticator-reset': (context: TemplateContext): Rendered => {
+    const url = String(context.securityUrl)
+    return {
+      subject: 'Your authenticator was reset',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The IT Manager reset the authenticator on your New Theatre account, and every device was
+signed out. Your old authenticator and recovery codes no longer work.</p>
+<p>Sign in with your password or a link as usual. If you hold a committee role, its screens stay
+closed until you set up a new authenticator under Security.</p>
+<p><a href="${url}">Set up a new authenticator</a></p>
+<p>${GOES_TO_US}</p>`),
+      text: `Hello ${context.name},
+
+The IT Manager reset the authenticator on your New Theatre account, and every device was signed
+out. Your old authenticator and recovery codes no longer work.
+
+Sign in with your password or a link as usual. If you hold a committee role, its screens stay
+closed until you set up a new authenticator under Security:
+
+${url}
+
+${GOES_TO_US}
+
+The Nottingham New Theatre`,
+    }
+  },
+
+  'account-enabled': (context: TemplateContext): Rendered => {
+    const url = String(context.signInUrl)
+    return {
+      subject: 'Your account is open again',
+      html: layout(`<p>Hello ${context.name},</p>
+<p>The IT Manager has enabled your New Theatre account again. Sign in as you did before.</p>
+<p><a href="${url}">Sign in</a></p>
+<p>${GOES_TO_US}</p>`),
+      text: `Hello ${context.name},
+
+The IT Manager has enabled your New Theatre account again. Sign in as you did before:
+
+${url}
+
+${GOES_TO_US}
+
+The Nottingham New Theatre`,
+    }
+  },
+
   'room-booked': (context: TemplateContext): Rendered => {
     const room = String(context.room)
     const when = String(context.when)

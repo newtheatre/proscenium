@@ -64,6 +64,14 @@ export default defineEventHandler(async (event) => {
         .limit(RECENT_ENTRIES)
     : []
 
+  // A tombstone left by a merge names the account it went into, read from the merge's own entry (0157).
+  const [mergedInto] = account.anonymisedAt === null
+    ? []
+    : await db.all<{ id: string, name: string, email: string }>(sql`select u.id, u.name, u.email
+        from audit_log a join users u on u.id = json_extract(a.detail, '$.into')
+        where a.action = 'account.merged' and a.target = ${`user:${id}`}
+        order by a.created_at desc limit 1`)
+
   const methods = {
     password: account.password !== null,
     google: Boolean((account as { googleSub?: string | null }).googleSub),
@@ -78,6 +86,7 @@ export default defineEventHandler(async (event) => {
       verified: account.verified,
       disabled: account.disabled,
       anonymisedAt: account.anonymisedAt,
+      mergedInto: mergedInto ?? null,
       // The Workspace address the first Google sign-in claims (A-121 criterion 7).
       pendingGoogleEmail: (account as { pendingGoogleEmail?: string | null }).pendingGoogleEmail ?? null,
       // The directory's isShadow, answered from what was already read (0071).

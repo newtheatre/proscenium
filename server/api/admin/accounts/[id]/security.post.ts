@@ -68,5 +68,14 @@ export default defineEventHandler(async (event) => {
     await batchKeepingAnItManager(guard, [touch, record], () => refuseStranding(PROTECTED_ROLE, id, 'disabling'))
   }
 
+  // A disable stays silent, as its refusal is (criterion 1); a reset and an enable say what next (0157).
+  const baseURL = useRuntimeConfig(event).public.baseURL
+  if (input.operation === 'reset-mfa') {
+    await notify(event, { type: 'account.authenticator-reset', userId: id, context: { name: account.name, securityUrl: `${baseURL}/account/security` } })
+  }
+  if (input.operation === 'enable') {
+    await notify(event, { type: 'account.enabled', userId: id, context: { name: account.name, signInUrl: `${baseURL}/sign-in` } })
+  }
+
   return { ok: true, operation: input.operation }
 })

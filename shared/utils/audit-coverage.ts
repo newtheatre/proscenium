@@ -70,7 +70,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   },
   { route: 'server/api/admin/memberships/claims/[id]/decline.post.ts', actions: ['membership.claim.declined'] },
   { route: 'server/api/account/membership/index.get.ts', exempt: 'reads your own membership and claim' },
-  { route: 'server/api/account/membership/claim.post.ts', exempt: 'a claim about yourself, creating no membership and carrying no authority' },
+  { route: 'server/api/account/membership/claim.post.ts', actions: ['membership.claim.sent'] },
   {
     route: 'server/api/account/membership/claim.delete.ts',
     actions: ['membership.claim.withdrawn'],

@@ -66,7 +66,9 @@ const offered = computed(() => ROLES
   .map(role => ({ label: saysRole(role), value: role })))
 
 const someone = computed(() => byAddress.value ? Boolean(address.value.trim() && name.value.trim()) : Boolean(chosenPerson.value))
-const ready = computed(() => Boolean(chosenRole.value && someone.value && (until.value !== 'date' || day.value)))
+// A typed day can sit before the picker's minimum, so it is said under the field rather than ignored (0157).
+const dayProblem = computed(() => until.value === 'date' && day.value && day.value < londonDay(new Date()) ? 'Pick a date from today on' : undefined)
+const ready = computed(() => Boolean(chosenRole.value && someone.value && (until.value !== 'date' || (day.value && !dayProblem.value))))
 
 // Omitted is the committee year end, null is permanent, and a picked day expires at its last
 // instant in London, never at midnight UTC (0009, 0014).
@@ -220,6 +222,7 @@ async function grant(): Promise<void> {
       <UFormField
         v-if="until === 'date'"
         label="Expires at the end of"
+        :error="dayProblem"
       >
         <DateField
           v-model="day"

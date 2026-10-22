@@ -170,7 +170,7 @@ SUMS remains the system of record and nothing here sells anything (0005, 0031, A
 member-facing routes are `GET /api/account/membership` (the longest-running term, its state as
 `membershipState()` computes it from `MEMBERSHIP_GRACE_DAYS`, and the newest claim with its
 reason), `POST /api/account/membership/claim` (Zod: `studentId`, `startsOn` not after today,
-`term` 1 or 3) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate,
+`term` 1 or 3; writes `membership.claim.sent` with the claim id and term in the same batch, 0157) and `DELETE /api/account/membership/claim` (withdraws the open claim by predicate,
 idempotent, writing `membership.claim.withdrawn` with the member as actor and the claim id alone
 in the same batch, guarded on the claim still being open, A-130 criterion 14). The screen is `/account/membership`, a `MY_NAV` entry.
 
