@@ -50,6 +50,16 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
   }
 }
 
+function write(statement: string, ...parameters: unknown[]): void {
+  const database = new Database(app.databaseFile)
+  try {
+    database.query(statement).run(...parameters as never[])
+  }
+  finally {
+    database.close()
+  }
+}
+
 const send = (method: string, path: string, body?: unknown, as = cookie): Promise<Response> =>
   fetch(`${app.baseURL}${path}`, {
     method,
@@ -269,6 +279,36 @@ describe.skipIf(skip !== null)('a scheduled session answers the asks (G-104 crit
     const { id: first } = await (await schedule(14)).json() as { id: string }
     await schedule(21)
     expect((await send('POST', `/api/admin/training/sessions/${first}/cancel`, { reason: 'The room flooded' })).status).toBe(200)
+    expect(statusOf(module)).toBe('SCHEDULED')
+  })
+
+  // Review of 0242: only what this session scheduled goes back, never an ask another one answered.
+  test('cancelling a session that scheduled nothing leaves an ask another session answered', async () => {
+    const module = await addModule()
+    await ask(module)
+    const schedule = (days: number, opensAt?: number): Promise<Response> => send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(days), startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [module], opensAt,
+    })
+    const { id: planned } = await (await schedule(28, Math.floor(Date.now() / 1000) + 86_400)).json() as { id: string }
+    expect(statusOf(module)).toBe('OPEN')
+    const { id: answered } = await (await schedule(14)).json() as { id: string }
+    expect(statusOf(module)).toBe('SCHEDULED')
+    write('UPDATE training_sessions SET register_opened_at = unixepoch() WHERE id = ?', answered)
+
+    expect((await send('POST', `/api/admin/training/sessions/${planned}/cancel`, { reason: 'The room flooded' })).status).toBe(200)
+    expect(statusOf(module)).toBe('SCHEDULED')
+  })
+
+  test('cancelling leaves the ask alone once the member holds the module', async () => {
+    const module = await addModule()
+    await ask(module)
+    const { id: session } = await (await send('POST', '/api/admin/training/sessions', {
+      heldOn: daysFrom(14), startsAt: '19:00', endsAt: '21:00', capacity: 20, moduleIds: [module],
+    })).json() as { id: string }
+    expect(statusOf(module)).toBe('SCHEDULED')
+    expect((await send('POST', '/api/admin/training/signoffs', { userId: memberId, moduleId: module, awardedOn: daysFrom(0) })).status).toBe(200)
+
+    expect((await send('POST', `/api/admin/training/sessions/${session}/cancel`, { reason: 'The room flooded' })).status).toBe(200)
     expect(statusOf(module)).toBe('SCHEDULED')
   })
 
