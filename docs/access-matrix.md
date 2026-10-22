@@ -47,7 +47,7 @@ not be a refusal at a desk (0031).
 | Route | Ability | Membership requirement | Sent to |
 | --- | --- | --- | --- |
 | `/rota` | `signedIn` | None yet. 0031 reserves the rota as something confirmation, not membership, may one day gate; nothing does today. | n/a |
-| `/tonight/emergency` | `signedIn`: every venue running tonight's card, to anybody signed in, shift or none (E-113 as amended by issue 1310). The duty managers' numbers show only to tonight's team at that venue, and a cached copy's only to the account that fetched it (A-114). | None: the card is the building's safety information. | `/sign-in` when signed out. |
+| `/tonight/emergency` | None to reach. Signed in: every venue running tonight's card, shift or none (E-113 as amended by issue 1310). Signed out: each venue's name, address and what3words with Call 999, and nothing else of the card (0237). The duty managers' numbers show only to tonight's team at that venue, and a cached copy's only to the account that fetched it (A-114). | None: the card is the building's safety information. | Nowhere: a signed-out phone stays on the card, with a **Sign in** button for the rest. |
 | `/tonight` and every other `/tonight/*` screen | `signedIn` to reach, through the `night-signed-in` middleware; each screen's own work is guarded by tonight's shift or the night permission (E-111, 0044). A session read that fails for want of signal is not a sign-out, so a cached screen still draws offline. | None. | `/sign-in` when signed out. |
 | `/training` | `signedIn` | None. | n/a |
 | `/training/sessions` | `signedIn` | None: signing up for a session does not check membership. | n/a |
