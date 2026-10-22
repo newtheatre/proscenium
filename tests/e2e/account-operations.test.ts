@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysRole } from '#shared/utils/roles'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, openSignedOutView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, letters, openSignedOutView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -105,6 +105,29 @@ describe.skipIf(skip !== null)('security operations on an account (A-122)', () =
     expect((await operate(person.id, 'sign-out')).status).toBe(200)
     expect(await stillSignedIn(person.cookie)).toBe(false)
   })
+
+  // The owner warned of an address change tells an officer, whose action must end the change too.
+  test('an officer\'s sign-out, disable or reset leaves a pending address change dead (0151)', async () => {
+    for (const operations of [['sign-out'], ['disable', 'enable'], ['reset-mfa']]) {
+      const person = await subject(`pending-${operations[0]}`)
+      const wanted = registrableAddress(`moved-${operations[0]}`)
+      expect((await send('PUT', '/api/account/email', { email: wanted }, person.cookie)).status).toBe(200)
+
+      let token: string | undefined
+      for (let tries = 0; !token && tries < 75; tries++) {
+        token = (await letters(app))
+          .filter(letter => letter.startsWith(`To: ${wanted}`))
+          .map(letter => letter.match(/\/verify\?token=([0-9a-f]+)/)?.[1])
+          .find(Boolean)
+        if (!token) await Bun.sleep(200)
+      }
+      expect(token).toBeDefined()
+
+      for (const operation of operations) expect((await operate(person.id, operation)).status).toBe(200)
+      expect((await send('POST', '/api/auth/verify', { token })).status).toBe(410)
+      expect(read('SELECT id FROM users WHERE email = ?', person.email)).toBeDefined()
+    }
+  }, 60_000)
 
   test('disabling kills every session, and re-enabling does not bring them back', async () => {
     const person = await subject('disable')

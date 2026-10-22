@@ -37,11 +37,17 @@ registration one. The requester's answer is unchanged, so nothing enumerates.
 **A pending change can be withdrawn.** `DELETE /api/account/email` deletes the bound token, so its
 link then answers 410, and audits `account.email.change.cancelled`. The profile's waiting notice
 offers it as **Cancel this change**, and `account.email.requested` links straight to it
-(`/account/profile#email`). Because a borrowed session is the case the warning exists for, every
-change to how the account is secured also deletes a pending change's token in the same batch:
-setting or changing the password, a password reset, confirming or removing the authenticator, and
-removing a sign-in method. An owner who follows the warning's advice to change their password
-therefore cancels the change without having to find it.
+(`/account/profile#email`). A change the owner did not ask for came from a session they do not
+hold, so cancelling also bumps the session epoch, ending every other session and re-sealing the
+one that cancelled; otherwise the borrowed session would simply ask again.
+
+**Every change to how the account is secured ends a pending change too**, deleting its token in
+the same batch: setting or changing the password, a password reset, confirming or removing the
+authenticator, removing a sign-in method, and an officer's sign-out everywhere, authenticator
+reset or disable (so enabling again revives nothing). A password set or changed while a change is
+waiting also bumps the epoch and re-seals the caller, since that is the owner answering the
+warning. An owner who follows the warning's advice to change their password therefore cancels the
+change and ends the session that asked for it, without having to find either.
 
 ## Consequences
 

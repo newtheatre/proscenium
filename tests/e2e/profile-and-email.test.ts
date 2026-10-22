@@ -297,7 +297,8 @@ describe.skipIf(skip !== null)('changing an email address (A-115, 0151)', () => 
       const cancelled = await send('DELETE', '/api/account/email', cookie)
       expect(cancelled.status).toBe(200)
       expect(await cancelled.json()).toMatchObject({ cancelled: true })
-      expect(await (await send('GET', '/api/account/email', cookie)).json()).toEqual({ email, pending: null })
+      const resealed = (cancelled.headers.get('set-cookie') ?? '').split(';')[0]!
+      expect(await (await send('GET', '/api/account/email', resealed)).json()).toEqual({ email, pending: null })
 
       expect(await cancelledLink(token)).toBe(410)
       expect(read('SELECT id FROM users WHERE email = ?', email)).toBeDefined()
@@ -307,9 +308,6 @@ describe.skipIf(skip !== null)('changing an email address (A-115, 0151)', () => 
         SELECT count(*) n FROM audit_log l JOIN users u ON u.id = l.actor_id
         WHERE u.email = ? AND l.action = 'account.email.change.cancelled'`, email)
       expect(logged?.n).toBe(1)
-
-      await visit(view, `${app.baseURL}/account/profile`, '[data-test="new-email"]')
-      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="pending-email"]\')')).toBe(false)
     }
     finally {
       view.close()
@@ -323,7 +321,32 @@ describe.skipIf(skip !== null)('changing an email address (A-115, 0151)', () => 
       await visit(view, `${app.baseURL}/account/profile`, '[data-test="pending-email"]')
       await click(view, '[data-test="cancel-email-change"]')
       await waitFor(view, '!document.querySelector(\'[data-test="pending-email"]\')')
-      expect((await (await send('GET', '/api/account/email', cookie)).json()).pending).toBeNull()
+      expect(await view.evaluate<string>('fetch(\'/api/account/email\').then(r => r.json()).then(j => String(j.pending))')).toBe('null')
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  // The borrowed session is what asked, so cancelling must end it or it simply asks again.
+  test('cancelling ends every other session, so the one that asked cannot ask again', async () => {
+    const { email, cookie, view } = await signedIn('email-cancel-borrowed')
+    try {
+      const borrowed = ((await fetch(`${app.baseURL}/api/auth/sign-in`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })).headers.get('set-cookie') ?? '').split(';')[0]!
+      await send('PUT', '/api/account/email', borrowed, { email: registrableAddress('email-borrowed') })
+
+      const cancelled = await send('DELETE', '/api/account/email', cookie)
+      expect(cancelled.status).toBe(200)
+      const resealed = (cancelled.headers.get('set-cookie') ?? '').split(';')[0]!
+      expect((await send('GET', '/api/account/email', resealed)).status).toBe(200)
+
+      expect((await send('GET', '/api/account/email', borrowed)).status).toBe(401)
+      expect((await send('PUT', '/api/account/email', borrowed, { email: registrableAddress('email-borrowed-again') })).status).toBe(401)
+      expect((await (await send('GET', '/api/account/email', resealed)).json()).pending).toBeNull()
     }
     finally {
       view.close()
@@ -339,7 +362,10 @@ describe.skipIf(skip !== null)('changing an email address (A-115, 0151)', () => 
 
       const changed = await send('PUT', '/api/account/password', cookie, { password: generatePassword() })
       expect(changed.status).toBe(200)
-      expect((await (await send('GET', '/api/account/email', cookie)).json()).pending).toBeNull()
+      // Answering the warning ends the other sessions, and this one is re-sealed to carry on.
+      const resealed = (changed.headers.get('set-cookie') ?? '').split(';')[0]!
+      expect((await send('GET', '/api/account/email', cookie)).status).toBe(401)
+      expect((await (await send('GET', '/api/account/email', resealed)).json()).pending).toBeNull()
       expect(await cancelledLink(token)).toBe(410)
       expect(read('SELECT id FROM users WHERE email = ?', email)).toBeDefined()
     }
