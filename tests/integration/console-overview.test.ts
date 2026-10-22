@@ -156,10 +156,12 @@ describe('the bar\'s set-up still to do (issue 1358)', () => {
   })
 })
 
-// E-116: severities ship routing nowhere (migration 0074), so the overview says so until one routes.
+// E-116: Serious ships routing (0235), so the overview only says so once every severity is off.
 describe('whether any incident severity routes to follow-up', () => {
-  test('as migrated, none does; opting one in is enough', async () => {
+  test('as migrated, Serious does; with every one off none does, and opting one in is enough', async () => {
     await withDatabase((database) => {
+      expect(read<{ anySeverityRoutes: number }>(database, safetyRoutingQuery())).toEqual([{ anySeverityRoutes: 1 }])
+      database.batch([['UPDATE incident_severity_config SET requires_follow_up = 0']])
       expect(read<{ anySeverityRoutes: number }>(database, safetyRoutingQuery())).toEqual([{ anySeverityRoutes: 0 }])
       database.batch([['UPDATE incident_severity_config SET requires_follow_up = 1 WHERE severity = ?', 'SERIOUS']])
       expect(read<{ anySeverityRoutes: number }>(database, safetyRoutingQuery())).toEqual([{ anySeverityRoutes: 1 }])

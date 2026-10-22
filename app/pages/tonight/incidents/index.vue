@@ -20,6 +20,7 @@ interface Entry {
   supersedesId: string | null
   supersededBy: string | null
   reviewed: boolean
+  createdAt: number
 }
 
 const request = useRequestFetch()
@@ -287,7 +288,10 @@ async function submitCorrect(): Promise<void> {
               <p class="font-mono text-xs text-muted">
                 {{ saysClock(entry.happenedAt) }} · logged by {{ entry.reportedByName }}
                 · {{ saysCategory(entry.category) }}, {{ saysSeverity(entry.severity) }}
-                <span v-if="entry.supersedesId"> · corrects an earlier entry</span>
+                <span
+                  v-if="entry.supersedesId"
+                  data-test="corrected-at"
+                > · a correction, filed at {{ saysClock(entry.createdAt) }}</span>
                 <span v-if="entry.supersededBy"> · corrected later</span>
                 <span v-if="entry.reviewed"> · reviewed</span>
               </p>

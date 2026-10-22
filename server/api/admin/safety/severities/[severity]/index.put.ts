@@ -6,21 +6,27 @@ import { severityConfigForm } from '#shared/utils/incident-safety'
 export default defineEventHandler(async (event) => {
   const severity = getRouterParam(event, 'severity') ?? ''
   const resolved = await requirePermission(event, 'safety.write')
-  const { requiresFollowUp } = await readValidatedBodyOrThrow(event, severityConfigForm)
+  const { requiresFollowUp: routes } = await readValidatedBodyOrThrow(event, severityConfigForm)
 
   if (!(SEVERITIES as readonly string[]).includes(severity)) {
     throw noSuch('severity')
   }
 
+  // Only a switch from off pulls anything in: a severity already routing has its list already.
+  const switchingOn = routes && !(await requiresFollowUp(severity))
+  const [{ waiting = 0 } = {}] = switchingOn
+    ? await db.all<{ waiting: number }>(waitingAtSeverityQuery(severity))
+    : []
+
   await db.batch([
-    db.run(setSeverityConfigStatement(severity, requiresFollowUp, resolved.account.id)),
+    db.run(setSeverityConfigStatement(severity, routes, resolved.account.id)),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: resolved.account.id,
       action: 'incident-severity.routing-changed',
       target: `severity:${severity}`,
-      detail: { requiresFollowUp },
+      detail: { requiresFollowUp: routes },
     })),
   ])
 
-  return { ok: true }
+  return { ok: true, waiting }
 })

@@ -454,6 +454,13 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     expect(text).toContain('https://newtheatre.org.uk/admin/requests')
   })
 
+  test('the safety notice says where and when in words, never the database\'s values (0235)', () => {
+    const { subject, text } = render('incident-follow-up-required', { ...EVERYTHING, venue: 'New Theatre', when: 'Wednesday 21 October at 21:09' })
+    expect(subject).toBe('Follow-up required: a serious incident at New Theatre')
+    expect(text).toContain('A serious near miss incident was logged at New Theatre on Wednesday 21 October at 21:09')
+    expect(`${subject} ${text}`).not.toMatch(/SERIOUS|SECURITY/)
+  })
+
   test('the safety notice links the list rather than describing it', () => {
     const { html } = render('incident-follow-up-required', EVERYTHING)
     expect(html).toContain('https://newtheatre.org.uk/rota/manage/safety')

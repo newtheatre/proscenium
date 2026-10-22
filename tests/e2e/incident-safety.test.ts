@@ -70,12 +70,28 @@ function read<T>(statement: string, ...parameters: unknown[]): T | undefined {
 interface SeverityRow { severity: string, requiresFollowUp: boolean }
 
 describe.skipIf(skip !== null)('severity routing (E-116 criterion 1)', () => {
-  test('all four severities are seeded, none routed', async () => {
+  test('all four severities are seeded, and only Serious routes out of the box (0235)', async () => {
     const listed = await send('GET', '/api/admin/safety/severities', undefined, safety.cookie)
     expect(listed.status).toBe(200)
     const { severities } = await listed.json() as { severities: SeverityRow[] }
     expect(severities).toHaveLength(4)
-    expect(severities.every(row => row.requiresFollowUp === false)).toBe(true)
+    expect(severities.filter(row => row.requiresFollowUp).map(row => row.severity)).toEqual(['SERIOUS'])
+  })
+
+  test('switching a severity on says how many earlier incidents it pulls in, unemailed (0235)', async () => {
+    await send('PUT', '/api/admin/safety/severities/INCIDENT', { requiresFollowUp: false }, safety.cookie)
+    await send('POST', '/api/tonight/incidents', { performanceId: house.performanceId, category: 'BEHAVIOUR', severity: 'INCIDENT', body: 'A heckler asked to leave.' }, bar.cookie)
+    const emailed = (): number => read<{ n: number }>(
+      `SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = 'incident.follow-up-required'`, safety.id)?.n ?? 0
+    const before = emailed()
+
+    const switched = await send('PUT', '/api/admin/safety/severities/INCIDENT', { requiresFollowUp: true }, safety.cookie)
+    expect(((await switched.json()) as { waiting: number }).waiting).toBeGreaterThanOrEqual(1)
+    expect(emailed()).toBe(before)
+
+    const again = await send('PUT', '/api/admin/safety/severities/INCIDENT', { requiresFollowUp: true }, safety.cookie)
+    expect(((await again.json()) as { waiting: number }).waiting).toBe(0)
+    await send('PUT', '/api/admin/safety/severities/INCIDENT', { requiresFollowUp: false }, safety.cookie)
   })
 
   test('the Theatre Manager can opt a severity in', async () => {

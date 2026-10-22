@@ -35,12 +35,12 @@ function person(database: TestDatabase, id: string): string {
   return id
 }
 
-describe('every severity is seeded closed by the migration (criterion 1)', () => {
-  test('all four severities exist, none requiring follow-up', async () => {
+describe('every severity is seeded by the migrations, Serious alone routing (criterion 1, 0235)', () => {
+  test('all four severities exist, and only Serious requires follow-up', async () => {
     await withDatabase((database) => {
       const found = run(database, severityConfigQuery())
       expect(found).toHaveLength(4)
-      expect(found.every(row => row.requiresFollowUp === 0)).toBe(true)
+      expect(found.filter(row => row.requiresFollowUp === 1).map(row => row.severity)).toEqual(['SERIOUS'])
       expect(found.map(row => row.severity).sort()).toEqual(['INCIDENT', 'NEAR_MISS', 'NOTE', 'SERIOUS'])
     })
   })

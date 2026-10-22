@@ -98,6 +98,24 @@ describe('incidentTrendsQuery groups by category, severity and venue within a ra
       expect(found?.total).toBe(2)
     })
   })
+
+  // The 21 October process map: a note and its correction were counted as two notes.
+  test('a corrected entry is counted once, as its correction', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const reporter = person(database, 'reporter-4')
+      incident(database, 'i-10', seeded.performanceId, reporter, 'OTHER', 'NOTE')
+      database.batch([['INSERT INTO incidents (id, performance_id, reported_by, category, severity, body, supersedes_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'i-11', seeded.performanceId, reporter, 'OTHER', 'INCIDENT', 'Corrected entry', 'i-10']])
+
+      const from = seeded.startsAt - 3600
+      const to = seeded.startsAt + 3600
+      const found = run<{ severity: string, count: number }>(database, incidentTrendsQuery(from, to, {}, 50, 0))
+      expect(found).toEqual([expect.objectContaining({ severity: 'INCIDENT', count: 1 })])
+      const [groups] = run<{ total: number }>(database, incidentTrendsCountQuery(from, to, {}))
+      expect(groups?.total).toBe(1)
+    })
+  })
 })
 
 // No-shows are counted once the curtain is up, so a night of attendance is one already played.

@@ -10,12 +10,13 @@ import type { SQL } from 'drizzle-orm'
 
 const EXPORT_LIMIT = 5000
 
+// A corrected entry is counted once, as its correction: the original stays on the log, not here.
 function incidentFilters(filter: IncidentTrendFilter): SQL {
-  const terms: SQL[] = []
+  const terms: SQL[] = [sql`NOT EXISTS (SELECT 1 FROM incidents c WHERE c.supersedes_id = i.id)`]
   if (filter.category) terms.push(sql`i.category = ${filter.category}`)
   if (filter.severity) terms.push(sql`i.severity = ${filter.severity}`)
   if (filter.venueId) terms.push(sql`v.id = ${filter.venueId}`)
-  return terms.length ? sql` AND ${sql.join(terms, sql` AND `)}` : sql``
+  return sql` AND ${sql.join(terms, sql` AND `)}`
 }
 
 // Grouped, never per-incident: a trend is the count for a category, severity and venue, which is

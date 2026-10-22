@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import { can, manageSafety } from '#shared/utils/abilities'
-import { closeFollowUpForm } from '#shared/utils/incident-safety'
+import { closeFollowUpForm, saysEarlierFollowUps } from '#shared/utils/incident-safety'
 import { saysCategory, saysSeverity, SEVERITIES } from '#shared/utils/incidents'
 import { saysWhen } from '#shared/utils/when'
 import type { Category, Severity } from '#shared/utils/incidents'
@@ -49,9 +49,14 @@ async function toggle(row: SeverityRow, requiresFollowUp: boolean): Promise<void
   saving.value = row.severity
   failure.value = null
   try {
-    await $fetch(`/api/admin/safety/severities/${row.severity}`, { method: 'PUT', body: { requiresFollowUp } })
-    toast.add({ title: requiresFollowUp ? `${saysSeverity(row.severity)} now routes to follow-up` : `${saysSeverity(row.severity)} no longer routes`, icon: 'i-lucide-check', color: 'success' })
-    await refreshSeverities()
+    const { waiting } = await $fetch<{ waiting: number }>(`/api/admin/safety/severities/${row.severity}`, { method: 'PUT', body: { requiresFollowUp } })
+    toast.add({
+      title: requiresFollowUp ? `${saysSeverity(row.severity)} now routes to follow-up` : `${saysSeverity(row.severity)} no longer routes`,
+      description: saysEarlierFollowUps(waiting),
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await reread()
   }
   catch (error) {
     failure.value = refusalText(error)
