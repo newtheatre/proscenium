@@ -1,6 +1,6 @@
 import { and, asc, eq, gt } from 'drizzle-orm'
 import { judge, resolvePolicy } from '#shared/utils/booking-policy'
-import { formatLondon } from '#shared/utils/london'
+import { saysRoomSpan } from '#shared/utils/room-messages'
 import { rejudgeForm } from '#shared/utils/no-shows'
 import type { DecisionOutcome } from '#server/utils/approvals'
 import type { CalendarEvent } from '#shared/utils/ics'
@@ -27,6 +27,7 @@ export default defineEventHandler(async (event) => {
     title: schema.roomBookings.title,
     startsAt: schema.roomBookings.startsAt,
     endsAt: schema.roomBookings.endsAt,
+    seriesId: schema.roomBookings.seriesId,
   })
     .from(schema.roomBookings)
     .where(and(
@@ -73,12 +74,13 @@ export default defineEventHandler(async (event) => {
     await notify(event, {
       type: 'room.request.approved',
       userId: member.id,
+      about: [...new Set(confirmed.flatMap(one => one.seriesId ? [one.id, one.seriesId] : [one.id]))],
       context: {
         name: '',
         bookings: confirmed.map(one => ({
           room: one.room,
           title: one.title,
-          when: formatLondon(new Date(one.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
+          when: saysRoomSpan(one.startsAt, one.endsAt),
         })),
         reason: null,
         moved: null,
