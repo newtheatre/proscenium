@@ -175,8 +175,8 @@ describe.skipIf(skip !== null)('the settings surface (J-104)', () => {
   })
 
   test('an unset key can be set, which is what the workshops are for', async () => {
-    expect((await settingFor('NIGHT_REPORT_ROLES')).set).toBe(false)
-    expect((await settingFor('NIGHT_REPORT_ROLES')).default).toBeNull()
+    expect((await settingFor('MEMBERSHIP_PURCHASE_URL')).set).toBe(false)
+    expect((await settingFor('MEMBERSHIP_PURCHASE_URL')).default).toBeNull()
   })
 
   test('a value the rules refuse is never stored, and the refusal names the rule', async () => {

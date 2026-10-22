@@ -174,7 +174,8 @@ export async function distributeReport(
 ): Promise<void> {
   const recipients = [...new Set([...(await configuredRecipients(event)), ...(closerEmail ? [closerEmail] : [])])]
   for (const recipient of recipients) {
-    const outcome = await sendRaw(event, { to: recipient, ...message })
+    // A report is the night's record, not a bill, so it comes from the theatre (0239).
+    const outcome = await sendRaw(event, { to: recipient, ...message, sender: 'ANNOUNCEMENTS' })
     await db.run(deliveryStatement({
       id: newId(),
       reportId,

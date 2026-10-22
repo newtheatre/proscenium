@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { saysMoney } from './bar'
 import { plural } from './text'
 import { saysClock } from './when'
 import type { Phase, SystemCheck } from './checklist'
@@ -40,6 +41,27 @@ export const OFFICER_SIGN_OFF_NOTICE = 'You hold no duty manager shift tonight. 
 
 export function tenderTotalPence(tenders: readonly { totalPence: number }[]): number {
   return tenders.reduce((sum, tender) => sum + tender.totalPence, 0)
+}
+
+export interface NightReportFigures {
+  sold: number
+  admitted: number
+  noShows: number
+  incidents: number
+  boxOfficePence: number
+  barPence: number
+}
+
+// The lines the signed-off email leads with, so a reader learns the night without opening it (0239).
+export function saysReportFigures(figures: NightReportFigures): string[] {
+  return [
+    `Sold: ${plural(figures.sold, 'seat')}`,
+    `In: ${plural(figures.admitted, 'seat')}`,
+    `No-shows: ${plural(figures.noShows, 'seat')}`,
+    `Incidents logged: ${figures.incidents}`,
+    `Box office: ${saysMoney(figures.boxOfficePence)}`,
+    `Bar: ${saysMoney(figures.barPence)}`,
+  ]
 }
 
 // Sign off and close answers this item itself, reviewing the incidents the report listed in the

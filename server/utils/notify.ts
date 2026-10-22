@@ -12,7 +12,7 @@ import { undeliverableReason } from '#shared/utils/deliverability'
 import { deliversOn, isMessageType, isTransactional, joinsDigest, messageType, outOfAttempts } from '#shared/utils/notifications'
 import { formatSender, senderForTopic, SENDERS } from '#shared/utils/senders'
 import type { Channel, MessageType, NotificationStatus } from '#shared/utils/notifications'
-import type { NotificationTopic } from '#shared/utils/senders'
+import type { NotificationTopic, SenderKey } from '#shared/utils/senders'
 import type { TemplateContext } from '#server/utils/templates'
 import type { H3Event } from 'h3'
 
@@ -498,6 +498,7 @@ export interface RawMessage {
   subject: string
   html: string
   text: string
+  sender?: SenderKey
 }
 
 // A raw send that logs nothing: the night report records each outcome on its own delivery row
@@ -506,7 +507,7 @@ export async function sendRaw(event: H3Event | undefined, message: RawMessage): 
   try {
     await transportFor(event).send({
       to: message.to,
-      from: formatSender(SENDERS.ACCOUNTS),
+      from: formatSender(SENDERS[message.sender ?? 'ACCOUNTS']),
       subject: message.subject,
       html: message.html,
       text: message.text,

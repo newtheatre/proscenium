@@ -151,6 +151,30 @@ describe('attendance (criterion 1)', () => {
     })
   })
 
+  // The 21 October process map: walk-ups read 1 (a pass) with four desk walk-ups sold, not yet in.
+  test('a walk-up counts once sold, and a pass admitted on the spot is a pass admission, not a walk-up (0239)', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      person(database, 'holder')
+      reserve(database, 'r-walk-up-out', tonight.performanceId, 'COLLECTED', 'DOOR')
+      seat(database, 't-walk-up-out', 'r-walk-up-out', tonight.performanceId)
+      reserve(database, 'r-pass-door', tonight.performanceId, 'DOOR', 'DOOR')
+      seat(database, 't-pass-door', 'r-pass-door', tonight.performanceId)
+      database.batch([
+        ['INSERT INTO pass_types (id, slug, name, valid_from, valid_until) VALUES (?, ?, ?, ?, ?)',
+          'pt-1', 'season', 'Season pass', 1_000, 2_000],
+        ['INSERT INTO pass_type_prices (id, pass_type_id, label, price) VALUES (?, ?, ?, 0)', 'price-1', 'pt-1', 'Standard'],
+        ['INSERT INTO passes (id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, issued_by) VALUES (?, ?, ?, ?, ?, 0, ?)',
+          'pass-1', 'PASS01', 'pt-1', 'price-1', 'holder', 'holder'],
+        ['INSERT INTO pass_admissions (id, pass_id, performance_id, ticket_id) VALUES (?, ?, ?, ?)',
+          'admission-1', 'pass-1', tonight.performanceId, 't-pass-door'],
+      ])
+
+      const [row] = read<{ walkUps: number, passAdmissions: number }>(database, reportAttendanceQuery(tonight.performanceId))
+      expect(row).toMatchObject({ walkUps: 1, passAdmissions: 1 })
+    })
+  })
+
   // D-126 criterion 3: pass admissions are `admitted`'s own subset, not a second seat count.
   test('a pass admission is counted separately from an ordinary paid admission', async () => {
     await withDatabase(async (database) => {

@@ -4,11 +4,11 @@ import { accessBookingsQuery } from '#server/utils/tonight-glance'
 import { tillBookingByIdQuery } from '#server/utils/till-bookings'
 import {
   admittedSeatsSubquery,
-  admittedWalkUpSeatsSubquery,
   heldAccessSeatsSubquery,
   heldSeatsOfKindSubquery,
   heldSeatsSubquery,
   noShowSeatsSubquery,
+  soldWalkUpSeatsSubquery,
   ticketInsertQueries,
   unpaidSeatsSubquery,
   walkUpSeatsSubquery,
@@ -99,7 +99,7 @@ describe('the house counts ignore a caller\'s own aliases (#1295)', () => {
     ['walk-up', walkUpSeatsSubquery],
     ['held of a kind', performanceId => heldSeatsOfKindSubquery(performanceId, 'SINGLE')],
     ['held for access', heldAccessSeatsSubquery],
-    ['admitted walk-up', admittedWalkUpSeatsSubquery],
+    ['sold walk-up', soldWalkUpSeatsSubquery],
     ['no-show', noShowSeatsSubquery],
   ]
 

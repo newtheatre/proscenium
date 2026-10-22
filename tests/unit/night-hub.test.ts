@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, compApprovalLine, doorStripLine, doorStripNumbers, firstNameOf, groupedBoardCode, hubHouseAfter, hubHouseRefused, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, runningTimeLine, saysIntervals, saysRunningTime, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, compApprovalLine, doorStripLine, doorStripNumbers, firstNameOf, groupedBoardCode, hubHouseAfter, hubHouseRefused, hubKpis, housePercentLine, nightHeaderLine, onShiftLabel, passPressureAdvice, reportTileHint, runningTimeLine, saysIntervals, saysRunningTime, saysSeatsLeft, seesAccessTonight, staleBannerLine } from '#shared/utils/night-hub'
 
 // The show-night hub's wording and numbers (E-112, E-127, issue 905). The screens place these; what
 // they say is decided here, so one test holds it.
@@ -277,5 +277,15 @@ describe('the strip under the door\'s camera (issue 1307)', () => {
   test('the strip names the latecomer rule and the intervals, in the glance\'s own words', () => {
     expect(doorStripLine('AT_INTERVAL', 1, 20)).toBe('Latecomers admitted at the interval · 1 interval of 20 minutes')
     expect(doorStripLine('NOT_ADMITTED', 0, null)).toBe('Latecomers not admitted · straight through')
+  })
+})
+
+// The 21 October process map: the hub still asked for the close after the night was signed (0239).
+describe('the night report tile', () => {
+  test('asks for the close after the curtain, and says who signed once signed', () => {
+    expect(reportTileHint(null, false)).toBe('The draft so far')
+    expect(reportTileHint(null, true)).toBe('Sign off and close')
+    expect(reportTileHint({ closedByName: 'Amy Volunteer', automatic: false }, true)).toBe('Signed off by Amy')
+    expect(reportTileHint({ closedByName: null, automatic: true }, true)).toBe('Closed automatically')
   })
 })
