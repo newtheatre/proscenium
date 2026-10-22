@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { emergencyCardsList } from '#shared/utils/emergency-cards-list'
-import { cardVersionsQuery, currentCardQuery, currentCardsQuery, emergencyCardsClause, recordCardStatement } from '#server/utils/venue-emergency'
+import { cardVersionsQuery, currentCardQuery, currentCardsQuery, emergencyCardsClause, performanceCardFiledQuery, recordCardStatement, unfiledTonightQuery } from '#server/utils/venue-emergency'
+import { showNightBounds } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
-import { testVenue } from '#tests/helpers/programme'
+import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { EmergencyCardInput } from '#shared/utils/venue-emergency'
 import type { SQL } from 'drizzle-orm'
@@ -211,6 +212,25 @@ describe('the committee overview (criterion 1)', () => {
       const found = run(database, currentCardsQuery(everyCard(), 25, 0)) as { venueId: string, address: string | null, venueAddress: string | null }[]
       expect(found.find(row => row.venueId === carded.id)).toMatchObject({ address: 'Stage door, Cherry Tree Hill', venueAddress: 'Cherry Tree Hill, Nottingham NG7 2RD' })
       expect(found.find(row => row.venueId === bare.id)).toMatchObject({ address: null, venueAddress: 'University Park, Nottingham NG7 2RD' })
+    })
+  })
+})
+
+// The 21 October process map: The Studio ran with no card and nothing said so before doors (0237).
+describe('a running venue with no filed card is named', () => {
+  test('until its card carries an address, on the console and on the house', async () => {
+    await withDatabase((database) => {
+      const officer = person(database, 'officer-unfiled')
+      const house = tonightsPerformance(database, { suffix: 'unfiled' })
+      const { from, to } = showNightBounds(house.night)
+      const tonight = (): Record<string, unknown>[] => run(database, unfiledTonightQuery(Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000)))
+
+      expect(tonight()).toEqual([{ venueName: expect.any(String) }])
+      expect(run(database, performanceCardFiledQuery(house.performanceId))).toEqual([{ filed: 0 }])
+
+      run(database, recordCardStatement(house.venueId, card(), officer, 'vei-unfiled').statement)
+      expect(tonight()).toEqual([])
+      expect(run(database, performanceCardFiledQuery(house.performanceId))).toEqual([{ filed: 1 }])
     })
   })
 })

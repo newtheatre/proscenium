@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { accessTonight, passPressure } from './tonight-glance'
+import { performanceCardFiledQuery } from './venue-emergency'
 import { tonightHouse, tonightPerformance } from './tonight'
 import type { AccessTonight } from './tonight-glance'
 import type { TonightHouse } from './tonight'
@@ -26,6 +27,8 @@ export interface TonightView {
   contentNotes: string | null
   // Whether anybody holds the confirmed duty manager shift: nobody else works the checklist (0236).
   dutyManagerOnShift: boolean
+  // Whether the venue has a card to read to 999, so the hub can say so before doors (0237).
+  emergencyCardFiled: boolean
 }
 
 export async function dutyManagerOnShift(performanceId: string): Promise<boolean> {
@@ -42,12 +45,13 @@ export async function tonightView(performanceId: string, withAccess: boolean): P
   if (!performance) return null
 
   const capacity = effectiveCapacity({ capacityOverride: performance.capacityOverride, venueCapacity: performance.venueCapacity })
-  const [house, warnings, passesCovering, access, managed] = await Promise.all([
+  const [house, warnings, passesCovering, access, managed, [card]] = await Promise.all([
     tonightHouse(performanceId, capacity),
     showWarnings(performance.showId),
     passPressure(performanceId, performance.showId),
     withAccess ? accessTonight(performanceId) : Promise.resolve(null),
     dutyManagerOnShift(performanceId),
+    db.all<{ filed: number }>(performanceCardFiledQuery(performanceId)),
   ])
 
   return {
@@ -67,5 +71,6 @@ export async function tonightView(performanceId: string, withAccess: boolean): P
     warnings: warnings.map(warning => ({ title: warning.title, level: warning.level })),
     contentNotes: performance.contentNotes,
     dutyManagerOnShift: managed,
+    emergencyCardFiled: card?.filed === 1,
   }
 }

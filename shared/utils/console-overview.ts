@@ -31,6 +31,7 @@ export interface SetUpFacts {
   anyStocktake?: boolean
   allergensUnknown?: number
   anySeverityRoutes?: boolean
+  venuesWithoutCard?: readonly string[]
 }
 
 export type SetUpLine
@@ -40,6 +41,7 @@ export type SetUpLine
     | { kind: 'NO_STOCKTAKE' }
     | { kind: 'ALLERGENS_UNKNOWN', items: number }
     | { kind: 'NO_SAFETY_ROUTING' }
+    | { kind: 'NO_EMERGENCY_CARD', venues: readonly string[] }
 
 export function setUpLines(facts: SetUpFacts): SetUpLine[] {
   return [
@@ -52,6 +54,7 @@ export function setUpLines(facts: SetUpFacts): SetUpLine[] {
     ...(facts.anyStocktake === false ? [{ kind: 'NO_STOCKTAKE' as const }] : []),
     ...(facts.allergensUnknown ? [{ kind: 'ALLERGENS_UNKNOWN' as const, items: facts.allergensUnknown }] : []),
     ...(facts.anySeverityRoutes === false ? [{ kind: 'NO_SAFETY_ROUTING' as const }] : []),
+    ...(facts.venuesWithoutCard?.length ? [{ kind: 'NO_EMERGENCY_CARD' as const, venues: facts.venuesWithoutCard }] : []),
   ]
 }
 
@@ -63,6 +66,7 @@ export function saysSetUp(line: SetUpLine): string {
     case 'NO_STOCKTAKE': return 'No stocktake has been applied yet, so on-hand is what deliveries and sales say, not a count.'
     case 'ALLERGENS_UNKNOWN': return `${plural(line.items, 'stocked item')} ${line.items === 1 ? 'has' : 'have'} no allergen answer.`
     case 'NO_SAFETY_ROUTING': return 'No incident severity routes to follow-up, so a serious incident reaches nobody.'
+    case 'NO_EMERGENCY_CARD': return `Running tonight with no emergency card to read to 999: ${line.venues.join(', ')}.`
     default: return line satisfies never
   }
 }
@@ -76,6 +80,7 @@ export function setUpHref(line: SetUpLine): string {
     case 'NO_STOCKTAKE': return '/bar/stock/stocktakes'
     case 'ALLERGENS_UNKNOWN': return '/bar/stock/allergens'
     case 'NO_SAFETY_ROUTING': return '/rota/manage/safety'
+    case 'NO_EMERGENCY_CARD': return '/rota/manage/emergency'
     default: return line satisfies never
   }
 }

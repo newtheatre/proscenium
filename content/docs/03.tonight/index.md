@@ -110,7 +110,8 @@ screens open on their own shift as if nothing were chosen. The till keeps its ow
    and the duty manager's screens, it is **Tonight at a glance**; on a door shift it is **Door**, which
    opens [the door](/docs/tonight/door) for tickets and passes alike.
 5. **Emergency** opens [the emergency card](/docs/tonight/emergency), which is cached on
-   the phone the moment any show-night screen opens.
+   the phone the moment any show-night screen opens. If the venue has no card filed, the hub says
+   **No emergency card for this venue** above the tiles.
 
 Each tile appears where your own shift or role opens it, and your own job comes first, in gold:
 **Door** on a door shift, **Till** on a bar shift, **Tonight at a glance** for the duty manager

@@ -28,7 +28,7 @@ export const emergencyCardForm = z.object({
   defibrillator: field(),
   firstAiders: field(),
   firePanel: field(),
-  what3words: field(100),
+  what3words: field(100).transform(bareWhat3words),
   notes: field(NOTES_LIMIT),
   firstCallName: field(80),
   firstCallPhone: field(40)
@@ -38,6 +38,12 @@ export const emergencyCardForm = z.object({
   message: 'Who to ring first needs both a name and a number, or neither',
   path: ['firstCallPhone'],
 })
+
+// Three words as what3words prints them, "///" and all, are stored and shown without the slashes,
+// which the card draws itself.
+export function bareWhat3words(value: string | null): string | null {
+  return value?.replace(/^[\s/]+/, '').trim() || null
+}
 
 export type EmergencyCardInput = z.output<typeof emergencyCardForm>
 
@@ -133,4 +139,12 @@ export function emergencyCalls(cards: readonly (FirstCall & { venueName: string 
 export function saysCall(call: PinnedCall): string {
   const rings = call.digits === EMERGENCY_SERVICES.phone ? 'This rings 999' : `This rings ${call.name} on ${call.phone}`
   return `${rings} from the phone you are holding. Have the address on the card ready to read.`
+}
+
+// Where the reader's own venues end, so every other venue running tonight folds under one line
+// beneath them. Null when there is nothing to fold: all theirs, or none of them (0237).
+export function otherVenuesFrom(cards: readonly { dutyManagers: unknown[] | null }[]): number | null {
+  const own = cards.filter(card => card.dutyManagers !== null).length
+  if (own === 0 || own === cards.length) return null
+  return cards.findIndex(card => card.dutyManagers === null)
 }

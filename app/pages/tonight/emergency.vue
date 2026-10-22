@@ -4,7 +4,7 @@ import { nightCacheKey } from '#shared/utils/night-cache'
 import { firstNameOf } from '#shared/utils/night-hub'
 import { currentShowNight } from '#shared/utils/show-night'
 import { telHref } from '#shared/utils/tonight'
-import { emergencyCalls, emergencyCardsFor, firstCallOf, saysCall, saysFirstAiders } from '#shared/utils/venue-emergency'
+import { bareWhat3words, emergencyCalls, emergencyCardsFor, firstCallOf, otherVenuesFrom, saysCall, saysFirstAiders } from '#shared/utils/venue-emergency'
 import type { FirstAider, PinnedCall } from '#shared/utils/venue-emergency'
 
 definePageMeta({ layout: 'tonight', middleware: 'signed-in', docs: '/docs/tonight/emergency' })
@@ -50,6 +50,12 @@ const cache = useNightCache<Cards>(key, () => request<Cards>('/api/tonight/emerg
 
 // Its numbers are only its fetcher's (A-114).
 const cards = computed(() => emergencyCardsFor(cache.shown.value, account.value.user?.id ?? null))
+
+// The reader's own building first; every other running venue waits under one line (0237).
+const othersFrom = computed(() => otherVenuesFrom(cards.value ?? []))
+const othersShown = ref(false)
+const othersCount = computed(() => (othersFrom.value === null ? 0 : (cards.value?.length ?? 0) - othersFrom.value))
+const hidden = (index: number): boolean => othersFrom.value !== null && index >= othersFrom.value && !othersShown.value
 
 // Every venue keeps 999, beside whoever its card rings first (issue 1519, 0106).
 const calls = computed(() => emergencyCalls(cards.value ?? []))
@@ -104,170 +110,186 @@ function isolation(one: Card): string[] {
       />
 
       <template v-else-if="cards?.length">
-        <article
-          v-for="card in cards"
+        <template
+          v-for="(card, index) in cards"
           :key="card.venueId"
-          class="space-y-4"
-          :data-test="`emergency-card-${card.venueId}`"
         >
-          <h2
-            class="nnt-headline text-xl font-bold"
-            data-test="emergency-venue"
+          <UButton
+            v-if="index === othersFrom"
+            color="neutral"
+            variant="outline"
+            block
+            class="min-h-12"
+            :icon="othersShown ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+            data-test="emergency-other-venues"
+            @click="othersShown = !othersShown"
           >
-            {{ card.venueName }}
-          </h2>
+            Other venues tonight ({{ othersCount }})
+          </UButton>
+          <article
+            v-show="!hidden(index)"
+            class="space-y-4"
+            :data-test="`emergency-card-${card.venueId}`"
+          >
+            <h2
+              class="nnt-headline text-xl font-bold"
+              data-test="emergency-venue"
+            >
+              {{ card.venueName }}
+            </h2>
 
-          <!-- Large display type on a red ground, because this is read aloud under pressure by
+            <!-- Large display type on a red ground, because this is read aloud under pressure by
                somebody who has never read it before (E-113 criterion 4). -->
-          <section
-            class="rounded-xl bg-error/10 p-5 ring-1 ring-error/60"
-            data-test="emergency-999"
-          >
-            <h3 class="mb-3 font-mono text-xs tracking-[0.2em] text-error uppercase">
-              Read to {{ firstCallName(card) }}
-            </h3>
-            <p
-              v-if="card.address"
-              class="nnt-headline text-3xl leading-tight font-bold"
-              data-test="emergency-address"
+            <section
+              class="rounded-xl bg-error/10 p-5 ring-1 ring-error/60"
+              data-test="emergency-999"
             >
-              {{ card.address }}
-            </p>
-            <p
-              v-else
-              class="text-lg text-muted"
-              data-test="emergency-no-address"
-            >
-              No address has been filed for {{ card.venueName }}. Ask the duty manager, and tell the
-              front of house officer afterwards.
-            </p>
-            <p
-              v-if="card.what3words"
-              class="mt-4 font-mono text-xl"
-              data-test="emergency-w3w"
-            >
-              <span class="text-error">///</span>{{ card.what3words }}
-            </p>
-          </section>
-
-          <!-- The order to ring in, on the card rather than in anybody's head: the first call is
-               pinned under the thumb and this says who follows it (E-113, issue 1150 item 14). -->
-          <section
-            class="rounded-xl bg-elevated p-4"
-            data-test="emergency-duty-manager"
-          >
-            <h3 class="mb-2 font-semibold">
-              After {{ firstCallName(card) }}
-            </h3>
-            <p
-              class="text-lg"
-              data-test="emergency-order"
-            >
-              Call {{ firstCallName(card) }} first, then tell the duty manager.
-            </p>
-            <ul
-              v-if="card.dutyManagers?.length"
-              class="mt-3 space-y-2"
-            >
-              <li
-                v-for="one in card.dutyManagers"
-                :key="one.phone"
-                class="flex flex-wrap items-center justify-between gap-3"
+              <h3 class="mb-3 font-mono text-xs tracking-[0.2em] text-error uppercase">
+                Read to {{ firstCallName(card) }}
+              </h3>
+              <p
+                v-if="card.address"
+                class="nnt-headline text-3xl leading-tight font-bold"
+                data-test="emergency-address"
               >
-                <span class="font-mono text-lg">{{ one.phone }}</span>
-                <UButton
-                  :to="telHref(one.phone)"
-                  color="error"
-                  variant="subtle"
-                  icon="i-lucide-phone"
-                  class="min-h-12"
-                  :data-test="`call-duty-manager-${one.phone.replace(/\s+/g, '')}`"
+                {{ card.address }}
+              </p>
+              <p
+                v-else
+                class="text-lg text-muted"
+                data-test="emergency-no-address"
+              >
+                No address has been filed for {{ card.venueName }}. Ask the duty manager, and tell the
+                Front of House Manager afterwards.
+              </p>
+              <p
+                v-if="card.what3words"
+                class="mt-4 font-mono text-xl"
+                data-test="emergency-w3w"
+              >
+                <span class="text-error">///</span>{{ bareWhat3words(card.what3words) }}
+              </p>
+            </section>
+
+            <!-- The order to ring in, on the card rather than in anybody's head: the first call is
+               pinned under the thumb and this says who follows it (E-113, issue 1150 item 14). -->
+            <section
+              class="rounded-xl bg-elevated p-4"
+              data-test="emergency-duty-manager"
+            >
+              <h3 class="mb-2 font-semibold">
+                After {{ firstCallName(card) }}
+              </h3>
+              <p
+                class="text-lg"
+                data-test="emergency-order"
+              >
+                Call {{ firstCallName(card) }} first, then tell the duty manager.
+              </p>
+              <ul
+                v-if="card.dutyManagers?.length"
+                class="mt-3 space-y-2"
+              >
+                <li
+                  v-for="one in card.dutyManagers"
+                  :key="one.phone"
+                  class="flex flex-wrap items-center justify-between gap-3"
                 >
-                  Call {{ firstNameOf(one.name) ?? one.name }}
-                </UButton>
-              </li>
-            </ul>
-            <p
-              v-else-if="card.dutyManagers"
-              class="mt-3 text-muted"
-              data-test="emergency-no-duty-manager"
+                  <span class="font-mono text-lg">{{ one.phone }}</span>
+                  <UButton
+                    :to="telHref(one.phone)"
+                    color="error"
+                    variant="subtle"
+                    icon="i-lucide-phone"
+                    class="min-h-12"
+                    :data-test="`call-duty-manager-${one.phone.replace(/\s+/g, '')}`"
+                  >
+                    Call {{ firstNameOf(one.name) ?? one.name }}
+                  </UButton>
+                </li>
+              </ul>
+              <p
+                v-else-if="card.dutyManagers"
+                class="mt-3 text-muted"
+                data-test="emergency-no-duty-manager"
+              >
+                No duty manager has shared a number tonight. Find them in the foyer.
+              </p>
+            </section>
+
+            <section
+              v-if="evacuation(card).length"
+              class="rounded-xl bg-elevated p-4"
+              data-test="emergency-evacuation"
             >
-              No duty manager has shared a number tonight. Find them in the foyer.
-            </p>
-          </section>
+              <h3 class="mb-2 font-semibold">
+                Evacuation
+              </h3>
+              <p
+                v-for="line in evacuation(card)"
+                :key="line"
+                class="text-lg"
+              >
+                {{ line }}
+              </p>
+            </section>
 
-          <section
-            v-if="evacuation(card).length"
-            class="rounded-xl bg-elevated p-4"
-            data-test="emergency-evacuation"
-          >
-            <h3 class="mb-2 font-semibold">
-              Evacuation
-            </h3>
-            <p
-              v-for="line in evacuation(card)"
-              :key="line"
-              class="text-lg"
+            <section
+              v-if="firstAid(card).length"
+              class="rounded-xl bg-elevated p-4"
+              data-test="emergency-first-aid"
             >
-              {{ line }}
-            </p>
-          </section>
+              <h3 class="mb-2 font-semibold">
+                First aid
+              </h3>
+              <p
+                v-for="line in firstAid(card)"
+                :key="line"
+                class="text-lg"
+              >
+                {{ line }}
+              </p>
+            </section>
 
-          <section
-            v-if="firstAid(card).length"
-            class="rounded-xl bg-elevated p-4"
-            data-test="emergency-first-aid"
-          >
-            <h3 class="mb-2 font-semibold">
-              First aid
-            </h3>
-            <p
-              v-for="line in firstAid(card)"
-              :key="line"
-              class="text-lg"
+            <section
+              v-if="isolation(card).length"
+              class="rounded-xl bg-elevated p-4"
+              data-test="emergency-isolation"
             >
-              {{ line }}
-            </p>
-          </section>
+              <h3 class="mb-2 font-semibold">
+                Isolation points
+              </h3>
+              <p
+                v-for="line in isolation(card)"
+                :key="line"
+                class="text-lg"
+              >
+                {{ line }}
+              </p>
+            </section>
 
-          <section
-            v-if="isolation(card).length"
-            class="rounded-xl bg-elevated p-4"
-            data-test="emergency-isolation"
-          >
-            <h3 class="mb-2 font-semibold">
-              Isolation points
-            </h3>
-            <p
-              v-for="line in isolation(card)"
-              :key="line"
-              class="text-lg"
+            <section
+              v-if="card.notes"
+              class="rounded-xl bg-elevated p-4"
+              data-test="emergency-notes"
             >
-              {{ line }}
-            </p>
-          </section>
+              <h3 class="mb-2 font-semibold">
+                Notes
+              </h3>
+              <p class="text-lg">
+                {{ card.notes }}
+              </p>
+            </section>
 
-          <section
-            v-if="card.notes"
-            class="rounded-xl bg-elevated p-4"
-            data-test="emergency-notes"
-          >
-            <h3 class="mb-2 font-semibold">
-              Notes
-            </h3>
-            <p class="text-lg">
-              {{ card.notes }}
+            <p
+              v-if="card.updatedAt"
+              data-test="emergency-as-of"
+              class="text-center text-sm text-muted"
+            >
+              Filed {{ asOf(card.updatedAt) }}
             </p>
-          </section>
-
-          <p
-            v-if="card.updatedAt"
-            data-test="emergency-as-of"
-            class="text-center text-sm text-muted"
-          >
-            Filed {{ asOf(card.updatedAt) }}
-          </p>
-        </article>
+          </article>
+        </template>
       </template>
 
       <p
