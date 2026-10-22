@@ -675,7 +675,7 @@ onMounted(load)
           </div>
 
           <div
-            v-else
+            v-else-if="mergePreview"
             data-test="merge-preview-result"
             class="space-y-3"
           >
