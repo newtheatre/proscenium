@@ -114,7 +114,7 @@ async function save(): Promise<void> {
     if (editing.value) await $fetch(`/api/admin/content-warnings/${editing.value.id}`, { method: 'PUT', body })
     else await $fetch('/api/admin/content-warnings', { method: 'POST', body })
     toast.add({
-      title: editing.value ? 'Content warning changed' : 'Content warning added',
+      title: editing.value ? 'Content warning saved' : 'Content warning added',
       icon: 'i-lucide-check',
       color: 'success',
     })
@@ -126,6 +126,27 @@ async function save(): Promise<void> {
   }
   finally {
     saving.value = false
+  }
+}
+
+// A row button like every other set-up list's: the same PUT as Edit, with only the switch moved.
+async function setArchived(warning: ContentWarning, archived: boolean): Promise<void> {
+  failure.value = null
+  const { slug, title, kind, category, description, icon, sort } = warning
+  try {
+    await $fetch(`/api/admin/content-warnings/${warning.id}`, {
+      method: 'PUT',
+      body: { slug, title, kind, category, description, icon, sort, archived },
+    })
+    toast.add({
+      title: archived ? `${title} retired` : `${title} back in use`,
+      icon: 'i-lucide-check',
+      color: 'success',
+    })
+    await reload()
+  }
+  catch (refused) {
+    failure.value = refusalText(refused)
   }
 }
 
@@ -197,6 +218,13 @@ const columns: TableColumn<ContentWarning>[] = [
         'data-test': `edit-warning-${row.original.id}`,
         'onClick': () => edit(row.original),
       }, () => 'Edit'),
+      h(UButton, {
+        'size': 'sm',
+        'color': 'neutral',
+        'variant': 'ghost',
+        'data-test': `archive-warning-${row.original.id}`,
+        'onClick': () => setArchived(row.original, !row.original.archived),
+      }, () => (row.original.archived ? 'Bring back' : 'Retire')),
       row.original.showCount > 0
         ? null
         : h(UButton, {
@@ -427,6 +455,7 @@ const columns: TableColumn<ContentWarning>[] = [
             </UFormField>
 
             <UFormField
+              v-if="editing"
               label="In use"
               name="archived"
             >

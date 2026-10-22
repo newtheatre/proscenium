@@ -69,7 +69,7 @@ async function save(): Promise<void> {
     else {
       await $fetch('/api/admin/reference-data/show-categories', { method: 'POST', body })
     }
-    toast.add({ title: editing.value ? 'Show category changed' : 'Show category added', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: editing.value ? 'Show category saved' : 'Show category added', icon: 'i-lucide-check', color: 'success' })
     open.value = false
     await reload()
   }
@@ -130,6 +130,12 @@ const columns: TableColumn<AdminShowCategory>[] = [
         ? h(UBadge, { color: 'neutral', variant: 'subtle', size: 'sm' }, () => 'Retired')
         : null,
     ]),
+  },
+  {
+    id: 'sort',
+    header: 'Order',
+    meta: { class: { th: 'w-20', td: 'tabular-nums' } },
+    cell: ({ row }) => String(row.original.sort),
   },
   {
     id: 'inUse',
@@ -286,6 +292,7 @@ const columns: TableColumn<AdminShowCategory>[] = [
           >
             <UInputNumber
               v-model="state.sort"
+              :min="0"
               class="w-full"
               data-test="category-sort"
             />

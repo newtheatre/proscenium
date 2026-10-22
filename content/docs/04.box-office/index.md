@@ -3,7 +3,7 @@ title: Box office
 description: The desk, passes, the programme and its reference data, and access profile verification.
 module: Ticketing
 audience: committee
-updatedOn: 2026-09-29
+updatedOn: 2026-10-21
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -54,7 +54,7 @@ no shift approves one.
   The theatre's seasons (Autumn, Spring, StuFF and the Fringe) a show belongs to, in date order.
   ::
   ::card{icon="i-lucide-layout-grid" title="Show categories" to="/docs/box-office/show-categories"}
-  The headings the public listing groups shows under.
+  The headings a show is filed under: the kicker on its page and a filter on the shows list.
   ::
   ::card{icon="i-lucide-tag" title="Ticket types" to="/docs/box-office/ticket-types"}
   What a seat is sold as and its base price; access, companion and members-only types.
