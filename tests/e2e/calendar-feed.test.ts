@@ -263,6 +263,8 @@ describe.skipIf(skip !== null)('one booking on its own (criterion 1)', () => {
 describe.skipIf(skip !== null)('the screen (C-104)', () => {
   test('a member mints the link from their own bookings page, and it works', async () => {
     placeBooking(member.id, weeksAhead(10))
+    // Earlier cases mint for this member, and a second mint asks first; this one starts with none.
+    write('DELETE FROM room_feed_tokens WHERE user_id = ?', member.id)
 
     const view = await openSignedOutView(app.baseURL)
     try {
