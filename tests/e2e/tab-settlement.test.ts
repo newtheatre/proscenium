@@ -306,6 +306,30 @@ describe.skipIf(skip !== null)('a settlement is a card charge answered at the re
     expect(await message(second)).toContain('already on the reader')
   })
 
+  // Matt's call (22 October 2026): the 0116 rule reaches the reader's answer too.
+  test('a holder may key their own settlement but someone else answers the reader', async () => {
+    const { venueId, performanceId } = programme(`settle-own-${crypto.randomUUID().slice(0, 6)}`)
+    const { variantId } = await aSellableProduct(500)
+    await openTill(venueId, performanceId)
+    await authorise([barStaff.id])
+    expect((await chargeToTab(venueId, variantId, barStaff.id, 500, barManager.cookie)).status).toBe(200)
+    const { charges } = await (await settleCandidates(venueId, barStaff.id)).json() as { charges: OutstandingCharge[] }
+    const entryIds = charges.map(charge => charge.entryId)
+    const owedPence = charges.reduce((sum, charge) => sum + charge.totalPence, 0)
+
+    const started = await startSettling(venueId, barStaff.id, entryIds, owedPence)
+    expect(started.status).toBe(200)
+    const { id } = await started.json() as { id: string }
+
+    const own = await answerCharge(app, id, 'succeeded', barStaff.cookie)
+    expect(own.status).toBe(403)
+    expect(await message(own)).toContain('Nobody answers the reader for their own tab')
+
+    const answered = await answerCharge(app, id, 'succeeded', barManager.cookie)
+    expect(answered.status).toBe(200)
+    expect((await answered.json() as { status: string }).status).toBe('SUCCEEDED')
+  })
+
   // Both tills read no attempt and both would key the card: the guard has to ride the insert,
   // not a read before it, or the holder pays twice (0162).
   test('two tills keying the same tab at once leave one charge on the reader', async () => {
