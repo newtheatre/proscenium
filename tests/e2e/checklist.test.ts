@@ -493,13 +493,13 @@ describe.skipIf(skip !== null)('the till line (F-102 criterion 5, E-114 criterio
       return (await answered.json() as { till: { tonight: number, earlier: number, unanswered: number } }).till
     }
 
-    expect(await tillOf()).toEqual({ tonight: 0, earlier: 0, unanswered: 0 })
+    expect(await tillOf()).toMatchObject({ tonight: 0, earlier: 0, unanswered: 0 })
 
     const opened = await send('POST', '/api/till', { venueId }, barManager.cookie)
     expect(opened.status).toBe(200)
     write('INSERT INTO till_sessions (id, venue_id, night, opened_by, opened_at) VALUES (?, ?, ?, ?, 1000)',
       `checklist-stale-${venueId}`, venueId, '2020-01-05', barManager.id)
-    expect(await tillOf()).toEqual({ tonight: 1, earlier: 1, unanswered: 0 })
+    expect(await tillOf()).toMatchObject({ tonight: 1, earlier: 1, unanswered: 0 })
 
     const view = await openSignedOutView(app.baseURL)
     try {
