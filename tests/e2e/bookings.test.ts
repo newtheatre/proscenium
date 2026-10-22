@@ -173,6 +173,12 @@ describe.skipIf(skip !== null)('booking within policy (C-106)', () => {
     expect(data.failures.map(failure => failure.reason)).toContain('NO_MEMBERSHIP')
   })
 
+  test('an officer who runs the estate books without a membership of their own (0200)', async () => {
+    const theatreManager = await adminSession(app, { additional: true })
+    const room = await makeRoom()
+    expect((await book(room, soon(9), theatreManager.cookie)).status).toBe(200)
+  })
+
   test('a retired room is gone, not merely refused', async () => {
     const room = await makeRoom()
     await send('DELETE', `/api/admin/rooms/${room}`, {}, officer)

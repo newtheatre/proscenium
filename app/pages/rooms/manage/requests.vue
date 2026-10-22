@@ -62,6 +62,12 @@ const failure = ref<string | null>(null)
 const selected = ref<string[]>([])
 const toast = useToast()
 const request = useRequestFetch()
+const viewer = useViewer()
+
+// The server refuses it anyway (0201); the row says so rather than offering a button that fails.
+function isMine(row: Request): boolean {
+  return row.userId === viewer.value?.id
+}
 
 // The active rooms, as filter options and as the choices the "move it" pickers offer.
 const filterRoomOptions = computed<FilterOption[]>(() =>
@@ -422,22 +428,29 @@ const columns = computed<TableColumn<Request>[]>(() => [
             ]),
           ]
         : [
-            h(UButton, {
-              'size': 'sm',
-              'variant': 'subtle',
-              'loading': acting.value,
-              'data-test': `approve-${row.original.id}`,
-              'onClick': () => decide([row.original.id], 'APPROVE'),
-            }, () => 'Approve'),
-            h(UButton, {
-              'size': 'sm',
-              'color': 'neutral',
-              'variant': 'ghost',
-              'icon': 'i-lucide-arrow-right-left',
-              'aria-label': `Approve ${row.original.requester} into another room`,
-              'data-test': `move-${row.original.id}`,
-              'onClick': () => askToMove(row.original.id),
-            }),
+            isMine(row.original)
+              ? h('span', { 'class': 'self-center text-sm text-muted', 'data-test': `own-${row.original.id}` }, 'Yours: somebody else decides it')
+              : null,
+            isMine(row.original)
+              ? null
+              : h(UButton, {
+                  'size': 'sm',
+                  'variant': 'subtle',
+                  'loading': acting.value,
+                  'data-test': `approve-${row.original.id}`,
+                  'onClick': () => decide([row.original.id], 'APPROVE'),
+                }, () => 'Approve'),
+            isMine(row.original)
+              ? null
+              : h(UButton, {
+                  'size': 'sm',
+                  'color': 'neutral',
+                  'variant': 'ghost',
+                  'icon': 'i-lucide-arrow-right-left',
+                  'aria-label': `Approve ${row.original.requester} into another room`,
+                  'data-test': `move-${row.original.id}`,
+                  'onClick': () => askToMove(row.original.id),
+                }),
             h(UButton, {
               'size': 'sm',
               'color': 'error',

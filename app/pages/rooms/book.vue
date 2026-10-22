@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
-import { BOOKING_NO_MEMBERSHIP } from '#shared/utils/booking-policy'
+import { BOOKING_NO_MEMBERSHIP, saysLimits } from '#shared/utils/booking-policy'
 import { TIERS, nameOrPurpose } from '#shared/utils/bookings'
 import { FREQUENCIES, saysRecurrence } from '#shared/utils/series'
 import { overCapacity } from '#shared/utils/rooms'
@@ -9,6 +9,7 @@ import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import { saysDayLong } from '#shared/utils/when'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import type { RoomHours } from '#shared/utils/rooms'
+import type { EstatePolicy } from '#shared/utils/booking-policy'
 import type { PolicyValues } from '#shared/utils/policy-tokens'
 import { z } from 'zod'
 
@@ -23,6 +24,14 @@ interface Room {
 }
 
 interface Failure { reason: string, says: string }
+
+interface RoomRules extends EstatePolicy {
+  seriesCap: number
+  purposes: string[]
+  byRoom: Record<string, EstatePolicy>
+  held: number
+  exemptFromLongest: boolean
+}
 
 const route = useRoute()
 const toast = useToast()
@@ -84,12 +93,17 @@ const refusals = ref<{ occurrence: number, day: string, failures: Failure[], con
 // Read rather than restated: the cap is committee-editable, and a number written into a screen
 // stops being true the moment they change it (0012).
 const { data: rules } = await useAsyncData(
-  'room-policy',
-  () => request<{ seriesCap: number, purposes: string[] }>('/api/rooms/policy'),
-  { default: () => ({ seriesCap: 12, purposes: [] as string[] }) },
+  'room-rules',
+  () => request<RoomRules>('/api/rooms/policy'),
+  { default: (): RoomRules | null => null },
 )
 
-const seriesCap = computed(() => rules.value.seriesCap)
+const seriesCap = computed(() => rules.value?.seriesCap ?? 12)
+
+// The chosen room's own numbers, or the house's before one is chosen.
+const limits = computed(() => rules.value
+  ? saysLimits(rules.value.byRoom[state.roomId] ?? rules.value, rules.value.held, rules.value.exemptFromLongest)
+  : null)
 
 // One schema for all three submits (C-105 criterion 8): what a series or a request needs on top is
 // asked for only when that is what the member is sending.
@@ -256,8 +270,8 @@ const capacity = computed(() => room.value?.capacity ?? undefined)
 const tooMany = computed(() => overCapacity(room.value?.capacity ?? null, state.attendees ?? null))
 
 // Refused before the form rather than after it is filled in, in the policy's own words with the
-// fix beside them (A-129 criterion 2, issue 1338). The server still refuses, whatever this says.
-const lapsed = computed(() => !can(useViewer().value, memberOrGrace))
+// fix beside them (A-129 criterion 2, issue 1338). An officer books without one (0200).
+const lapsed = computed(() => !can(useViewer().value, memberOrGrace) && !namesTier.value)
 
 // The server refuses NO_MEMBERSHIP outright (0031), so the form's job is to say where to put it
 // right rather than to invent its own wording (A-129).
@@ -400,6 +414,14 @@ useSeoMeta({ title: 'Book a room' })
       :ui="MEMBER_PAGE_HEADER"
     />
 
+    <p
+      v-if="limits && !lapsed"
+      class="mt-4 text-sm text-muted"
+      data-test="booking-limits"
+    >
+      {{ limits }}
+    </p>
+
     <UAlert
       v-if="lapsed"
       class="mt-8"
@@ -476,7 +498,7 @@ useSeoMeta({ title: 'Book a room' })
         >
           <PurposeChips
             v-model="state.purpose"
-            :purposes="rules.purposes"
+            :purposes="rules?.purposes ?? []"
             test-prefix="booking"
           />
         </UFormField>

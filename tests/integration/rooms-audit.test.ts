@@ -114,6 +114,20 @@ describe('a decision is audited only if it applied', () => {
   })
 })
 
+describe('nobody approves their own request (0201)', () => {
+  test('the approving write refuses the requester, audits nothing, and another officer still can', async () => {
+    await withDatabase((database) => {
+      booking(database, 'b-asked', 'PENDING_APPROVAL')
+      run(database, approveStatement('b-asked', 'u-member', null, NOW, OFFSETS), auditIfChanged(entry('room.request.approved', 'booking:b-asked')))
+      expect(statusOf(database, 'b-asked')).toBe('PENDING_APPROVAL')
+      expect(audits(database, 'room.request.approved')).toEqual([])
+
+      run(database, approveStatement('b-asked', 'u-officer', null, NOW, OFFSETS), auditIfChanged(entry('room.request.approved', 'booking:b-asked')))
+      expect(statusOf(database, 'b-asked')).toBe('CONFIRMED')
+    })
+  })
+})
+
 describe('a bump is all or nothing, and audited with what it actually did', () => {
   const bump = (offer: BumpWrite['offer'] = OFFER): BumpWrite => ({
     displaced: { id: 'b-standing', roomId: 'r-studio', userId: 'u-member', title: 'Rehearsal', attendees: null, tier: 'REHEARSAL', purpose: 'REHEARSAL', ...SPAN },
