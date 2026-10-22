@@ -1,4 +1,4 @@
-import { and, eq, gt, isNotNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNotNull, ne, sql } from 'drizzle-orm'
 import { refusalToChangeEmail } from '#shared/utils/email-change'
 import type { AccountRow } from '#server/utils/accounts'
 import type { H3Event } from 'h3'
@@ -46,7 +46,7 @@ export async function requestEmailChange(event: H3Event, account: AccountRow, ne
   await notify(event, {
     type: 'account.email.requested',
     userId: account.id,
-    context: { name: '', wanted, securityUrl: `${base}/account/security` },
+    context: { name: '', wanted, cancelUrl: `${base}/account/profile#email`, securityUrl: `${base}/account/security` },
   })
   return { requested: true }
 }
@@ -89,4 +89,15 @@ export async function pendingEmail(account: AccountRow): Promise<string | null> 
     gt(schema.authTokens.expiresAt, Math.floor(Date.now() / 1000)),
   )).limit(1)
   return row?.email && normaliseEmail(row.email) !== account.email ? row.email : null
+}
+
+// A pending change dies with any change to how the account is secured, so an owner who finds one
+// they never asked for ends it by doing what the warning says (0151).
+export function cancelPendingEmailChange(account: Pick<AccountRow, 'id' | 'email'>) {
+  return db.delete(schema.authTokens).where(and(
+    eq(schema.authTokens.userId, account.id),
+    eq(schema.authTokens.kind, 'EMAIL_VERIFY'),
+    isNotNull(schema.authTokens.email),
+    ne(schema.authTokens.email, account.email),
+  ))
 }

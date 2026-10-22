@@ -28,6 +28,8 @@ export default defineEventHandler(async (event) => {
     db.update(schema.users)
       .set({ password: await hashPassword(input.password), passwordSetAt: now, ...others })
       .where(eq(schema.users.id, account.id)),
+    // A password changed after the warning is the owner answering it, so a pending address goes (0151).
+    cancelPendingEmailChange(account),
     db.insert(schema.auditLog).values(auditEntry({
       actorId: account.id,
       action: adding ? 'account.method.added' : 'password.set',

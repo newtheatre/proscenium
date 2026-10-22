@@ -203,15 +203,15 @@ The Nottingham New Theatre`,
     html: layout(`<p>Hello ${context.name},</p>
 <p>Someone signed in to your account asked to move it to ${String(context.wanted)}. Nothing has
 changed yet: it moves only once that address confirms it.</p>
-<p>If this was not you, change your password and sign out everywhere from
-<a href="${String(context.securityUrl)}">Security</a>, and tell the ${saysRole('ADMIN')}.</p>`),
+<p>If this was not you, <a href="${String(context.cancelUrl)}">cancel it</a>, then change your
+password from <a href="${String(context.securityUrl)}">Security</a> and tell the ${saysRole('ADMIN')}.</p>`),
     text: `Hello ${context.name},
 
 Someone signed in to your account asked to move it to ${String(context.wanted)}. Nothing has
 changed yet: it moves only once that address confirms it.
 
-If this was not you, change your password and sign out everywhere from Security
-(${String(context.securityUrl)}), and tell the ${saysRole('ADMIN')}.
+If this was not you, cancel it (${String(context.cancelUrl)}), then change your
+password from Security (${String(context.securityUrl)}) and tell the ${saysRole('ADMIN')}.
 
 The Nottingham New Theatre`,
   }),

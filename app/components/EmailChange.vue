@@ -12,6 +12,7 @@ const { data: address, refresh: refreshAddress } = await useAsyncData('account-e
 
 const reauthenticating = ref(false)
 const changing = ref(false)
+const cancelling = ref(false)
 const wantedEmail = ref('')
 
 async function changeEmail(): Promise<void> {
@@ -33,10 +34,26 @@ async function changeEmail(): Promise<void> {
     changing.value = false
   }
 }
+
+async function cancelChange(): Promise<void> {
+  cancelling.value = true
+  try {
+    await $fetch('/api/account/email', { method: 'DELETE' })
+    toast.add({ title: 'Address change cancelled', icon: 'i-lucide-mail-x', color: 'success' })
+    await refreshAddress()
+  }
+  catch (error) {
+    toast.add({ title: refusalText(error), color: 'error' })
+  }
+  finally {
+    cancelling.value = false
+  }
+}
 </script>
 
 <template>
   <UPageCard
+    id="email"
     title="Email address"
     :description="audience"
   >
@@ -53,7 +70,18 @@ async function changeEmail(): Promise<void> {
         variant="subtle"
         icon="i-lucide-mail"
         :description="`Waiting for ${address.pending} to be confirmed. Until the link in that inbox is opened, you still sign in as ${account.user?.email}.`"
-      />
+      >
+        <template #actions>
+          <UButton
+            label="Cancel this change"
+            color="neutral"
+            variant="outline"
+            :loading="cancelling"
+            data-test="cancel-email-change"
+            @click="cancelChange"
+          />
+        </template>
+      </UAlert>
       <UFormField
         label="New email address"
         name="email"

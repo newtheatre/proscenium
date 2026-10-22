@@ -34,9 +34,19 @@ registration one. The requester's answer is unchanged, so nothing enumerates.
 
 `GET /api/account/email` returns the address and any pending one, which the profile shows.
 
+**A pending change can be withdrawn.** `DELETE /api/account/email` deletes the bound token, so its
+link then answers 410, and audits `account.email.change.cancelled`. The profile's waiting notice
+offers it as **Cancel this change**, and `account.email.requested` links straight to it
+(`/account/profile#email`). Because a borrowed session is the case the warning exists for, every
+change to how the account is secured also deletes a pending change's token in the same batch:
+setting or changing the password, a password reset, confirming or removing the authenticator, and
+removing a sign-in method. An owner who follows the warning's advice to change their password
+therefore cancels the change without having to find it.
+
 ## Consequences
 
 - A typo costs nothing: the link never arrives and the old address still works.
 - Asking twice replaces the first link, as before.
-- The audit trail gains `account.email.change.requested`; `account.email.changed` is now written
-  when the link is opened.
+- The audit trail gains `account.email.change.requested` and `account.email.change.cancelled`;
+  `account.email.changed` is now written when the link is opened.
+- Someone who changes their password while waiting on their own address change asks for it again.

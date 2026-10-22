@@ -273,4 +273,78 @@ describe.skipIf(skip !== null)('changing an email address (A-115, 0151)', () => 
       view.close()
     }
   }, CASE_TIMEOUT_MS)
+
+  // A change somebody else asked for is ended from the warning, before its link can be opened.
+  async function cancelledLink(token: string): Promise<number> {
+    const opened = await fetch(`${app.baseURL}/api/auth/verify`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    return opened.status
+  }
+
+  test('a pending change can be cancelled, and its link then moves nothing', async () => {
+    const { email, cookie, view } = await signedIn('email-cancel')
+    try {
+      const wanted = registrableAddress('email-cancelled')
+      await send('PUT', '/api/account/email', cookie, { email: wanted })
+      const token = await verifyLinkTo(wanted)
+
+      const warning = (await letters(app)).find(letter => letter.startsWith(`To: ${email}`) && letter.includes(wanted))
+      expect(warning).toContain('/account/profile#email')
+
+      const cancelled = await send('DELETE', '/api/account/email', cookie)
+      expect(cancelled.status).toBe(200)
+      expect(await cancelled.json()).toMatchObject({ cancelled: true })
+      expect(await (await send('GET', '/api/account/email', cookie)).json()).toEqual({ email, pending: null })
+
+      expect(await cancelledLink(token)).toBe(410)
+      expect(read('SELECT id FROM users WHERE email = ?', email)).toBeDefined()
+      expect(read('SELECT id FROM users WHERE email = ?', wanted)).toBeUndefined()
+
+      const logged = read<{ n: number }>(`
+        SELECT count(*) n FROM audit_log l JOIN users u ON u.id = l.actor_id
+        WHERE u.email = ? AND l.action = 'account.email.change.cancelled'`, email)
+      expect(logged?.n).toBe(1)
+
+      await visit(view, `${app.baseURL}/account/profile`, '[data-test="new-email"]')
+      expect(await view.evaluate<boolean>('!!document.querySelector(\'[data-test="pending-email"]\')')).toBe(false)
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('the profile offers to cancel a pending change', async () => {
+    const { cookie, view } = await signedIn('email-cancel-screen')
+    try {
+      await send('PUT', '/api/account/email', cookie, { email: registrableAddress('email-cancel-shown') })
+      await visit(view, `${app.baseURL}/account/profile`, '[data-test="pending-email"]')
+      await click(view, '[data-test="cancel-email-change"]')
+      await waitFor(view, '!document.querySelector(\'[data-test="pending-email"]\')')
+      expect((await (await send('GET', '/api/account/email', cookie)).json()).pending).toBeNull()
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('changing the password cancels a pending change', async () => {
+    const { email, cookie, view } = await signedIn('email-cancel-password')
+    try {
+      const wanted = registrableAddress('email-cancel-by-password')
+      await send('PUT', '/api/account/email', cookie, { email: wanted })
+      const token = await verifyLinkTo(wanted)
+
+      const changed = await send('PUT', '/api/account/password', cookie, { password: generatePassword() })
+      expect(changed.status).toBe(200)
+      expect((await (await send('GET', '/api/account/email', cookie)).json()).pending).toBeNull()
+      expect(await cancelledLink(token)).toBe(410)
+      expect(read('SELECT id FROM users WHERE email = ?', email)).toBeDefined()
+    }
+    finally {
+      view.close()
+    }
+  }, CASE_TIMEOUT_MS)
 })
