@@ -2,7 +2,8 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { auditEntry } from './audit'
 import { constraintRefusal } from './constraint-refusal'
-import { endOfTerm, londonDayField, londonDay } from './membership'
+import { endOfTerm, londonDayField, londonDay, studentIdField } from './membership'
+import { saysDay } from './when'
 import { PERMISSION_MAP, ROLES } from './roles'
 import type { AuditRow } from './audit'
 import type { MembershipTerm } from './membership'
@@ -26,11 +27,18 @@ export function canTransition(from: ClaimStatus, to: ClaimStatus): boolean {
 export const CLAIM_REASON_LIMIT = 300
 
 export const membershipClaimForm = z.object({
-  studentId: z.string().trim().min(1, 'Your student number is how the SU knows you').max(32),
+  studentId: z.string().trim().min(1, 'Your student number is how the SU knows you').pipe(studentIdField),
   // Never in the future: a purchase is something that has happened (criterion 1).
   startsOn: z.string({ error: 'Give the date on your SU receipt' })
     .pipe(londonDayField.refine(day => day <= londonDay(new Date()), 'That purchase date has not happened yet')),
   term: z.union([z.literal(1), z.literal(3)]),
+}).superRefine((claim, context) => {
+  // A term already over is nothing to record: the member is pointed at the one they hold now (0155).
+  if (context.issues.length > 0) return
+  const ends = endOfTerm(claim.startsOn, claim.term)
+  if (ends < londonDay(new Date())) {
+    context.addIssue({ code: 'custom', path: ['startsOn'], message: `That membership ended on ${saysDay(ends, { year: true })}. Tell us about the one you hold now.` })
+  }
 })
 
 export type MembershipClaimInput = z.output<typeof membershipClaimForm>

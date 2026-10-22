@@ -109,7 +109,7 @@ export async function executeMerge(winnerId: string, loserId: string, actorId: s
   const grantPlan = planGrantMerge(winnerGrants, loserGrants)
   const now = Math.floor(Date.now() / 1000)
 
-  const { moves, retireCredentials, tombstone } = mergeStatements({ winnerId, loserId, actorId, grantPlan, trainingRecords, now })
+  const { moves, retireCredentials, tombstone } = mergeStatements({ winnerId, loserId, actorId, grantPlan, trainingRecords, loserStudentId: loser.studentId, now })
 
   const entry = auditEntry({
     actorId,

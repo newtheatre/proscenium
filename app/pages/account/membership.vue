@@ -73,7 +73,7 @@ async function submit(event: FormSubmitEvent<MembershipClaimInput>): Promise<voi
   failure.value = null
   try {
     await $fetch('/api/account/membership/claim', { method: 'POST', body: event.data })
-    toast.add({ title: 'Claim sent', description: 'An officer records it, usually within a day.', icon: 'i-lucide-check', color: 'success' })
+    toast.add({ title: 'Claim sent', description: 'The IT Manager records it, usually within a day.', icon: 'i-lucide-check', color: 'success' })
     await refresh()
   }
   catch (error) {
@@ -111,6 +111,9 @@ async function withdraw(): Promise<void> {
 }
 
 const open = computed(() => data.value.claim?.status === 'OPEN' ? data.value.claim : null)
+// A current member rarely needs the form, so it waits behind a question until they do (0155).
+const renewing = ref(false)
+const formShown = computed(() => data.value.state.kind !== 'current' || renewing.value || declined.value !== null)
 const declined = computed(() => data.value.claim?.status === 'DECLINED' ? data.value.claim : null)
 
 // Read from /policies/membership rather than baked in, so a fee change needs no code edit (J-110).
@@ -185,8 +188,8 @@ useSeoMeta({ title: 'Membership' })
         icon="i-lucide-badge-check"
         title="Membership is bought at the Students' Union"
         :description="feeValue
-          ? `We cannot sell it here. The current fee is ${feeValue.text}. Once you have bought it, tell us below and an officer will record it on your account.`
-          : 'We cannot sell it here. Once you have bought it, tell us below and an officer will record it on your account.'"
+          ? `We cannot sell it here. The current fee is ${feeValue.text}. Once you have bought it, tell us below and the IT Manager will record it on your account.`
+          : 'We cannot sell it here. Once you have bought it, tell us below and the IT Manager will record it on your account.'"
         :actions="purchaseUrl ? [{ label: 'Buy a membership from the Students\' Union', to: purchaseUrl, target: '_blank', external: true, trailingIcon: 'i-lucide-external-link', color: 'neutral', variant: 'outline' }] : []"
         data-test="membership-fee"
       />
@@ -225,7 +228,7 @@ useSeoMeta({ title: 'Membership' })
             <dd>{{ termLabel(open.term) }}</dd>
           </dl>
           <p class="text-muted">
-            An officer records it, usually within a day. The committee checks memberships against the SU's list later.
+            The IT Manager records it, usually within a day. The committee checks memberships against the SU's list later.
           </p>
           <UButton
             data-test="claim-withdraw"
@@ -258,7 +261,26 @@ useSeoMeta({ title: 'Membership' })
           class="mb-4"
         />
 
+        <div
+          v-if="!formShown"
+          class="space-y-2 text-sm"
+        >
+          <p class="text-muted">
+            Your membership is current, so there is nothing to tell us yet.
+          </p>
+          <UButton
+            data-test="claim-renewal"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            @click="renewing = true"
+          >
+            Bought a renewal?
+          </UButton>
+        </div>
+
         <UForm
+          v-else
           ref="claimForm"
           data-test="claim-form"
           :schema="membershipClaimForm"

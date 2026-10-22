@@ -33,6 +33,8 @@ export default defineEventHandler(async (event) => {
     startsOn: schema.memberships.startsOn,
     expiresOn: schema.memberships.expiresOn,
     source: schema.memberships.source,
+    // Recorded from a member's own claim, which the evidence names; never the evidence itself.
+    fromClaim: sql<number>`coalesce(${schema.memberships.evidence} like 'claim %', 0)`,
     confirmedAt: schema.memberships.confirmedAt,
   })
     .from(schema.memberships)
