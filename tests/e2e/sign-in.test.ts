@@ -195,9 +195,11 @@ describe.skipIf(skip !== null)('an unverified address cannot sign in (0026)', ()
     const unknown = await signIn(registrableAddress('nobody'))
 
     expect(refused.status).toBe(401)
-    const body = await refused.text()
-    expect(await wrong.text()).toBe(body)
-    expect(await unknown.text()).toBe(body)
+    // The dev server's stack trace is source-mapped on some answers and not others, so it is left out.
+    const answer = async (response: Response): Promise<unknown> => ({ ...await response.json() as object, stack: undefined })
+    const body = await answer(refused)
+    expect(await answer(wrong)).toEqual(body)
+    expect(await answer(unknown)).toEqual(body)
   })
 
   // Each of the four routes to a verified address is a way back for somebody who never got the
