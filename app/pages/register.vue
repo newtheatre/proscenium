@@ -36,7 +36,9 @@ const resent = ref<string | null>(null)
 
 // A click before the page hydrates would be lost without a word, so the button waits for it.
 const hydrated = ref(false)
-onMounted(() => { hydrated.value = true })
+onMounted(() => {
+  hydrated.value = true
+})
 
 // One rule for the browser and the server: the same function decides both (0012).
 function checkPassword(state: Partial<z.output<typeof schema>>): FormError[] {
