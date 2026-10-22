@@ -98,7 +98,9 @@ const predicate = (clause: ListClause): SQL => (clause.where ? sql` WHERE ${clau
 
 export function venuesQuery(clause: ListClause, limit: number, offset: number): SQL {
   return sql`
-    SELECT ${COLUMNS}, ${venueInUseColumn('v')} AS inUse
+    SELECT ${COLUMNS}, ${venueInUseColumn('v')} AS inUse,
+           (SELECT count(DISTINCT p.show_id) FROM performances p WHERE p.venue_id = v.id) AS showCount,
+           (SELECT count(*) FROM performances p WHERE p.venue_id = v.id) AS performanceCount
     FROM venues v${predicate(clause)}
     ORDER BY ${sql.join(clause.orderBy, sql`, `)}
     LIMIT ${limit} OFFSET ${offset}

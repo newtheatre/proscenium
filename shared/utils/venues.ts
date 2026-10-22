@@ -11,7 +11,8 @@ export const venueForm = z.object({
   name: z.string().trim().min(1, 'A venue needs a name').max(MAX_VENUE_NAME),
   address: z.string().trim().max(MAX_VENUE_ADDRESS).nullish(),
   // Null is uncapped: general admission only, no seat map exists (programme.ts).
-  capacity: z.number().int().positive().nullish(),
+  capacity: z.number().int('A capacity is a whole number of seats')
+    .positive('A venue seats at least 1. To close one performance, set its own capacity to 0').nullish(),
   isExternal: z.boolean().default(false),
   description: z.string().trim().max(MAX_VENUE_DESCRIPTION).nullish(),
   roomId: z.string().trim().min(1, 'Say which room you mean').nullish(),
@@ -34,4 +35,16 @@ export interface AdminVenue {
   roomId: string | null
   archived: boolean
   inUse: boolean
+  // What "in use" most often means, so the list can say it rather than "has records".
+  showCount: number
+  performanceCount: number
+}
+
+// The list's "In use" cell: the shows and performances when there are any, the rest by name.
+export function saysVenueUse(venue: Pick<AdminVenue, 'inUse' | 'showCount' | 'performanceCount'>): string {
+  if (!venue.inUse) return 'Nothing yet'
+  if (venue.performanceCount === 0) return 'Rota or night records'
+  const shows = venue.showCount === 1 ? '1 show' : `${venue.showCount} shows`
+  const nights = venue.performanceCount === 1 ? '1 performance' : `${venue.performanceCount} performances`
+  return `${shows}, ${nights}`
 }
