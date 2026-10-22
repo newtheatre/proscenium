@@ -38,6 +38,8 @@ export interface PerformanceReportRow {
   heldPence: number
   officerBypass: boolean
   autoClosed: boolean
+  // Whether a frozen report exists to open, signed or closed by itself (0239).
+  signedOff: boolean
 }
 
 export const performanceReportFilter = z.object({

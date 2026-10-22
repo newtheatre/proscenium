@@ -20,7 +20,7 @@ useSeoMeta({ title: 'Night report' })
 interface Takings { tenders: { tender: string, totalPence: number }[], compsPence: number, discountsPence: number }
 interface Report {
   performanceId: string
-  attendance: { sold: number, admitted: number, noShows: number, walkUps: number }
+  attendance: { sold: number, admitted: number, noShows: number, walkUps: number, passAdmissions: number }
   takings: { desk: Takings, bar: Takings }
   incidents: { id: string, category: Category, severity: Severity, body: string, happenedAt: number, supersededBy: string | null, followUpRequired: boolean }[]
   ageChecks: { accepted: number, refused: number }
@@ -153,8 +153,10 @@ const figures = computed(() => {
     { title: 'Attendance', rows: [
       { label: 'Sold', value: String(read.attendance.sold) },
       { label: 'In', value: String(read.attendance.admitted) },
-      { label: 'No-shows', value: String(read.attendance.noShows) },
-      { label: 'Walk-ups', value: String(read.attendance.walkUps) },
+      // Before the curtain a paid seat not yet in is somebody still on their way (0239).
+      { label: curtainDown.value ? 'No-shows' : 'Paid, not yet in', value: String(read.attendance.noShows) },
+      { label: 'Walk-ups sold', value: String(read.attendance.walkUps) },
+      { label: 'Pass admissions', value: String(read.attendance.passAdmissions) },
     ] },
     { title: 'Takings', rows: [
       { label: 'Box office', value: saysMoney(tenderTotalPence(desk.tenders)) },
@@ -163,7 +165,7 @@ const figures = computed(() => {
       { label: 'Discounts given', value: saysMoney(desk.discountsPence + bar.discountsPence) },
       { label: 'Bar items sold', value: String(read.bar.itemsSold) },
       // The reader serves the whole night, so its figure is labelled as the night's, not this show's.
-      ...(read.bar.nightCardSalesPence === undefined ? [] : [{ label: 'Drinks on card, whole night', value: saysMoney(read.bar.nightCardSalesPence) }]),
+      ...(read.bar.nightCardSalesPence === undefined ? [] : [{ label: 'Card reader, whole night (all venues)', value: saysMoney(read.bar.nightCardSalesPence) }]),
     ] },
   ]
 })
@@ -509,6 +511,13 @@ async function signOff(): Promise<void> {
             data-test="closing-note"
           />
         </UFormField>
+        <p
+          v-if="curtainDown && closingNote.trim().length === 0"
+          class="text-sm text-muted"
+          data-test="closing-note-hint"
+        >
+          Write a closing note first: Sign off and close waits for it.
+        </p>
         <UAlert
           v-if="signFailure"
           data-test="sign-off-failure"

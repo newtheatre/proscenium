@@ -2018,7 +2018,7 @@ real SQL:
 
 | Section | Reads | Note |
 | --- | --- | --- |
-| Attendance | `reservations`, `tickets`, `pass_admissions`, `passes`, `pass_types` | Every line counts unrefunded seats, as sold does (issue 1326): sold rides `heldSeatsSubquery` (D-105), in `admittedSeatsSubquery`, walk-ups `admittedWalkUpSeatsSubquery` (admitted seats on a door-source booking), no-shows `noShowSeatsSubquery` (unrefunded seats on a `COLLECTED` booking at compile time, or on a self-served pass booking nobody admitted, derived and never written, issue 1296, or on one the old estate imported as `NO_SHOW`). Pass and Fellowship admissions (`passAdmittedSeatsSubquery`, `fellowshipAdmittedSeatsSubquery`) are unrefunded seats on an admitted booking with a pass admission, subsets of in. At close, sold is in, plus no-shows, plus the unpaid seats still held. |
+| Attendance | `reservations`, `tickets`, `pass_admissions`, `passes`, `pass_types` | Every line counts unrefunded seats, as sold does (issue 1326): sold rides `heldSeatsSubquery` (D-105), in `admittedSeatsSubquery`, walk-ups `soldWalkUpSeatsSubquery` (seats still held on a door-source booking, admitted or not, leaving out a pass admitted on the spot, which is its own line, 0239), no-shows `noShowSeatsSubquery` (unrefunded seats on a `COLLECTED` booking at compile time, or on a self-served pass booking nobody admitted, derived and never written, issue 1296, or on one the old estate imported as `NO_SHOW`). Pass and Fellowship admissions (`passAdmittedSeatsSubquery`, `fellowshipAdmittedSeatsSubquery`) are unrefunded seats on an admitted booking with a pass admission, subsets of in. At close, sold is in, plus no-shows, plus the unpaid seats still held. |
 | Takings | `ledger_entries`, `ledger_lines` | Grouped by tender, summed from `ll.amount_pence` on the lines matched to this performance, never `le.total_pence`, which can span more than one performance or product in a single entry. A reversal's negative line nets against what it reverses in the same sum; nothing is filtered by `void_of_entry_id`, which marks a tab-charge reversal, not something to exclude (0031). |
 | Incidents | `incidents`, `incident_severity_config`, `incident_followup_closures` | The full chain, each flagged with its follow-up requirement and closure state whichever way it sits. Closes the known-issues gap E-116 criterion 4 left open. |
 | Age checks | `age_checks` | Current (unsuperseded) entries only, accepted and refused counted separately. |
@@ -2072,6 +2072,10 @@ not hold the report back. Automatic retry until delivered and the operations-das
 criterion 4 also asks for are H-105 and H-106's own scope, not this route's: distribution is not
 yet wired to `notify()` (`docs/known-issues.md`), so a failed send here stops after the one
 attempt, recorded as `FAILED` rather than retried.
+
+`GET /api/admin/night-reports/[performanceId]` reopens a frozen report after its night, from
+`/reports/night/[performanceId]`: the snapshot verbatim with its addenda and delivery outcomes,
+guarded by `night.manage` or `safety.read` since it carries incident bodies (0239).
 
 An addendum (`POST /api/admin/night-reports/addenda`) is not shift-scoped: a correction can be found
 days after the night ends, when nobody holds a live shift on it any more, so the guard is the

@@ -283,6 +283,25 @@ describe('performanceReportsQuery reads attendance and staffing per performance 
     })
   })
 
+  // The row offers the frozen report only once one exists (0239).
+  test('a performance reads as signed off only once its report is frozen', async () => {
+    await withDatabase((database) => {
+      const seeded = tonightsPerformance(database)
+      const from = seeded.startsAt - 3600
+      const to = seeded.startsAt + 3600
+      const [before] = run<{ signedOff: number }>(database, performanceReportsQuery(from, to, {}, 50, 0))
+      expect(Boolean(before?.signedOff)).toBe(false)
+
+      const signer = person(database, 'signer')
+      database.batch([
+        ['INSERT INTO night_reports (id, performance_id, venue_id, night, closing_note, report, signed_by, signed_via) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          'nr-signed', seeded.performanceId, seeded.venueId, seeded.night, 'A good night', '{}', signer, 'SHIFT'],
+      ])
+      const [after] = run<{ signedOff: number }>(database, performanceReportsQuery(from, to, {}, 50, 0))
+      expect(Boolean(after?.signedOff)).toBe(true)
+    })
+  })
+
   test('a cancelled performance is excluded, and a venue filter narrows the rest', async () => {
     await withDatabase((database) => {
       const venueA = testVenue(database, { suffix: 'perf-a' })

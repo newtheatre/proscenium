@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, curtainIsDown, hubHouseAfter, hubHouseRefused, hubKpis, hubTiles, hubTilesWhileAsking, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
+import { HUB_KPI_LABELS, NO_HUB_HOUSE, checklistHint, reportTileHint, curtainIsDown, hubHouseAfter, hubHouseRefused, hubKpis, hubTiles, hubTilesWhileAsking, nightHeaderLine, saysSeatsLeft, staleBannerLine } from '#shared/utils/night-hub'
 import { activePerformanceId } from '#shared/utils/tonight'
-import type { ChecklistEntry, TonightChecklist } from '#shared/utils/checklist'
+import type { ChecklistClose, ChecklistEntry, TonightChecklist } from '#shared/utils/checklist'
 import type { HubHouse, HubHouseRead, HubHouseState, HubTileId } from '#shared/utils/night-hub'
 
 definePageMeta({ layout: 'tonight', middleware: 'night-signed-in', docs: '/docs/tonight' })
@@ -46,10 +46,10 @@ async function readHouse(): Promise<HubHouseRead<HouseTonight>> {
 
 // The duty manager's alone to read: any other shift would be refused on every poll. Best-effort,
 // since E-114 criterion 6 is a warning and never blocks the house numbers above it.
-async function readChecklist(): Promise<ChecklistEntry[] | null> {
+async function readChecklist(): Promise<{ items: ChecklistEntry[], close: ChecklistClose | null } | null> {
   if (!dutyManager.value) return null
   const read = await settleRead(() => request<TonightChecklist>('/api/tonight/checklist'))
-  return read.kind === 'READ' ? read.value.items : null
+  return read.kind === 'READ' ? { items: read.value.items, close: read.value.close } : null
 }
 
 async function readStocktake(): Promise<boolean> {
@@ -58,7 +58,7 @@ async function readStocktake(): Promise<boolean> {
   return read.kind === 'READ' && read.value.stocktake !== null
 }
 
-interface HubRead { house: HubHouseRead<HouseTonight>, checklist: ChecklistEntry[] | null, stocktakeOpen: boolean, at: number }
+interface HubRead { house: HubHouseRead<HouseTonight>, checklist: { items: ChecklistEntry[], close: ChecklistClose | null } | null, stocktakeOpen: boolean, at: number }
 
 // None depends on another's answer, so they run together. The checklist is read before house
 // open too, so its banner has data the instant `houseOpen` turns true.
@@ -70,12 +70,16 @@ async function readHub(): Promise<HubRead> {
 const shown = ref<HubHouseState<HouseTonight>>({ ...NO_HUB_HOUSE })
 // A null read keeps what the banner last had.
 const checklist = ref<ChecklistEntry[]>([])
+const closed = ref<ChecklistClose | null>(null)
 const stocktakeOpen = ref(false)
 const { now, stamp } = useNightClock()
 
 function apply(read: HubRead): void {
   shown.value = hubHouseAfter(shown.value, read.house, read.at)
-  if (read.checklist) checklist.value = read.checklist
+  if (read.checklist) {
+    checklist.value = read.checklist.items
+    closed.value = read.checklist.close
+  }
   stocktakeOpen.value = read.stocktakeOpen
   stamp(read.at)
 }
@@ -84,8 +88,11 @@ const waiting = useServedRead('tonight-hub', readHub, apply)
 
 // Roles that land after the first read, on a phone arriving from elsewhere, need not wait a poll.
 watch(dutyManager, async () => {
-  const items = await readChecklist()
-  if (items) checklist.value = items
+  const read = await readChecklist()
+  if (read) {
+    checklist.value = read.items
+    closed.value = read.close
+  }
 })
 watch(onTheBar, async (holds) => {
   if (holds) stocktakeOpen.value = await readStocktake()
@@ -137,7 +144,7 @@ const HUB_TILES: Record<HubTileId | 'stocktake', { label: string, hint: string, 
 // A tile says what is left rather than repeating its own name (issue 1150 item 3).
 function tileHint(id: HubTileId | 'stocktake'): string {
   if (id === 'checklist') return checklistHint(checklist.value, houseOpen.value)
-  if (id === 'report' && curtainDown.value) return 'Sign off and close'
+  if (id === 'report') return reportTileHint(closed.value?.performanceId === selectedId.value ? closed.value : null, curtainDown.value)
   return HUB_TILES[id].hint
 }
 

@@ -1,7 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { checklistFor } from './checklist'
-import { admittedSeatsSubquery, admittedWalkUpSeatsSubquery, heldSeatsSubquery, noShowSeatsSubquery } from './capacity'
+import { admittedSeatsSubquery, heldSeatsSubquery, noShowSeatsSubquery, soldWalkUpSeatsSubquery } from './capacity'
 import { cardSalesQuery } from './reconciliation'
 import { lateAdditionsQuery } from './late-charge'
 import { DOOR_COVER_ACTION, NIGHT_ROLES, OFFICER_BYPASS_ACTION, doorCoverTarget, officerBypassTarget } from '#shared/utils/night-authority'
@@ -51,7 +51,7 @@ export function reportAttendanceQuery(performanceId: string): SQL {
       ${heldSeatsSubquery(sql`${performanceId}`)} AS sold,
       ${admittedSeatsSubquery(sql`${performanceId}`)} AS admitted,
       ${noShowSeatsSubquery(sql`${performanceId}`)} AS noShows,
-      ${admittedWalkUpSeatsSubquery(sql`${performanceId}`)} AS walkUps,
+      ${soldWalkUpSeatsSubquery(sql`${performanceId}`)} AS walkUps,
       ${passAdmittedSeatsSubquery(sql`${performanceId}`)} AS passAdmissions,
       ${fellowshipAdmittedSeatsSubquery(sql`${performanceId}`)} AS fellowshipAdmissions
   `

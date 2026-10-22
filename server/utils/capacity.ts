@@ -96,19 +96,6 @@ export function admittedSeatsSubquery(performanceId: SQL): SQL {
   )`
 }
 
-// The admitted share of the night's walk-ups: seats through the door on a door-source booking,
-// which the night report counts beside "in" without counting a walk-up sold but not yet in (D-126).
-export function admittedWalkUpSeatsSubquery(performanceId: SQL): SQL {
-  return sql`(
-    SELECT count(*) FROM ${sql.raw(TICKETS)} walkin_t
-    JOIN ${sql.raw(RESERVATIONS)} walkin_r ON walkin_r.id = walkin_t.reservation_id
-    WHERE walkin_t.performance_id = ${performanceId}
-      AND walkin_t.refunded_at IS NULL
-      AND walkin_r.status = 'DOOR'
-      AND walkin_r.source = 'DOOR'
-  )`
-}
-
 // Seats sold for reporting: still held, or marked a no-show, which released the seat but was
 // still sold. Sold is in, plus no-shows, plus unpaid holds (architecture.md, Attendance).
 export function soldSeatsSubquery(performanceId: SQL): SQL {
@@ -143,6 +130,20 @@ export function walkUpSeatsSubquery(performanceId: SQL): SQL {
       AND walkup_t.refunded_at IS NULL
       AND walkup_r.source = 'DOOR'
       AND walkup_r.status IN (${holding})
+  )`
+}
+
+// Walk-up seats sold on the night and still held, admitted or not, leaving out a pass admitted on
+// the spot, which the report counts as a pass admission of its own (0239).
+export function soldWalkUpSeatsSubquery(performanceId: SQL): SQL {
+  return sql`(
+    SELECT count(*) FROM ${sql.raw(TICKETS)} walksold_t
+    JOIN ${sql.raw(RESERVATIONS)} walksold_r ON walksold_r.id = walksold_t.reservation_id
+    WHERE walksold_t.performance_id = ${performanceId}
+      AND walksold_t.refunded_at IS NULL
+      AND walksold_r.source = 'DOOR'
+      AND walksold_r.status IN (${holding})
+      AND NOT EXISTS (SELECT 1 FROM pass_admissions walksold_a WHERE walksold_a.ticket_id = walksold_t.id)
   )`
 }
 

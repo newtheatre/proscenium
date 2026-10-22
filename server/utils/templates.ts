@@ -732,18 +732,24 @@ The Nottingham New Theatre`,
 
   // No personal greeting: this reaches a committee-configured address as often as an account,
   // and `sendRaw()` renders it once for every recipient (E-124 criterion 3).
-  'night-report-signed': (context: TemplateContext): Rendered => ({
-    subject: `Night report signed off: ${context.venueName}, ${context.night}`,
-    html: layout(`<p>Tonight's report at ${context.venueName} was signed off by ${context.signedByName}
-${context.officerBypass ? '(an officer, standing in for the duty manager)' : ''}.</p>
+  'night-report-signed': (context: TemplateContext): Rendered => {
+    const figures = context.figures as string[]
+    const standing = context.officerBypass ? ' (an officer, standing in for the duty manager)' : ''
+    return {
+      subject: `Night report: ${context.show}, ${context.night}, signed off by ${context.signedByFirstName}`,
+      html: layout(`<p>The night report for ${context.show} at ${context.venueName} was signed off by ${context.signedByName}${standing}.</p>
+<ul>${figures.map(line => `<li>${line}</li>`).join('')}</ul>
 <p>Closing note:</p>
 ${paragraphs(String(context.closingNote))}`),
-    text: `Tonight's report at ${context.venueName} was signed off by ${context.signedByName}${context.officerBypass ? ' (an officer, standing in for the duty manager)' : ''}.
+      text: `The night report for ${context.show} at ${context.venueName} was signed off by ${context.signedByName}${standing}.
+
+${figures.join('\n')}
 
 Closing note: ${context.closingNote}
 
 The Nottingham New Theatre`,
-  }),
+    }
+  },
 
   'night-report-addendum': (context: TemplateContext): Rendered => ({
     subject: `Correction to the ${context.night} report: ${context.venueName}`,

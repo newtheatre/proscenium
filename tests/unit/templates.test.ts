@@ -60,6 +60,8 @@ const EVERYTHING: TemplateContext = {
   path: '/docs/communications/send-log',
   reportedByName: 'Bea Stone',
   signedByName: 'Bea Stone',
+  signedByFirstName: 'Bea',
+  figures: ['Sold: 40 seats', 'Box office: £120.00'],
   addedByName: 'Bea Stone',
   closingNote: 'A quiet house.',
   note: 'The interval ran long.',
@@ -654,6 +656,14 @@ describe('every typed value is escaped in the HTML part, and only there (issue 1
       expect(rendered.text).toContain(note)
     })
   }
+
+  // The show, a British date and who signed lead the subject, and the figures lead the body (0239).
+  test('the signed-off report names the show and carries the figures', () => {
+    const rendered = render('night-report-signed', { ...EVERYTHING, night: 'Wed 21 Oct' })
+    expect(rendered.subject).toBe('Night report: The Tempest, Wed 21 Oct, signed off by Bea')
+    expect(rendered.text).toContain('Sold: 40 seats\nBox office: £120.00')
+    expect(rendered.html).toContain('<li>Sold: 40 seats</li>')
+  })
 
   test('a link keeps its address, escaped for the attribute it sits in', () => {
     const rendered = render('membership-expiring', { ...EVERYTHING, purchaseUrl: 'https://su.example.invalid/buy?a=1&b=2' })

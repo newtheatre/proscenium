@@ -242,3 +242,13 @@ export function groupedBoardCode(code: string): string {
   if (digits.length !== 6) return code
   return `${digits.slice(0, 3)} ${digits.slice(3)}`
 }
+
+// The report tile's line: once the house is signed off it says by whom, rather than still asking
+// for the close (0239).
+export function reportTileHint(
+  close: { closedByName: string | null, automatic: boolean } | null,
+  curtainDown: boolean,
+): string {
+  if (close) return close.automatic ? 'Closed automatically' : `Signed off by ${firstNameOf(close.closedByName) ?? 'a former member'}`
+  return curtainDown ? 'Sign off and close' : 'The draft so far'
+}
