@@ -37,8 +37,11 @@ export default defineEventHandler(async (event) => {
     },
   )
 
-  // A request the rules refuse outright (no membership, a past slot) queues too: the officer moving
-  // it is not the one who decides it, and confirming it would wave the refusal through.
+  // A slot already gone is no booking at all, and approving does not look at the clock.
+  const gone = verdict.failures.find(failure => failure.reason === 'IN_THE_PAST')
+  if (gone) throw createError({ statusCode: 422, statusMessage: gone.says })
+
+  // Any other outright refusal (a lapsed membership) queues: confirming it would wave it through.
   const queued = verdict.needsApproval || verdict.refusedOutright
 
   // The member asked, so the tier is theirs as any member booking's is (C-115 criterion 1).

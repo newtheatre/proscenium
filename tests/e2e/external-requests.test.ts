@@ -825,6 +825,18 @@ describe.skipIf(skip !== null)('moving a request into one of our rooms', () => {
     expect((await answered.json() as { status: string }).status).toBe('PENDING_APPROVAL')
   })
 
+  test('a request whose slot has already happened is refused, not queued', async () => {
+    const id = await ask(span(39))
+    const gone = Math.floor(Date.now() / 1000) - 7200
+    write('UPDATE external_requests SET starts_at = ?, ends_at = ? WHERE id = ?', gone, gone + 3600, id)
+
+    const answered = await send('POST', `/api/admin/rooms/external-requests/${id}/relist`,
+      { roomId: await ourRoom(), reason: 'Too late to help' }, officer)
+
+    expect(answered.status).toBe(422)
+    expect(statusOf(id)).not.toBe('CANCELLED')
+  })
+
   test('a settled request has nothing to move', async () => {
     const id = await ask(span(36))
     await send('POST', `/api/rooms/external-requests/${id}/cancel`, {}, member.cookie)
