@@ -464,7 +464,7 @@ describe('the rewritten bodies and subjects (item 7)', () => {
   // Every severity reads as English: "incident" and "note" once read "A incident other incident".
   test('the safety notice reads the same way at any severity', () => {
     for (const severity of ['note', 'near miss', 'incident', 'serious']) {
-      const { subject, text } = render('incident-follow-up-required', { ...EVERYTHING, severity, category: 'other' })
+      const { subject, text } = render('incident-follow-up-required', { ...EVERYTHING, severity, category: 'other', venue: null, when: null })
       expect(subject).toBe(`Follow-up required: an incident logged as ${severity}`)
       expect(text).toContain(`An incident logged as ${severity} (other) needs your follow-up.`)
     }
