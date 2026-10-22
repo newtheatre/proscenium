@@ -44,7 +44,8 @@ describe('the past is not offered (C-105 criterion 6)', () => {
 
   test('the grid disables a past slot and names it, and the week table does not call a past day free', async () => {
     const grid = await read('app/components/RoomGrid.vue')
-    expect(grid).toContain('slotPassed(')
+    expect(grid).toContain('slotState(')
+    expect(await read('shared/utils/room-grid.ts')).toContain('slotPassed(day, minutes')
     expect(grid).toContain('\'past\': \'past\'')
     expect(await read('app/pages/rooms/index.vue')).toContain('cell.past')
   })

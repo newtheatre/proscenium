@@ -2,11 +2,12 @@
 import { fromLondonWallClock, londonWeekday } from '#shared/utils/london'
 import { saysDay } from '#shared/utils/when'
 import { closedOn, dateStrip } from '#shared/utils/rooms'
-import { closureCover, slotInstant } from '#shared/utils/room-grid'
+import { closureCover, gridFirstHour, slotInstant } from '#shared/utils/room-grid'
 import { addDays } from '#shared/utils/series'
 import { SU_ROOM_ASK } from '#shared/utils/external-requests'
 import { londonDate } from '#shared/utils/working-days'
-import { can, manageRoomsEstate } from '#shared/utils/abilities'
+import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
+import { BOOKING_NO_MEMBERSHIP } from '#shared/utils/booking-policy'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/book-a-room' })
@@ -35,19 +36,45 @@ const request = useRequestFetch()
 // console would let in (C-102 criterion 8).
 const managesRooms = computed(() => can(useViewer().value, manageRoomsEstate))
 
+// Said above the calendar, not after a slot is pressed. An officer who manages rooms books for the
+// theatre rather than as a member, so the notice is not theirs.
+const needsMembership = computed(() => !can(useViewer().value, memberOrGrace) && !managesRooms.value)
+
 // Day below tablet width, week above: a foyer is not a desk (C-102 criterion 5). False while
 // rendering, a server having no viewport, and corrected on the first client tick.
 const narrow = useMediaQuery('(max-width: 767px)')
-const view = ref<'day' | 'week'>('week')
+
+// The view, the room and the day live in the query string, so Back from the booking form and a
+// link somebody sends both open the calendar where it was. Defaults are left out of the URL.
+const route = useRoute()
+const asked = (key: string): string | undefined => (typeof route.query[key] === 'string' ? route.query[key] : undefined)
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+
+const view = ref<'day' | 'week'>(asked('view') === 'day' ? 'day' : 'week')
 const shown = computed<'day' | 'week'>(() => (narrow.value ? 'day' : view.value))
 
-const anchor = ref(todayInLondon())
+const anchor = ref(DAY.test(asked('day') ?? '') ? asked('day')! : todayInLondon())
 
 // A Select item may not carry an empty string: Reka reserves it for clearing the selection, and
 // an item that uses one throws on hydration. The audit trail carries the same sentinel.
 const EVERY_ROOM = 'all'
-const roomId = ref(EVERY_ROOM)
+const roomId = ref(asked('room')?.slice(0, 64) || EVERY_ROOM)
 const everyRoom = computed(() => roomId.value === EVERY_ROOM)
+
+// Written straight to history, not through the router: a navigation per change raced the slot
+// click, and the booking form never opened.
+const router = useRouter()
+watch([view, roomId, anchor], () => {
+  const { href } = router.resolve({
+    query: {
+      ...route.query,
+      view: view.value === 'day' ? 'day' : undefined,
+      room: everyRoom.value ? undefined : roomId.value,
+      day: anchor.value === todayInLondon() ? undefined : anchor.value,
+    },
+  })
+  window.history.replaceState(window.history.state, '', href)
+})
 
 function todayInLondon(): string {
   return londonDate(new Date())
@@ -107,11 +134,11 @@ const columns = computed<GridColumn[]>(() => {
   return days.value.map(day => ({ key: day, label: labelFor(day), room, day }))
 })
 
-// The first hour the day view draws, and the start of the span the week table reads closures over.
-const GRID_FROM_HOUR = 8
+// The first hour the day view draws, early enough for the rooms and bookings in its columns.
+const gridFrom = computed(() => gridFirstHour(columns.value.map(column => ({ place: column.room, day: column.day }))))
 
 // A week across every room would be seven days by ten rooms of quarter hours, which nobody can
-// read. It becomes a count per room per day, closures read over the day view's hours (C-114).
+// read. It becomes a count per room per day, closures read over that room's drawn hours (C-114).
 const summary = computed(() => rooms.value.map(room => ({
   room,
   days: days.value.map(day => ({
@@ -119,7 +146,7 @@ const summary = computed(() => rooms.value.map(room => ({
     // A room shut that day is neither free nor busy, and saying "Free" invites a click that the
     // day view would then refuse.
     closed: closedOn(room.hours, londonWeekday(noonOn(day))),
-    shut: closureCover(room.closed, slotInstant(day, GRID_FROM_HOUR * 60), slotInstant(day, 24 * 60)),
+    shut: closureCover(room.closed, slotInstant(day, gridFirstHour([{ place: room, day }]) * 60), slotInstant(day, 24 * 60)),
     past: day < todayInLondon(),
     held: room.taken.filter(taken => taken.startsAt >= dayStart(day) && taken.startsAt < dayStart(addDays(day, 1))).length,
   })),
@@ -182,6 +209,27 @@ useSeoMeta({ title: 'Rooms' })
       :links="SECOND_PAGE"
       :ui="MEMBER_PAGE_HEADER"
     />
+
+    <UAlert
+      v-if="needsMembership"
+      class="mt-6"
+      color="warning"
+      variant="subtle"
+      icon="i-lucide-id-card"
+      data-test="calendar-needs-membership"
+    >
+      <template #description>
+        <p>{{ BOOKING_NO_MEMBERSHIP }} You can still see what is free.</p>
+        <UButton
+          class="mt-3"
+          to="/account/membership"
+          variant="subtle"
+          data-test="calendar-membership-link"
+        >
+          Tell us about your membership
+        </UButton>
+      </template>
+    </UAlert>
 
     <div class="mt-6 flex flex-wrap items-center gap-2">
       <UFieldGroup>
@@ -325,12 +373,10 @@ useSeoMeta({ title: 'Rooms' })
       data-test="calendar-empty"
     >
       <template v-if="managesRooms">
-        No rooms are bookable yet. Add them under <ULink to="/rooms/manage">
-          Rooms
-        </ULink>.
+        No rooms are bookable yet. Add them under <ULink to="/rooms/manage">Rooms</ULink>.
       </template>
       <template v-else>
-        No rooms are bookable yet. They appear here once the committee has added them.
+        No rooms can be booked yet.
       </template>
     </p>
 
@@ -370,7 +416,7 @@ useSeoMeta({ title: 'Rooms' })
               class="p-1 text-center"
             >
               <span
-                v-if="cell.closed"
+                v-if="cell.closed && !cell.held"
                 class="block py-1 text-xs text-muted"
                 :data-test="`summary-${row.room.id}-${cell.day}`"
               >Not open</span>
@@ -404,7 +450,7 @@ useSeoMeta({ title: 'Rooms' })
       <RoomGrid
         class="mt-3"
         :columns="columns"
-        :starts-at="GRID_FROM_HOUR"
+        :starts-at="gridFrom"
         data-test="calendar-grid"
         @pick="book"
       />

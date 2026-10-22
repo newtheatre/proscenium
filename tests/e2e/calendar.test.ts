@@ -258,6 +258,8 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await waitFor(view, `document.querySelectorAll('[data-test^="slot-"]').length > 0`, 30_000)
 
       expect(await textOf(view, 'body')).not.toContain('Internal Server Error')
+      // The view is in the address, so Back from the form and a shared link both land on it.
+      await waitFor(view, `new URLSearchParams(location.search).get('view') === 'day'`, 30_000)
       const free = await view.evaluate<number>(`[...document.querySelectorAll('[data-test^="slot-"]')].filter(button => !button.disabled).length`)
       expect(free).toBeGreaterThan(0)
     }
@@ -308,6 +310,7 @@ describe.skipIf(skip !== null)('the calendar in a browser (C-102)', () => {
       await waitFor(view, `document.querySelector('[data-test="read-failure"]')`, 30_000)
 
       expect(await textOf(view, '[data-test="read-failure"]')).toContain('shorter')
+      expect(await textOf(view, 'body')).not.toContain('No rooms can be booked yet')
       expect(await textOf(view, 'body')).not.toContain('No rooms are bookable yet')
     }
     finally {

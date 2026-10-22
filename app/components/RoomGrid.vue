@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { fromLondonWallClock, londonClock, londonWeekday } from '#shared/utils/london'
-import { clickSpan, saysRoomClosure, slotInstant, slotPassed } from '#shared/utils/room-grid'
+import { londonClock } from '#shared/utils/london'
+import { clickSpan, saysRoomClosure, saysSlot, slotInstant, slotState } from '#shared/utils/room-grid'
+import type { SlotState } from '#shared/utils/room-grid'
 import type { RoomHours } from '#shared/utils/rooms'
 
 // One grid, two shapes. A column is a room on a day, so a week of one room and a day of every
@@ -173,16 +174,6 @@ function bookingAt(column: GridColumn, minutes: number): GridTaken | undefined {
   return column.room.taken.find(taken => taken.startsAt <= at && taken.endsAt > at)
 }
 
-function openAt(column: GridColumn, minutes: number): boolean {
-  if (column.room.hours.length === 0) return true
-  const [year, month, date] = column.day.split('-').map(Number)
-  const weekday = londonWeekday(fromLondonWallClock(year!, month!, date!, 12))
-  const clock = clockAt(minutes)
-  return column.room.hours.some(hours => hours.weekday === weekday && clock >= hours.opens && clock < hours.closes)
-}
-
-type SlotState = 'past' | 'closed' | 'blacked-out' | 'mine' | 'booked' | 'pending' | 'free'
-
 function closureAt(column: GridColumn, minutes: number): GridClosure | undefined {
   const at = instantOf(column.day, minutes)
   return column.room.closed?.find(closure => closure.startsAt <= at && closure.endsAt > at)
@@ -191,12 +182,7 @@ function closureAt(column: GridColumn, minutes: number): GridClosure | undefined
 // A blackout outranks a booking: the room being shut is the reason it is unavailable, and saying
 // "booked" instead would send somebody looking for whoever booked it (C-114 criterion 4).
 function stateOf(column: GridColumn, minutes: number): SlotState {
-  if (closureAt(column, minutes)) return 'blacked-out'
-  if (!openAt(column, minutes)) return 'closed'
-  const taken = bookingAt(column, minutes)
-  if (!taken) return slotPassed(column.day, minutes, props.slotMinutes, now.value) ? 'past' : 'free'
-  if (taken.mine) return 'mine'
-  return taken.status === 'PENDING_APPROVAL' ? 'pending' : 'booked'
+  return slotState(column.room, column.day, minutes, props.slotMinutes, now.value)
 }
 
 // Every closure the grid shows, said in text: a tooltip is unreachable by touch and announced by
@@ -246,7 +232,7 @@ function labelOf(column: GridColumn, minutes: number): string {
     ? `closed, ${closure.reason}`
     : state === 'mine' && taken ? `yours, ${taken.title}` : SAYS[state]
 
-  return `${column.room.name}, ${column.label} at ${clockAt(minutes)}: ${what}`
+  return saysSlot(column.room.name, column.day, minutes, what)
 }
 </script>
 
