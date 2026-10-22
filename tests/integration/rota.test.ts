@@ -1234,6 +1234,18 @@ describe('releasing a held shift (E-107 criterion 1)', () => {
 })
 
 describe('dismissing a declined claim (E-114)', () => {
+  // 0213: the member reads the officer's reason on their own card, not only in the email.
+  test('a member\'s own declined shift carries its reason', async () => {
+    await withDatabase(async (database) => {
+      const tonight = tonightsPerformance(database)
+      const who = person(database, 'declined')
+      database.batch([['INSERT INTO shifts (id, performance_id, role, slot, user_id, status, decline_reason) VALUES (?, ?, ?, 1, ?, ?, ?)',
+        'shift-declined', tonight.performanceId, 'DOOR', who, 'DECLINED', 'Not eligible']])
+
+      expect(run(database, myShiftsQuery(who, tonight.startsAt))).toMatchObject([{ status: 'DECLINED', declineReason: 'Not eligible' }])
+    })
+  })
+
   test('a declined claim returns to OPEN, naming nobody, exactly as a release would', async () => {
     await withDatabase(async (database) => {
       const tonight = tonightsPerformance(database)

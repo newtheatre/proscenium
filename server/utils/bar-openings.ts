@@ -306,6 +306,7 @@ export interface MyOpeningShiftRow {
   venueName: string
   startsAt: number
   endsAt: number
+  declineReason: string | null
 }
 
 // A member's own opening slots from tonight on, kept until 04:00 as a performance shift is (0094),
@@ -313,7 +314,8 @@ export interface MyOpeningShiftRow {
 export function myOpeningShiftsQuery(userId: string, now: number): SQL {
   return sql`
     SELECT s.id AS slotId, o.id AS openingId, s.slot AS slot, s.status AS status,
-           o.label AS label, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt
+           o.label AS label, v.name AS venueName, o.starts_at AS startsAt, o.ends_at AS endsAt,
+           s.decline_reason AS declineReason
     FROM bar_opening_shifts s
     JOIN bar_openings o ON o.id = s.opening_id
     JOIN venues v ON v.id = o.venue_id

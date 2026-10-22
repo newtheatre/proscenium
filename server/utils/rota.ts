@@ -547,6 +547,8 @@ export interface MyShiftRow {
   // The shift's own window, null where it was stamped before shifts carried one (0078).
   windowStartsAt: number | null
   windowEndsAt: number | null
+  // The officer's words on a declined claim, the member's own to read again on Rota (0213).
+  declineReason: string | null
 }
 
 // A member's own shifts from tonight on, not cancelled. Bounded by LIMIT rather than paged: nobody
@@ -555,7 +557,7 @@ export function myShiftsQuery(userId: string, now: number): SQL {
   return sql`
     SELECT s.id AS shiftId, s.role AS role, s.status AS status, p.id AS performanceId,
            v.name AS venueName, sh.title AS showTitle, p.starts_at AS startsAt,
-           s.starts_at AS windowStartsAt, s.ends_at AS windowEndsAt
+           s.starts_at AS windowStartsAt, s.ends_at AS windowEndsAt, s.decline_reason AS declineReason
     FROM shifts s
     JOIN performances p ON p.id = s.performance_id
     JOIN venues v ON v.id = p.venue_id

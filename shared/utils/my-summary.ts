@@ -8,7 +8,17 @@ export interface MySummary {
   onShiftTonight: boolean
   // Whether the shift the tile shows is tonight's: on shift at a bar opening is not next week's show.
   shiftIsTonight: boolean
-  shift: { shiftId: string, role: string, showTitle: string, venueName: string, startsAt: number, status: string } | null
+  shift: {
+    shiftId: string
+    role: string
+    showTitle: string
+    venueName: string
+    startsAt: number
+    status: string
+    windowStartsAt: number | null
+    windowEndsAt: number | null
+    moreThatNight: number
+  } | null
   membership: { state: 'current' | 'grace' | 'lapsed' | 'none', until: string | null, claim: 'open' | 'declined' | null }
   room: { bookingId: string, roomName: string, startsAt: number, endsAt: number, purpose: string | null, cancellable: boolean } | null
   training: {
@@ -85,7 +95,7 @@ export function splitMyTiles(summary: MySummary): { tiles: MyTileName[], things:
 
 // A line on the list: what would be there, and the one action that fills it.
 export const MY_THINGS_TO_DO: Record<MyThingName, { says: string, label: string, to: string }> = {
-  shift: { says: 'You have no shift claimed.', label: 'See open shifts', to: '/rota' },
+  shift: { says: 'You have no shift claimed.', label: 'See shifts and what opens them', to: '/rota' },
   room: { says: 'You have no room booked.', label: 'Book a room', to: '/rooms' },
   tickets: { says: 'You have no bookings to come.', label: 'Book a show', to: '/whats-on' },
   training: { says: 'You have no training recorded yet.', label: 'See what we teach', to: '/training/modules' },

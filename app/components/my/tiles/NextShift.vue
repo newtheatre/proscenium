@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { isNightRole } from '#shared/utils/night-authority'
 import { saysShiftRole, saysShiftStatus } from '#shared/utils/rota'
+import { londonClock } from '#shared/utils/london'
 import { saysWhen } from '#shared/utils/when'
 import type { ShiftStatus } from '#shared/utils/rota'
 import type { MySummary } from '#shared/utils/my-summary'
@@ -21,6 +22,13 @@ const roleWords = computed(() => {
 })
 // On shift, and this shift being tonight's: a bar opening tonight never lights next week's show.
 const onThisShift = computed(() => props.summary.onShiftTonight && props.summary.shiftIsTonight)
+// The hours the shift is worked, as Rota gives them, never the curtain alone (0213).
+const when = computed(() => {
+  const shift = props.summary.shift
+  if (!shift) return ''
+  if (shift.windowStartsAt === null || shift.windowEndsAt === null) return saysWhen(shift.startsAt)
+  return `${saysWhen(shift.windowStartsAt)} to ${londonClock(new Date(shift.windowEndsAt * 1000))}`
+})
 </script>
 
 <template>
@@ -51,7 +59,10 @@ const onThisShift = computed(() => props.summary.onShiftTonight && props.summary
         {{ roleWords }} · {{ summary.shift.venueName }}
       </p>
       <div class="mt-2 flex items-center gap-2">
-        <span class="text-sm">{{ saysWhen(summary.shift.startsAt) }}</span>
+        <span
+          class="text-sm"
+          data-test="next-shift-when"
+        >{{ when }}</span>
         <UBadge
           :color="badgeColor"
           variant="subtle"
@@ -60,6 +71,13 @@ const onThisShift = computed(() => props.summary.onShiftTonight && props.summary
           {{ badgeLabel }}
         </UBadge>
       </div>
+      <p
+        v-if="summary.shift.moreThatNight > 0"
+        class="mt-1 text-sm text-muted"
+        data-test="next-shift-more"
+      >
+        and {{ plural(summary.shift.moreThatNight, 'more shift') }} that night
+      </p>
     </template>
   </MyTile>
 </template>

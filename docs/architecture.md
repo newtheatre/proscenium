@@ -1338,7 +1338,7 @@ holds no locked role, so its `officers` is always empty. The
 roles they do not qualify for come from `GET /api/rota/roles`, one card each with the open count
 (`openShiftCountsByRoleQuery`, plus bar opening slots for the bar), the published module and its
 one training action, and `committeeOnly`, the roles whose training the member holds but whose
-committee role they lack, so Rota says why no duty manager shift is offered (0210). `GET /api/rota/mine` is a member's own shifts and opening slots from the start
+committee role they lack, so Rota says why no duty manager shift is offered (0210). `GET /api/rota/mine` is a member's own shifts and opening slots, each with its own `declineReason` (0213), from the start
 of the current show night on, so tonight's shift stays on the list until 04:00 rather than dropping
 at its curtain, each performance shift with its own window (`windowStartsAt`, `windowEndsAt`). It
 adds `dutyManagers`, keyed by performance, for the member's confirmed non-duty-manager shifts
