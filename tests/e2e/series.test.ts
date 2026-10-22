@@ -676,7 +676,7 @@ const TOLD = '(SELECT user_id, type FROM notification_log UNION ALL SELECT user_
 describe.skipIf(skip !== null)('a term that mixes both kinds of room', () => {
   async function pendingSeries(): Promise<{ seriesId: string, occurrences: ReturnType<typeof occurrencesOf> }> {
     const room = await makeRoom({ sensitive: true })
-    const answered = await bookSeries(room)
+    const answered = await bookSeries(room, { reason: 'The term\'s rehearsals.' })
     const { id } = await answered.json() as SeriesAnswer
     return { seriesId: id, occurrences: occurrencesOf(id) }
   }
