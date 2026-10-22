@@ -416,7 +416,7 @@ async function resolveWalkUps(walkUps: WalkUpLineInput[], performanceIds: string
     const refusal = saleRefusal(performance, at, 'DESK')
     if (refusal) throw createError({ statusCode: 409, statusMessage: refusal.says })
 
-    const types = new Map((await bookableTicketTypes(performanceId, performance.showId, false, false))
+    const types = new Map((await bookableTicketTypes(performanceId, performance.showId, false, false, 'DESK'))
       .filter(type => type.accessKind === null)
       .map(type => [type.id, type]))
     const priced = lines.map((line) => {

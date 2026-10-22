@@ -640,8 +640,9 @@ stateDiagram-v2
 
 ### ticket_types
 `id` PK · `name` UNIQUE global · `description` · `price` pence (base) · `kind` CHECK
-`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to` CHECK
-`MEMBER` NULL (D-109; set once at creation, like `kind` and `access_kind`) · `archived` bool ·
+`SINGLE|PASS_ADMISSION` · `access_kind` CHECK `ACCESS|COMPANION` NULL · `restricted_to`
+`MEMBER|DESK` NULL, enforced by Zod rather than a CHECK (D-109; `MEMBER` set once at creation,
+like `kind` and `access_kind`; NULL and `DESK` swap on edit, 0190) · `archived` bool ·
 `active_by_default` bool.
 Archive, never delete, once sold (FK restrict from tickets). Built by Wave 0 contract (d) with
 the two override tables below; everything else in this module is unbuilt.
@@ -691,7 +692,9 @@ A performance of a show that is not `PUBLISHED` answers 404 there and on
 currently a member (`hasCurrentMembership()`, checked fresh at each, since a membership can lapse
 between the two). Concession has no committee-agreed eligibility evidence yet (open question,
 `docs/backlog/D-ticketing.md`), so it is not a value here: a concession type stays open online and
-is checked at collection instead. Entitlement is read from a session-scoped call, never folded
+is checked at collection instead. `restricted_to = 'DESK'` (0190) drops a type from every
+customer path, and from the public listing's prices in SQL; only callers passing the `DESK`
+channel to `bookableTicketTypes()` (the desk and the till) are offered it. Entitlement is read from a session-scoped call, never folded
 into the cacheable public listing (`/api/whats-on`, `/api/shows/[slug]`), so those stay
 viewer-independent.
 

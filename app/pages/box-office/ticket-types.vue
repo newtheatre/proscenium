@@ -2,12 +2,13 @@
 import { h, resolveComponent } from 'vue'
 import {
   TICKET_TYPE_ACCESS_KINDS,
+  SAYS_ANYONE,
   TICKET_TYPE_RESTRICTIONS,
+  editTicketTypeForm,
   newTicketTypeForm,
   saysAccessKind,
   saysPrice,
   saysRestriction,
-  ticketTypeForm,
 } from '#shared/utils/ticket-types'
 import { ticketTypesList } from '#shared/utils/ticket-types-list'
 import type { TableColumn } from '@nuxt/ui'
@@ -84,9 +85,15 @@ const accessOptions = [
   ...TICKET_TYPE_ACCESS_KINDS.map(kind => ({ label: saysAccessKind(kind) ?? kind, value: kind })),
 ]
 const restrictionOptions = [
-  { label: 'Nobody, open to all', value: null },
+  { label: SAYS_ANYONE, value: null },
   ...TICKET_TYPE_RESTRICTIONS.map(restriction => ({ label: saysRestriction(restriction) ?? restriction, value: restriction })),
 ]
+// Members-only is fixed once added (D-109); open and box office only swap either way (0190).
+const editableRestrictionOptions = restrictionOptions.filter(option => option.value !== 'MEMBER')
+
+// A free type anybody may book online is a free seat for the public, which a comp never is (0190).
+const freeToThePublic = computed(() =>
+  state.price === 0 && state.restrictedTo === null && (editing.value?.accessKind ?? state.accessKind) === null)
 
 function edit(type: TicketType | null): void {
   editing.value = type
@@ -115,7 +122,8 @@ async function save(): Promise<void> {
   }
   try {
     if (editing.value) {
-      await $fetch(`/api/admin/ticket-types/${editing.value.id}`, { method: 'PUT', body })
+      const restriction = editing.value.restrictedTo === 'MEMBER' ? {} : { restrictedTo: state.restrictedTo }
+      await $fetch(`/api/admin/ticket-types/${editing.value.id}`, { method: 'PUT', body: { ...body, ...restriction } })
     }
     else {
       await $fetch('/api/admin/ticket-types', {
@@ -347,7 +355,7 @@ const columns: TableColumn<TicketType>[] = [
       <template #body>
         <UForm
           id="ticket-type-form"
-          :schema="editing ? ticketTypeForm : newTicketTypeForm"
+          :schema="editing ? editTicketTypeForm : newTicketTypeForm"
           :state="state"
           class="space-y-4"
           data-test="ticket-type-form"
@@ -426,30 +434,40 @@ const columns: TableColumn<TicketType>[] = [
           </UFormField>
 
           <UFormField
-            v-if="!editing"
-            label="Who may book it online"
+            v-if="editing?.restrictedTo !== 'MEMBER'"
+            label="Who may book it"
             name="restrictedTo"
-            description="A restricted type only appears for a signed-in booker who currently qualifies; a guest never sees it."
+            description="Members only appears just for a signed-in current member. Box office only is sold on the desk and the till, and never online: use it for a comp."
           >
             <USelect
               v-model="state.restrictedTo"
-              :items="restrictionOptions"
+              :items="editing ? editableRestrictionOptions : restrictionOptions"
               class="w-full"
               data-test="ticket-type-restriction"
             />
           </UFormField>
           <UFormField
             v-else
-            label="Who may book it online"
-            description="Set when the type was added, and not changed afterwards."
+            label="Who may book it"
+            description="Members only is set when the type was added, and not changed afterwards."
           >
             <p
               class="text-sm"
               data-test="ticket-type-restriction-fixed"
             >
-              {{ saysRestriction(editing.restrictedTo) ?? 'Nobody, open to all' }}
+              {{ saysRestriction(editing.restrictedTo) }}
             </p>
           </UFormField>
+
+          <UAlert
+            v-if="freeToThePublic"
+            color="warning"
+            variant="subtle"
+            icon="i-lucide-triangle-alert"
+            title="Anyone could book this free online"
+            description="A free type open to anyone appears on the public booking page wherever it is on sale. For a comp, choose Box office only."
+            data-test="ticket-type-free-warning"
+          />
 
           <USwitch
             v-model="state.activeByDefault"

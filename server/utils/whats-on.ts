@@ -152,6 +152,7 @@ export function listedPricesQuery(scope: SQL, at: number): SQL {
     FROM performances p
     JOIN shows s ON s.id = p.show_id
     JOIN ticket_types t ON t.archived = 0 AND t.access_kind IS NULL AND t.kind = 'SINGLE'
+      AND (t.restricted_to IS NULL OR t.restricted_to <> 'DESK')
     LEFT JOIN show_ticket_overrides so ON so.show_id = p.show_id AND so.ticket_type_id = t.id
     LEFT JOIN performance_ticket_overrides po ON po.performance_id = p.id AND po.ticket_type_id = t.id
     WHERE p.show_id IN (${scope}) AND ${listable(at)}

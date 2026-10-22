@@ -716,6 +716,54 @@ describe.skipIf(skip !== null)('what a walk-up may be sold as at the desk (D-115
   }, CASE_TIMEOUT_MS)
 })
 
+// 0190: a comp turned on for one night was booked online at £0.00 by a guest.
+describe.skipIf(skip !== null)('a box-office-only type is sold at the desk and never online (0190)', () => {
+  test('the desk is offered it, the booking form and a reservation are not, and it swaps back on Edit', async () => {
+    const { performanceId } = await bookableShow(1100)
+    const comp = await send('POST', '/api/admin/ticket-types', { name: named('Complimentary'), price: 0, activeByDefault: false, restrictedTo: 'DESK' }, officer.cookie)
+    expect(comp.status).toBe(200)
+    const compId = (await comp.json() as { id: string }).id
+    try {
+      const priced = await send('PUT', `/api/admin/performances/${performanceId}/prices`, { overrides: [{ ticketTypeId: compId, price: null, active: true }] }, officer.cookie)
+      expect(priced.status).toBe(200)
+
+      const desk = await (await send('GET', `/api/box-office/desk/ticket-types?performanceId=${performanceId}`)).json() as { options: { id: string }[] }
+      expect(desk.options.map(one => one.id)).toContain(compId)
+
+      const online = await (await send('GET', `/api/performances/${performanceId}/booking`, undefined, '')).json() as { ticketTypes: { id: string }[] }
+      expect(online.ticketTypes.map(one => one.id)).not.toContain(compId)
+
+      const booked = await send('POST', '/api/reservations', {
+        performanceId,
+        lines: [{ ticketTypeId: compId, quantity: 1 }],
+        guest: { name: 'Free Seat', email: registrableAddress('comp') },
+      }, '')
+      expect(booked.status).toBe(400)
+
+      const opened = await send('PUT', `/api/admin/ticket-types/${compId}`, { name: named('Complimentary'), price: 0, activeByDefault: false, restrictedTo: null }, officer.cookie)
+      expect(opened.status).toBe(200)
+      const after = await (await send('GET', `/api/performances/${performanceId}/booking`, undefined, '')).json() as { ticketTypes: { id: string }[] }
+      expect(after.ticketTypes.map(one => one.id)).toContain(compId)
+    }
+    finally {
+      await send('POST', `/api/admin/ticket-types/${compId}/archive`, { archived: true }, officer.cookie)
+    }
+  }, CASE_TIMEOUT_MS)
+
+  test('a members-only type cannot be made open or box office only on Edit', async () => {
+    const member = await send('POST', '/api/admin/ticket-types', { name: named('Member'), price: 500, activeByDefault: false, restrictedTo: 'MEMBER' }, officer.cookie)
+    const memberId = (await member.json() as { id: string }).id
+    try {
+      const answered = await send('PUT', `/api/admin/ticket-types/${memberId}`, { name: named('Member'), price: 500, activeByDefault: false, restrictedTo: 'DESK' }, officer.cookie)
+      expect(answered.status).toBe(400)
+      expect((await answered.json() as { message: string }).message).toContain('members-only')
+    }
+    finally {
+      await send('POST', `/api/admin/ticket-types/${memberId}/archive`, { archived: true }, officer.cookie)
+    }
+  }, CASE_TIMEOUT_MS)
+})
+
 describe.skipIf(skip !== null)('selling a walk-up from the desk screen (D-115 criterion 7)', () => {
   test('the total is read out, the sale lands as a door booking and the tiles move', async () => {
     const { performanceId, ticketTypeId, title } = await bookableShow(1100, twoHoursSeconds)
