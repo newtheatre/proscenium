@@ -98,6 +98,7 @@ const EVERYTHING: TemplateContext = {
   refused: 0,
   wouldAnonymise: 1,
   anonymisationsCappedAt: null,
+  unconfirmed: false,
   subject: 'The get-in moves to Sunday',
   body: 'The get-in moves to Sunday.',
   noun: 'room booking update',
@@ -117,7 +118,7 @@ const EVERYTHING: TemplateContext = {
 function everything(): { name: string, subject: string, html: string, text: string }[] {
   const variants = [
     {},
-    { settled: false, underPreApproval: true, formIsIn: false, officerBypass: true, armed: false, partySize: 1 },
+    { unconfirmed: true, settled: false, underPreApproval: true, formIsIn: false, officerBypass: true, armed: false, partySize: 1 },
     { bookings: [], days: [], modules: [], roles: [], permanent: [], expiring: [], expired: [], lapsed: [], performances: [], offered: null, moved: null },
   ]
   const rendered: { name: string, subject: string, html: string, text: string }[] = []
@@ -211,6 +212,10 @@ describe('the rewritten bodies and subjects (item 7)', () => {
 
   test('account-claim says we already know the address', () => {
     expect(render('account-claim', EVERYTHING).html).toContain('We already know this address, from a booking or from our old records')
+  })
+
+  test('account-claim on an unconfirmed registration says why a password is asked for again (0153)', () => {
+    expect(render('account-claim', { ...EVERYTHING, unconfirmed: true }).html).toContain('it was never confirmed, so we cannot tell whether the password chosen was yours')
   })
 
   test('role-expiring says our year, and names the IT Manager', () => {

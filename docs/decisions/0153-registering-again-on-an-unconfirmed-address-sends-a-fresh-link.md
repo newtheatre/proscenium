@@ -1,4 +1,4 @@
-# 0153: Registering again on an unconfirmed address sends a fresh link
+# 0153: Registering again on an unconfirmed address sends a fresh link to choose a password
 
 - Status: Proposed
 - Date: 2026-10-21
@@ -17,10 +17,14 @@ nothing in the app called it.
 
 ## Decision
 
-**An account registered but never confirmed is sent a fresh confirmation link** when its address
-registers again, the same `account.verify` message the first registration sent. The answer on
-screen is unchanged, so nothing enumerates. A confirmed account still gets "You already have an
-account", and an account with no way in still gets the claim link (A-116).
+**An account registered but never confirmed has its password cleared, and is sent the claim
+link** when its address registers again: the `account.claim` message A-116 sends, worded for an
+unconfirmed registration, to choose a password. Nobody has proved the mailbox, so the first
+password is as likely a stranger's as the owner's; sending a fresh confirmation link instead
+(as first drafted) let a stranger register an address first and keep a working password once its
+owner confirmed it. Clearing the password also bumps the session epoch. The answer on screen is
+unchanged, so nothing enumerates. A confirmed account still gets "You already have an account",
+and an account with no way in still gets the claim link.
 
 **The "Check your email" screen offers "Nothing arrived? Send the link again"**, which calls
 `POST /api/auth/verify/resend` with the address just typed; its own rate limit applies.
@@ -31,5 +35,8 @@ is never lost without a word, and shows that it is working once pressed.
 ## Consequences
 
 - The resend route now has a caller, so it stays.
-- The second registration's name and password are ignored, as before; the first registration's
-  password is the one that works once the address is confirmed.
+- Neither registration's password survives a second registration: whoever holds the mailbox
+  chooses one from the link. A person who simply lost the first email chooses their password
+  again.
+- A confirmation link from the first email still confirms the address, but leaves no password, so
+  it signs nobody in by password.

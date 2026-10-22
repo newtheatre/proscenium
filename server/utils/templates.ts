@@ -184,19 +184,21 @@ The Nottingham New Theatre`,
   'account-claim': (context: TemplateContext): Rendered => {
     const url = String(context.url)
     const until = expiry(context.expiresAt as Date)
+    // An unconfirmed registration is told why a password it may have chosen is asked for again (0153).
+    const why = context.unconfirmed
+      ? 'Somebody registered this address with us, but it was never confirmed, so we cannot tell whether the password chosen was yours. Choose one now and the account is yours.'
+      : 'We already know this address, from a booking or from our old records, but it has no way to sign in yet. Choose a password and everything already on it is yours.'
     return {
       subject: 'Finish setting up your account',
       html: layout(`<p>Hello ${context.name},</p>
-<p>We already know this address, from a booking or from our old records, but it has no way to
-sign in yet. Choose a password and everything already on it is yours.</p>
+<p>${why}</p>
 <p><a href="${url}">Choose my password</a></p>
 <p>The link works until ${until}. If you were not expecting this, ignore it: nothing has
 changed.</p>
 <p>${GOES_TO_US}</p>`),
       text: `Hello ${context.name},
 
-We already know this address, from a booking or from our old records, but it has no way to sign
-in yet. Choose a password and everything already on it is yours:
+${why}
 
 ${url}
 

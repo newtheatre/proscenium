@@ -222,23 +222,25 @@ describe.skipIf(skip !== null)('registering and verifying in a browser (A-101, A
     }
   }, CASE_TIMEOUT_MS)
 
-  // Somebody who lost the first message and registers again is sent a link, not told to sign in (0153).
-  test('registering again on an address never confirmed sends a fresh confirmation link', async () => {
+  // A second registration on an unconfirmed address clears the first password and sends a link to
+  // choose one, so a stranger who registered first cannot keep a way in (0153).
+  test('registering again on an address never confirmed asks the mailbox to choose a password', async () => {
     const person = syntheticPerson(Math.floor(Math.random() * 1_000_000))
     const email = address('again')
-    await send('POST', '/api/auth/register', { email, name: person.name, password })
-    const first = await linkSentTo(email, '/verify')
+    const strangers = generatePassword()
+    await send('POST', '/api/auth/register', { email, name: person.name, password: strangers })
+    const verify = await linkSentTo(email, '/verify')
     await send('POST', '/api/auth/register', { email, name: person.name, password })
 
-    const deadline = Date.now() + 15_000
-    let links: string[] = []
-    while (Date.now() < deadline && links.length < 2) {
-      links = (await letters(app)).filter(letter => letter.startsWith(`To: ${email}`) && letter.includes('/verify?token='))
-      await Bun.sleep(200)
-    }
-    expect(links.length).toBe(2)
+    const claim = await linkSentTo(email, '/reset')
+    expect(claim).toContain('kind=set')
+    expect(withDatabase(database => database.query('SELECT password FROM users WHERE email = ?').get(email) as { password: string | null }).password).toBeNull()
     expect((await letters(app)).some(letter => letter.startsWith(`To: ${email}`) && letter.includes('You already have an account'))).toBe(false)
-    expect(first).toContain('/verify?token=')
+
+    // Confirming from the first email still leaves the stranger's password refused.
+    const token = new URL(verify, app.baseURL).searchParams.get('token')
+    expect((await send('POST', '/api/auth/verify', { token })).status).toBe(200)
+    expect((await send('POST', '/api/auth/sign-in', { email, password: strangers })).status).toBe(401)
   }, CASE_TIMEOUT_MS)
 
   test('the check-your-email screen sends the link again on request', async () => {
