@@ -4,6 +4,7 @@ import {
   barOpeningForm,
   MAX_BAR_OPENING_SECONDS,
   openingOverlapWarning,
+  DAY_LONG_REFUSAL,
   SAME_TIME_REFUSAL,
   openingClaimRefusal,
   openingReleaseRefusal,
@@ -48,10 +49,11 @@ describe('what a planned opening names (E-130 criterion 1)', () => {
   })
 
   // Equal times on the form would make a whole day, so a day or longer is refused (0215).
-  test('an opening a day or longer is refused, with the reason the form gives', () => {
+  test('an opening a day or longer is refused as too long, not as the same time twice', () => {
     const allDay = barOpeningForm.safeParse({ ...PLANNED, endsAt: PLANNED.startsAt + MAX_BAR_OPENING_SECONDS })
     expect(allDay.success).toBe(false)
-    expect(allDay.error?.issues.map(issue => issue.message)).toContain(SAME_TIME_REFUSAL)
+    expect(allDay.error?.issues.map(issue => issue.message)).toContain(DAY_LONG_REFUSAL)
+    expect(allDay.error?.issues.map(issue => issue.message)).not.toContain(SAME_TIME_REFUSAL)
     expect(barOpeningForm.safeParse({ ...PLANNED, endsAt: PLANNED.startsAt + MAX_BAR_OPENING_SECONDS - 60 }).success).toBe(true)
   })
 

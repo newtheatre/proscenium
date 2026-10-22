@@ -52,6 +52,11 @@ describe('the claims waiting for confirmation are worked on the board (E-105 cri
     expect(source).toContain('data-test="board-waiting"')
   })
 
+  // Back and Forward change the address without remounting the board, so it reads the span again (0214).
+  test('the board follows its span when the address changes under it', async () => {
+    expect(await read(BOARD)).toContain('watch(() => [route.query.from, route.query.to, route.query.until]')
+  })
+
   test('a claim on the board can be declined with a reason, as well as confirmed', async () => {
     expect(await read(BOARD)).toContain(':data-test="`decline-${shift.shiftId}`"')
     expect(await read(CLAIM_ANSWER)).toContain('/decline`')

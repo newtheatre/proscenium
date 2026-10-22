@@ -59,6 +59,10 @@ watch(() => [window.from, window.to], ([from, to]) => {
   const shown = from === opened.from && to === opened.to ? { from: undefined, to: undefined } : { from, to }
   void navigateTo({ query: { ...route.query, ...shown, until: undefined } }, { replace: true })
 })
+// Back and Forward change the address under a mounted board; settling equal values writes nothing back.
+watch(() => [route.query.from, route.query.to, route.query.until], () => {
+  Object.assign(window, boardWindowFromQuery(route.query, new Date()))
+})
 const waiting = computed<boolean>({
   get: () => route.query.waiting === 'true',
   set: (on) => {

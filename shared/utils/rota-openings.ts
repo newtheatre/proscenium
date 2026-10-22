@@ -17,6 +17,7 @@ export const BAR_OPENING_LABEL_LIMIT = 120
 // Shorter than a day, so a closing time typed the same as the opening time is refused (0215).
 export const MAX_BAR_OPENING_SECONDS = 86_400
 export const SAME_TIME_REFUSAL = 'The bar closes at the time it opens. Give a closing time after the opening time'
+export const DAY_LONG_REFUSAL = 'A bar opening lasts less than a day. Give a closing time within a day of the opening time'
 
 // What an officer is told before planning a second opening over one already at the venue (0215).
 export function openingOverlapWarning(other: { label: string, opens: string, closes: string }, venueName: string): string {
@@ -39,7 +40,7 @@ export const barOpeningForm = z.object({
   path: ['endsAt'],
 // Equal times on the form read as a whole day; nobody plans a 24-hour bar on purpose (0215).
 }).refine(input => input.endsAt - input.startsAt < MAX_BAR_OPENING_SECONDS, {
-  message: SAME_TIME_REFUSAL,
+  message: DAY_LONG_REFUSAL,
   path: ['endsAt'],
 // The night is what the list filters and what authority resolves against, so one disagreeing
 // with the opening's own clock would file under one night and let people in on another (0014).
