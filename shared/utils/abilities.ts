@@ -38,6 +38,7 @@ export const reachConsole = defineAbility((viewer: Viewer) =>
 export const viewAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.read'))
 export const disableAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.disable'))
 export const createAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.create'))
+export const mergeAccounts = defineAbility((viewer: Viewer) => holds(viewer, 'accounts.merge'))
 export const grantRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.grant'))
 export const revokeRoles = defineAbility((viewer: Viewer) => holds(viewer, 'roles.revoke'))
 export const viewMembers = defineAbility((viewer: Viewer) => holds(viewer, 'members.read'))
@@ -186,6 +187,7 @@ export const ABILITY_PERMISSIONS: Record<string, Permission> = {
   viewAccounts: 'accounts.read',
   disableAccounts: 'accounts.disable',
   createAccounts: 'accounts.create',
+  mergeAccounts: 'accounts.merge',
   grantRoles: 'roles.grant',
   revokeRoles: 'roles.revoke',
   viewMembers: 'members.read',

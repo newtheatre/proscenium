@@ -16,6 +16,8 @@ const EXPECTED_SENDERS: Record<MessageTypeName, SenderKey> = {
   'account.set-password': 'ACCOUNTS',
   'account.claim': 'ACCOUNTS',
   'account.method-removed': 'ACCOUNTS',
+  'account.authenticator-reset': 'ACCOUNTS',
+  'account.enabled': 'ACCOUNTS',
   'membership.expiring': 'ACCOUNTS',
   'membership.claim.recorded': 'ACCOUNTS',
   'membership.claim.declined': 'ACCOUNTS',

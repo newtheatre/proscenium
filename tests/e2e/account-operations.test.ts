@@ -145,6 +145,19 @@ describe.skipIf(skip !== null)('security operations on an account (A-122)', () =
     expect((await after.json() as { mfaRequired: boolean }).mfaRequired).toBe(false)
   })
 
+  // Told what happened and what to do next, rather than meeting a refused screen (0157).
+  test('a reset and an enable email the person; a disable does not', async () => {
+    const person = await subject('told')
+    const told = (type: string): number => read<{ n: number }>(
+      'SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type = ?', person.id, type)!.n
+    expect((await operate(person.id, 'reset-mfa')).status).toBe(200)
+    expect(told('account.authenticator-reset')).toBe(1)
+    expect((await operate(person.id, 'disable')).status).toBe(200)
+    expect(read<{ n: number }>('SELECT count(*) AS n FROM notification_log WHERE user_id = ? AND type LIKE \'account.dis%\'', person.id)!.n).toBe(0)
+    expect((await operate(person.id, 'enable')).status).toBe(200)
+    expect(told('account.enabled')).toBe(1)
+  })
+
   // A reset exists for the person who lost their phone, including one who holds a role that
   // requires a factor. The self-service route refuses that; this one must not.
   test('a privileged account can have its authenticator reset', async () => {
@@ -395,6 +408,22 @@ describe.skipIf(skip !== null)('the account screen', () => {
       await click(view, '[data-test="back-to-accounts"]')
       await waitFor(view, 'document.querySelector(\'[data-test="toolbar-search"]\')')
       expect(await view.evaluate<string>('location.pathname')).toBe('/people/accounts')
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
+  test('a merged account names the account it went into, with a link (0157)', async () => {
+    const loser = await subject('merged-away')
+    const winner = await subject('merged-into')
+    expect((await send('POST', `/api/admin/accounts/${loser.id}/merge`, { winnerId: winner.id, confirmEmail: loser.email }, cookie)).status).toBe(200)
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${loser.id}`, '[data-test="erased-line"]')
+      expect(await textOf(view, '[data-test="erased-line"]')).toMatch(/^Merged into .+ \(.+\) on .+\. Kept only for the theatre's statistics\.$/)
+      expect(await view.evaluate<string>('document.querySelector(\'[data-test="merged-into"]\').getAttribute("href")')).toBe(`/people/accounts/${winner.id}`)
+      expect(await textOf(view, '[data-test="state-erased"]')).toBe('Merged')
     }
     finally {
       view.close()

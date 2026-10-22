@@ -12,6 +12,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // The refusal carries who the screen is for, so the page can name them (issue 1304, K-133).
   const entry = entryFor(to.path)
   if (await denies(reachConsole) || (entry && await denies(entry.ability))) {
-    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that', data: { roles: entry ? rolesThatReach(entry.ability) : [] } })
+    throw createError({ statusCode: 403, statusMessage: 'You do not have permission to do that', data: { roles: entry ? rolesThatReach(entry.ability) : [], changedByItManager: entry?.changedByItManager ?? false } })
   }
 })

@@ -3,7 +3,7 @@ import { alias } from 'drizzle-orm/sqlite-core'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { envelope, offsetFor } from '#shared/utils/pagination'
 import { rolesList } from '#shared/utils/roles-list'
-import { grantsClause, holderCounts, pendingClause, permanentClause, registerTotal } from '#server/utils/roles-register'
+import { grantsClause, holderCounts, pendingClause, permanentClause, registerTotal, waitsOnFactor } from '#server/utils/roles-register'
 
 // Lapsed grants ride beside the declared fields the way shadow accounts do: asked for without
 // filtering to them (0071, A-131 criterion 3).
@@ -22,6 +22,7 @@ export default defineEventHandler(async (event) => {
 
   const now = Math.floor(Date.now() / 1000)
   const { where, orderBy, hiddenLapsed } = grantsClause(input, now)
+  const privileged = await configValue(event, 'PRIVILEGED_ROLES') as readonly string[]
 
   // The grantor's name is joined rather than stored: an id on a screen is no provenance at all
   // (0032), and an erased grantor reads as their tombstone (0011).
@@ -37,6 +38,7 @@ export default defineEventHandler(async (event) => {
     grantedBy: grantor.name,
     note: schema.roleGrants.note,
     disabled: schema.users.disabled,
+    waitsOnFactor: sql<number>`case when ${waitsOnFactor(privileged)} then 1 else 0 end`,
   }
   const grants = () => db.select(columns)
     .from(schema.roleGrants)
@@ -67,7 +69,7 @@ export default defineEventHandler(async (event) => {
       input.page,
       input.pageSize,
     ),
-    counts: await holderCounts(now),
+    counts: await holderCounts(now, privileged),
     permanent: permanent.map(row => ({ ...row, live: true })),
     pending: pending.map(isLive),
     lapsedHidden: hiddenLapsed ? await registerTotal(hiddenLapsed) : 0,

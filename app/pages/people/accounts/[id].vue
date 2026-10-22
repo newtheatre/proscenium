@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ListFailure } from '~/composables/useListFailure'
 import { saysDay, saysDayRange, saysDayLong, saysWhen } from '#shared/utils/when'
-import { can, createAccounts, disableAccounts, grantRoles, revokeRoles } from '#shared/utils/abilities'
+import { can, createAccounts, disableAccounts, grantRoles, mergeAccounts, revokeRoles } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
 import { describeAction } from '#shared/utils/audit-actions'
 
@@ -10,7 +10,7 @@ definePageMeta({ layout: 'console', title: 'Account', middleware: 'console', doc
 interface Grant { role: string, expiresAt: number | null, grantedAt: number, note: string | null, live: boolean }
 
 interface View {
-  account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null, shadow: boolean, pendingGoogleEmail: string | null }
+  account: { id: string, name: string, email: string, verified: boolean, disabled: boolean, anonymisedAt: number | null, mergedInto: { id: string, name: string, email: string } | null, shadow: boolean, pendingGoogleEmail: string | null }
   methods: { password: boolean, google: boolean, passkeys: number, factor: boolean, recoveryCodesRemaining: number }
   grants: Grant[]
   memberships: { id: string, startsOn: string, expiresOn: string, source: string, confirmedAt: number | null }[]
@@ -42,6 +42,7 @@ const sees = computed(() => ({
   revokes: can(useViewer().value, revokeRoles),
   disables: can(useViewer().value, disableAccounts),
   prelinks: can(useViewer().value, createAccounts),
+  merges: can(useViewer().value, mergeAccounts),
 }))
 
 // The Workspace address their first Google sign-in claims; clearing it confirms, because the
@@ -296,7 +297,17 @@ onMounted(load)
               data-test="erased-line"
               class="text-sm text-muted"
             >
-              Erased on {{ saysDayLong(erased, { year: true }) }}. Kept only for the theatre's statistics.
+              <template v-if="view.account.mergedInto">
+                Merged into
+                <ULink
+                  :to="`/people/accounts/${view.account.mergedInto.id}`"
+                  data-test="merged-into"
+                >{{ view.account.mergedInto.name }} ({{ view.account.mergedInto.email }})</ULink>
+                on {{ saysDayLong(erased, { year: true }) }}. Kept only for the theatre's statistics.
+              </template>
+              <template v-else>
+                Erased on {{ saysDayLong(erased, { year: true }) }}. Kept only for the theatre's statistics.
+              </template>
             </p>
             <p
               v-else
@@ -312,7 +323,7 @@ onMounted(load)
               color="neutral"
               variant="subtle"
             >
-              Erased
+              {{ view.account.mergedInto ? 'Merged' : 'Erased' }}
             </UBadge>
             <UBadge
               v-else-if="view.account.disabled"
@@ -357,7 +368,7 @@ onMounted(load)
             v-else
             class="text-sm text-muted"
           >
-            {{ erased ? 'Nothing. An erased account cannot sign in.' : 'Nothing yet. This account cannot sign in.' }}
+            {{ erased ? (view.account.mergedInto ? 'Nothing. They sign in to the account it was merged into.' : 'Nothing. An erased account cannot sign in.') : 'Nothing yet. This account cannot sign in.' }}
           </p>
 
           <div
@@ -627,7 +638,7 @@ onMounted(load)
           v-if="!erased"
           data-test="merge"
           title="Merge into another account"
-          description="A dry run first: nothing changes until the losing account's email is typed back as confirmation."
+          :description="sees.merges ? 'A dry run first: nothing changes until the losing account\'s email is typed back as confirmation.' : 'The IT Manager carries out merges. If this account is a duplicate, tell them which account is the one to keep.'"
         >
           <UAlert
             v-if="mergeFailure"
@@ -639,7 +650,7 @@ onMounted(load)
           />
 
           <div
-            v-if="!mergePreview"
+            v-if="sees.merges && !mergePreview"
             class="flex flex-wrap items-end gap-2"
           >
             <UFormField
@@ -768,7 +779,7 @@ onMounted(load)
         :verb="securing === 'disable' ? 'Disable the account' : 'Reset the authenticator'"
         :consequence="securing === 'disable'
           ? 'They are signed out everywhere and cannot sign in again until somebody enables the account.'
-          : 'Their authenticator and recovery codes go, and they are signed out everywhere. An officer holding a privileged role cannot sign in again until they enrol a new one.'"
+          : 'Their authenticator and recovery codes go, and they are signed out everywhere. They can still sign in, but a privileged role\'s screens are refused until they set up a new authenticator. They are emailed to say so.'"
         :loading="working === securing"
         :failure="secureFailure"
         @update:open="value => { if (!value) securing = null }"

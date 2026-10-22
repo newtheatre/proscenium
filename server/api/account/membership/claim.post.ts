@@ -10,13 +10,22 @@ export default defineEventHandler(async (event) => {
 
   const id = newId()
   try {
-    await db.insert(schema.membershipClaims).values({
-      id,
-      userId: account.id,
-      studentId: input.studentId,
-      startsOn: input.startsOn,
-      term: input.term,
-    })
+    // The trail shows the claim sent as well as withdrawn, never the student number (0157).
+    await db.batch([
+      db.insert(schema.membershipClaims).values({
+        id,
+        userId: account.id,
+        studentId: input.studentId,
+        startsOn: input.startsOn,
+        term: input.term,
+      }),
+      db.insert(schema.auditLog).values(auditEntry({
+        actorId: account.id,
+        action: 'membership.claim.sent',
+        target: `user:${account.id}`,
+        detail: { claim: id, term: input.term },
+      })),
+    ])
   }
   catch (error) {
     // Criterion 1 is the partial unique index, so the second claim is refused by the database

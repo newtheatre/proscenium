@@ -273,6 +273,22 @@ describe.skipIf(skip !== null)('the screens', () => {
     }
   }, 120_000)
 
+  test('an address outside the theatre is refused on the page, in words (0157)', async () => {
+    const incoming = await person('screen-outside')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${incoming.id}`, '[data-test="google-link-address"]')
+      await fill(view, '[data-test="google-link-address"]', 'someone@gmail.example')
+      await click(view, '[data-test="google-link-save"]')
+      await waitFor(view, 'document.querySelector(\'[data-test="google-link-failure"]\')')
+      expect(await textOf(view, '[data-test="google-link-failure"]')).toContain('Only a newtheatre.org.uk address')
+      expect(pendingOf(incoming.id)).toBeNull()
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
   test('the field is not offered on an account already linked to Google', async () => {
     const linked = await person('screen-google')
     write('UPDATE users SET google_sub = ? WHERE id = ?', `sub-${linked.id}`, linked.id)

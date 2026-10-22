@@ -79,6 +79,18 @@ export const MESSAGE_TYPES = {
     template: 'method-removed',
   },
 
+  // What the IT Manager did to the account, told to its owner with the next step (0157).
+  'account.authenticator-reset': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'authenticator-reset',
+  },
+  'account.enabled': {
+    topic: null,
+    channels: ['EMAIL'],
+    template: 'account-enabled',
+  },
+
   // Transactional, so no topic. It does not reach an unverified address, which is what keeps a
   // sweep over ten thousand imported accounts from becoming a bulk send (A-102 criterion 2).
   'membership.expiring': {
