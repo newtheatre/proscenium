@@ -1641,7 +1641,9 @@ have created it) and `supersedeAgeCheck(checkedBy, entryId, input, id)` for a co
 predicated `WHERE EXISTS (that entry) AND NOT EXISTS (a correction of it already)` and decided
 from the statement's own `RETURNING` via `auditedWrite()` (0049, read onto an INSERT rather than
 an UPDATE). The partial unique index `age_checks_one_correction` is the same guarantee a second
-time, in case a future caller ever bypasses the predicate.
+time, in case a future caller ever bypasses the predicate. `looksLikeName()` in
+`shared/utils/age-checks.ts` flags a description that may name somebody, on the forms as it is
+typed and on the register; it never refuses one (0218).
 
 `recordAgeCheck()` is what F-106 is waited on for (build-order.md's own seam): it returns
 `{ id, statement }`, the same shape `postEntry()` returns, so a till sale and its inline age
@@ -1858,7 +1860,8 @@ grouped a person and read against a current record of `FIRST_AID_MODULE` (read w
 committee's own `firstAiders` line (`saysFirstAiders`). A GET records no bypass (0098). `PUT
 /api/admin/venues/[id]/emergency` writes a new version, gated by a new standing permission pair,
 `emergency-card.read`/`write`, granted to `FOH_MANAGER` alongside `checklist.*` and `rota.*`, and
-to `THEATRE_MANAGER` for fire training (0112).
+to `THEATRE_MANAGER` for fire training (0112). `GET /api/admin/venues/[id]/emergency-versions`
+pages every version of one venue's card, newest first, under `emergency-card.read` (0217).
 `GET /api/admin/venues/emergency`, the committee's overview, filters by venue name and by
 `filed` through `shared/utils/emergency-cards-list.ts` (K-129); the `venues` envelope it answers
 also carries paging, though a venue with no card yet still lists.

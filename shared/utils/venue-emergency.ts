@@ -20,7 +20,7 @@ const EMERGENCY_NUMBERS = new Set(['999', '112'])
 // The one line a volunteer reads aloud to a 999 handler, so a card without it is not a card
 // (issue 902). Everything else on the form stays optional.
 export const emergencyCardForm = z.object({
-  address: z.string().trim().min(1, 'the address is what gets read to a 999 handler').max(FIELD_LIMIT),
+  address: z.string().trim().min(1, 'The address is what gets read to a 999 handler, so give it').max(FIELD_LIMIT),
   assemblyPoint: field(),
   exits: field(),
   isolationPoints: field(),
@@ -32,14 +32,27 @@ export const emergencyCardForm = z.object({
   notes: field(NOTES_LIMIT),
   firstCallName: field(80),
   firstCallPhone: field(40)
-    .refine(value => value === null || (DIALLABLE.test(value) && /^\d{3,15}$/.test(dialled(value))), 'the number to ring first is digits and spaces, with a plus in front if it needs one')
-    .refine(value => value === null || !EMERGENCY_NUMBERS.has(dialled(value)), 'the number to ring first is who you call before 999, so it cannot be 999 itself'),
+    .refine(value => value === null || (DIALLABLE.test(value) && /^\d{3,15}$/.test(dialled(value))), 'The number to ring first is digits and spaces, with a plus in front if it needs one')
+    .refine(value => value === null || !EMERGENCY_NUMBERS.has(dialled(value)), 'The number to ring first is who you call before 999, so it cannot be 999 itself'),
 }).refine(card => (card.firstCallName === null) === (card.firstCallPhone === null), {
-  message: 'who to ring first needs both a name and a number, or neither',
+  message: 'Who to ring first needs both a name and a number, or neither',
   path: ['firstCallPhone'],
 })
 
 export type EmergencyCardInput = z.output<typeof emergencyCardForm>
+
+// Each field's first refusal, read as the officer types, so Save waits on a card that would fail (0217).
+export function emergencyCardProblems(state: unknown): Record<string, string> {
+  const problems: Record<string, string> = {}
+  for (const issue of emergencyCardForm.safeParse(state).error?.issues ?? []) {
+    const field = String(issue.path[0] ?? 'address')
+    problems[field] ??= issue.message
+  }
+  return problems
+}
+
+// A venue with no address for audiences has nothing to start a card from, so the form says so (0217).
+export const NO_VENUE_ADDRESS_HINT = 'This venue has no address for audiences to start from, so type the address in full, postcode included.'
 
 export interface EmergencyCardCompleteness {
   address: string | null
