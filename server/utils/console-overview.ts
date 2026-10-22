@@ -71,16 +71,17 @@ export function safetyRoutingQuery(): SQL {
   return sql`SELECT EXISTS (SELECT 1 FROM incident_severity_config WHERE requires_follow_up = 1) AS anySeverityRoutes`
 }
 
-// One row, each step a constant EXISTS: started once is done, whatever has happened to it since.
+// One row, each step a constant EXISTS with no status or expiry filter: started once is done for
+// good, so a lapsed committee year or an archived catalogue never reopens it (0221).
 export function firstRunQuery(): SQL {
   const started: Record<FirstRunStep, SQL> = {
     VENUE: sql`EXISTS (SELECT 1 FROM venues)`,
     SEASON: sql`EXISTS (SELECT 1 FROM seasons)`,
-    TICKET_TYPE: sql`EXISTS (SELECT 1 FROM ticket_types WHERE archived = 0)`,
+    TICKET_TYPE: sql`EXISTS (SELECT 1 FROM ticket_types)`,
     SHOW: sql`EXISTS (SELECT 1 FROM shows)`,
-    ROLES: sql`EXISTS (SELECT 1 FROM role_grants WHERE role <> 'ADMIN' AND (expires_at IS NULL OR expires_at > unixepoch()))`,
+    ROLES: sql`EXISTS (SELECT 1 FROM role_grants WHERE role <> 'ADMIN')`,
     ROTA_TEMPLATE: sql`EXISTS (SELECT 1 FROM shift_templates)`,
-    BAR_PRODUCT: sql`EXISTS (SELECT 1 FROM bar_products WHERE status <> 'RETIRED')`,
+    BAR_PRODUCT: sql`EXISTS (SELECT 1 FROM bar_products)`,
   }
   return sql`SELECT ${sql.join(FIRST_RUN_STEPS.map(step => sql`${started[step]} AS ${sql.identifier(step)}`), sql`, `)}`
 }

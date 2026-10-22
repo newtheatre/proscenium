@@ -110,7 +110,10 @@ describe('setting up a fresh install', () => {
 
   test('the overview shows it, and the route reads it only for whoever grants roles', async () => {
     expect(await read(OVERVIEW)).toContain('data-test="first-run"')
-    expect(await read('server/utils/console-overview.ts')).toContain('holds(\'roles.grant\')')
+    const source = await read('server/utils/console-overview.ts')
+    expect(source).toContain('holds(\'roles.grant\')')
+    // Started once is done for good: no expiry or status filter can bring the card back (0221).
+    expect(source).not.toMatch(/expires_at > unixepoch\(\)|archived = 0|status <> 'RETIRED'/)
   })
 })
 

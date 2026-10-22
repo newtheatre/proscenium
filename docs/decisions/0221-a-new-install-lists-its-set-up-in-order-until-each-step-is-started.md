@@ -21,9 +21,11 @@ types, a show, roles for the rest of the committee, a shift template, bar produc
 whether it is done. It is read only for a holder of `roles.grant`, the IT Manager, who is the one
 person a new install is sure to have.
 
-- A step is done once one of its rows exists (a ticket type not archived, a bar product not
-  retired, a live role grant other than the IT Manager's). It is one constant query of `EXISTS`
-  columns, so its cost does not grow with the data (0006).
+- A step is done once one of its rows has ever existed: any ticket type, any bar product, any role
+  grant other than the IT Manager's, archived, retired or expired included. Filtering on status or
+  expiry would bring the card back every 1 August, when the committee's grants lapse, or whenever
+  a catalogue is archived. It is one constant query of `EXISTS` columns, so its cost does not grow
+  with the data (0006).
 - Once every step is done the answer is `null` and the card is not drawn. A working install never
   sees it.
 - It does not come back when something is later removed. Keeping a running install whole is
