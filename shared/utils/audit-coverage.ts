@@ -140,6 +140,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
     route: 'server/api/admin/rooms/requests/decide.post.ts',
     actions: ['room.request.approved', 'room.request.rejected'],
   },
+  { route: 'server/api/admin/rooms/requests/rejudge.post.ts', actions: ['room.request.approved'] },
   { route: 'server/api/admin/rooms/index.post.ts', actions: ['room.created'] },
   { route: 'server/api/admin/rooms/[id]/index.put.ts', actions: ['room.updated', 'room.hours.set'] },
   { route: 'server/api/admin/rooms/[id]/index.delete.ts', actions: ['room.updated'] },

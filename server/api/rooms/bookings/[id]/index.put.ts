@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
   const verdict = judge({ startsAt: new Date(startsAt * 1000), endsAt: new Date(endsAt * 1000) }, resolvePolicy(room, await estatePolicy(event)), room, {
     now,
     isAdmin: permissions.has('rooms.write'),
-    hasMembership: await mayBookRooms(event, account.id, permissions, now),
+    ...await mayBookRooms(event, account.id, permissions, now),
     activeBookings: othersHeld(await activeBookingsFor(account.id, nowSeconds), booking, nowSeconds),
     underPreApproval: await underPreApproval(event, account.id, now),
   })

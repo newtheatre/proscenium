@@ -152,7 +152,9 @@ describe.skipIf(skip !== null)('the bookings a member holds (C-112)', () => {
 
     await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)
     expect((await send('POST', `/api/rooms/bookings/${booking}/cancel`, {}, member.cookie)).status).toBe(409)
-    expect((await mine(member.cookie)).items.map(one => one.id)).toContain(booking)
+    // Still to come, so it is kept under Cancelled rather than among the live ones.
+    expect((await mine(member.cookie, 'cancelled')).items.map(one => one.id)).toContain(booking)
+    expect((await mine(member.cookie)).items.map(one => one.id)).not.toContain(booking)
   })
 
   test('somebody else\'s booking cannot be cancelled, and the refusal does not confirm it exists', async () => {

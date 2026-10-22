@@ -7,11 +7,8 @@ export default defineEventHandler(async (event) => {
   const estate = await estatePolicy(event)
 
   // The first day a room we do not manage can be asked for, said before the form (issue 1338).
-  const externalEarliestDay = earliestAskDay(
-    new Date(),
-    await configValue(event, 'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS'),
-    await configValue(event, 'BANK_HOLIDAYS'),
-  )
+  const externalNoticeWorkingDays = await configValue(event, 'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS')
+  const externalEarliestDay = earliestAskDay(new Date(), externalNoticeWorkingDays, await configValue(event, 'BANK_HOLIDAYS'))
 
   return {
     ...estate,
@@ -23,5 +20,6 @@ export default defineEventHandler(async (event) => {
     byRoom: Object.fromEntries((await listRooms(false)).map(room => [room.id, resolvePolicy(room, estate)])),
     held: await activeBookingsFor(account.id, Math.floor(Date.now() / 1000)),
     exemptFromLongest: permissions.has('rooms.write') && estate.maxBookingAdminsExempt,
+    externalNoticeWorkingDays,
   }
 })

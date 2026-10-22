@@ -7,7 +7,7 @@ import { addDays } from '#shared/utils/series'
 import { SU_ROOM_ASK } from '#shared/utils/external-requests'
 import { londonDate } from '#shared/utils/working-days'
 import { can, manageRoomsEstate, memberOrGrace } from '#shared/utils/abilities'
-import { BOOKING_NO_MEMBERSHIP } from '#shared/utils/booking-policy'
+import { saysBookingNoMembership } from '#shared/utils/booking-policy'
 import type { GridColumn, GridRoom } from '~/components/RoomGrid.vue'
 
 definePageMeta({ layout: 'member', middleware: 'signed-in', docs: '/docs/my-nnt/book-a-room' })
@@ -39,6 +39,7 @@ const managesRooms = computed(() => can(useViewer().value, manageRoomsEstate))
 // Said above the calendar, not after a slot is pressed. An officer who manages rooms books for the
 // theatre rather than as a member, so the notice is not theirs.
 const needsMembership = computed(() => !can(useViewer().value, memberOrGrace) && !managesRooms.value)
+const refusedFor = computed(() => saysBookingNoMembership(useViewer().value?.membershipState.kind === 'lapsed'))
 
 // Day below tablet width, week above: a foyer is not a desk (C-102 criterion 5). False while
 // rendering, a server having no viewport, and corrected on the first client tick.
@@ -219,7 +220,7 @@ useSeoMeta({ title: 'Rooms' })
       data-test="calendar-needs-membership"
     >
       <template #description>
-        <p>{{ BOOKING_NO_MEMBERSHIP }} You can still see what is free.</p>
+        <p>{{ refusedFor }} You can still see what is free.</p>
         <UButton
           class="mt-3"
           to="/account/membership"

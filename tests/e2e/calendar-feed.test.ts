@@ -263,6 +263,8 @@ describe.skipIf(skip !== null)('one booking on its own (criterion 1)', () => {
 describe.skipIf(skip !== null)('the screen (C-104)', () => {
   test('a member mints the link from their own bookings page, and it works', async () => {
     placeBooking(member.id, weeksAhead(10))
+    // Earlier cases mint for this member, and a second mint asks first; this one starts with none.
+    write('DELETE FROM room_feed_tokens WHERE user_id = ?', member.id)
 
     const view = await openSignedOutView(app.baseURL)
     try {
@@ -282,6 +284,15 @@ describe.skipIf(skip !== null)('the screen (C-104)', () => {
       const url = await view.evaluate<string>(`document.querySelector('[data-test="feed-url"]').value`)
       expect(url).toContain('/rooms/feed/')
       expect((await fetch(url)).status).toBe(200)
+
+      // Replacing breaks every subscribed calendar, so a second visit asks before it does.
+      await visit(view, `${app.baseURL}/rooms/mine`, '[data-test="feed-exists"]')
+      await click(view, '[data-test="feed-mint"]')
+      await waitFor(view, `document.querySelector('[data-test="feed-replace-confirm"]')`, 30_000)
+      expect((await fetch(url)).status).toBe(200)
+      await click(view, '[data-test="feed-replace-confirm"]')
+      await waitFor(view, `document.querySelector('[data-test="feed-url"]')`, 30_000)
+      expect((await fetch(url)).status).toBe(404)
     }
     finally {
       view.close()

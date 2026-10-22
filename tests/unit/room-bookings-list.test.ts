@@ -122,12 +122,13 @@ describe('the row actions reach their routes and confirm first (K-123, 0032)', (
     expect(source).toContain('/withdraw`')
   })
 
-  test('every one of the three confirms in the shared dialogue before it writes', async () => {
+  // The fourth is the second look a withdrawal can offer at the member's waiting requests.
+  test('every one of the three, and the second look after a withdrawal, confirms in the shared dialogue', async () => {
     const source = await read(PAGE)
-    for (const name of ['bump-booking', 'record-no-show', 'withdraw-no-show']) {
+    for (const name of ['bump-booking', 'record-no-show', 'withdraw-no-show', 'rejudge-requests']) {
       expect(source).toContain(`name="${name}"`)
     }
-    expect(source.match(/<ConfirmModal/g)?.length).toBe(3)
+    expect(source.match(/<ConfirmModal/g)?.length).toBe(4)
   })
 
   test('a withdrawal cannot be sent without its reason', async () => {

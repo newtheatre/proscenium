@@ -44,12 +44,16 @@ interface Alternatives { nearest: Offer | null, total: number }
 
 interface StandingAnswer { count: number, standing: Standing }
 
+interface WithdrawAnswer extends StandingAnswer { released: boolean, waiting: number, userId: string }
+
 const request = useRequestFetch()
 const rooms = ref<{ id: string, name: string }[]>([])
 const purposes = ref<string[]>([])
 const toast = useToast()
 
 const writes = computed(() => can(useViewer().value, manageRoomsEstate))
+const { account } = useAccount()
+const picker = useTemplateRef<{ preset: (person: { id: string, name: string, email: string }) => void }>('picker')
 
 const roomOptions = computed<FilterOption[]>(() => rooms.value.map(one => ({ value: one.id, label: one.name })))
 
@@ -89,6 +93,13 @@ const bump = reactive<Partial<BumpInput>>({})
 const offer = ref<Alternatives | null>(null)
 // Widened to string: the form's tier is a plain string, checked against the live order by the route.
 const tierItems: { label: string, value: string }[] = TIERS.map(tier => ({ label: saysTier(tier), value: tier }))
+
+// Usually taken for the officer doing it, so they are chosen already and can be changed. The
+// picker mounts with the dialogue, so it is filled in once it exists.
+watch([picker, bumping], ([one, booking]) => {
+  const me = account.value.user
+  if (one && booking && me && bump.userId === undefined) one.preset({ id: me.id, name: me.name, email: me.email })
+})
 
 async function openBump(booking: Booking): Promise<void> {
   refusal.value = null
@@ -133,8 +144,8 @@ async function submitBump(): Promise<void> {
       toast.add({
         title: 'Booking bumped',
         description: answer.offered
-          ? `${booking.member} has been told and offered ${answer.offered.room}, ${spanOf(answer.offered)}.`
-          : `${booking.member} has been told. Nothing equivalent was free to offer.`,
+          ? `${booking.member} has been told, and ${answer.offered.room}, ${spanOf(answer.offered)}, is held for them.`
+          : `${booking.member} has been told. Nothing equivalent was free to hold for them.`,
         icon: 'i-lucide-check',
         color: 'success',
       })
@@ -180,16 +191,42 @@ async function record(): Promise<void> {
   )
 }
 
+// Off pre-approval, what they asked for while on it may now pass by itself, so the officer is
+// offered a second look rather than leaving it for somebody to notice in the queue.
+const releasing = ref<{ member: string, userId: string, waiting: number } | null>(null)
+
 async function withdraw(): Promise<void> {
   const booking = withdrawing.value
   if (!booking?.noShowId) return
-  await post<StandingAnswer>(
+  await post<WithdrawAnswer>(
     `/api/admin/rooms/no-shows/${booking.noShowId}/withdraw`,
     { reason: withdrawal.value },
     'Reload the list to see whether the no-show was withdrawn.',
     (answer) => {
       toast.add({ title: 'No-show withdrawn', description: saysStandingOf(booking.member, answer), icon: 'i-lucide-check', color: 'success' })
       withdrawing.value = null
+      if (answer.released && answer.waiting > 0) {
+        releasing.value = { member: booking.member, userId: answer.userId, waiting: answer.waiting }
+      }
+    },
+  )
+}
+
+async function rejudge(): Promise<void> {
+  const released = releasing.value
+  if (!released) return
+  await post<{ confirmed: number, waiting: number }>(
+    '/api/admin/rooms/requests/rejudge',
+    { userId: released.userId },
+    'Open Room requests to see which of their requests are still waiting.',
+    (answer) => {
+      toast.add({
+        title: answer.confirmed ? `${plural(answer.confirmed, 'request')} confirmed` : 'Nothing confirmed',
+        description: answer.waiting ? `${plural(answer.waiting, 'request')} still waiting in Room requests.` : `Nothing of ${released.member}'s is waiting any more.`,
+        icon: 'i-lucide-check',
+        color: 'success',
+      })
+      releasing.value = null
     },
   )
 }
@@ -337,10 +374,12 @@ onMounted(() => {
             Looking for a slot to offer instead.
           </template>
           <template v-else-if="offer.nearest">
-            They will be offered {{ offer.nearest.room }}, {{ spanOf(offer.nearest) }}.
+            {{ offer.nearest.room }}, {{ spanOf(offer.nearest) }}, is held for them in its place, so
+            they are not left without a room. They are told it is theirs unless they cancel it on
+            My bookings, which they can if it does not suit.
           </template>
           <template v-else>
-            Nothing equivalent is free, and they will be offered nothing.
+            Nothing equivalent is free, and nothing is held for them in its place.
           </template>
         </p>
         <UForm
@@ -356,6 +395,7 @@ onMounted(() => {
             required
           >
             <PersonPicker
+              ref="picker"
               v-model="bump.userId"
               data-test="bump-user"
             />
@@ -476,6 +516,26 @@ onMounted(() => {
             data-test="withdraw-reason"
           />
         </UFormField>
+      </template>
+    </ConfirmModal>
+
+    <ConfirmModal
+      :open="releasing !== null"
+      name="rejudge-requests"
+      title="Judge their waiting requests again?"
+      verb="Judge them again"
+      color="primary"
+      :consequence="releasing ? `${releasing.member} is no longer under pre-approval, and has ${plural(releasing.waiting, 'request')} waiting.` : ''"
+      :loading="working"
+      :failure="refusal"
+      @update:open="releasing = null; refusal = null"
+      @confirm="rejudge"
+    >
+      <template #body>
+        <p class="text-sm">
+          Each one that now passes the booking rules by itself is confirmed, and they are told. The
+          rest keep waiting in Room requests for a person to decide.
+        </p>
       </template>
     </ConfirmModal>
   </ReadGate>

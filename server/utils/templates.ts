@@ -1429,8 +1429,9 @@ The Nottingham New Theatre`,
 claim on the room: ${asSentence(String(context.reason))}</p>
 <p>${context.title}</p>
 ${offered
-  ? `<p>You have been booked into <strong>${offered}</strong> instead, and that slot is held for
-you. If it does not suit, cancel it and book something else.</p>`
+  ? `<p>We have held <strong>${offered}</strong> for you in its place, so you are not left without
+a room. It is yours unless you cancel it: if it does not suit, cancel it on My bookings and book
+something else.</p>`
   : `<p>Nothing equivalent was free nearby, so nothing has been booked in its place. Please find
 another slot.</p>`}
 <p><a href="${String(context.roomsUrl)}">${offered ? 'See your bookings' : 'Find another slot'}</a></p>`),
@@ -1442,7 +1443,7 @@ a higher claim on the room: ${asSentence(String(context.reason))}
 ${String(context.title)}
 
 ${offered
-  ? `You have been booked into ${offered} instead, and that slot is held for you. If it does not suit, cancel it and book something else.`
+  ? `We have held ${offered} for you in its place, so you are not left without a room. It is yours unless you cancel it: if it does not suit, cancel it on My bookings and book something else.`
   : 'Nothing equivalent was free nearby, so nothing has been booked in its place. Please find another slot.'}
 
 ${offered ? 'See your bookings' : 'Find another slot'}: ${String(context.roomsUrl)}

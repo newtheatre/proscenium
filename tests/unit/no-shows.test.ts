@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { saysStanding, refusalToRecord, standingFor, windowStart } from '#shared/utils/no-shows'
+import { rejudgeForm, releasedFromPreApproval, saysStanding, refusalToRecord, standingFor, windowStart } from '#shared/utils/no-shows'
 import { committeeYearEnd } from '#shared/utils/london'
 
 // C-116's pure half. The ladder is configuration, so nothing here knows the numbers (0012).
@@ -30,6 +30,9 @@ describe('the ladder is the configured numbers', () => {
     expect(saysStanding('RECORDED', 2, LADDER)).toContain('3')
     expect(saysStanding('PRE_APPROVAL', 3, LADDER)).toContain('checked by the Theatre Manager')
     expect(saysStanding('CLEAR', 0, LADDER)).toBe('Nothing on your record.')
+    // The member's screen shows the card from the first mark, so a mark below the ladder is said.
+    expect(saysStanding('CLEAR', 1, LADDER)).toBe('You have missed one booking. Nothing follows from it.')
+    expect(saysStanding('CLEAR', 2, { recordAt: 4, preApprovalAt: 5 })).toContain('missed 2 bookings')
   })
 })
 
@@ -75,5 +78,20 @@ describe('what may be marked (criterion 1)', () => {
   test.each(['CANCELLED', 'REJECTED', 'PENDING_APPROVAL', 'BUMPED'])('not a %s one', (status) => {
     expect(refusalToRecord({ status, endsAt: NOW - 3600 }, NOW))
       .toBe('Only a confirmed booking can be marked as a no-show')
+  })
+})
+
+// A withdrawal that drops somebody below pre-approval offers to judge their waiting requests again.
+describe('being released from pre-approval', () => {
+  test('only a step down from pre-approval releases anybody', () => {
+    expect(releasedFromPreApproval('PRE_APPROVAL', 'RECORDED')).toBe(true)
+    expect(releasedFromPreApproval('PRE_APPROVAL', 'CLEAR')).toBe(true)
+    expect(releasedFromPreApproval('PRE_APPROVAL', 'PRE_APPROVAL')).toBe(false)
+    expect(releasedFromPreApproval('RECORDED', 'CLEAR')).toBe(false)
+  })
+
+  test('the second look names the account it is for', () => {
+    expect(rejudgeForm.safeParse({ userId: 'u-1' }).success).toBe(true)
+    expect(rejudgeForm.safeParse({ userId: '' }).success).toBe(false)
   })
 })

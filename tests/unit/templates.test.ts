@@ -662,6 +662,24 @@ describe('ordinal (item 7)', () => {
   })
 })
 
+// Decision 0207: the slot a bump holds is the member's unless they cancel it, and they are told so.
+describe('a bump holds the offer and says it can be cancelled', () => {
+  test('with an offer, it is held for them and cancellable on My bookings', () => {
+    const { html, text } = render('room-bumped', { ...EVERYTHING, room: 'Rehearsal Room 1', when: 'Thursday, 5 November 2026 at 10:00', title: 'Meeting', reason: 'Show week', offered: 'Rehearsal Room 1, Wednesday, 4 November 2026 at 10:00' })
+    for (const part of [html, text]) {
+      expect(flat(part)).toContain('for you in its place, so you are not left without a room')
+      expect(flat(part)).toContain('cancel it on My bookings')
+      expect(flat(part)).not.toContain('booked into')
+    }
+  })
+
+  test('without one, nothing is said to be held', () => {
+    const { text } = render('room-bumped', { ...EVERYTHING, room: 'Rehearsal Room 1', when: 'Thursday, 5 November 2026 at 10:00', title: 'Meeting', reason: 'Show week', offered: null })
+    expect(flat(text)).not.toContain('held')
+    expect(flat(text)).toContain('Find another slot')
+  })
+})
+
 describe('the shared labels (item 8)', () => {
   test('saysStatus never yields an enum word', () => {
     for (const status of ['CONFIRMED', 'PENDING_APPROVAL', 'REJECTED', 'CANCELLED', 'BUMPED', 'SOMETHING_ELSE']) {

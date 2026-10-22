@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
   const now = new Date()
   const policy = resolvePolicy(room, await estatePolicy(event))
   const isAdmin = permissions.has('rooms.write')
-  const hasMembership = await mayBookRooms(event, account.id, permissions, now)
+  const membership = await mayBookRooms(event, account.id, permissions, now)
   const alreadyHeld = await activeBookingsFor(account.id, Math.floor(now.getTime() / 1000))
   const preApproval = await underPreApproval(event, account.id, now)
   const clashes = await conflictsAcross(room.id, occurrences)
@@ -70,7 +70,7 @@ export default defineEventHandler(async (event) => {
     const verdict = judge({ startsAt: one.startsAt, endsAt: one.endsAt }, policy, room, {
       now,
       isAdmin,
-      hasMembership,
+      ...membership,
       activeBookings: alreadyHeld + at,
       underPreApproval: preApproval,
     })

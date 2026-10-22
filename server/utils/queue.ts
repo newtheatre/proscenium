@@ -62,7 +62,7 @@ export async function pendingRoomRequests(
   const estate = await estatePolicy(event)
   const now = new Date()
   const held = await heldByRequesters()
-  const current = await membersAmongRequesters(event, now)
+  const { current, ever } = await membersAmongRequesters(event, now)
   const stopped = await requestersUnderPreApproval(event, rows, now)
   const nowSeconds = Math.floor(now.getTime() / 1000)
 
@@ -77,6 +77,7 @@ export async function pendingRoomRequests(
         // The requester's standing, never the reader's: this is what they were judged against.
         isAdmin: false,
         hasMembership: current.has(row.userId),
+        hasEverBeenMember: ever.has(row.userId),
         activeBookings: heldBesides(held.get(row.userId) ?? 0, row, nowSeconds),
         underPreApproval: stopped.has(row.userId),
       },
@@ -126,7 +127,7 @@ async function heldByRequesters(): Promise<Map<string, number>> {
 }
 
 // The longest-running term each requester holds, which is the one that counts (0031).
-async function membersAmongRequesters(event: H3Event, now: Date): Promise<Set<string>> {
+async function membersAmongRequesters(event: H3Event, now: Date): Promise<{ current: Set<string>, ever: Set<string> }> {
   const rows = await db.select({
     userId: schema.memberships.userId,
     startsOn: sql<string>`min(${schema.memberships.startsOn})`,
@@ -138,5 +139,8 @@ async function membersAmongRequesters(event: H3Event, now: Date): Promise<Set<st
 
   const grace = await configValue(event, 'MEMBERSHIP_GRACE_DAYS')
   const today = londonDay(now)
-  return new Set(rows.filter(row => isCurrent(row, today, grace)).map(row => row.userId))
+  return {
+    current: new Set(rows.filter(row => isCurrent(row, today, grace)).map(row => row.userId)),
+    ever: new Set(rows.map(row => row.userId)),
+  }
 }

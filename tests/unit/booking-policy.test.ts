@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { REFUSALS, judge, resolvePolicy, saysLimits, spanMinutes } from '#shared/utils/booking-policy'
+import { BOOKING_LAPSED_MEMBERSHIP, BOOKING_NO_MEMBERSHIP, REFUSALS, judge, resolvePolicy, saysLimits, spanMinutes } from '#shared/utils/booking-policy'
 import type { EstatePolicy, Proposal } from '#shared/utils/booking-policy'
 
 // C-106. The published policy and the enforced policy are the same document, and every rule has a
@@ -98,6 +98,16 @@ describe('each rule refuses in its own name (criterion 6)', () => {
 
   test('a lapsed membership, named as the reason (C-105 criterion 2)', () => {
     expect(reasons(judge(GOOD, policy(), ROOM, { ...CONTEXT, hasMembership: false }))).toContain('NO_MEMBERSHIP')
+  })
+
+  // Renewing is said only to somebody who has had a membership; anybody else is told to buy one.
+  test('never a member is told to buy one, and a lapsed member to renew', () => {
+    const says = (hasEverBeenMember?: boolean): string | undefined =>
+      judge(GOOD, policy(), ROOM, { ...CONTEXT, hasMembership: false, hasEverBeenMember }).failures.find(one => one.reason === 'NO_MEMBERSHIP')?.says
+    expect(says()).toBe(BOOKING_NO_MEMBERSHIP)
+    expect(says(false)).toContain('Buy one at the Students\' Union')
+    expect(says(true)).toBe(BOOKING_LAPSED_MEMBERSHIP)
+    expect(says(true)).toContain('Renew it')
   })
 
   test('two broken rules are both named, not just the first', () => {

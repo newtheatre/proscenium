@@ -1,11 +1,14 @@
-import { and, asc, desc, eq, gte, lt } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import { seriesPlace } from '#server/utils/room-writes'
 import { z } from 'zod'
 
 const query = z.object({
-  // Past bookings stay visible with their status, so a cancelled one is history rather than gone.
-  when: z.enum(['upcoming', 'past']).default('upcoming'),
+  // Past keeps every status, so a cancelled one is history; still to come, cancelled ones sit apart.
+  when: z.enum(['upcoming', 'past', 'cancelled']).default('upcoming'),
 })
+
+// A moved booking is cancelled carrying a pointer, and stays with the live ones (C-123 criterion 5).
+const WITHDRAWN = sql`(${schema.roomBookings.status} = 'CANCELLED' AND ${schema.roomBookings.convertedToRequestId} IS NULL)`
 
 // The bookings this member holds.
 export default defineEventHandler(async (event) => {
@@ -44,9 +47,11 @@ export default defineEventHandler(async (event) => {
     .leftJoin(schema.roomSeries, eq(schema.roomSeries.id, schema.roomBookings.seriesId))
     .where(and(
       eq(schema.roomBookings.userId, account.id),
-      input.when === 'upcoming' ? gte(schema.roomBookings.endsAt, now) : lt(schema.roomBookings.endsAt, now),
+      input.when === 'past' ? lt(schema.roomBookings.endsAt, now) : gte(schema.roomBookings.endsAt, now),
+      input.when === 'upcoming' ? sql`NOT ${WITHDRAWN}` : undefined,
+      input.when === 'cancelled' ? WITHDRAWN : undefined,
     ))
-    .orderBy(input.when === 'upcoming' ? asc(schema.roomBookings.startsAt) : desc(schema.roomBookings.startsAt))
+    .orderBy(input.when === 'past' ? desc(schema.roomBookings.startsAt) : asc(schema.roomBookings.startsAt))
     .limit(200)
 
   return {

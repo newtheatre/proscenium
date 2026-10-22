@@ -164,6 +164,12 @@ describe('what a slot and the calendar say', () => {
     expect(source).toContain('data-test="calendar-needs-membership"')
   })
 
+  test('a lapsed member above the calendar is told to renew, not to buy one', async () => {
+    const source = await Bun.file('app/pages/rooms/index.vue').text()
+    expect(source).toContain('saysBookingNoMembership(useViewer().value?.membershipState.kind === \'lapsed\')')
+    expect(source).not.toContain('BOOKING_NO_MEMBERSHIP')
+  })
+
   test('an empty calendar tells an officer where to add rooms, and a member only that there are none', async () => {
     const source = await Bun.file('app/pages/rooms/index.vue').text()
     expect(source).toContain('<ULink to="/rooms/manage">Rooms</ULink>.')

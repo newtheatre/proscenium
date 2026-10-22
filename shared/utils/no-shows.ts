@@ -32,9 +32,10 @@ export function saysStanding(standing: Standing, count: number, ladder: Ladder):
   if (standing === 'RECORDED') {
     return `You have missed ${plural(count, 'booking')}. At ${ladder.preApprovalAt}, every booking you make is checked by the Theatre Manager first.`
   }
+  if (count === 0) return 'Nothing on your record.'
   return count === 1
     ? 'You have missed one booking. Nothing follows from it.'
-    : 'Nothing on your record.'
+    : `You have missed ${plural(count, 'booking')}. Nothing follows from them yet.`
 }
 
 // Rolling, and never further back than the committee year: a June no-show survives the July
@@ -59,4 +60,14 @@ export const noShowForm = z.object({
 
 export const withdrawForm = z.object({
   reason: z.string().trim().min(1, 'Say why it is being withdrawn').max(NO_SHOW_REASON_LIMIT),
+})
+
+// A withdrawal that takes somebody off pre-approval frees what waited on it alone, so the
+// dialogue offers to judge those requests again (C-116).
+export function releasedFromPreApproval(before: Standing, after: Standing): boolean {
+  return before === 'PRE_APPROVAL' && after !== 'PRE_APPROVAL'
+}
+
+export const rejudgeForm = z.object({
+  userId: z.string().min(1, 'Say which account you mean').max(64),
 })

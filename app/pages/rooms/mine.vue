@@ -40,12 +40,13 @@ interface Listing { when: string, items: Booking[], total: number }
 
 const toast = useToast()
 const request = useRequestFetch()
-const when = ref<'upcoming' | 'past'>('upcoming')
+const when = ref<'upcoming' | 'past' | 'cancelled'>('upcoming')
 const cancelling = ref<Booking | null>(null)
 const working = ref(false)
 const feedUrl = ref<string | null>(null)
 const minting = ref(false)
 const copied = ref(false)
+const replacing = ref(false)
 
 // Their own record, shown to them rather than sprung on them (C-116 criterion 5).
 const { data: standing } = await useAsyncData(
@@ -63,6 +64,7 @@ const { data: feed } = await useAsyncData(
 // The plaintext exists only in the response that mints it, so a second visit cannot show the
 // URL again: it can only replace it, which is what makes revoking one an ordinary action.
 async function mintFeed(): Promise<void> {
+  replacing.value = false
   minting.value = true
   copied.value = false
   try {
@@ -98,15 +100,29 @@ interface UnlistedRequest {
   endsAt: number
   status: string
   preferred: string | null
+  preferredBuilding: string | null
   assigned: string | null
+  assignedBuilding: string | null
+  movedTo: string | null
+  movedToBuilding: string | null
   rejectionReason: string | null
   cancellable: boolean
 }
 
+// Where it is, or went: a moved request names our room, never the one first asked for.
+function roomOf(one: UnlistedRequest): { room: string, building: string | null } {
+  if (one.convertedToBookingId && one.movedTo) return { room: one.movedTo, building: one.movedToBuilding }
+  if (one.assigned) return { room: one.assigned, building: one.assignedBuilding }
+  return { room: one.preferred ?? 'A Students\' Union room', building: one.preferredBuilding }
+}
+
+// Nothing here is ever cancelled in our list's sense, so the Cancelled filter reads what is to come.
+const unlistedWhen = computed(() => when.value === 'past' ? 'past' : 'upcoming')
+
 const { data: unlisted, refresh: refreshUnlisted } = await useAsyncData(
-  () => `my-unlisted-requests-${when.value}`,
-  () => request<{ items: UnlistedRequest[] }>('/api/rooms/external-requests', { query: { when: when.value } }),
-  { watch: [when], default: (): { items: UnlistedRequest[] } => ({ items: [] }) },
+  () => `my-unlisted-requests-${unlistedWhen.value}`,
+  () => request<{ items: UnlistedRequest[] }>('/api/rooms/external-requests', { query: { when: unlistedWhen.value } }),
+  { watch: [unlistedWhen], default: (): { items: UnlistedRequest[] } => ({ items: [] }) },
 )
 
 const cancellingUnlisted = ref<UnlistedRequest | null>(null)
@@ -343,6 +359,16 @@ useSeoMeta({ title: 'My bookings' })
       >
         Past
       </UButton>
+      <UButton
+        :color="when === 'cancelled' ? 'primary' : 'neutral'"
+        variant="outline"
+        :aria-pressed="when === 'cancelled'"
+        :icon="when === 'cancelled' ? 'i-lucide-check' : undefined"
+        data-test="mine-cancelled"
+        @click="when = 'cancelled'"
+      >
+        Cancelled
+      </UButton>
     </UFieldGroup>
 
     <div
@@ -373,8 +399,11 @@ useSeoMeta({ title: 'My bookings' })
           Find a free slot
         </ULink> and it appears here.
       </template>
-      <template v-else>
+      <template v-else-if="when === 'past'">
         Nothing has finished. A booking moves here once its slot has passed.
+      </template>
+      <template v-else>
+        Nothing cancelled is still to come.
       </template>
     </p>
 
@@ -425,7 +454,7 @@ useSeoMeta({ title: 'My bookings' })
             :data-test="`bumped-${booking.id}`"
           >
             Given to something with a higher claim: {{ booking.bumpedReason }}.
-            {{ booking.bumpedToBookingId ? 'A replacement is held for you below.' : '' }}
+            {{ booking.bumpedToBookingId ? 'A replacement is held for you in this list. If it does not suit, cancel it.' : '' }}
           </p>
         </div>
 
@@ -479,7 +508,7 @@ useSeoMeta({ title: 'My bookings' })
     </p>
 
     <section
-      v-if="unlisted.items.length"
+      v-if="when !== 'cancelled' && unlisted.items.length"
       class="mt-10"
       data-test="unlisted-list"
     >
@@ -487,7 +516,7 @@ useSeoMeta({ title: 'My bookings' })
         {{ SU_ROOMS }}
       </h2>
       <p class="mt-1 text-sm text-muted">
-        The Theatre Manager decides which room we get, and none of these is held until they answer.
+        The Students' Union decides which room we get, and none of these is held until they answer.
       </p>
 
       <ul class="mt-4 divide-y divide-default">
@@ -499,7 +528,7 @@ useSeoMeta({ title: 'My bookings' })
         >
           <div class="min-w-0 flex-1">
             <p class="flex flex-wrap items-center gap-2 font-medium">
-              {{ one.assigned ?? one.preferred ?? 'A Students\' Union room' }}
+              {{ roomOf(one).room }}
               <UBadge
                 :color="one.status === 'CONFIRMED' ? 'success' : one.status === 'AWAITING_EXTERNAL' ? 'info' : 'neutral'"
                 variant="subtle"
@@ -507,6 +536,13 @@ useSeoMeta({ title: 'My bookings' })
               >
                 {{ saysExternalState(one) }}
               </UBadge>
+            </p>
+            <p
+              v-if="roomOf(one).building"
+              class="text-sm text-muted"
+              :data-test="`unlisted-building-${one.id}`"
+            >
+              {{ roomOf(one).building }}
             </p>
             <p class="text-sm text-muted">
               {{ spanOf(one) }}
@@ -536,8 +572,9 @@ useSeoMeta({ title: 'My bookings' })
       </ul>
     </section>
 
+    <!-- From the first mark: the email about it is no use if the screen says nothing. -->
     <UAlert
-      v-if="standing.standing !== 'CLEAR'"
+      v-if="standing.count > 0"
       class="mt-8"
       :color="standing.standing === 'PRE_APPROVAL' ? 'warning' : 'neutral'"
       variant="subtle"
@@ -587,7 +624,7 @@ useSeoMeta({ title: 'My bookings' })
             :color="feed.exists ? 'neutral' : 'primary'"
             :variant="feed.exists ? 'outline' : 'solid'"
             data-test="feed-mint"
-            @click="mintFeed"
+            @click="feed.exists ? replacing = true : mintFeed()"
           >
             {{ feed.exists ? 'Replace my calendar link' : 'Create my calendar link' }}
           </UButton>
@@ -603,6 +640,37 @@ useSeoMeta({ title: 'My bookings' })
         </p>
       </div>
     </UPageCard>
+
+    <!-- Replacing breaks every calendar already subscribed, so it is asked first. -->
+    <UModal
+      :open="replacing"
+      title="Replace your calendar link?"
+      description="The old link stops working straight away."
+      @update:open="replacing = false"
+    >
+      <template #body>
+        <p class="text-sm">
+          Every calendar subscribed with the old link stops showing your bookings until you
+          subscribe it again with the new one.
+        </p>
+      </template>
+      <template #footer>
+        <UButton
+          :loading="minting"
+          data-test="feed-replace-confirm"
+          @click="mintFeed"
+        >
+          Replace the link
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="ghost"
+          @click="replacing = false"
+        >
+          Keep the old one
+        </UButton>
+      </template>
+    </UModal>
 
     <UModal
       :open="cancellingUnlisted !== null"

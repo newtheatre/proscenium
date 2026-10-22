@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   const failures = judgeExternal({ startsAt, endsAt }, {
     now,
-    hasMembership: await mayBookRooms(event, account.id, permissions, now),
+    ...await mayBookRooms(event, account.id, permissions, now),
     noticeWorkingDays: await configValue(event, 'EXTERNAL_REQUEST_NOTICE_WORKING_DAYS'),
     horizonWeeks: await configValue(event, 'ROOM_BOOKING_HORIZON_WEEKS'),
     holidays: await configValue(event, 'BANK_HOLIDAYS'),
