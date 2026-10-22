@@ -278,7 +278,7 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
     const outcome = doorTicketOutcome('COLLECTED', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null)
     expect(outcome.admit).toBe(false)
     expect(outcome.headline).toBe('Wrong performance')
-    expect(outcome.detail).toBe('This ticket is for The Seagull, Friday, 2pm. Ask the Front of House Manager.')
+    expect(outcome.detail).toBe('This ticket is for The Seagull, Friday, 2pm. Ask tonight\'s duty manager or the Front of House Manager.')
   })
 
   test('an unpaid ticket for the right performance still refuses, quoting the amount due', () => {
@@ -318,7 +318,7 @@ describe('the door\'s own fifth state, wrong performance (E-127 criterion 3, D-1
   test('a ticket admitted to another performance names that performance, never a re-entry', () => {
     const outcome = doorTicketOutcome('DOOR', null, 'perf-matinee', 'perf-evening', 'The Seagull', 'Friday, 2pm', null)
     expect(outcome.headline).toBe('Wrong performance')
-    expect(outcome.detail).toBe('Admitted for The Seagull, Friday, 2pm. Ask the Front of House Manager.')
+    expect(outcome.detail).toBe('Admitted for The Seagull, Friday, 2pm. Ask tonight\'s duty manager or the Front of House Manager.')
   })
 
   test('a lapsed or cancelled ticket sends its holder to the bar, never to the box office', () => {

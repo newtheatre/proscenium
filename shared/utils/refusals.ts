@@ -1,5 +1,5 @@
 import { can } from './abilities'
-import { NIGHT_ROLES, nightAuthorityRefusal } from './night-authority'
+import { NO_SHIFT_REFUSAL_OPENING } from './night-authority'
 import { PERMISSION_MAP, ROLES, saysRole } from './roles'
 import type { BouncerAbility } from 'nuxt-authorization/utils'
 import type { Viewer } from './abilities'
@@ -51,5 +51,5 @@ export function saysScreenIsFor(roles: readonly Role[], standings: readonly Scre
 export function hubRefusal(said: string | null): string | null {
   if (!said) return null
   // A door refusal may go on to name tonight's duty manager (0095); it is still no shift at all.
-  return NIGHT_ROLES.some(role => said.startsWith(nightAuthorityRefusal(role).statusMessage)) ? null : said
+  return said.startsWith(NO_SHIFT_REFUSAL_OPENING) ? null : said
 }

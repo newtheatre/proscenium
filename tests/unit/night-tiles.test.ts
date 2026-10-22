@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { curtainIsDown, hubTiles, hubTilesWhileAsking, whoCanHelpTonight } from '#shared/utils/night-hub'
-import { NIGHT_ROLES, claimedShiftRefusal, nightAuthorityRefusal, outsideWindowRefusal } from '#shared/utils/night-authority'
+import { NIGHT_ROLES, claimedShiftRefusal, nightAnyRoleRefusal, nightAuthorityRefusal, outsideWindowRefusal } from '#shared/utils/night-authority'
 import { hubRefusal, rolesThatReach, saysScreenIsFor, standingsThatReach } from '#shared/utils/refusals'
 import { viewAccounts, viewProgramme, viewTrainingCatalogue } from '#shared/utils/abilities'
 import type { NightRole } from '#shared/utils/night-authority'
@@ -113,7 +113,26 @@ describe('the hub keeps a refusal that says more than no shift (issue 1304, issu
   test('no shift of any kind leaves the hub\'s own line', () => {
     for (const role of NIGHT_ROLES) expect(hubRefusal(nightAuthorityRefusal(role).statusMessage)).toBeNull()
     expect(hubRefusal(nightAuthorityRefusal('DOOR', { firstName: 'Rowan' }).statusMessage)).toBeNull()
+    expect(hubRefusal(nightAnyRoleRefusal(NIGHT_ROLES).statusMessage)).toBeNull()
     expect(hubRefusal(null)).toBeNull()
+  })
+})
+
+// The 21 October process map: one volunteer with no shift was told "door", "duty manager" and "bar"
+// by three screens that each open to all three (0232).
+describe('a screen several shifts open names every one of them (0232)', () => {
+  test('all three, in the order a night meets them, whatever order the guard tried', () => {
+    expect(nightAnyRoleRefusal(['DUTY_MANAGER', 'DOOR', 'BAR']).statusMessage)
+      .toBe('This needs a confirmed door, bar or duty manager shift on one of tonight\'s performances, or the Front of House Manager\'s role')
+  })
+
+  test('two say both', () => {
+    expect(nightAnyRoleRefusal(['DUTY_MANAGER', 'DOOR']).statusMessage)
+      .toBe('This needs a confirmed door or duty manager shift on one of tonight\'s performances, or the Front of House Manager\'s role')
+  })
+
+  test('one is the single-role refusal itself', () => {
+    expect(nightAnyRoleRefusal(['BAR'])).toEqual(nightAuthorityRefusal('BAR'))
   })
 })
 
@@ -127,6 +146,7 @@ describe('a refused screen names who can help tonight (issue 1304)', () => {
 
   test('with no duty manager on, the Front of House Manager is named', () => {
     expect(whoCanHelpTonight([{ role: 'DUTY_MANAGER', filled: false, name: null }])).toBe('Nobody is on as duty manager tonight: ask the Front of House Manager.')
+    expect(whoCanHelpTonight([{ role: 'DOOR', filled: true, name: 'Priya Shah' }])).toBe('Nobody is on as duty manager tonight: ask the Front of House Manager.')
     expect(whoCanHelpTonight(null)).toBe('Ask tonight\'s duty manager, or the Front of House Manager.')
   })
 })

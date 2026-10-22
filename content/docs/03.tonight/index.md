@@ -30,10 +30,12 @@ which is how the committee sees a rota that is not being kept; looking at a scre
 ## If something goes wrong
 
 - **"This needs a confirmed door shift on one of tonight's performances, or the Front of House
-  Manager's role"** (or the same for a bar shift, or for a duty manager shift): nothing tonight gives you this screen. It shows as one card in place of the screen,
-  naming tonight's duty manager to ask, or the Front of House Manager on a night with no duty
-  manager on, with **Back to tonight**; none of the screen's own buttons is
-  left to press. Find the person named, or ask the officer to assign you the shift on the rota. The
+  Manager's role"** (or the same for a bar shift, or for a duty manager shift; a screen more than
+  one shift opens names them all, such as **"a confirmed door, bar or duty manager shift"**):
+  nothing tonight gives you this screen. It shows as one card in place of the screen, naming
+  tonight's duty manager to ask, or the Front of House Manager on a night with no duty manager on,
+  with **Back to tonight**; none of the screen's own buttons is left to press. Find the person
+  named, or ask the officer to assign you the shift on the rota. The
   IT Manager is never offered as the answer to a rota that is wrong. At the door the refusal also
   says tonight's duty manager can open it for their own performance, by first name if you hold a
   confirmed shift on that performance yourself.
