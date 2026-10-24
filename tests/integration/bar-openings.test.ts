@@ -22,6 +22,7 @@ import {
 } from '#server/utils/bar-openings'
 import { replaceTemplateStatements } from '#server/utils/rota'
 import { auditEntry, changes } from '#shared/utils/audit'
+import { daysAfter } from '#shared/utils/membership'
 import { currentShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
 import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
 import { testVenue } from '#tests/helpers/programme'
@@ -602,7 +603,8 @@ describe('a member\'s own opening slots stay on their rota through the night (E-
 
       const listed = (at: number): unknown[] => run(database, myOpeningShiftsQuery('one', at))
       expect(listed(CLOSES_AT + 3600)).toHaveLength(1)
-      expect(listed(NIGHT_START + 24 * 3600 + 60)).toHaveLength(0)
+      // The next night's 04:00, not 24 hours on: the night the clocks go back is 25 hours long (0014).
+      expect(listed(showNightOpensAt(daysAfter(NIGHT, 1)) + 60)).toHaveLength(0)
     })
   })
 })
