@@ -3,7 +3,7 @@ import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import type { RosterOpening, RosterOpeningShiftRow, RosterPerformanceRow, RosterShiftRow } from '#server/utils/rota'
 
 // Every non-cancelled shift on the nights the window names, whole rather than paged (E-107
-// criterion 7), with the planned bar openings among them to read, not to act on (E-130 criterion 8).
+// criterion 7), with the planned bar openings among them, staffed here too (0250).
 
 export default defineEventHandler(async (event) => {
   await requirePermission(event, 'rota.write')
@@ -16,8 +16,8 @@ export default defineEventHandler(async (event) => {
   const [performances, shifts, openings, openingShifts, [claims]] = await Promise.all([
     db.all<RosterPerformanceRow>(rosterPerformancesQuery(scope)),
     db.all<RosterShiftRow>(rosterShiftsQuery(scope)),
-    window.waiting ? Promise.resolve([]) : db.all<RosterOpening>(rosterOpeningsQuery(bounds)),
-    window.waiting ? Promise.resolve([]) : db.all<RosterOpeningShiftRow>(rosterOpeningShiftsQuery(bounds)),
+    db.all<RosterOpening>(rosterOpeningsQuery(scope)),
+    db.all<RosterOpeningShiftRow>(rosterOpeningShiftsQuery(scope)),
     db.all<{ waiting: number }>(waitingClaimsQuery(tonight)),
   ])
 

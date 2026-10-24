@@ -1339,7 +1339,9 @@ search the assignment screen picks a name from (each match carries `reason`, why
 from `candidateLock()`: committee role, training, then already on the performance, 0210), distinct
 from the account directory that
 `accounts.read` gates (E-107 criterion 5); its search term is escaped against `%` and `_` before
-it reaches `LIKE`, the same guard every other search route in the app applies.
+it reaches `LIKE`, the same guard every other search route in the app applies. `GET /api/rota/openings/shifts/[id]/candidates?search=` is
+the same search for a bar opening's slot, under the same scope: its lock is the bar module, then
+another slot of the same opening, which is exactly what the opening's assign route refuses (0250).
 
 ### Eligibility (E-103)
 

@@ -13,6 +13,7 @@ import { saysShiftStatus } from '#shared/utils/rota'
 import type { BarOpeningStatus } from '#shared/utils/rota-openings'
 import type { ShiftStatus, TemplateSlot } from '#shared/utils/rota'
 import type { TableColumn } from '@nuxt/ui'
+import type { AssignCandidate } from '~/components/AssignShiftModal.vue'
 
 definePageMeta({ layout: 'console', title: 'Bar openings', middleware: 'console', docs: '/docs/rota/bar-openings' })
 
@@ -213,6 +214,30 @@ const { confirmingId, confirm, declining, declineOffered, declineFailure, declin
   refresh,
 })
 
+// An officer puts somebody on an open or declined slot, as the rota board does (0250).
+const assigning = ref<Slot | null>(null)
+const assignWorking = ref(false)
+const assignFailure = ref<string | null>(null)
+
+async function assign(candidate: AssignCandidate): Promise<void> {
+  const slot = assigning.value
+  if (!slot) return
+  assignWorking.value = true
+  assignFailure.value = null
+  try {
+    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/assign`, { method: 'POST', body: { userId: candidate.id } })
+    toast.add({ title: `${candidate.name} assigned`, description: `Slot ${slot.slot}, confirmed.`, icon: 'i-lucide-check', color: 'success' })
+    assigning.value = null
+    await refresh()
+  }
+  catch (error) {
+    assignFailure.value = refusalText(error)
+  }
+  finally {
+    assignWorking.value = false
+  }
+}
+
 const adding = ref<string | null>(null)
 
 async function addSlot(opening: Opening): Promise<void> {
@@ -277,6 +302,18 @@ function slotLine(slot: Slot, opening: Opening): VNode {
       size: 'sm',
     }, () => saysShiftStatus(slot.status)),
     h('span', { class: 'text-muted' }, slot.holderName ?? 'Nobody yet'),
+    ...(writes.value && opening.status === 'PLANNED' && (slot.status === 'OPEN' || slot.status === 'DECLINED')
+      ? [h(UButton, {
+          'size': 'xs',
+          'variant': 'subtle',
+          'icon': 'i-lucide-user-plus',
+          'data-test': `assign-${slot.slotId}`,
+          'onClick': () => {
+            assignFailure.value = null
+            assigning.value = slot
+          },
+        }, () => 'Assign')]
+      : []),
     ...(writes.value && slot.status === 'CLAIMED'
       ? [
           h(UButton, {
@@ -395,7 +432,7 @@ const columns: TableColumn<Opening>[] = [
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
 const modalOpen = computed(() => planning.value || cancellingOpening.value !== null || standingDown.value !== null
-  || removing.value !== null || declining.value !== null)
+  || removing.value !== null || declining.value !== null || assigning.value !== null)
 
 watch(modalOpen, (nowOpen) => {
   if (nowOpen) return
@@ -627,6 +664,15 @@ watch(modalOpen, (nowOpen) => {
       :failure="removeFailure"
       @update:open="value => { if (!value) removing = null }"
       @confirm="removeSlot"
+    />
+
+    <AssignShiftModal
+      :open="assigning !== null"
+      :target="assigning ? { kind: 'opening', id: assigning.slotId } : null"
+      :loading="assignWorking"
+      :failure="assignFailure"
+      @close="assigning = null"
+      @assign="assign"
     />
 
     <DeclineClaimModal

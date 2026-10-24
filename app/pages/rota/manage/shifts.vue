@@ -29,7 +29,7 @@ interface RosterPerformance {
   shifts: RosterShift[]
 }
 
-// Shown, never acted on here: an opening is staffed on its own screen (E-130 criterion 8).
+// Staffed here as a performance is; planned, resized and cancelled on Bar openings (0250).
 interface RosterOpening {
   openingId: string
   label: string
@@ -43,6 +43,10 @@ interface RosterOpening {
 type Board = { items: BoardEntry<RosterPerformance, RosterOpening>[], waiting: number }
 
 interface Candidate { id: string, name: string, email: string, eligible: boolean, reason: string | null, movable?: boolean }
+
+// A row the board acts on: a performance's shift or a bar opening's slot, each with its own routes.
+type SlotKind = 'shift' | 'opening'
+interface BoardSlot { kind: SlotKind, shiftId: string, status: ShiftStatus, holderName: string | null }
 
 const request = useRequestFetch()
 const toast = useToast()
@@ -143,10 +147,9 @@ const statusColor: Record<ShiftStatus, 'success' | 'warning' | 'neutral' | 'erro
   CANCELLED: 'neutral',
 }
 
-// Assigning a person, onto an open or claimed shift, or into the "add a shift" form below.
-const assigning = ref<{ shiftId: string, role: ShiftRole } | null>(null)
-// Declared before the candidate search below reads it: an ad hoc shift's role narrows the same
-// eligibility search an existing shift's id would.
+// Assigning a person onto an open or declined shift or slot; the modal searches its own route.
+const assigning = ref<BoardSlot | null>(null)
+// An ad hoc shift's role narrows the same eligibility search an existing shift's id would.
 const adding = ref<{ performanceId: string, role: ShiftRole | undefined } | null>(null)
 const submitting = ref(false)
 const candidateSearch = ref('')
@@ -154,25 +157,19 @@ const candidateSettled = useDebounced(candidateSearch, 250)
 const chosen = ref<Candidate | null>(null)
 
 const { data: candidateData, status: candidateStatus } = await useAsyncData(
-  () => `shift-candidates-${assigning.value?.shiftId ?? `${adding.value?.performanceId}-${adding.value?.role}`}-${candidateSettled.value}`,
+  () => `shift-candidates-${adding.value?.performanceId}-${adding.value?.role}-${candidateSettled.value}`,
   () => {
     const term = candidateSettled.value.trim()
     if (term.length < 2) return Promise.resolve({ items: [] as Candidate[] })
-    if (assigning.value) {
-      return request<{ items: Candidate[] }>(`/api/admin/rota/shifts/${assigning.value.shiftId}/candidates`, { query: { search: term } })
-    }
     if (adding.value?.role) {
       return request<{ items: Candidate[] }>('/api/admin/rota/candidates', { query: { search: term, role: adding.value.role, performanceId: adding.value.performanceId } })
     }
     return Promise.resolve({ items: [] as Candidate[] })
   },
-  { watch: [candidateSettled, assigning, () => adding.value?.role], default: (): { items: Candidate[] } => ({ items: [] }), getCachedData: () => undefined },
+  { watch: [candidateSettled, () => adding.value?.role], default: (): { items: Candidate[] } => ({ items: [] }), getCachedData: () => undefined },
 )
 
 const options = computed(() => candidateData.value.items.map(candidate => ({ ...candidate, value: candidate.id, label: candidate.name })))
-
-// Somebody on another shift of this performance can be moved onto this one, never doubled up (0211).
-const moving = ref(false)
 
 // A role's number is said only where the performance has more than one of it (0211).
 function saysRow(shifts: readonly RosterShift[], shift: RosterShift): string {
@@ -180,11 +177,12 @@ function saysRow(shifts: readonly RosterShift[], shift: RosterShift): string {
   return shifts.filter(one => one.role === shift.role).length > 1 ? `${role} ${shift.slot}` : role
 }
 
-function openAssign(shift: RosterShift): void {
-  assigning.value = { shiftId: shift.shiftId, role: shift.role }
-  moving.value = false
-  chosen.value = null
-  candidateSearch.value = ''
+function slotOf(kind: SlotKind, shift: Omit<BoardSlot, 'kind'>): BoardSlot {
+  return { kind, shiftId: shift.shiftId, status: shift.status, holderName: shift.holderName }
+}
+
+function openAssign(kind: SlotKind, shift: Omit<BoardSlot, 'kind'>): void {
+  assigning.value = slotOf(kind, shift)
   failure.value = null
 }
 
@@ -192,13 +190,16 @@ function choose(option: Candidate | undefined): void {
   chosen.value = option ?? null
 }
 
-async function submitAssign(): Promise<void> {
+// Somebody on another shift of this performance can be moved onto this one, never doubled up (0211).
+async function submitAssign(candidate: Candidate, move: boolean): Promise<void> {
   const row = assigning.value
-  if (!row || !chosen.value) return
+  if (!row) return
   submitting.value = true
   try {
-    const move = chosen.value.movable === true && moving.value
-    await $fetch(`/api/admin/rota/shifts/${row.shiftId}/assign`, { method: 'POST', body: { userId: chosen.value.id, move } })
+    await $fetch(row.kind === 'opening' ? `/api/rota/openings/shifts/${row.shiftId}/assign` : `/api/admin/rota/shifts/${row.shiftId}/assign`, {
+      method: 'POST',
+      body: row.kind === 'opening' ? { userId: candidate.id } : { userId: candidate.id, move },
+    })
     toast.add({ title: 'Assigned', icon: 'i-lucide-check', color: 'success' })
     assigning.value = null
     await refresh()
@@ -212,16 +213,18 @@ async function submitAssign(): Promise<void> {
 }
 
 // Confirming a claim, through E-105's approval route; the waiting filter is where the queue is worked.
-const { confirmingId, confirm, declining, declineOffered, declineFailure, declineWorking, openDecline, closeDecline, submitDecline } = useClaimAnswer<RosterShift>({
-  route: shift => `/api/admin/rota/approvals/${shift.shiftId}`,
-  id: shift => shift.shiftId,
+const { confirmingId, confirm, declining, declineOffered, declineFailure, declineWorking, openDecline, closeDecline, submitDecline } = useClaimAnswer<BoardSlot>({
+  route: slot => slot.kind === 'opening' ? `/api/rota/openings/shifts/${slot.shiftId}` : `/api/admin/rota/approvals/${slot.shiftId}`,
+  id: slot => slot.shiftId,
   confirmedTitle: () => 'Confirmed',
-  declinedDescription: shift => `${shift.holderName ?? 'The claimant'} is told why, and the shift stays off the open list until it is reassigned.`,
+  declinedDescription: slot => slot.kind === 'opening'
+    ? `${slot.holderName ?? 'The claimant'} is told why. The slot is back on offer once they dismiss it or you reassign it.`
+    : `${slot.holderName ?? 'The claimant'} is told why, and the shift stays off the open list until it is reassigned.`,
   failure,
   refresh,
 })
 
-const unconfirming = ref<RosterShift | null>(null)
+const unconfirming = ref<BoardSlot | null>(null)
 const unconfirmFailure = ref<string | null>(null)
 const unconfirmWorking = ref(false)
 
@@ -231,7 +234,7 @@ async function unconfirm(): Promise<void> {
   unconfirmWorking.value = true
   unconfirmFailure.value = null
   try {
-    await $fetch(`/api/admin/rota/shifts/${shift.shiftId}/unconfirm`, { method: 'POST' })
+    await $fetch(shift.kind === 'opening' ? `/api/rota/openings/shifts/${shift.shiftId}/unconfirm` : `/api/admin/rota/shifts/${shift.shiftId}/unconfirm`, { method: 'POST' })
     toast.add({ title: 'Unconfirmed', description: 'The shift is open again.', icon: 'i-lucide-undo-2', color: 'neutral' })
     unconfirming.value = null
     await refresh()
@@ -407,11 +410,11 @@ watch(modalOpen, (nowOpen) => {
             <li
               v-for="shift in entry.shifts"
               :key="shift.shiftId"
-              class="flex items-center justify-between gap-2 rounded-lg border p-2"
+              class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2"
               :class="shift.status === 'OPEN' || shift.status === 'DECLINED' ? 'border-warning' : 'border-default'"
               :data-test="`opening-shift-${shift.shiftId}`"
             >
-              <div>
+              <div class="min-w-0">
                 <p class="text-xs text-muted">
                   {{ saysShiftRole('BAR') }}
                 </p>
@@ -419,15 +422,64 @@ watch(modalOpen, (nowOpen) => {
                   {{ shift.holderName ?? 'Unfilled' }}
                 </p>
               </div>
-              <!-- An open slot already reads Unfilled with a warning border; Open beside it says it twice. -->
-              <UBadge
-                v-if="shift.status !== 'OPEN'"
-                :color="statusColor[shift.status]"
-                variant="subtle"
-                size="sm"
-              >
-                {{ saysShiftStatus(shift.status) }}
-              </UBadge>
+              <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+                <!-- An open slot already reads Unfilled with a warning border; Open beside it says it twice. -->
+                <UBadge
+                  v-if="shift.status !== 'OPEN'"
+                  :color="statusColor[shift.status]"
+                  variant="subtle"
+                  size="sm"
+                >
+                  {{ saysShiftStatus(shift.status) }}
+                </UBadge>
+
+                <UButton
+                  v-if="shift.status === 'OPEN' || shift.status === 'DECLINED'"
+                  size="xs"
+                  variant="subtle"
+                  icon="i-lucide-user-plus"
+                  :data-test="`assign-${shift.shiftId}`"
+                  @click="openAssign('opening', shift)"
+                >
+                  Assign
+                </UButton>
+                <template v-else-if="shift.status === 'CLAIMED'">
+                  <UButton
+                    size="xs"
+                    color="secondary"
+                    variant="subtle"
+                    icon="i-lucide-check"
+                    :loading="confirmingId === shift.shiftId"
+                    :disabled="confirmingId !== null && confirmingId !== shift.shiftId"
+                    :data-test="`confirm-${shift.shiftId}`"
+                    @click="confirm(slotOf('opening', shift))"
+                  >
+                    Confirm
+                  </UButton>
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="ghost"
+                    icon="i-lucide-x"
+                    :disabled="confirmingId === shift.shiftId"
+                    :data-test="`decline-${shift.shiftId}`"
+                    @click="openDecline(slotOf('opening', shift))"
+                  >
+                    Decline
+                  </UButton>
+                </template>
+                <UButton
+                  v-else-if="shift.status === 'CONFIRMED'"
+                  size="xs"
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-undo-2"
+                  :data-test="`unconfirm-${shift.shiftId}`"
+                  @click="unconfirmFailure = null; unconfirming = slotOf('opening', shift)"
+                >
+                  Unconfirm
+                </UButton>
+              </div>
             </li>
           </ul>
 
@@ -457,7 +509,7 @@ watch(modalOpen, (nowOpen) => {
               :to="openingsOnNightHref(entry.night)"
               :data-test="`manage-opening-${entry.openingId}`"
             >
-              Staff it on Bar openings
+              Slots and cancelling on Bar openings
             </UButton>
           </template>
         </UCard>
@@ -521,7 +573,7 @@ watch(modalOpen, (nowOpen) => {
                   variant="subtle"
                   icon="i-lucide-user-plus"
                   :data-test="`assign-${shift.shiftId}`"
-                  @click="openAssign(shift)"
+                  @click="openAssign('shift', shift)"
                 >
                   Assign
                 </UButton>
@@ -534,7 +586,7 @@ watch(modalOpen, (nowOpen) => {
                     :loading="confirmingId === shift.shiftId"
                     :disabled="confirmingId !== null && confirmingId !== shift.shiftId"
                     :data-test="`confirm-${shift.shiftId}`"
-                    @click="confirm(shift)"
+                    @click="confirm(slotOf('shift', shift))"
                   >
                     Confirm
                   </UButton>
@@ -545,7 +597,7 @@ watch(modalOpen, (nowOpen) => {
                     icon="i-lucide-x"
                     :disabled="confirmingId === shift.shiftId"
                     :data-test="`decline-${shift.shiftId}`"
-                    @click="openDecline(shift)"
+                    @click="openDecline(slotOf('shift', shift))"
                   >
                     Decline
                   </UButton>
@@ -557,7 +609,7 @@ watch(modalOpen, (nowOpen) => {
                   variant="ghost"
                   icon="i-lucide-undo-2"
                   :data-test="`unconfirm-${shift.shiftId}`"
-                  @click="unconfirmFailure = null; unconfirming = shift"
+                  @click="unconfirmFailure = null; unconfirming = slotOf('shift', shift)"
                 >
                   Unconfirm
                 </UButton>
@@ -624,79 +676,14 @@ watch(modalOpen, (nowOpen) => {
       </template>
     </div>
 
-    <UModal
+    <AssignShiftModal
       :open="assigning !== null"
-      title="Assign this shift"
-      description="Search by name or address. Eligibility is checked live, the same gate self-claiming uses."
-      @update:open="assigning = null"
-    >
-      <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="failure"
-          class="mb-4"
-          color="error"
-          variant="subtle"
-          :description="failure"
-        />
-        <div class="space-y-4">
-          <UInputMenu
-            class="w-full"
-            :model-value="options.find(option => option.value === chosen?.id)"
-            :items="options"
-            :loading="candidateStatus === 'pending'"
-            placeholder="Name or address"
-            :search-input="{ icon: 'i-lucide-search' }"
-            :content="{ hideWhenEmpty: true }"
-            ignore-filter
-            icon="i-lucide-user"
-            data-test="assign-candidate"
-            @update:model-value="choose"
-            @update:search-term="value => candidateSearch = value"
-          >
-            <template #item-label="{ item }">
-              <span class="flex items-center gap-1.5">
-                {{ item.name }}
-                <UBadge
-                  :color="item.eligible ? 'success' : 'neutral'"
-                  variant="subtle"
-                  size="sm"
-                >
-                  {{ item.eligible ? 'Eligible' : 'Locked' }}
-                </UBadge>
-                <span
-                  v-if="item.reason"
-                  class="text-xs text-muted"
-                  data-test="candidate-reason"
-                >{{ item.reason }}</span>
-              </span>
-            </template>
-            <template #empty>
-              <span class="text-sm text-muted">
-                {{ candidateSearch.trim().length < 2 ? 'Type at least two characters' : 'Nobody matches that' }}
-              </span>
-            </template>
-          </UInputMenu>
-
-          <UCheckbox
-            v-if="chosen?.movable"
-            v-model="moving"
-            label="Move them off their other shift on this performance"
-            description="That shift goes back to open."
-            data-test="assign-move"
-          />
-
-          <UButton
-            :disabled="!chosen || !(chosen.eligible || (chosen.movable && moving))"
-            :loading="submitting"
-            data-test="assign-submit"
-            @click="submitAssign"
-          >
-            Assign
-          </UButton>
-        </div>
-      </template>
-    </UModal>
+      :target="assigning ? { kind: assigning.kind, id: assigning.shiftId } : null"
+      :loading="submitting"
+      :failure="failure"
+      @close="assigning = null"
+      @assign="submitAssign"
+    />
 
     <UModal
       :open="adding !== null"
