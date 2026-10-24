@@ -14,6 +14,7 @@ const OPENINGS = 'app/pages/rota/manage/openings.vue'
 const APPROVALS = 'app/pages/rota/manage/approvals.vue'
 const CLAIM_ANSWER = 'app/composables/useClaimAnswer.ts'
 const DECLINE_MODAL = 'app/components/DeclineClaimModal.vue'
+const ASSIGN_MODAL = 'app/components/AssignShiftModal.vue'
 const RECORDS = 'app/pages/training/manage/records.vue'
 const REQUESTS = 'app/pages/training/manage/requests.vue'
 const SESSIONS = 'app/pages/training/manage/sessions/index.vue'
@@ -69,8 +70,8 @@ describe('the claims waiting for confirmation are worked on the board (E-105 cri
     expect(answer).toContain('openDecline(claim, offered)')
     expect(await read(DECLINE_MODAL)).toContain('if (isOpen) state.reason = props.offered')
     const board = await read(BOARD)
-    expect(board).toContain('useClaimAnswer<RosterShift>(')
-    expect(board).toContain('@click="openDecline(shift)"')
+    expect(board).toContain('useClaimAnswer<BoardSlot>(')
+    expect(board).toContain('@click="openDecline(slotOf(\'shift\', shift))"')
     expect(board).toContain(':offered="declineOffered"')
   })
 
@@ -103,15 +104,19 @@ describe('the board shows the nights it was asked for (E-107 criterion 7)', () =
   })
 })
 
-describe('the board shows bar openings beside performances (E-130 criterion 8)', () => {
+describe('the board shows bar openings beside performances (E-130 criterion 8, 0250)', () => {
   test('an opening card is marked as a bar opening', async () => {
     const source = await read(BOARD)
     expect(source).toContain(':data-test="`opening-${entry.openingId}`"')
     expect(source).toContain('Bar opening')
   })
 
-  test('an opening links to its night on the openings screen rather than acting on the board', async () => {
+  // 0250: staffed on the board, while its slots and its cancelling stay on Bar openings.
+  test('an opening is staffed on the board and links to its night for everything else', async () => {
     const source = await read(BOARD)
+    expect(source).toContain('@click="openAssign(\'opening\', shift)"')
+    expect(source).toContain('@click="confirm(slotOf(\'opening\', shift))"')
+    expect(source).toContain(':target="assigning ? { kind: assigning.kind, id: assigning.shiftId } : null"')
     expect(source).toContain('openingsOnNightHref(entry.night)')
     expect(source).toContain(':data-test="`manage-opening-${entry.openingId}`"')
   })
@@ -157,6 +162,27 @@ describe('a queued claim on a bar opening is confirmed or declined on the openin
 
   test('a claimed slot is answered rather than stood down', async () => {
     expect(await read(OPENINGS)).toContain('slot.status === \'CONFIRMED\' || slot.status === \'DECLINED\'')
+  })
+})
+
+// 0250: an officer puts somebody on an opening's slot, which only a member's claim could fill before.
+describe('an officer assigns a bar opening\'s slot', () => {
+  test('an open or declined slot on a planned opening offers Assign, through the opening\'s own route', async () => {
+    const source = await read(OPENINGS)
+    expect(source).toContain('opening.status === \'PLANNED\' && (slot.status === \'OPEN\' || slot.status === \'DECLINED\')')
+    expect(source).toContain('`/api/rota/openings/shifts/${slot.slotId}/assign`')
+    expect(source).toContain(':target="assigning ? { kind: \'opening\', id: assigning.slotId } : null"')
+  })
+
+  test('the board and the openings screen search with one dialogue, each naming its own route', async () => {
+    expect(await read(OPENINGS)).toContain('<AssignShiftModal')
+    expect(await read(BOARD)).toContain('<AssignShiftModal')
+    const modal = await read(ASSIGN_MODAL)
+    expect(modal).toContain('data-test="assign-candidate"')
+    expect(modal).toContain('data-test="candidate-reason"')
+    expect(modal).toContain('if (mine === asked) found.value = answer.items')
+    expect(modal).toContain('`/api/rota/openings/shifts/${target.id}/candidates?${encoded}`')
+    expect(modal).toContain('`/api/admin/rota/shifts/${target.id}/candidates?${encoded}`')
   })
 })
 

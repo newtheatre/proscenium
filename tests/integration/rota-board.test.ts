@@ -278,4 +278,43 @@ describe('the board\'s waiting filter is the approvals queue', () => {
       expect(run<{ waiting: number }>(database, waitingClaimsQuery(from))).toEqual([{ waiting: 1 }])
     })
   })
+
+  // 0250: a claim on a bar opening's slot waits on the same officer as a shift's.
+  function openingClaims(database: TestDatabase): void {
+    claims(database)
+    barOpening(database, 'opening-claimed', daysAfter(tonight, 3))
+    barOpening(database, 'opening-open', daysAfter(tonight, 4))
+    barOpening(database, 'opening-past', daysAfter(tonight, -1))
+    barOpening(database, 'opening-off', daysAfter(tonight, 5), 'CANCELLED')
+    database.batch([
+      ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status, user_id) VALUES (?, ?, ?, ?, ?)', 'slot-claimed-1', 'opening-claimed', 1, 'CLAIMED', 'claimant'],
+      ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status) VALUES (?, ?, ?, ?)', 'slot-claimed-2', 'opening-claimed', 2, 'OPEN'],
+      ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status) VALUES (?, ?, ?, ?)', 'slot-open-1', 'opening-open', 1, 'OPEN'],
+      ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status, user_id) VALUES (?, ?, ?, ?, ?)', 'slot-past-1', 'opening-past', 1, 'CLAIMED', 'claimant'],
+      ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status, user_id) VALUES (?, ?, ?, ?, ?)', 'slot-off-1', 'opening-off', 1, 'CLAIMED', 'claimant'],
+    ])
+  }
+
+  test('a planned bar opening from tonight on holding a claim is read, and no other (0250)', async () => {
+    await withDatabase((database) => {
+      openingClaims(database)
+      expect(run<{ openingId: string }>(database, rosterOpeningsQuery(WAITING)).map(row => row.openingId))
+        .toEqual(['opening-claimed'])
+    })
+  })
+
+  test('a waiting opening comes whole, its open slot beside the claim (0250)', async () => {
+    await withDatabase((database) => {
+      openingClaims(database)
+      expect(run<{ shiftId: string }>(database, rosterOpeningShiftsQuery(WAITING)).map(row => row.shiftId))
+        .toEqual(['slot-claimed-1', 'slot-claimed-2'])
+    })
+  })
+
+  test('the count adds the claims on bar openings to the claims on shifts (0250)', async () => {
+    await withDatabase((database) => {
+      openingClaims(database)
+      expect(run<{ waiting: number }>(database, waitingClaimsQuery(from))).toEqual([{ waiting: 3 }])
+    })
+  })
 })
