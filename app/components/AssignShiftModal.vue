@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Putting a person on a shift or on a bar opening's slot: one search, the route's own gate shown
 // under each name (E-107 criterion 3, 0250). The caller submits the choice to its own route.
-export interface AssignCandidate { id: string, name: string, email: string, eligible: boolean, reason: string | null, movable?: boolean }
+export interface AssignCandidate { id: string, name: string, email: string, eligible: boolean, reason: string | null, movable?: boolean, upcoming: number }
 
 const props = defineProps<{
   open: boolean
@@ -16,16 +16,34 @@ const emit = defineEmits<{ close: [], assign: [candidate: AssignCandidate, move:
 const search = ref('')
 const settled = useDebounced(search, 250)
 const found = ref<AssignCandidate[]>([])
+const suggested = ref<AssignCandidate[]>([])
 const searching = ref(false)
 const chosen = ref<AssignCandidate | null>(null)
 const moving = ref(false)
 
-watch(() => [props.open, props.target?.id], () => {
+function candidatesUrl(target: { kind: 'shift' | 'opening', id: string }, term: string): string {
+  const base = target.kind === 'opening' ? `/api/rota/openings/shifts/${target.id}/candidates` : `/api/admin/rota/shifts/${target.id}/candidates`
+  return term === '' ? base : `${base}?search=${encodeURIComponent(term)}`
+}
+
+// Nothing typed yet: the eligible people with the fewest shifts ahead, one click each (0251).
+watch(() => [props.open, props.target?.id], async () => {
   search.value = ''
   found.value = []
+  suggested.value = []
   chosen.value = null
   moving.value = false
-})
+  const target = props.target
+  if (!props.open || !target) return
+  try {
+    // No options, so the widened form holds (0053).
+    const answer = await $fetch<{ items: AssignCandidate[] }, string>(candidatesUrl(target, ''))
+    if (props.target?.id === target.id) suggested.value = answer.items
+  }
+  catch {
+    suggested.value = []
+  }
+}, { immediate: true })
 
 // Only the latest answer is kept, so a slow reply to an earlier term never replaces a newer one.
 let asked = 0
@@ -40,10 +58,7 @@ watch(settled, async (value) => {
   searching.value = true
   try {
     // No options, so the widened form holds (0053); the term is encoded into the address instead.
-    const encoded = `search=${encodeURIComponent(term)}`
-    const answer = target.kind === 'opening'
-      ? await $fetch<{ items: AssignCandidate[] }, string>(`/api/rota/openings/shifts/${target.id}/candidates?${encoded}`)
-      : await $fetch<{ items: AssignCandidate[] }, string>(`/api/admin/rota/shifts/${target.id}/candidates?${encoded}`)
+    const answer = await $fetch<{ items: AssignCandidate[] }, string>(candidatesUrl(target, term))
     if (mine === asked) found.value = answer.items
   }
   catch {
@@ -54,7 +69,14 @@ watch(settled, async (value) => {
   }
 })
 
-const options = computed(() => found.value.map(candidate => ({ ...candidate, value: candidate.id, label: candidate.name })))
+const options = computed(() => [...found.value, ...(chosen.value && !found.value.some(c => c.id === chosen.value?.id) ? [chosen.value] : [])]
+  .map(candidate => ({ ...candidate, value: candidate.id, label: candidate.name })))
+
+const showSuggestions = computed(() => search.value.trim().length < 2 && suggested.value.length > 0)
+
+function ahead(count: number): string {
+  return count === 0 ? 'No shifts ahead' : count === 1 ? '1 shift ahead' : `${count} shifts ahead`
+}
 
 const canAssign = computed(() => chosen.value !== null && (chosen.value.eligible || (chosen.value.movable === true && moving.value)))
 
@@ -110,14 +132,41 @@ function submit(): void {
                 class="text-xs text-muted"
                 data-test="candidate-reason"
               >{{ item.reason }}</span>
+              <span
+                v-else
+                class="text-xs text-muted"
+              >{{ ahead(item.upcoming) }}</span>
             </span>
           </template>
           <template #empty>
             <span class="text-sm text-muted">
-              {{ search.trim().length < 2 ? 'Type at least two characters' : 'Nobody matches that' }}
+              {{ search.trim().length < 2 ? 'Type at least two characters, or pick a suggestion' : 'Nobody matches that' }}
             </span>
           </template>
         </UInputMenu>
+
+        <div
+          v-if="showSuggestions"
+          data-test="assign-suggestions"
+        >
+          <p class="mb-2 text-xs text-muted">
+            Suggested: eligible now, fewest shifts ahead first
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <UButton
+              v-for="person in suggested"
+              :key="person.id"
+              size="sm"
+              :variant="chosen?.id === person.id ? 'solid' : 'outline'"
+              color="neutral"
+              data-test="assign-suggestion"
+              @click="chosen = person"
+            >
+              {{ person.name }}
+              <span class="text-xs opacity-70">{{ ahead(person.upcoming) }}</span>
+            </UButton>
+          </div>
+        </div>
 
         <UCheckbox
           v-if="chosen?.movable"

@@ -350,6 +350,36 @@ describe.skipIf(skip !== null)('who might be assigned (E-107 criterion 3)', () =
     expect(items.find(item => item.id === locked.id)?.eligible).toBe(false)
   })
 
+  test('nothing typed suggests the eligible people, fewest shifts ahead first (0251)', async () => {
+    const fresh = `${doorModule}-S${suffix()}`
+    const department = doorModule.split('-')[0]
+    expect((await send('POST', '/api/admin/training/modules', { id: fresh, department, kind: 'MODULE', name: `Module ${fresh}`, status: 'ACTIVE' })).status).toBe(200)
+    expect((await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DOOR_MODULE', { value: fresh })).status).toBe(200)
+    try {
+      const busy = await registerMember(app, 'suggest-busy', generatePassword())
+      const free = await registerMember(app, 'suggest-free', generatePassword())
+      const untrained = await registerMember(app, 'suggest-untrained', generatePassword())
+      const onIt = await registerMember(app, 'suggest-on-it', generatePassword())
+      for (const person of [busy, free, onIt]) await award(person.id, fresh)
+      claim(performance(3, 'suggest-ahead').shiftId, busy.id)
+      const house = performance(7, 'suggest')
+      write('INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, 2, ?, ?)',
+        `${house.performanceId}-DOOR-2`, house.performanceId, 'DOOR', 'CONFIRMED', onIt.id)
+
+      const answered = await send('GET', `/api/admin/rota/shifts/${house.shiftId}/candidates`, undefined, foh.cookie)
+      expect(answered.status).toBe(200)
+      const body = await answered.json() as { suggested: boolean, items: { id: string, eligible: boolean, upcoming: number }[] }
+      expect(body.suggested).toBe(true)
+      expect(body.items.map(item => item.id)).toEqual([free.id, busy.id])
+      expect(body.items.map(item => item.upcoming)).toEqual([0, 1])
+      expect(body.items.every(item => item.eligible)).toBe(true)
+      expect(body.items.some(item => item.id === untrained.id)).toBe(false)
+    }
+    finally {
+      expect((await send('PUT', '/api/admin/config/SHIFT_ELIGIBILITY_DOOR_MODULE', { value: doorModule })).status).toBe(200)
+    }
+  })
+
   test('an ordinary member cannot search candidates', async () => {
     const member = await registerMember(app, 'candidate-forbidden', generatePassword())
     const house = performance(7, 'candidates-forbidden')

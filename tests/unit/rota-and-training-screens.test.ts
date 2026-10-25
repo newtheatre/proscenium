@@ -181,8 +181,18 @@ describe('an officer assigns a bar opening\'s slot', () => {
     expect(modal).toContain('data-test="assign-candidate"')
     expect(modal).toContain('data-test="candidate-reason"')
     expect(modal).toContain('if (mine === asked) found.value = answer.items')
-    expect(modal).toContain('`/api/rota/openings/shifts/${target.id}/candidates?${encoded}`')
-    expect(modal).toContain('`/api/admin/rota/shifts/${target.id}/candidates?${encoded}`')
+    expect(modal).toContain('`/api/rota/openings/shifts/${target.id}/candidates`')
+    expect(modal).toContain('`/api/admin/rota/shifts/${target.id}/candidates`')
+    expect(modal).toContain('`${base}?search=${encodeURIComponent(term)}`')
+  })
+
+  // 0251: the dialogue opens on suggestions, so a routine gap needs no name in mind.
+  test('the dialogue suggests before anything is typed, each saying how booked they are', async () => {
+    const modal = await read(ASSIGN_MODAL)
+    expect(modal).toContain('candidatesUrl(target, \'\')')
+    expect(modal).toContain('data-test="assign-suggestion"')
+    expect(modal).toContain('@click="chosen = person"')
+    expect(modal).toContain('{{ ahead(person.upcoming) }}')
   })
 })
 

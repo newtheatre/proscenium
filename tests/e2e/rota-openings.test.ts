@@ -599,6 +599,47 @@ describe.skipIf(skip !== null)('an officer assigns a bar opening\'s slot (0250)'
     }
   }, 120_000)
 
+  // 0251: nothing typed lists who passes the gate now, least booked first.
+  test('nothing typed suggests the bar-trained, never one already on the opening', async () => {
+    const { first, second } = await planned('A suggested hire')
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${second.slotId}/assign`, { userId: other.id }, foh.cookie)).status).toBe(200)
+    const answered = await request(app, 'GET', `/api/rota/openings/shifts/${first.slotId}/candidates`, undefined, foh.cookie)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { suggested: boolean, items: (Candidate & { upcoming: number })[] }
+    expect(body.suggested).toBe(true)
+    expect(body.items.some(one => one.id === member.id)).toBe(true)
+    expect(body.items.some(one => one.id === other.id || one.id === foh.id)).toBe(false)
+    expect(body.items.every(one => one.eligible)).toBe(true)
+    const loads = body.items.map(one => one.upcoming)
+    expect(loads).toEqual([...loads].sort((a, b) => a - b))
+  })
+
+  test('on Bar openings, a suggestion is assigned in two clicks', async () => {
+    const { first } = await planned('A two-click hire')
+    let view: Bun.WebView | null = null
+    try {
+      view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', foh.email)
+      await fill(view, 'form input[type="password"]', fohPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, foh.email)
+
+      await visit(view, `${app.baseURL}/rota/manage/openings`, `[data-test="assign-${first.slotId}"]`)
+      await click(view, `[data-test="assign-${first.slotId}"]`)
+      const pick = `[...document.querySelectorAll('[data-test="assign-suggestion"]')].find(one => one.textContent.includes(${JSON.stringify(member.name)}))`
+      await waitFor(view, pick, 30_000)
+      await view.evaluate(`${pick}.click()`)
+      await waitFor(view, `!document.querySelector('[data-test="assign-submit"]').disabled`, 30_000)
+      await click(view, '[data-test="assign-submit"]')
+      await waitFor(view, `!document.querySelector('[data-test="assign-${first.slotId}"]')`, 30_000)
+      expect((await listing(foh.cookie)).slots.find(one => one.slotId === first.slotId)).toMatchObject({ status: 'CONFIRMED', holderName: member.name })
+    }
+    finally {
+      view?.close()
+    }
+  }, 120_000)
+
   test('on Bar openings, Assign is offered on an open slot and never on a held one', async () => {
     const { opening, first, second } = await planned('An openings-staffed hire')
     expect((await request(app, 'POST', `/api/rota/openings/shifts/${second.slotId}/assign`, { userId: other.id }, foh.cookie)).status).toBe(200)

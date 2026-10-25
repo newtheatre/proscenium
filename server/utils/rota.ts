@@ -418,6 +418,33 @@ export function clashesWith(userId: string | SQL, startsAt: SQL, endsAt: SQL, ve
   )`
 }
 
+// Claimed and confirmed shifts and opening slots a person holds from `from` on, so a suggestion
+// list can put the least-booked first and the rota spreads (0251).
+export function upcomingLoad(userId: SQL, from: number): SQL {
+  return sql`((
+    SELECT count(*) FROM shifts load_s
+    JOIN performances load_p ON load_p.id = load_s.performance_id
+    WHERE load_s.user_id = ${userId} AND load_s.status IN ('CLAIMED', 'CONFIRMED')
+      AND load_p.status <> 'CANCELLED' AND load_p.starts_at >= ${from}
+  ) + (
+    SELECT count(*) FROM bar_opening_shifts load_b
+    JOIN bar_openings load_o ON load_o.id = load_b.opening_id
+    WHERE load_b.user_id = ${userId} AND load_b.status IN ('CLAIMED', 'CONFIRMED')
+      AND load_o.status = 'PLANNED' AND load_o.starts_at >= ${from}
+  ))`
+}
+
+// Holds the module today, by the rule `heldNow` keeps: unrevoked and not yet at its expiry date.
+export function holdsModuleNow(userId: SQL, moduleId: string, today: string): SQL {
+  return sql`EXISTS (
+    SELECT 1 FROM training_records held_r
+    WHERE held_r.user_id = ${userId} AND held_r.module_id = ${moduleId}
+      AND held_r.revoked_at IS NULL AND (held_r.expires_on IS NULL OR held_r.expires_on > ${today})
+  )`
+}
+
+export const SUGGESTION_LIMIT = 8
+
 const targetVenue = sql`(SELECT venue_id FROM performances WHERE id = target.performance_id)`
 
 // The shift that clashes, for the refusal to name, read only once a write has been refused.
