@@ -148,7 +148,9 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
   6. The FOH officer can add a one-off shift to a performance directly, outside the venue's template, naming its role and slot and optionally a person; naming an eligible person confirms it at once, the same as an assignment. The officer can also stand a confirmed shift back down to open, distinct from a holder's own release, notifying whoever held it. Both are audited with actor.
   7. The board reads a window of dates rather than a fixed count of performances: it opens on the
      coming fortnight and takes a from and an until, so a quiet week and a festival week both show
-     the nights an officer is working on.
+     the nights an officer is working on. Amended 25 October 2026 by decision 0252: the window is
+     shown as one row per show night, each with its date and that night's confirmed count, holding
+     the night's performances and bar openings in the order they start.
   8. A holder's release, of a shift or of a slot on a bar opening, asks first in the shared
      confirmation: it says the shift goes back on the open list for anyone who qualifies and that
      having it back means claiming it again. Nothing is released until the holder confirms.
@@ -480,7 +482,7 @@ Counts: 31 MVP stories (E-101 to E-131), 4 V2 stories (E-201 to E-204), 1 Later 
 - Depends on: E-101, E-104, E-106; decision 0077
 - Acceptance criteria:
   1. An opening records a venue, the London show-night date, a label, a start and an end, its creator and a status of `PLANNED` or `CANCELLED`; the database refuses an end at or before the start, and `/rota/manage/openings` is where an officer creates, lists and cancels one.
-  2. Creating an opening stamps bar slots from the venue's template count; a venue with no bar row in its template stamps nothing and says so rather than guessing one slot.
+  2. Creating an opening stamps bar slots from the venue's template count; a venue with no bar row in its template stamps nothing and says so rather than guessing one slot. Amended 25 October 2026 by decision 0252: an opening can also be planned from its night on the rota board, in the same dialogue, with the evening already set.
   3. Slots are claimed and confirmed through the same race-safe conditional write the rota's own claims use, honouring the auto-confirm setting, so two simultaneous claims on one slot resolve to exactly one winner and the loser is told the slot has gone.
   4. An opening's shifts appear on the claimant's own rota alongside their performance shifts, labelled by the opening's label and venue rather than by a show title, and the open-slot list offers them the same way.
   5. Cancelling an opening cancels its shifts; whoever held one keeps their name on it and is told, and an unclaimed slot names nobody, exactly as a cancelled performance's shifts behave.

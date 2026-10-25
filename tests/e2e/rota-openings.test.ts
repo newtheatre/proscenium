@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickOption, readDate, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import { daysAfter } from '#shared/utils/membership'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -655,6 +655,41 @@ describe.skipIf(skip !== null)('an officer assigns a bar opening\'s slot (0250)'
       await visit(view, `${app.baseURL}/rota/manage/openings`, `[data-test="assign-${first.slotId}"]`)
       expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="staffing-${opening.openingId}"] [data-test="assign-${second.slotId}"]'))`)).toBe(false)
       expect(await textOf(view, `[data-test="staffing-${opening.openingId}"]`)).toContain('Confirmed')
+    }
+    finally {
+      view?.close()
+    }
+  }, 120_000)
+})
+
+// 0252: each night on the board offers Plan a bar opening, with the evening already given.
+describe.skipIf(skip !== null)('a bar opening is planned from its night on the board (0252)', () => {
+  test('the night\'s own button opens the plan on that evening, and the opening joins the row', async () => {
+    expect((await plan('A night already on the board', foh.cookie)).status).toBe(200)
+    let view: Bun.WebView | null = null
+    try {
+      view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', foh.email)
+      await fill(view, 'form input[type="password"]', fohPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, foh.email)
+
+      await visit(view, `${app.baseURL}/rota/manage/shifts?from=${night}&to=${night}`, `[data-test="plan-opening-${night}"]`)
+      await click(view, `[data-test="plan-opening-${night}"]`)
+      await waitFor(view, `document.querySelector('[data-test="opening-label"]')`, 30_000)
+      const [year, month, day] = night.split('-')
+      const shown = await readDate(view, '[data-test="opening-evening"]')
+      for (const part of [year!, month!, day!]) expect(shown).toContain(part)
+
+      await pickOption(view, '[data-test="opening-venue"]', 'The Hire Room')
+      await fill(view, '[data-test="opening-label"]', 'Planned from its night')
+      await click(view, '[data-test="opening-submit"]')
+      // These cases share a venue and night, so the overlap warning is answered (0215).
+      await waitFor(view, `document.querySelector('[data-test="opening-submit-anyway"]')`, 30_000)
+      await click(view, '[data-test="opening-submit-anyway"]')
+      await waitFor(view, `document.querySelector('[data-test="night-${night}"]')?.textContent.includes('Planned from its night')`, 30_000)
+      expect((await listing(foh.cookie)).items.some(one => one.label === 'Planned from its night')).toBe(true)
     }
     finally {
       view?.close()

@@ -196,6 +196,24 @@ describe('an officer assigns a bar opening\'s slot', () => {
   })
 })
 
+// 0252: the board is a row per night, and a bar opening is planned from its night.
+describe('the board plans a bar opening from its night', () => {
+  test('each night offers Plan a bar opening, with the evening already given', async () => {
+    const board = await read(BOARD)
+    expect(board).toContain('v-for="row in nights"')
+    expect(board).toContain(':data-test="`plan-opening-${row.night}`"')
+    expect(board).toContain(':evening="planningNight ?? undefined"')
+  })
+
+  test('the board and Bar openings plan with one dialogue', async () => {
+    expect(await read(BOARD)).toContain('<PlanOpeningModal')
+    expect(await read(OPENINGS)).toContain('<PlanOpeningModal')
+    const modal = await read('app/components/PlanOpeningModal.vue')
+    expect(modal).toContain('if (evening) plan.evening = evening')
+    expect(modal).toContain('if (!plan.venueId && options.length === 1) plan.venueId = options[0]!.value')
+  })
+})
+
 describe('a module is chosen by name (G-120 criterion 7)', () => {
   test('the sign-off picker names the module', async () => {
     const source = await read(RECORDS)

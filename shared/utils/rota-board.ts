@@ -70,6 +70,23 @@ export function boardEntries<P extends { startsAt: number }, O extends { startsA
   return entries.sort((a, b) => a.startsAt - b.startsAt || rank(a) - rank(b))
 }
 
+export interface BoardNight<P, O> { night: string, entries: BoardEntry<P, O>[] }
+
+// The board reads as one row per show night, so an evening's house and its bar opening sit
+// together (0252). Entries arrive ordered, so each night keeps their order.
+export function boardNights<P extends { startsAt: number }, O extends { startsAt: number }>(
+  entries: readonly BoardEntry<P, O>[],
+): BoardNight<P, O>[] {
+  const nights: BoardNight<P, O>[] = []
+  for (const entry of entries) {
+    const night = showNightOf(new Date(entry.startsAt * 1000))
+    const last = nights.at(-1)
+    if (last?.night === night) last.entries.push(entry)
+    else nights.push({ night, entries: [entry] })
+  }
+  return nights
+}
+
 export interface Staffing {
   says: string
   tone: 'success' | 'warning' | 'neutral'
