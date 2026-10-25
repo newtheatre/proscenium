@@ -156,7 +156,7 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
   test('an administrator is counted every queue, a Theatre Manager only the requests they answer', async () => {
     const everything = await read<{ counts: Record<string, number> }>(officer.cookie, '/api/admin/waiting')
     expect(everything.status).toBe(200)
-    expect(Object.keys(everything.body.counts).sort()).toEqual(['access-profiles', 'membership-claims', 'pass-requests', 'room-requests', 'training-requests'])
+    expect(Object.keys(everything.body.counts).sort()).toEqual(['access-profiles', 'membership-claims', 'pass-requests', 'room-requests', 'rota-claims', 'training-requests'])
     for (const count of Object.values(everything.body.counts)) expect(Number.isInteger(count)).toBe(true)
 
     expect((await read<{ counts: Record<string, number> }>(theatre.cookie, '/api/admin/waiting')).body.counts).toEqual({ 'room-requests': expect.any(Number), 'training-requests': expect.any(Number) })
@@ -164,9 +164,11 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
   })
 
   test('tonight is offered to whoever may open its screens, and set-up to whoever can finish it', async () => {
-    const officerView = await read<{ setUp: unknown[], tonight: unknown[] | null, firstRun: { step: string, done: boolean }[] | null }>(officer.cookie, '/api/admin/overview')
+    const officerView = await read<{ setUp: unknown[], tonight: unknown[] | null, firstRun: { step: string, done: boolean }[] | null, rotaWeek: unknown[] | null }>(officer.cookie, '/api/admin/overview')
     expect(officerView.status).toBe(200)
     expect(Array.isArray(officerView.body.tonight)).toBe(true)
+    // 0253: whoever reads the rota is shown its week.
+    expect(Array.isArray(officerView.body.rotaWeek)).toBe(true)
     expect(Array.isArray(officerView.body.setUp)).toBe(true)
     // The Theatre Manager's grant below is a role besides the IT Manager's, so that step is ticked,
     // or the card is gone altogether once every step is (0221).
@@ -177,6 +179,7 @@ describe.skipIf(skip !== null)('the overview is what waits for the caller (issue
     const routed = await read<{ setUp: unknown[], tonight: unknown[] | null }>(theatre.cookie, '/api/admin/overview')
     expect(routed.body.tonight).toBeNull()
     expect((routed.body as { firstRun?: unknown }).firstRun).toBeNull()
+    expect((routed.body as { rotaWeek?: unknown }).rotaWeek).toBeNull()
     expect(routed.body.setUp).toEqual([])
 
     expect((await request(app, 'PUT', '/api/admin/safety/severities/SERIOUS', { requiresFollowUp: false }, theatre.cookie)).status).toBe(200)
