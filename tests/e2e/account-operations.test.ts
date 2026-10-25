@@ -4,7 +4,7 @@ import { codeForStep, stepFor } from '#shared/utils/totp'
 import { saysRole } from '#shared/utils/roles'
 import { forgetSpentStep, markVerified } from '#tests/helpers/accounts'
 import { generatePassword, registrableAddress, syntheticPerson } from '#tests/helpers/seed'
-import { click, fill, fillPin, letters, openSignedOutView, pickOption, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, fillPin, letters, openSignedOutView, pickOption, pickOptions, pickPerson, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 
 const skip = skipReason()
@@ -305,6 +305,65 @@ describe.skipIf(skip !== null)('the account view (A-121 criterion 5)', () => {
   })
 })
 
+// 0257: several roles in one grant, each its own row and audit entry, every one or none.
+describe.skipIf(skip !== null)('several roles are granted at once (A-118 criterion 8)', () => {
+  const grantsOf = (userId: string) => {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return database.query('SELECT role, expires_at AS expiresAt, note FROM role_grants WHERE user_id = ? ORDER BY role').all(userId) as { role: string, expiresAt: number | null, note: string | null }[]
+    }
+    finally {
+      database.close()
+    }
+  }
+  const audited = (userId: string): string[] => {
+    const database = new Database(app.databaseFile, { readonly: true })
+    try {
+      return (database.query(`SELECT json_extract(detail, '$.role') AS role FROM audit_log WHERE action = 'role.granted' AND target = ? ORDER BY role`).all(`user:${userId}`) as { role: string }[]).map(row => row.role)
+    }
+    finally {
+      database.close()
+    }
+  }
+
+  test('each role is its own grant with the same expiry and note, and its own audit entry', async () => {
+    const person = await subject('several')
+    const answered = await send('POST', '/api/admin/roles', { userId: person.id, roles: ['FOH_MANAGER', 'TREASURER'], expiresAt: null, note: 'Handover' }, cookie)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { granted: { role: string, renewed: boolean }[] }
+    expect(body.granted.map(one => [one.role, one.renewed])).toEqual([['FOH_MANAGER', false], ['TREASURER', false]])
+
+    expect(grantsOf(person.id)).toEqual([
+      { role: 'FOH_MANAGER', expiresAt: null, note: 'Handover' },
+      { role: 'TREASURER', expiresAt: null, note: 'Handover' },
+    ])
+    expect(audited(person.id)).toEqual(['FOH_MANAGER', 'TREASURER'])
+  })
+
+  test('a held role among them is renewed, and said to be', async () => {
+    const person = await subject('several-renewed')
+    await send('POST', '/api/admin/roles', { userId: person.id, role: 'FOH_MANAGER' }, cookie)
+    const body = await (await send('POST', '/api/admin/roles', { userId: person.id, roles: ['FOH_MANAGER', 'TREASURER'] }, cookie)).json() as { granted: { role: string, renewed: boolean }[] }
+    expect(body.granted.map(one => [one.role, one.renewed])).toEqual([['FOH_MANAGER', true], ['TREASURER', false]])
+  })
+
+  test('a role twice, several roles by address, and none at all are refused', async () => {
+    const person = await subject('several-refused')
+    expect((await send('POST', '/api/admin/roles', { userId: person.id, roles: ['TREASURER', 'TREASURER'] }, cookie)).status).toBe(400)
+    expect((await send('POST', '/api/admin/roles', { userId: person.id, roles: [] }, cookie)).status).toBe(400)
+    expect((await send('POST', '/api/admin/roles', { userId: person.id, role: 'TREASURER', roles: ['FOH_MANAGER'] }, cookie)).status).toBe(400)
+    expect((await send('POST', '/api/admin/roles', { email: registrableAddress('several-by-address'), name: 'By Address (test)', roles: ['TREASURER', 'FOH_MANAGER'] }, cookie)).status).toBe(400)
+    expect(grantsOf(person.id)).toEqual([])
+  })
+
+  test('one refused role writes none of them', async () => {
+    const me = read<{ id: string }>('SELECT id FROM users WHERE email = ?', officer.email)!.id
+    const before = grantsOf(me)
+    expect((await send('POST', '/api/admin/roles', { userId: me, roles: ['ADMIN', 'TREASURER'] }, cookie)).status).toBe(403)
+    expect(grantsOf(me)).toEqual(before)
+  })
+})
+
 async function officerView(): Promise<Bun.WebView> {
   const view = await openSignedOutView(app.baseURL)
   await visit(view, `${app.baseURL}/sign-in`)
@@ -344,9 +403,9 @@ describe.skipIf(skip !== null)('the account screen', () => {
     const person = await subject('grantable')
     const view = await officerView()
     try {
-      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-role"]')
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-roles"]')
 
-      await pickOption(view, '[data-test="grant-role"]', saysRole('FOH_MANAGER'))
+      await pickOptions(view, '[data-test="grant-roles"]', [saysRole('FOH_MANAGER')])
       await click(view, '[data-test="grant-submit"]')
       await waitFor(view, 'document.querySelector(\'[data-test="revoke-FOH_MANAGER"]\')')
 
@@ -367,13 +426,28 @@ describe.skipIf(skip !== null)('the account screen', () => {
     }
   }, 120_000)
 
+  test('several roles are chosen and granted with one press (0257)', async () => {
+    const person = await subject('several-screen')
+    const view = await officerView()
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-roles"]')
+      await pickOptions(view, '[data-test="grant-roles"]', [saysRole('FOH_MANAGER'), saysRole('TREASURER')])
+      await waitFor(view, `document.querySelector('[data-test="grant-submit"]').innerText.includes('Grant 2 roles')`)
+      await click(view, '[data-test="grant-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="revoke-FOH_MANAGER"]') && document.querySelector('[data-test="revoke-TREASURER"]')`)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
+
   test('a permanent grant carries no expiry', async () => {
     const person = await subject('permanent')
     const view = await officerView()
     try {
-      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-role"]')
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="grant-roles"]')
 
-      await pickOption(view, '[data-test="grant-role"]', saysRole('TREASURER'))
+      await pickOptions(view, '[data-test="grant-roles"]', [saysRole('TREASURER')])
       await pickOption(view, '[data-test="grant-until"]', 'Further notice')
       await click(view, '[data-test="grant-submit"]')
       await waitFor(view, 'document.body.innerText.includes(\'further notice\')')

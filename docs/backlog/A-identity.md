@@ -310,6 +310,7 @@ Open questions for the committee:
   5. Every grant change is audited as a from/to diff.
   6. Old-estate grants and their provenance import via a written role-vocabulary mapping table agreed in Phase 0.
   7. Added 29 September 2026 (decision 0114): a grant to the granter's own account is refused for every role but the IT Manager's, whose holder already holds every permission; renewing one's own IT Manager grant (to make it permanent, A-120) stays allowed.
+  8. Added 25 October 2026 (decision 0257): one grant from an account's page may name several roles, written together with one expiry and one note, each role its own grant row and its own audit entry; if any is refused, none is written.
 - Source: Prompt Book A-4, module 0 principle P3; audit SD-9; Get-In part 2 (roles row: carry); criterion 7 from the role audit on issue #1211, 26 September 2026 (R4).
 
 ## A-119: Warn holders before roles lapse

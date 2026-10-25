@@ -5,6 +5,12 @@ export function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`
 }
 
+// "Bar, Door and Duty manager": a list read as a sentence, with no comma before the "and".
+export function saysList(words: readonly string[]): string {
+  if (words.length <= 1) return words[0] ?? ''
+  return `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
+}
+
 // "That is the 3rd booking not used this year": a count read as a position. 11 to 13 take "th"
 // whatever their last digit would otherwise ask for.
 export function ordinal(count: number): string {

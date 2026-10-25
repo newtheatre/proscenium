@@ -2,6 +2,7 @@
 import { endOfLondonDay } from '#shared/utils/london'
 import { londonDay } from '#shared/utils/membership'
 import { ROLES, defaultRoleExpiry, saysRole } from '#shared/utils/roles'
+import { saysList } from '#shared/utils/text'
 import { saysDayLong } from '#shared/utils/when'
 import type { Role } from '#shared/utils/roles'
 
@@ -29,14 +30,17 @@ const UNTIL: { value: Until, label: string }[] = [
 ]
 
 const chosenRole = ref<Role | undefined>(props.role)
+// The account page fixes the person, so it grants several roles at once; the register one (0257).
+const several = computed(() => !props.role && Boolean(props.userId))
+const chosenRoles = ref<Role[]>([])
 const chosenPerson = ref<string | undefined>(props.userId)
 const until = ref<Until>('year')
 const day = ref<string | undefined>(undefined)
 const note = ref('')
 const working = ref(false)
 const failure = ref<string | null>(null)
-// The role just granted when it does nothing until its holder sets up an authenticator (A-112).
-const waitsOn = ref<Role | null>(null)
+// The roles just granted that do nothing until their holder sets up an authenticator (A-112).
+const waitsOn = ref<Role[]>([])
 
 // The address is only ever the fallback once the picker has found nobody (A-132, K-123 criterion 1).
 const nobody = ref<string | null>(null)
@@ -68,7 +72,8 @@ const offered = computed(() => ROLES
 const someone = computed(() => byAddress.value ? Boolean(address.value.trim() && name.value.trim()) : Boolean(chosenPerson.value))
 // A typed day can sit before the picker's minimum, so it is said under the field rather than ignored (0157).
 const dayProblem = computed(() => until.value === 'date' && day.value && day.value < londonDay(new Date()) ? 'Pick a date from today on' : undefined)
-const ready = computed(() => Boolean(chosenRole.value && someone.value && (until.value !== 'date' || (day.value && !dayProblem.value))))
+const roleChosen = computed(() => several.value ? chosenRoles.value.length > 0 : Boolean(chosenRole.value))
+const ready = computed(() => Boolean(roleChosen.value && someone.value && (until.value !== 'date' || (day.value && !dayProblem.value))))
 
 // Omitted is the committee year end, null is permanent, and a picked day expires at its last
 // instant in London, never at midnight UTC (0009, 0014).
@@ -82,21 +87,22 @@ async function grant(): Promise<void> {
   if (!ready.value) return
   working.value = true
   failure.value = null
-  waitsOn.value = null
+  waitsOn.value = []
   try {
-    const granted = await $fetch<{ role: Role, waitsOnFactor: boolean }>('/api/admin/roles', {
+    const granted = await $fetch<{ role: Role, waitsOnFactor: boolean, granted?: { role: Role, waitsOnFactor: boolean }[] }>('/api/admin/roles', {
       method: 'POST',
       body: {
         ...(byAddress.value ? { email: address.value.trim(), name: name.value.trim() } : { userId: chosenPerson.value }),
-        role: chosenRole.value,
+        ...(several.value ? { roles: chosenRoles.value } : { role: chosenRole.value }),
         ...expiry(),
         ...(note.value.trim() ? { note: note.value.trim() } : {}),
       },
     })
-    waitsOn.value = granted.waitsOnFactor ? granted.role : null
+    waitsOn.value = (granted.granted ?? [granted]).filter(one => one.waitsOnFactor).map(one => one.role)
     if (!props.userId) chosenPerson.value = undefined
     searchAgain()
     if (!props.role) chosenRole.value = undefined
+    chosenRoles.value = []
     until.value = 'year'
     day.value = undefined
     note.value = ''
@@ -126,12 +132,12 @@ async function grant(): Promise<void> {
     />
 
     <UAlert
-      v-if="waitsOn"
+      v-if="waitsOn.length"
       data-test="grant-waits-on-factor"
       color="warning"
       variant="subtle"
       icon="i-lucide-smartphone"
-      :title="`Granted, but ${saysRole(waitsOn)} needs an authenticator app`"
+      :title="`Granted, but ${saysList(waitsOn.map(saysRole))} ${waitsOn.length === 1 ? 'needs' : 'need'} an authenticator app`"
       description="It does nothing for them until they set one up under Security in their account. Tell them now, before they meet a refused screen."
     />
 
@@ -196,7 +202,23 @@ async function grant(): Promise<void> {
       </div>
 
       <UFormField
-        v-if="!props.role"
+        v-if="several"
+        label="Roles"
+        description="One or more, granted together with the same expiry and note."
+      >
+        <USelect
+          v-model="chosenRoles"
+          :items="offered"
+          value-key="value"
+          multiple
+          placeholder="Choose roles"
+          class="w-full"
+          data-test="grant-roles"
+        />
+      </UFormField>
+
+      <UFormField
+        v-else-if="!props.role"
         label="Role"
       >
         <USelect
@@ -251,7 +273,7 @@ async function grant(): Promise<void> {
       :disabled="!ready"
       data-test="grant-submit"
     >
-      Grant it
+      {{ several && chosenRoles.length > 1 ? `Grant ${chosenRoles.length} roles` : 'Grant it' }}
     </UButton>
   </form>
 </template>
