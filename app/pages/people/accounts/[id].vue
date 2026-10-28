@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ListFailure } from '~/composables/useListFailure'
 import { saysDay, saysDayRange, saysDayLong, saysWhen } from '#shared/utils/when'
-import { can, createAccounts, disableAccounts, grantRoles, mergeAccounts, revokeRoles } from '#shared/utils/abilities'
+import { can, createAccounts, disableAccounts, grantRoles, mergeAccounts, revokeRoles, viewRota, viewTrainingCatalogue } from '#shared/utils/abilities'
 import { saysRole } from '#shared/utils/roles'
 import { describeAction } from '#shared/utils/audit-actions'
 
@@ -43,6 +43,8 @@ const sees = computed(() => ({
   disables: can(useViewer().value, disableAccounts),
   prelinks: can(useViewer().value, createAccounts),
   merges: can(useViewer().value, mergeAccounts),
+  rota: can(useViewer().value, viewRota),
+  training: can(useViewer().value, viewTrainingCatalogue),
 }))
 
 // The Workspace address their first Google sign-in claims; clearing it confirms, because the
@@ -233,6 +235,13 @@ const signsInWith = computed(() => {
     methods.factor ? `An authenticator, with ${plural(methods.recoveryCodesRemaining, 'recovery code')} left` : null,
   ].filter(Boolean) as string[]
 })
+
+// A role granted here can unlock a duty manager shift, so the rota card reads again with it.
+const personRota = ref<{ refresh: () => Promise<void> } | null>(null)
+
+async function granted(): Promise<void> {
+  await Promise.all([load(), personRota.value?.refresh()])
+}
 
 onMounted(load)
 </script>
@@ -476,12 +485,13 @@ onMounted(load)
 
           <div
             v-if="sees.grants && !erased"
+            id="grant-role"
             class="mt-3 border-t border-default pt-3"
           >
             <RoleGrantForm
               :user-id="String(route.params.id)"
               :held="heldRoles"
-              @granted="load"
+              @granted="granted"
             />
           </div>
 
@@ -495,6 +505,17 @@ onMounted(load)
             data-test="open-register"
           />
         </UPageCard>
+
+        <!-- Each shows only to a viewer who already opens the screen it summarises (0255). -->
+        <PersonRotaCard
+          v-if="sees.rota && !erased"
+          ref="personRota"
+          :user-id="view.account.id"
+        />
+        <PersonTrainingCard
+          v-if="sees.training && !erased"
+          :user-id="view.account.id"
+        />
 
         <UPageCard
           title="Membership"
