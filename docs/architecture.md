@@ -1339,7 +1339,14 @@ search the assignment screen picks a name from (each match carries `reason`, why
 from `candidateLock()`: committee role, training, then already on the performance, 0210), distinct
 from the account directory that
 `accounts.read` gates (E-107 criterion 5); its search term is escaped against `%` and `_` before
-it reaches `LIKE`, the same guard every other search route in the app applies.
+it reaches `LIKE`, the same guard every other search route in the app applies. `GET /api/rota/openings/shifts/[id]/candidates?search=` is
+the same search for a bar opening's slot, under the same scope: its lock is the bar module, then
+another slot of the same opening, which is exactly what the opening's assign route refuses (0250).
+Called with no `search`, either route suggests instead (0251): up to `SUGGESTION_LIMIT` (8) people
+who pass the gate now (`holdsModuleNow()`, the committee role for a duty manager, not on the
+performance or opening, no clash for a shift), ordered by `upcomingLoad()`, the claimed and
+confirmed shifts and opening slots they hold from tonight's 04:00 on, then by name. Every item
+carries `upcoming`, and the answer says `suggested`. An unnamed rule suggests nobody.
 
 ### Eligibility (E-103)
 

@@ -4,7 +4,7 @@ import { sqliteTarget } from '#tests/helpers/database'
 import { adminSession, finishSignIn, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { testVenue } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { click, fill, openSignedOutView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
+import { click, fill, openSignedOutView, pickOption, readDate, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
 import { daysAfter } from '#shared/utils/membership'
 import type { AppUnderTest } from '#tests/helpers/webview'
@@ -398,6 +398,23 @@ describe.skipIf(skip !== null)('a queued claim is confirmed or declined (E-130 c
     }
   })
 
+  // 0250: the board's waiting filter is every claim waiting, a bar opening's beside a shift's.
+  test('a queued claim on an opening waits on the board\'s filter, and is counted there', async () => {
+    await setAutoConfirm(false)
+    try {
+      const { opening } = await queued('A waiting hire')
+      const response = await request(app, 'GET', '/api/admin/rota/shifts/board?waiting=true', undefined, foh.cookie)
+      expect(response.status).toBe(200)
+      const board = await response.json() as { waiting: number, items: { kind: string, openingId?: string, shifts: { status: string }[] }[] }
+      const waiting = board.items.find(entry => entry.kind === 'opening' && entry.openingId === opening.openingId)
+      expect(waiting?.shifts.map(one => one.status)).toEqual(['CLAIMED', 'CLAIMED'])
+      expect(board.waiting).toBeGreaterThanOrEqual(2)
+    }
+    finally {
+      await setAutoConfirm(true)
+    }
+  })
+
   // Issue 1302 through the opening's own route: a claimant whose bar training lapsed since is not
   // confirmed, and the refusal carries the decline reason the screen offers.
   test('a claim whose bar training lapsed since is refused, offering its decline reason', async () => {
@@ -523,4 +540,159 @@ describe.skipIf(skip !== null)('a release close to the night tells the rota offi
     expect((await request(app, 'POST', `/api/rota/openings/shifts/${far.slotId}/release`, {}, member.cookie)).status).toBe(200)
     expect(releaseNotices(foh.id)).toBe(before + 1)
   })
+})
+
+// 0250: an officer puts a person on a slot, from the board or from Bar openings, through the
+// opening's own route and its gate; only a member's claim could fill one before.
+describe.skipIf(skip !== null)('an officer assigns a bar opening\'s slot (0250)', () => {
+  async function planned(label: string): Promise<{ opening: Opening, first: Slot, second: Slot }> {
+    expect((await plan(label, foh.cookie)).status).toBe(200)
+    const { items, slots } = await listing(foh.cookie)
+    const opening = items.find(one => one.label === label)!
+    const [first, second] = slots.filter(one => one.openingId === opening.openingId) as [Slot, Slot]
+    return { opening, first, second }
+  }
+
+  interface Candidate { id: string, eligible: boolean, reason: string | null }
+  async function candidates(slotId: string, search: string, as: string): Promise<Response> {
+    return await request(app, 'GET', `/api/rota/openings/shifts/${slotId}/candidates?search=${encodeURIComponent(search)}`, undefined, as)
+  }
+
+  test('the candidates say who qualifies and why the others are locked', async () => {
+    const { first, second } = await planned('A candidates hire')
+    expect((await candidates(first.slotId, 'openings', member.cookie)).status).toBe(403)
+
+    const before = await (await candidates(first.slotId, 'openings', foh.cookie)).json() as { items: Candidate[] }
+    expect(before.items.find(one => one.id === member.id)).toMatchObject({ eligible: true, reason: null })
+    expect(before.items.find(one => one.id === foh.id)).toMatchObject({ eligible: false, reason: `Needs Module ${barModuleId}` })
+
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${second.slotId}/assign`, { userId: member.id }, foh.cookie)).status).toBe(200)
+    const after = await (await candidates(first.slotId, 'openings', foh.cookie)).json() as { items: Candidate[] }
+    expect(after.items.find(one => one.id === member.id)).toMatchObject({ eligible: false, reason: 'Already on another slot of this bar opening' })
+  })
+
+  test('on the board, Assign puts a member on an open slot, confirmed', async () => {
+    const { first } = await planned('A board-staffed hire')
+    let view: Bun.WebView | null = null
+    try {
+      view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', foh.email)
+      await fill(view, 'form input[type="password"]', fohPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, foh.email)
+
+      await visit(view, `${app.baseURL}/rota/manage/shifts?from=${night}&to=${night}`, `[data-test="assign-${first.slotId}"]`)
+      await click(view, `[data-test="assign-${first.slotId}"]`)
+      // The combobox inside the open dialog: the attribute lands on the menu, not on its field.
+      await waitFor(view, `document.querySelector('[role="dialog"] input[role="combobox"]')`, 30_000)
+      await fill(view, '[role="dialog"] input[role="combobox"]', other.email)
+      await waitFor(view, `document.querySelectorAll('[role="option"]').length === 1`, 30_000)
+      await view.evaluate(`document.querySelector('[role="option"]').click()`)
+      await waitFor(view, `!document.querySelector('[data-test="assign-submit"]').disabled`, 30_000)
+      await click(view, '[data-test="assign-submit"]')
+      await waitFor(view, `document.querySelector('[data-test="unconfirm-${first.slotId}"]')`, 30_000)
+      expect((await listing(foh.cookie)).slots.find(one => one.slotId === first.slotId)).toMatchObject({ status: 'CONFIRMED' })
+    }
+    finally {
+      view?.close()
+    }
+  }, 120_000)
+
+  // 0251: nothing typed lists who passes the gate now, least booked first.
+  test('nothing typed suggests the bar-trained, never one already on the opening', async () => {
+    const { first, second } = await planned('A suggested hire')
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${second.slotId}/assign`, { userId: other.id }, foh.cookie)).status).toBe(200)
+    const answered = await request(app, 'GET', `/api/rota/openings/shifts/${first.slotId}/candidates`, undefined, foh.cookie)
+    expect(answered.status).toBe(200)
+    const body = await answered.json() as { suggested: boolean, items: (Candidate & { upcoming: number })[] }
+    expect(body.suggested).toBe(true)
+    expect(body.items.some(one => one.id === member.id)).toBe(true)
+    expect(body.items.some(one => one.id === other.id || one.id === foh.id)).toBe(false)
+    expect(body.items.every(one => one.eligible)).toBe(true)
+    const loads = body.items.map(one => one.upcoming)
+    expect(loads).toEqual([...loads].sort((a, b) => a - b))
+  })
+
+  test('on Bar openings, a suggestion is assigned in two clicks', async () => {
+    const { first } = await planned('A two-click hire')
+    let view: Bun.WebView | null = null
+    try {
+      view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', foh.email)
+      await fill(view, 'form input[type="password"]', fohPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, foh.email)
+
+      await visit(view, `${app.baseURL}/rota/manage/openings`, `[data-test="assign-${first.slotId}"]`)
+      await click(view, `[data-test="assign-${first.slotId}"]`)
+      const pick = `[...document.querySelectorAll('[data-test="assign-suggestion"]')].find(one => one.textContent.includes(${JSON.stringify(member.name)}))`
+      await waitFor(view, pick, 30_000)
+      await view.evaluate(`${pick}.click()`)
+      await waitFor(view, `!document.querySelector('[data-test="assign-submit"]').disabled`, 30_000)
+      await click(view, '[data-test="assign-submit"]')
+      await waitFor(view, `!document.querySelector('[data-test="assign-${first.slotId}"]')`, 30_000)
+      expect((await listing(foh.cookie)).slots.find(one => one.slotId === first.slotId)).toMatchObject({ status: 'CONFIRMED', holderName: member.name })
+    }
+    finally {
+      view?.close()
+    }
+  }, 120_000)
+
+  test('on Bar openings, Assign is offered on an open slot and never on a held one', async () => {
+    const { opening, first, second } = await planned('An openings-staffed hire')
+    expect((await request(app, 'POST', `/api/rota/openings/shifts/${second.slotId}/assign`, { userId: other.id }, foh.cookie)).status).toBe(200)
+    let view: Bun.WebView | null = null
+    try {
+      view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', foh.email)
+      await fill(view, 'form input[type="password"]', fohPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, foh.email)
+
+      await visit(view, `${app.baseURL}/rota/manage/openings`, `[data-test="assign-${first.slotId}"]`)
+      expect(await view.evaluate<boolean>(`Boolean(document.querySelector('[data-test="staffing-${opening.openingId}"] [data-test="assign-${second.slotId}"]'))`)).toBe(false)
+      expect(await textOf(view, `[data-test="staffing-${opening.openingId}"]`)).toContain('Confirmed')
+    }
+    finally {
+      view?.close()
+    }
+  }, 120_000)
+})
+
+// 0252: each night on the board offers Plan a bar opening, with the evening already given.
+describe.skipIf(skip !== null)('a bar opening is planned from its night on the board (0252)', () => {
+  test('the night\'s own button opens the plan on that evening, and the opening joins the row', async () => {
+    expect((await plan('A night already on the board', foh.cookie)).status).toBe(200)
+    let view: Bun.WebView | null = null
+    try {
+      view = await openSignedOutView(app.baseURL)
+      await visit(view, `${app.baseURL}/sign-in`)
+      await fill(view, 'form input[type="email"]', foh.email)
+      await fill(view, 'form input[type="password"]', fohPassword)
+      await click(view, 'form button[type="submit"]')
+      await finishSignIn(app, view, foh.email)
+
+      await visit(view, `${app.baseURL}/rota/manage/shifts?from=${night}&to=${night}`, `[data-test="plan-opening-${night}"]`)
+      await click(view, `[data-test="plan-opening-${night}"]`)
+      await waitFor(view, `document.querySelector('[data-test="opening-label"]')`, 30_000)
+      const [year, month, day] = night.split('-')
+      const shown = await readDate(view, '[data-test="opening-evening"]')
+      for (const part of [year!, month!, day!]) expect(shown).toContain(part)
+
+      await pickOption(view, '[data-test="opening-venue"]', 'The Hire Room')
+      await fill(view, '[data-test="opening-label"]', 'Planned from its night')
+      await click(view, '[data-test="opening-submit"]')
+      // These cases share a venue and night, so the overlap warning is answered (0215).
+      await waitFor(view, `document.querySelector('[data-test="opening-submit-anyway"]')`, 30_000)
+      await click(view, '[data-test="opening-submit-anyway"]')
+      await waitFor(view, `document.querySelector('[data-test="night-${night}"]')?.textContent.includes('Planned from its night')`, 30_000)
+      expect((await listing(foh.cookie)).items.some(one => one.label === 'Planned from its night')).toBe(true)
+    }
+    finally {
+      view?.close()
+    }
+  }, 120_000)
 })

@@ -57,6 +57,7 @@ export function noLongerOnCommittee(role: ShiftRole, claimantName: string): Laps
 }
 
 export const ALREADY_ON_PERFORMANCE = 'Already on this performance'
+export const ALREADY_ON_OPENING = 'Already on another slot of this bar opening'
 
 export interface CandidateFacts {
   role: ShiftRole

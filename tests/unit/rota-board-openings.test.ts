@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { boardEntries, openingsOnNightHref } from '#shared/utils/rota-board'
+import { boardEntries, boardNights, openingsOnNightHref } from '#shared/utils/rota-board'
 import { parseCondition } from '#shared/utils/list-filters'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
 
@@ -45,5 +45,34 @@ describe('an opening links to its night on the openings screen', () => {
     const field = rotaOpeningsList.fields.find(candidate => candidate.key === 'night')!
     const value = new URL(openingsOnNightHref('2026-09-25'), 'https://example.invalid').searchParams.get('night')!
     expect(parseCondition(field, value)).toEqual({ condition: { key: 'night', operator: 'is', values: ['2026-09-25'] } })
+  })
+})
+
+// 0252: one row per show night, so an evening's house and its bar opening are staffed together.
+describe('the board reads as one row per show night', () => {
+  // 18:00 London on 24 and 25 October 2026, either side of the clocks going back.
+  const evening = (day: number): number => Math.floor(Date.UTC(2026, 9, day, day === 24 ? 17 : 18) / 1000)
+
+  test('a performance and the opening after it on one evening share a night', () => {
+    const entries = boardEntries([performance('p1', evening(24))], [opening('o1', evening(24) + 3 * 3600)])
+    const nights = boardNights(entries)
+    expect(nights).toHaveLength(1)
+    expect(nights[0]!.night).toBe('2026-10-24')
+    expect(nights[0]!.entries.map(entry => entry.kind)).toEqual(['performance', 'opening'])
+  })
+
+  test('an opening past midnight belongs to the evening it started on', () => {
+    const lateOpening = Math.floor(Date.UTC(2026, 9, 25, 1, 30) / 1000)
+    const nights = boardNights(boardEntries([performance('p1', evening(24))], [opening('o1', lateOpening)]))
+    expect(nights.map(night => night.night)).toEqual(['2026-10-24'])
+  })
+
+  test('two evenings are two nights, in order', () => {
+    const nights = boardNights(boardEntries([performance('p2', evening(25)), performance('p1', evening(24))], []))
+    expect(nights.map(night => night.night)).toEqual(['2026-10-24', '2026-10-25'])
+  })
+
+  test('nothing on the board is no nights', () => {
+    expect(boardNights([])).toEqual([])
   })
 })

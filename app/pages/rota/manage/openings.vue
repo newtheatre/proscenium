@@ -1,18 +1,16 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
 import type { VNode } from 'vue'
-import { fromLondonWallClock, londonClock } from '#shared/utils/london'
+import { londonClock } from '#shared/utils/london'
 import { saysWhenLong } from '#shared/utils/when'
-import { daysAfter } from '#shared/utils/membership'
-import { MAX_PAGE_SIZE } from '#shared/utils/pagination'
 import { can, manageRota } from '#shared/utils/abilities'
-import { BAR_OPENING_LABEL_LIMIT, ONLY_SLOT_HINT, SAME_TIME_REFUSAL, saysBarOpeningStatus } from '#shared/utils/rota-openings'
+import { ONLY_SLOT_HINT, saysBarOpeningStatus } from '#shared/utils/rota-openings'
 import { rotaOpeningsList } from '#shared/utils/rota-openings-list'
-import { showNightOf } from '#shared/utils/show-night'
 import { saysShiftStatus } from '#shared/utils/rota'
 import type { BarOpeningStatus } from '#shared/utils/rota-openings'
-import type { ShiftStatus, TemplateSlot } from '#shared/utils/rota'
+import type { ShiftStatus } from '#shared/utils/rota'
 import type { TableColumn } from '@nuxt/ui'
+import type { AssignCandidate } from '~/components/AssignShiftModal.vue'
 
 definePageMeta({ layout: 'console', title: 'Bar openings', middleware: 'console', docs: '/docs/rota/bar-openings' })
 
@@ -48,8 +46,6 @@ interface Listing {
   pages: number
 }
 
-interface VenueTemplate { venueId: string, venueName: string, archived: boolean, slots: TemplateSlot[] }
-
 const request = useRequestFetch()
 const toast = useToast()
 // Tidiness rather than enforcement: the routes are what refuse (0040).
@@ -57,9 +53,6 @@ const writes = computed(() => can(useViewer().value, manageRota))
 const failure = ref<string | null>(null)
 const cancelling = ref<string | null>(null)
 const planning = ref(false)
-const saving = ref(false)
-// Set when the route warns of an overlapping opening; going ahead resends with the flag (0215).
-const overlapWarned = ref(false)
 
 const { search, conditions, sort, page, query, active, filtered, set, setSort, clear } = useListQuery(rotaOpeningsList)
 
@@ -72,84 +65,10 @@ const { data: listing, status, refresh, error } = await useAsyncData(
 )
 const readFailure = useListFailure(error, 'The bar openings could not be read.')
 
-// Only venues whose template staffs a bar: anywhere else stamps nothing, and offering it would
-// be a form that always refuses (E-130 criterion 2).
-const { data: templates } = await useAsyncData(
-  'rota-openings-venues',
-  () => request<{ venues: VenueTemplate[] }>('/api/admin/rota/templates', { query: { pageSize: MAX_PAGE_SIZE } }),
-  { default: () => ({ venues: [] as VenueTemplate[] }) },
-)
-
-const venueOptions = computed(() => templates.value.venues
-  .filter(venue => !venue.archived && venue.slots.some(slot => slot.role === 'BAR'))
-  .map(venue => ({ label: venue.venueName, value: venue.venueId })))
-
-const plan = reactive({ venueId: '', evening: '', opensAt: '18:00', closesAt: '23:00', label: '' })
-
-// One bar to open is the usual case, and there is nothing to choose between (0140).
-watch(venueOptions, (options) => {
-  if (!plan.venueId && options.length === 1) plan.venueId = options[0]!.value
-}, { immediate: true })
-
-// A wall-clock time as typed, or null: an empty field is a missing answer, never midnight.
-function clockParts(value: string): [number, number] | null {
-  const [hour, minute] = value.split(':').map(Number)
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null
-  return [hour!, minute!]
-}
-
-// The night is the evening's own show night, worked out from the instant rather than typed: a bar
-// opening at 00:30 belongs to the night before, and the write path refuses a pair that disagrees.
-function instantsFor(): { night: string, startsAt: number, endsAt: number } | 'same' | null {
-  const [year, month, day] = plan.evening.split('-').map(Number)
-  const opensAt = clockParts(plan.opensAt)
-  const closesAt = clockParts(plan.closesAt)
-  if (!year || !month || !day || !opensAt || !closesAt) return null
-
-  const opens = fromLondonWallClock(year, month, day, opensAt[0], opensAt[1])
-  if (opensAt[0] === closesAt[0] && opensAt[1] === closesAt[1]) return 'same'
-  const sameDay = fromLondonWallClock(year, month, day, closesAt[0], closesAt[1])
-  // A bar closing earlier on the clock than it opened closes the next morning, on the next London
-  // day rather than this instant plus 86400: a clock-change night is not that long (0014).
-  const [nextYear, nextMonth, nextDay] = daysAfter(plan.evening, 1).split('-').map(Number)
-  const closes = sameDay <= opens
-    ? fromLondonWallClock(nextYear!, nextMonth!, nextDay!, closesAt[0], closesAt[1])
-    : sameDay
-  return { night: showNightOf(opens), startsAt: Math.floor(opens.getTime() / 1000), endsAt: Math.floor(closes.getTime() / 1000) }
-}
-
-async function submitPlan(anyway = false): Promise<void> {
-  const when = instantsFor()
-  if (!when || when === 'same') {
-    failure.value = when === 'same' ? SAME_TIME_REFUSAL : 'Give the evening, the time the bar opens and the time it closes'
-    overlapWarned.value = false
-    return
-  }
-  saving.value = true
-  failure.value = null
-  overlapWarned.value = false
-  try {
-    const answer = await $fetch<{ stamped: number }>('/api/rota/openings', {
-      method: 'POST',
-      body: { venueId: plan.venueId, label: plan.label.trim(), ...when, overlapping: anyway || undefined },
-    })
-    toast.add({
-      title: 'Bar opening planned',
-      description: `${plural(answer.stamped, 'bar slot')} stamped from the venue's template.`,
-      icon: 'i-lucide-check',
-      color: 'success',
-    })
-    planning.value = false
-    plan.label = ''
-    await refresh()
-  }
-  catch (error) {
-    failure.value = refusalText(error)
-    overlapWarned.value = refusalData<{ overlap?: boolean }>(error)?.overlap === true
-  }
-  finally {
-    saving.value = false
-  }
+// Planned in its own dialogue, which the rota board opens from a night too (0252).
+async function planned(): Promise<void> {
+  planning.value = false
+  await refresh()
 }
 
 const cancellingOpening = ref<Opening | null>(null)
@@ -212,6 +131,30 @@ const { confirmingId, confirm, declining, declineOffered, declineFailure, declin
   failure,
   refresh,
 })
+
+// An officer puts somebody on an open or declined slot, as the rota board does (0250).
+const assigning = ref<Slot | null>(null)
+const assignWorking = ref(false)
+const assignFailure = ref<string | null>(null)
+
+async function assign(candidate: AssignCandidate): Promise<void> {
+  const slot = assigning.value
+  if (!slot) return
+  assignWorking.value = true
+  assignFailure.value = null
+  try {
+    await $fetch(`/api/rota/openings/shifts/${slot.slotId}/assign`, { method: 'POST', body: { userId: candidate.id } })
+    toast.add({ title: `${candidate.name} assigned`, description: `Slot ${slot.slot}, confirmed.`, icon: 'i-lucide-check', color: 'success' })
+    assigning.value = null
+    await refresh()
+  }
+  catch (error) {
+    assignFailure.value = refusalText(error)
+  }
+  finally {
+    assignWorking.value = false
+  }
+}
 
 const adding = ref<string | null>(null)
 
@@ -277,6 +220,18 @@ function slotLine(slot: Slot, opening: Opening): VNode {
       size: 'sm',
     }, () => saysShiftStatus(slot.status)),
     h('span', { class: 'text-muted' }, slot.holderName ?? 'Nobody yet'),
+    ...(writes.value && opening.status === 'PLANNED' && (slot.status === 'OPEN' || slot.status === 'DECLINED')
+      ? [h(UButton, {
+          'size': 'xs',
+          'variant': 'subtle',
+          'icon': 'i-lucide-user-plus',
+          'data-test': `assign-${slot.slotId}`,
+          'onClick': () => {
+            assignFailure.value = null
+            assigning.value = slot
+          },
+        }, () => 'Assign')]
+      : []),
     ...(writes.value && slot.status === 'CLAIMED'
       ? [
           h(UButton, {
@@ -395,12 +350,11 @@ const columns: TableColumn<Opening>[] = [
 // A page alert renders behind an open modal's overlay, where nobody can read it, so a refusal
 // is shown wherever the action was taken.
 const modalOpen = computed(() => planning.value || cancellingOpening.value !== null || standingDown.value !== null
-  || removing.value !== null || declining.value !== null)
+  || removing.value !== null || declining.value !== null || assigning.value !== null)
 
 watch(modalOpen, (nowOpen) => {
   if (nowOpen) return
   failure.value = null
-  overlapWarned.value = false
 })
 </script>
 
@@ -492,106 +446,11 @@ watch(modalOpen, (nowOpen) => {
       />
     </div>
 
-    <UModal
+    <PlanOpeningModal
       :open="planning"
-      title="Plan a bar opening"
-      description="The evening, the venue and what to call it. Bar slots are stamped from the venue's template; a venue with no bar row stamps nothing and says so."
-      @update:open="planning = $event"
-    >
-      <template #body>
-        <UAlert
-          v-if="failure"
-          data-test="failure"
-          class="mb-4"
-          :color="overlapWarned ? 'warning' : 'error'"
-          variant="subtle"
-          :description="failure"
-        />
-        <div class="space-y-4">
-          <UFormField
-            label="Venue"
-            required
-          >
-            <USelectMenu
-              v-model="plan.venueId"
-              :items="venueOptions"
-              placeholder="Choose a venue"
-              value-key="value"
-              data-test="opening-venue"
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField
-            label="Evening"
-            required
-          >
-            <DateField
-              v-model="plan.evening"
-              data-test="opening-evening"
-              class="w-full"
-            />
-          </UFormField>
-          <div class="grid grid-cols-2 gap-4">
-            <UFormField
-              label="Opens"
-              required
-            >
-              <UInput
-                v-model="plan.opensAt"
-                type="time"
-                data-test="opening-opens"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField
-              label="Closes"
-              required
-            >
-              <UInput
-                v-model="plan.closesAt"
-                type="time"
-                data-test="opening-closes"
-                class="w-full"
-              />
-            </UFormField>
-          </div>
-          <UFormField
-            label="What it is"
-            required
-            hint="Stands in for a show title on the rota"
-          >
-            <UInput
-              v-model="plan.label"
-              :maxlength="BAR_OPENING_LABEL_LIMIT"
-              placeholder="A society social"
-              data-test="opening-label"
-              class="w-full"
-            />
-          </UFormField>
-          <div class="flex gap-2">
-            <UButton
-              type="button"
-              :loading="saving"
-              data-test="opening-submit"
-              @click="submitPlan()"
-            >
-              Plan the opening
-            </UButton>
-            <UButton
-              v-if="overlapWarned"
-              type="button"
-              color="warning"
-              variant="soft"
-              :loading="saving"
-              data-test="opening-submit-anyway"
-              @click="submitPlan(true)"
-            >
-              Plan the opening anyway
-            </UButton>
-          </div>
-        </div>
-      </template>
-    </UModal>
+      @close="planning = false"
+      @planned="planned"
+    />
 
     <ConfirmModal
       :open="cancellingOpening !== null"
@@ -627,6 +486,15 @@ watch(modalOpen, (nowOpen) => {
       :failure="removeFailure"
       @update:open="value => { if (!value) removing = null }"
       @confirm="removeSlot"
+    />
+
+    <AssignShiftModal
+      :open="assigning !== null"
+      :target="assigning ? { kind: 'opening', id: assigning.slotId } : null"
+      :loading="assignWorking"
+      :failure="assignFailure"
+      @close="assigning = null"
+      @assign="assign"
     />
 
     <DeclineClaimModal

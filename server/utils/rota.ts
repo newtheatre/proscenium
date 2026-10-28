@@ -418,6 +418,33 @@ export function clashesWith(userId: string | SQL, startsAt: SQL, endsAt: SQL, ve
   )`
 }
 
+// Claimed and confirmed shifts and opening slots a person holds from `from` on, so a suggestion
+// list can put the least-booked first and the rota spreads (0251).
+export function upcomingLoad(userId: SQL, from: number): SQL {
+  return sql`((
+    SELECT count(*) FROM shifts load_s
+    JOIN performances load_p ON load_p.id = load_s.performance_id
+    WHERE load_s.user_id = ${userId} AND load_s.status IN ('CLAIMED', 'CONFIRMED')
+      AND load_p.status <> 'CANCELLED' AND load_p.starts_at >= ${from}
+  ) + (
+    SELECT count(*) FROM bar_opening_shifts load_b
+    JOIN bar_openings load_o ON load_o.id = load_b.opening_id
+    WHERE load_b.user_id = ${userId} AND load_b.status IN ('CLAIMED', 'CONFIRMED')
+      AND load_o.status = 'PLANNED' AND load_o.starts_at >= ${from}
+  ))`
+}
+
+// Holds the module today, by the rule `heldNow` keeps: unrevoked and not yet at its expiry date.
+export function holdsModuleNow(userId: SQL, moduleId: string, today: string): SQL {
+  return sql`EXISTS (
+    SELECT 1 FROM training_records held_r
+    WHERE held_r.user_id = ${userId} AND held_r.module_id = ${moduleId}
+      AND held_r.revoked_at IS NULL AND (held_r.expires_on IS NULL OR held_r.expires_on > ${today})
+  )`
+}
+
+export const SUGGESTION_LIMIT = 8
+
 const targetVenue = sql`(SELECT venue_id FROM performances WHERE id = target.performance_id)`
 
 // The shift that clashes, for the refusal to name, read only once a write has been refused.
@@ -859,11 +886,18 @@ export type RosterScope = BoardBounds | WaitingScope
 const scopeOf = (scope: RosterScope): SQL => 'waitingFrom' in scope ? waitingScope(scope.waitingFrom) : rosterScope(scope)
 
 // How many claims wait on the board's filter, which is the count its label carries.
+// A bar opening's claims are counted too: they wait on the same officer (0250).
 export function waitingClaimsQuery(from: number): SQL {
   return sql`
-    SELECT count(*) AS waiting FROM shifts s
-    JOIN performances p ON p.id = s.performance_id
-    WHERE s.status = 'CLAIMED' AND p.status <> 'CANCELLED' AND p.starts_at >= ${from}
+    SELECT (
+      SELECT count(*) FROM shifts s
+      JOIN performances p ON p.id = s.performance_id
+      WHERE s.status = 'CLAIMED' AND p.status <> 'CANCELLED' AND p.starts_at >= ${from}
+    ) + (
+      SELECT count(*) FROM bar_opening_shifts s
+      JOIN bar_openings o ON o.id = s.opening_id
+      WHERE s.status = 'CLAIMED' AND o.status = 'PLANNED' AND o.starts_at >= ${from}
+    ) AS waiting
   `
 }
 
@@ -918,24 +952,33 @@ const rosterOpeningScope = (bounds: BoardBounds): SQL => sql`
   WHERE o.status = 'PLANNED' AND o.starts_at >= ${bounds.from} AND o.starts_at < ${bounds.to}
 `
 
-export function rosterOpeningsQuery(bounds: BoardBounds): SQL {
+// The waiting filter's openings: every planned one from tonight on holding a claim (0250).
+const waitingOpeningScope = (from: number): SQL => sql`
+  SELECT o.id FROM bar_openings o
+  WHERE o.status = 'PLANNED' AND o.starts_at >= ${from}
+    AND EXISTS (SELECT 1 FROM bar_opening_shifts c WHERE c.opening_id = o.id AND c.status = 'CLAIMED')
+`
+
+const openingScopeOf = (scope: RosterScope): SQL => 'waitingFrom' in scope ? waitingOpeningScope(scope.waitingFrom) : rosterOpeningScope(scope)
+
+export function rosterOpeningsQuery(scope: RosterScope): SQL {
   return sql`
     SELECT o.id AS openingId, o.label AS label, v.name AS venueName, o.night AS night,
            o.starts_at AS startsAt, o.ends_at AS endsAt
     FROM bar_openings o
     JOIN venues v ON v.id = o.venue_id
-    WHERE o.id IN (${rosterOpeningScope(bounds)})
+    WHERE o.id IN (${openingScopeOf(scope)})
     ORDER BY o.starts_at, o.id
   `
 }
 
-export function rosterOpeningShiftsQuery(bounds: BoardBounds): SQL {
+export function rosterOpeningShiftsQuery(scope: RosterScope): SQL {
   return sql`
     SELECT s.opening_id AS openingId, s.id AS shiftId, s.slot AS slot, s.status AS status,
            u.name AS holderName
     FROM bar_opening_shifts s
     LEFT JOIN users u ON u.id = s.user_id
-    WHERE s.opening_id IN (${rosterOpeningScope(bounds)}) AND s.status <> 'CANCELLED'
+    WHERE s.opening_id IN (${openingScopeOf(scope)}) AND s.status <> 'CANCELLED'
     ORDER BY s.opening_id, s.slot
   `
 }

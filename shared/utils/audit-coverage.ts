@@ -578,6 +578,7 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/rota/openings/shifts/[id]/release.post.ts', actions: ['bar-opening-shift.released'] },
   { route: 'server/api/rota/openings/shifts/[id]/dismiss.post.ts', actions: ['bar-opening-shift.dismissed'] },
   { route: 'server/api/rota/openings/shifts/[id]/assign.post.ts', actions: ['bar-opening-shift.reassigned'] },
+  { route: 'server/api/rota/openings/shifts/[id]/candidates.get.ts', exempt: 'reads who might be put on a bar opening slot, scoped to rota.write' },
   { route: 'server/api/rota/openings/shifts/[id]/unconfirm.post.ts', actions: ['bar-opening-shift.unconfirmed'] },
   { route: 'server/api/rota/openings/shifts/[id]/remove.post.ts', actions: ['bar-opening-shift.removed'] },
 
