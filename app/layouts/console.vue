@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { can } from '#shared/utils/abilities'
 import { SIDEBAR_DEFAULT_SIZE, SIDEBAR_MAX_SIZE, openOnArrival, sidebarParts, visibleGroups } from '#shared/utils/console-sidebar'
-import { CONSOLE_HOME, groupFor, navCount } from '#shared/utils/site-nav'
+import { CONSOLE_HOME, entryFor, groupFor, navCount } from '#shared/utils/site-nav'
 import type { NavEntry, NavSection } from '#shared/utils/site-nav'
 import type { NavigationMenuItem } from '@nuxt/ui'
 
@@ -22,12 +22,16 @@ watch(() => route.path, refresh)
 const badge = (count: number): NavigationMenuItem['badge'] =>
   count > 0 ? { label: String(count), color: 'warning', variant: 'subtle', size: 'sm' } : undefined
 
+// A tab's screen lights the entry it is a tab of; anywhere else the router decides (0253).
+const tabbedOn = computed(() => entryFor(route.path)?.tabOf)
+
 const link = (entry: NavEntry): NavigationMenuItem => ({
   label: entry.label,
   icon: entry.icon,
   to: entry.to,
   exact: entry.exact,
   badge: badge(navCount([entry], counts.value)),
+  ...(tabbedOn.value === entry.to ? { active: true } : {}),
 })
 
 // A group opens when the route lands in it and stays open until the officer closes it, so moving

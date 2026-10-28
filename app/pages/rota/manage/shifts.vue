@@ -6,7 +6,7 @@ import type { ActiveFilter } from '~/components/AdminToolbar.vue'
 import type { BoardEntry, BoardNight } from '#shared/utils/rota-board'
 import type { ShiftRole, ShiftStatus } from '#shared/utils/rota'
 
-definePageMeta({ layout: 'console', title: 'Rota board', middleware: 'console', docs: '/docs/rota/rota-board' })
+definePageMeta({ layout: 'console', title: 'Rota', middleware: 'console', docs: '/docs/rota/rota-board' })
 
 interface RosterShift {
   shiftId: string
@@ -82,6 +82,12 @@ const { data, status, refresh, error } = await useAsyncData(
   { watch: [() => window.from, () => window.to, waiting], default: (): Board => ({ items: [], waiting: 0 }) },
 )
 const readFailure = useListFailure(error, 'The rota could not be read.')
+
+// The sidebar's Rota badge is this count, so it moves when a claim here is answered (0253).
+const { refresh: refreshCounts } = useNavCounts()
+watch(() => data.value.waiting, () => {
+  void refreshCounts()
+})
 
 // One row per show night, so an evening's house and its bar opening are staffed together (0252).
 const nights = computed(() => boardNights(data.value.items))
@@ -318,6 +324,8 @@ watch(modalOpen, (nowOpen) => {
     <p class="text-sm text-muted">
       A confirmed shift is what lights up the show-night screen.
     </p>
+
+    <RotaTabs current="board" />
 
     <RotaFlow step="board" />
 

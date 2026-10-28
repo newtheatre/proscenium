@@ -59,9 +59,11 @@ export interface NavEntry {
   count?: NavCount
   // Where others read but only the IT Manager changes anything, a refusal says so (0157).
   changedByItManager?: boolean
+  // Drawn as a tab on the screen at this address rather than in the sidebar; still guarded here (0253).
+  tabOf?: string
 }
 
-export const NAV_COUNTS = ['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests'] as const
+export const NAV_COUNTS = ['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests', 'rota-claims'] as const
 
 export type NavCount = (typeof NAV_COUNTS)[number]
 
@@ -73,6 +75,7 @@ export const NAV_QUEUES: Record<NavCount, { says: string, to: string }> = {
   'room-requests': { says: 'Room requests to decide', to: '/rooms/manage/requests' },
   'training-requests': { says: 'Training requests to answer', to: '/training/manage/requests' },
   'pass-requests': { says: 'Pass requests to fulfil', to: '/box-office/desk-passes' },
+  'rota-claims': { says: 'Rota claims to confirm', to: '/rota/manage/shifts?waiting=true' },
 }
 
 // What a group or an entry shows: the sum of the counts its visible entries carry (A-130).
@@ -117,8 +120,8 @@ export const CONSOLE_NAV: NavGroup[] = [
     icon: 'i-lucide-calendar-clock',
     prefix: '/rota/manage',
     items: [
-      { label: 'Rota board', icon: 'i-lucide-users-round', to: '/rota/manage/shifts', ability: viewRota, section: 'Every day' },
-      { label: 'Bar openings', icon: 'i-lucide-store', to: '/rota/manage/openings', ability: viewRota, section: 'Every day' },
+      { label: 'Rota', icon: 'i-lucide-users-round', to: '/rota/manage/shifts', ability: viewRota, section: 'Every day', count: 'rota-claims' },
+      { label: 'Bar openings', icon: 'i-lucide-store', to: '/rota/manage/openings', ability: viewRota, section: 'Every day', tabOf: '/rota/manage/shifts' },
       { label: 'Safety', icon: 'i-lucide-hard-hat', to: '/rota/manage/safety', ability: viewSafety, section: 'Every day' },
       // What the door calls it, so one register has one name everywhere (issue 1365).
       { label: 'Challenge 25 register', icon: 'i-lucide-id-card', to: '/rota/manage/age-checks', ability: exportAgeChecks, section: 'Every day' },

@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { adminSession, request } from '#tests/helpers/accounts'
-import { click, fillDate, openView, pickOption, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
+import { adminSession, grantRole, registerMember, request } from '#tests/helpers/accounts'
+import { generatePassword } from '#tests/helpers/seed'
+import { click, fillDate, pickOption, signInView, skipReason, startApp, visit, waitFor } from '#tests/helpers/webview'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 
@@ -12,25 +13,26 @@ const BOOT_TIMEOUT_MS = 180_000
 const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 let officer: TestMember
+const password = generatePassword()
 
 beforeAll(async () => {
   if (skip) return
   app = await startApp()
-  officer = await adminSession(app)
+  const admin = await adminSession(app)
+  officer = await registerMember(app, 'ids', password)
+  expect((await grantRole(app, officer, 'ADMIN', admin.cookie)).status).toBe(200)
   // Add a module is offered only once a department exists to file the module under.
-  expect((await request(app, 'POST', '/api/admin/training/departments', { code: 'IDS', name: 'Department IDS' }, officer.cookie)).status).toBe(200)
+  expect((await request(app, 'POST', '/api/admin/training/departments', { code: 'IDS', name: 'Department IDS' }, admin.cookie)).status).toBe(200)
 }, BOOT_TIMEOUT_MS)
 
 afterAll(async () => {
   await app?.stop()
 }, 30_000)
 
-async function signedIn(): Promise<Bun.WebView> {
-  const view = await openView()
-  await view.navigate(`${app.baseURL}/`)
-  await waitFor(view, 'document.body')
-  await view.evaluate(`document.cookie = ${JSON.stringify(officer.cookie)}`)
-  return view
+// Through the form, as every other suite signs in: a cookie written by the page could be
+// overwritten by any response the shared cookie jar takes before the case's first visit.
+function signedIn(): Promise<Bun.WebView> {
+  return signInView(app, officer.email, password)
 }
 
 interface Naming { duplicated: string[], named: Record<string, string> }

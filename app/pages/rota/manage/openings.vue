@@ -65,6 +65,12 @@ const { data: listing, status, refresh, error } = await useAsyncData(
 )
 const readFailure = useListFailure(error, 'The bar openings could not be read.')
 
+// A claim answered here is one off the sidebar's Rota badge, so it is read again (0253).
+const { refresh: refreshCounts } = useNavCounts()
+watch(listing, () => {
+  void refreshCounts()
+})
+
 // Planned in its own dialogue, which the rota board opens from a night too (0252).
 async function planned(): Promise<void> {
   planning.value = false
@@ -387,6 +393,8 @@ watch(modalOpen, (nowOpen) => {
         class="text-primary underline"
       >shift templates</ULink>.
     </p>
+
+    <RotaTabs current="openings" />
 
     <RotaFlow step="openings" />
 
