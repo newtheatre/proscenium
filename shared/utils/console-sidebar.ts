@@ -17,9 +17,10 @@ export const SIDEBAR_LABEL_MAX = 22
 export type SidebarPart = { kind: 'entry', entry: NavEntry } | { kind: 'group', group: NavGroup }
 
 // Each group narrowed to what the viewer may open; a group left with nothing is not drawn (0040).
+// A tab is reached from the screen it sits on, so the sidebar leaves it out (0253).
 export function visibleGroups(viewer: Viewer | null): NavGroup[] {
   return CONSOLE_NAV
-    .map(group => ({ ...group, items: group.items.filter(entry => can(viewer, entry.ability)) }))
+    .map(group => ({ ...group, items: group.items.filter(entry => !entry.tabOf && can(viewer, entry.ability)) }))
     .filter(group => group.items.length > 0)
 }
 

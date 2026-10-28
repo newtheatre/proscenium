@@ -11,7 +11,7 @@ export interface RotaStep {
 
 export const ROTA_FLOW = [
   { key: 'templates', label: 'Shift templates', onward: 'Set the templates up', to: '/rota/manage/templates' },
-  { key: 'board', label: 'Rota board', onward: 'Fill the rota', to: '/rota/manage/shifts' },
+  { key: 'board', label: 'Rota', onward: 'Fill the rota', to: '/rota/manage/shifts' },
   { key: 'openings', label: 'Bar openings', onward: 'Plan the bar openings', to: '/rota/manage/openings' },
 ] as const satisfies readonly RotaStep[]
 

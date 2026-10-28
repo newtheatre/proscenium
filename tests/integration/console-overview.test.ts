@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { barSetUpQuery, safetyRoutingQuery, waitingCountsQuery } from '#server/utils/console-overview'
-import { boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { barSetUpQuery, rotaWeekQuery, safetyRoutingQuery, waitingCountsQuery } from '#server/utils/console-overview'
+import { daysAfter } from '#shared/utils/membership'
+import { currentShowNight, showNightOpensAt } from '#shared/utils/show-night'
+import { MAX_BOUND_PARAMETERS, boundStatement, createTestDatabase, rows } from '#tests/helpers/database'
+import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
@@ -165,6 +168,56 @@ describe('whether any incident severity routes to follow-up', () => {
       expect(read<{ anySeverityRoutes: number }>(database, safetyRoutingQuery())).toEqual([{ anySeverityRoutes: 0 }])
       database.batch([['UPDATE incident_severity_config SET requires_follow_up = 1 WHERE severity = ?', 'SERIOUS']])
       expect(read<{ anySeverityRoutes: number }>(database, safetyRoutingQuery())).toEqual([{ anySeverityRoutes: 1 }])
+    })
+  })
+})
+
+// 0253: the rota's next seven nights, each with what is still to fill and whether a duty manager is confirmed.
+describe('the rota this week', () => {
+  const tonight = currentShowNight()
+
+  function week(database: TestDatabase): void {
+    testVenue(database, { suffix: 'a' })
+    person(database, 'dm')
+    tonightsPerformance(database, { suffix: 'tonight', night: tonight, venueId: 'venue-a' })
+    tonightsPerformance(database, { suffix: 'friday', night: daysAfter(tonight, 2), venueId: 'venue-a' })
+    tonightsPerformance(database, { suffix: 'later', night: daysAfter(tonight, 9), venueId: 'venue-a' })
+    const opensAt = showNightOpensAt(daysAfter(tonight, 3)) + 18 * 3600
+    database.batch([
+      ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'dm-tonight', 'performance-tonight', 'DUTY_MANAGER', 1, 'OPEN'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'door-tonight', 'performance-tonight', 'DOOR', 1, 'DECLINED', 'dm'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status, user_id) VALUES (?, ?, ?, ?, ?, ?)', 'dm-friday', 'performance-friday', 'DUTY_MANAGER', 1, 'CONFIRMED', 'dm'],
+      ['INSERT INTO shifts (id, performance_id, role, slot, status) VALUES (?, ?, ?, ?, ?)', 'door-later', 'performance-later', 'DOOR', 1, 'OPEN'],
+      ['INSERT INTO bar_openings (id, venue_id, night, label, starts_at, ends_at, status) VALUES (?, ?, ?, ?, ?, ?, ?)', 'opening', 'venue-a', daysAfter(tonight, 3), 'A social', opensAt, opensAt + 5 * 3600, 'PLANNED'],
+      ['INSERT INTO bar_opening_shifts (id, opening_id, slot, status) VALUES (?, ?, ?, ?)', 'slot-1', 'opening', 1, 'OPEN'],
+    ])
+  }
+
+  test('each of seven nights says its places to fill and its performances with no confirmed duty manager', async () => {
+    await withDatabase((database) => {
+      week(database)
+      const nights = read<{ night: string, open: number, withoutDutyManager: number }>(database, rotaWeekQuery(tonight))
+      expect(nights.map(row => row.night)).toEqual(Array.from({ length: 7 }, (_, offset) => daysAfter(tonight, offset)))
+      expect(nights[0]).toEqual({ night: tonight, open: 2, withoutDutyManager: 1 })
+      expect(nights[2]).toEqual({ night: daysAfter(tonight, 2), open: 0, withoutDutyManager: 0 })
+      expect(nights[3]).toEqual({ night: daysAfter(tonight, 3), open: 1, withoutDutyManager: 0 })
+    })
+  })
+
+  test('a cancelled performance needs nobody', async () => {
+    await withDatabase((database) => {
+      week(database)
+      database.batch([['UPDATE performances SET status = ? WHERE id = ?', 'CANCELLED', 'performance-tonight']])
+      expect(read<{ open: number, withoutDutyManager: number }>(database, rotaWeekQuery(tonight))[0]).toMatchObject({ open: 0, withoutDutyManager: 0 })
+    })
+  })
+
+  test('its parameters are a fixed number, whatever the rota holds (0006)', async () => {
+    await withDatabase((database) => {
+      const empty = boundStatement(database, rotaWeekQuery(tonight))
+      week(database)
+      expect(boundStatement(database, rotaWeekQuery(tonight)).length).toBe(empty.length)
+      expect(empty.length - 1).toBeLessThanOrEqual(MAX_BOUND_PARAMETERS)
     })
   })
 })
