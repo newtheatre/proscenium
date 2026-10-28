@@ -105,7 +105,7 @@ describe('a group is a job, and the order never varies (0040)', () => {
   test('Approvals is folded into the rota board', () => {
     const rota = CONSOLE_NAV.find(group => group.key === 'rota')!
     expect(rota.items.map(item => item.to)).not.toContain('/rota/manage/approvals')
-    expect(entryFor('/rota/manage/shifts')?.label).toBe('Rota board')
+    expect(entryFor('/rota/manage/shifts')?.label).toBe('Rota')
   })
 
   test('every item sits under its own group prefix', () => {
@@ -342,9 +342,9 @@ describe('a waiting count rides the entry that opens it', () => {
     expect(navCount(people.items.filter(entry => entry.to !== '/people/members'), { 'membership-claims': 4 })).toBe(0)
   })
 
-  // Issue 1358: the five queues an officer works, each counted where it is opened.
-  test('room, training and pass requests are counted on the entries that open them', () => {
-    expect(NAV_COUNTS).toEqual(['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests'])
+  // Issue 1358, and 0253 for the rota's claims: each queue an officer works, counted where it is opened.
+  test('room, training, pass requests and rota claims are counted on the entries that open them', () => {
+    expect(NAV_COUNTS).toEqual(['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests', 'rota-claims'])
     const counted = CONSOLE_NAV.flatMap(group => group.items).filter(entry => entry.count)
     expect(Object.fromEntries(counted.map(entry => [entry.count, entry.to]))).toEqual({
       'membership-claims': '/people/members',
@@ -352,6 +352,7 @@ describe('a waiting count rides the entry that opens it', () => {
       'room-requests': '/rooms/manage/requests',
       'training-requests': '/training/manage/requests',
       'pass-requests': '/box-office/desk-passes',
+      'rota-claims': '/rota/manage/shifts',
     })
   })
 

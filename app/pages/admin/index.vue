@@ -2,12 +2,12 @@
 import { can, viewAuditTrail, viewBackups, viewCommsOperations, viewSeasonSummary } from '#shared/utils/abilities'
 import { nightsNeedingYou } from '#shared/utils/night-reconciliation'
 import type { Outstanding } from '#shared/utils/night-reconciliation'
-import { firstRunHref, queuesFor, saysFirstRun, saysSetUp, setUpHref } from '#shared/utils/console-overview'
+import { firstRunHref, queuesFor, saysFirstRun, saysRotaWeekLine, saysSetUp, setUpHref } from '#shared/utils/console-overview'
 import { saysNotificationStatus } from '#shared/utils/notifications'
 import { currentShowNight } from '#shared/utils/show-night'
 import { NAV_COUNTS, NAV_QUEUES } from '#shared/utils/site-nav'
 import { londonDay } from '#shared/utils/membership'
-import { saysClock, saysDay, saysWhen } from '#shared/utils/when'
+import { saysClock, saysDay, saysDayLong, saysWhen } from '#shared/utils/when'
 import type { ConsoleOverview } from '#shared/utils/console-overview'
 import type { Ref } from 'vue'
 import type { ListFailure } from '~/composables/useListFailure'
@@ -32,7 +32,7 @@ const decidesAny = computed(() => viewer.value !== null && queuesFor(new Set(vie
 const { data: overview, error: overviewError } = await useAsyncData(
   'console-overview',
   () => request<ConsoleOverview>('/api/admin/overview'),
-  { default: (): ConsoleOverview => ({ setUp: [], tonight: null, firstRun: null }), immediate: false },
+  { default: (): ConsoleOverview => ({ setUp: [], tonight: null, firstRun: null, rotaWeek: null }), immediate: false },
 )
 const overviewFailure = useListFailure(overviewError, 'Tonight and the set-up still to do could not be read.')
 
@@ -117,6 +117,7 @@ const { data: outstanding } = useNuxtData<Outstanding>('nights-needing-you')
 const settled = ref(false)
 const quiet = computed(() => settled.value && waiting.value.length === 0 && !waitingOwn.value && !wall.value
   && (overview.value.tonight === null || overview.value.tonight.length === 0) && overview.value.setUp.length === 0 && overview.value.firstRun === null
+  && (overview.value.rotaWeek === null || overview.value.rotaWeek.length === 0)
   && !seesTrouble.value && unassessed.value.total === 0 && !(seesDrill.value && drill.value?.overdue)
   && (outstanding.value ? nightsNeedingYou(outstanding.value).length === 0 : true))
 const seesMoney = computed(() => can(viewer.value, viewSeasonSummary))
@@ -322,6 +323,30 @@ onMounted(async () => {
           Open tonight's screens
         </UButton>
       </div>
+    </UPageCard>
+
+    <UPageCard
+      v-if="overview.rotaWeek !== null && overview.rotaWeek.length > 0"
+      title="The rota this week"
+      description="The next seven nights that still need somebody, each opening that night on the rota."
+      data-test="rota-week"
+    >
+      <ul class="divide-y divide-default text-sm">
+        <li
+          v-for="line in overview.rotaWeek"
+          :key="line.night"
+          class="flex flex-wrap items-baseline justify-between gap-3 py-2"
+          :data-test="`rota-week-${line.night}`"
+        >
+          <ULink
+            :to="`/rota/manage/shifts?from=${line.night}&to=${line.night}`"
+            class="underline underline-offset-4"
+          >
+            {{ saysDayLong(line.night) }}
+          </ULink>
+          <span :class="line.withoutDutyManager > 0 ? 'text-warning' : 'text-muted'">{{ saysRotaWeekLine(line) }}</span>
+        </li>
+      </ul>
     </UPageCard>
 
     <UPageCard

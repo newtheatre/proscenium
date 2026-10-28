@@ -1,21 +1,23 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
-import { FIRST_RUN_STEPS, firstRunLines, queuesFor, setUpLines, tonightLines } from '#shared/utils/console-overview'
+import { FIRST_RUN_STEPS, ROTA_WEEK_NIGHTS, firstRunLines, queuesFor, rotaWeekLines, setUpLines, tonightLines } from '#shared/utils/console-overview'
 import { OPEN_STATUSES } from '#shared/utils/external-requests'
 import { filterQuerySchema } from '#shared/utils/list-filters'
 import { accessProfilesList } from '#shared/utils/access-profiles-list'
 import { membershipClaimsList } from '#shared/utils/membership-claims-list'
 import { OPERATIONAL_PERMISSIONS } from '#shared/utils/roles'
-import { currentShowNight, showNightBounds } from '#shared/utils/show-night'
+import { currentShowNight, showNightBounds, showNightOpensAt } from '#shared/utils/show-night'
+import { daysAfter } from '#shared/utils/membership'
 import { accessProfilesClause } from './access-profiles'
 import { allergensUnansweredCount, onHandColumn } from './bar'
 import { STOCK_COUNTED } from './bar-linkage'
 import { claimsClause } from './membership-claims'
 import { performancesOnNight } from './performances'
 import { qualifiedCounts, roleEligibilities } from './rota-readiness'
+import { waitingClaimsCount } from './rota'
 import { unfiledTonightQuery } from './venue-emergency'
 import { demandScope } from './training-demand'
-import type { ConsoleOverview, FirstRunStep } from '#shared/utils/console-overview'
+import type { ConsoleOverview, FirstRunStep, RotaWeekLine } from '#shared/utils/console-overview'
 import type { Permission } from '#shared/utils/roles'
 import type { NavCount } from '#shared/utils/site-nav'
 import type { SQL } from 'drizzle-orm'
@@ -43,6 +45,8 @@ const COUNTS: Record<NavCount, (leadOf: string | undefined) => SQL> = {
   'pass-requests': () => sql`(SELECT count(*) FROM pass_requests r
     JOIN pass_types t ON t.id = r.pass_type_id
     WHERE r.status = 'PENDING' AND t.status = 'ON_SALE')`,
+  // The board's own Waiting for confirmation count, so the badge and the filter agree (0253).
+  'rota-claims': () => waitingClaimsCount(showNightOpensAt(currentShowNight())),
 }
 
 // One row, one column per queue asked for, named by its key. Never called with none.
@@ -87,6 +91,33 @@ export function firstRunQuery(): SQL {
   return sql`SELECT ${sql.join(FIRST_RUN_STEPS.map(step => sql`${started[step]} AS ${sql.identifier(step)}`), sql`, `)}`
 }
 
+// One row per night from tonight, a fixed seven, so its parameters never grow with the rota (0006, 0253).
+export function rotaWeekQuery(tonight: string): SQL {
+  const nights = Array.from({ length: ROTA_WEEK_NIGHTS }, (_, offset) => daysAfter(tonight, offset))
+  return sql.join(nights.map((night) => {
+    const { from, to } = showNightBounds(night)
+    const start = Math.floor(from.getTime() / 1000)
+    const end = Math.floor(to.getTime() / 1000)
+    return sql`SELECT ${night} AS night, ((
+        SELECT count(*) FROM shifts s JOIN performances p ON p.id = s.performance_id
+        WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${start} AND p.starts_at < ${end} AND s.status IN ('OPEN', 'DECLINED')
+      ) + (
+        SELECT count(*) FROM bar_opening_shifts b JOIN bar_openings o ON o.id = b.opening_id
+        WHERE o.status = 'PLANNED' AND o.starts_at >= ${start} AND o.starts_at < ${end} AND b.status IN ('OPEN', 'DECLINED')
+      )) AS open, (
+        SELECT count(*) FROM performances p
+        WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${start} AND p.starts_at < ${end}
+          AND EXISTS (SELECT 1 FROM shifts d WHERE d.performance_id = p.id AND d.role = 'DUTY_MANAGER' AND d.status <> 'CANCELLED')
+          AND NOT EXISTS (SELECT 1 FROM shifts d WHERE d.performance_id = p.id AND d.role = 'DUTY_MANAGER' AND d.status = 'CONFIRMED')
+      ) AS withoutDutyManager`
+  }), sql` UNION ALL `)
+}
+
+async function rotaWeek(): Promise<RotaWeekLine[]> {
+  const rows = await db.all<RotaWeekLine>(rotaWeekQuery(currentShowNight()))
+  return rotaWeekLines(rows.map(row => ({ night: row.night, open: Number(row.open), withoutDutyManager: Number(row.withoutDutyManager) })))
+}
+
 // Each part is read only for a reader who could finish it: the rota's owner, the bar's, or whoever counts.
 export async function consoleOverview(event: H3Event, permissions: ReadonlySet<Permission>): Promise<ConsoleOverview> {
   const holds = (permission: Permission): boolean => permissions.has(permission)
@@ -94,7 +125,7 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
   const stocktakes = bar || holds('bar.stocktake')
 
   const { from, to } = showNightBounds(currentShowNight())
-  const [eligibility, facts, tonight, routing, firstRun, unfiled] = await Promise.all([
+  const [eligibility, facts, tonight, routing, firstRun, unfiled, week] = await Promise.all([
     holds('rota.read') ? roleEligibilities(event) : undefined,
     stocktakes ? db.all<BarSetUp>(barSetUpQuery()).then(([row]) => row) : undefined,
     OPERATIONAL_PERMISSIONS.some(holds) ? performancesOnNight(currentShowNight()) : null,
@@ -106,6 +137,7 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
     holds('emergency-card.write')
       ? db.all<{ venueName: string }>(unfiledTonightQuery(Math.floor(from.getTime() / 1000), Math.floor(to.getTime() / 1000))).then(rows => rows.map(row => row.venueName))
       : undefined,
+    holds('rota.read') ? rotaWeek() : null,
   ])
 
   const qualified = eligibility ? await qualifiedCounts(eligibility) : undefined
@@ -122,5 +154,6 @@ export async function consoleOverview(event: H3Event, permissions: ReadonlySet<P
     }),
     tonight: tonight === null ? null : tonightLines(tonight),
     firstRun,
+    rotaWeek: week,
   }
 }

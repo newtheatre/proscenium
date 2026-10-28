@@ -887,9 +887,8 @@ const scopeOf = (scope: RosterScope): SQL => 'waitingFrom' in scope ? waitingSco
 
 // How many claims wait on the board's filter, which is the count its label carries.
 // A bar opening's claims are counted too: they wait on the same officer (0250).
-export function waitingClaimsQuery(from: number): SQL {
-  return sql`
-    SELECT (
+export function waitingClaimsCount(from: number): SQL {
+  return sql`((
       SELECT count(*) FROM shifts s
       JOIN performances p ON p.id = s.performance_id
       WHERE s.status = 'CLAIMED' AND p.status <> 'CANCELLED' AND p.starts_at >= ${from}
@@ -897,8 +896,11 @@ export function waitingClaimsQuery(from: number): SQL {
       SELECT count(*) FROM bar_opening_shifts s
       JOIN bar_openings o ON o.id = s.opening_id
       WHERE s.status = 'CLAIMED' AND o.status = 'PLANNED' AND o.starts_at >= ${from}
-    ) AS waiting
-  `
+    ))`
+}
+
+export function waitingClaimsQuery(from: number): SQL {
+  return sql`SELECT ${waitingClaimsCount(from)} AS waiting`
 }
 
 // Bounded by a window of nights, not paged: the board reads every performance in the span whole,
