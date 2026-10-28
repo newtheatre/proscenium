@@ -51,6 +51,21 @@ const byAddressAllowed = can(useViewer().value, recordTrainingByAddress)
 const pickerEndpoint = can(useViewer().value, viewAccounts) ? undefined : '/api/admin/training/people'
 const picker = ref<{ preset: (person: { id: string, name: string, email: string }) => void } | null>(null)
 const nobody = ref<string | null>(null)
+
+// The account page links here with ?person=, so its person opens chosen (0255). Without
+// accounts.read there is no account to read, and the picker simply starts empty.
+const route = useRoute()
+onMounted(async () => {
+  const linked = typeof route.query.person === 'string' ? route.query.person : ''
+  if (!linked || pickerEndpoint !== undefined) return
+  try {
+    const { account } = await $fetch<{ account: { id: string, name: string, email: string } }, string>(`/api/admin/accounts/${encodeURIComponent(linked)}`)
+    picker.value?.preset(account)
+  }
+  catch {
+    // A stale or mistyped link leaves the picker empty, which is where the screen starts anyway.
+  }
+})
 const byAddress = ref(false)
 const address = ref('')
 const name = ref('')

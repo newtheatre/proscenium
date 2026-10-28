@@ -362,6 +362,9 @@ Open questions for the committee:
      memberships out entirely, and say how many they left out (0071); an erased account's own
      page is a read-only record, badged Erased, with nothing on it to act.
   5. Every account view links to that person's grants, sign-in methods, membership state and audit history.
+     Amended 25 October 2026 (decision 0255): it also shows, to whoever already reads the rota or
+     training records, which rota roles the person can take now and what is missing for each,
+     linked to the screen that fixes it, their shifts from tonight, and the training they hold.
   6. An account's own page is reached from the directory and says so: it carries the way back to
      the directory, and it draws a skeleton of the cards that are coming while it loads rather
      than an empty page that fills without warning.
