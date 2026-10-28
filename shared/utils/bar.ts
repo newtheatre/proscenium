@@ -603,6 +603,17 @@ const setupDeliveryForm = z.strictObject({
   costPence: deliveryCostField,
 })
 
+// A delivery note is one delivery of many items, each its own movement (0254). The cap bounds the
+// batch, never a statement: every line is a statement of its own with fixed parameters (0006).
+export const MAX_DELIVERY_LINES = 100
+
+export const deliveryNoteForm = z.strictObject({
+  lines: z.array(z.strictObject({ itemId: z.string().trim().min(1, 'A line is about a stocked item') }).extend(setupDeliveryForm.shape))
+    .min(1, 'A delivery note needs at least one line')
+    .max(MAX_DELIVERY_LINES, `A delivery note holds at most ${MAX_DELIVERY_LINES} lines: record the rest as a second note`)
+    .refine(lines => new Set(lines.map(line => line.itemId)).size === lines.length, 'Each item is on the note once: add its quantities together'),
+})
+
 // The attach form's own fields, so the set-up asks nothing the product page would not (issue 1528).
 const setupChoiceForm = variantChoiceForm
   .pick({ qty: true, includedInPrice: true, optional: true })

@@ -404,7 +404,9 @@ Open questions:
      Only an unsettled tab charge's void puts such stock back, with its money (F-109); a card or
      cash sale, a comp or a settled charge puts none back by hand.
   5. Every movement stamps its actor (or system), timestamp and source document (delivery, sale
-     line, stocktake), so any on-hand figure can be audited to its causes.
+     line, stocktake), so any on-hand figure can be audited to its causes. Amended 25 October 2026
+     (decision 0254): a delivery note writes one delivery movement per line, together in one
+     batch; each line is its own source document, as a single delivery is.
   6. Deliveries record cost, giving GP reporting (F-119) its cost basis. Amended 26 September
      2026 (issue 1320, decision 0100): a delivery of a measured item records what one container
      cost, in whole pence, and what that container held (or what the whole delivery cost, where

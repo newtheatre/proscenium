@@ -1317,3 +1317,85 @@ describe.skipIf(skip !== null)('the screens', () => {
     view.close()
   }, 120_000)
 })
+
+// 0254: a supplier's note is one sheet and one press, each line an ordinary delivery movement.
+describe.skipIf(skip !== null)('a delivery note records many items at once (0254)', () => {
+  test('every line is its own delivery, costed the way it is bought and stamped with who recorded it', async () => {
+    const bottle = await addItem({ name: named('Note gin'), containerMl: 700 })
+    const cans = await addItem({ name: named('Note cans'), unit: 'ITEM', containerMl: null })
+    const answered = await send('POST', '/api/admin/bar/deliveries', {
+      lines: [{ itemId: bottle, qty: 2100, costPence: 1450 }, { itemId: cans, qty: 24, costPence: 65 }],
+    }, barManager.cookie)
+    expect(answered.status).toBe(200)
+    expect(await answered.json()).toEqual({ ok: true, recorded: 2 })
+
+    expect([await onHand(bottle), await onHand(cans)]).toEqual([2100, 24])
+    const [gin] = await movements(`&itemId=${bottle}`)
+    const [can] = await movements(`&itemId=${cans}`)
+    expect(gin).toMatchObject({ kind: 'DELIVERY', qty: 2100, containerCostPence: 1450, containerQty: 700, unitCostPence: null, actorId: barManager.id })
+    expect(can).toMatchObject({ kind: 'DELIVERY', qty: 24, unitCostPence: 65, containerCostPence: null, actorId: barManager.id })
+  })
+
+  test('a retired line refuses the whole note by name, and nothing is written', async () => {
+    const kept = await addItem({ name: named('Kept tonic') })
+    const retiredName = named('Retired cider')
+    const retired = await addItem({ name: retiredName })
+    expect((await send('POST', `/api/admin/bar/items/${retired}/status`, { status: 'RETIRED' })).status).toBe(200)
+
+    const answered = await send('POST', '/api/admin/bar/deliveries', { lines: [{ itemId: kept, qty: 750 }, { itemId: retired, qty: 750 }] })
+    expect(answered.status).toBe(409)
+    expect((await answered.json() as { message: string }).message).toContain(`${retiredName} is retired`)
+    expect(await movements(`&itemId=${kept}`)).toEqual([])
+  })
+
+  test('an empty note, an item twice, an unknown item and a member without the bar are refused', async () => {
+    const itemId = await addItem()
+    expect((await send('POST', '/api/admin/bar/deliveries', { lines: [] })).status).toBe(400)
+    expect((await send('POST', '/api/admin/bar/deliveries', { lines: [{ itemId, qty: 750 }, { itemId, qty: 750 }] })).status).toBe(400)
+    expect((await send('POST', '/api/admin/bar/deliveries', { lines: [{ itemId, qty: 0 }] })).status).toBe(400)
+    expect((await send('POST', '/api/admin/bar/deliveries', { lines: [{ itemId: 'no-such-item', qty: 750 }] })).status).toBe(404)
+    expect((await send('POST', '/api/admin/bar/deliveries', { lines: [{ itemId, qty: 750 }] }, member.cookie)).status).toBe(403)
+    expect(await movements(`&itemId=${itemId}`)).toEqual([])
+  })
+
+  test('the sheet fills from the order list, and records the typed lines with one press', async () => {
+    const shortName = named('Short wine')
+    const short = await addItem({ name: shortName, parQty: 3000 })
+    const lagerName = named('Note lager')
+    const lager = await addItem({ name: lagerName, unit: 'ITEM', containerMl: null })
+
+    const view = await openSignedOutView(app.baseURL)
+    await visit(view, `${app.baseURL}/sign-in`)
+    await fill(view, 'form input[type="email"]', barManager.email)
+    await fill(view, 'form input[type="password"]', barPassword)
+    await click(view, 'form button[type="submit"]')
+    await finishSignIn(app, view, barManager.email)
+
+    await visit(view, `${app.baseURL}/bar/stock`, '[data-test="delivery-note"]')
+    await click(view, '[data-test="delivery-note"]')
+    await fill(view, 'input[data-test="delivery-find"]', shortName)
+    await waitFor(view, `document.querySelector('[data-test="delivery-count-${short}"]')`)
+    expect(await textOf(view, `[data-test="delivery-line-${short}"]`)).toContain('Cost of one container')
+
+    // 3000 ml short at 750 ml a bottle is four bottles to order (0140).
+    await click(view, '[data-test="delivery-fill"]')
+    await waitFor(view, `document.querySelector('[data-test="delivery-count-${short}"]')?.value === '4'`)
+
+    // Reopened clean, so only what is typed here is recorded.
+    await view.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`)
+    await waitFor(view, `!document.querySelector('[data-test="delivery-sheet"]')`)
+    await click(view, '[data-test="delivery-note"]')
+    await fill(view, 'input[data-test="delivery-find"]', shortName)
+    await fillNumber(view, `[data-test="delivery-count-${short}"]`, '3')
+    await fillNumber(view, `[data-test="delivery-cost-${short}"]`, '6.5')
+    await fill(view, 'input[data-test="delivery-find"]', lagerName)
+    await fillNumber(view, `[data-test="delivery-count-${lager}"]`, '24')
+    await waitFor(view, `document.querySelector('[data-test="delivery-submit"]')?.textContent.includes('Record 2 lines')`)
+    await click(view, '[data-test="delivery-submit"]')
+    await waitFor(view, `!document.querySelector('[data-test="delivery-sheet"]')`)
+
+    expect([await onHand(short), await onHand(lager)]).toEqual([2250, 24])
+    expect((await movements(`&itemId=${short}`))[0]).toMatchObject({ containerCostPence: 650, containerQty: 750 })
+    view.close()
+  }, 120_000)
+})

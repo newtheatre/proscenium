@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  MAX_DELIVERY_LINES,
+  deliveryNoteForm,
   saysMovementReason,
   priceStanding,
   saysPriceSet,
@@ -671,5 +673,27 @@ describe('a price set says where it stands', () => {
   test('the first price ever set does not mention one before it', () => {
     const set = priceStanding([{ id: 'only', effective: true }], 'only', '2026-10-21', '2026-10-21')
     expect(saysPriceSet('Default', set)).toEqual({ title: 'Default set, and in force now' })
+  })
+})
+
+describe('a delivery note is one delivery of many items (0254)', () => {
+  const line = (itemId: string, qty = 750, costPence: number | null = null) => ({ itemId, qty, costPence })
+
+  test('a note of distinct items with whole quantities is accepted, a cost optional', () => {
+    expect(deliveryNoteForm.safeParse({ lines: [line('a'), line('b', 24, 65)] }).success).toBe(true)
+  })
+
+  test('an empty note, an item twice and a note over the cap are refused', () => {
+    expect(deliveryNoteForm.safeParse({ lines: [] }).success).toBe(false)
+    expect(deliveryNoteForm.safeParse({ lines: [line('a'), line('a')] }).success).toBe(false)
+    const over = Array.from({ length: MAX_DELIVERY_LINES + 1 }, (_, index) => line(`item-${index}`))
+    expect(deliveryNoteForm.safeParse({ lines: over }).success).toBe(false)
+    expect(deliveryNoteForm.safeParse({ lines: over.slice(1) }).success).toBe(true)
+  })
+
+  test('a line that takes stock away, or is not whole, is refused', () => {
+    expect(deliveryNoteForm.safeParse({ lines: [line('a', 0)] }).success).toBe(false)
+    expect(deliveryNoteForm.safeParse({ lines: [line('a', -750)] }).success).toBe(false)
+    expect(deliveryNoteForm.safeParse({ lines: [line('a', 2.5)] }).success).toBe(false)
   })
 })

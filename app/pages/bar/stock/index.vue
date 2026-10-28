@@ -109,6 +109,12 @@ const sizeChips = computed(() => (moving.value ? writeOffSizes(moving.value) : [
 const directionOptions = [{ label: 'Add to stock', value: true }, { label: 'Take off stock', value: false }]
 
 const costPence = ref<number>()
+const noting = ref(false)
+
+async function noted(): Promise<void> {
+  noting.value = false
+  await reload()
+}
 
 // Asked the way the item is bought, never per millilitre (F-114 criterion 6); the route keeps it
 // that way and a report divides it only when read (0100).
@@ -533,6 +539,15 @@ const columns = computed(() => (data.value.items.some(item => item.category)
       </template>
 
       <template #actions>
+        <UButton
+          data-test="delivery-note"
+          icon="i-lucide-truck"
+          variant="outline"
+          color="neutral"
+          @click="noting = true"
+        >
+          Record a delivery note
+        </UButton>
         <UButton
           data-test="add-item"
           icon="i-lucide-plus"
@@ -966,6 +981,12 @@ const columns = computed(() => (data.value.items.some(item => item.category)
       :failure="retireFailure"
       @update:open="value => { if (!value) retiring = null }"
       @confirm="retire"
+    />
+
+    <DeliveryNoteModal
+      :open="noting"
+      @close="noting = false"
+      @recorded="noted"
     />
   </ReadGate>
 </template>
