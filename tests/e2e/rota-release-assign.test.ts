@@ -5,7 +5,7 @@ import { showNightOf } from '#shared/utils/show-night'
 import { adminSession, grantCommitteeRole, grantRole, registerMember, request } from '#tests/helpers/accounts'
 import { tonightsPerformance } from '#tests/helpers/programme'
 import { generatePassword } from '#tests/helpers/seed'
-import { skipReason, startApp } from '#tests/helpers/webview'
+import { click, signInView, skipReason, startApp, textOf, visit, waitFor } from '#tests/helpers/webview'
 import type { TestMember } from '#tests/helpers/accounts'
 import type { AppUnderTest } from '#tests/helpers/webview'
 import { MAX_SLOT_COUNT } from '#shared/utils/rota'
@@ -549,4 +549,71 @@ describe.skipIf(skip !== null)('an officer unconfirms a shift (E-107, issue 933)
     claim(house.shiftId, holder.id)
     expect((await send('POST', `/api/admin/rota/shifts/${house.shiftId}/unconfirm`, undefined, holder.cookie)).status).toBe(403)
   })
+})
+
+// 0255: the account page answers "why can they not take that shift?" from the write's own facts.
+describe.skipIf(skip !== null)('an account says what its person can staff (0255)', () => {
+  interface Standing { roles: { role: string, staffing: string }[], shifts: { shiftId: string, status: string }[] }
+  const standing = async (userId: string): Promise<Record<string, string>> => {
+    const answered = await send('GET', `/api/admin/accounts/${userId}/rota`)
+    expect(answered.status).toBe(200)
+    return Object.fromEntries((await answered.json() as Standing).roles.map(line => [line.role, line.staffing]))
+  }
+
+  test('each role says what is missing, and is unlocked by the training and committee role the write reads', async () => {
+    const person = await registerMember(app, 'person-view', generatePassword())
+    expect(await standing(person.id)).toMatchObject({ DOOR: 'NO_MODULE', DUTY_MANAGER: 'NEITHER' })
+
+    await award(person.id, doorModule)
+    await award(person.id, dutyManagerModule)
+    expect(await standing(person.id)).toMatchObject({ DOOR: 'CAN_STAFF', DUTY_MANAGER: 'NO_COMMITTEE_ROLE' })
+
+    grantCommitteeRole(app, person.id)
+    expect(await standing(person.id)).toMatchObject({ DOOR: 'CAN_STAFF', DUTY_MANAGER: 'CAN_STAFF' })
+  })
+
+  test('their shifts from tonight are listed, and a disabled account takes none', async () => {
+    const person = await registerMember(app, 'person-shifts', generatePassword())
+    await award(person.id, doorModule)
+    const house = performance(5, 'person-view-shift')
+    claim(house.shiftId, person.id, 'CLAIMED')
+
+    const answered = await (await send('GET', `/api/admin/accounts/${person.id}/rota`)).json() as Standing
+    expect(answered.shifts.map(shift => [shift.shiftId, shift.status])).toEqual([[house.shiftId, 'CLAIMED']])
+
+    write('UPDATE users SET disabled = 1 WHERE id = ?', person.id)
+    expect(await standing(person.id)).toMatchObject({ DOOR: 'DISABLED', DUTY_MANAGER: 'DISABLED' })
+  })
+
+  test('only a reader of the rota is answered, and only about a real account', async () => {
+    const theatre = await registerMember(app, 'person-theatre', generatePassword())
+    await grantRole(app, theatre, 'THEATRE_MANAGER', admin.cookie)
+    const person = await registerMember(app, 'person-asked', generatePassword())
+    expect((await send('GET', `/api/admin/accounts/${person.id}/rota`, undefined, theatre.cookie)).status).toBe(403)
+    expect((await send('GET', '/api/admin/accounts/no-such-account/rota')).status).toBe(404)
+  })
+
+  test('the account page shows the gap and links to their records with them chosen', async () => {
+    const password = generatePassword()
+    const officer = await registerMember(app, 'person-officer', password)
+    await grantRole(app, officer, 'FOH_MANAGER', admin.cookie)
+    await grantRole(app, officer, 'THEATRE_MANAGER', admin.cookie)
+    const person = await registerMember(app, 'person-page', generatePassword())
+    await award(person.id, dutyManagerModule)
+
+    const view = await signInView(app, officer.email, password)
+    try {
+      await visit(view, `${app.baseURL}/people/accounts/${person.id}`, '[data-test="person-staffing-DOOR"]')
+      expect(await textOf(view, '[data-test="person-staffing-DOOR"]')).toContain(`Needs Module ${doorModule}`)
+      expect(await textOf(view, '[data-test="person-staffing-DUTY_MANAGER"]')).toContain('also needs a committee role')
+      await waitFor(view, `document.querySelector('[data-test="person-held-${dutyManagerModule}"]')`)
+
+      await click(view, '[data-test="person-fix-DOOR"]')
+      await waitFor(view, `location.pathname === '/training/manage/records' && Boolean(document.querySelector('[data-test="records-table"]'))`)
+      await waitFor(view, `document.querySelector('[data-test="records-table"]').innerText.includes(${JSON.stringify(dutyManagerModule)})`)
+    }
+    finally {
+      view.close()
+    }
+  }, 120_000)
 })
