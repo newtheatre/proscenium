@@ -44,10 +44,10 @@ async function sectionTitles(): Promise<{ folder: string, title: string }[]> {
   return found.sort((a, b) => a.folder.localeCompare(b.folder))
 }
 
-// One line per group, in the shape the page writes them: "Bar. Every day: … Set-up: …", or
-// "People: …" where the group is not split. Trailing full stops are the prose's, not the data's.
+// One line per group as the page writes them, "Bar. Every day: … Set-up: …" or "People: …", less
+// any tab, which is drawn on its screen (0253). Trailing full stops are the prose's, not the data's.
 function navLines(): string[] {
-  return CONSOLE_NAV.map((group) => {
+  return CONSOLE_NAV.map(group => ({ ...group, items: group.items.filter(item => !item.tabOf) })).map((group) => {
     const split = group.items.some(item => item.section)
     if (!split) return `${group.label}: ${group.items.map(item => item.label).join(', ')}`
     const parts = NAV_SECTIONS.map(section =>
