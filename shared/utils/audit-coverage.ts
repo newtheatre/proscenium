@@ -640,6 +640,10 @@ export const AUDIT_COVERAGE: Coverage[] = [
     actions: ['bar.tab-charge.voided'],
     via: ['server/utils/tab-settlement.ts'],
   },
+  {
+    route: 'server/api/admin/bar/deliveries/index.post.ts',
+    exempt: 'each line is a delivery movement, which is the record: it stamps its own actor and time and a correction supersedes it (0010, 0254)',
+  },
   { route: 'server/api/admin/bar/movements/index.get.ts', exempt: 'reads the movement history' },
   {
     route: 'server/api/admin/bar/movements/index.post.ts',
