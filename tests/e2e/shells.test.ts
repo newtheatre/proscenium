@@ -10,6 +10,8 @@ import type { TestMember } from '#tests/helpers/accounts'
 
 const skip = skipReason()
 const BOOT_TIMEOUT_MS = 180_000
+// The first case after boot meets a cold dev server, which can take longer than bun's 5 seconds.
+const CASE_TIMEOUT_MS = 120_000
 let app: AppUnderTest
 
 // The programme pages are only themselves with a show on them, so the budget is counted on a
@@ -107,7 +109,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     expect(seen.subtree).toContain('oklch')
     expect(seen.header).toBe(seen.subtree)
     expect(seen.root).not.toBe(seen.subtree)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // At most one marquee CTA, one sticker and one spotlight per view. The budget is a rule and
   // not a suggestion, so it is a test rather than a habit.
@@ -129,7 +131,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
   // another and the page hydrates with a mismatch on every load (#895).
   test('the header title is one anchor deep', async () => {
     expect(await inspect<number>('/', `document.querySelectorAll('header a a').length`)).toBe(0)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The toggle is a phone visitor's only navigation control, so the panel behind it has to carry
   // the links rather than open empty (#894).
@@ -147,14 +149,14 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     finally {
       view.close()
     }
-  })
+  }, CASE_TIMEOUT_MS)
 
   // No poster kit in the console. On /dev because it wears the console layout and holds no
   // middleware, so a signed-out view renders the shell rather than the sign-in screen (0040).
   test('the console shell uses none of the expressive kit', async () => {
     expect(await inspect<Record<string, number>>('/dev', KIT_COUNTS))
       .toEqual({ marquee: 0, sticker: 0, spotlight: 0 })
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The one place every console screen agrees on was a bare span, so the sidebar had no way home
   // (0082). On /dev for the same reason the test above is.
@@ -228,7 +230,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     }))()`)
     expect(seen.offBoard).toEqual([])
     expect(seen.dark).toBeGreaterThan(0)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The chrome table's "The way in" row covers five screens, not two: the three a person reaches
   // from an email look like the way in too, rather than like a card adrift on the page.
@@ -256,7 +258,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     expect(seen.footer).toBe(1)
     expect(seen.ways).toEqual(['/whats-on', '/get-involved', '/'])
     expect(seen.text).not.toMatch(/\b[45]\d\d\b/)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // Show art is sovereign: the frame is ours and what is inside it is the show's, so the flag
   // sits on the card body and never over the artwork (docs/design-language.md, rule 2).
@@ -274,7 +276,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     })()`)
     expect(seen.found).toBe(1)
     expect(seen.overlaps).toBe(0)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The header's booking button goes to what's on, so a second "What's on" beside it is the same
   // destination twice; the footer still carries the entry (J-111 criteria 4 and 10).
@@ -287,7 +289,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     expect(seen.footerColumns).toContain('Visit')
     expect(seen.footerColumns).not.toContain('My theatre')
     expect(seen.footerColumns).not.toContain('Your account')
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The signed return key is the credential, so the page answers a browser holding no session,
   // and it is a till operator's screen rather than a public one (F-124 criterion 3).
@@ -301,7 +303,7 @@ describe.skipIf(skip !== null)('the shells (docs/design-language.md)', () => {
     expect(seen.footer).toBe(0)
     expect(seen.siteNav).toBe(0)
     expect(seen.card).toBe(1)
-  })
+  }, CASE_TIMEOUT_MS)
 
   // The Google route refuses with a code; the wording lives on the page that shows it, so an
   // unhandled code would leave a member staring at nothing.
