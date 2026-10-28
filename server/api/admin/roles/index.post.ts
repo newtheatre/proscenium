@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import type { H3Event } from 'h3'
 import { changes } from '#shared/utils/audit'
@@ -15,12 +15,17 @@ const body = z.object({
   userId: z.string().min(1).max(64).optional(),
   email: z.string().email().max(320).optional(),
   name: z.string().trim().min(1).max(200).optional(),
-  role: z.enum(ROLES),
+  role: z.enum(ROLES).optional(),
+  // Several roles for one account, granted together with one expiry and note, or none (0257).
+  roles: z.array(z.enum(ROLES)).min(1, 'Choose a role').max(ROLES.length).optional(),
   // Omitted means the committee year end; explicit null means permanent (0009).
   expiresAt: z.union([z.number().int().positive(), z.null()]).optional(),
   note: z.string().max(MAX_NOTE).optional(),
 }).refine(input => (input.userId === undefined) !== (input.email === undefined), { message: 'Choose somebody, or give an address' })
   .refine(input => input.email === undefined || input.name !== undefined, { message: 'Give their name', path: ['name'] })
+  .refine(input => (input.role === undefined) !== (input.roles === undefined), { message: 'Choose a role', path: ['role'] })
+  .refine(input => input.roles === undefined || input.userId !== undefined, { message: 'Grant one role by address; add the rest once they have an account', path: ['roles'] })
+  .refine(input => input.roles === undefined || new Set(input.roles).size === input.roles.length, { message: 'Each role is granted once', path: ['roles'] })
 
 // Whether the role does nothing for its holder until they set up an authenticator (A-112 criterion
 // 7): a password account with none, or one still to set its password, given a privileged role.
@@ -39,6 +44,7 @@ export default defineEventHandler(async (event) => {
   const note = input.note?.trim() || null
 
   if (input.email !== undefined) {
+    const role = input.role!
     // Making the account is account creation, whatever screen it was asked from.
     if (!resolved.permissions.has('accounts.create')) {
       throw createError({ statusCode: 403, statusMessage: 'You do not have permission to add somebody' })
@@ -56,7 +62,7 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Nothing can be delivered to that address' })
     }
     // Waiting for a first sign-in, so it keeps nothing until then (A-120 criterion 3).
-    const guard = input.role === PROTECTED_ROLE ? grantKeepsAnItManagerWhere({ userId: null, expiresAt }, Math.floor(Date.now() / 1000)) : null
+    const guard = role === PROTECTED_ROLE ? grantKeepsAnItManagerWhere({ userId: null, expiresAt }, Math.floor(Date.now() / 1000)) : null
 
     const userId = newId()
     const statements = pendingGrantStatements({
@@ -64,7 +70,7 @@ export default defineEventHandler(async (event) => {
       grantId: newId(),
       email,
       name,
-      role: input.role,
+      role: role,
       expiresAt,
       note,
       actorId: resolved.account.id,
@@ -74,7 +80,7 @@ export default defineEventHandler(async (event) => {
           actorId: resolved.account.id,
           action: 'role.granted',
           target: `user:${userId}`,
-          detail: pendingGrantDetail(input.role, expiresAt, note !== null),
+          detail: pendingGrantDetail(role, expiresAt, note !== null),
         }),
       },
     }).map(statement => db.run(statement))
@@ -91,59 +97,67 @@ export default defineEventHandler(async (event) => {
 
     // A Workspace address is claimed by Google sign-in alone, so it is sent nothing (0008).
     if (!isWorkspaceEmail(email)) await inviteToSetPassword(event, userId, name)
-    const waits = !isWorkspaceEmail(email) && await waitsOnFactor(event, input.role, null)
-    return { ok: true, role: input.role, expiresAt, renewed: false, pending: true, userId, waitsOnFactor: waits }
+    const waits = !isWorkspaceEmail(email) && await waitsOnFactor(event, role, null)
+    return { ok: true, role: role, expiresAt, renewed: false, pending: true, userId, waitsOnFactor: waits }
   }
 
   const subject = await findById(input.userId!)
   if (!subject || subject.anonymisedAt !== null) {
     throw noSuch('account')
   }
+  const roles = input.roles ?? [input.role!]
   // Committee standing is somebody else's decision; the IT Manager's own adds nothing it lacks (0114).
-  if (subject.id === resolved.account.id && input.role !== PROTECTED_ROLE) {
+  if (subject.id === resolved.account.id && roles.some(role => role !== PROTECTED_ROLE)) {
     throw createError({ statusCode: 403, statusMessage: SELF_GRANT })
   }
 
   // A lapse is a revocation nobody acts on, so every IT Manager grant leaves one that cannot
   // lapse (A-120 criterion 1); the batch carries the guard (criterion 5).
-  const guard = input.role === PROTECTED_ROLE
+  const guard = roles.includes(PROTECTED_ROLE)
     ? grantKeepsAnItManagerWhere({ userId: subject.id, expiresAt }, Math.floor(Date.now() / 1000))
     : null
 
   // The unique key is (user, role), so a lapsed grant is still a row: without this a renewal
   // would insert nothing, say nothing, and leave the role gone (A-131 criterion 5).
-  const [held] = await db.select({
+  const grants = await db.select({
+    role: schema.roleGrants.role,
     expiresAt: schema.roleGrants.expiresAt,
     note: schema.roleGrants.note,
   })
     .from(schema.roleGrants)
-    .where(and(eq(schema.roleGrants.userId, subject.id), eq(schema.roleGrants.role, input.role)))
-    .limit(1)
+    // Every grant the account has, by its own key, never an IN list of the roles asked for (0006).
+    .where(eq(schema.roleGrants.userId, subject.id))
+  const heldAs = new Map(grants.map(grant => [grant.role, grant]))
 
-  await batchKeepingAnItManager(guard, [
-    db.insert(schema.roleGrants).values({
-      id: newId(),
-      userId: subject.id,
-      role: input.role,
-      expiresAt,
-      grantedBy: resolved.account.id,
-      note,
-    }).onConflictDoUpdate({
-      target: [schema.roleGrants.userId, schema.roleGrants.role],
-      // A changed expiry re-arms the lapse warning, which would otherwise never fire again
-      // for this grant (A-119 criterion 1).
-      set: { expiresAt, grantedBy: resolved.account.id, grantedAt: Math.floor(Date.now() / 1000), note, expiryWarnedAt: null },
-    }),
-    db.insert(schema.auditLog).values(auditEntry({
-      actorId: resolved.account.id,
-      action: held ? 'role.renewed' : 'role.granted',
-      target: `user:${subject.id}`,
-      detail: held
-        ? { role: input.role, noted: note !== null, ...changes({ expiresAt: [held.expiresAt, expiresAt] }) }
-        : { role: input.role, expiresAt, permanent: expiresAt === null, noted: note !== null },
-    })),
-  ], () => refuseProtectedGrant(subject.id, expiresAt))
+  // Each role is its own upsert and its own audit entry, all in one batch: every one or none (0257).
+  await batchKeepingAnItManager(guard, roles.flatMap((role) => {
+    const held = heldAs.get(role)
+    return [
+      db.insert(schema.roleGrants).values({
+        id: newId(),
+        userId: subject.id,
+        role,
+        expiresAt,
+        grantedBy: resolved.account.id,
+        note,
+      }).onConflictDoUpdate({
+        target: [schema.roleGrants.userId, schema.roleGrants.role],
+        // A changed expiry re-arms the lapse warning, which would otherwise never fire again
+        // for this grant (A-119 criterion 1).
+        set: { expiresAt, grantedBy: resolved.account.id, grantedAt: Math.floor(Date.now() / 1000), note, expiryWarnedAt: null },
+      }),
+      db.insert(schema.auditLog).values(auditEntry({
+        actorId: resolved.account.id,
+        action: held ? 'role.renewed' : 'role.granted',
+        target: `user:${subject.id}`,
+        detail: held
+          ? { role, noted: note !== null, ...changes({ expiresAt: [held.expiresAt, expiresAt] }) }
+          : { role, expiresAt, permanent: expiresAt === null, noted: note !== null },
+      })),
+    ]
+  }), () => refuseProtectedGrant(subject.id, expiresAt))
 
-  const waits = await waitsOnFactor(event, input.role, subject)
-  return { ok: true, role: input.role, expiresAt, renewed: Boolean(held), pending: false, userId: subject.id, waitsOnFactor: waits }
+  const granted = await Promise.all(roles.map(async role => ({ role, renewed: heldAs.has(role), waitsOnFactor: await waitsOnFactor(event, role, subject) })))
+  const [first] = granted
+  return { ok: true, role: first!.role, expiresAt, renewed: first!.renewed, pending: false, userId: subject.id, waitsOnFactor: granted.some(one => one.waitsOnFactor), granted }
 })
