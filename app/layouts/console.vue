@@ -103,6 +103,11 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
         </NuxtLink>
       </template>
       <template #default="{ collapsed }">
+        <UDashboardSearchButton
+          :collapsed="collapsed"
+          label="Go to"
+          data-test="quick-jump-open"
+        />
         <!-- unmount-on-hide keeps a closed group's accordion trigger ids from colliding with an
              open one's (issue 896): Reka does not scope them per instance while both stay mounted. -->
         <UNavigationMenu
@@ -119,6 +124,8 @@ function items(collapsed: boolean): NavigationMenuItem[][] {
         <AuthStatus stacked />
       </template>
     </UDashboardSidebar>
+
+    <QuickJump />
 
     <UDashboardPanel>
       <template #header>

@@ -924,7 +924,7 @@ Stories: 36. Phases: 30 MVP, 1 V2, 0 Later, 5 resolved.
 ## K-201: The console command palette
 
 - Role: Administrator
-- Phase: V2
+- Phase: V2, brought forward to MVP on 25 October 2026 (decision 0256)
 - Story: As an officer who knows the name of a screen but not which group holds it, I want to
   open it by typing its name from anywhere in the console so that finding a screen never costs
   more than remembering what it is called.
@@ -941,6 +941,8 @@ Stories: 36. Phases: 30 MVP, 1 V2, 0 Later, 5 resolved.
      viewer's palette and their sidebar hold the same destinations.
   5. Opening a result navigates and closes the palette; the palette holds no destination that is
      not in the declaration and adds no route of its own.
+     Amended 25 October 2026 (decision 0256): it may also send typed words to a declared list
+     that searches by them, as that list's `?search=`, offered only to a viewer who can open it.
 - Source: Pre-cutover review, issue 1151 item 1. The design language names the palette as the
   answer once the sidebar passes roughly forty items; it carries fifty-four. Decision 0082 split
   the groups into sections first, because search finds a screen whose name is already known and
