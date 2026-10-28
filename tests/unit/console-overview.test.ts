@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { FIRST_RUN_STEPS, firstRunHref, firstRunLines, queuesFor, saysFirstRun, saysSetUp, setUpHref, setUpLines, tonightLines } from '#shared/utils/console-overview'
+import { FIRST_RUN_STEPS, firstRunHref, firstRunLines, queuesFor, rotaWeekLines, saysFirstRun, saysRotaWeekLine, saysSetUp, setUpHref, setUpLines, tonightLines } from '#shared/utils/console-overview'
 import { PERMISSION_MAP } from '#shared/utils/roles'
 import type { Permission, Role } from '#shared/utils/roles'
 import type { RoleEligibility } from '#shared/utils/rota-readiness'
@@ -17,8 +17,8 @@ describe('a queue is offered to whoever decides it', () => {
   test('each officer is given the queues their role works, and nobody else\'s', () => {
     expect(queuesFor(holding('SECRETARY'), false)).toEqual(['access-profiles'])
     expect(queuesFor(holding('PRESIDENT', 'TREASURER', 'COMMITTEE'), false)).toEqual([])
-    expect(queuesFor(holding('FOH_MANAGER'), false)).toEqual(['pass-requests'])
-    expect(queuesFor(holding('ADMIN'), false)).toEqual(['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests'])
+    expect(queuesFor(holding('FOH_MANAGER'), false)).toEqual(['pass-requests', 'rota-claims'])
+    expect(queuesFor(holding('ADMIN'), false)).toEqual(['membership-claims', 'access-profiles', 'room-requests', 'training-requests', 'pass-requests', 'rota-claims'])
   })
 
   test('a department lead answers training requests without the Theatre Manager\'s grant', () => {
@@ -175,5 +175,20 @@ describe('the overview screen', () => {
       expect(source).toContain('useNavCounts()')
       expect(source).toContain('nav.refresh()')
     }
+  })
+})
+
+// 0253: the rota's week says only the nights still needing somebody, in words.
+describe('the rota this week', () => {
+  const line = (open: number, withoutDutyManager: number) => ({ night: '2026-10-31', open, withoutDutyManager })
+
+  test('a night that needs nobody is left out', () => {
+    expect(rotaWeekLines([line(0, 0), line(2, 0), line(0, 1)]).map(one => [one.open, one.withoutDutyManager])).toEqual([[2, 0], [0, 1]])
+  })
+
+  test('a line says what is open and whether a duty manager is confirmed', () => {
+    expect(saysRotaWeekLine(line(1, 0))).toBe('1 place to fill')
+    expect(saysRotaWeekLine(line(3, 1))).toBe('3 places to fill, no confirmed duty manager')
+    expect(saysRotaWeekLine(line(0, 2))).toBe('2 performances with no confirmed duty manager')
   })
 })

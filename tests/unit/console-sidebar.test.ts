@@ -87,3 +87,17 @@ describe('every console label fits the sidebar at its default width (issue #1365
     expect(layout).toContain(':default-size="SIDEBAR_DEFAULT_SIZE"')
   })
 })
+
+// 0253: Bar openings is a tab on the Rota screen, guarded from its declaration but not drawn.
+describe('a tab is declared for its guard and left out of the sidebar', () => {
+  test('Bar openings is declared as a tab of the Rota screen', () => {
+    const declared = CONSOLE_NAV.flatMap(group => group.items).find(entry => entry.to === '/rota/manage/openings')
+    expect(declared?.tabOf).toBe('/rota/manage/shifts')
+  })
+
+  test('the Front of House Manager\'s sidebar draws Rota and not Bar openings', () => {
+    const rota = visibleGroups(viewerHolding('FOH_MANAGER')).find(group => group.key === 'rota')!
+    expect(rota.items.map(item => item.to)).toContain('/rota/manage/shifts')
+    expect(rota.items.map(item => item.to)).not.toContain('/rota/manage/openings')
+  })
+})

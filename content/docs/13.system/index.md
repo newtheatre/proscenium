@@ -3,7 +3,7 @@ title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
 audience: committee
-updatedOn: 2026-10-14
+updatedOn: 2026-10-25
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -78,8 +78,17 @@ with nothing in it for you is not drawn at all. When no part has anything for yo
 | Room requests to decide | the Theatre Manager | [Room requests](/docs/spaces/room-requests) |
 | Training requests to answer | the Theatre Manager, and a department lead for their own departments | [Requests](/docs/training/requests) |
 | Pass requests to fulfil, for a pass on sale | the Front of House Manager | [Pass desk](/docs/box-office/pass-desk) |
+| Rota claims to confirm, a shift's or a bar opening slot's, from tonight on | whoever changes the rota: the Front of House Manager | [Rota](/docs/rota/rota-board), on Waiting for confirmation |
 
 The IT Manager holds every permission, so sees every line.
+
+### The rota this week
+
+Whoever reads the rota also sees **The rota this week**: the next seven nights, from tonight, that
+still need somebody. Each line names the night and says how many places are left to fill (an open
+or declined shift, or a bar opening's slot) and whether a performance has no confirmed duty
+manager, which reads in amber. The night opens on the [rota](/docs/rota/rota-board) at that date.
+A week with every place filled and a duty manager confirmed every night shows no card at all.
 
 ### Set-up still to do
 

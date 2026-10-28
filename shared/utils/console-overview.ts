@@ -17,6 +17,7 @@ const DECIDES: Record<NavCount, Permission> = {
   'room-requests': 'rooms.write',
   'training-requests': 'training.read',
   'pass-requests': 'ticketing.write',
+  'rota-claims': 'rota.write',
 }
 
 export function queuesFor(permissions: ReadonlySet<Permission>, leadsDepartment: boolean): NavCount[] {
@@ -124,10 +125,36 @@ export function tonightLines(performances: readonly { id: string, showTitle: str
     .map(({ id, showTitle, venueName, startsAt }) => ({ performanceId: id, showTitle, venueName, startsAt }))
 }
 
+// The nights from tonight that the rota's week reads, and what one of them still needs (0253).
+export const ROTA_WEEK_NIGHTS = 7
+
+export interface RotaWeekLine {
+  night: string
+  // Open or declined shifts and bar opening slots, which nobody is down to work.
+  open: number
+  // Performances with a duty manager shift and none of them confirmed.
+  withoutDutyManager: number
+}
+
+// Only a night that still needs somebody is a line; a week with none is said as one sentence.
+export function rotaWeekLines(nights: readonly RotaWeekLine[]): RotaWeekLine[] {
+  return nights.filter(line => line.open > 0 || line.withoutDutyManager > 0)
+}
+
+export function saysRotaWeekLine(line: RotaWeekLine): string {
+  const parts = [
+    ...(line.open > 0 ? [`${plural(line.open, 'place')} to fill`] : []),
+    ...(line.withoutDutyManager > 0 ? [line.withoutDutyManager === 1 ? 'no confirmed duty manager' : `${line.withoutDutyManager} performances with no confirmed duty manager`] : []),
+  ]
+  return parts.join(', ')
+}
+
 // Tonight is null for a reader who holds no night permission, and a list, maybe empty, otherwise;
 // the first run is null for anybody but the IT Manager, and for them once it is finished.
 export interface ConsoleOverview {
   setUp: SetUpLine[]
   tonight: TonightLine[] | null
   firstRun: FirstRunLine[] | null
+  // Null for a reader who cannot read the rota; otherwise only the nights still needing somebody.
+  rotaWeek: RotaWeekLine[] | null
 }
