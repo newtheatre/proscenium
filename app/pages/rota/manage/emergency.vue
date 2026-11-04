@@ -132,7 +132,7 @@ async function save(): Promise<void> {
     await $fetch(`/api/admin/venues/${venue.venueId}/emergency`, { method: 'PUT', body: state })
     toast.add({
       title: 'Card saved',
-      description: 'A new version, never a rewrite: the last one stays exactly as it was filed.',
+      description: 'Saved as a new version. The previous one is kept as it was.',
       icon: 'i-lucide-check',
       color: 'success',
     })

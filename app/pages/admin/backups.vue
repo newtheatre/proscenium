@@ -278,7 +278,7 @@ onMounted(load)
     <UModal
       v-model:open="recording"
       title="Record a restore drill"
-      description="Whether it passed or failed, record what it reconciled: a failure is the finding, not a reason to omit it."
+      description="Record what it reconciled, whether it passed or failed. A failed drill still needs recording."
     >
       <template #body>
         <UForm

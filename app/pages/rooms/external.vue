@@ -129,7 +129,7 @@ useSeoMeta({ title: SU_ROOM_ASK })
   <UContainer :class="MEMBER_PAGE_WORKING">
     <UPageHeader
       :title="SU_ROOM_ASK"
-      description="For when nothing of ours suits. The Students' Union decides which room we get, and this is a request rather than a booking."
+      description="For when none of our rooms will do. The Students' Union decides which room we get, so this is a request, not a booking."
       :ui="MEMBER_PAGE_HEADER"
     />
 
@@ -254,7 +254,7 @@ useSeoMeta({ title: SU_ROOM_ASK })
           label="A room you would like"
           name="preferredSpaceId"
           hint="Optional"
-          description="A preference, not a promise. If we know a room is no good for what you are doing, you are told here."
+          description="We will ask for it, but cannot promise it. If we know a room will not suit what you are doing, we say so here."
         >
           <SpacePicker
             v-model="state.preferredSpaceId"

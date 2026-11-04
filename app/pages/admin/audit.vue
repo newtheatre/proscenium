@@ -470,7 +470,7 @@ onMounted(load)
           <UFormField
             name="onBehalfOf"
             label="Who decided it"
-            description="Whose decision this was, not yours. You are the signature."
+            description="The person who made the decision. You are recorded as the one who entered it."
             required
           >
             <PersonPicker

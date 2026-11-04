@@ -67,7 +67,7 @@ function describe(charge: ItemisedTab['charges'][number]): string {
   >
     <UPageHeader
       title="Bar tab"
-      description="A charge to a tab is owed, not taken. Settle it in person on the reader."
+      description="Anything put on your tab is still to pay. Settle it in person on the card reader."
       :ui="MEMBER_PAGE_HEADER"
     />
 
