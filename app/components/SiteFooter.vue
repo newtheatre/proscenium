@@ -50,7 +50,7 @@ const year = new Date().getFullYear()
         <div class="flex flex-col gap-3">
           <SiteWordmark class="self-start" />
           <p class="max-w-xs text-sm text-muted">
-            The country's only entirely student-run theatre, in {{ SITE_ADDRESS.addressLocality }}.
+            England's only entirely student-run theatre, in {{ SITE_ADDRESS.addressLocality }}.
           </p>
           <!-- Not the sticker variant: the footer is on every view, and the sticker is a budget
                of one per view that a public page should be free to spend on itself. -->

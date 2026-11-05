@@ -5,7 +5,7 @@ const { account } = useAccount()
 
 useSeoMeta({
   title: 'The Nottingham New Theatre',
-  description: 'The country\'s only entirely student-run theatre, at the University of Nottingham: what is on, how to book a ticket, and how to get involved.',
+  description: 'England\'s only entirely student-run theatre, at the University of Nottingham: what is on, how to book a ticket, and how to get involved.',
 })
 
 // The one page whose title is already the house's name, so the site template would read it twice.
@@ -38,7 +38,7 @@ const joinTo = computed(() => (account.value.signedIn ? '/account/membership' : 
       src="/images/nnt-front.webp"
       align="start"
       title="A century of first nights."
-      description="The country's only entirely student-run theatre. Fourteen shows a term, every one made from scratch by students."
+      description="England's only entirely student-run theatre."
     >
       <template #title>
         A century of<br>
