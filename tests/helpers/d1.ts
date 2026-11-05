@@ -50,5 +50,9 @@ const binding = {
 export function bindD1(database: TestDatabase): void {
   current = database.raw
   const globals = globalThis as { __env__?: Record<string, unknown> }
-  globals.__env__ = { ...globals.__env__, DB: binding }
+  // @nuxthub/db keeps the first binding it sees, so a stand-in installed earlier in the process
+  // (scripts/seed/money.ts) is given the methods in place rather than replaced.
+  const existing = globals.__env__?.DB
+  const target = existing && typeof existing === 'object' ? Object.assign(existing, binding) : binding
+  globals.__env__ = { ...globals.__env__, DB: target }
 }
