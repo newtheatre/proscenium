@@ -25,6 +25,10 @@
   ],
   "routes": [
     {
+      "pattern": "newtheatre.org.uk",
+      "custom_domain": true,
+    },
+    {
       "pattern": "proscenium.newtheatre.org.uk",
       "custom_domain": true,
     },
