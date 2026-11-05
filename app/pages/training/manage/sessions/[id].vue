@@ -364,7 +364,7 @@ const registerLabel = computed(() => {
         icon="i-lucide-check"
         data-test="session-marked"
         title="The register has been marked"
-        description="The records are made. Correcting one now is a revocation and a re-grant, not a second mark."
+        description="The records are made. To correct one now, revoke it and grant it again."
       />
 
       <UAlert

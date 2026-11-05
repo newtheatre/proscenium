@@ -445,7 +445,7 @@ onMounted(async () => {
     <UPageCard
       v-if="unassessed.total > 0"
       title="Published shows nobody has assessed for content warnings"
-      description="No warnings and no confirmation that there are none. The show page says as much, which is honest and is not the answer anybody wants on a published show."
+      description="Nobody has added warnings or confirmed there are none, and the show page says so. Assess each one."
       data-test="unassessed-shows"
     >
       <ul class="divide-y divide-default text-sm">

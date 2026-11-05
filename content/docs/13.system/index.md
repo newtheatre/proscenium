@@ -3,7 +3,7 @@ title: System
 description: The console overview, the settings, the audit trail, backups and restore, and how this documentation is kept.
 module: Platform
 audience: committee
-updatedOn: 2026-10-25
+updatedOn: 2026-11-04
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -145,8 +145,8 @@ list.
 
 **Published shows nobody has assessed for content warnings** appears only when there is at least
 one, and only to somebody holding a ticketing permission. A published show with no warnings and
-no confirmation that there are none says exactly that on its public page, which is honest and
-is not the answer anybody wants. Each title links to the show, where the assessment is recorded:
+no confirmation that there are none says so on its public page, which is not what anyone wants
+a booker to read. Each title links to the show, where the assessment is recorded:
 see [Content warnings](/docs/box-office/content-warnings).
 
 ## The screens

@@ -5,7 +5,7 @@ const { account } = useAccount()
 
 useSeoMeta({
   title: 'The Nottingham New Theatre',
-  description: 'The country\'s only entirely student-run theatre, at the University of Nottingham: what is on, how to book a ticket, and how to get involved.',
+  description: 'England\'s only entirely student-run theatre, at the University of Nottingham: what is on, how to book a ticket, and how to get involved.',
 })
 
 // The one page whose title is already the house's name, so the site template would read it twice.
@@ -21,10 +21,10 @@ const { data } = await useFetch<Listing>('/api/whats-on', {
 
 // Every department takes anybody, which is the point the tiles make by all saying the same thing.
 const FIELDS = [
-  { title: 'Acting', description: 'Audition for anything. No CV, no headshots, no gatekeeping.' },
-  { title: 'Backstage and tech', description: 'Build the set, rig the lights, cue the thunder.' },
+  { title: 'Acting', description: 'Audition for any show. You do not need a CV or headshots.' },
+  { title: 'Backstage and tech', description: 'Build the set, rig the lights and run the sound.' },
   { title: 'Front of house', description: 'Welcome the audience, run the bar, learn the building.' },
-  { title: 'Design and marketing', description: 'Posters, trailers and socials, so people show up.' },
+  { title: 'Design and marketing', description: 'Posters, trailers and social media for every show.' },
 ]
 
 // Joining is a membership, so a signed-out visitor arrives at the page that explains it and a
@@ -38,7 +38,7 @@ const joinTo = computed(() => (account.value.signedIn ? '/account/membership' : 
       src="/images/nnt-front.webp"
       align="start"
       title="A century of first nights."
-      description="The country's only entirely student-run theatre. Fourteen shows a term, made from scratch by people who should probably be revising."
+      description="England's only entirely student-run theatre."
     >
       <template #title>
         A century of<br>
@@ -160,13 +160,12 @@ const joinTo = computed(() => (account.value.signedIn ? '/account/membership' : 
       <div class="grid gap-10 lg:grid-cols-2 lg:gap-16">
         <div>
           <h2 class="nnt-headline text-3xl sm:text-4xl">
-            No experience necessary.<br>
-            <span class="text-primary">Honestly.</span>
+            No experience needed.<br>
+            <span class="text-primary">Everyone starts somewhere.</span>
           </h2>
           <p class="mt-4 max-w-md text-muted">
             Act, direct, build sets, rig lights, mix sound, run the bar or design the posters. Every
-            single person on every single show is a student, and every one of them started by
-            turning up.
+            show is made by students, and most of them had never done it before they joined.
           </p>
           <UButton
             class="mt-8"

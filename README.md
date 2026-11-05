@@ -1,7 +1,7 @@
 # The unified Nottingham New Theatre system
 
 One application replacing the four-app estate (stage-door, proscenium, rooms, rehearsal): one
-account, one calendar, one ledger and one show-night toolkit for the country's only entirely
+account, one calendar, one ledger and one show-night toolkit for England's only entirely
 student-run theatre. This branch starts from an empty history on purpose; the definition came
 first, and the first product commit lands only after the Phase 0 gate.
 

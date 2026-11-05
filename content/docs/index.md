@@ -3,7 +3,7 @@ title: Documentation
 description: How each part of the theatre is run, kept by the people who run it.
 module: Governance
 audience: member
-updatedOn: 2026-09-27
+updatedOn: 2026-11-04
 updatedBy: Matt Adcock
 ---
 
@@ -16,7 +16,7 @@ anybody does.
 
 Every page says when it was last updated and by whom. If a page and a screen disagree, the
 screen has changed and the page has not: use **Report as out of date** at the top of the page
-and the IT Manager is told. Drift is a defect, not a chore.
+and the IT Manager is told. Please do: an out-of-date page is treated as a bug.
 
 ::card-group
   ::card{icon="i-lucide-compass" title="Getting started" to="/docs/getting-started"}

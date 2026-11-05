@@ -1876,25 +1876,25 @@ The Nottingham New Theatre`,
         : `${roles.length} of your roles lapse soon`,
       html: layout(`<p>Hello ${context.name},</p>
 <p>${one ? 'A role you hold lapses soon.' : 'Roles you hold lapse soon.'} Committee roles run to the
-end of our year, so this is the ordinary handover rather than anything having gone wrong.</p>
+end of our year, so this is the normal handover and nothing has gone wrong.</p>
 <ul>${lines.map(line => `<li>${line}</li>`).join('')}</ul>
 <p>If you are carrying on, ask the ${saysRole('ADMIN')} to renew ${one ? 'it' : 'them'}. If you are
 handing over, this is the notice to plan it.</p>
-<p>This is about your standing role and nothing else. A shift you are confirmed for still opens the
-screens it always did, and your account, bookings and training records are untouched.</p>
+<p>Only the role changes. A shift you are confirmed for still opens the same screens, and your
+account, bookings and training records stay as they are.</p>
 <p>Your roles are listed on <a href="${String(context.accountUrl)}">My NNT</a>.</p>`),
       text: `Hello ${context.name},
 
 ${one ? 'A role you hold lapses soon.' : 'Roles you hold lapse soon.'} Committee roles run to the end
-of our year, so this is the ordinary handover rather than anything having gone wrong.
+of our year, so this is the normal handover and nothing has gone wrong.
 
 ${lines.map(line => `- ${line}`).join('\n')}
 
 If you are carrying on, ask the ${saysRole('ADMIN')} to renew ${one ? 'it' : 'them'}. If you are
 handing over, this is the notice to plan it.
 
-This is about your standing role and nothing else. A shift you are confirmed for still opens the
-screens it always did, and your account, bookings and training records are untouched.
+Only the role changes. A shift you are confirmed for still opens the same screens, and your
+account, bookings and training records stay as they are.
 
 Your roles are listed on My NNT:
 ${String(context.accountUrl)}

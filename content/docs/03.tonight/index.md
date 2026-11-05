@@ -3,7 +3,7 @@ title: Tonight
 description: The phone screens a show night runs on, who they open for, and the hub they all start from.
 module: Show night
 audience: member
-updatedOn: 2026-10-22
+updatedOn: 2026-11-04
 updatedBy: Matt Adcock
 navigation:
   title: Overview
@@ -74,8 +74,8 @@ A door shift does not open the till, and a bar shift does not open the door; the
 interchangeable. The one crossing is the duty manager covering the door: their
 confirmed shift opens the door and pass admission for their own performance, inside their own
 hours, and nothing more. The show night runs from 04:00 to 04:00, so a performance that
-finishes at 01:00 is still tonight, and a screen left open past 04:00 is refused rather than
-quietly moved on to the next night.
+finishes at 01:00 is still tonight. A screen left open past 04:00 stops working, and does not
+move on to the next night by itself.
 
 Nothing on these screens refunds a ticket. The box office refunds a paid ticket in person, at the
 desk, on any day: take the person's booking reference and pass it to the Front of House Manager.

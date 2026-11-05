@@ -35,7 +35,7 @@ did and warmer without being less precise, and the K-128 sweep moved the rest of
 Four shells, one posture each (0040):
 
 - **`default`** (public, expressive): full sentences, unhurried. `app/pages/index.vue`'s hero
-  description reads "The country's only entirely student-run theatre." One marquee CTA per view,
+  description reads "England's only entirely student-run theatre." One marquee CTA per view,
   verb first: "Book a room", "Sign in".
 - **`member`** (your own things, calm): full sentences, second person, no jargon. `app/pages/
   account/membership.vue` reads "Your membership runs until {day}." and "We cannot sell it here.
