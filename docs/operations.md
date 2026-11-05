@@ -298,20 +298,25 @@ chosen at the time (`<archive-name>` below; nothing is decided yet). In order:
    curled the site (`## Applying migrations`, "What it cannot do"). From here on, the by-hand
    health check after a migration run is made against the production host.
 
-4. **The DNS flip, and its ordering against the rename.** `wrangler.jsonc`'s one route today is
-   `proscenium.newtheatre.org.uk` (`custom_domain: true`), the pre-cutover testing host; the
-   application's own code already assumes production is the bare `newtheatre.org.uk`
-   (`nuxt.config.ts`'s `baseURL`). Changing the route pattern to the production hostname is a code
-   change, merged and deployed; the rename does not do this by itself. Order: **rename first, then
-   merge the route change to the newly-renamed `main`, then confirm a real deploy has gone out**
-   (Workers Builds deploying `main` needs no reconfiguration in this repository, the same reason
-   the database id below needs none: it is *the branch that currently deploys*, and the rename is
-   what makes `unified/main`'s content that branch). What is **not** confirmed and must be checked
-   at the time, not assumed: whether Cloudflare's own Workers Builds project, in the Cloudflare
-   dashboard rather than this repository, tracks the branch to deploy by a fixed name that the
-   GitHub rename may or may not carry across automatically. If a push to the renamed `main` does
-   not trigger a fresh build, that setting is where to look, not this repository's own workflow
-   files.
+4. **The DNS flip, and its ordering against the rename.** Production is the bare
+   `newtheatre.org.uk` (`nuxt.config.ts`'s `baseURL`), and it moves to this application when a
+   deploy lists it under `wrangler.jsonc`'s `routes` (`custom_domain: true`). Run outside a
+   terminal, as Workers Builds does, `wrangler deploy` takes a listed custom domain from whichever
+   worker holds it and drops any domain the worker holds that the list leaves out, so **merging the
+   route change is the flip**, a few minutes later when the build finishes. Three facts about
+   Workers Builds, all checked on 4 November 2026, decide the order:
+   - It deploys under the name of the worker it is connected to, ignoring `name` in the config, so
+     this application deploys as `unified-staging` whatever `nuxt.config.ts` calls it.
+   - Each trigger watches a branch by name, and a GitHub rename does not change it.
+   - The old `proscenium` worker had a trigger watching `main`. After the rename it would have
+     built this application and deployed it over the old worker.
+
+   Order: delete the old worker's trigger; rename the branches; point `unified-staging`'s trigger at
+   `main`; check the Google OAuth client allows `https://newtheatre.org.uk/auth/google` and that
+   the `NUXT_PUBLIC_BASE_URL` worker secret is the bare domain or unset; then merge the route
+   change and confirm the build deployed. To roll back, move the custom domain back to `proscenium`
+   (Workers, the worker's Settings, Domains and routes); nothing above changes the old worker
+   itself.
 
 5. **Retire `main`'s duplicate workflows.** After the rename, the archive branch carries its own
    frozen copies of `ci.yml` and `migrate.yml`, exactly as they stood at the last commit on old
