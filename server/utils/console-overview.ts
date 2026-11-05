@@ -92,25 +92,27 @@ export function firstRunQuery(): SQL {
 }
 
 // One row per night from tonight, a fixed seven, so its parameters never grow with the rota (0006, 0253).
+// A VALUES list, not a UNION ALL per night: D1 refuses a compound SELECT of more than five (0258).
 export function rotaWeekQuery(tonight: string): SQL {
-  const nights = Array.from({ length: ROTA_WEEK_NIGHTS }, (_, offset) => daysAfter(tonight, offset))
-  return sql.join(nights.map((night) => {
+  const nights = Array.from({ length: ROTA_WEEK_NIGHTS }, (_, offset) => daysAfter(tonight, offset)).map((night) => {
     const { from, to } = showNightBounds(night)
-    const start = Math.floor(from.getTime() / 1000)
-    const end = Math.floor(to.getTime() / 1000)
-    return sql`SELECT ${night} AS night, ((
+    return sql`(${night}, ${Math.floor(from.getTime() / 1000)}, ${Math.floor(to.getTime() / 1000)})`
+  })
+  return sql`WITH week(night, starts, ends) AS (VALUES ${sql.join(nights, sql`, `)})
+    SELECT w.night AS night, ((
         SELECT count(*) FROM shifts s JOIN performances p ON p.id = s.performance_id
-        WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${start} AND p.starts_at < ${end} AND s.status IN ('OPEN', 'DECLINED')
+        WHERE p.status <> 'CANCELLED' AND p.starts_at >= w.starts AND p.starts_at < w.ends AND s.status IN ('OPEN', 'DECLINED')
       ) + (
         SELECT count(*) FROM bar_opening_shifts b JOIN bar_openings o ON o.id = b.opening_id
-        WHERE o.status = 'PLANNED' AND o.starts_at >= ${start} AND o.starts_at < ${end} AND b.status IN ('OPEN', 'DECLINED')
+        WHERE o.status = 'PLANNED' AND o.starts_at >= w.starts AND o.starts_at < w.ends AND b.status IN ('OPEN', 'DECLINED')
       )) AS open, (
         SELECT count(*) FROM performances p
-        WHERE p.status <> 'CANCELLED' AND p.starts_at >= ${start} AND p.starts_at < ${end}
+        WHERE p.status <> 'CANCELLED' AND p.starts_at >= w.starts AND p.starts_at < w.ends
           AND EXISTS (SELECT 1 FROM shifts d WHERE d.performance_id = p.id AND d.role = 'DUTY_MANAGER' AND d.status <> 'CANCELLED')
           AND NOT EXISTS (SELECT 1 FROM shifts d WHERE d.performance_id = p.id AND d.role = 'DUTY_MANAGER' AND d.status = 'CONFIRMED')
-      ) AS withoutDutyManager`
-  }), sql` UNION ALL `)
+      ) AS withoutDutyManager
+    FROM week w
+    ORDER BY w.night`
 }
 
 async function rotaWeek(): Promise<RotaWeekLine[]> {
