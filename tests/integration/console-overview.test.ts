@@ -212,6 +212,12 @@ describe('the rota this week', () => {
     })
   })
 
+  test('it is one SELECT, since D1 refuses a compound of more than five terms (0258)', async () => {
+    await withDatabase((database) => {
+      expect(String(boundStatement(database, rotaWeekQuery(tonight))[0])).not.toMatch(/\bUNION\b/i)
+    })
+  })
+
   test('its parameters are a fixed number, whatever the rota holds (0006)', async () => {
     await withDatabase((database) => {
       const empty = boundStatement(database, rotaWeekQuery(tonight))
