@@ -4,8 +4,8 @@ import { saysPassOffer } from '#shared/utils/passes'
 import type { PassOffer } from '#shared/utils/passes'
 import type { TillPassLine } from '~/composables/useTillPass'
 
-// The Season pass pane (D-134): a pass covering tonight's show, for the buyer's own account. The
-// sale itself is the ordinary charge, so the money goes through the reader with the basket.
+// The Season pass pane (D-134): a pass covering tonight's show, kept on the buyer's email with or
+// without an account (D-138). The sale is the ordinary charge, through the reader with the basket.
 
 defineProps<{
   offers: PassOffer[]
@@ -16,6 +16,7 @@ defineProps<{
 }>()
 
 const email = defineModel<string>('email', { required: true })
+const name = defineModel<string>('name', { required: true })
 const priceId = defineModel<string | undefined>('priceId')
 </script>
 
@@ -25,7 +26,7 @@ const priceId = defineModel<string | undefined>('priceId')
     data-test="pass-pane"
   >
     <p class="text-xs text-muted">
-      A pass needs an account. Type the email address they signed up with; if they have no account, they make one on their phone first. The pass and its QR are emailed to them.
+      Type their email address; the pass and its QR are emailed there, and they need no account. Add their name if they have never booked with us.
     </p>
     <UAlert
       v-if="failure"
@@ -63,9 +64,18 @@ const priceId = defineModel<string | undefined>('priceId')
         v-model="email"
         type="email"
         autocapitalize="off"
-        placeholder="Their account's email"
+        placeholder="Their email"
+        aria-label="Buyer's email"
         class="w-full"
         data-test="till-pass-email"
+      />
+      <UInput
+        v-model="name"
+        autocomplete="off"
+        placeholder="Their name, if new to us"
+        aria-label="Buyer's name"
+        class="mt-2 w-full"
+        data-test="till-pass-name"
       />
       <UButton
         class="mt-3 min-h-12"

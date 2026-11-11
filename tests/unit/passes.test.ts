@@ -87,6 +87,14 @@ describe('issuing asks for a buyer, a price point and the reader\'s own figure (
     })
     expect(parsed.success).toBe(false)
   })
+
+  test('a new buyer is a name and an email instead of a person (D-138 criterion 1)', () => {
+    const guest = { name: 'Gwen Guest', email: 'gwen@example.invalid' }
+    expect(issuePassForm.safeParse({ passTypeId: 'pt-1', passTypePriceId: 'price-1', guest, expectedTotalPence: 4500 }).success).toBe(true)
+    expect(issuePassForm.safeParse({ passTypeId: 'pt-1', passTypePriceId: 'price-1', userId: 'u-1', guest, expectedTotalPence: 4500 }).success).toBe(false)
+    expect(issuePassForm.safeParse({ passTypeId: 'pt-1', passTypePriceId: 'price-1', expectedTotalPence: 4500 }).success).toBe(false)
+    expect(issuePassForm.safeParse({ passTypeId: 'pt-1', passTypePriceId: 'price-1', guest: { name: '', email: 'gwen@example.invalid' }, expectedTotalPence: 4500 }).success).toBe(false)
+  })
 })
 
 describe('a request names only which product (criterion 3)', () => {

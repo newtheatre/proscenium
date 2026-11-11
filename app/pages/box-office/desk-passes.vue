@@ -71,9 +71,22 @@ watch(selectedPassType, (type) => {
 
 const buyerId = ref<string | undefined>(undefined)
 const buyerName = ref<string | null>(null)
-const personPicker = useTemplateRef('personPicker')
-
 const requestId = ref<string | undefined>(undefined)
+
+// D-138 criterion 1: somebody with no record yet is named and addressed instead of picked.
+const newBuyer = ref(false)
+const guestName = ref('')
+const guestEmail = ref('')
+const guestReady = computed(() => guestName.value.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.value.trim()))
+const canIssue = computed(() => newBuyer.value ? guestReady.value : Boolean(buyerId.value))
+watch(newBuyer, (fresh) => {
+  if (fresh) {
+    buyerId.value = undefined
+    buyerName.value = null
+    requestId.value = undefined
+  }
+})
+const personPicker = useTemplateRef('personPicker')
 
 const buyerIsMember = ref<boolean | null>(null)
 watch(buyerId, async (id) => {
@@ -105,7 +118,7 @@ const issuing = ref(false)
 const issueFailure = ref<string | null>(null)
 
 async function issue(): Promise<void> {
-  if (!passTypeId.value || !priceId.value || !buyerId.value) return
+  if (!passTypeId.value || !priceId.value || !canIssue.value) return
   const passName = selectedPassType.value?.name ?? 'Pass'
   issuing.value = true
   issueFailure.value = null
@@ -115,15 +128,19 @@ async function issue(): Promise<void> {
       body: {
         passTypeId: passTypeId.value,
         passTypePriceId: priceId.value,
-        userId: buyerId.value,
+        ...(newBuyer.value
+          ? { guest: { name: guestName.value.trim(), email: guestEmail.value.trim() } }
+          : { userId: buyerId.value, requestId: requestId.value }),
         expectedTotalPence: duePence.value,
-        requestId: requestId.value,
       },
     })
     toast.add({ title: `${passName} issued`, icon: 'i-lucide-check', color: 'success' })
     buyerId.value = undefined
     buyerName.value = null
     requestId.value = undefined
+    guestName.value = ''
+    guestEmail.value = ''
+    newBuyer.value = false
     await Promise.all([refreshPassTypes(), loadRequests(), nav.refresh()])
   }
   catch (error) {
@@ -224,7 +241,10 @@ async function issue(): Promise<void> {
           </ul>
         </div>
 
-        <UFormField label="Buyer">
+        <UFormField
+          v-show="!newBuyer"
+          label="Buyer"
+        >
           <PersonPicker
             ref="personPicker"
             v-model="buyerId"
@@ -234,6 +254,36 @@ async function issue(): Promise<void> {
             @chosen="person => buyerName = person?.name ?? null"
           />
         </UFormField>
+
+        <USwitch
+          v-model="newBuyer"
+          label="New to us: no account and no booking"
+          description="The pass is kept on their email address and sent there; they need no account."
+          data-test="desk-pass-new-buyer"
+        />
+
+        <div
+          v-if="newBuyer"
+          class="grid gap-3 sm:grid-cols-2"
+        >
+          <UFormField label="Their name">
+            <UInput
+              v-model="guestName"
+              autocomplete="off"
+              class="w-full"
+              data-test="desk-pass-guest-name"
+            />
+          </UFormField>
+          <UFormField label="Their email">
+            <UInput
+              v-model="guestEmail"
+              type="email"
+              autocapitalize="off"
+              class="w-full"
+              data-test="desk-pass-guest-email"
+            />
+          </UFormField>
+        </div>
 
         <p
           v-if="buyerIsMember !== null"
@@ -255,11 +305,11 @@ async function issue(): Promise<void> {
           class="text-lg font-semibold"
           data-test="desk-pass-due"
         >
-          Due now{{ buyerId && buyerName ? ` from ${buyerName}` : '' }}: {{ saysPrice(duePence) }}
+          Due now{{ newBuyer && guestName.trim() ? ` from ${guestName.trim()}` : buyerId && buyerName ? ` from ${buyerName}` : '' }}: {{ saysPrice(duePence) }}
         </p>
 
         <UButton
-          :disabled="!buyerId"
+          :disabled="!canIssue"
           :loading="issuing"
           data-test="desk-pass-issue"
           @click="issue"

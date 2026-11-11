@@ -58,6 +58,8 @@ export const tillPassForm = z.object({
   passTypeId: z.string().trim().min(1, 'Say which pass you mean'),
   passTypePriceId: z.string().trim().min(1, 'Say which price you mean'),
   email: z.string().trim().email('Enter a real email address').max(320),
+  // Only asked for when nobody holds the address yet: it names the guest record (D-138, 0259).
+  name: z.string().trim().max(120).nullish().transform(value => value || null),
 })
 
 export type TillPassInput = z.output<typeof tillPassForm>

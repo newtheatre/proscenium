@@ -617,7 +617,7 @@ describe('Check ID follows what the line pours, not the product switch alone (is
 
 // D-134: a season pass rides the basket as ticket money does: on the reader, never on a tab.
 describe('a season pass in the basket is charged on the reader with everything else (D-134)', () => {
-  const aPass = (): TillPassLine => ({ passTypeId: 'pt-1', passTypePriceId: 'price-1', passName: 'Season pass', priceLabel: 'Standard', price: 4500, email: 'buyer@example.invalid' })
+  const aPass = (): TillPassLine => ({ passTypeId: 'pt-1', passTypePriceId: 'price-1', passName: 'Season pass', priceLabel: 'Standard', price: 4500, email: 'buyer@example.invalid', name: null })
 
   test('its price joins the total, and the basket is no longer empty', () => {
     const { basket, scope } = setup([aProduct()], { passLine: ref(aPass()) })
@@ -626,9 +626,9 @@ describe('a season pass in the basket is charged on the reader with everything e
     scope.stop()
   })
 
-  test('the sale names the pass and the buyer by email, nothing else about it', () => {
+  test('the sale names the pass and the buyer by email, and a name only for a new buyer (D-138)', () => {
     const { basket, scope } = setup([aProduct()], { passLine: ref(aPass()) })
-    expect(basket.saleBody(null, 4500).pass).toEqual({ passTypeId: 'pt-1', passTypePriceId: 'price-1', email: 'buyer@example.invalid' })
+    expect(basket.saleBody(null, 4500).pass).toEqual({ passTypeId: 'pt-1', passTypePriceId: 'price-1', email: 'buyer@example.invalid', name: null })
     scope.stop()
   })
 

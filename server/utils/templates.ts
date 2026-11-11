@@ -2186,8 +2186,9 @@ The Nottingham New Theatre`,
 person.</p>${covers ? `\n<p>${covers}</p>` : ''}
 <p><a href="${url}"><img src="${imageUrl}" alt="Pass QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>
-<p>To book ahead, sign in with this email address and choose "Use my pass" when you book.
-You can also just turn up, subject to space on the night.</p>
+<p>To book ahead, open the link above on the phone or computer you book with, then choose
+"Use my pass" when you book; no account is needed. You can also just turn up, subject to space
+on the night.</p>
 <p><a href="${termsUrl}">The ticket and pass terms</a></p>`),
       text: `Hello ${context.name},
 
@@ -2195,8 +2196,9 @@ Reference ${reference}: ${passType} (${priceLabel}), issued and paid for in pers
 
 Open your pass: ${url}
 
-To book ahead, sign in with this email address and choose "Use my pass" when you book.
-You can also just turn up, subject to space on the night.
+To book ahead, open the link above on the phone or computer you book with, then choose
+"Use my pass" when you book; no account is needed. You can also just turn up, subject to space
+on the night.
 
 The ticket and pass terms: ${termsUrl}
 

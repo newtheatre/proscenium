@@ -1,15 +1,17 @@
 import { db } from '@nuxthub/db'
 import { createError } from 'h3'
 import { sql } from 'drizzle-orm'
-import { findByEmail, hasNoWayIn, newId } from './accounts'
+import { findByEmail, newId } from './accounts'
 import { heldSeatsForReservation, passAdmissionTicketInsert } from './capacity'
 import { postEntry, runLedgerBatch } from './ledger'
 import { passAdmissionAllows } from './pass-redemption'
+import { PASS_HOLDER_CLOSED_SAYS } from './pass-holders'
 import { passTypeForSale, passTypePriceById } from './passes'
 import { effectiveCapacity } from './performances'
 import { performanceById } from './programme'
 import { passAdmissionTicketType } from './ticket-types'
 import { auditEntry } from '#shared/utils/audit'
+import { normaliseEmail } from '#shared/utils/auth'
 import { generatePassReference, passCapReason, passSaleRefusal } from '#shared/utils/passes'
 import { generateReservationReference } from '#shared/utils/reservations'
 import type { TillPassInput } from '#shared/utils/sale'
@@ -28,7 +30,8 @@ export interface ResolvedTillPass {
   priceLabel: string
   pricePence: number
   maxIssued: number | null
-  buyer: { id: string, name: string }
+  // `guestEmail` is set when nobody held the address: the sale's own batch writes the record (0259).
+  buyer: { id: string, name: string, guestEmail?: string }
   requestId: string | null
   swap: SwapCandidate | null
   // Why tonight's booking stays as it is, said on the receipt; null when there is none to move.
@@ -53,7 +56,7 @@ interface TonightBookingRow {
   covered: number
 }
 
-export const NO_ACCOUNT_SAYS = 'Nobody has an account on that email address. A pass needs one: ask them to create an account on their phone, then sell again. Nothing has been charged.'
+export const NO_ACCOUNT_SAYS = 'Nobody holds that email address yet: add the buyer\'s name, and the pass is kept for them on it. Nothing has been charged.'
 
 // One performance at a time, never an `IN` list: the till's own houses tonight, a bounded handful (0006).
 export function tonightBookingQuery(userId: string, performanceId: string, passTypeId: string): SQL {
@@ -95,10 +98,18 @@ export async function resolveTillPass(input: TillPassInput, performanceIds: stri
     throw createError({ statusCode: 400, statusMessage: 'Choose one of the prices this pass offers' })
   }
 
-  // A pass always needs an account (D-133 criterion 3): a guest record from a booking is not one.
+  // Any record on the address holds the pass, a guest's included (D-138 criterion 1, 0259).
   const account = await findByEmail(input.email)
-  if (!account || account.anonymisedAt !== null || account.disabled || !account.verified || await hasNoWayIn(account)) {
-    throw createError({ statusCode: 409, statusMessage: NO_ACCOUNT_SAYS })
+  if (account && (account.anonymisedAt !== null || account.disabled)) throw createError({ statusCode: 409, statusMessage: PASS_HOLDER_CLOSED_SAYS })
+  if (!account && !input.name) throw createError({ statusCode: 409, statusMessage: NO_ACCOUNT_SAYS })
+  if (!account) {
+    return {
+      ...resolvedPass(passType, price),
+      buyer: { id: newId(), name: input.name!, guestEmail: normaliseEmail(input.email) },
+      requestId: null,
+      swap: null,
+      keptBooking: null,
+    }
   }
 
   const [held] = await db.all<{ id: string }>(sql`
@@ -116,6 +127,18 @@ export async function resolveTillPass(input: TillPassInput, performanceIds: stri
   }
 
   return {
+    ...resolvedPass(passType, price),
+    buyer: { id: account.id, name: account.name },
+    requestId: request?.id ?? null,
+    ...swapDecision(rows),
+  }
+}
+
+type PassForSale = NonNullable<Awaited<ReturnType<typeof passTypeForSale>>>
+type PassPrice = NonNullable<Awaited<ReturnType<typeof passTypePriceById>>>
+
+function resolvedPass(passType: PassForSale, price: PassPrice): Omit<ResolvedTillPass, 'buyer' | 'requestId' | 'swap' | 'keptBooking'> {
+  return {
     passId: newId(),
     reference: generatePassReference(),
     passTypeId: passType.id,
@@ -124,9 +147,6 @@ export async function resolveTillPass(input: TillPassInput, performanceIds: stri
     priceLabel: price.label,
     pricePence: price.price,
     maxIssued: passType.maxIssued,
-    buyer: { id: account.id, name: account.name },
-    requestId: request?.id ?? null,
-    ...swapDecision(rows),
   }
 }
 
@@ -135,14 +155,30 @@ export async function resolveTillPass(input: TillPassInput, performanceIds: stri
 export function tillPassSql(pass: ResolvedTillPass, entryId: string, actorId: string): SQL[] {
   const posts = sql`EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${entryId})`
   const columns = sql`id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, status, issued_by`
-  const values = sql`${pass.passId}, ${pass.reference}, ${pass.passTypeId}, ${pass.passTypePriceId}, ${pass.buyer.id}, ${pass.pricePence}, 'ACTIVE', ${actorId}`
+  const { guestEmail } = pass.buyer
+  // Read back by address, so a record another checkout wrote first still holds the pass (0006).
+  const holder = guestEmail ? sql`(SELECT id FROM users WHERE email = ${guestEmail})` : sql`${pass.buyer.id}`
+  const values = sql`${pass.passId}, ${pass.reference}, ${pass.passTypeId}, ${pass.passTypePriceId}, ${holder}, ${pass.pricePence}, 'ACTIVE', ${actorId}`
   const issued = auditEntry({ actorId, action: 'pass.issued', target: `pass:${pass.passId}`, detail: { passTypeId: pass.passTypeId, userId: pass.buyer.id, pricePaid: pass.pricePence } })
 
-  const statements: SQL[] = [
+  const statements: SQL[] = []
+  if (guestEmail) {
+    const created = auditEntry({ actorId, action: 'account.created.guest', target: `user:${pass.buyer.id}` })
+    statements.push(
+      sql`INSERT INTO users (id, email, name) SELECT ${pass.buyer.id}, ${guestEmail}, ${pass.buyer.name} WHERE ${posts} ON CONFLICT (email) DO NOTHING`,
+      sql`
+        INSERT INTO audit_log (id, actor_id, action, target, detail)
+        SELECT ${created.id}, ${created.actorId}, ${created.action}, ${created.target}, NULL
+        WHERE changes() = 1
+      `,
+    )
+  }
+
+  statements.push(
     sql`INSERT INTO passes (${columns}) SELECT ${values} WHERE ${posts}`,
     sql`
       INSERT INTO passes (${columns})
-      SELECT ${pass.passId}, ${pass.passId}, ${pass.passTypeId}, ${pass.passTypePriceId}, ${pass.buyer.id}, ${pass.pricePence}, 'ACTIVE', ${actorId}
+      SELECT ${pass.passId}, ${pass.passId}, ${pass.passTypeId}, ${pass.passTypePriceId}, ${holder}, ${pass.pricePence}, 'ACTIVE', ${actorId}
       WHERE ${pass.maxIssued} IS NOT NULL
         AND (SELECT count(*) FROM passes WHERE pass_type_id = ${pass.passTypeId} AND status != 'CANCELLED') > ${pass.maxIssued}
     `,
@@ -151,7 +187,7 @@ export function tillPassSql(pass: ResolvedTillPass, entryId: string, actorId: st
       SELECT ${issued.id}, ${issued.actorId}, ${issued.action}, ${issued.target}, ${JSON.stringify(issued.detail)}
       WHERE ${posts}
     `,
-  ]
+  )
 
   if (pass.requestId) {
     const fulfilled = auditEntry({ actorId, action: 'pass.request.fulfilled', target: `pass-request:${pass.requestId}`, detail: { passId: pass.passId } })

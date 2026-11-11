@@ -206,8 +206,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/box-office/desk/passes/[passTypeId]/requests.get.ts', exempt: 'reads pending requests; nothing is written' },
   {
     route: 'server/api/box-office/desk/passes/index.post.ts',
-    actions: ['pass.issued', 'pass.request.fulfilled'],
-    via: ['server/utils/pass-issue.ts'],
+    actions: ['pass.issued', 'pass.request.fulfilled', 'account.created.guest'],
+    via: ['server/utils/pass-issue.ts', 'server/utils/reservations.ts'],
   },
   { route: 'server/api/account/passes/index.get.ts', exempt: 'reads the caller\'s own held passes and requests' },
   {
@@ -221,6 +221,8 @@ export const AUDIT_COVERAGE: Coverage[] = [
     via: ['server/utils/pass-issue.ts'],
   },
   { route: 'server/api/passes/current.get.ts', exempt: 'reads the pass the cookie names; nothing is written' },
+  { route: 'server/api/passes/resend.post.ts', exempt: 'sends a message; the send is recorded in notification_log' },
+  { route: 'server/api/passes/device.delete.ts', exempt: 'clears this browser\'s own pass cookie; nothing is written' },
   { route: 'server/routes/passes/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
   { route: 'server/routes/passes/[token]/image.png.get.ts', exempt: 'renders the pass QR as a PNG for the email; nothing is written' },
   {

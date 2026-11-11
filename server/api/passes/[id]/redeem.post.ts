@@ -1,8 +1,9 @@
 import { redeemPassForm } from '#shared/utils/passes'
 
-// Self-serve pass redemption while reserving (D-125). Only the pass's own holder may spend it.
+// Self-serve pass redemption while reserving (D-125). Only the pass's own holder may spend it:
+// signed in as its record, or in the browser that opened its link (D-138 criterion 3).
 export default defineEventHandler(async (event) => {
-  const account = await requireAccount(event)
+  const account = await currentAccount(event)
   const input = await readValidatedBodyOrThrow(event, redeemPassForm)
   const passId = getRouterParam(event, 'id') ?? ''
 
@@ -12,7 +13,8 @@ export default defineEventHandler(async (event) => {
   const state = await passRedemptionState(passId, performance.showId)
   // Enumeration-safe: a pass that is not the caller's own answers exactly as one that does not
   // exist, the same shape a pass type's own 404 already takes.
-  if (!state || state.userId !== account.id) throw noSuch('pass')
+  const holds = state && (state.userId === account?.id || (await rememberedPasses(event)).some(one => one.passId === passId))
+  if (!state || !holds) throw noSuch('pass')
 
   const now = Math.floor(Date.now() / 1000)
   const refusal = refusalFor(state, now)
@@ -21,13 +23,13 @@ export default defineEventHandler(async (event) => {
   const capacity = effectiveCapacity(performance)
   const result = await redeemPass({
     passId,
-    userId: account.id,
+    userId: state.userId,
     performanceId: input.performanceId,
     showId: performance.showId,
     capacity,
     source: 'WEB',
     admittedBy: null,
-    actorId: account.id,
+    actorId: account?.id ?? null,
   })
 
   if (!result.applied) {
@@ -48,7 +50,7 @@ export default defineEventHandler(async (event) => {
   rememberQrToken(event, qrToken)
 
   await sendReservationConfirmation(event, {
-    userId: account.id,
+    userId: state.userId,
     reference: result.reference!,
     showTitle: performance.showTitle,
     startsAt: performance.startsAt,

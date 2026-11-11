@@ -31,15 +31,18 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // A new buyer becomes the same guest record a guest booking makes (D-138 criterion 1, 0259).
+  const userId = input.userId ?? await guestPassHolder(input.guest!)
+
   // A buyer picked by name may still have asked online: their request is settled by this sale too,
   // under the same conditional fulfilment, so a withdrawal racing it simply finds nothing (issue 1331).
-  const requestId = input.requestId ?? await openPassRequestFor(input.userId, input.passTypeId)
+  const requestId = input.requestId ?? await openPassRequestFor(userId, input.passTypeId)
 
   const result = await issuePass({
     passTypeId: input.passTypeId,
     passTypePriceId: input.passTypePriceId,
     maxIssued: passType.maxIssued,
-    userId: input.userId,
+    userId,
     pricePaid: price.price,
     actorId: resolved.account.id,
     requestId,
@@ -50,7 +53,7 @@ export default defineEventHandler(async (event) => {
   }
 
   await sendPassIssued(event, {
-    userId: input.userId,
+    userId,
     reference: result.reference!,
     passTypeName: passType.name,
     priceLabel: price.label,
