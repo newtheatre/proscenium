@@ -26,6 +26,8 @@ export interface RoleEligibility {
   moduleId: string | null
   moduleName: string | null
   standing: EligibilityStanding
+  // A committee role admits in place of the module, set for the bar while 0259's override stands.
+  committeeStandsIn?: boolean
 }
 
 // `status` is the catalogue row's lifecycle, or null when no module carries the id at all.
@@ -42,6 +44,9 @@ function saysModule(line: RoleEligibility): string {
 // One sentence per role, read by an officer who cannot change it as well as by one who can.
 export function saysEligibility(line: RoleEligibility): string {
   const shift = `${saysShiftRole(line.role).toLowerCase()} shift`
+  if (line.committeeStandsIn) {
+    return line.standing === 'SET' ? `Unlocked by ${saysModule(line)}, or for now by a committee role.` : 'For now, unlocked by a committee role alone.'
+  }
   switch (line.standing) {
     case 'SET': return needsCommitteeRole(line.role) ? `Unlocked by ${saysModule(line)} and a committee role.` : `Unlocked by ${saysModule(line)}.`
     case 'UNSET': return `No module named yet, so nobody can claim a ${shift}.`

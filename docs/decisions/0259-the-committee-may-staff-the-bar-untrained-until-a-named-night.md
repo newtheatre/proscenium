@@ -21,10 +21,10 @@ its own, and be switched off without a release.
 ## Decision
 
 1. **A new setting, `BAR_SHIFT_COMMITTEE_UNTIL`, names the last show night of the override.** It
-   ships unset, which is off. While the current show night (0014) is on or before it, a member who
-   holds a live committee role, as 0115 reads one (`COMMITTEE_ROLES` on a usable account, never
-   `ADMIN` alone), qualifies for a bar shift whether or not they hold the bar module, and whatever
-   the module's own standing. Clearing the setting, or letting the night pass, ends it.
+   ships empty (null), which is off. While the current show night (0014) is on or before it, a
+   member who holds a live committee role, as 0115 reads one (`COMMITTEE_ROLES` on a usable account,
+   never `ADMIN` alone), qualifies for a bar shift whether or not they hold the bar module, and
+   whatever the module's own standing. Clearing the setting, or letting the night pass, ends it.
 2. **It widens the bar gate only, on every path the gate already rides.** `shiftGate()` carries
    the committee alternative for `BAR` when the override stands, so the claim, the officer's
    assignment, adding a shift with somebody on it, and the approval of a queued claim all admit a

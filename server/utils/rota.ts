@@ -634,26 +634,30 @@ export interface ClaimScope { table: string, event: string }
 
 export const SHIFT_CLAIM_SCOPE: ClaimScope = { table: 'shifts', event: 'performance_id' }
 
-// The role's gating module and London's today, as the live check read them (E-104 criterion 1);
-// `committeeAt` is the instant a duty manager shift's committee role is read at (0115).
-export interface TrainingGate { moduleId: string | null, today: string, committeeAt?: number }
+// The gating module and London's today, as the live check read them (E-104 criterion 1). A committee
+// role is read at `committeeAt` beside the module (0115), or at `committeeInsteadAt` in its place (0259).
+export interface TrainingGate { moduleId: string | null, today: string, committeeAt?: number, committeeInsteadAt?: number }
 
 // Every write that confirms somebody on a shift builds its gate here, so none can forget the role.
-export function shiftGate(role: ShiftRole, moduleId: string | null, today: string, now: number): TrainingGate {
-  return needsCommitteeRole(role) ? { moduleId, today, committeeAt: now } : { moduleId, today }
+export function shiftGate(role: ShiftRole, moduleId: string | null, today: string, now: number, committeeStaffsBar = false): TrainingGate {
+  if (needsCommitteeRole(role)) return { moduleId, today, committeeAt: now }
+  return role === 'BAR' && committeeStaffsBar ? { moduleId, today, committeeInsteadAt: now } : { moduleId, today }
 }
 
 // `heldNow` repeated, not imported: training.ts leans on ambient imports Bun cannot typecheck, so
 // change both together. An unset rule holds for nobody, as it lets nobody claim (E-103 criterion 4).
 export function holdsGate(gate: TrainingGate, userId: string | SQL): SQL {
-  if (gate.moduleId === null) return sql`0`
-  const standing = gate.committeeAt === undefined ? sql`` : sql` AND ${holdsCommitteeRole(userId, gate.committeeAt)}`
-  return sql`EXISTS (
+  const trained = gate.moduleId === null
+    ? sql`0`
+    : sql`EXISTS (
     SELECT 1 FROM training_records gate_record
     WHERE gate_record.user_id = ${userId} AND gate_record.module_id = ${gate.moduleId}
       AND gate_record.revoked_at IS NULL
       AND (gate_record.expires_on IS NULL OR gate_record.expires_on > ${gate.today})
-  )${standing}`
+  )`
+  if (gate.committeeInsteadAt !== undefined) return sql`(${trained} OR ${holdsCommitteeRole(userId, gate.committeeInsteadAt)})`
+  if (gate.moduleId === null) return trained
+  return gate.committeeAt === undefined ? trained : sql`${trained} AND ${holdsCommitteeRole(userId, gate.committeeAt)}`
 }
 
 // Availability, one-slot-per-event and the training gate all ride the UPDATE, so two claims resolve

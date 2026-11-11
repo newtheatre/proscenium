@@ -98,8 +98,7 @@ describe('the committee may staff the bar untrained until a named night', () => 
     expect(candidateLock({ ...bar, clashes: true })).toBe('On a shift at another venue at the same time')
   })
 
-  test('the door and the duty manager are untouched', () => {
-    expect(candidateLock({ ...bar, role: 'DOOR', moduleId: 'ADMN-103', moduleName: 'Box Office' })).toBe('Needs Box Office')
-    expect(candidateLock({ ...bar, role: 'DUTY_MANAGER', moduleId: 'ADMN-201', moduleName: 'Committee Operations' })).toBe('Needs Committee Operations')
+  test('once it has ended, the bar needs its module again', () => {
+    expect(candidateLock({ ...bar, committeeStandsIn: false })).toBe('Needs Bar Service')
   })
 })

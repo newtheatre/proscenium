@@ -11,7 +11,6 @@ import type { Permission } from '#shared/utils/roles'
 // features needing them wait rather than guessing. Typed, so a typo here is a build error.
 const UNSET: ConfigKey[] = [
   'AUTO_CLOSE_FROM_NIGHT',
-  'BAR_SHIFT_COMMITTEE_UNTIL',
   'FIRST_AID_MODULE',
   'MEMBERSHIP_PURCHASE_URL',
   'RETENTION_FINAL_WARNING_DAYS',
@@ -56,11 +55,12 @@ describe('configuration surface (0012, 0019)', () => {
     expect(CONFIG_KEYS.AUTO_CLOSE_FROM_NIGHT.schema.safeParse('2026-02-30').success).toBe(false)
   })
 
-  // A stopgap that ends on its own: unset is off, and a night is all it takes (0259).
+  // A stopgap that ends on its own: empty is off, and a night is all it takes (0259).
   test('the committee bar override names its last show night, and ships off', () => {
-    expect(hasDefault('BAR_SHIFT_COMMITTEE_UNTIL')).toBe(false)
+    expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.default).toBeNull()
     expect(isEnforced('BAR_SHIFT_COMMITTEE_UNTIL')).toBe(true)
     expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.schema.safeParse('2026-12-13').success).toBe(true)
+    expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.schema.safeParse(null).success).toBe(true)
     expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.schema.safeParse('13 December').success).toBe(false)
   })
 

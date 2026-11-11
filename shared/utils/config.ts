@@ -716,6 +716,13 @@ export const CONFIG_KEYS = {
     workshop: 'spaces-and-training',
     describes: 'Training module a member must hold to claim a bar shift.',
   },
+  // A stopgap that ends itself: empty or past, the bar needs its module again (0259).
+  BAR_SHIFT_COMMITTEE_UNTIL: {
+    schema: z.string().refine(isShowNight, 'A show night is written YYYY-MM-DD, such as 2026-12-13').nullable(),
+    default: null,
+    workshop: 'spaces-and-training',
+    describes: 'The last show night on which any member holding a committee role may claim or be put on a bar shift, at a performance or a bar opening, without the bar training. Clear it, or let the night pass, and the bar needs its training again. A shift confirmed meanwhile is kept. Empty, the training is always needed.',
+  },
   // No default on purpose: the catalogue has no first-aid module yet. Unset, the emergency card
   // reads the committee's own first aiders line instead of tonight's rota (E-113, issue 1310).
   FIRST_AID_MODULE: {
@@ -853,6 +860,7 @@ export const ENFORCED_KEYS = [
   'SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE',
   'SHIFT_ELIGIBILITY_DOOR_MODULE',
   'SHIFT_ELIGIBILITY_BAR_MODULE',
+  'BAR_SHIFT_COMMITTEE_UNTIL',
   'SHIFT_CLAIM_AUTO_CONFIRM',
   'SHIFT_RELEASE_NOTICE_HOURS',
   'SHIFT_START_BEFORE_DOORS_MINUTES',
