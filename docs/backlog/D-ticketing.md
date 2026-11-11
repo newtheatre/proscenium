@@ -965,7 +965,8 @@ Open questions:
      and where to pay, rather than offered it again.
   3. A guest is asked to create an account, or sign in, to ask for it, and comes back to the same
      booking page afterwards. Using or asking for a pass always needs an account (decided by the
-     IT Manager, 21 October 2026).
+     IT Manager, 21 October 2026). Amended 11 November 2026 by decision 0259: using a pass no
+     longer needs one (D-138); asking for one still does until requests are replaced.
   4. The offer asks for nothing and moves no money (0005): the request reserves nothing, and the
      booking form works exactly as it did whether the offer is taken or not.
 - Source: Season pass flow review, 21 October 2026.
@@ -982,7 +983,8 @@ Open questions:
      already uses, under the expected-total cross-check, writing the same pass-sale ledger line
      and email as the desk (D-124 criteria 1, 2, 5).
   2. The buyer is chosen by name or email. A buyer with no account is asked to create one (D-133
-     criterion 3), and the sale waits for it.
+     criterion 3), and the sale waits for it. Amended 11 November 2026 by decision 0259: a buyer
+     with no account gives a name, and the pass is issued to a guest record (D-138 criterion 1).
   3. A buyer holding a booking for tonight that the pass covers has it moved onto the pass in the
      same transaction: the unpaid booking is cancelled and the pass redeemed for that performance,
      so the seat is not counted twice and nothing is charged for it.
@@ -999,7 +1001,9 @@ Open questions:
 - Acceptance criteria:
   1. The pass page opened from the pass email says that booking ahead uses the pass, and offers
      to create an account (or sign in) on the email the pass was issued to; once signed in, the
-     booking page offers "Use my pass" as D-125 already does.
+     booking page offers "Use my pass" as D-125 already does. Amended 11 November 2026 by
+     decision 0259: the browser that opened the pass books with it without an account (D-138
+     criterion 3), so the page no longer asks for one.
   2. Turning up without booking stays possible and is described as subject to space.
 - Source: Season pass flow review, 21 October 2026.
 
@@ -1028,6 +1032,29 @@ Open questions:
   2. The booking offer, the pass page and the pass email link the ticket terms. Until the terms
      are published, the link points at a placeholder page marked as placeholder (0051).
 - Source: Season pass flow review, 21 October 2026.
+
+## D-138: A pass without an account
+
+- Role: Visitor
+- Phase: MVP
+- Story: As somebody who bought a season pass without making an account, I want the pass kept on
+  my phone and in my email so that I can book ahead with it like anybody else.
+- Depends on: D-124, D-125, D-134, D-135
+- Acceptance criteria:
+  1. The desk issues a pass to a new buyer by name and email as well as to a person it picks, and
+     the till issues one to an email with no account when given a name. Either way a new address
+     becomes a guest record, the same one a guest booking makes; at the till it is written in the
+     sale's own batch, so a refused charge leaves no record. An anonymised or disabled account's
+     address is refused.
+  2. Opening the pass link remembers the pass in that browser in an httpOnly cookie, up to four
+     passes, until the latest of their validity ends. The reference alone is never a credential.
+  3. The booking page offers "Use my pass" for a remembered pass that covers the performance, to a
+     visitor who is not signed in, and redeeming it with the cookie makes the same zero-value
+     booking a signed-in holder gets (D-125), on the pass's own record.
+  4. `/passes` offers "Email me my pass": an address in, every live pass on it re-sent, under the
+     booking resend's rate limits, and the same answer whether or not a pass was found.
+  5. The pass page offers "Forget passes on this device", which clears the cookie.
+- Source: Season pass review, 11 November 2026; decision 0259.
 
 ## D-201: Named allocations reserve capacity without tickets
 

@@ -105,6 +105,40 @@ describe('the till issues a pass in the sale\'s own batch (D-134 criterion 1)', 
   })
 })
 
+describe('a buyer with no account is given a guest record in the same batch (D-138 criterion 1, 0259)', () => {
+  const guest = { id: 'u-new', name: 'New Buyer', guestEmail: 'new@example.invalid' }
+
+  test('the record and the pass land together, gated on the sale\'s entry', async () => {
+    await withDatabase((database) => {
+      anEntry(database, 'entry-1')
+      run(database, tillPassSql(aPass({ buyer: guest }), 'entry-1', 'u-seller'))
+      const [record] = rows<{ name: string, password: string | null }>(database, 'SELECT name, password FROM users WHERE email = ?', 'new@example.invalid')
+      expect(record).toEqual({ name: 'New Buyer', password: null })
+      const [held] = rows<{ userId: string }>(database, 'SELECT user_id AS userId FROM passes WHERE id = ?', 'pass-1')
+      expect(held?.userId).toBe('u-new')
+      expect(rows(database, `SELECT id FROM audit_log WHERE action = 'account.created.guest' AND target = 'user:u-new'`)).toHaveLength(1)
+    })
+  })
+
+  test('with no entry posted, neither the record nor the pass is written', async () => {
+    await withDatabase((database) => {
+      run(database, tillPassSql(aPass({ buyer: guest }), 'entry-missing', 'u-seller'))
+      expect(rows(database, 'SELECT id FROM users WHERE email = ?', 'new@example.invalid')).toEqual([])
+      expect(rows(database, 'SELECT id FROM passes')).toEqual([])
+    })
+  })
+
+  test('an address taken meanwhile keeps its record, and the pass goes to it', async () => {
+    await withDatabase((database) => {
+      database.batch([['INSERT INTO users (id, email, name) VALUES (?, ?, ?)', 'u-raced', 'new@example.invalid', 'Raced']])
+      anEntry(database, 'entry-1')
+      run(database, tillPassSql(aPass({ buyer: guest }), 'entry-1', 'u-seller'))
+      expect(rows<{ id: string }>(database, 'SELECT id FROM users WHERE email = ?', 'new@example.invalid')).toEqual([{ id: 'u-raced' }])
+      expect(rows<{ userId: string }>(database, 'SELECT user_id AS userId FROM passes WHERE id = ?', 'pass-1')).toEqual([{ userId: 'u-raced' }])
+    })
+  })
+})
+
 describe('which of tonight\'s bookings moves onto the pass (D-134 criterion 3)', () => {
   test('a one-seat booking the pass covers moves', async () => {
     await withDatabase((database, tonight) => {
