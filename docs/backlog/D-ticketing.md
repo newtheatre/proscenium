@@ -966,7 +966,9 @@ Open questions:
   3. A guest is asked to create an account, or sign in, to ask for it, and comes back to the same
      booking page afterwards. Using or asking for a pass always needs an account (decided by the
      IT Manager, 21 October 2026). Amended 11 November 2026 by decision 0260: using a pass no
-     longer needs one (D-138); asking for one still does until requests are replaced.
+     longer needs one (D-138); asking for one still does until requests are replaced. Amended
+     again 11 November 2026 by decision 0261: the offer is a choice of pass, made while booking
+     and paid for at the first show (D-139); asking for one is no longer offered.
   4. The offer asks for nothing and moves no money (0005): the request reserves nothing, and the
      booking form works exactly as it did whether the offer is taken or not.
 - Source: Season pass flow review, 21 October 2026.
@@ -1055,6 +1057,46 @@ Open questions:
      booking resend's rate limits, and the same answer whether or not a pass was found.
   5. The pass page offers "Forget passes on this device", which clears the cookie.
 - Source: Season pass review, 11 November 2026; decision 0260.
+
+## D-139: Choose a pass while booking
+
+- Role: Visitor
+- Phase: MVP
+- Story: As somebody booking a show, I want to put my seat on a season pass that covers it and pay
+  for the pass when I arrive, so that I book once and pay once.
+- Depends on: D-104, D-125, D-133, D-138
+- Acceptance criteria:
+  1. The booking page offers each pass on sale today that covers the show and is under its cap,
+     with each price point, signed in or not. Choosing one makes an unpaid pass at that price and
+     a zero-value booking on it for this performance in one batch; a full house refuses both.
+  2. The booking on an unpaid pass holds and releases exactly as an ordinary unpaid booking does,
+     and its email says what the pass costs and that it is paid for at the till or the box office
+     on the first night. Other covered performances can be booked on the unpaid pass the same way.
+  3. An unpaid pass does not count towards its type's cap, and admits nobody at the door: a
+     booking or a pass QR on it is refused with the amount due.
+  4. An unpaid pass lapses when its type's sales window closes or its validity ends, and any
+     booking still held on it is cancelled.
+  5. "Ask for this pass" is no longer offered; open requests run out as before.
+- Source: Season pass review, 11 November 2026; decision 0261.
+
+## D-140: Pay for a chosen pass at the till
+
+- Role: Front of house volunteer
+- Phase: MVP
+- Story: As whoever is on the till, I want to scan a booking on an unpaid pass and charge for the
+  pass there, choosing a different pass or price if the buyer wants, so that paying is one step.
+- Depends on: D-134, D-139
+- Acceptance criteria:
+  1. Scanning or finding a booking on an unpaid pass, or scanning the pass's own QR, adds the pass
+     to the basket at its chosen price, naming the holder.
+  2. Before charging, the seller may choose another price point or another pass type on sale; one
+     that does not cover every live booking on the pass is refused naming the show.
+  3. Charging marks the pass paid at the charged price, names the seller as its issuer, posts the
+     `PASS_SALE` line and clears the hold on every booking on the pass, in the sale's own batch
+     under the expected-total cross-check; the cap is asserted there.
+  4. **Drop the pass** cancels the unpaid pass and its bookings, and says so, so tonight's seat can
+     be sold as a walk-up instead. Nothing is charged for a dropped pass.
+- Source: Season pass review, 11 November 2026; decision 0261.
 
 ## D-201: Named allocations reserve capacity without tickets
 

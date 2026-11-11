@@ -3,6 +3,7 @@ import {
   PASS_REFERENCE_LENGTH,
   PASS_REQUEST_STATUSES,
   PASS_STATUSES,
+  choosePassForm,
   generatePassReference,
   issuePassForm,
   passCapReason,
@@ -13,7 +14,9 @@ import {
   saysPassOffer,
   saysPayAtDesk,
   showsPassQr,
+  unpaidPassSays,
 } from '#shared/utils/passes'
+import { tillPassForm } from '#shared/utils/sale'
 
 // D-124 as pure rules. The database enforcement (the cap, the race) is in
 // tests/integration/races-pass-issue.test.ts; the full flow is tests/e2e/passes.test.ts.
@@ -192,5 +195,23 @@ describe('the bar is reminded to mention a pass after a sale', () => {
   test('nothing is prompted on a night with no pass on sale, or none priced yet', () => {
     expect(passPromptFor([], false)).toBeNull()
     expect(passPromptFor([{ ...offer, prices: [] }], false)).toBeNull()
+  })
+})
+
+// D-139 and D-140 (0261): choosing a pass while booking, and paying for it at the till.
+describe('a pass chosen while booking (D-139, D-140)', () => {
+  test('choosing names a price point, and a guest gives a name and an email', () => {
+    expect(choosePassForm.safeParse({ performanceId: 'perf-1', passTypePriceId: 'price-1' }).success).toBe(true)
+    expect(choosePassForm.safeParse({ performanceId: 'perf-1', passTypePriceId: 'price-1', guest: { name: 'Ana', email: 'ana@example.invalid' } }).success).toBe(true)
+    expect(choosePassForm.safeParse({ performanceId: 'perf-1', passTypePriceId: 'price-1', guest: { name: 'Ana', email: 'nope' } }).success).toBe(false)
+  })
+
+  test('the till pays for a chosen pass by its id, with no email typed', () => {
+    expect(tillPassForm.safeParse({ passTypeId: 'pt-1', passTypePriceId: 'price-1', passId: 'pass-1' }).success).toBe(true)
+    expect(tillPassForm.safeParse({ passTypeId: 'pt-1', passTypePriceId: 'price-1' }).success).toBe(false)
+  })
+
+  test('the door and the desk refuse a seat on it with the figure owed', () => {
+    expect(unpaidPassSays(3000)).toBe('This pass is not paid for yet: £30.00 is due at the till first. Paying for it lets every booking on it in.')
   })
 })

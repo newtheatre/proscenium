@@ -300,6 +300,15 @@ describe('the rewritten bodies and subjects (item 7)', () => {
     }
   })
 
+  // 0261: a seat on a pass still owed says the pass is what is paid for, never "£0.00 is due".
+  test('a booking on an unpaid pass names the pass and where it is paid for', () => {
+    const { html, text } = render('reservation-confirmed', { ...EVERYTHING, totalDue: '£0.00', passDue: 'Season pass (Student, £30.00)' })
+    for (const part of [flat(html), flat(text)]) {
+      expect(part).toContain('Not yet paid: this seat is on your Season pass (Student, £30.00), which is paid for at the till the first night you come.')
+      expect(part).not.toContain('£0.00 is due')
+    }
+  })
+
   // 0170: a guest typed this account's address in another name, so the owner learns and can cancel.
   test('a booking made with the address in another name tells the owner how to undo it', () => {
     const { html, text } = render('reservation-confirmed', { ...EVERYTHING, bookedAs: 'Zed <Zane>' })
@@ -894,6 +903,14 @@ describe('the pass email follows the ticket terms (D-137)', () => {
     for (const part of [bare.html, bare.text]) {
       expect(part).not.toContain('It is valid')
       expect(part).not.toContain('It covers')
+    }
+  })
+
+  test('a pass chosen online and not yet paid says what is owed and that it admits nobody yet (0261)', () => {
+    const owed = render('pass-issued', { ...EVERYTHING, owed: '£30.00' })
+    for (const part of [owed.html, owed.text]) {
+      expect(flat(part)).toContain('chosen online and not yet paid. £30.00 is paid at the till the first night you come, and the pass admits nobody until then.')
+      expect(flat(part)).not.toContain('issued and paid for in person')
     }
   })
 
