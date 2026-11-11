@@ -12,6 +12,9 @@ export default defineEventHandler(async (event) => {
   const reservation = await reservationForDoor(input.reference)
   if (!reservation) throw noSuch('booking', 'Check the reference and try again')
 
+  // A seat on an unpaid pass owes the pass's price, not the booking's zero (0261).
+  const unpaidPass = reservation.status === 'PENDING' ? await unpaidPassForReservation(reservation.id) : undefined
+  const totalDue = unpaidPass ? `${saysPrice(unpaidPass.pricePence)} for the ${unpaidPass.passTypeName}` : saysPrice(reservation.totalPence)
   const outcome = doorTicketOutcome(
     reservation.status,
     reservation.cancelledBy,
@@ -19,7 +22,7 @@ export default defineEventHandler(async (event) => {
     input.performanceId,
     reservation.showTitle,
     formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
-    reservation.status === 'PENDING' ? saysPrice(reservation.totalPence) : null,
+    reservation.status === 'PENDING' ? totalDue : null,
     reservation.exchangedToShowTitle && reservation.exchangedToStartsAt
       ? { showTitle: reservation.exchangedToShowTitle, when: formatLondon(new Date(reservation.exchangedToStartsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }) }
       : null,

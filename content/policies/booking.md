@@ -152,7 +152,7 @@ A pass is valid between the dates stated on it, and only for performances within
 
 ### 7.5 How to buy a pass
 
-Passes are sold in person, at the box office or at the bar on a performance night, and paid for on the same card reader as tickets. You can also ask for a pass online, while booking or from your account, and pay for it when you arrive. You can also order a pass by emailing boxoffice@newtheatre.org.uk and pay for it on your first visit. Passes are not paid for online. A pass is held in the holder's name and email address; you do not need an NNT account to buy or use one. You will receive a confirmation email with your pass reference, your pass's QR code and a link to its page.
+Passes are sold in person, at the box office or at the bar on a performance night, and paid for on the same card reader as tickets. You can also choose a pass online while booking: your seat is booked on it, and you pay for the pass at the till the first night you come. Until then the pass admits nobody, its bookings are held like any unpaid booking, and if it is never paid for it lapses when it goes off sale. You can also order a pass by emailing boxoffice@newtheatre.org.uk and pay for it on your first visit. Passes are not paid for online. A pass is held in the holder's name and email address; you do not need an NNT account to buy or use one. You will receive a confirmation email with your pass reference, your pass's QR code and a link to its page.
 
 ### 7.6 Using a pass
 

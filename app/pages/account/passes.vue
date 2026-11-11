@@ -22,6 +22,8 @@ interface HeldPass {
   priceLabel: string
   pricePaid: number
   status: PassStatus
+  // 0 while chosen online and owed at the till (0261).
+  paid: number
   // Null for a pass the door would refuse as cancelled, expired or archived (issue 1332).
   qrSvg: string | null
 }
@@ -159,6 +161,13 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error' | 'warning'> =
                 {{ saysPassStatus(pass.status) }}
               </UBadge>
             </div>
+            <p
+              v-if="pass.paid === 0 && pass.status === 'ACTIVE'"
+              class="text-muted"
+              :data-test="`account-pass-unpaid-${pass.id}`"
+            >
+              Not paid for yet: {{ saysPrice(pass.pricePaid) }} is due at the till the first night you come. It admits nobody until then.
+            </p>
             <div
               v-if="pass.qrSvg"
               class="flex flex-wrap items-center gap-4"

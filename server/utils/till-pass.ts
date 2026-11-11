@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm'
 import { findByEmail, newId } from './accounts'
 import { heldSeatsForReservation, passAdmissionTicketInsert } from './capacity'
 import { postEntry, runLedgerBatch } from './ledger'
+import { clearPassHoldsSql } from './pass-choice'
 import { passAdmissionAllows } from './pass-redemption'
 import { PASS_HOLDER_CLOSED_SAYS } from './pass-holders'
 import { passTypeForSale, passTypePriceById } from './passes'
@@ -36,6 +37,8 @@ export interface ResolvedTillPass {
   swap: SwapCandidate | null
   // Why tonight's booking stays as it is, said on the receipt; null when there is none to move.
   keptBooking: string | null
+  // A pass chosen online and owed (D-140, 0261): the sale pays for it rather than issuing one.
+  settle?: boolean
 }
 
 export interface SwapCandidate {
@@ -98,23 +101,26 @@ export async function resolveTillPass(input: TillPassInput, performanceIds: stri
     throw createError({ statusCode: 400, statusMessage: 'Choose one of the prices this pass offers' })
   }
 
+  if (input.passId) return resolveOwedPass(input.passId, passType, price)
+
   // Any record on the address holds the pass, a guest's included (D-138 criterion 1, 0260).
-  const account = await findByEmail(input.email)
+  const account = await findByEmail(input.email!)
   if (account && (account.anonymisedAt !== null || account.disabled)) throw createError({ statusCode: 409, statusMessage: PASS_HOLDER_CLOSED_SAYS })
   if (!account && !input.name) throw createError({ statusCode: 409, statusMessage: NO_ACCOUNT_SAYS })
   if (!account) {
     return {
       ...resolvedPass(passType, price),
-      buyer: { id: newId(), name: input.name!, guestEmail: normaliseEmail(input.email) },
+      buyer: { id: newId(), name: input.name!, guestEmail: normaliseEmail(input.email!) },
       requestId: null,
       swap: null,
       keptBooking: null,
     }
   }
 
-  const [held] = await db.all<{ id: string }>(sql`
-    SELECT id AS id FROM passes WHERE user_id = ${account.id} AND pass_type_id = ${input.passTypeId} AND status = 'ACTIVE'
+  const [held] = await db.all<{ id: string, paid: number }>(sql`
+    SELECT id AS id, paid AS paid FROM passes WHERE user_id = ${account.id} AND pass_type_id = ${input.passTypeId} AND status = 'ACTIVE'
   `)
+  if (held?.paid === 0) throw createError({ statusCode: 409, statusMessage: `${account.name} chose this pass online and it is waiting to be paid for: scan their booking or the pass's QR to take it. Nothing has been charged.` })
   if (held) throw createError({ statusCode: 409, statusMessage: `${account.name} already holds this pass. Nothing has been charged.` })
 
   const [request] = await db.all<{ id: string }>(sql`
@@ -136,6 +142,87 @@ export async function resolveTillPass(input: TillPassInput, performanceIds: stri
 
 type PassForSale = NonNullable<Awaited<ReturnType<typeof passTypeForSale>>>
 type PassPrice = NonNullable<Awaited<ReturnType<typeof passTypePriceById>>>
+
+interface OwedPassRow {
+  id: string
+  reference: string
+  userId: string
+  holderName: string
+  status: string
+  paid: number
+}
+
+export const PASS_NOT_OWED_SAYS = 'That pass is no longer waiting to be paid for: it was paid, dropped or has lapsed. Nothing has been charged.'
+
+// A live booking on the pass that the chosen type does not cover (D-140 criterion 2), one is enough to refuse.
+export function uncoveredBookingQuery(passId: string, passTypeId: string): SQL {
+  return sql`
+    SELECT s.title AS showTitle
+    FROM pass_admissions a
+    JOIN tickets k ON k.id = a.ticket_id
+    JOIN reservations r ON r.id = k.reservation_id
+    JOIN performances pf ON pf.id = r.performance_id
+    JOIN shows s ON s.id = pf.show_id
+    WHERE a.pass_id = ${passId} AND r.status = 'PENDING'
+      AND NOT EXISTS (SELECT 1 FROM pass_type_shows c WHERE c.pass_type_id = ${passTypeId} AND c.show_id = s.id)
+    LIMIT 1
+  `
+}
+
+// D-140 criteria 1 and 2: the owed pass keeps its id, reference and holder; type and price are the till's.
+async function resolveOwedPass(passId: string, passType: PassForSale, price: PassPrice): Promise<ResolvedTillPass> {
+  const [owed] = await db.all<OwedPassRow>(sql`
+    SELECT p.id AS id, p.reference AS reference, p.user_id AS userId, u.name AS holderName, p.status AS status, p.paid AS paid
+    FROM passes p JOIN users u ON u.id = p.user_id WHERE p.id = ${passId}
+  `)
+  if (!owed || owed.status !== 'ACTIVE' || owed.paid !== 0) throw createError({ statusCode: 409, statusMessage: PASS_NOT_OWED_SAYS })
+  const [uncovered] = await db.all<{ showTitle: string }>(uncoveredBookingQuery(passId, passType.id))
+  if (uncovered) {
+    throw createError({ statusCode: 409, statusMessage: `${passType.name} does not cover ${uncovered.showTitle}, which this pass has a booking for. Choose a pass that does. Nothing has been charged.` })
+  }
+  return {
+    ...resolvedPass(passType, price),
+    passId: owed.id,
+    reference: owed.reference,
+    buyer: { id: owed.userId, name: owed.holderName },
+    requestId: null,
+    swap: null,
+    keptBooking: null,
+    settle: true,
+  }
+}
+
+// D-140 criterion 3: paid at the charged price, its issuer named and every hold cleared, gated on
+// the sale's entry; 0035's assertion re-inserts the pass's id if it was not still owed, or the cap is passed.
+export function owedPassSql(pass: ResolvedTillPass, entryId: string, actorId: string): SQL[] {
+  const posts = sql`EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${entryId})`
+  const columns = sql`id, reference, pass_type_id, pass_type_price_id, user_id, price_paid, status, issued_by`
+  const reinsert = sql`
+    INSERT INTO passes (${columns})
+    SELECT ${pass.passId}, ${pass.passId}, ${pass.passTypeId}, ${pass.passTypePriceId}, ${pass.buyer.id}, ${pass.pricePence}, 'ACTIVE', ${actorId}
+  `
+  const paid = auditEntry({ actorId, action: 'pass.paid', target: `pass:${pass.passId}`, detail: { passTypeId: pass.passTypeId, pricePaid: pass.pricePence } })
+  return [
+    sql`
+      UPDATE passes
+      SET paid = 1, pass_type_id = ${pass.passTypeId}, pass_type_price_id = ${pass.passTypePriceId}, price_paid = ${pass.pricePence},
+          issued_by = ${actorId}, updated_at = unixepoch()
+      WHERE id = ${pass.passId} AND paid = 0 AND status = 'ACTIVE' AND ${posts}
+    `,
+    sql`${reinsert} WHERE changes() = 0`,
+    sql`
+      ${reinsert}
+      WHERE ${pass.maxIssued} IS NOT NULL
+        AND (SELECT count(*) FROM passes WHERE pass_type_id = ${pass.passTypeId} AND status != 'CANCELLED' AND paid = 1) > ${pass.maxIssued}
+    `,
+    clearPassHoldsSql(pass.passId, posts),
+    sql`
+      INSERT INTO audit_log (id, actor_id, action, target, detail)
+      SELECT ${paid.id}, ${paid.actorId}, ${paid.action}, ${paid.target}, ${JSON.stringify(paid.detail)}
+      WHERE ${posts}
+    `,
+  ]
+}
 
 function resolvedPass(passType: PassForSale, price: PassPrice): Omit<ResolvedTillPass, 'buyer' | 'requestId' | 'swap' | 'keptBooking'> {
   return {
@@ -180,7 +267,7 @@ export function tillPassSql(pass: ResolvedTillPass, entryId: string, actorId: st
       INSERT INTO passes (${columns})
       SELECT ${pass.passId}, ${pass.passId}, ${pass.passTypeId}, ${pass.passTypePriceId}, ${holder}, ${pass.pricePence}, 'ACTIVE', ${actorId}
       WHERE ${pass.maxIssued} IS NOT NULL
-        AND (SELECT count(*) FROM passes WHERE pass_type_id = ${pass.passTypeId} AND status != 'CANCELLED') > ${pass.maxIssued}
+        AND (SELECT count(*) FROM passes WHERE pass_type_id = ${pass.passTypeId} AND status != 'CANCELLED' AND paid = 1) > ${pass.maxIssued}
     `,
     sql`
       INSERT INTO audit_log (id, actor_id, action, target, detail)
@@ -207,14 +294,15 @@ export function tillPassSql(pass: ResolvedTillPass, entryId: string, actorId: st
 }
 
 export function tillPassStatements(pass: ResolvedTillPass, entryId: string, actorId: string): BatchItem<'sqlite'>[] {
-  return tillPassSql(pass, entryId, actorId).map(statement => db.run(statement))
+  return (pass.settle ? owedPassSql(pass, entryId, actorId) : tillPassSql(pass, entryId, actorId)).map(statement => db.run(statement))
 }
 
 export function passCapRaised(error: unknown): boolean {
   return error instanceof Error && /UNIQUE constraint failed: passes\.id/.test(error.message)
 }
 
-export function passCapSays(maxIssued: number | null): string {
+export function passCapSays(maxIssued: number | null, settle = false): string {
+  if (settle) return `That pass could not be paid for: it was paid, dropped or lapsed meanwhile${maxIssued === null ? '' : ', or its kind is at its cap'}. Nothing has been charged.`
   return `${passCapReason(maxIssued) ?? 'This pass could not be issued.'} Nothing has been issued.`
 }
 

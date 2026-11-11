@@ -27,6 +27,9 @@ defineProps<{
   openCamera: () => void
   fallBackToTyping: (failure: ScannerFailure) => void
   addBooking: (booking: TillBooking) => void
+  payForPass: (booking: TillBooking) => void
+  dropPass: (booking: TillBooking) => Promise<void>
+  passInBasket: string | null
   bumpWalkUp: (typeId: string, by: number) => void
   addWalkUps: () => void
 }>()
@@ -131,8 +134,36 @@ const walkUpGuestExistingAccount = defineModel<boolean>('walkUpGuestExistingAcco
             · not tonight
           </template>
         </p>
+        <template v-if="booking.unpaidPass && !booking.refusal">
+          <p
+            class="mt-2 text-sm"
+            :data-test="`found-pass-${booking.id}`"
+          >
+            On the {{ booking.unpaidPass.passTypeName }} ({{ booking.unpaidPass.priceLabel }}), not paid for yet. Take the pass's price and this seat, and every other on it, is paid.
+          </p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <UButton
+              class="min-h-12"
+              :disabled="passInBasket !== null"
+              :data-test="`found-pass-add-${booking.id}`"
+              @click="payForPass(booking)"
+            >
+              {{ passInBasket === booking.unpaidPass.passId ? 'The pass is in the basket' : `Add the pass ${saysMoney(booking.unpaidPass.pricePence)}` }}
+            </UButton>
+            <UButton
+              class="min-h-12"
+              color="neutral"
+              variant="subtle"
+              :disabled="passInBasket === booking.unpaidPass.passId"
+              :data-test="`found-pass-drop-${booking.id}`"
+              @click="dropPass(booking)"
+            >
+              Drop the pass
+            </UButton>
+          </div>
+        </template>
         <p
-          v-if="booking.refusal"
+          v-else-if="booking.refusal"
           class="mt-2 text-sm text-muted"
           :data-test="`found-refusal-${booking.id}`"
         >

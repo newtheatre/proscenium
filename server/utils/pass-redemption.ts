@@ -8,6 +8,7 @@ import { auditEntry } from '#shared/utils/audit'
 import { passRedemptionRefusal } from '#shared/utils/passes'
 import { generateReservationReference } from '#shared/utils/reservations'
 import type { SQL } from 'drizzle-orm'
+import type { BatchItem } from 'drizzle-orm/batch'
 
 // D-125: redeeming a pass while reserving online. `redeemPass()` is also D-126's door path and
 // D-130's Fellow admission, both with a different `source` and `admittedBy`.
@@ -22,6 +23,8 @@ export interface PassRedemptionStateRow {
   validUntil: number
   coversShow: number
   anonymised: number
+  paid: number
+  pricePaid: number
 }
 
 // A Fellowship covers everything the theatre puts on, standing in for "our own productions only"
@@ -37,7 +40,7 @@ function stateColumns(showId: string): SQL {
     p.id AS id, p.user_id AS userId, p.status AS status, t.name AS passTypeName, t.status AS passTypeStatus,
     t.valid_from AS validFrom, t.valid_until AS validUntil,
     ${coversShowClause(showId)} AS coversShow,
-    u.anonymised_at IS NOT NULL AS anonymised
+    u.anonymised_at IS NOT NULL AS anonymised, p.paid AS paid, p.price_paid AS pricePaid
   `
 }
 
@@ -237,6 +240,8 @@ export interface RedeemPassWriteInput {
   // True only for D-126's on-the-spot redemption: the seat and the physical admission are one
   // gesture, so the reservation is born already checked in rather than PENDING (E-112's `admitted`).
   admitImmediately?: boolean
+  // When the pass is still unpaid, the seat's hold; ignored once it is paid (0261).
+  holdExpiresAt?: number | null
 }
 
 export interface RedeemPassResult {
@@ -246,9 +251,16 @@ export interface RedeemPassResult {
   ticketId?: string
 }
 
+export interface RedemptionWrites {
+  reservationId: string
+  reference: string
+  ticketId: string
+  statements: BatchItem<'sqlite'>[]
+}
+
 // Race-safe (criteria 2, 3): the contended guard rides the ticket insert's own WHERE
 // (`passAdmissionTicketInsert`, server/utils/capacity.ts), so a lost race writes nothing at all.
-export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): Promise<RedeemPassResult> {
+export async function redemptionWrites(input: RedeemPassWriteInput, at: Date): Promise<RedemptionWrites> {
   const reservationId = newId()
   const reference = generateReservationReference()
   const ticketId = newId()
@@ -256,9 +268,12 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
   const now = Math.floor(at.getTime() / 1000)
   const ticketTypeId = await passAdmissionTicketType()
 
+  // A seat on an unpaid pass holds and releases like any unpaid booking (D-139 criterion 2, 0261),
+  // asked of the pass in the statement so a payment racing it never leaves a stray hold.
+  const hold = sql`CASE WHEN EXISTS (SELECT 1 FROM passes WHERE id = ${input.passId} AND paid = 0) THEN ${input.holdExpiresAt ?? null} ELSE NULL END`
   const reservationInsert = sql`
     INSERT INTO reservations (id, reference, performance_id, user_id, status, source, window_bypassed, hold_expires_at)
-    VALUES (${reservationId}, ${reference}, ${input.performanceId}, ${input.userId}, ${input.admitImmediately ? 'DOOR' : 'PENDING'}, ${input.source}, 0, NULL)
+    VALUES (${reservationId}, ${reference}, ${input.performanceId}, ${input.userId}, ${input.admitImmediately ? 'DOOR' : 'PENDING'}, ${input.source}, 0, ${hold})
   `
 
   const ticketInsert = passAdmissionTicketInsert(
@@ -294,17 +309,27 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
     detail: { performanceId: input.performanceId, ticketId },
   })
 
-  const results = await runLedgerBatch([
-    db.run(reservationInsert),
-    db.all<{ id: string }>(ticketInsert),
-    db.all<{ id: string }>(admissionInsert),
-    ...posted.statements,
-    db.run(sql`
-      INSERT INTO audit_log (id, actor_id, action, target, detail)
-      SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
-      WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
-    `),
-  ])
+  return {
+    reservationId,
+    reference,
+    ticketId,
+    statements: [
+      db.run(reservationInsert),
+      db.all<{ id: string }>(ticketInsert),
+      db.all<{ id: string }>(admissionInsert),
+      ...posted.statements,
+      db.run(sql`
+        INSERT INTO audit_log (id, actor_id, action, target, detail)
+        SELECT ${entry.id}, ${entry.actorId}, ${entry.action}, ${entry.target}, ${JSON.stringify(entry.detail)}
+        WHERE EXISTS (SELECT 1 FROM ledger_entries WHERE id = ${posted.id})
+      `),
+    ],
+  }
+}
+
+export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): Promise<RedeemPassResult> {
+  const { reservationId, reference, ticketId, statements } = await redemptionWrites(input, at)
+  const results = await runLedgerBatch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
 
   const ticketRows = results[1] as { id: string }[]
   const applied = ticketRows.length > 0
@@ -318,4 +343,35 @@ export async function redeemPass(input: RedeemPassWriteInput, at = new Date()): 
   return applied
     ? { applied: true, reservationId, reference, ticketId }
     : { applied: false }
+}
+
+export interface UnpaidPassOnBooking {
+  passId: string
+  reference: string
+  passTypeId: string
+  passTypeName: string
+  passTypePriceId: string
+  priceLabel: string
+  pricePence: number
+}
+
+// The unpaid pass a booking stands on (0261), which the door, the desk, the till and the email
+// all quote instead of the booking's own zero total.
+export function unpaidPassForReservationQuery(reservationId: string): SQL {
+  return sql`
+    SELECT p.id AS passId, p.reference AS reference, p.pass_type_id AS passTypeId, t.name AS passTypeName,
+           p.pass_type_price_id AS passTypePriceId, pr.label AS priceLabel, p.price_paid AS pricePence
+    FROM tickets k
+    JOIN pass_admissions a ON a.ticket_id = k.id
+    JOIN passes p ON p.id = a.pass_id
+    JOIN pass_types t ON t.id = p.pass_type_id
+    JOIN pass_type_prices pr ON pr.id = p.pass_type_price_id
+    WHERE k.reservation_id = ${reservationId} AND p.paid = 0 AND p.status = 'ACTIVE'
+    LIMIT 1
+  `
+}
+
+export async function unpaidPassForReservation(reservationId: string): Promise<UnpaidPassOnBooking | undefined> {
+  const [row] = await db.all<UnpaidPassOnBooking>(unpaidPassForReservationQuery(reservationId))
+  return row
 }

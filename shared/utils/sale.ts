@@ -57,10 +57,12 @@ export const walkUpGuestForm = z.object({
 export const tillPassForm = z.object({
   passTypeId: z.string().trim().min(1, 'Say which pass you mean'),
   passTypePriceId: z.string().trim().min(1, 'Say which price you mean'),
-  email: z.string().trim().email('Enter a real email address').max(320),
+  email: z.string().trim().email('Enter a real email address').max(320).nullish().transform(value => value || null),
   // Only asked for when nobody holds the address yet: it names the guest record (D-138, 0260).
   name: z.string().trim().max(120).nullish().transform(value => value || null),
-})
+  // A pass chosen online and owed (D-140, 0261): its holder is already known, so no email is typed.
+  passId: z.string().trim().min(1).nullish().transform(value => value || null),
+}).refine(input => input.passId !== null || input.email !== null, { path: ['email'], message: 'Enter a real email address' })
 
 export type TillPassInput = z.output<typeof tillPassForm>
 
@@ -181,6 +183,18 @@ export interface TillBooking {
   owedPence: number
   // Null when the booking can join the basket; otherwise why it cannot, in the desk's words.
   refusal: string | null
+  // The pass the seat stands on while it is owed (D-140 criterion 1); its price is what the till takes.
+  unpaidPass: TillUnpaidPass | null
+}
+
+export interface TillUnpaidPass {
+  passId: string
+  reference: string
+  passTypeId: string
+  passTypeName: string
+  passTypePriceId: string
+  priceLabel: string
+  pricePence: number
 }
 
 export interface WalkUpOption {

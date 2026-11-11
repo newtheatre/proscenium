@@ -72,6 +72,20 @@ export function useTillTickets(venueId: Ref<string | null>, session: Ref<TillSes
     }
   }
 
+  // Drop the pass (D-140 criterion 4): the holder will not pay, so it and its bookings are cancelled.
+  async function dropPass(booking: TillBooking): Promise<void> {
+    if (!booking.unpaidPass || !venueId.value) return
+    lookupFailure.value = null
+    try {
+      const answered = await $fetch<{ message: string }>(`/api/till/passes/${booking.unpaidPass.passId}/drop`, { method: 'POST', body: { venueId: venueId.value } })
+      found.value = found.value.filter(one => one.id !== booking.id)
+      cameraNote.value = answered.message
+    }
+    catch (refused) {
+      lookupFailure.value = refusalText(refused)
+    }
+  }
+
   // Bookings whose money is in the basket (F-122 criterion 2): each once, and only a pending one.
   const ticketLines = ref<TillBooking[]>([])
   const ticketsPence = computed(() => ticketLines.value.reduce((sum, booking) => sum + booking.owedPence, 0))
@@ -179,6 +193,7 @@ export function useTillTickets(venueId: Ref<string | null>, session: Ref<TillSes
     fallBackToTyping,
     lookUp,
     scanDecoded,
+    dropPass,
     ticketLines,
     ticketsPence,
     addBooking,

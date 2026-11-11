@@ -1992,9 +1992,12 @@ The Nottingham New Theatre`,
     const arrival = arrivalBlock(context)
     const nothingDue = context.nothingDue === true
     // A pass booking owes nothing and holds nothing (issue 1390); every other booking is a hold.
+    const passDue = typeof context.passDue === 'string' && context.passDue !== '' ? context.passDue : null
     const owed = nothingDue
       ? 'Nothing to pay: this booking was made with your pass.'
-      : `Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and is not a purchase until then.`
+      : passDue
+        ? `Not yet paid: this seat is on your ${passDue}, which is paid for at the till the first night you come. This booking holds your seat until then.`
+        : `Not yet paid: ${totalDue} is due at the box office on the night. This booking holds your seats and is not a purchase until then.`
     // A change or an exchange is a fresh copy of the same e-ticket, said so up front (0122).
     const change = context.change === 'CHANGED' || context.change === 'EXCHANGED' ? context.change : null
     const replaces = typeof context.replaces === 'string' ? context.replaces : null
@@ -2179,11 +2182,15 @@ The Nottingham New Theatre`,
     const valid = String(context.valid)
     const shows = String(context.shows)
     const covers = [valid ? `It is valid ${valid}.` : '', shows ? `It covers ${shows}.` : ''].filter(Boolean).join(' ')
+    // Chosen online and not yet paid (0261): the figure owed, said where "paid for" would be.
+    const owed = typeof context.owed === 'string' && context.owed !== '' ? context.owed : null
+    const state = owed
+      ? `chosen online and not yet paid. ${owed} is paid at the till the first night you come, and the pass admits nobody until then.`
+      : 'issued and paid for in person.'
     return {
       subject: `Your ${passType}`,
       html: layout(`<p>Hello ${context.name},</p>
-<p>Reference <strong>${reference}</strong>: ${passType} (${priceLabel}), issued and paid for in
-person.</p>${covers ? `\n<p>${covers}</p>` : ''}
+<p>Reference <strong>${reference}</strong>: ${passType} (${priceLabel}), ${state}</p>${covers ? `\n<p>${covers}</p>` : ''}
 <p><a href="${url}"><img src="${imageUrl}" alt="Pass QR code" width="${qrWidth}" height="${qrWidth}"></a></p>
 <p>Show this code at the door, or open it yourself: <a href="${url}">${url}</a></p>
 <p>To book ahead, open the link above on the phone or computer you book with, then choose
@@ -2192,7 +2199,7 @@ on the night.</p>
 <p><a href="${termsUrl}">The ticket and pass terms</a></p>`),
       text: `Hello ${context.name},
 
-Reference ${reference}: ${passType} (${priceLabel}), issued and paid for in person.${covers ? `\n\n${covers}` : ''}
+Reference ${reference}: ${passType} (${priceLabel}), ${state}${covers ? `\n\n${covers}` : ''}
 
 Open your pass: ${url}
 

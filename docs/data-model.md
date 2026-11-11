@@ -1172,6 +1172,26 @@ re-sends the `pass-issued` email for up to four live passes on an address, under
 `RESERVATION_RESEND_ATTEMPTS` per IP and per address, and answers the same whatever it finds;
 `DELETE /api/passes/device` clears the cookie, as signing out and closing an account do.
 
+**A pass chosen while booking, paid for at the till (D-139, D-140, 0261).** `passes.paid` (default
+1) is 0 while a pass is owed: a column, not a status value, because rebuilding `passes` would drop
+the append-only `pass_admissions`. `price_paid` is the price owed and `issued_by` stays NULL until
+paid. `POST /api/passes/choose` (`choosePass()`, `server/utils/pass-choice.ts`) writes the unpaid
+pass, a zero-value pass booking, its admission and the zero-value `PASS_ADMISSION` line in one
+batch, with 0035's assertion re-inserting the booking's id when no seat was written, so a full house
+leaves no pass. `redemptionWrites()` gives a booking on an unpaid pass the ordinary hold, decided in
+the statement from `passes.paid`, so `holds:release` lets it go like any other. Every cap count
+(`passCapAllows()`, the offer and sale reads, the till's assertion) counts paid passes only. The door
+refuses a pass, or a booking on one, that is unpaid, quoting `unpaidPassSays()`; the desk will not
+collect such a booking; `unpaidPassForReservation()` gives the figure to the door, the desk, the
+booking page and the confirmation email. The till finds the booking (or the pass's QR) with its
+`unpaidPass`, and a sale naming `pass.passId` runs `owedPassSql()` in its batch: marks it paid at
+the charged type and price, names the seller, clears every hold on its bookings by subquery, and
+re-inserts the pass id (0035) if it was no longer owed or the cap is passed. A replacement type
+must cover every live booking on the pass (`uncoveredBookingQuery()`). `POST
+/api/till/passes/[id]/drop` cancels an unpaid pass and its held bookings; `passes:expire-requests`
+lapses one as `EXPIRED`, with the same cancellation, once its type's sales window has closed or its
+validity ended.
+
 **Prompted at the bar, and the terms linked (D-136, D-137).** After a till sale that did not sell
 a pass, `passPromptFor()` turns the till's own pass offers into one dismissable line on the
 confirmation screen; it is never a step of the sale. `PASS_TERMS_PATH` (`/policies/booking`)

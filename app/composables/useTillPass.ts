@@ -1,9 +1,10 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { watchSinceMount } from '../utils/watch-since-mount'
 import { refusalText } from '../utils/refusal'
 import type { Ref } from 'vue'
 import { newestRequest } from '#shared/utils/night-cache'
 import type { PassOffer } from '#shared/utils/passes'
+import type { TillBooking } from '#shared/utils/sale'
 import type { TillSession } from '#shared/utils/till'
 
 // A season pass sold on the till (D-134): one per sale, for the buyer whose email is typed in, and
@@ -17,6 +18,9 @@ export interface TillPassLine {
   price: number
   email: string
   name: string | null
+  // A pass chosen online and owed (D-140, 0261): its holder is known, so no email is typed.
+  passId?: string
+  holderName?: string | null
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -56,6 +60,26 @@ export function useTillPass(venueId: Ref<string | null>, session: Ref<TillSessio
     passLine.value = { passTypeId: offer.id, passTypePriceId: price.id, passName: offer.name, priceLabel: price.label, price: price.price, email: passEmail.value.trim(), name: passName.value.trim() || null }
   }
 
+  // D-140 criterion 1: the chosen pass at its chosen price, which the seller may change below.
+  function payForChosenPass(booking: TillBooking): void {
+    const owed = booking.unpaidPass
+    if (!owed) return
+    passPriceId.value = owed.passTypePriceId
+    passLine.value = {
+      passTypeId: owed.passTypeId, passTypePriceId: owed.passTypePriceId, passName: owed.passTypeName, priceLabel: owed.priceLabel,
+      price: owed.pricePence, email: '', name: null, passId: owed.passId, holderName: booking.bookerFirstName,
+    }
+  }
+
+  // Criterion 2: another price point or pass on offer tonight; the server refuses one not covering every booking.
+  watch(passPriceId, (priceId) => {
+    const line = passLine.value
+    if (!line?.passId || !priceId || priceId === line.passTypePriceId) return
+    const offer = passOffers.value.find(one => one.prices.some(price => price.id === priceId))
+    const price = offer?.prices.find(one => one.id === priceId)
+    if (offer && price) passLine.value = { ...line, passTypeId: offer.id, passTypePriceId: price.id, passName: offer.name, priceLabel: price.label, price: price.price }
+  })
+
   function removePass(): void {
     passLine.value = null
   }
@@ -67,5 +91,5 @@ export function useTillPass(venueId: Ref<string | null>, session: Ref<TillSessio
     passPriceId.value = undefined
   }
 
-  return { passOffers, passOffersFailure, passEmail, passName, passEmailValid, passPriceId, passLine, passPence, addPass, removePass, resetPass }
+  return { passOffers, passOffersFailure, passEmail, passName, passEmailValid, passPriceId, passLine, passPence, addPass, payForChosenPass, removePass, resetPass }
 }

@@ -123,6 +123,7 @@ const {
   fallBackToTyping,
   lookUp,
   scanDecoded,
+  dropPass,
   ticketLines,
   ticketsPence,
   addBooking,
@@ -154,6 +155,7 @@ const {
   passPriceId,
   passLine,
   addPass,
+  payForChosenPass,
   removePass,
   resetPass,
 } = useTillPass(venueId, session, walkUpPerformanceId)
@@ -944,6 +946,9 @@ const basketBindings = computed(() => ({
                 :open-camera="openCamera"
                 :fall-back-to-typing="fallBackToTyping"
                 :add-booking="addBooking"
+                :pay-for-pass="payForChosenPass"
+                :drop-pass="dropPass"
+                :pass-in-basket="passLine ? (passLine.passId ?? '') : null"
                 :bump-walk-up="bumpWalkUp"
                 :add-walk-ups="addWalkUps"
               />

@@ -30,7 +30,7 @@ export function sellablePassTypesQuery(): SQL {
   return sql`
     SELECT t.id AS id, t.name AS name, t.description AS description, t.status AS status,
            t.sales_open_at AS salesOpenAt, t.sales_close_at AS salesCloseAt, t.max_issued AS maxIssued,
-           (SELECT count(*) FROM passes p WHERE p.pass_type_id = t.id AND p.status != 'CANCELLED') AS issuedCount,
+           (SELECT count(*) FROM passes p WHERE p.pass_type_id = t.id AND p.status != 'CANCELLED' AND p.paid = 1) AS issuedCount,
            COALESCE((
              SELECT json_group_array(json_object('id', pr.id, 'label', pr.label, 'price', pr.price))
              FROM pass_type_prices pr WHERE pr.pass_type_id = t.id
@@ -72,7 +72,7 @@ export function passTypeForSaleQuery(id: string): SQL {
   return sql`
     SELECT t.id AS id, t.name AS name, t.status AS status,
            t.sales_open_at AS salesOpenAt, t.sales_close_at AS salesCloseAt, t.max_issued AS maxIssued,
-           (SELECT count(*) FROM passes p WHERE p.pass_type_id = t.id AND p.status != 'CANCELLED') AS issuedCount
+           (SELECT count(*) FROM passes p WHERE p.pass_type_id = t.id AND p.status != 'CANCELLED' AND p.paid = 1) AS issuedCount
     FROM pass_types t WHERE t.id = ${id}
   `
 }
@@ -153,6 +153,7 @@ export interface HeldPass {
   passTypeStatus: string
   validUntil: number
   createdAt: number
+  paid: number
 }
 
 // A member's own held passes (criterion 5), and separately their own pending requests: a
@@ -161,7 +162,7 @@ export function heldPassesQuery(userId: string): SQL {
   return sql`
     SELECT p.id AS id, p.reference AS reference, p.pass_type_id AS passTypeId, t.name AS passTypeName,
            pr.label AS priceLabel, p.price_paid AS pricePaid, p.status AS status,
-           t.status AS passTypeStatus, t.valid_until AS validUntil, p.created_at AS createdAt
+           t.status AS passTypeStatus, t.valid_until AS validUntil, p.created_at AS createdAt, p.paid AS paid
     FROM passes p
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN pass_type_prices pr ON pr.id = p.pass_type_price_id
@@ -202,6 +203,7 @@ export interface PassCurrentState {
   status: string
   validFrom: number
   validUntil: number
+  paid: number
 }
 
 // What the QR answers when it is presented, read live rather than from anything saved earlier,
@@ -210,7 +212,7 @@ export function passCurrentStateQuery(id: string): SQL {
   return sql`
     SELECT p.id AS id, p.reference AS reference, p.user_id AS userId, t.name AS passTypeName,
            pr.label AS priceLabel, p.price_paid AS pricePaid, p.status AS status,
-           t.valid_from AS validFrom, t.valid_until AS validUntil
+           t.valid_from AS validFrom, t.valid_until AS validUntil, p.paid AS paid
     FROM passes p
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN pass_type_prices pr ON pr.id = p.pass_type_price_id
@@ -306,7 +308,7 @@ export function passOffersQuery(showId: string, userId: string | null, now: numb
       AND t.valid_until >= ${now}
       AND EXISTS (SELECT 1 FROM pass_type_shows s WHERE s.pass_type_id = t.id AND s.show_id = ${showId})
       AND (t.max_issued IS NULL
-        OR (SELECT count(*) FROM passes p WHERE p.pass_type_id = t.id AND p.status != 'CANCELLED') < t.max_issued)
+        OR (SELECT count(*) FROM passes p WHERE p.pass_type_id = t.id AND p.status != 'CANCELLED' AND p.paid = 1) < t.max_issued)
       AND NOT EXISTS (
         SELECT 1 FROM passes p WHERE p.pass_type_id = t.id AND p.user_id = ${userId} AND p.status = 'ACTIVE'
       )
@@ -321,4 +323,11 @@ export async function passOffers(showId: string, userId: string | null, now: num
     prices: JSON.parse(pricesJson) as PassOffer['prices'],
     requested: requested === 1,
   }))
+}
+
+export async function activePassOfType(userId: string, passTypeId: string): Promise<boolean> {
+  const [row] = await db.all<{ id: string }>(sql`
+    SELECT id AS id FROM passes WHERE user_id = ${userId} AND pass_type_id = ${passTypeId} AND status = 'ACTIVE' LIMIT 1
+  `)
+  return row !== undefined
 }

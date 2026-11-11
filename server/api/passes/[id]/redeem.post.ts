@@ -1,4 +1,6 @@
 import { redeemPassForm } from '#shared/utils/passes'
+import { saleRefusal } from '#shared/utils/programme'
+import { holdExpiresAt } from '#shared/utils/reservations'
 
 // Self-serve pass redemption while reserving (D-125). Only the pass's own holder may spend it:
 // signed in as its record, or in the browser that opened its link (D-138 criterion 3).
@@ -20,6 +22,11 @@ export default defineEventHandler(async (event) => {
   const refusal = refusalFor(state, now)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
 
+  // A seat on an unpaid pass is a hold like any unpaid booking, so it closes when booking does (0261).
+  const releaseMinutes = await holdReleaseMinutesFor(event, performance)
+  const unpaidRefusal = state.paid === 0 ? saleRefusal(performance, new Date(), 'CUSTOMER', releaseMinutes) : null
+  if (unpaidRefusal) throw createError({ statusCode: 409, statusMessage: unpaidRefusal.says })
+
   const capacity = effectiveCapacity(performance)
   const result = await redeemPass({
     passId,
@@ -30,6 +37,7 @@ export default defineEventHandler(async (event) => {
     source: 'WEB',
     admittedBy: null,
     actorId: account?.id ?? null,
+    holdExpiresAt: holdExpiresAt(performance.startsAt, releaseMinutes),
   })
 
   if (!result.applied) {
