@@ -32,6 +32,21 @@ describe('a role is open to a person exactly when its gate would admit them (025
   })
 })
 
+// 0259: the account page reads the same stand-in the write does.
+describe('while the bar override stands, a committee role opens the bar', () => {
+  const standing = { ...bar, committeeStandsIn: true }
+
+  test('a committee member can staff it without the module', () => {
+    expect(staffingStanding(standing, false, true, false)).toBe('CAN_STAFF')
+    expect(staffingStanding({ ...standing, moduleId: null, standing: 'UNSET' }, false, true, false)).toBe('CAN_STAFF')
+  })
+
+  test('anybody else still needs the module, and a disabled account takes nothing', () => {
+    expect(staffingStanding(standing, false, false, false)).toBe('NO_MODULE')
+    expect(staffingStanding(standing, false, true, true)).toBe('DISABLED')
+  })
+})
+
 describe('each gap says what is missing and points at its fix (0255)', () => {
   const line = (eligibility: RoleEligibility, holdsModule: boolean, holdsCommitteeRole: boolean) =>
     ({ ...eligibility, holdsModule, holdsCommitteeRole, staffing: staffingStanding(eligibility, holdsModule, holdsCommitteeRole, false) })
