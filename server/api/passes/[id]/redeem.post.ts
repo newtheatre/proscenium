@@ -1,4 +1,4 @@
-import { redeemPassForm } from '#shared/utils/passes'
+import { redeemPassForm, saysOncePerShow } from '#shared/utils/passes'
 import { saleRefusal } from '#shared/utils/programme'
 import { holdExpiresAt } from '#shared/utils/reservations'
 
@@ -21,6 +21,8 @@ export default defineEventHandler(async (event) => {
   const now = Math.floor(Date.now() / 1000)
   const refusal = refusalFor(state, now)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
+  const otherNight = await otherNightOfShow(passId, performance.id, performance.showId)
+  if (otherNight) throw createError({ statusCode: 409, statusMessage: saysOncePerShow(formatLondon(new Date(otherNight.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }), otherNight.reference) })
 
   // A seat on an unpaid pass is a hold like any unpaid booking, so it closes when booking does (0261).
   const releaseMinutes = await holdReleaseMinutesFor(event, performance)

@@ -22,6 +22,9 @@ export const passTypes = sqliteTable('pass_types', {
   salesCloseAt: integer('sales_close_at'),
   // Null is uncapped. The blunt guard against selling 200 passes into an 86-seat house.
   maxIssued: integer('max_issued'),
+  // PER_SHOW admits once to each show rather than each performance (0262); checked by the write
+  // path, since a table CHECK here is a rebuild of a table the append-only ones reference.
+  admissionRule: text('admission_rule').notNull().default('PER_PERFORMANCE'),
   createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at').notNull().default(sql`(unixepoch())`),
 }, table => [

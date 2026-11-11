@@ -156,7 +156,7 @@ Passes are sold in person, at the box office or at the bar on a performance nigh
 
 ### 7.6 Using a pass
 
-You can book a seat at any covered performance online at no charge, by choosing "Use my pass" when you book, either signed in to your account or on a device where you have opened the link in your pass email. At the theatre, show your pass's QR code, or give your name, email or pass reference at the box office, and you will be admitted if there is room. Each pass admits one person, once, to each performance. You may use your pass for the same production on more than one night.
+You can book a seat at any covered performance online at no charge, by choosing "Use my pass" when you book, either signed in to your account or on a device where you have opened the link in your pass email. At the theatre, show your pass's QR code, or give your name, email or pass reference at the box office, and you will be admitted if there is room. Each pass admits one person, once, to each performance, and you may use it for the same production on more than one night, unless the pass says it is for one night of each show. A one-night-of-each-show pass admits you to one performance of each show it covers; if you cancel that booking at the box office, you may choose another night.
 
 ### 7.7 Passes are personal and non-transferable
 
