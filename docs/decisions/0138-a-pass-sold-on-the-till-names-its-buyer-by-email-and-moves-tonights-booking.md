@@ -3,7 +3,7 @@
 - Status: Proposed
 - Date: 2026-10-21
 - Amends: D-124 criterion 1 (where a pass may be sold); specifies D-134
-- Amended by: 0259 (a buyer with no account is given a guest record, not refused)
+- Amended by: 0260 (a buyer with no account is given a guest record, not refused)
 
 ## Context
 

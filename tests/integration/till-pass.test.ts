@@ -105,7 +105,7 @@ describe('the till issues a pass in the sale\'s own batch (D-134 criterion 1)', 
   })
 })
 
-describe('a buyer with no account is given a guest record in the same batch (D-138 criterion 1, 0259)', () => {
+describe('a buyer with no account is given a guest record in the same batch (D-138 criterion 1, 0260)', () => {
   const guest = { id: 'u-new', name: 'New Buyer', guestEmail: 'new@example.invalid' }
 
   test('the record and the pass land together, gated on the sale\'s entry', async () => {

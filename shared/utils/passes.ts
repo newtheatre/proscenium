@@ -32,7 +32,7 @@ export function saysPassStatus(status: PassStatus | PassRequestStatus): string {
   return 'Cancelled'
 }
 
-// A buyer with no account, named and addressed rather than picked (D-138 criterion 1, 0259).
+// A buyer with no account, named and addressed rather than picked (D-138 criterion 1, 0260).
 export const passGuestBuyer = z.strictObject({
   name: z.string().trim().min(1, 'Give the buyer\'s name').max(120),
   email: z.string().trim().email('Enter a real email address').max(320),

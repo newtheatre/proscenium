@@ -15,6 +15,11 @@ export function eligibilityRefusal(requiredModuleId: string | null, held: Readon
   return held.has(requiredModuleId) ? null : requiredModuleId
 }
 
+// Through the named show night a committee role stands in for the bar module; unset is off (0259).
+export function barOverrideStands(until: string | null, night: string): boolean {
+  return until !== null && night <= until
+}
+
 export interface LapsedClaim { statusMessage: string, declineReason: string }
 
 // Why an officer could not confirm a queued claim, and the decline reason offered in its place,
@@ -68,12 +73,14 @@ export interface CandidateFacts {
   onPerformance: boolean
   // Holds a shift at another venue whose window overlaps this one (0211).
   clashes?: boolean
+  // A committee role admits them in place of the module: the bar while 0259's override stands.
+  committeeStandsIn?: boolean
 }
 
 // Why an officer cannot put somebody on a shift, read under their "Locked" badge, or null when
 // they can. The order is the gate's: committee role, then training, then the performance (0210).
 export function candidateLock(facts: CandidateFacts): string | null {
-  const refusal = eligibilityRefusal(facts.moduleId, facts.held)
+  const refusal = facts.committeeStandsIn && facts.committee ? null : eligibilityRefusal(facts.moduleId, facts.held)
   if (refusal === UNCONFIGURED_ELIGIBILITY_RULE) return 'No training is named for this role yet'
   if (needsCommitteeRole(facts.role) && !facts.committee) return 'Needs a committee role'
   if (refusal !== null) return `Needs ${facts.moduleName ?? refusal}`

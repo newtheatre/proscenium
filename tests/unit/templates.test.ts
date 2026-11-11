@@ -877,7 +877,7 @@ describe('every typed value is escaped in the HTML part, and only there (issue 1
 describe('the pass email follows the ticket terms (D-137)', () => {
   const { html, text } = render('pass-issued', EVERYTHING)
 
-  test('it says booking ahead uses the pass from the opened link, with no account (D-138, 0259)', () => {
+  test('it says booking ahead uses the pass from the opened link, with no account (D-138, 0260)', () => {
     for (const part of [html, text]) expect(flat(part)).toContain('To book ahead, open the link above on the phone or computer you book with, then choose "Use my pass" when you book; no account is needed.')
   })
 

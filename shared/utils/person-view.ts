@@ -16,6 +16,7 @@ export interface PersonRoleLine extends RoleEligibility {
 
 export function staffingStanding(line: RoleEligibility, holdsModule: boolean, holdsCommitteeRole: boolean, disabled: boolean): StaffingStanding {
   if (disabled) return 'DISABLED'
+  if (line.committeeStandsIn && holdsCommitteeRole) return 'CAN_STAFF'
   // A retired module still admits whoever holds it; nobody new can gain one that is not active.
   if (line.moduleId === null || line.standing === 'MISSING' || (!holdsModule && line.standing !== 'SET')) return 'NOT_OPEN'
   const committee = !needsCommitteeRole(line.role) || holdsCommitteeRole

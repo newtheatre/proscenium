@@ -23,11 +23,13 @@ export default defineEventHandler(async (event) => {
   const held = await shiftDetail(id)
   if (!held) throw noSuch('shift')
 
-  const rules = await shiftRoleRules(event)
+  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
   const moduleId = rules[held.role]
   const today = londonToday()
   const tonight = showNightOpensAt(currentShowNight())
   const now = Math.floor(Date.now() / 1000)
+  const gate = shiftGate(held.role, moduleId, today, now, standsIn)
+  const committeeStandsIn = gate.committeeInsteadAt !== undefined
 
   // The assignment refuses anybody already holding another shift on the performance, so this says so.
   const onPerformance = sql`EXISTS (
@@ -43,14 +45,13 @@ export default defineEventHandler(async (event) => {
   // Nothing typed: the eligible people with the fewest shifts ahead, so the rota spreads (0251).
   // An unnamed rule suggests nobody, the way it admits nobody (E-103 criterion 4).
   const matched = search === ''
-    ? moduleId === null
+    ? moduleId === null && !committeeStandsIn
       ? []
       : await db.all<Row>(sql`
         SELECT ${columns}
         FROM users cand
         WHERE cand.anonymised_at IS NULL AND cand.disabled = 0
-          AND ${holdsModuleNow(sql`cand.id`, moduleId, today)}
-          AND ${needsCommitteeRole(held.role) ? holdsCommitteeRole(sql`cand.id`, now) : sql`1`}
+          AND ${holdsGate(gate, sql`cand.id`)}
           AND NOT ${onPerformance} AND NOT ${clashes}
         ORDER BY upcoming, cand.name COLLATE NOCASE
         LIMIT ${SUGGESTION_LIMIT}
@@ -67,8 +68,8 @@ export default defineEventHandler(async (event) => {
   const moduleName = moduleId === null ? null : (await gatingModules([moduleId])).get(moduleId)?.name ?? null
   // A duty manager also needs a live committee role, which the assignment's write reads too (0115).
   const items: AssignCandidate[] = await Promise.all(matched.map(async ({ onPerformance, clashes, ...row }) => {
-    const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), needsCommitteeRole(held.role) ? hasCommitteeRole(row.id) : true])
-    const facts = { role: held.role, moduleId, moduleName, held: heldModules, committee, onPerformance: onPerformance === 1, clashes: clashes === 1 }
+    const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), needsCommitteeRole(held.role) || committeeStandsIn ? hasCommitteeRole(row.id) : true])
+    const facts = { role: held.role, moduleId, moduleName, held: heldModules, committee, onPerformance: onPerformance === 1, clashes: clashes === 1, committeeStandsIn }
     const reason = candidateLock(facts)
     const movable = reason === ALREADY_ON_PERFORMANCE && candidateLock({ ...facts, onPerformance: false }) === null
     return { ...row, eligible: reason === null, reason, movable }

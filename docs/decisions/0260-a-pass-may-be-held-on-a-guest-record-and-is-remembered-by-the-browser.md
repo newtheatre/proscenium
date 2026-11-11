@@ -1,4 +1,4 @@
-# 0259: A pass may be held on a guest record, and the browser that opened it remembers it
+# 0260: A pass may be held on a guest record, and the browser that opened it remembers it
 
 - Status: Proposed
 - Date: 2026-11-11

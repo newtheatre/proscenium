@@ -4,7 +4,7 @@ import { guestAccount } from './reservations'
 
 export const PASS_HOLDER_CLOSED_SAYS = 'That address belongs to a closed account, so a pass cannot be issued to it. Nothing has been charged.'
 
-// D-138 criterion 1 (0259): an address nobody holds becomes a guest record, exactly as a guest
+// D-138 criterion 1 (0260): an address nobody holds becomes a guest record, exactly as a guest
 // booking makes one; a closed or disabled account's address is refused rather than revived.
 export async function guestPassHolder(buyer: { name: string, email: string }): Promise<string> {
   const existing = await findByEmail(buyer.email)

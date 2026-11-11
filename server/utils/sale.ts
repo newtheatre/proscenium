@@ -897,7 +897,7 @@ export async function commitSale(
 // After the sale's batch, so the pass exists: the email, then tonight's booking moved onto it
 // (D-134 criteria 1, 3). A move that loses a race leaves the booking as it was and says so.
 async function finishTillPass(pass: ResolvedTillPass, context: SaleContext): Promise<PassSaleReceipt> {
-  // A new guest's record may be one another checkout wrote first, so the holder is read back (0259).
+  // A new guest's record may be one another checkout wrote first, so the holder is read back (0260).
   const [holder] = await db.all<{ userId: string }>(sql`SELECT user_id AS userId FROM passes WHERE id = ${pass.passId}`)
   await sendPassIssued(context.event, { userId: holder?.userId ?? pass.buyer.id, reference: pass.reference, passTypeName: pass.passTypeName, priceLabel: pass.priceLabel }, pass.passId)
   const receipt: PassSaleReceipt = { reference: pass.reference, passTypeName: pass.passTypeName, holderName: pass.buyer.name, movedBooking: null, keptBooking: pass.keptBooking }

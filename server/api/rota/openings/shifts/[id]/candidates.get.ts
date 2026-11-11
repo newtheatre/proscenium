@@ -19,8 +19,10 @@ export default defineEventHandler(async (event) => {
   const held = await openingShiftDetail(id)
   if (!held) throw noSuch('bar opening slot')
 
-  const moduleId = (await shiftRoleRules(event)).BAR
+  const [rules, committeeStandsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
+  const moduleId = rules.BAR
   const today = londonToday()
+  const gate = shiftGate('BAR', moduleId, today, Math.floor(Date.now() / 1000), committeeStandsIn)
   const tonight = showNightOpensAt(currentShowNight())
 
   const onOpening = sql`EXISTS (
@@ -34,13 +36,13 @@ export default defineEventHandler(async (event) => {
   type Row = { id: string, name: string, email: string, onOpening: number, upcoming: number }
   // Nothing typed: the bar-trained people with the fewest shifts ahead, so the rota spreads (0251).
   const matched = search === ''
-    ? moduleId === null
+    ? moduleId === null && !committeeStandsIn
       ? []
       : await db.all<Row>(sql`
         SELECT ${columns}
         FROM users cand
         WHERE cand.anonymised_at IS NULL AND cand.disabled = 0
-          AND ${holdsModuleNow(sql`cand.id`, moduleId, today)} AND NOT ${onOpening}
+          AND ${holdsGate(gate, sql`cand.id`)} AND NOT ${onOpening}
         ORDER BY upcoming, cand.name COLLATE NOCASE
         LIMIT ${SUGGESTION_LIMIT}
       `)
@@ -55,8 +57,9 @@ export default defineEventHandler(async (event) => {
 
   const moduleName = moduleId === null ? null : (await gatingModules([moduleId])).get(moduleId)?.name ?? null
   const items: OpeningCandidate[] = await Promise.all(matched.map(async ({ onOpening, ...row }) => {
-    const gate = candidateLock({ role: 'BAR', moduleId, moduleName, held: await modulesHeldBy(row.id, today), committee: true, onPerformance: false })
-    const reason = gate ?? (onOpening === 1 ? ALREADY_ON_OPENING : null)
+    const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), committeeStandsIn ? hasCommitteeRole(row.id) : true])
+    const lock = candidateLock({ role: 'BAR', moduleId, moduleName, held: heldModules, committee, onPerformance: false, committeeStandsIn })
+    const reason = lock ?? (onOpening === 1 ? ALREADY_ON_OPENING : null)
     return { ...row, eligible: reason === null, reason }
   }))
 

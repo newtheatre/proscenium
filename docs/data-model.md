@@ -1142,7 +1142,7 @@ request. `passOffersQuery()` binds the same parameters for a guest as for a sign
 already has a pass to redeem there. The page asks through the same request route; a guest is sent
 to register or sign in first, since a pass always needs an account.
 
-**Sold on the till (D-134, 0138, 0259).** The till's basket carries an optional `pass` (pass type,
+**Sold on the till (D-134, 0138, 0260).** The till's basket carries an optional `pass` (pass type,
 price point, the buyer's email, and a name for an address nobody holds). `resolveTillPass()`
 (`server/utils/till-pass.ts`) refuses an anonymised or disabled account's address, a new address
 with no name, a pass already held, or one off sale, before the reader is asked. A new address
@@ -1159,7 +1159,7 @@ pointing at a new zero-value pass booking, in one batch closed by the same kind 
 first, from `passCoveredShowsQuery()`. `/passes` lists them for an `ACTIVE` pass, says that turning
 up without booking is subject to space, and tells a signed-out holder that this browser now keeps the pass (D-138).
 
-**A pass without an account (D-138, 0259).** The desk's issue route takes `guest: { name, email }`
+**A pass without an account (D-138, 0260).** The desk's issue route takes `guest: { name, email }`
 in place of `userId`; `guestPassHolder()` (`server/utils/pass-holders.ts`) makes or reuses the guest
 record a guest booking would, refusing an anonymised or disabled account. Opening `/passes/[token]`
 adds the token to the `nnt-passes` httpOnly cookie, at most four, newest first

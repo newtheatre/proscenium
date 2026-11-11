@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   })
 
   const moduleId = (await shiftRoleRules(event))[held.role]
-  const statement = approveShiftStatement(id, shiftGate(held.role, moduleId, londonToday(), Math.floor(Date.now() / 1000)))
+  const statement = approveShiftStatement(id, shiftGate(held.role, moduleId, londonToday(), Math.floor(Date.now() / 1000), await committeeStaffsBar(event)))
   const applied = await withShiftConstraints(() => auditedWrite(db.all<{ id: string }>(statement), entry))
 
   if (!applied) {

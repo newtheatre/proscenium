@@ -29,13 +29,14 @@ export default defineEventHandler(async (event) => {
     LIMIT 10
   `)
 
-  const rules = await shiftRoleRules(event)
+  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
+  const committeeStandsIn = role === 'BAR' && standsIn
   const moduleId = rules[role]
   const moduleName = moduleId === null ? null : (await gatingModules([moduleId])).get(moduleId)?.name ?? null
   const today = londonToday()
   const items: AddShiftCandidate[] = await Promise.all(matched.map(async ({ onPerformance: on, ...row }) => {
-    const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), needsCommitteeRole(role) ? hasCommitteeRole(row.id) : true])
-    const reason = candidateLock({ role, moduleId, moduleName, held: heldModules, committee, onPerformance: on === 1 })
+    const [heldModules, committee] = await Promise.all([modulesHeldBy(row.id, today), needsCommitteeRole(role) || committeeStandsIn ? hasCommitteeRole(row.id) : true])
+    const reason = candidateLock({ role, moduleId, moduleName, held: heldModules, committee, onPerformance: on === 1, committeeStandsIn })
     return { ...row, eligible: reason === null, reason }
   }))
 

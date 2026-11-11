@@ -1,4 +1,4 @@
-// D-138 criterion 2: the pass tokens a browser keeps in its own cookie, newest first (0259).
+// D-138 criterion 2: the pass tokens a browser keeps in its own cookie, newest first (0260).
 
 export const PASS_DEVICE_COOKIE_NAME = 'nnt-passes'
 export const PASS_DEVICE_LIMIT = 4

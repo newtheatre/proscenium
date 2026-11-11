@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { PASS_DEVICE_LIMIT, rememberedPassTokens, rememberPassToken, rememberedUntil } from '#shared/utils/pass-device'
 
-// D-138 criterion 2: what the browser's pass cookie holds, and for how long (0259).
+// D-138 criterion 2: what the browser's pass cookie holds, and for how long (0260).
 
 describe('the remembered pass list', () => {
   test('an absent or empty cookie remembers nothing', () => {

@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // A new buyer becomes the same guest record a guest booking makes (D-138 criterion 1, 0259).
+  // A new buyer becomes the same guest record a guest booking makes (D-138 criterion 1, 0260).
   const userId = input.userId ?? await guestPassHolder(input.guest!)
 
   // A buyer picked by name may still have asked online: their request is settled by this sale too,

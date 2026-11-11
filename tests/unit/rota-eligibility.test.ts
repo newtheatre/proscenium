@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { candidateLock, eligibilityRefusal, noLongerQualifies } from '#shared/utils/rota-eligibility'
+import { barOverrideStands, candidateLock, eligibilityRefusal, noLongerQualifies } from '#shared/utils/rota-eligibility'
 
 // E-103's safety gate: an empty or unreadable rule refuses eligibility rather than granting it to
 // everyone (criterion 4). Held modules come from `modulesHeldBy()`, never a copy (criterion 3).
@@ -64,5 +64,41 @@ describe('a locked candidate says why', () => {
 
   test('an unset rule locks everybody and says so', () => {
     expect(candidateLock({ ...facts, moduleId: null })).toBe('No training is named for this role yet')
+  })
+})
+
+// 0259: through the named show night a committee role stands in for the bar module, and nothing else.
+describe('the committee may staff the bar untrained until a named night', () => {
+  test('the override stands through its own night and ends after it', () => {
+    expect(barOverrideStands('2026-12-13', '2026-11-11')).toBe(true)
+    expect(barOverrideStands('2026-12-13', '2026-12-13')).toBe(true)
+    expect(barOverrideStands('2026-12-13', '2026-12-14')).toBe(false)
+  })
+
+  test('unset, the override is off', () => {
+    expect(barOverrideStands(null, '2026-11-11')).toBe(false)
+  })
+
+  const bar = { role: 'BAR' as const, moduleId: 'ADMN-102', moduleName: 'Bar Service', held: new Set<string>(), committee: true, onPerformance: false, committeeStandsIn: true }
+
+  test('a committee member without the bar module is not locked while it stands', () => {
+    expect(candidateLock(bar)).toBeNull()
+  })
+
+  test('nor when no bar module is named at all', () => {
+    expect(candidateLock({ ...bar, moduleId: null, moduleName: null })).toBeNull()
+  })
+
+  test('somebody off the committee still needs the module', () => {
+    expect(candidateLock({ ...bar, committee: false })).toBe('Needs Bar Service')
+  })
+
+  test('the performance and the clash still lock a committee member', () => {
+    expect(candidateLock({ ...bar, onPerformance: true })).toBe('Already on this performance')
+    expect(candidateLock({ ...bar, clashes: true })).toBe('On a shift at another venue at the same time')
+  })
+
+  test('once it has ended, the bar needs its module again', () => {
+    expect(candidateLock({ ...bar, committeeStandsIn: false })).toBe('Needs Bar Service')
   })
 })

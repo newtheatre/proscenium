@@ -6,7 +6,7 @@ import type { H3Event } from 'h3'
 // a pass id from a reservation id, so neither token resolves against the other's route.
 const DOMAIN = 'pass:'
 
-// The single 60-minute cookie 0259 replaced; cleared wherever the device list is, so none lingers.
+// The single 60-minute cookie 0260 replaced; cleared wherever the device list is, so none lingers.
 const RETIRED_COOKIE_NAME = 'nnt-pass-token'
 
 export interface RememberedPass {
@@ -24,7 +24,7 @@ export async function rememberedPasses(event: H3Event): Promise<RememberedPass[]
   return remembered
 }
 
-// D-138 criterion 2 (0259): the browser keeps the token, never the address bar, until the latest
+// D-138 criterion 2 (0260): the browser keeps the token, never the address bar, until the latest
 // remembered pass's validity ends.
 export async function rememberPassQrToken(event: H3Event, token: string): Promise<void> {
   const tokens = rememberPassToken((await rememberedPasses(event)).map(one => one.token), token)

@@ -30,7 +30,7 @@ export interface ResolvedTillPass {
   priceLabel: string
   pricePence: number
   maxIssued: number | null
-  // `guestEmail` is set when nobody held the address: the sale's own batch writes the record (0259).
+  // `guestEmail` is set when nobody held the address: the sale's own batch writes the record (0260).
   buyer: { id: string, name: string, guestEmail?: string }
   requestId: string | null
   swap: SwapCandidate | null
@@ -98,7 +98,7 @@ export async function resolveTillPass(input: TillPassInput, performanceIds: stri
     throw createError({ statusCode: 400, statusMessage: 'Choose one of the prices this pass offers' })
   }
 
-  // Any record on the address holds the pass, a guest's included (D-138 criterion 1, 0259).
+  // Any record on the address holds the pass, a guest's included (D-138 criterion 1, 0260).
   const account = await findByEmail(input.email)
   if (account && (account.anonymisedAt !== null || account.disabled)) throw createError({ statusCode: 409, statusMessage: PASS_HOLDER_CLOSED_SAYS })
   if (!account && !input.name) throw createError({ statusCode: 409, statusMessage: NO_ACCOUNT_SAYS })
