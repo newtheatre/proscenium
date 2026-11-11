@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   })
 
   const moduleId = (await shiftRoleRules(event)).BAR
-  const statement = approveOpeningShiftStatement(id, { moduleId, today: londonToday() })
+  const statement = approveOpeningShiftStatement(id, shiftGate('BAR', moduleId, londonToday(), Math.floor(Date.now() / 1000), await committeeStaffsBar(event)))
   const applied = await withOpeningConstraints(() => auditedWrite(db.all<{ id: string }>(statement), entry))
 
   if (!applied) {

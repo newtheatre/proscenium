@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const refusedTraining = createError({ statusCode: 403, statusMessage: 'You do not currently qualify for a bar shift' })
   if (!(await shiftEligibilities(event, account.id, today)).BAR.eligible) throw refusedTraining
   // The same gate rides the write, so a record lapsing after this check admits nobody (#1302).
-  const gate = { moduleId: (await shiftRoleRules(event)).BAR, today }
+  const gate = shiftGate('BAR', (await shiftRoleRules(event)).BAR, today, Math.floor(Date.now() / 1000), await committeeStaffsBar(event))
 
   const autoConfirm = await configValue(event, 'SHIFT_CLAIM_AUTO_CONFIRM')
   const status = autoConfirm ? 'CONFIRMED' : 'CLAIMED'

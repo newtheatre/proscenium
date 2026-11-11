@@ -55,6 +55,15 @@ describe('configuration surface (0012, 0019)', () => {
     expect(CONFIG_KEYS.AUTO_CLOSE_FROM_NIGHT.schema.safeParse('2026-02-30').success).toBe(false)
   })
 
+  // A stopgap that ends on its own: empty is off, and a night is all it takes (0259).
+  test('the committee bar override names its last show night, and ships off', () => {
+    expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.default).toBeNull()
+    expect(isEnforced('BAR_SHIFT_COMMITTEE_UNTIL')).toBe(true)
+    expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.schema.safeParse('2026-12-13').success).toBe(true)
+    expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.schema.safeParse(null).success).toBe(true)
+    expect(CONFIG_KEYS.BAR_SHIFT_COMMITTEE_UNTIL.schema.safeParse('13 December').success).toBe(false)
+  })
+
   test('retention ships disarmed', () => {
     expect(CONFIG_KEYS.RETENTION_ARMED.default).toBe(false)
   })

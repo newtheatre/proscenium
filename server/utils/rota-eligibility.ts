@@ -58,7 +58,7 @@ export async function shiftEligibilities(
       result[line.role] = { eligible: false, unlockedBy: null, needsCommittee: true }
       continue
     }
-    const refusal = eligibilityRefusal(line.moduleId, held)
+    const refusal = line.committeeStandsIn && committee ? null : eligibilityRefusal(line.moduleId, held)
     result[line.role] = {
       eligible: refusal === null,
       unlockedBy: refusal !== null && line.standing === 'SET' ? { moduleId: refusal, moduleName: line.moduleName ?? refusal } : null,

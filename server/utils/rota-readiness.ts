@@ -6,6 +6,8 @@ import { holdsGate, shiftGate } from './rota'
 import { cardFiled } from './venue-emergency'
 import { londonParts } from '#shared/utils/london'
 import { SHIFT_ROLES } from '#shared/utils/rota'
+import { barOverrideStands } from '#shared/utils/rota-eligibility'
+import { currentShowNight } from '#shared/utils/show-night'
 import { eligibilityStanding } from '#shared/utils/rota-readiness'
 import type { SystemCheck } from '#shared/utils/checklist'
 import type { TrainingGate } from './rota'
@@ -32,6 +34,11 @@ export async function shiftRoleRules(event?: H3Event): Promise<Record<ShiftRole,
   return { DUTY_MANAGER, DOOR, BAR }
 }
 
+// Whether a committee role stands in for the bar module tonight, read once per request (0259).
+export async function committeeStaffsBar(event?: H3Event): Promise<boolean> {
+  return barOverrideStands(await configValue(event, 'BAR_SHIFT_COMMITTEE_UNTIL'), currentShowNight())
+}
+
 export function gatingModulesQuery(ids: readonly string[]): SQL {
   return sql`
     SELECT id, name, status FROM modules
@@ -51,13 +58,14 @@ export async function gatingModules(named: readonly (string | null)[]): Promise<
 }
 
 export async function roleEligibilities(event?: H3Event): Promise<RoleEligibility[]> {
-  const rules = await shiftRoleRules(event)
+  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
   const modules = await gatingModules(Object.values(rules))
 
   return SHIFT_ROLES.map((role) => {
     const moduleId = rules[role]
     const held = moduleId === null ? undefined : modules.get(moduleId)
-    return { role, moduleId, moduleName: held?.name ?? null, standing: eligibilityStanding(moduleId, held?.status ?? null) }
+    const line: RoleEligibility = { role, moduleId, moduleName: held?.name ?? null, standing: eligibilityStanding(moduleId, held?.status ?? null) }
+    return role === 'BAR' && standsIn ? { ...line, committeeStandsIn: true } : line
   })
 }
 
@@ -75,7 +83,7 @@ export async function qualifiedCounts(lines: readonly RoleEligibility[]): Promis
   const today = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   const now = Math.floor(Date.now() / 1000)
   const counts = await Promise.all(lines.map(async (line) => {
-    const [row] = await db.all<{ total: number }>(qualifiedCountQuery(shiftGate(line.role, line.moduleId, today, now)))
+    const [row] = await db.all<{ total: number }>(qualifiedCountQuery(shiftGate(line.role, line.moduleId, today, now, line.committeeStandsIn)))
     return [line.role, row?.total ?? 0] as const
   }))
   return Object.fromEntries(counts) as Record<ShiftRole, number>
