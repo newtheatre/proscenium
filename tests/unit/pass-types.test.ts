@@ -6,6 +6,7 @@ import {
   newPassTypeForm,
   passTypeForm,
   passTypeShowsForm,
+  saysAdmissionRule,
   saysPassTypeStatus,
 } from '#shared/utils/pass-types'
 import { publishShowForm } from '#shared/utils/programme'
@@ -164,5 +165,22 @@ describe('removing a price point an issued pass holds is refused by name', () =>
   test('several, in the words of a list', () => {
     expect(heldPricePointRefusal(['Concession', 'Standard', 'Student']))
       .toBe('Concession, Standard and Student are held by issued passes, so they cannot be removed: change their prices instead')
+  })
+})
+
+// D-141 criterion 1 (0262): every pass admitted once to each performance, and still does unless told.
+describe('a pass type says how often it admits', () => {
+  test('a pass type sent without a rule admits to every performance', () => {
+    expect(newPassTypeForm.parse(base).admissionRule).toBe('PER_PERFORMANCE')
+  })
+
+  test('once to each show is accepted, and anything else refused', () => {
+    expect(newPassTypeForm.parse({ ...base, admissionRule: 'PER_SHOW' }).admissionRule).toBe('PER_SHOW')
+    expect(newPassTypeForm.safeParse({ ...base, admissionRule: 'PER_SEASON' }).success).toBe(false)
+  })
+
+  test('the screen says it in words', () => {
+    expect(saysAdmissionRule('PER_SHOW')).toBe('One night of each show')
+    expect(saysAdmissionRule('PER_PERFORMANCE')).toBe('Every night of each show')
   })
 })

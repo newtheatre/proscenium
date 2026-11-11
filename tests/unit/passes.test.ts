@@ -14,6 +14,7 @@ import {
   saysPassOffer,
   saysPayAtDesk,
   showsPassQr,
+  saysOncePerShow,
   unpaidPassSays,
 } from '#shared/utils/passes'
 import { tillPassForm } from '#shared/utils/sale'
@@ -213,5 +214,17 @@ describe('a pass chosen while booking (D-139, D-140)', () => {
 
   test('the door and the desk refuse a seat on it with the figure owed', () => {
     expect(unpaidPassSays(3000)).toBe('This pass is not paid for yet: £30.00 is due at the till first. Paying for it lets every booking on it in.')
+  })
+})
+
+describe('a pass that admits once to each show says so where it is offered (D-141 criterion 4)', () => {
+  test('one night of each is said beside what it covers, and nothing is said otherwise', () => {
+    const prices = [{ label: 'Standard', price: 4500 }]
+    expect(saysPassOffer({ name: 'Season pass', coveredShows: 3, prices, admissionRule: 'PER_SHOW' })).toBe('Season pass covers 3 shows, one night of each, from £45.00.')
+    expect(saysPassOffer({ name: 'Season pass', coveredShows: 3, prices, admissionRule: 'PER_PERFORMANCE' })).toBe('Season pass covers 3 shows, from £45.00.')
+  })
+
+  test('the refusal names the night already booked', () => {
+    expect(saysOncePerShow('Friday 13 November 2026 at 19:30', 'ABC234')).toBe('This pass admits once to each show, and is already booked for Friday 13 November 2026 at 19:30 (ABC234). Cancel that booking at the box office to choose another night.')
   })
 })
