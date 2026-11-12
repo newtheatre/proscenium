@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   const held = await openingShiftDetail(id)
   if (!held) throw noSuch('bar opening slot')
 
-  const [rules, committeeStandsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
+  const [rules, committeeStandsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsRota(event)])
   const moduleId = rules.BAR
   const today = londonToday()
   const gate = shiftGate('BAR', moduleId, today, Math.floor(Date.now() / 1000), committeeStandsIn)

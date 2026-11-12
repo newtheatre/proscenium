@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     if (!eligibility.eligible) throw ineligibleRefusal(input.role, eligibility, subject.name)
   }
   // The same gate rides the insert, so a record or a role lapsing after this check confirms nobody (#1302).
-  const gate = shiftGate(input.role, (await shiftRoleRules(event))[input.role], today, Math.floor(Date.now() / 1000), await committeeStaffsBar(event))
+  const gate = shiftGate(input.role, (await shiftRoleRules(event))[input.role], today, Math.floor(Date.now() / 1000), await committeeStaffsRota(event))
 
   const shiftId = newId()
   const entry = auditEntry({

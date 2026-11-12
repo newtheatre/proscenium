@@ -1363,12 +1363,14 @@ Which training module gates which role is committee configuration, three keys,
 null rule refuses eligibility rather than granting it to everyone: an unnamed or unreadable rule is
 the safer failure (criterion 4).
 
-A temporary override widens the bar's gate alone (0259). While `BAR_SHIFT_COMMITTEE_UNTIL` names a
-show night on or after the current one, `committeeStaffsBar()` reads true and `shiftGate('BAR', ...)`
-carries `committeeInsteadAt`, so `holdsGate()` admits a live committee role (0115's reading) in place
-of the module: in every write that confirms somebody on a performance's bar shift or a bar opening's
-slot, the live checks, the assignment suggestions, the readiness count and the account's staffing
-card. The key ships empty, which is off; a shift confirmed while it stood is kept after it ends.
+A temporary override widens every role's gate (0259, 0263). While `SHIFT_COMMITTEE_UNTIL` names a
+show night on or after the current one, `committeeStaffsRota()` reads true and `shiftGate()` carries
+`committeeInsteadAt`, so `holdsGate()` reads the role's usual gate or a live committee role (0115's
+reading): the module or the role for the bar and the door, the role alone for the duty manager,
+whose usual gate already needs it. It applies in every write that confirms somebody on a shift or a
+bar opening's slot, the live checks, the assignment suggestions, the readiness count and the
+account's staffing card. The key ships empty, which is off; a shift confirmed while it stood is
+kept after it ends.
 
 `GET /api/rota/shifts?role=&from=&to=&page=` is the open-shift list, paged in SQL and gated live.
 `from` and `to` are show nights, held whole from 04:00 to 04:00 as the rota board's window is

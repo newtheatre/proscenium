@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
   if (!eligibility.eligible) throw ineligibleRefusal(held.role, eligibility)
   // The same gate rides the write, so a record or a committee role lapsing after this check admits
   // nobody (#1302, 0115).
-  const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000), await committeeStaffsBar(event))
+  const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000), await committeeStaffsRota(event))
 
   const autoConfirm = await configValue(event, 'SHIFT_CLAIM_AUTO_CONFIRM')
   const status = autoConfirm ? 'CONFIRMED' : 'CLAIMED'

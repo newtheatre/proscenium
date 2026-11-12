@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const today = londonToday()
   const eligibility = (await shiftEligibilities(event, userId, today))[held.role]
   if (!eligibility.eligible) throw ineligibleRefusal(held.role, eligibility, subject.name)
-  const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000), await committeeStaffsBar(event))
+  const gate = shiftGate(held.role, (await shiftRoleRules(event))[held.role], today, Math.floor(Date.now() / 1000), await committeeStaffsRota(event))
 
   const movesOff = move && await holdsOtherShift(id, userId)
   const entry = auditEntry({

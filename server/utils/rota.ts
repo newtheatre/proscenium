@@ -635,13 +635,13 @@ export interface ClaimScope { table: string, event: string }
 export const SHIFT_CLAIM_SCOPE: ClaimScope = { table: 'shifts', event: 'performance_id' }
 
 // The gating module and London's today, as the live check read them (E-104 criterion 1). A committee
-// role is read at `committeeAt` beside the module (0115), or at `committeeInsteadAt` in its place (0259).
+// role is read at `committeeAt` beside the module (0115), or at `committeeInsteadAt` in its place (0263).
 export interface TrainingGate { moduleId: string | null, today: string, committeeAt?: number, committeeInsteadAt?: number }
 
 // Every write that confirms somebody on a shift builds its gate here, so none can forget the role.
-export function shiftGate(role: ShiftRole, moduleId: string | null, today: string, now: number, committeeStaffsBar = false): TrainingGate {
-  if (needsCommitteeRole(role)) return { moduleId, today, committeeAt: now }
-  return role === 'BAR' && committeeStaffsBar ? { moduleId, today, committeeInsteadAt: now } : { moduleId, today }
+export function shiftGate(role: ShiftRole, moduleId: string | null, today: string, now: number, committeeStandsIn = false): TrainingGate {
+  const gate: TrainingGate = needsCommitteeRole(role) ? { moduleId, today, committeeAt: now } : { moduleId, today }
+  return committeeStandsIn ? { ...gate, committeeInsteadAt: now } : gate
 }
 
 // `heldNow` repeated, not imported: training.ts leans on ambient imports Bun cannot typecheck, so
@@ -655,9 +655,9 @@ export function holdsGate(gate: TrainingGate, userId: string | SQL): SQL {
       AND gate_record.revoked_at IS NULL
       AND (gate_record.expires_on IS NULL OR gate_record.expires_on > ${gate.today})
   )`
-  if (gate.committeeInsteadAt !== undefined) return sql`(${trained} OR ${holdsCommitteeRole(userId, gate.committeeInsteadAt)})`
-  if (gate.moduleId === null) return trained
-  return gate.committeeAt === undefined ? trained : sql`${trained} AND ${holdsCommitteeRole(userId, gate.committeeAt)}`
+  const usual = gate.moduleId === null || gate.committeeAt === undefined ? trained : sql`${trained} AND ${holdsCommitteeRole(userId, gate.committeeAt)}`
+  // An alternative to the whole gate, so a duty manager off the committee is never admitted (0263).
+  return gate.committeeInsteadAt === undefined ? usual : sql`(${usual} OR ${holdsCommitteeRole(userId, gate.committeeInsteadAt)})`
 }
 
 // Availability, one-slot-per-event and the training gate all ride the UPDATE, so two claims resolve
