@@ -29,8 +29,7 @@ export default defineEventHandler(async (event) => {
     LIMIT 10
   `)
 
-  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
-  const committeeStandsIn = role === 'BAR' && standsIn
+  const [rules, committeeStandsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsRota(event)])
   const moduleId = rules[role]
   const moduleName = moduleId === null ? null : (await gatingModules([moduleId])).get(moduleId)?.name ?? null
   const today = londonToday()

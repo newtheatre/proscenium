@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
   const today = londonToday()
   const refusedTraining = createError({ statusCode: 403, statusMessage: 'That member does not currently qualify for a bar shift' })
   if (!(await shiftEligibilities(event, userId, today)).BAR.eligible) throw refusedTraining
-  const gate = shiftGate('BAR', (await shiftRoleRules(event)).BAR, today, Math.floor(Date.now() / 1000), await committeeStaffsBar(event))
+  const gate = shiftGate('BAR', (await shiftRoleRules(event)).BAR, today, Math.floor(Date.now() / 1000), await committeeStaffsRota(event))
 
   const entry = auditEntry({
     actorId: resolved.account.id,

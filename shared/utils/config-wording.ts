@@ -65,7 +65,7 @@ const HEADINGS: Record<ConfigKey, string> = {
   SHIFT_ELIGIBILITY_DUTY_MANAGER_MODULE: 'Training for a duty manager shift',
   SHIFT_ELIGIBILITY_DOOR_MODULE: 'Training for a door shift',
   SHIFT_ELIGIBILITY_BAR_MODULE: 'Training for a bar shift',
-  BAR_SHIFT_COMMITTEE_UNTIL: 'Committee may staff the bar untrained until',
+  SHIFT_COMMITTEE_UNTIL: 'Committee may take any shift untrained until',
   FIRST_AID_MODULE: 'Training that makes a first aider',
   SHIFT_CLAIM_AUTO_CONFIRM: 'A claimed shift is confirmed at once',
   SHIFT_RELEASE_NOTICE_HOURS: 'A released shift is told at once within',

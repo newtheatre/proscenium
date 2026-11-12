@@ -15,8 +15,8 @@ export function eligibilityRefusal(requiredModuleId: string | null, held: Readon
   return held.has(requiredModuleId) ? null : requiredModuleId
 }
 
-// Through the named show night a committee role stands in for the bar module; unset is off (0259).
-export function barOverrideStands(until: string | null, night: string): boolean {
+// Through the named show night a committee role stands in for any role's training; unset is off (0263).
+export function committeeOverrideStands(until: string | null, night: string): boolean {
   return until !== null && night <= until
 }
 
@@ -73,7 +73,7 @@ export interface CandidateFacts {
   onPerformance: boolean
   // Holds a shift at another venue whose window overlaps this one (0211).
   clashes?: boolean
-  // A committee role admits them in place of the module: the bar while 0259's override stands.
+  // A committee role admits them in place of the module, while 0263's override stands.
   committeeStandsIn?: boolean
 }
 

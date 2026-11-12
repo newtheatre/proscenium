@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
   const held = await shiftDetail(id)
   if (!held) throw noSuch('shift')
 
-  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
+  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsRota(event)])
   const moduleId = rules[held.role]
   const today = londonToday()
   const tonight = showNightOpensAt(currentShowNight())

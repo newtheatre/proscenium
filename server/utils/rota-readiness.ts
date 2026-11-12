@@ -6,7 +6,7 @@ import { holdsGate, shiftGate } from './rota'
 import { cardFiled } from './venue-emergency'
 import { londonParts } from '#shared/utils/london'
 import { SHIFT_ROLES } from '#shared/utils/rota'
-import { barOverrideStands } from '#shared/utils/rota-eligibility'
+import { committeeOverrideStands } from '#shared/utils/rota-eligibility'
 import { currentShowNight } from '#shared/utils/show-night'
 import { eligibilityStanding } from '#shared/utils/rota-readiness'
 import type { SystemCheck } from '#shared/utils/checklist'
@@ -34,9 +34,9 @@ export async function shiftRoleRules(event?: H3Event): Promise<Record<ShiftRole,
   return { DUTY_MANAGER, DOOR, BAR }
 }
 
-// Whether a committee role stands in for the bar module tonight, read once per request (0259).
-export async function committeeStaffsBar(event?: H3Event): Promise<boolean> {
-  return barOverrideStands(await configValue(event, 'BAR_SHIFT_COMMITTEE_UNTIL'), currentShowNight())
+// Whether a committee role stands in for every role's training tonight, read once per request (0263).
+export async function committeeStaffsRota(event?: H3Event): Promise<boolean> {
+  return committeeOverrideStands(await configValue(event, 'SHIFT_COMMITTEE_UNTIL'), currentShowNight())
 }
 
 export function gatingModulesQuery(ids: readonly string[]): SQL {
@@ -58,14 +58,14 @@ export async function gatingModules(named: readonly (string | null)[]): Promise<
 }
 
 export async function roleEligibilities(event?: H3Event): Promise<RoleEligibility[]> {
-  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsBar(event)])
+  const [rules, standsIn] = await Promise.all([shiftRoleRules(event), committeeStaffsRota(event)])
   const modules = await gatingModules(Object.values(rules))
 
   return SHIFT_ROLES.map((role) => {
     const moduleId = rules[role]
     const held = moduleId === null ? undefined : modules.get(moduleId)
     const line: RoleEligibility = { role, moduleId, moduleName: held?.name ?? null, standing: eligibilityStanding(moduleId, held?.status ?? null) }
-    return role === 'BAR' && standsIn ? { ...line, committeeStandsIn: true } : line
+    return standsIn ? { ...line, committeeStandsIn: true } : line
   })
 }
 

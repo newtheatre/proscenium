@@ -8,8 +8,8 @@ import { testVenue, tonightsPerformance } from '#tests/helpers/programme'
 import type { TestDatabase } from '#tests/helpers/database'
 import type { SQL } from 'drizzle-orm'
 
-// Decision 0259 against the real migrations: while the override stands, a live committee role
-// stands in for the bar module in every write that confirms somebody on a bar slot.
+// Decisions 0259 and 0263 against the real migrations: while the override stands, a live committee
+// role stands in for a role's training in every write that confirms somebody on a shift.
 
 const NOW = Math.floor(Date.now() / 1000)
 const DAY = 86_400
@@ -69,12 +69,12 @@ const STANDINGS = [
   ['a Committee role that has lapsed', { role: 'COMMITTEE', expiresAt: NOW - DAY }, 0],
 ] as const
 
-describe('the gate carries the committee alternative for the bar alone, and only while it stands', () => {
-  test('only a bar gate built while the override stands', () => {
+describe('the gate carries the committee alternative for every role, and only while it stands', () => {
+  test('a gate built while the override stands, for any role', () => {
     expect(standing.committeeInsteadAt).toBe(NOW)
     expect(ended.committeeInsteadAt).toBeUndefined()
-    expect(shiftGate('DOOR', 'ADMN-103', TODAY, NOW, true).committeeInsteadAt).toBeUndefined()
-    expect(shiftGate('DUTY_MANAGER', 'ADMN-201', TODAY, NOW, true).committeeInsteadAt).toBeUndefined()
+    expect(shiftGate('DOOR', 'ADMN-103', TODAY, NOW, true).committeeInsteadAt).toBe(NOW)
+    expect(shiftGate('DUTY_MANAGER', 'ADMN-201', TODAY, NOW, true)).toMatchObject({ committeeAt: NOW, committeeInsteadAt: NOW })
   })
 })
 
@@ -122,14 +122,55 @@ describe('a performance\'s bar shift while the override stands (0259)', () => {
       expect(run(database, claimShiftStatement(`${tonight.performanceId}-BAR`, committee, 'CONFIRMED', unnamed))).toHaveLength(1)
     })
   })
+})
 
-  test('a door shift still asks the committee member for its training', async () => {
+describe('a door and a duty manager shift while the override stands (0263)', () => {
+  const DOOR = 'ADMN-103'
+  const DUTY = 'ADMN-201'
+
+  test.each(STANDINGS)('an untrained member holding %s claims a door shift', async (_, grant, written) => {
     await withDatabase((database) => {
       const tonight = tonightsPerformance(database)
-      const claimant = member(database, 'door', { role: 'COMMITTEE' })
+      const claimant = member(database, 'door', grant)
       const shiftId = openShift(database, tonight.performanceId, 'DOOR')
 
-      expect(run(database, claimShiftStatement(shiftId, claimant, 'CONFIRMED', shiftGate('DOOR', 'ADMN-103', TODAY, NOW, true)))).toHaveLength(0)
+      expect(run(database, claimShiftStatement(shiftId, claimant, 'CONFIRMED', shiftGate('DOOR', DOOR, TODAY, NOW, true)))).toHaveLength(written)
+    })
+  })
+
+  test.each(STANDINGS)('an officer assigns an untrained member holding %s as duty manager', async (_, grant, written) => {
+    await withDatabase((database) => {
+      const tonight = tonightsPerformance(database)
+      const officer = member(database, 'officer', { role: 'FOH_MANAGER' })
+      const assignee = member(database, 'assignee', grant)
+      const shiftId = openShift(database, tonight.performanceId, 'DUTY_MANAGER')
+
+      expect(run(database, assignShiftStatement(shiftId, assignee, officer, shiftGate('DUTY_MANAGER', DUTY, TODAY, NOW, true)))).toHaveLength(written)
+    })
+  })
+
+  // The committee role is an alternative to the whole gate, never a way round its committee half.
+  test('a member off the committee who holds the duty manager module is still refused', async () => {
+    await withDatabase((database) => {
+      const tonight = tonightsPerformance(database)
+      const claimant = member(database, 'trained-dm')
+      database.batch([
+        ['INSERT OR IGNORE INTO modules (id, department, kind, name) VALUES (?, ?, ?, ?)', DUTY, 'ADMN', 'MODULE', 'Committee Operations and Governance'],
+        [`INSERT INTO training_records (id, user_id, module_id, awarded_on, source) VALUES (?, ?, ?, '2026-08-21', 'SIGNOFF')`, 'tr-dm', claimant, DUTY],
+      ])
+      const shiftId = openShift(database, tonight.performanceId, 'DUTY_MANAGER')
+
+      expect(run(database, claimShiftStatement(shiftId, claimant, 'CONFIRMED', shiftGate('DUTY_MANAGER', DUTY, TODAY, NOW, true)))).toHaveLength(0)
+    })
+  })
+
+  test('once it has ended, an untrained committee member is refused both', async () => {
+    await withDatabase((database) => {
+      const tonight = tonightsPerformance(database)
+      const claimant = member(database, 'committee', { role: 'COMMITTEE' })
+
+      expect(run(database, claimShiftStatement(openShift(database, tonight.performanceId, 'DOOR'), claimant, 'CONFIRMED', shiftGate('DOOR', DOOR, TODAY, NOW, false)))).toHaveLength(0)
+      expect(run(database, claimShiftStatement(openShift(database, tonight.performanceId, 'DUTY_MANAGER'), claimant, 'CONFIRMED', shiftGate('DUTY_MANAGER', DUTY, TODAY, NOW, false)))).toHaveLength(0)
     })
   })
 })

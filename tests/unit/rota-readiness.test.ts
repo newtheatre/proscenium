@@ -90,11 +90,16 @@ describe('the readiness card says each role in words an officer without settings
   })
 })
 
-// 0259: the card says the bar is open to the committee while the override stands.
-describe('the readiness card names the committee bar override while it stands', () => {
+// 0263: the card says each role is open to the committee while the override stands.
+describe('the readiness card names the committee override while it stands', () => {
   test('beside a published module', () => {
     expect(saysEligibility({ role: 'BAR', moduleId: 'ADMN-102', moduleName: 'Selling Alcohol', standing: 'SET', committeeStandsIn: true }))
-      .toBe('Unlocked by Selling Alcohol (ADMN-102), or for now by a committee role.')
+      .toBe('Unlocked by Selling Alcohol (ADMN-102), or for now by a committee role alone.')
+  })
+
+  test('beside a duty manager\'s module and committee role', () => {
+    expect(saysEligibility({ role: 'DUTY_MANAGER', moduleId: 'ADMN-201', moduleName: 'Committee Operations', standing: 'SET', committeeStandsIn: true }))
+      .toBe('Unlocked by Committee Operations (ADMN-201) and a committee role, or for now by a committee role alone.')
   })
 
   test('in place of a module that admits nobody', () => {

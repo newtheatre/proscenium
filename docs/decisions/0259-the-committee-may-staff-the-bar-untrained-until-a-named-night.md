@@ -1,6 +1,7 @@
 # 0259: The committee may staff the bar untrained until a named night
 
 - Status: Proposed
+- Superseded by 0263
 - Date: 2026-11-11
 - Amends: E-103 (who a bar shift is offered to) and 0210 (what the gate admits), for as long as
   `BAR_SHIFT_COMMITTEE_UNTIL` stands; extends 0115's reading of "a committee role"

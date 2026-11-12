@@ -26,7 +26,7 @@ export interface RoleEligibility {
   moduleId: string | null
   moduleName: string | null
   standing: EligibilityStanding
-  // A committee role admits in place of the module, set for the bar while 0259's override stands.
+  // A committee role admits in place of the module, while 0263's override stands.
   committeeStandsIn?: boolean
 }
 
@@ -45,7 +45,9 @@ function saysModule(line: RoleEligibility): string {
 export function saysEligibility(line: RoleEligibility): string {
   const shift = `${saysShiftRole(line.role).toLowerCase()} shift`
   if (line.committeeStandsIn) {
-    return line.standing === 'SET' ? `Unlocked by ${saysModule(line)}, or for now by a committee role.` : 'For now, unlocked by a committee role alone.'
+    if (line.standing !== 'SET') return 'For now, unlocked by a committee role alone.'
+    const usual = needsCommitteeRole(line.role) ? `${saysModule(line)} and a committee role` : saysModule(line)
+    return `Unlocked by ${usual}, or for now by a committee role alone.`
   }
   switch (line.standing) {
     case 'SET': return needsCommitteeRole(line.role) ? `Unlocked by ${saysModule(line)} and a committee role.` : `Unlocked by ${saysModule(line)}.`

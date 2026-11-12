@@ -981,6 +981,13 @@
       "when": 1794422534947,
       "tag": "0139_a_pass_admits_once_per_show_or_performance",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "6",
+      "when": 1794423534947,
+      "tag": "0140_the_committee_override_covers_every_rota_role",
+      "breakpoints": true
     }
   ]
 }
