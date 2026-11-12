@@ -62,6 +62,9 @@ export const passes = sqliteTable('passes', {
   // reprices a pass already sold (the same rule D-120 applies to tickets).
   pricePaid: integer('price_paid').notNull(),
   status: text('status').notNull().default('ACTIVE'),
+  // False while chosen online and owed at the till (0261): a column, since a status value is a
+  // rebuild that would drop the append-only `pass_admissions`. `price_paid` is then the price owed.
+  paid: integer('paid', { mode: 'boolean' }).notNull().default(true),
   // NULL only on a pass the import reconstructed from an old sale or admission, whose issuer the
   // old estate never recorded (0073); every pass issued here names the officer who issued it.
   issuedBy: text('issued_by').references(() => users.id, { onDelete: 'restrict' }),

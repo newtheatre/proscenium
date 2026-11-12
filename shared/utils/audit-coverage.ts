@@ -226,6 +226,11 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/routes/passes/[token].get.ts', exempt: 'exchanges a token for a cookie; nothing is written' },
   { route: 'server/routes/passes/[token]/image.png.get.ts', exempt: 'renders the pass QR as a PNG for the email; nothing is written' },
   {
+    route: 'server/api/passes/choose.post.ts',
+    actions: ['pass.chosen', 'pass.redeemed', 'account.created.guest'],
+    via: ['server/utils/pass-choice.ts', 'server/utils/pass-redemption.ts', 'server/utils/reservations.ts'],
+  },
+  {
     route: 'server/api/passes/[id]/redeem.post.ts',
     actions: ['pass.redeemed'],
     via: ['server/utils/pass-redemption.ts'],
@@ -661,12 +666,13 @@ export const AUDIT_COVERAGE: Coverage[] = [
   { route: 'server/api/till/price.post.ts', exempt: 'prices a basket against live prices; nothing is written until F-104 and F-105 land the sale write' },
   {
     route: 'server/api/till/sale.post.ts',
-    actions: ['bar.till.sale', 'age-check.logged', 'bar.tab.cap-overridden', 'reservation.collected', 'account.created.guest'],
-    via: ['server/utils/sale.ts', 'server/utils/reservations.ts'],
+    actions: ['bar.till.sale', 'age-check.logged', 'bar.tab.cap-overridden', 'reservation.collected', 'account.created.guest', 'pass.paid'],
+    via: ['server/utils/sale.ts', 'server/utils/reservations.ts', 'server/utils/till-pass.ts'],
   },
   { route: 'server/api/till/bookings/index.get.ts', exempt: 'reads a booking for the Tickets tab, writing nothing' },
   { route: 'server/api/till/bookings/scan.post.ts', exempt: 'resolves a scanned code to a booking, writing nothing' },
   { route: 'server/api/till/walk-up-options.get.ts', exempt: 'reads what a walk-up may be sold as, writing nothing' },
+  { route: 'server/api/till/passes/[id]/drop.post.ts', actions: ['pass.dropped'], via: ['server/utils/pass-choice.ts'] },
   { route: 'server/api/till/passes.get.ts', exempt: 'reads what season pass may be sold tonight, writing nothing' },
   { route: 'server/api/till/payments/index.post.ts', actions: ['bar.sumup.started'], via: ['server/utils/sumup-attempts.ts'] },
   { route: 'server/api/till/payments/index.get.ts', exempt: 'reads tonight\'s unresolved SumUp hand-offs, writing nothing' },

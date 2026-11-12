@@ -1,4 +1,5 @@
 import { PASS_TERMS_PATH } from '#shared/utils/passes'
+import { saysPrice } from '#shared/utils/ticket-types'
 import { saysDayRange } from '#shared/utils/when'
 import { notify } from './notify'
 import { passCoveredShows, passCurrentState } from './passes'
@@ -39,6 +40,7 @@ export async function sendPassIssued(event: H3Event | undefined, context: PassCo
       termsUrl: `${baseURL}${PASS_TERMS_PATH}`,
       valid: pass ? saysDayRange(pass.validFrom, pass.validUntil) : '',
       shows: shows.join(', '),
+      owed: pass && !pass.paid ? saysPrice(pass.pricePaid) : '',
     },
   })
 }

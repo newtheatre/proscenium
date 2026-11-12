@@ -214,11 +214,11 @@ export async function passTypeBySlug(slug: string, exceptId?: string): Promise<P
   return row ? read(row) : undefined
 }
 
-// D-124 criterion 4: the cap is asked at the statement that issues, over the same "not
-// cancelled" count `sellablePassTypes()` shows, never a count read earlier and trusted.
+// D-124 criterion 4: the cap is asked at the statement that issues, over the same paid, not
+// cancelled count `sellablePassTypes()` shows; an unpaid pass holds no place (0261).
 export function passCapAllows(passTypeId: string, maxIssued: number | null): SQL {
   if (maxIssued === null) return sql`1 = 1`
-  return sql`(SELECT count(*) FROM passes WHERE pass_type_id = ${passTypeId} AND status != 'CANCELLED') < ${maxIssued}`
+  return sql`(SELECT count(*) FROM passes WHERE pass_type_id = ${passTypeId} AND status != 'CANCELLED' AND paid = 1) < ${maxIssued}`
 }
 
 // A new pass type's price points and covered shows, each gated on the create's own entry, so a

@@ -1,4 +1,5 @@
 import { notify } from './notify'
+import { unpaidPassForReservation } from './pass-redemption'
 import { qrPng } from './qr'
 import { bookingGuidance, referenceShowScope } from './whats-on'
 import { holdExpiresAtByReference, namedTicketLines, reservationCurrentState, reservationIdByReference } from './reservations'
@@ -58,10 +59,11 @@ async function arrivalContext(reference: string): Promise<Record<string, unknown
 // template with the same QR rather than a second, driftable copy (D-108 criteria 1, 2).
 export async function sendReservationConfirmation(event: H3Event | undefined, context: ConfirmationContext): Promise<void> {
   // The e-ticket carries the show's guidance from the rows the show page reads (D-102 criterion 4).
-  const [shown, holdExpiresAt, arrival] = await Promise.all([
+  const [shown, holdExpiresAt, arrival, pass] = await Promise.all([
     bookingGuidance(referenceShowScope(context.reference)),
     holdExpiresAtByReference(context.reference),
     arrivalContext(context.reference),
+    reservationIdByReference(context.reference).then(id => (id ? unpaidPassForReservation(id) : undefined)),
   ])
   await notify(event, {
     userId: context.userId,
@@ -74,6 +76,8 @@ export async function sendReservationConfirmation(event: H3Event | undefined, co
       totalDue: saysPrice(context.totalPence),
       // A pass booking owes nothing, so it never reads "£0.00 is due" (issue 1390).
       nothingDue: nothingToCollect(holdExpiresAt, context.totalPence),
+      // The seat stands on a pass still owed (0261), so the pass's price is what is due.
+      passDue: pass ? `${pass.passTypeName} (${pass.priceLabel}, ${saysPrice(pass.pricePence)})` : '',
       ...bookingLink(event, context.qrToken),
       guidance: shown?.lines ?? [],
       showUrl: shown?.slug ? `${useRuntimeConfig(event).public.baseURL}/shows/${shown.slug}` : null,

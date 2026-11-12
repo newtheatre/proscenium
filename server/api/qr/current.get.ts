@@ -21,10 +21,11 @@ export default defineEventHandler(async (event) => {
   // Guidance is for somebody still coming, from the rows the show page reads (D-102 criterion 4):
   // a cancelled, lapsed, exchanged or already admitted booking is told nothing.
   const coming = reservation.status === 'PENDING' || reservation.status === 'COLLECTED'
-  const [ticketLines, shown, refundedPence] = await Promise.all([
+  const [ticketLines, shown, refundedPence, unpaidPass] = await Promise.all([
     namedTicketLines(reservationId),
     bookingGuidance(referenceShowScope(reservation.reference)),
     refundedPenceFor(reservationId),
+    reservation.status === 'PENDING' ? unpaidPassForReservation(reservationId) : undefined,
   ])
   const guidance = coming ? shown : null
 
@@ -37,7 +38,8 @@ export default defineEventHandler(async (event) => {
     // The page offers no change, exchange or cancel on a pass booking (issue 1390).
     passBooking: reservation.passBooking === 1,
     when: formatLondon(new Date(reservation.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }),
-    totalDue: saysTotalDue(reservation.status, reservation.holdExpiresAt, reservation.totalPence),
+    // A seat on a pass still owed: the pass's price is what is due, at the till (0261).
+    totalDue: unpaidPass ? `${saysPrice(unpaidPass.pricePence)} for the ${unpaidPass.passTypeName}` : saysTotalDue(reservation.status, reservation.holdExpiresAt, reservation.totalPence),
     refunded: refundedPence > 0 ? saysPrice(refundedPence) : null,
     qrSvg: qrSvgBase64(url),
     lines: ticketLines,

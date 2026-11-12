@@ -1,6 +1,7 @@
 import { db } from '@nuxthub/db'
 import { sql } from 'drizzle-orm'
 import { heldSeatsForReservation } from './capacity'
+import { unpaidPassForReservation } from './pass-redemption'
 import { uncollectableReason } from '#shared/utils/desk'
 import { looksLikeReference } from '#shared/utils/reservations'
 import type { SQL } from 'drizzle-orm'
@@ -75,12 +76,34 @@ function shape(row: TillBookingRow, tonightPerformanceIds: readonly string[]): T
     partySize: Number(row.partySize),
     owedPence: Number(row.owedPence),
     refusal: uncollectableReason(row.status),
+    unpaidPass: null,
   }
+}
+
+// One booking at a time over a short page (0006): the pass its seat stands on, while owed (D-140).
+async function withUnpaidPass(booking: TillBooking): Promise<TillBooking> {
+  if (booking.status !== 'PENDING') return booking
+  const pass = await unpaidPassForReservation(booking.id)
+  return pass ? { ...booking, unpaidPass: pass } : booking
+}
+
+// The pass's own QR at the till (D-140 criterion 1): its booking among tonight's, if it has one.
+export async function tillBookingOnPass(passId: string, tonightPerformanceIds: readonly string[]): Promise<TillBooking | undefined> {
+  for (const performanceId of tonightPerformanceIds) {
+    const [row] = await db.all<TillBookingRow>(sql`
+      SELECT ${BOOKING_COLUMNS} ${BOOKING_FROM}
+      JOIN tickets k ON k.reservation_id = r.id
+      JOIN pass_admissions a ON a.ticket_id = k.id
+      WHERE a.pass_id = ${passId} AND r.performance_id = ${performanceId}
+    `)
+    if (row) return withUnpaidPass(shape(row, tonightPerformanceIds))
+  }
+  return undefined
 }
 
 export async function tillBookingById(id: string, tonightPerformanceIds: readonly string[]): Promise<TillBooking | undefined> {
   const [row] = await db.all<TillBookingRow>(tillBookingByIdQuery(id))
-  return row ? shape(row, tonightPerformanceIds) : undefined
+  return row ? withUnpaidPass(shape(row, tonightPerformanceIds)) : undefined
 }
 
 // A reference finds the booking wherever its performance is, so an advance payment for another
@@ -89,12 +112,12 @@ export async function findTillBookings(q: string, tonightPerformanceIds: readonl
   const trimmed = q.trim()
   if (looksLikeReference(trimmed)) {
     const [row] = await db.all<TillBookingRow>(tillBookingByReferenceQuery(trimmed))
-    return row ? [shape(row, tonightPerformanceIds)] : []
+    return row ? [await withUnpaidPass(shape(row, tonightPerformanceIds))] : []
   }
   const found: TillBooking[] = []
   for (const performanceId of tonightPerformanceIds) {
     const rows = await db.all<TillBookingRow>(tillBookingsByNameQuery(performanceId, trimmed))
-    found.push(...rows.map(row => shape(row, tonightPerformanceIds)))
+    for (const row of rows) found.push(await withUnpaidPass(shape(row, tonightPerformanceIds)))
   }
   return found
 }

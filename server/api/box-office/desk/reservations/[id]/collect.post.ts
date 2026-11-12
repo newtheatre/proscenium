@@ -1,5 +1,6 @@
 import { collectForm, uncollectableReason } from '#shared/utils/desk'
 import { passCollectReason } from '#shared/utils/reservations'
+import { unpaidPassSays } from '#shared/utils/passes'
 
 // The payment boundary (criterion 2): the reader is paid from the figure this route refuses to
 // let drift from what the server actually charges (criterion 3, D-104 criterion 1 for tickets).
@@ -14,6 +15,9 @@ export default defineEventHandler(async (event) => {
   const refusal = uncollectableReason(reservation.status)
     ?? passCollectReason(reservation.holdExpiresAt, reservation.tickets.reduce((total, ticket) => total + ticket.pricePaid, 0))
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
+  // The seat is the pass's, and the till takes the pass's price (D-140, 0261), never a zero collect.
+  const unpaidPass = await unpaidPassForReservation(id)
+  if (unpaidPass) throw createError({ statusCode: 409, statusMessage: unpaidPassSays(unpaidPass.pricePence) })
 
   const expiryMinutes = await configValue(event, 'COMP_REQUEST_EXPIRY_MINUTES')
   let compRequest = null

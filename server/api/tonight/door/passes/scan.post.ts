@@ -1,5 +1,5 @@
-import { doorPassScanForm } from '#shared/utils/passes'
 import { saysAlreadyAdmitted } from '#shared/utils/reservations'
+import { doorPassScanForm, unpaidPassSays } from '#shared/utils/passes'
 
 // Scan a pass at the door (D-126). Admits in one gesture if it is already redeemed for tonight;
 // offers to redeem it on the spot, capacity-checked, if it is not (criterion 1).
@@ -12,6 +12,8 @@ export default defineEventHandler(async (event) => {
 
   const state = await passRedemptionStateByReference(input.reference, performance.showId)
   if (!state) throw noSuch('pass')
+  // Chosen online and still owed (D-139 criterion 3, 0261): paid at the till before it admits.
+  if (state.paid === 0) throw createError({ statusCode: 409, statusMessage: unpaidPassSays(state.pricePaid) })
 
   const existing = await admissionForPerformance(state.id, input.performanceId)
   if (existing) {

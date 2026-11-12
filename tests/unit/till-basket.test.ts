@@ -628,7 +628,13 @@ describe('a season pass in the basket is charged on the reader with everything e
 
   test('the sale names the pass and the buyer by email, and a name only for a new buyer (D-138)', () => {
     const { basket, scope } = setup([aProduct()], { passLine: ref(aPass()) })
-    expect(basket.saleBody(null, 4500).pass).toEqual({ passTypeId: 'pt-1', passTypePriceId: 'price-1', email: 'buyer@example.invalid', name: null })
+    expect(basket.saleBody(null, 4500).pass).toEqual({ passTypeId: 'pt-1', passTypePriceId: 'price-1', email: 'buyer@example.invalid', name: null, passId: null })
+    scope.stop()
+  })
+
+  test('a pass chosen online is named by its id, with no email typed (D-140 criterion 1)', () => {
+    const { basket, scope } = setup([aProduct()], { passLine: ref({ ...aPass(), email: '', passId: 'pass-9', holderName: 'Holder' }) })
+    expect(basket.saleBody(null, 4500).pass).toEqual({ passTypeId: 'pt-1', passTypePriceId: 'price-1', email: null, name: null, passId: 'pass-9' })
     scope.stop()
   })
 

@@ -92,6 +92,22 @@ export const redeemPassForm = z.strictObject({
   performanceId: z.string().trim().min(1, 'Say which performance you mean'),
 })
 
+// D-139 criterion 1 (0261): a price point of a pass on offer, and who holds it when signed out.
+export const choosePassForm = z.strictObject({
+  performanceId: z.string().trim().min(1, 'Say which performance you mean'),
+  passTypePriceId: z.string().trim().min(1, 'Choose one of the pass\'s prices'),
+  guest: passGuestBuyer.optional(),
+})
+
+export type ChoosePassInput = z.output<typeof choosePassForm>
+
+// The door's and the desk's refusal of a seat on an unpaid pass (0261), with the figure owed.
+export function unpaidPassSays(pricePence: number): string {
+  return `This pass is not paid for yet: ${saysPrice(pricePence)} is due at the till first. Paying for it lets every booking on it in.`
+}
+
+export const PASS_ALREADY_ON_ADDRESS_SAYS = 'A pass of this kind is already on that email address. Open the link in its email, or ask for it to be sent again from the passes page, and book with it.'
+
 // D-138 criterion 4: an address alone, answered the same whatever it holds.
 export const passResendForm = z.strictObject({
   email: z.string().trim().email('Enter a real email address').max(320),

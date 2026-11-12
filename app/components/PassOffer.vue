@@ -1,36 +1,49 @@
 <script setup lang="ts">
-import { PASS_TERMS_PATH, saysPassOffer, saysPayAtDesk } from '#shared/utils/passes'
-import { withNext } from '#shared/utils/sign-in'
+import { PASS_TERMS_PATH, saysPassOffer } from '#shared/utils/passes'
+import { saysPrice } from '#shared/utils/ticket-types'
 import type { PassOffer } from '#shared/utils/passes'
 
-// D-133: the season pass offered beside a booking. Asking moves no money and reserves nothing
-// (0005); a guest is sent to make an account first, since a pass always needs one.
+// D-139 (0261): a season pass chosen while booking, signed in or not. The seat goes on the pass and
+// both are held; the pass is paid for at the till the first night (0005), never here.
 const props = defineProps<{
   offers: PassOffer[]
   signedIn: boolean
-  returnTo: string
+  performanceId: string
 }>()
 
-const toast = useToast()
-const asked = ref<string[]>([])
-const asking = ref<string | null>(null)
+const emit = defineEmits<{ chosen: [emailedTo: string | null] }>()
+
+const priceIds = ref<Record<string, string | undefined>>({})
+const name = ref('')
+const email = ref('')
+const choosing = ref<string | null>(null)
 const failure = ref<string | null>(null)
 
-const isAsked = (offer: PassOffer): boolean => offer.requested || asked.value.includes(offer.id)
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const detailsReady = computed(() => props.signedIn || (name.value.trim() !== '' && EMAIL.test(email.value.trim())))
 
-async function ask(offer: PassOffer): Promise<void> {
-  asking.value = offer.id
+function priceItems(offer: PassOffer): { label: string, value: string }[] {
+  return offer.prices.map(price => ({ label: `${price.label} · ${saysPrice(price.price)}`, value: price.id }))
+}
+
+async function choose(offer: PassOffer): Promise<void> {
+  const passTypePriceId = priceIds.value[offer.id] ?? (offer.prices.length === 1 ? offer.prices[0]!.id : undefined)
+  if (!passTypePriceId) {
+    failure.value = 'Choose which price applies to you first.'
+    return
+  }
+  choosing.value = offer.id
   failure.value = null
   try {
-    await $fetch('/api/account/passes/request', { method: 'POST', body: { passTypeId: offer.id } })
-    asked.value.push(offer.id)
-    toast.add({ title: `${offer.name} requested`, icon: 'i-lucide-check', color: 'success' })
+    const guest = props.signedIn ? undefined : { name: name.value.trim(), email: email.value.trim() }
+    await $fetch('/api/passes/choose', { method: 'POST', body: { performanceId: props.performanceId, passTypePriceId, guest } })
+    emit('chosen', guest?.email ?? null)
   }
   catch (error) {
     failure.value = refusalText(error)
   }
   finally {
-    asking.value = null
+    choosing.value = null
   }
 }
 </script>
@@ -46,6 +59,10 @@ async function ask(offer: PassOffer): Promise<void> {
       </h2>
     </template>
 
+    <p class="mb-4 text-sm text-muted">
+      Book this seat on a season pass instead. Nothing is paid now: you pay for the pass at the till the first night you come, and it covers the rest.
+    </p>
+
     <UAlert
       v-if="failure"
       class="mb-4"
@@ -54,6 +71,27 @@ async function ask(offer: PassOffer): Promise<void> {
       :description="failure"
       data-test="pass-offer-notice"
     />
+
+    <div
+      v-if="!props.signedIn"
+      class="mb-4 grid gap-2 sm:grid-cols-2"
+    >
+      <UInput
+        v-model="name"
+        autocomplete="name"
+        placeholder="Your name"
+        aria-label="Your name, for the pass"
+        data-test="pass-offer-name"
+      />
+      <UInput
+        v-model="email"
+        type="email"
+        autocomplete="email"
+        placeholder="Your email"
+        aria-label="Your email, for the pass"
+        data-test="pass-offer-email"
+      />
+    </div>
 
     <ul class="space-y-4 text-sm">
       <li
@@ -71,47 +109,22 @@ async function ask(offer: PassOffer): Promise<void> {
         >
           {{ offer.description }}
         </p>
-        <p
-          v-if="isAsked(offer)"
-          class="text-muted"
-          :data-test="`pass-offer-asked-${offer.id}`"
+        <URadioGroup
+          v-if="offer.prices.length > 1"
+          v-model="priceIds[offer.id]"
+          :items="priceItems(offer)"
+          :data-test="`pass-offer-prices-${offer.id}`"
+        />
+        <UButton
+          size="sm"
+          variant="subtle"
+          :loading="choosing === offer.id"
+          :disabled="!detailsReady || offer.prices.length === 0"
+          :data-test="`pass-offer-choose-${offer.id}`"
+          @click="choose(offer)"
         >
-          You have asked for this pass. {{ saysPayAtDesk(offer.prices) }} when you arrive.
-        </p>
-        <div
-          v-else-if="props.signedIn"
-          class="flex flex-wrap items-center gap-3"
-        >
-          <UButton
-            size="sm"
-            variant="subtle"
-            :loading="asking === offer.id"
-            :data-test="`pass-offer-ask-${offer.id}`"
-            @click="ask(offer)"
-          >
-            Ask for this pass
-          </UButton>
-          <span class="text-muted">Nothing to pay now. {{ saysPayAtDesk(offer.prices) }} when you arrive.</span>
-        </div>
-        <div
-          v-else
-          class="flex flex-wrap items-center gap-3"
-          :data-test="`pass-offer-guest-${offer.id}`"
-        >
-          <UButton
-            size="sm"
-            variant="subtle"
-            :to="withNext('/register', props.returnTo)"
-          >
-            Create an account to ask for it
-          </UButton>
-          <NuxtLink
-            class="text-muted underline"
-            :to="withNext('/sign-in', props.returnTo)"
-          >
-            or sign in
-          </NuxtLink>
-        </div>
+          Book this seat on the {{ offer.name }}
+        </UButton>
       </li>
     </ul>
     <p class="mt-4 text-xs text-muted">

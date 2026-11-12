@@ -29,6 +29,13 @@ const priceId = defineModel<string | undefined>('priceId')
       Type their email address; the pass and its QR are emailed there, and they need no account. Add their name if they have never booked with us.
     </p>
     <UAlert
+      v-if="inBasket?.passId"
+      color="info"
+      variant="subtle"
+      :description="`Taking ${inBasket.holderName ? `${inBasket.holderName}'s` : 'their'} chosen pass: pick another price or pass below to change it before charging.`"
+      data-test="till-pass-settling"
+    />
+    <UAlert
       v-if="failure"
       color="warning"
       variant="subtle"

@@ -820,7 +820,7 @@ export async function commitSale(
     if (error instanceof Error && error.message.includes('stock_movements_sale_exceeds_on_hand')) {
       throw createError({ statusCode: 409, statusMessage: NOT_ENOUGH_STOCK })
     }
-    if (pass && passCapRaised(error)) throw createError({ statusCode: 409, statusMessage: passCapSays(pass.maxIssued) })
+    if (pass && passCapRaised(error)) throw createError({ statusCode: 409, statusMessage: passCapSays(pass.maxIssued, pass.settle) })
     if (error instanceof Error) {
       const refusal = ageCheckConstraintRefusal(error)
       if (refusal) throw createError(refusal)

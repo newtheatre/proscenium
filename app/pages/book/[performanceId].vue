@@ -241,6 +241,12 @@ async function redeemPass(): Promise<void> {
   }
 }
 
+// D-139: the seat is booked on the chosen pass, and the booking page's confirmation follows as usual.
+async function passChosen(emailedTo: string | null): Promise<void> {
+  made.value = { emailedTo: emailedTo ?? account.value.user?.email ?? null }
+  await navigateTo('/qr')
+}
+
 useSeoMeta({
   title: 'Book tickets',
   description: () => `Book seats for ${data.value?.show.title ?? 'a show'} at the Nottingham New Theatre. ${SAYS_PAYMENT}`,
@@ -364,7 +370,8 @@ useSeoMeta({
         <PassOffer
           :offers="data!.passOffers"
           :signed-in="account.signedIn"
-          :return-to="route.fullPath"
+          :performance-id="performanceId"
+          @chosen="passChosen"
         />
 
         <section

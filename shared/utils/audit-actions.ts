@@ -212,6 +212,11 @@ const CATALOGUE = {
   'pass.request.expired': { label: 'Pass request lapsed unfulfilled', module: 'ticketing' },
   // Not `self`: D-126 and D-130 both write this for an officer acting on somebody else's pass.
   'pass.redeemed': { label: 'Pass redeemed for a performance', module: 'ticketing' },
+  // D-139 and D-140 (0261): a pass chosen while booking, then paid for, dropped or lapsed.
+  'pass.chosen': { label: 'Pass chosen while booking, to pay at the till', module: 'ticketing' },
+  'pass.paid': { label: 'Chosen pass paid for at the till', module: 'ticketing' },
+  'pass.dropped': { label: 'Chosen pass dropped at the till unpaid', module: 'ticketing' },
+  'pass.lapsed': { label: 'Chosen pass lapsed unpaid', module: 'ticketing' },
   'tickets.exported': { label: 'Ticket export downloaded', module: 'ticketing' },
   'ticketing.comp-request.created': { label: 'Ticket comp requested at the desk', module: 'ticketing' },
   'ticketing.comp-request.approved': { label: 'Ticket comp request approved', module: 'ticketing' },
