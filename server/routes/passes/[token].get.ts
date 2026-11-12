@@ -5,6 +5,6 @@ export default defineEventHandler(async (event) => {
   const passId = await verifyPassQrToken(token)
   if (!passId) return sendRedirect(event, '/passes?refused=invalid')
 
-  rememberPassQrToken(event, token)
+  await rememberPassQrToken(event, token)
   return sendRedirect(event, '/passes')
 })

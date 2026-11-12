@@ -43,10 +43,15 @@ export default defineEventHandler(async (event) => {
     : ticketTypes.filter(type =>
         (type.accessKind !== 'ACCESS' || remaining.access > 0) && (type.accessKind !== 'COMPANION' || remaining.companion > 0))
 
-  // Offered automatically (D-125 criterion 1), same gate an ordinary ticket type sits behind:
-  // nothing is offered against a performance that is not on sale in the first place.
-  const redeemablePass = !refusal && account ? (await redeemablePassFor(account.id, id, performance.showId, now)) ?? null : null
-  const usedPass = !redeemablePass && account ? (await usedPassFor(account.id, id)) ?? null : null
+  // Offered automatically (D-125 criterion 1) behind an ordinary ticket type's gate; a signed-out
+  // visitor's passes are the ones this browser remembers (D-138 criterion 3).
+  const remembered = account ? [] : (await rememberedPasses(event)).map(one => one.passId)
+  const redeemablePass = refusal
+    ? null
+    : (account ? await redeemablePassFor(account.id, id, performance.showId, now) : await redeemableRememberedPass(remembered, id, performance.showId, now)) ?? null
+  const usedPass = redeemablePass
+    ? null
+    : (account ? await usedPassFor(account.id, id) : await usedRememberedPass(remembered, id)) ?? null
   // D-133: a holder is offered the pass they hold, never asked to buy another one.
   const passOffersHere = refusal || redeemablePass || usedPass ? [] : await passOffers(performance.showId, account?.id ?? null, now)
 

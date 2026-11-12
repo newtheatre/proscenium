@@ -152,11 +152,11 @@ A pass is valid between the dates stated on it, and only for performances within
 
 ### 7.5 How to buy a pass
 
-Passes are sold in person, at the box office or at the bar on a performance night, and paid for on the same card reader as tickets. You can also ask for a pass online, while booking or from your account, and pay for it when you arrive. You can also order a pass by emailing boxoffice@newtheatre.org.uk and pay for it on your first visit. Passes are not paid for online. A pass is attached to an NNT account in the holder's name and email address, so you need an account to buy one: if you do not have one, create it on the website first, which takes a minute. You will receive a confirmation email with your pass reference, your pass's QR code and a link to its page.
+Passes are sold in person, at the box office or at the bar on a performance night, and paid for on the same card reader as tickets. You can also ask for a pass online, while booking or from your account, and pay for it when you arrive. You can also order a pass by emailing boxoffice@newtheatre.org.uk and pay for it on your first visit. Passes are not paid for online. A pass is held in the holder's name and email address; you do not need an NNT account to buy or use one. You will receive a confirmation email with your pass reference, your pass's QR code and a link to its page.
 
 ### 7.6 Using a pass
 
-Signed in to your account, you can book a seat at any covered performance online at no charge, by choosing "Use my pass" when you book. At the theatre, show your pass's QR code, or give your name, email or pass reference at the box office, and you will be admitted if there is room. Each pass admits one person, once, to each performance. You may use your pass for the same production on more than one night.
+You can book a seat at any covered performance online at no charge, by choosing "Use my pass" when you book, either signed in to your account or on a device where you have opened the link in your pass email. At the theatre, show your pass's QR code, or give your name, email or pass reference at the box office, and you will be admitted if there is room. Each pass admits one person, once, to each performance. You may use your pass for the same production on more than one night.
 
 ### 7.7 Passes are personal and non-transferable
 
@@ -172,7 +172,7 @@ Passes are non-refundable once bought, except that if we cancel half or more of 
 
 ### 7.10 Lost pass details
 
-A pass is a record on your account, not a physical card, so there is nothing to lose. Signed in, you can open your pass from your account at any time. If you forget your pass reference, the box office can look it up by your name or email address.
+A pass is a record held against your email address, not a physical card, so there is nothing to lose. You can ask for your pass email again from the pass page on our website, or, signed in, open your pass from your account at any time. If you forget your pass reference, the box office can look it up by your name or email address.
 
 ## 8. NNT members
 

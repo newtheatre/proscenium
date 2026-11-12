@@ -97,12 +97,21 @@ const DISPLAY_NAME = sql`CASE WHEN t.slug = 'fellowship' THEN 'Pass' ELSE t.name
 // What a booking screen offers automatically (criterion 1): eligible and not already redeemed
 // for this performance. Oldest first, so a holder of more than one offers the one nearest lapsing.
 export function redeemablePassQuery(userId: string, performanceId: string, showId: string, now: number): SQL {
+  return redeemableQuery(sql`p.user_id = ${userId}`, performanceId, showId, now)
+}
+
+// D-138 criterion 3: one pass this browser remembers, asked the same question a holder's are.
+export function redeemableRememberedPassQuery(passId: string, performanceId: string, showId: string, now: number): SQL {
+  return redeemableQuery(sql`p.id = ${passId}`, performanceId, showId, now)
+}
+
+function redeemableQuery(holds: SQL, performanceId: string, showId: string, now: number): SQL {
   return sql`
     SELECT p.id AS id, p.reference AS reference, ${DISPLAY_NAME} AS passTypeName
     FROM passes p
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN users u ON u.id = p.user_id
-    WHERE p.user_id = ${userId}
+    WHERE ${holds}
       AND p.status = 'ACTIVE'
       AND t.status != 'CLOSED'
       AND t.valid_from <= ${now} AND t.valid_until >= ${now}
@@ -119,6 +128,15 @@ export async function redeemablePassFor(userId: string, performanceId: string, s
   return row
 }
 
+// One pass at a time, never an `IN` list, and at most four of them (0006, D-138 criterion 2).
+export async function redeemableRememberedPass(passIds: string[], performanceId: string, showId: string, now: number): Promise<RedeemablePass | undefined> {
+  for (const passId of passIds) {
+    const [row] = await db.all<RedeemablePass>(redeemableRememberedPassQuery(passId, performanceId, showId, now))
+    if (row) return row
+  }
+  return undefined
+}
+
 export interface UsedPass {
   reference: string
   passTypeName: string
@@ -127,6 +145,10 @@ export interface UsedPass {
 
 // A pass already used for this performance, so the booking screen says so rather than going quiet.
 export function usedPassQuery(userId: string, performanceId: string): SQL {
+  return usedQuery(sql`p.user_id = ${userId}`, performanceId)
+}
+
+function usedQuery(holds: SQL, performanceId: string): SQL {
   return sql`
     SELECT p.reference AS reference, ${DISPLAY_NAME} AS passTypeName, r.reference AS bookingReference
     FROM pass_admissions a
@@ -134,7 +156,7 @@ export function usedPassQuery(userId: string, performanceId: string): SQL {
     JOIN pass_types t ON t.id = p.pass_type_id
     JOIN tickets k ON k.id = a.ticket_id
     JOIN reservations r ON r.id = k.reservation_id
-    WHERE p.user_id = ${userId} AND a.performance_id = ${performanceId}
+    WHERE ${holds} AND a.performance_id = ${performanceId}
     ORDER BY a.admitted_at
     LIMIT 1
   `
@@ -143,6 +165,14 @@ export function usedPassQuery(userId: string, performanceId: string): SQL {
 export async function usedPassFor(userId: string, performanceId: string): Promise<UsedPass | undefined> {
   const [row] = await db.all<UsedPass>(usedPassQuery(userId, performanceId))
   return row
+}
+
+export async function usedRememberedPass(passIds: string[], performanceId: string): Promise<UsedPass | undefined> {
+  for (const passId of passIds) {
+    const [row] = await db.all<UsedPass>(usedQuery(sql`p.id = ${passId}`, performanceId))
+    if (row) return row
+  }
+  return undefined
 }
 
 // What a lost race quotes (criterion 2): read after the write already decided.

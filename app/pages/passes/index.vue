@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { PASS_TERMS_PATH, saysPassStatus } from '#shared/utils/passes'
-import { withNext } from '#shared/utils/sign-in'
 import { saysDayRange } from '#shared/utils/when'
 import type { PassStatus } from '#shared/utils/passes'
 
@@ -42,6 +41,30 @@ const statusColor: Record<string, 'success' | 'neutral' | 'error'> = {
   ACTIVE: 'success',
   CANCELLED: 'error',
   EXPIRED: 'neutral',
+}
+
+// D-138 criterion 4: a new device asks for the email again; the answer never says what was found.
+const resendEmail = ref('')
+const resendSays = ref<string | null>(null)
+const resending = ref(false)
+async function resend(): Promise<void> {
+  resending.value = true
+  try {
+    resendSays.value = (await $fetch<{ message: string }>('/api/passes/resend', { method: 'POST', body: { email: resendEmail.value.trim() } })).message
+  }
+  catch (error) {
+    resendSays.value = refusalText(error)
+  }
+  finally {
+    resending.value = false
+  }
+}
+
+// D-138 criterion 5: for a shared computer.
+async function forget(): Promise<void> {
+  await $fetch('/api/passes/device', { method: 'DELETE' })
+  pass.value = null
+  outcome.value = 'refused'
 }
 
 useSeoMeta({
@@ -130,27 +153,13 @@ useSeoMeta({
               </NuxtLink>
             </li>
           </ul>
-          <div
+          <p
             v-if="!account.signedIn"
-            class="flex flex-wrap items-center gap-3 pt-1"
-            data-test="pass-account-prompt"
+            class="text-sm"
+            data-test="pass-device-note"
           >
-            <p class="w-full text-sm">
-              Booking with a pass needs an account on the email address the pass was sent to.
-            </p>
-            <UButton
-              size="sm"
-              :to="withNext('/register', '/passes')"
-            >
-              Create an account
-            </UButton>
-            <NuxtLink
-              :to="withNext('/sign-in', '/passes')"
-              class="text-sm text-muted underline"
-            >
-              or sign in
-            </NuxtLink>
-          </div>
+            This browser now keeps your pass, so booking here uses it without an account. On another phone or computer, open the link in your pass email there.
+          </p>
           <p class="text-xs text-muted">
             <NuxtLink
               class="underline"
@@ -161,15 +170,26 @@ useSeoMeta({
             </NuxtLink>
           </p>
         </div>
+        <UButton
+          v-if="!account.signedIn"
+          size="sm"
+          color="neutral"
+          variant="link"
+          class="px-0"
+          data-test="pass-forget"
+          @click="forget"
+        >
+          Forget passes on this device
+        </UButton>
       </div>
 
       <div
         v-else
         data-test="pass-refused"
-        class="space-y-2"
+        class="space-y-3"
       >
         <h1 class="nnt-headline text-xl">
-          That link isn't valid
+          No pass on this device
         </h1>
         <p class="text-muted">
           Open your pass from the email you were sent when it was issued, or sign in and it is under
@@ -178,6 +198,38 @@ useSeoMeta({
             class="underline"
           >Passes</NuxtLink>, with its QR code.
         </p>
+        <form
+          class="space-y-2 border-t border-default pt-3"
+          data-test="pass-resend"
+          @submit.prevent="resend"
+        >
+          <UFormField label="Lost the email? We will send it again">
+            <UInput
+              v-model="resendEmail"
+              type="email"
+              autocomplete="email"
+              placeholder="The address the pass was sent to"
+              class="w-full"
+              data-test="pass-resend-email"
+            />
+          </UFormField>
+          <UButton
+            type="submit"
+            size="sm"
+            :loading="resending"
+            :disabled="!resendEmail.trim()"
+            data-test="pass-resend-send"
+          >
+            Email me my pass
+          </UButton>
+          <p
+            v-if="resendSays"
+            class="text-sm text-muted"
+            role="status"
+          >
+            {{ resendSays }}
+          </p>
+        </form>
       </div>
     </UPageCard>
   </UContainer>

@@ -149,6 +149,7 @@ const {
   passOffers,
   passOffersFailure,
   passEmail,
+  passName,
   passEmailValid,
   passPriceId,
   passLine,
@@ -951,6 +952,7 @@ const basketBindings = computed(() => ({
                 v-show="pane === 'pass'"
                 id="pane-pass-panel"
                 v-model:email="passEmail"
+                v-model:name="passName"
                 v-model:price-id="passPriceId"
                 role="tabpanel"
                 aria-labelledby="till-pane-pass"

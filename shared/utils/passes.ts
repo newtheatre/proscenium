@@ -32,16 +32,27 @@ export function saysPassStatus(status: PassStatus | PassRequestStatus): string {
   return 'Cancelled'
 }
 
+// A buyer with no account, named and addressed rather than picked (D-138 criterion 1, 0260).
+export const passGuestBuyer = z.strictObject({
+  name: z.string().trim().min(1, 'Give the buyer\'s name').max(120),
+  email: z.string().trim().email('Enter a real email address').max(320),
+})
+
 // Criterion 1: sold on the reader under the same cross-check D-114 collection uses. `userId` is
-// the buyer's own account, chosen at the desk, never typed as an id (K-123 criterion 1).
+// chosen at the desk, never typed as an id (K-123 criterion 1); `guest` stands in for it.
+
 export const issuePassForm = z.strictObject({
   passTypeId: z.string().trim().min(1, 'Say which pass type you mean'),
   passTypePriceId: z.string().trim().min(1, 'Say which price point you mean'),
-  userId: z.string().trim().min(1, 'Say which person you mean'),
+  userId: z.string().trim().min(1, 'Say which person you mean').optional(),
+  guest: passGuestBuyer.optional(),
   expectedTotalPence: z.number().int().min(0),
   // Fulfils the named request in the same batch as issuing, one-tap at payment (criterion 3).
   requestId: z.string().trim().min(1, 'Say which request you mean').optional(),
-})
+}).refine(
+  input => (input.userId === undefined) !== (input.guest === undefined),
+  { path: ['userId'], message: 'Choose a person, or give a new buyer\'s name and email, not both' },
+)
 
 export type IssuePassInput = z.output<typeof issuePassForm>
 
@@ -80,6 +91,13 @@ export function passSaleRefusal(type: PassTypeSaleState, now: number): string | 
 export const redeemPassForm = z.strictObject({
   performanceId: z.string().trim().min(1, 'Say which performance you mean'),
 })
+
+// D-138 criterion 4: an address alone, answered the same whatever it holds.
+export const passResendForm = z.strictObject({
+  email: z.string().trim().email('Enter a real email address').max(320),
+})
+
+export const PASS_RESEND_SAYS = 'If that address holds a pass, it is on its way to it now.'
 
 export type RedeemPassInput = z.output<typeof redeemPassForm>
 

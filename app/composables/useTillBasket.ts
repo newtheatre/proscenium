@@ -299,7 +299,7 @@ export function useTillBasket(deps: TillBasketDeps) {
       tickets: ticketLines.value.map(booking => ({ reservationId: booking.id })),
       walkUps: walkUpLines.value.map(line => ({ performanceId: line.performanceId, ticketTypeId: line.ticketTypeId, quantity: line.quantity })),
       walkUpGuest: walkUpGuest.value,
-      pass: passLine.value ? { passTypeId: passLine.value.passTypeId, passTypePriceId: passLine.value.passTypePriceId, email: passLine.value.email } : null,
+      pass: passLine.value ? { passTypeId: passLine.value.passTypeId, passTypePriceId: passLine.value.passTypePriceId, email: passLine.value.email, name: passLine.value.name } : null,
     }
   }
 

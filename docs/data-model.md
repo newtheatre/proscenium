@@ -1142,10 +1142,12 @@ request. `passOffersQuery()` binds the same parameters for a guest as for a sign
 already has a pass to redeem there. The page asks through the same request route; a guest is sent
 to register or sign in first, since a pass always needs an account.
 
-**Sold on the till (D-134, 0138).** The till's basket carries an optional `pass` (pass type, price
-point, the buyer's account email). `resolveTillPass()` (`server/utils/till-pass.ts`) refuses an
-email with no confirmed account that can sign in, a pass already held, or one off sale, before the
-reader is asked; `GET /api/till/passes` lists what may be sold for a house under the till's own
+**Sold on the till (D-134, 0138, 0260).** The till's basket carries an optional `pass` (pass type,
+price point, the buyer's email, and a name for an address nobody holds). `resolveTillPass()`
+(`server/utils/till-pass.ts`) refuses an anonymised or disabled account's address, a new address
+with no name, a pass already held, or one off sale, before the reader is asked. A new address
+is written as a guest record in the sale's own batch, gated on its entry, and the pass's
+`user_id` is read back by that address, so a record another checkout wrote first still holds it; `GET /api/till/passes` lists what may be sold for a house under the till's own
 `BAR` authority, and never lists accounts. The sale's batch posts a `PASS_SALE` line in the same
 entry as the rest of the basket, inserts the pass gated on that entry, fulfils the buyer's open
 request, and asserts the cap with 0035's re-insert of the pass id. Afterwards, an unpaid one-seat
@@ -1155,8 +1157,20 @@ pointing at a new zero-value pass booking, in one batch closed by the same kind 
 **Booking ahead from the pass page (D-135).** `GET /api/passes/current` also returns
 `coveredShows`: the published shows the pass covers that still have a performance to come, soonest
 first, from `passCoveredShowsQuery()`. `/passes` lists them for an `ACTIVE` pass, says that turning
-up without booking is subject to space, and offers a signed-out holder "Create an account" or
-"sign in", returning to `/passes`, since booking ahead with a pass needs the account it was issued to.
+up without booking is subject to space, and tells a signed-out holder that this browser now keeps the pass (D-138).
+
+**A pass without an account (D-138, 0260).** The desk's issue route takes `guest: { name, email }`
+in place of `userId`; `guestPassHolder()` (`server/utils/pass-holders.ts`) makes or reuses the guest
+record a guest booking would, refusing an anonymised or disabled account. Opening `/passes/[token]`
+adds the token to the `nnt-passes` httpOnly cookie, at most four, newest first
+(`shared/utils/pass-device.ts`), living until the latest of their `valid_until` (at least an hour,
+at most 400 days). `rememberedPasses()` verifies each token on every read. A signed-out caller of
+`GET /api/performances/[id]/booking` is offered a remembered pass, asked one pass at a time with
+the same predicate a holder's are, and `POST /api/passes/[id]/redeem` accepts either the holder's
+session or the pass in that cookie, booking onto the pass's own record. `POST /api/passes/resend`
+re-sends the `pass-issued` email for up to four live passes on an address, under
+`RESERVATION_RESEND_ATTEMPTS` per IP and per address, and answers the same whatever it finds;
+`DELETE /api/passes/device` clears the cookie, as signing out and closing an account do.
 
 **Prompted at the bar, and the terms linked (D-136, D-137).** After a till sale that did not sell
 a pass, `passPromptFor()` turns the till's own pass offers into one dismissable line on the
@@ -1168,8 +1182,8 @@ carries the full ticket and pass terms, quoting the live settings for every numb
 (`server/utils/pass-qr-tokens.ts`) reuse D-108's HMAC scheme over `"pass:" + passId` rather than a
 second secret: the prefix domain-separates a pass token from a reservation token, so neither
 resolves against the other's route even if the two id spaces collided. `GET /passes/[token]`
-exchanges it for a cookie exactly as `/qr/[token]` does; `GET /api/passes/current` and `/passes`
-read the pass live from that cookie. The email (`pass-issued` template) carries the same QR
+exchanges it for the device cookie above; `GET /api/passes/current` and `/passes` read the newest
+remembered pass live from it. The email (`pass-issued` template) carries the same QR
 inline. `GET /api/account/passes` is the signed-in view: held passes and the caller's own
 requests, regardless of channel; a pass the door would admit carries its QR, built from the same
 token, so it can be shown at the door without the email (issue 1332). `showsPassQr()` decides
