@@ -1,9 +1,9 @@
 name: End-to-end
 
 on:
-  # A schedule registers only from the default branch, so every pull request into unified/main runs them.
+  # Every pull request into main runs them; the schedule registers only from the default branch.
   pull_request:
-    branches: [unified/main]
+    branches: [main]
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
