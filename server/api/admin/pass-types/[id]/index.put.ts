@@ -1,5 +1,5 @@
 import { changes } from '#shared/utils/audit'
-import { heldPricePointRefusal, passTypeForm } from '#shared/utils/pass-types'
+import { ADMISSION_RULE_FIXED_SAYS, heldPricePointRefusal, passTypeForm } from '#shared/utils/pass-types'
 
 // Edit a pass product: name, description, windows, price points and status. Covered shows move
 // through their own endpoint, sometimes manager-gated (D-123 criterion 4).
@@ -11,6 +11,8 @@ export default defineEventHandler(async (event) => {
   if (!held) throw noSuch('pass')
 
   const input = await readValidatedBodyOrThrow(event, passTypeForm)
+  // Holders bought it on its rule (D-141 criterion 1, 0262), so the rule is fixed once any are out.
+  if (held.everIssued && input.admissionRule !== held.admissionRule) throw createError({ statusCode: 409, statusMessage: ADMISSION_RULE_FIXED_SAYS })
   const description = input.description ?? null
   const salesOpenAt = input.salesOpenAt ?? null
   const salesCloseAt = input.salesCloseAt ?? null
@@ -30,6 +32,7 @@ export default defineEventHandler(async (event) => {
         salesOpenAt: [held.salesOpenAt, salesOpenAt],
         salesCloseAt: [held.salesCloseAt, salesCloseAt],
         maxIssued: [held.maxIssued, maxIssued],
+        admissionRule: [held.admissionRule, input.admissionRule],
       }),
       // Prose stays on the record; the trail records only that it moved (0011).
       descriptionChanged: description !== held.description,
@@ -48,6 +51,7 @@ export default defineEventHandler(async (event) => {
     salesOpenAt,
     salesCloseAt,
     maxIssued,
+    admissionRule: input.admissionRule,
     prices: input.prices,
   })), entry, ...priceUpsertStatements(id, input.prices, entry).map(statement => db.run(statement)))
 

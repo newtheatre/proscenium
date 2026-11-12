@@ -281,6 +281,7 @@ export async function ownPassRequests(userId: string): Promise<OwnPassRequest[]>
 interface PassOfferRow {
   id: string
   name: string
+  admissionRule: string
   description: string | null
   coveredShows: number
   pricesJson: string
@@ -291,7 +292,7 @@ interface PassOfferRow {
 // guest's NULL id matches no request and no pass, so the statement's shape never depends on it.
 export function passOffersQuery(showId: string, userId: string | null, now: number): SQL {
   return sql`
-    SELECT t.id AS id, t.name AS name, t.description AS description,
+    SELECT t.id AS id, t.name AS name, t.description AS description, t.admission_rule AS admissionRule,
            (SELECT count(*) FROM pass_type_shows s WHERE s.pass_type_id = t.id) AS coveredShows,
            COALESCE((
              SELECT json_group_array(json_object('id', pr.id, 'label', pr.label, 'price', pr.price))

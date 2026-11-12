@@ -1268,3 +1268,22 @@ Open questions:
   3. Decomposition follows the production module and external-hire decisions (Get-In phase 5),
      not before.
 - Source: Prompt Book C-4, D-8; Get-In part 2 and phase 5
+
+## D-141: A pass that admits once to each show
+
+- Role: Box office manager
+- Phase: MVP
+- Story: As whoever sets up the season's passes, I want a pass that admits its holder to one night
+  of each show it covers, so that a pass priced per show is not a pass to every night of a run.
+- Depends on: D-123, D-125
+- Acceptance criteria:
+  1. A pass type is set to admit once to each performance (the default, and every existing one) or
+     once to each show. The setting cannot change once a pass of the type is out.
+  2. A once-per-show pass with a live booking on one night of a show is refused for any other night
+     of it, online, at the door and on the till, naming the night already booked; racing bookings
+     for two nights leave one.
+  3. A cancelled or lapsed booking frees the show, so another night can be chosen; the performance
+     it was for stays used.
+  4. The pass offer, the booking page and the pass type screen say "one night of each" for such a pass.
+- Source: Season pass review, 11 November 2026; decision 0262.
+

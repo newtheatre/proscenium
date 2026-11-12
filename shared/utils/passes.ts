@@ -106,6 +106,11 @@ export function unpaidPassSays(pricePence: number): string {
   return `This pass is not paid for yet: ${saysPrice(pricePence)} is due at the till first. Paying for it lets every booking on it in.`
 }
 
+// D-141 (0262): a once-per-show pass already booked for another night of this show.
+export function saysOncePerShow(when: string, reference: string): string {
+  return `This pass admits once to each show, and is already booked for ${when} (${reference}). Cancel that booking at the box office to choose another night.`
+}
+
 export const PASS_ALREADY_ON_ADDRESS_SAYS = 'A pass of this kind is already on that email address. Open the link in its email, or ask for it to be sent again from the passes page, and book with it.'
 
 // D-138 criterion 4: an address alone, answered the same whatever it holds.
@@ -186,12 +191,14 @@ export interface PassOffer {
   coveredShows: number
   prices: { id: string, label: string, price: number }[]
   requested: boolean
+  // Absent on an offer read before 0262; PER_SHOW is said beside what it covers.
+  admissionRule?: string
 }
 
 // What the booking page says of a pass that covers the show (D-133 criterion 1): the cheapest
 // figure, since a booker reads "from", and the desk quotes every price point anyway.
-export function saysPassOffer(offer: { name: string, coveredShows: number, prices: readonly { label: string, price: number }[] }): string {
-  const covers = `${offer.name} covers ${plural(offer.coveredShows, 'show')}`
+export function saysPassOffer(offer: { name: string, coveredShows: number, prices: readonly { label: string, price: number }[], admissionRule?: string }): string {
+  const covers = `${offer.name} covers ${plural(offer.coveredShows, 'show')}${offer.admissionRule === 'PER_SHOW' ? ', one night of each' : ''}`
   if (offer.prices.length === 0) return `${covers}.`
   const cheapest = Math.min(...offer.prices.map(one => one.price))
   return `${covers}, from ${saysPrice(cheapest)}.`

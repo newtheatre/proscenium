@@ -109,12 +109,10 @@ fifteen minutes to catch a deploy that touched no migration, was removed for the
 `health:watch` task's job alone (J-106 criterion 5).
 
 **`e2e.yml`'s nightly schedule has never actually run.** GitHub only reads a `schedule:` trigger
-from a workflow file on the repository's default branch, still `main` until cutover; a file that
-exists only on `unified/main` never registers. The suites run on every pull request into
-`unified/main` meanwhile, since a `pull_request` run reads the pull request's own workflow file. A `platform/register-scheduled-workflows` copy on
-`main` (#825) is what makes the schedule real before cutover rather than for the first time on
-the day it matters most, ADR-0021's lesson again. That pull request also carries a copy of
-`health-watch.yml`, which should be dropped when #825 is next revisited.
+from a workflow file on the repository's default branch, and that is still the archived `v3`
+after cutover; it registers once `main` is made the default branch. The suites run on every pull
+request into `main` meanwhile. Their `pull_request` trigger names its base branch, so a branch
+rename must rename it too: left naming a branch that no longer exists, it runs on nothing.
 
 ### Applying a destructive migration by hand (K-107 criterion 3)
 

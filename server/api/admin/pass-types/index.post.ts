@@ -24,9 +24,9 @@ export default defineEventHandler(async (event) => {
   // The slug predicate rides the INSERT, so a clash is a refusal, not a constraint error (0003, 0006);
   // the prices and shows follow in its batch, gated on its entry having landed (0049).
   const created = await auditedWrite(db.all<{ id: string }>(sql`
-    INSERT INTO pass_types (id, slug, name, description, valid_from, valid_until, sales_open_at, sales_close_at, max_issued, status)
+    INSERT INTO pass_types (id, slug, name, description, valid_from, valid_until, sales_open_at, sales_close_at, max_issued, admission_rule, status)
     SELECT ${id}, ${input.slug}, ${input.name}, ${input.description ?? null}, ${input.validFrom},
-           ${input.validUntil}, ${input.salesOpenAt ?? null}, ${input.salesCloseAt ?? null}, ${input.maxIssued ?? null}, 'DRAFT'
+           ${input.validUntil}, ${input.salesOpenAt ?? null}, ${input.salesCloseAt ?? null}, ${input.maxIssued ?? null}, ${input.admissionRule}, 'DRAFT'
     WHERE NOT EXISTS (SELECT 1 FROM pass_types WHERE slug = ${input.slug})
     RETURNING id
   `), entry, ...newPassTypeChildren(id, input.prices, showIds, entry).map(statement => db.run(statement)))

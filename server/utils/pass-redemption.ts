@@ -121,6 +121,7 @@ function redeemableQuery(holds: SQL, performanceId: string, showId: string, now:
       AND u.anonymised_at IS NULL
       AND ${coversShowClause(showId)}
       AND NOT EXISTS (SELECT 1 FROM pass_admissions a WHERE a.pass_id = p.id AND a.performance_id = ${performanceId})
+      AND NOT EXISTS ${otherNightOfShowQuery(sql`p.id`, performanceId, showId)}
     ORDER BY p.created_at
     LIMIT 1
   `
@@ -211,11 +212,35 @@ export async function admissionForPerformance(passId: string, performanceId: str
   return row
 }
 
+// D-141 (0262): a once-per-show pass's live booking on another night of the same show. Cancelled
+// or lapsed frees the show; `pass_admissions` is append-only, so its row alone is not a use.
+export function otherNightOfShowQuery(passId: string | SQL, performanceId: string, showId: string): SQL {
+  return sql`(
+    SELECT once_r.reference AS reference, once_pf.starts_at AS startsAt
+    FROM pass_admissions once_a
+    JOIN passes once_p ON once_p.id = once_a.pass_id
+    JOIN pass_types once_t ON once_t.id = once_p.pass_type_id
+    JOIN performances once_pf ON once_pf.id = once_a.performance_id
+    JOIN tickets once_k ON once_k.id = once_a.ticket_id
+    JOIN reservations once_r ON once_r.id = once_k.reservation_id
+    WHERE once_a.pass_id = ${passId} AND once_t.admission_rule = 'PER_SHOW'
+      AND once_pf.show_id = ${showId} AND once_a.performance_id != ${performanceId}
+      AND once_r.status IN ('PENDING', 'COLLECTED', 'DOOR')
+    LIMIT 1
+  )`
+}
+
+export async function otherNightOfShow(passId: string, performanceId: string, showId: string): Promise<{ reference: string, startsAt: number } | undefined> {
+  const [row] = await db.all<{ reference: string, startsAt: number }>(sql`SELECT * FROM ${otherNightOfShowQuery(passId, performanceId, showId)}`)
+  return row
+}
+
 // Criteria 2 and 3 as one predicate, re-asked here rather than trusted from an earlier read
 // (0003, 0062). Capacity is `passAdmissionTicketInsert`'s own.
 export function passAdmissionAllows(passId: string, performanceId: string, showId: string, now: number): SQL {
   return sql`
     NOT EXISTS (SELECT 1 FROM pass_admissions WHERE pass_id = ${passId} AND performance_id = ${performanceId})
+    AND NOT EXISTS ${otherNightOfShowQuery(passId, performanceId, showId)}
     AND EXISTS (
       SELECT 1 FROM passes p JOIN pass_types t ON t.id = p.pass_type_id JOIN users u ON u.id = p.user_id
       WHERE p.id = ${passId} AND p.status = 'ACTIVE' AND t.status != 'CLOSED'

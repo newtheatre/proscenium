@@ -1,5 +1,6 @@
 import { saysAlreadyAdmitted } from '#shared/utils/reservations'
-import { doorPassScanForm, unpaidPassSays } from '#shared/utils/passes'
+import { doorPassScanForm, saysOncePerShow, unpaidPassSays } from '#shared/utils/passes'
+import { formatLondon } from '#shared/utils/london'
 
 // Scan a pass at the door (D-126). Admits in one gesture if it is already redeemed for tonight;
 // offers to redeem it on the spot, capacity-checked, if it is not (criterion 1).
@@ -33,6 +34,8 @@ export default defineEventHandler(async (event) => {
   const now = Math.floor(Date.now() / 1000)
   const refusal = refusalFor(state, now)
   if (refusal) throw createError({ statusCode: 409, statusMessage: refusal })
+  const otherNight = await otherNightOfShow(state.id, performance.id, performance.showId)
+  if (otherNight) throw createError({ statusCode: 409, statusMessage: saysOncePerShow(formatLondon(new Date(otherNight.startsAt * 1000), { dateStyle: 'full', timeStyle: 'short' }), otherNight.reference) })
 
   const capacity = effectiveCapacity(performance)
   const result = await redeemPass({

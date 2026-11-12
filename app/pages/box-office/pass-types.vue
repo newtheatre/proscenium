@@ -3,15 +3,17 @@ import { h, resolveComponent } from 'vue'
 import { endOfLondonDay, londonParts, startOfLondonDay } from '#shared/utils/london'
 import { saysDayRange } from '#shared/utils/when'
 import {
+  PASS_ADMISSION_RULES,
   PASS_TYPE_STATUSES,
   newPassTypeScreenForm,
   passTypeScreenForm,
+  saysAdmissionRule,
   saysPassTypeStatus,
 } from '#shared/utils/pass-types'
 import { saysPrice } from '#shared/utils/ticket-types'
 import { passTypesList } from '#shared/utils/pass-types-list'
 import type { TableColumn } from '@nuxt/ui'
-import type { PassType, PassTypeStatus } from '#shared/utils/pass-types'
+import type { PassAdmissionRule, PassType, PassTypeStatus } from '#shared/utils/pass-types'
 
 definePageMeta({ layout: 'console', title: 'Pass types', middleware: 'console', docs: '/docs/box-office/pass-types' })
 
@@ -93,6 +95,7 @@ const state = reactive({
   salesOpenAt: '',
   salesCloseAt: '',
   maxIssued: null as number | null,
+  admissionRule: 'PER_PERFORMANCE' as PassAdmissionRule,
   status: 'DRAFT' as PassTypeStatus,
   showIds: [] as string[],
 })
@@ -126,6 +129,7 @@ function edit(passType: PassType | null): void {
     salesOpenAt: isoDate(passType?.salesOpenAt ?? null),
     salesCloseAt: isoDate(passType?.salesCloseAt ?? null),
     maxIssued: passType?.maxIssued ?? null,
+    admissionRule: passType?.admissionRule ?? 'PER_PERFORMANCE',
     status: passType?.status ?? 'DRAFT',
     showIds: passType?.showIds ?? [],
   })
@@ -150,6 +154,7 @@ async function save(): Promise<void> {
     salesOpenAt: startOfDay(state.salesOpenAt),
     salesCloseAt: endOfDay(state.salesCloseAt),
     maxIssued: state.maxIssued,
+    admissionRule: state.admissionRule,
     prices,
   }
   try {
@@ -508,6 +513,20 @@ const columns: TableColumn<PassType>[] = [
               :min="1"
               class="w-full"
               data-test="pass-type-cap"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Admits"
+            name="admissionRule"
+            :description="editing?.everIssued ? 'Fixed now that passes of this kind are out: holders bought it on this rule.' : 'One night of each show lets a holder book any one performance of each show it covers; cancelling that booking frees another night.'"
+          >
+            <USelect
+              v-model="state.admissionRule"
+              :items="PASS_ADMISSION_RULES.map(rule => ({ label: saysAdmissionRule(rule), value: rule }))"
+              :disabled="editing?.everIssued === true"
+              class="w-full"
+              data-test="pass-type-admission-rule"
             />
           </UFormField>
 

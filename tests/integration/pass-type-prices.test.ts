@@ -39,7 +39,7 @@ function edit(database: TestDatabase, slug: string, prices: { label: string, pri
   const entry = auditEntry({ actorId: null, action: 'pass-type.updated', target: 'pass-type:pt-b' })
   const written = run(database, updatePassTypeStatement('pt-b', {
     slug, name: 'Flexi', description: null, status: 'ON_SALE', validFrom: 1_000, validUntil: 2_000,
-    salesOpenAt: null, salesCloseAt: null, maxIssued: null, prices,
+    salesOpenAt: null, salesCloseAt: null, maxIssued: null, admissionRule: 'PER_PERFORMANCE', prices,
   }))
   run(database, auditIfChanged(entry))
   for (const statement of priceUpsertStatements('pt-b', prices, entry)) run(database, statement)

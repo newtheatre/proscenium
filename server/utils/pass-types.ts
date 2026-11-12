@@ -7,7 +7,7 @@ import { passTypesList } from '#shared/utils/pass-types-list'
 import type { SQL } from 'drizzle-orm'
 import type { ListClause } from './list-filters'
 import type { ListQuery } from '#shared/utils/list-filters'
-import type { CoveringPass, PassType, PassTypeStatus } from '#shared/utils/pass-types'
+import type { CoveringPass, PassAdmissionRule, PassType, PassTypeStatus } from '#shared/utils/pass-types'
 import type { AuditRow } from '#shared/utils/audit'
 
 // "Ever issued" and "live coverage" (D-123 criteria 3 and 4) have no real answer until D-124
@@ -127,6 +127,7 @@ interface PassTypeRow {
   salesOpenAt: number | null
   salesCloseAt: number | null
   maxIssued: number | null
+  admissionRule: PassAdmissionRule
   everIssued: number
   pricesJson: string
   showIdsJson: string
@@ -156,6 +157,7 @@ const COLUMNS = sql`
   t.sales_open_at AS salesOpenAt,
   t.sales_close_at AS salesCloseAt,
   t.max_issued AS maxIssued,
+  t.admission_rule AS admissionRule,
   COALESCE((
     SELECT json_group_array(json_object('id', p.id, 'label', p.label, 'price', p.price))
     FROM pass_type_prices p WHERE p.pass_type_id = t.id
@@ -245,6 +247,7 @@ export interface PassTypeUpdate {
   salesOpenAt: number | null
   salesCloseAt: number | null
   maxIssued: number | null
+  admissionRule: PassAdmissionRule
   prices: { label: string, price: number }[]
 }
 
@@ -265,6 +268,7 @@ export function updatePassTypeStatement(id: string, input: PassTypeUpdate): SQL 
         sales_open_at = ${input.salesOpenAt},
         sales_close_at = ${input.salesCloseAt},
         max_issued = ${input.maxIssued},
+        admission_rule = ${input.admissionRule},
         updated_at = unixepoch()
     WHERE id = ${id}
       AND NOT EXISTS (SELECT 1 FROM pass_types WHERE slug = ${input.slug} AND id <> ${id})

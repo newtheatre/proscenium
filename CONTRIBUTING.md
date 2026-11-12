@@ -49,9 +49,9 @@ nothing it changes reaches the application; `test` and the checks always run.
     table disagrees with the stories its module files hold, by the rule beside the table in
     `docs/backlog/README.md`.
 
-`test:e2e` runs on every pull request into `unified/main` and on demand, in ten slices
+`test:e2e` runs on every pull request into `main` and on demand, in ten slices
 (`E2E_SLICE=i/10`), each on its own runner with its own dev server; the nightly schedule
-registers only once `unified/main` is the default branch. Each slice is a required check (0109). A
+registers only once `main` is the default branch. Each slice is a required check (0109). A
 slice takes under ten minutes, inside a 60-minute limit. A pull request runs only the suites it can
 reach (0110, `scripts/lib/ci-scope.ts`): none for a change to documentation, the unit or
 integration tests, the checkers, or a workflow other than `e2e.yml`; only the suites it edits when
@@ -136,7 +136,7 @@ old rooms application is the cautionary tale.
 - Three layers, all under Bun 1.4's test tooling: unit tests for pure logic, integration tests
   against a real test database (where the racing tests live), and end-to-end interface tests
   driving the critical journeys (booking, door, till, register, room request) in a browser.
-  The first two gate every merge; the third runs on every pull request into `unified/main`.
+  The first two gate every merge; the third runs on every pull request into `main`.
 - The register, the ledger and erasure are correct or the system is not shippable; their tests
   are written before their implementations.
 - Every defect found in the old estate's audit becomes a regression test here before its

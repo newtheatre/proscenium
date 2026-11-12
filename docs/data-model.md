@@ -1192,6 +1192,13 @@ must cover every live booking on the pass (`uncoveredBookingQuery()`). `POST
 lapses one as `EXPIRED`, with the same cancellation, once its type's sales window has closed or its
 validity ended.
 
+**Once to each show (D-141, 0262).** `pass_types.admission_rule` is `PER_PERFORMANCE` (the
+default) or `PER_SHOW`, fixed by the edit route once `everIssued`. `passAdmissionAllows()` adds
+`otherNightOfShowQuery()`: for a `PER_SHOW` pass, no live (`PENDING`, `COLLECTED`, `DOOR`) booking on
+another performance of the same show through the pass's own admissions, so cancelling frees the show
+while the append-only admission row keeps that performance spent. The redeem, door and offer reads
+use the same subquery; the routes quote the night already booked.
+
 **Prompted at the bar, and the terms linked (D-136, D-137).** After a till sale that did not sell
 a pass, `passPromptFor()` turns the till's own pass offers into one dismissable line on the
 confirmation screen; it is never a step of the sale. `PASS_TERMS_PATH` (`/policies/booking`)

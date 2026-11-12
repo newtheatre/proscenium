@@ -7,6 +7,16 @@ import { CIVIL_DAY, SLUG } from './programme'
 export const PASS_TYPE_STATUSES = ['DRAFT', 'ON_SALE', 'CLOSED'] as const
 export type PassTypeStatus = (typeof PASS_TYPE_STATUSES)[number]
 
+// D-141 (0262): once to each performance, as every pass always did, or once to each show.
+export const PASS_ADMISSION_RULES = ['PER_PERFORMANCE', 'PER_SHOW'] as const
+export type PassAdmissionRule = (typeof PASS_ADMISSION_RULES)[number]
+
+export function saysAdmissionRule(rule: string): string {
+  return rule === 'PER_SHOW' ? 'One night of each show' : 'Every night of each show'
+}
+
+export const ADMISSION_RULE_FIXED_SAYS = 'Passes of this kind are already out, and were sold on how often they admit, so that cannot change now. Make a new pass for the new rule.'
+
 export const MAX_PASS_TYPE_NAME = 120
 export const MAX_PASS_TYPE_SLUG = 120
 export const MAX_PRICE_LABEL = 80
@@ -35,6 +45,7 @@ const passTypeFields = {
   // Null is uncapped: the blunt guard against selling 200 passes into an 86-seat house is an
   // explicit number, never assumed (D-123 criterion 2).
   maxIssued: z.number().int().positive().nullish(),
+  admissionRule: z.enum(PASS_ADMISSION_RULES).default('PER_PERFORMANCE'),
   prices: z.array(passTypePriceForm).min(1, 'A pass needs at least one price point')
     .refine(
       given => new Set(given.map(one => one.label.trim().toLowerCase())).size === given.length,
@@ -85,6 +96,7 @@ const passTypeScreenFields = {
   salesOpenAt: screenWindow('That is not a date'),
   salesCloseAt: screenWindow('That is not a date'),
   maxIssued: z.number().int().positive().nullish(),
+  admissionRule: z.enum(PASS_ADMISSION_RULES),
 }
 
 export const newPassTypeScreenForm = z.object({ ...passTypeScreenFields, showIds: showIdsField })
@@ -109,6 +121,7 @@ export interface PassType {
   salesOpenAt: number | null
   salesCloseAt: number | null
   maxIssued: number | null
+  admissionRule: PassAdmissionRule
   everIssued: boolean
   prices: PassTypePrice[]
   showIds: string[]
