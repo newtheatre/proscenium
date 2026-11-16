@@ -10,7 +10,7 @@ import { LIVE, guardLastOwner, isOwner } from './grants'
 import { endSessionsOf } from './sessions'
 
 /** What a merge does to one account column. */
-export interface MergeStep { table: string, column: string, action: 'move' | 'alias' | 'delete' | 'end-sessions' | 'reissue-grants' | 'none' }
+export interface MergeStep { table: string, column: string, action: 'move' | 'move-unless-present' | 'alias' | 'delete' | 'end-sessions' | 'reissue-grants' | 'none' }
 
 /** identity's own `handler` columns, and what a merge does to each. */
 const HANDLERS: Record<string, MergeStep['action']> = {
@@ -18,6 +18,8 @@ const HANDLERS: Record<string, MergeStep['action']> = {
   'core_account_tokens.account_id': 'delete',
   'core_passkey_challenges.account_id': 'delete',
   'core_sessions.account_id': 'end-sessions',
+  // A notification preference is keyed by account: where both accounts chose, the survivor's choice stands.
+  'core_notification_preferences.account_id': 'move-unless-present',
 }
 
 /** Columns a merge must leave alone because they record the merge or the grant history itself. */
@@ -85,6 +87,11 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
     if (step.action === 'move') {
       unit.add({ sql: `INSERT INTO core_account_merge_items (merge_id, table_name, column_name, row_id, action) SELECT ?, ?, ?, rowid, 'moved' FROM ${t} WHERE ${c} = ?`, params: [mergeId, step.table, step.column, mergedAccountId] })
       unit.add({ sql: `UPDATE ${t} SET ${c} = ? WHERE ${c} = ?`, params: [survivorId, mergedAccountId] })
+    }
+    else if (step.action === 'move-unless-present') {
+      // The row moves unless the survivor already has one with the same key; that one wins.
+      unit.add({ sql: `UPDATE OR IGNORE ${t} SET ${c} = ? WHERE ${c} = ?`, params: [survivorId, mergedAccountId] })
+      unit.add({ sql: `DELETE FROM ${t} WHERE ${c} = ?`, params: [mergedAccountId] })
     }
     else if (step.action === 'delete') {
       unit.add({ sql: `DELETE FROM ${t} WHERE ${c} = ?`, params: [mergedAccountId] })

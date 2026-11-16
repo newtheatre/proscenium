@@ -2,10 +2,13 @@
 // read by the build, the checks and the running app alike (Module manifest tab).
 import { z } from 'zod'
 import { DeclarationError } from './refusal'
-import { isDuration } from './duration'
+import { isDuration, parseDuration } from './duration'
 import { tableMeta } from './db'
 import type { SettingEntry, SettingRule } from './settings'
 import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
+
+/** The `events.listens` key for the listener that hears every event not marked internal. */
+export const DELIVERABLE = 'deliverable'
 
 export interface EventDecl<P extends z.ZodObject<any> = z.ZodObject<any>> {
   version: number
@@ -30,6 +33,12 @@ export interface TaskDecl {
 export type PointDecl = { kind: 'data', schema: z.ZodType } | { kind: 'code', contract: string }
 export interface SecretDecl { needed: 'always' | 'when-used' | 'optional' }
 export interface CredentialDecl { needed: 'always' | 'when-used' | 'optional' }
+/**
+ * One purpose a module signs under (F-37). The kit makes the key pair, makes a new current key every
+ * `rotateEvery`, and keeps an old key for checking for `keepFor` after it stops signing, so anything
+ * signed under the purpose can be checked for at least that long.
+ */
+export interface SigningDecl { purpose: string, rotateEvery: string, keepFor: string }
 export interface CallDecl {
   /** After how long an attempt with no outcome is handed to the reconcile handler. Default core.external.reconcile-after. */
   reconcileAfter?: string
@@ -57,6 +66,10 @@ export interface ModuleManifest {
   facts?: Record<string, FactDecl>
   records?: Record<string, RecordDecl>
   tables?: Record<string, unknown>
+  /**
+   * `listens` maps an event name to a listener file. The key `deliverable` is the listener declared
+   * on: 'deliverable': it hears every event not marked internal. Only core may declare it.
+   */
   events?: { announces?: Record<string, EventDecl<any>>, listens?: Record<string, string> }
   jobs?: Record<string, JobDecl<any>>
   tasks?: Record<string, TaskDecl>
@@ -65,6 +78,7 @@ export interface ModuleManifest {
   contributes?: Record<string, Contribution[]>
   secrets?: Record<string, SecretDecl>
   credentials?: Record<string, CredentialDecl>
+  signing?: readonly SigningDecl[]
   presets?: Partial<Record<PresetId, Preset>>
 }
 
@@ -91,10 +105,11 @@ export function defineModule<const M extends ModuleManifest>(manifest: M): M {
   return manifest
 }
 
+const SIGNING_MIN = 86_400 // not-policy: a signing key lives at least a day, in seconds
 const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
 const kebab = new RegExp(`^${KEBAB}$`)
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9a-z.-]+)?$/
-const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'presets'])
+const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'signing', 'presets'])
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 export function snake(id: string): string {
@@ -149,6 +164,11 @@ export function validateManifest(m: ModuleManifest): void {
     checkPayload(f, decl.payload)
   }
   for (const [name, listener] of Object.entries(events.listens ?? {})) {
+    if (name === DELIVERABLE) {
+      if (m.id !== 'core') throw new DeclarationError(`events.listens.${name}`, "only core may listen on: 'deliverable'; the webhook sender is its one user")
+      if (typeof listener !== 'string' || !kebab.test(listener)) throw new DeclarationError(`events.listens.${name}`, 'names a listener file under server/listeners/, kebab-case')
+      continue
+    }
     if (!new RegExp(`^${KEBAB}\\.${KEBAB}\\.${KEBAB}$`).test(name)) throw new DeclarationError(`events.listens.${name}`, 'is an event name')
     if (typeof listener !== 'string' || !kebab.test(listener)) throw new DeclarationError(`events.listens.${name}`, 'names a listener file under server/listeners/, kebab-case')
   }
@@ -198,6 +218,19 @@ export function validateManifest(m: ModuleManifest): void {
     for (const [name, decl] of Object.entries(m[section] ?? {})) {
       if (!SECRET.test(name)) throw new DeclarationError(`${section}.${name}`, `is ${snake(id).toUpperCase()}_<NAME> in capitals`)
       if (!['always', 'when-used', 'optional'].includes(decl?.needed)) throw new DeclarationError(`${section}.${name}.needed`, "is 'always', 'when-used' or 'optional'")
+    }
+  }
+  if (m.signing !== undefined) {
+    if (!Array.isArray(m.signing)) throw new DeclarationError('signing', 'is a list of { purpose, rotateEvery, keepFor }')
+    const seen = new Set<string>()
+    for (const [i, decl] of m.signing.entries()) {
+      const f = `signing[${i}]`
+      if (!decl || typeof decl.purpose !== 'string' || !own('', KEBAB).test(decl.purpose)) throw new DeclarationError(`${f}.purpose`, `is <module>.<noun>, under the module's own id, such as ${id}.door-code`)
+      if (seen.has(decl.purpose)) throw new DeclarationError(`${f}.purpose`, `${decl.purpose} is listed twice`)
+      seen.add(decl.purpose)
+      for (const key of ['rotateEvery', 'keepFor'] as const) {
+        if (typeof decl[key] !== 'string' || !isDuration(decl[key]) || parseDuration(decl[key]) < SIGNING_MIN) throw new DeclarationError(`${f}.${key}`, "is a duration of at least a day, such as '90d'")
+      }
     }
   }
   for (const [preset, value] of Object.entries(m.presets ?? {})) {

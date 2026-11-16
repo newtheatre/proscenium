@@ -4,7 +4,7 @@
 // after a few wrong tries. Neither can make a session strong.
 import type { H3Event } from 'h3'
 import { first, newId, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
-import { takeRate } from '#kit/ratelimit'
+import { countAgainstRate } from '#kit/ratelimit'
 import { digest, randomCode, randomToken, sealValue, sameText } from './crypto'
 import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAddress } from './accounts'
 import { BROWSER_COOKIE, readCookie, relyingParty, setShortCookie } from './web'
@@ -47,7 +47,7 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
   const quiet = { sent: true } as const
   if (!(await useSetting('core.sign-in.email-link'))) return quiet
   // The per-address limit: over it, the same screen and no email.
-  if (!(await takeRate('sign-in', `address:${address}`))) return quiet
+  if (!(await countAgainstRate('sign-in', `address:${address}`)).allowed) return quiet
 
   const existing = await addressRow(address)
   if (!existing && !(await useSetting('core.sign-in.open-sign-up'))) return quiet
