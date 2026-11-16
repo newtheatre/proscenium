@@ -253,20 +253,18 @@ onMounted(() => {
             </div>
           </div>
           <template #footer>
-            <div class="flex items-center justify-end gap-3">
-              <p
-                class="text-sm text-muted"
-                aria-live="polite"
-              >
-                {{ changesIn(section.settings).length ? t('core.settings-page.changes', { count: changesIn(section.settings).length }) : t('core.settings-page.no-changes') }}
-              </p>
-              <UButton
-                type="submit"
-                :label="t('core.settings-page.save', { section: sectionTitle(section) })"
-                :loading="saving === section.id"
-                :disabled="!changesIn(section.settings).length || saving !== null"
-              />
-            </div>
+            <p
+              class="text-sm text-muted"
+              aria-live="polite"
+            >
+              {{ changesIn(section.settings).length ? t('core.settings-page.changes', { count: changesIn(section.settings).length }) : t('core.settings-page.no-changes') }}
+            </p>
+            <UButton
+              type="submit"
+              :label="t('core.settings-page.save', { section: sectionTitle(section) })"
+              :loading="saving === section.id"
+              :disabled="!changesIn(section.settings).length || saving !== null"
+            />
           </template>
         </PageSection>
       </form>

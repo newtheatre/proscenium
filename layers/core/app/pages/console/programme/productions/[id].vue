@@ -163,30 +163,22 @@ async function remove() {
     >
       <div
         v-if="production"
-        class="space-y-10"
+        class="space-y-4"
       >
         <RefusalNotice :refusal="refusal" />
         <UAlert
           v-if="data!.needs.length && production.state !== 'published'"
           color="info"
-          variant="subtle"
           icon="i-lucide-info"
           :title="`To publish, this production needs ${data!.needs.join(', ')}.`"
         />
 
-        <section
-          class="space-y-4"
-          aria-labelledby="production-details"
-        >
-          <h2
+        <PageSection title="Details">
+          <UForm
             id="production-details"
-            class="text-base font-semibold"
-          >
-            Details
-          </h2>
-          <form
+            :state="details"
             class="space-y-4"
-            @submit.prevent="saveDetails"
+            @submit="saveDetails"
           >
             <UFormField
               label="Title"
@@ -195,14 +187,12 @@ async function remove() {
               <UInput
                 v-model="details.title"
                 maxlength="200"
-                class="w-full"
               />
             </UFormField>
             <UFormField label="Subtitle">
               <UInput
                 v-model="details.subtitle"
                 maxlength="200"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -213,7 +203,6 @@ async function remove() {
                 v-model="details.summary"
                 :rows="2"
                 maxlength="300"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -224,7 +213,6 @@ async function remove() {
                 v-model="details.description"
                 :rows="6"
                 maxlength="20000"
-                class="w-full"
               />
             </UFormField>
             <div class="grid gap-4 sm:grid-cols-2">
@@ -232,7 +220,6 @@ async function remove() {
                 <USelect
                   v-model="details.kind"
                   :items="KINDS"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField
@@ -243,14 +230,12 @@ async function remove() {
                   v-model="details.categoryTermId"
                   :items="categories"
                   placeholder="Choose a category"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField label="Season">
                 <USelect
                   v-model="details.seasonId"
                   :items="seasons"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField
@@ -260,14 +245,12 @@ async function remove() {
                 <UInput
                   v-model="details.companyName"
                   maxlength="200"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField label="Running time in minutes">
                 <UInputNumber
                   v-model="details.runningMinutes"
                   :min="1"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField label="Intervals">
@@ -275,7 +258,6 @@ async function remove() {
                   v-model="details.intervalCount"
                   :min="0"
                   :max="10"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField
@@ -285,7 +267,6 @@ async function remove() {
                 <UInput
                   v-model="details.ageGuidance"
                   maxlength="40"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField
@@ -295,7 +276,6 @@ async function remove() {
                 <UInput
                   v-model="details.slug"
                   maxlength="60"
-                  class="w-full"
                 />
               </UFormField>
             </div>
@@ -306,7 +286,6 @@ async function remove() {
               <UInput
                 v-model="details.externalBookingUrl"
                 type="url"
-                class="w-full"
               />
             </UFormField>
             <UCheckbox
@@ -318,30 +297,26 @@ async function remove() {
               label="List it on what's on"
               description="Turn off to keep a published production out of lists and feeds while its own page still answers."
             />
+          </UForm>
+          <template #footer>
             <UButton
               type="submit"
+              form="production-details"
               label="Save production"
               :disabled="!details.title.trim()"
             />
-          </form>
-        </section>
+          </template>
+        </PageSection>
 
-        <section
-          class="space-y-4"
-          aria-labelledby="production-advisories"
+        <PageSection
+          title="Advisories"
+          description="List what people may want to know before they come, or confirm there is nothing. Publishing needs one or the other, so silence is never taken for &quot;nothing to warn about&quot;."
         >
-          <h2
+          <UForm
             id="production-advisories"
-            class="text-base font-semibold"
-          >
-            Advisories
-          </h2>
-          <p class="text-sm text-muted">
-            List what people may want to know before they come, or confirm there is nothing. Publishing needs one or the other, so silence is never taken for "nothing to warn about".
-          </p>
-          <form
+            :state="chosen"
             class="space-y-3"
-            @submit.prevent="saveAdvisories"
+            @submit="saveAdvisories"
           >
             <div
               v-for="a in shownAdvisories"
@@ -368,14 +343,17 @@ async function remove() {
               v-model="confirmedNone"
               label="This production has no advisories"
             />
+          </UForm>
+          <template #footer>
             <UButton
               type="submit"
+              form="production-advisories"
               label="Save advisories"
               color="neutral"
               variant="outline"
             />
-          </form>
-        </section>
+          </template>
+        </PageSection>
       </div>
     </DataBoundary>
   </PageFrame>
