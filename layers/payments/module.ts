@@ -3,7 +3,7 @@
 // through the point payments.settlement, so it never imports Box office, a bar or anything else that
 // sells. Cash and attested card ship with it, so a desk works on day one with no account anywhere.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, point, setting, task } from '#kit'
+import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'payments.settings.manage'
@@ -38,6 +38,7 @@ export default defineModule({
   }),
   abilities: defineAbilities('payments', {
     'provider.manage': ability({ risk: 'privileged' }),
+    'attempt.reconcile': ability({ on: 'payments.attempt', risk: 'privileged' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -54,12 +55,22 @@ export default defineModule({
       'payments.intent.succeeded': event({ version: 1, payload: z.object({ intentId: z.string(), owners }), internal: true }),
       'payments.intent.unfulfilled': event({ version: 1, payload: z.object({ intentId: z.string(), owners }), internal: true }),
       'payments.intent.expired': event({ version: 1, payload: z.object({ intentId: z.string(), owners }), internal: true }),
+      // An operational alarm for staff.
+      'payments.attempt.unknown': event({ version: 1, payload: z.object({ attemptId: z.string() }), internal: true }),
     },
   },
 
   tasks: {
     // The backstop for a sale prepared and never paid.
     'payments.expire-intents': task({ every: '5m' }),
+    // Asks providers about attempts still waiting, and marks unknown those past the time allowed.
+    'payments.reconcile-attempts': task({ every: '5m' }),
+    'payments.prune-webhooks': task({ dailyAt: '03:40' }),
+  },
+
+  jobs: {
+    // One stored, verified webhook event. Retried while the provider has no answer.
+    'payments.handle-webhook': job({ payload: z.object({ webhookEventId: z.string() }), retries: 8 }),
   },
 
   contributes: {
@@ -73,5 +84,6 @@ export default defineModule({
     ],
     'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
+    'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
   },
 })

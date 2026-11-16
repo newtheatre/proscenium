@@ -48,7 +48,7 @@ function recordMove(unit: UnitView, attempt: AttemptRow, answer: Answer, source:
   const by = source.kind === 'person' ? actor.accountId ?? null : null
   const from = FROM[answer.state]
   unit.add({
-    sql: `UPDATE payments_attempts SET state = ?, provider_ref = coalesce(?, provider_ref), fee_minor = coalesce(?, fee_minor), failure_code = ?, answered_by = coalesce(?, answered_by), answered_at = ?, updated_at = ?
+    sql: `UPDATE payments_attempts SET state = ?, provider_ref = coalesce(provider_ref, ?), fee_minor = coalesce(?, fee_minor), failure_code = ?, answered_by = coalesce(?, answered_by), answered_at = ?, updated_at = ?
       WHERE id = ? AND state IN (SELECT value FROM json_each(?))`,
     params: [answer.state, 'providerRef' in answer ? answer.providerRef ?? null : null, answer.state === 'succeeded' ? answer.feeMinor ?? null : null, answer.state === 'failed' ? answer.failureCode : null, by, answer.state === 'pending' ? null : at, at, attempt.id, JSON.stringify(from)],
   }).expect(1, { code: 'payments.attempt.already-answered', reason: 'This payment already has its answer.' })
@@ -116,6 +116,7 @@ async function settle(unit: UnitView, intent: IntentRow, parts: PartRow[], attem
 export async function applyAnswer(unit: UnitView, attempt: AttemptRow, answer: Answer, source: Source): Promise<{ changed: boolean, settled: boolean }> {
   if (attempt.state === answer.state || !FROM[answer.state].includes(attempt.state)) return { changed: false, settled: false }
   recordMove(unit, attempt, answer, source)
+  if (answer.state === 'unknown') unit.announce('payments.attempt.unknown', { attemptId: attempt.id }, { record: ['payments.attempt', attempt.id] })
   if (answer.state !== 'succeeded') return { changed: true, settled: false }
   const intent = (await getIntent(attempt.intent_id))!
   const paid = (await moneyLines(intent.id)).reduce((sum, l) => sum + l.amountMinor, 0) + attempt.amount_minor
@@ -191,4 +192,13 @@ export function addAttempt(unit: UnitView, input: { intentId: string, providerAc
   })
   unit.add({ sql: "INSERT INTO payments_attempt_events (id, attempt_id, kind, source, at) VALUES (?, ?, 'started', 'system', ?)", params: [newId('ate'), id, at] })
   return row
+}
+
+/**
+ * The provider's answer as this attempt can take it. An attempt already unknown cannot be cancelled,
+ * so the provider saying it stopped means it was not paid.
+ */
+export function fitAnswer(attempt: AttemptRow, answer: ProviderAnswer): ProviderAnswer {
+  if (attempt.state === 'unknown' && answer.state === 'cancelled') return { state: 'failed', providerRef: answer.providerRef, failureCode: 'cancelled' }
+  return answer
 }

@@ -40,12 +40,18 @@ export interface PaymentProvider {
   methods: readonly { method: Method, channels: readonly ('online' | 'desk')[] }[]
   /** The Worker secrets it needs, by name. None for cash and attested card. */
   secrets: readonly string[]
+  /** Which of its secrets signs its webhooks, if it sends any. */
+  webhookSecret?: string
   /** Begin a payment. Not given for an attested provider: a person records the answer instead. */
   start?: (attempt: ProviderAttempt) => Promise<{ next: NextStep, providerRef?: string, answer?: ProviderAnswer }>
   /** Ask the provider for the truth now. Required unless attested. */
   status?: (attempt: ProviderAttempt) => Promise<ProviderAnswer | 'unknown'>
   /** Ask the provider to stop a payment waiting on a reader; true once it confirms it stopped. */
   cancel?: (attempt: ProviderAttempt) => Promise<boolean>
-  /** Check a webhook's signature; give the provider's event id, its type and the reference it concerns. */
+  /**
+   * Check a webhook's signature; give the provider's event id, its type and the reference it
+   * concerns. Null when the body cannot be read at all. Nothing in the body is trusted beyond which
+   * attempt to ask about: the handler always asks `status` for the truth.
+   */
   verifyWebhook?: (request: { body: string, headers: Record<string, string>, secret: string | undefined }) => Promise<{ ok: boolean, eventId: string, type: string, providerRef?: string } | null>
 }
