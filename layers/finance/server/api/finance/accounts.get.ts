@@ -1,5 +1,6 @@
 // The chart of accounts, with each account's balance across every sealed posting.
 import { all, defineRoute } from '#kit'
+import { useRegistry } from '#kit/registry'
 import { balances } from '../../ledger'
 
 export default defineRoute({ ability: 'finance.ledger.view', rateLimit: 'default' }, async () => {
@@ -7,6 +8,8 @@ export default defineRoute({ ability: 'finance.ledger.view', rateLimit: 'default
     'SELECT id, code, name, kind, module, system_key, scope, active FROM finance_accounts ORDER BY code')
   const totals = await balances()
   return {
+    // The modules an added account may be given to.
+    modules: [...useRegistry().modules.keys()].sort(),
     accounts: rows.map(r => ({
       id: r.id,
       code: r.code,

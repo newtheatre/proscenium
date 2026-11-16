@@ -39,6 +39,7 @@ const props = defineProps<{
   /** 'site' draws every setting declared with scope 'site', whichever module declares it (Site administration). */
   scope?: 'module' | 'site'
   title: string
+  trail?: { label: string, to: string }[]
   /** A setting to scroll into view and highlight, from settings search. */
   highlight?: string
   /** Only settings whose key starts with one of these, for a page of one subject (Sign-in). */
@@ -154,6 +155,7 @@ onMounted(() => {
 <template>
   <PageFrame
     :title="title"
+    :trail="trail"
     width="reading"
   >
     <SettingsSearch />

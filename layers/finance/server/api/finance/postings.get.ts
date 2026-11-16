@@ -1,7 +1,7 @@
 // Sealed postings with their entries, newest first; filter by account, production, performance or
 // period. Every posting names its source, so a screen can link to it.
 import { z } from 'zod'
-import { all, defineRoute, idSchema } from '#kit'
+import { all, can, defineRoute, idSchema } from '#kit'
 
 const PAGE = 50 // not-policy: one page of the ledger
 
@@ -15,7 +15,7 @@ export default defineRoute({
     performanceId: z.string().max(40).optional(), // not-policy: an id's bound
     before: idSchema('post').optional(),
   }),
-}, async (_event, { input }) => {
+}, async (_event, { input, actor }) => {
   const where = ['EXISTS (SELECT 1 FROM finance_seals s WHERE s.posting_id = p.id)']
   const params: unknown[] = []
   const add = (clause: string, value: unknown) => {
@@ -46,5 +46,7 @@ export default defineRoute({
       entries: lines.filter(l => l.posting_id === p.id).map(l => ({ accountId: l.account_id, code: l.code, name: l.name, amountMinor: l.amount_minor, currency: l.currency, productionId: l.production_id, performanceId: l.performance_id })),
     })),
     next: postings.length === PAGE ? postings.at(-1)!.id : null,
+    // Whether the viewer may reverse a posting, so the screen offers it only to them.
+    canCorrect: (await can(actor, 'finance.posting.correct')).allowed,
   }
 })

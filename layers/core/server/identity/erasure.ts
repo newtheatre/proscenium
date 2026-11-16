@@ -107,7 +107,7 @@ export async function eraseAccount(unit: UnitView, accountId: string): Promise<{
   const owner = await isOwner(accountId)
   const params = [accountId, JSON.stringify(emails), at]
   // Live grants end, as history: core_grants is append-only and keeps who held what.
-  unit.add(bound(`INSERT INTO core_grant_ends (grant_id, ended_at, ended_by, ended_reason) SELECT g.id, ?3, NULL, 'account_closed' FROM core_grants g WHERE g.account_id = ?1 AND ${LIVE.replaceAll('?', '?3')}`, params))
+  unit.add(bound(`INSERT INTO core_grant_ends (grant_id, ended_at, ended_by, ended_reason) SELECT g.id, ?3, NULL, 'account_closed' FROM core_grants g WHERE g.account_id ${SCOPE} AND ${LIVE.replaceAll('?', '?3')}`, params))
   for (const handler of await usePoint<ErasureHandler>('core.erasure-handler')) await handler.value.erase(unit, { accountId, emails })
   const plan = erasurePlan()
   for (const step of plan) {

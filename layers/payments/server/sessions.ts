@@ -6,6 +6,7 @@
 import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
 import { postEntries } from '#modules/finance'
 import { exactAccount, inAccountScope } from './account-scope'
+import { labelsOf } from './people'
 
 export interface SessionRow { id: string, point_label: string, opened_by: string, closed_by: string | null, opened_at: number, closed_at: number | null, state: 'open' | 'counting' | 'closed', float_minor: number, expected_cash_minor: number | null, counted_cash_minor: number | null, variance_note: string | null, currency: string }
 
@@ -106,15 +107,18 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
   return { varianceMinor: variance }
 }
 
-export interface SessionSummary { id: string, pointLabel: string, openedBy: string, closedBy: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
+export interface SessionSummary { id: string, pointLabel: string, openedBy: string, openedByName: string, closedBy: string | null, closedByName: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
 
-export async function summarise(session: SessionRow): Promise<SessionSummary> {
+export async function summarise(session: SessionRow, names?: Map<string, string>): Promise<SessionSummary> {
   const expected = session.expected_cash_minor ?? await expectedCash(session)
+  const label = names ?? await labelsOf([session.opened_by, session.closed_by])
   return {
     id: session.id,
     pointLabel: session.point_label,
     openedBy: session.opened_by,
+    openedByName: label.get(session.opened_by) ?? '',
     closedBy: session.closed_by,
+    closedByName: session.closed_by ? label.get(session.closed_by) ?? '' : null,
     openedAt: session.opened_at,
     closedAt: session.closed_at,
     state: session.state,
@@ -129,5 +133,24 @@ export async function summarise(session: SessionRow): Promise<SessionSummary> {
 
 export async function listSessions(limit: number): Promise<SessionSummary[]> {
   const rows = await all<SessionRow>('SELECT * FROM payments_sessions ORDER BY opened_at DESC LIMIT ?', limit)
-  return Promise.all(rows.map(summarise))
+  const names = await labelsOf(rows.flatMap(r => [r.opened_by, r.closed_by]))
+  return Promise.all(rows.map(r => summarise(r, names)))
+}
+
+const SECOND = 1000 // not-policy: settings hold seconds, times are milliseconds
+
+export interface WaitingAttempt { id: string, method: string, amountMinor: number, currency: string, state: string, provider: string, startedAt: number, unknownAt: number | null }
+
+/**
+ * The payments in a session still waiting for an answer: what stops it being counted. A started or
+ * pending one becomes unknown at unknownAt if nothing answers; an unknown one waits for someone to
+ * settle it on Needs attention.
+ */
+export async function waitingIn(sessionId: string): Promise<WaitingAttempt[]> {
+  const answerWithin = await useSetting('payments.attempts.answer-within') as number
+  const rows = await all<{ id: string, method: string, amount_minor: number, currency: string, state: string, label: string, started_at: number }>(
+    `SELECT a.id, a.method, a.amount_minor, i.currency, a.state, p.label, a.started_at FROM payments_attempts a
+      JOIN payments_intents i ON i.id = a.intent_id JOIN payments_provider_accounts p ON p.id = a.provider_account_id
+      WHERE i.session_id = ? AND a.state IN ('started', 'pending', 'unknown') ORDER BY a.started_at`, sessionId)
+  return rows.map(r => ({ id: r.id, method: r.method, amountMinor: r.amount_minor, currency: r.currency, state: r.state, provider: r.label, startedAt: r.started_at, unknownAt: r.state === 'unknown' ? null : r.started_at + answerWithin * SECOND }))
 }

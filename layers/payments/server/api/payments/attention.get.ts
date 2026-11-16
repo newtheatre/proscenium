@@ -1,5 +1,6 @@
 // What Needs attention lists (Box office specification, part 5): attempts with no answer, with how
-// long each has waited, and payments taken that could not be completed and are not yet refunded.
+// long each has waited, payments taken that could not be completed and are not yet refunded, and
+// refunds the provider turned down.
 import { z } from 'zod'
 import { all, defineRoute, nowMs } from '#kit'
 
@@ -17,8 +18,12 @@ export default defineRoute({
     `SELECT i.id, i.amount_minor, i.currency, i.updated_at FROM payments_intents i WHERE i.state = 'unfulfilled'
       AND NOT EXISTS (SELECT 1 FROM payments_refunds r JOIN payments_intent_parts p ON p.id = r.part_id WHERE p.intent_id = i.id AND r.state = 'succeeded')
       ORDER BY i.updated_at`)
+  const failed = await all<{ id: string, amount_minor: number, currency: string, method: string, updated_at: number }>(
+    `SELECT r.id, r.amount_minor, i.currency, a.method, r.updated_at FROM payments_refunds r JOIN payments_attempts a ON a.id = r.attempt_id
+      JOIN payments_intents i ON i.id = a.intent_id WHERE r.state = 'failed' ORDER BY r.updated_at`)
   return {
     unknown: unknown.map(a => ({ id: a.id, intentId: a.intent_id, method: a.method, amountMinor: a.amount_minor, currency: a.currency, providerRef: a.provider_ref, provider: a.label, waitingMs: now - a.started_at })),
     unfulfilled: unfulfilled.map(i => ({ id: i.id, amountMinor: i.amount_minor, currency: i.currency, sinceMs: now - i.updated_at })),
+    failedRefunds: failed.map(r => ({ id: r.id, amountMinor: r.amount_minor, currency: r.currency, method: r.method, sinceMs: now - r.updated_at })),
   }
 })
