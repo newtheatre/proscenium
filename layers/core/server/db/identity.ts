@@ -12,7 +12,7 @@ import { defineTable, col } from '#kit/db'
 
 export const ACCOUNT_ORIGINS = ['setup', 'self', 'guest', 'named-by-other', 'invite', 'staff'] as const
 export const DISABLED_REASONS = ['security', 'conduct', 'requested', 'duplicate'] as const
-export const TOKEN_PURPOSES = ['sign_in', 'verify_address', 'invite', 'enrol_passkey', 'owner_recovery', 'confirm_merge', 'confirm_erasure'] as const
+export const TOKEN_PURPOSES = ['sign_in', 'verify_address', 'invite', 'enrol_passkey', 'owner_recovery', 'confirm_merge', 'confirm_erasure', 'reassert'] as const
 export const SESSION_END_REASONS = ['signed_out', 'ended_by_person', 'ended_by_staff', 'credential_changed', 'disabled', 'merged', 'erased'] as const
 export const GRANT_END_REASONS = ['revoked', 'replaced', 'role_archived', 'account_closed', 'merged', 'given_up'] as const
 
@@ -304,7 +304,97 @@ export const emergencyContacts = defineTable('core_emergency_contacts', {
   extra: t => [index('core_emergency_contacts_account').on(t.accountId), check('core_emergency_contacts_relationship', sql`${t.relationship} IS NULL OR length(${t.relationship}) BETWEEN 1 AND 40`)],
 })
 
+export const DATA_REQUEST_KINDS = ['export', 'erasure'] as const
+export const DATA_REQUEST_STATES = ['requested', 'confirmed', 'held', 'running', 'done', 'cancelled', 'failed'] as const
+/** How staff checked who somebody was when they started a request for them (ID-35). */
+export const IDENTITY_CHECKS = ['signed-in', 'email-reply', 'in-person', 'document', 'known'] as const
+
+/**
+ * A request to download or erase a person's data, by them or by staff for them (ID-15, ID-16,
+ * ID-35). Kept as the record that the request was met; it holds no personal content.
+ */
+export const dataRequests = defineTable('core_data_requests', {
+  id: col.id(),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias' }),
+  kind: col.internal(text('kind', { enum: DATA_REQUEST_KINDS }).notNull()),
+  state: col.internal(text('state', { enum: DATA_REQUEST_STATES }).notNull()),
+  requestedBy: col.account('requested_by', { role: 'actor', onMerge: 'alias' }),
+  requestedAt: col.timestamp('requested_at').notNull(),
+  // Null when the person asked for themselves, signed in.
+  identityCheck: col.internal(text('identity_check', { enum: IDENTITY_CHECKS })),
+  respondBy: col.timestamp('respond_by').notNull(),
+  notBefore: col.timestamp('not_before'),
+  // A JSON list of the hold codes modules raised, never free text.
+  holds: col.internal(text('holds')),
+  fileId: col.internal(text('file_id')),
+  finishedAt: col.timestamp('finished_at'),
+  // Staff close a request once every unlinked table has been searched by hand.
+  closedAt: col.timestamp('closed_at'),
+  closedBy: col.account('closed_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+}, {
+  id: 'dreq',
+  realm: 'operational',
+  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore)],
+})
+
+/** One line of a request's hand-search checklist: a table that may hold rows linked to no account. */
+export const dataRequestChecks = defineTable('core_data_request_checks', {
+  requestId: col.ref('core_data_requests'),
+  tableName: col.internal(text('table_name').notNull()),
+  outcome: col.internal(text('outcome', { enum: ['nothing-found', 'handled'] }).notNull()),
+  tickedBy: col.account('ticked_by', { role: 'actor', onMerge: 'alias' }),
+  tickedAt: col.timestamp('ticked_at').notNull(),
+}, { realm: 'operational', subject: 'none', extra: t => [primaryKey({ columns: [t.requestId, t.tableName] })] })
+
+export const ACCESS_STATUSES = ['submitted', 'more-info', 'accepted', 'rejected'] as const
+export const VERIFIED_METHODS = ['access-card', 'document', 'known'] as const
+
+/**
+ * A person's application to the access scheme and, once accepted, the needs in force (ID-38 to
+ * ID-44). At most one per account. What it says may reveal health, so it is held in special columns,
+ * sealed, and never searched, filtered or listed outside the reviewers' queue.
+ */
+export const accessProfiles = defineTable('core_access_profiles', {
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
+  status: col.internal(text('status', { enum: ACCESS_STATUSES }).notNull()),
+  // The needs and companions in force; set exactly while accepted.
+  payload: col.special('payload'),
+  // An application or a change waiting for a decision.
+  pending: col.special('pending'),
+  // The reviewer's latest message to the person.
+  message: col.special('message'),
+  submittedAt: col.timestamp('submitted_at').notNull(),
+  submittedVia: col.internal(text('submitted_via', { enum: ['self', 'staff'] }).notNull()),
+  submittedBy: col.account('submitted_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  decidedAt: col.timestamp('decided_at'),
+  decidedBy: col.account('decided_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  verifiedAt: col.timestamp('verified_at'),
+  verifiedBy: col.account('verified_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  verifiedMethod: col.special('verified_method'),
+  // The companions the verification was seen for: a change to the number clears the mark.
+  verifiedCompanions: col.internal(integer('verified_companions')),
+  reviewDue: col.timestamp('review_due'),
+  reminders: col.internal(integer('reminders').notNull().default(0)),
+  flaggedAt: col.timestamp('flagged_at'),
+  updatedAt: col.updatedAt(),
+}, {
+  realm: 'audience',
+  onErasure: 'delete-row',
+  extra: t => [
+    primaryKey({ columns: [t.accountId] }),
+    check('core_access_profiles_payload_when_accepted', sql`(status = 'accepted') = (payload IS NOT NULL)`),
+    check('core_access_profiles_verified_when_accepted', sql`verified_at IS NULL OR status = 'accepted'`),
+  ],
+})
+
+/** One row for each purpose a person agreed may read their access needs. No row, no sharing. */
+export const accessShares = defineTable('core_access_shares', {
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
+  purpose: col.internal(text('purpose').notNull()),
+  createdAt: col.createdAt(),
+}, { realm: 'audience', onErasure: 'delete-row', extra: t => [primaryKey({ columns: [t.accountId, t.purpose] })] })
+
 export const identityTables = {
   accounts, accountEmails, passkeys, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
-  roles, roleAbilities, factAbilities, grants, grantEnds, accountMerges, accountMergeItems, emergencyContacts,
+  roles, roleAbilities, factAbilities, grants, grantEnds, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
 }

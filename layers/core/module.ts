@@ -24,14 +24,16 @@ export default defineModule({
   records: { ...records, ...identity.identityRecords, ...domain.records },
   facts: { ...identity.identityFacts },
   tables: { ...tables, ...domainTables },
-  points: { ...points, ...domain.points },
+  points: { ...points, ...identity.identityPoints, ...domain.points },
   contributes: {
     ...domain.contributes,
     ...identity.identityContributions,
     'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }],
+    'core.vocabulary': [...domain.contributes['core.vocabulary'], ...identity.identityContributions['core.vocabulary']],
     // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
+      { id: 'core.venues', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
       { id: 'core.email', menu: 'console', group: 'system', section: 'setup', to: '/console/system/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.seasons', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20 },

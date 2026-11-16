@@ -88,6 +88,8 @@ export const records = defineRecords('core', {
   vocabulary: record({ table: 'core_vocabularies' }),
   season: record({ table: 'core_seasons' }),
   production: record({ table: 'core_productions' }),
+  venue: record({ table: 'core_venues' }),
+  space: record({ table: 'core_spaces', parent: 'core.venue' }),
 })
 
 export const abilities = defineAbilities('core', {
@@ -106,6 +108,8 @@ export const abilities = defineAbilities('core', {
   'production.publish': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.edit'] }),
   'season.manage': ability(),
   'programme.configure': ability(),
+  // A venue and its spaces. Creating a venue needs it site-wide; a grant on one venue covers its spaces.
+  'venue.manage': ability({ on: 'core.venue', grantAt: ['site', 'record'] }),
 })
 
 const variableName = z.string().regex(/^[a-z][a-zA-Z0-9]*$/)
@@ -251,6 +255,8 @@ export const announces = {
   'core.production.published': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
   'core.production.updated': event({ version: 1, payload: z.object({ productionId: z.string(), fields: z.array(z.enum(PRODUCTION_PUBLIC_FIELDS)) }), internal: false }),
   'core.production.withdrawn': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
+  'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
+  'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.file.rejected': event({ version: 1, payload: z.object({ fileId: z.string(), reason: code() }), internal: true }),
   'core.file.deleted': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),

@@ -1,12 +1,19 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "9088364e-0cab-48aa-b4fc-c11dc881bda8",
+  "id": "dad7e1ea-590d-45e6-a11d-1d1bd48e9d90",
   "prevIds": [
-    "b58fe255-1bfb-465f-a30f-ffaaf78a96b4",
-    "bf5de3ce-afa2-4dc4-96ed-14d5b94e4551"
+    "3df4d1c2-528f-49ce-bcaf-6a133ffb4485"
   ],
   "ddl": [
+    {
+      "name": "core_access_profiles",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_access_shares",
+      "entityType": "tables"
+    },
     {
       "name": "core_account_emails",
       "entityType": "tables"
@@ -33,6 +40,14 @@
     },
     {
       "name": "core_credentials",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_data_request_checks",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_data_requests",
       "entityType": "tables"
     },
     {
@@ -120,15 +135,7 @@
       "entityType": "tables"
     },
     {
-      "name": "core_production_advisories",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_production_slugs",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_productions",
+      "name": "core_place_access",
       "entityType": "tables"
     },
     {
@@ -141,10 +148,6 @@
     },
     {
       "name": "core_roles",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_seasons",
       "entityType": "tables"
     },
     {
@@ -168,6 +171,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_spaces",
+      "entityType": "tables"
+    },
+    {
       "name": "core_task_runs",
       "entityType": "tables"
     },
@@ -176,8 +183,222 @@
       "entityType": "tables"
     },
     {
+      "name": "core_venues",
+      "entityType": "tables"
+    },
+    {
       "name": "core_vocabularies",
       "entityType": "tables"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "payload",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "pending",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "message",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "submitted_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "submitted_via",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "submitted_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_method",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_companions",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "review_due",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "reminders",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "flagged_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "purpose",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
     },
     {
       "table": "core_account_emails",
@@ -902,6 +1123,196 @@
     {
       "table": "core_credentials",
       "name": "hint",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "request_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "table_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "outcome",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "ticked_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "ticked_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "requested_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "identity_check",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "respond_by",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "not_before",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "holds",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "file_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "finished_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "closed_by",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -2760,77 +3171,7 @@
       "entityType": "columns"
     },
     {
-      "table": "core_production_advisories",
-      "name": "production_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_advisories",
-      "name": "term_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_advisories",
-      "name": "detail",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_advisories",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_slugs",
-      "name": "slug",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_slugs",
-      "name": "production_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_production_slugs",
-      "name": "retired_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
+      "table": "core_place_access",
       "name": "id",
       "type": "text",
       "notNull": false,
@@ -2840,8 +3181,8 @@
       "entityType": "columns"
     },
     {
-      "table": "core_productions",
-      "name": "slug",
+      "table": "core_place_access",
+      "name": "venue_id",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -2850,8 +3191,18 @@
       "entityType": "columns"
     },
     {
-      "table": "core_productions",
-      "name": "title",
+      "table": "core_place_access",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_place_access",
+      "name": "term_id",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -2860,8 +3211,8 @@
       "entityType": "columns"
     },
     {
-      "table": "core_productions",
-      "name": "subtitle",
+      "table": "core_place_access",
+      "name": "note",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -2870,212 +3221,12 @@
       "entityType": "columns"
     },
     {
-      "table": "core_productions",
-      "name": "summary",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "description",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "category_term_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "season_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "company_name",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "age_guidance",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "advisories_confirmed_none",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "content_note",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "running_minutes",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "interval_count",
+      "table": "core_place_access",
+      "name": "sort",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
       "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "external_booking_url",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "credits_public",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'draft'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "cancel_reason_term_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "listed",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "published_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "first_starts_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "last_ends_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "created_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -3264,96 +3415,6 @@
       "name": "archived_at",
       "type": "integer",
       "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "slug",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "starts_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "ends_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "summary",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'draft'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_seasons",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -3720,6 +3781,136 @@
       "entityType": "columns"
     },
     {
+      "table": "core_spaces",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "kind_term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "default_capacity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "performable",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "exclusive",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "access_info",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_task_runs",
       "name": "task",
       "type": "text",
@@ -3881,6 +4072,156 @@
     },
     {
       "table": "core_terms",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "managed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "address_lines",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "locality",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "postcode",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "country",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "latitude",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "longitude",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "access_info",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "getting_here",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
       "name": "created_at",
       "type": "integer",
       "notNull": true,
@@ -4097,6 +4438,46 @@
         },
         {
           "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "core_data_requests_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "kind",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "core_data_requests_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "not_before",
           "isExpression": false
         }
       ],
@@ -4502,61 +4883,23 @@
       "entityType": "indexes"
     },
     {
-      "table": "core_productions",
-      "name": "core_productions_slug",
+      "table": "core_place_access",
+      "name": "core_place_access_term",
       "columns": [
         {
-          "value": "slug",
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "coalesce(\"space_id\", '')",
+          "isExpression": true
+        },
+        {
+          "value": "term_id",
           "isExpression": false
         }
       ],
       "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_listing",
-      "columns": [
-        {
-          "value": "state",
-          "isExpression": false
-        },
-        {
-          "value": "last_ends_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_season",
-      "columns": [
-        {
-          "value": "season_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_category",
-      "columns": [
-        {
-          "value": "category_term_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
       "where": null,
       "origin": "manual",
       "entityType": "indexes"
@@ -4596,34 +4939,6 @@
         {
           "value": "key",
           "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_seasons",
-      "name": "core_seasons_slug",
-      "columns": [
-        {
-          "value": "slug",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_seasons",
-      "name": "core_seasons_name",
-      "columns": [
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
         }
       ],
       "isUnique": true,
@@ -4728,6 +5043,60 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_spaces",
+      "name": "core_spaces_venue_pair",
+      "columns": [
+        {
+          "value": "id",
+          "isExpression": false
+        },
+        {
+          "value": "venue_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_spaces",
+      "name": "core_spaces_slug",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_spaces",
+      "name": "core_spaces_name",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_terms",
       "name": "core_terms_slug",
       "columns": [
@@ -4782,12 +5151,41 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_venues",
+      "name": "core_venues_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_account_merge_items",
       "name": "fk_core_account_merge_items_merge_id_core_account_merges_id_fk",
       "columns": [
         "merge_id"
       ],
       "tableTo": "core_account_merges",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "fk_core_data_request_checks_request_id_core_data_requests_id_fk",
+      "columns": [
+        "request_id"
+      ],
+      "tableTo": "core_data_requests",
       "columnsTo": [
         "id"
       ],
@@ -4902,12 +5300,12 @@
       "entityType": "fks"
     },
     {
-      "table": "core_production_advisories",
-      "name": "fk_core_production_advisories_production_id_core_productions_id_fk",
+      "table": "core_place_access",
+      "name": "fk_core_place_access_venue_id_core_venues_id_fk",
       "columns": [
-        "production_id"
+        "venue_id"
       ],
-      "tableTo": "core_productions",
+      "tableTo": "core_venues",
       "columnsTo": [
         "id"
       ],
@@ -4917,8 +5315,8 @@
       "entityType": "fks"
     },
     {
-      "table": "core_production_advisories",
-      "name": "fk_core_production_advisories_term_id_core_terms_id_fk",
+      "table": "core_place_access",
+      "name": "fk_core_place_access_term_id_core_terms_id_fk",
       "columns": [
         "term_id"
       ],
@@ -4932,62 +5330,19 @@
       "entityType": "fks"
     },
     {
-      "table": "core_production_slugs",
-      "name": "fk_core_production_slugs_production_id_core_productions_id_fk",
+      "table": "core_place_access",
+      "name": "fk_core_place_access_space_id_venue_id_core_spaces_id_venue_id_fk",
       "columns": [
-        "production_id"
+        "space_id",
+        "venue_id"
       ],
-      "tableTo": "core_productions",
+      "tableTo": "core_spaces",
       "columnsTo": [
-        "id"
+        "id",
+        "venue_id"
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_productions",
-      "name": "fk_core_productions_category_term_id_core_terms_id_fk",
-      "columns": [
-        "category_term_id"
-      ],
-      "tableTo": "core_terms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_productions",
-      "name": "fk_core_productions_season_id_core_seasons_id_fk",
-      "columns": [
-        "season_id"
-      ],
-      "tableTo": "core_seasons",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_productions",
-      "name": "fk_core_productions_cancel_reason_term_id_core_terms_id_fk",
-      "columns": [
-        "cancel_reason_term_id"
-      ],
-      "tableTo": "core_terms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -4998,6 +5353,36 @@
         "role_id"
       ],
       "tableTo": "core_roles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_spaces",
+      "name": "fk_core_spaces_venue_id_core_venues_id_fk",
+      "columns": [
+        "venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_spaces",
+      "name": "fk_core_spaces_kind_term_id_core_terms_id_fk",
+      "columns": [
+        "kind_term_id"
+      ],
+      "tableTo": "core_terms",
       "columnsTo": [
         "id"
       ],
@@ -5037,6 +5422,25 @@
       "entityType": "fks"
     },
     {
+      "table": "core_access_profiles",
+      "name": "core_access_profiles_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "core_access_shares_pk",
+      "columns": [
+        "account_id",
+        "purpose"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_account_merge_items",
       "name": "core_account_merge_items_pk",
       "columns": [
@@ -5054,6 +5458,16 @@
       "columns": [
         "module_id",
         "name"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "core_data_request_checks_pk",
+      "columns": [
+        "request_id",
+        "table_name"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -5096,16 +5510,6 @@
         "account_id",
         "topic_key",
         "channel"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_production_advisories",
-      "name": "core_production_advisories_pk",
-      "columns": [
-        "production_id",
-        "term_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -5169,6 +5573,15 @@
     {
       "table": "core_audit",
       "name": "core_audit_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "core_data_requests_pk",
       "columns": [
         "id"
       ],
@@ -5311,17 +5724,8 @@
       "entityType": "pks"
     },
     {
-      "table": "core_production_slugs",
-      "name": "core_production_slugs_pk",
-      "columns": [
-        "slug"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_pk",
+      "table": "core_place_access",
+      "name": "core_place_access_pk",
       "columns": [
         "id"
       ],
@@ -5340,15 +5744,6 @@
     {
       "table": "core_roles",
       "name": "core_roles_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_seasons",
-      "name": "core_seasons_pk",
       "columns": [
         "id"
       ],
@@ -5401,8 +5796,26 @@
       "entityType": "pks"
     },
     {
+      "table": "core_spaces",
+      "name": "core_spaces_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_terms",
       "name": "core_terms_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_pk",
       "columns": [
         "id"
       ],
@@ -5426,6 +5839,27 @@
       ],
       "nameExplicit": false,
       "entityType": "uniques"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_slug_unique",
+      "columns": [
+        "slug"
+      ],
+      "nameExplicit": false,
+      "entityType": "uniques"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "core_access_profiles_payload_when_accepted",
+      "value": "(status = 'accepted') = (payload IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "core_access_profiles_verified_when_accepted",
+      "value": "verified_at IS NULL OR status = 'accepted'",
+      "entityType": "checks"
     },
     {
       "table": "core_accounts",
@@ -5530,63 +5964,9 @@
       "entityType": "checks"
     },
     {
-      "table": "core_production_advisories",
-      "name": "core_production_advisories_detail",
-      "value": "\"detail\" IS NULL OR length(\"detail\") <= 300",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_state",
-      "value": "\"state\" IN ('draft', 'published', 'withdrawn', 'cancelled')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_kind",
-      "value": "\"kind\" IN ('own', 'visiting', 'hire', 'event')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_title",
-      "value": "length(\"title\") BETWEEN 1 AND 200",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_summary",
-      "value": "\"summary\" IS NULL OR length(\"summary\") <= 300",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_age",
-      "value": "\"age_guidance\" IS NULL OR length(\"age_guidance\") <= 40",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_running",
-      "value": "\"running_minutes\" IS NULL OR \"running_minutes\" > 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_intervals",
-      "value": "\"interval_count\" >= 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_booking_url",
-      "value": "\"external_booking_url\" IS NULL OR \"external_booking_url\" LIKE 'https://_%'",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_productions",
-      "name": "core_productions_cancel_reason",
-      "value": "(\"state\" = 'cancelled') = (\"cancel_reason_term_id\" IS NOT NULL)",
+      "table": "core_place_access",
+      "name": "core_place_access_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 200",
       "entityType": "checks"
     },
     {
@@ -5596,15 +5976,15 @@
       "entityType": "checks"
     },
     {
-      "table": "core_seasons",
-      "name": "core_seasons_state",
-      "value": "\"state\" IN ('draft', 'published', 'archived')",
+      "table": "core_spaces",
+      "name": "core_spaces_state",
+      "value": "\"state\" IN ('active', 'archived')",
       "entityType": "checks"
     },
     {
-      "table": "core_seasons",
-      "name": "core_seasons_dates",
-      "value": "\"ends_on\" >= \"starts_on\"",
+      "table": "core_spaces",
+      "name": "core_spaces_capacity",
+      "value": "\"default_capacity\" IS NULL OR \"default_capacity\" > 0",
       "entityType": "checks"
     },
     {
@@ -5617,6 +5997,24 @@
       "table": "core_terms",
       "name": "core_terms_description_length",
       "value": "\"description\" IS NULL OR length(\"description\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_state",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_position",
+      "value": "(\"latitude\" IS NULL) = (\"longitude\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_country",
+      "value": "\"country\" IS NULL OR length(\"country\") = 2",
       "entityType": "checks"
     },
     {
