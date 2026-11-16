@@ -87,6 +87,16 @@ Any module may import core's services without listing core: `import { notifyAddr
   where your records hold files as contributions to `core.file-slot`; uploads go to
   `POST /api/core/files?slot=<id>&owner=<record id>` and are checked and cleaned by a job.
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
+- Vocabularies, the shared lists of options such as production categories and advisories. Declare
+  yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
+  `<module>.<name>`); it is made the first time the module is on and from then on its terms are the
+  theatre's. A record stores the term's id in a `col.ref('core_terms')` column, never the label.
+  `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
+  label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
+  your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
+  is refused. Staff edit terms at `/console/system/vocabularies`; a term in use can be retired but
+  never deleted, and the restrict reference makes the database refuse it too. Merging terms
+  (C-22) comes later; `core.term.merged` is declared for it.
 
 ## The unit of work
 
@@ -123,7 +133,8 @@ a module that is switched on. Payloads hold ids, numbers, enums and `code()` val
 person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is the truth, so a
 duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
 with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`.
-Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
+Core alone may declare `events.listens: { deliverable: '<listener>' }`, the listener on
+`'deliverable'`: it hears every event not marked `internal: true`, for the webhook sender. Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
 `POST /api/core/jobs/<id>/cancel`, ability `core.job.manage`) cancels a job that has not started. A
 switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `weeklyOn` in the
 theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
@@ -138,6 +149,33 @@ fact resolver may give the accounts that hold it, `defineFact(resolve, { holders
 names a `menu` (account, members, console or live) and may set `hideEmpty` beside `count`; only an
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
+
+## Requirements
+
+A module that can judge a condition contributes a source to `core.requirement` under its own id,
+in `server/contributions/core.requirement/<id>.ts`:
+`export default defineRequirementSource({ options, describe, check, holder?, holderAbility?, checkAbility? })`.
+A host stores references as text, `<source>:<id>`, or `fact:<name>` for a fact, which core
+answers. It asks with
+`requirements.check({ accounts, refs, at?, record?, presented?, whenUnavailable })`, and every pair
+of account and reference gets `{ verdict: 'met' | 'not-met', unavailable, until?, reason?, summary?,
+evidence?, help?, quantity? }`. `whenUnavailable` is required: `'met'` where the requirement
+restricts who may do something, `'not-met'` where it grants a benefit. A source that is off, absent
+or fails answers unavailable. `quantity` (a whole number, nought or more) is kept only on a met
+verdict. With `checkAbility`, a check about any account but the actor's own reaches the source only
+if the actor holds that ability, and the read is audited against the account; a job or task never
+holds it. A check carrying a typed value counts against the `presented-value` rate-limit class, by
+session and by address; past it, those pairs answer not met and the source is not called.
+`requirements.holder(ref, evidence)` gives staff with the source's `holderAbility` a display name,
+and audits the read.
+
+## Public components
+
+A module offers a component to the fork's Markdown pages through `core.public-component`:
+`{ id, component: 'CoreAccessApplication', alias: 'access-application' }`. The component's own name
+starts with its module's name; the alias is what a content file writes (`::access-application`),
+kebab-case, unique across modules and never an HTML element's name. The build refuses a clash, and
+the core layer registers the component a second time, globally, under its alias.
 
 ## External calls
 
@@ -208,6 +246,12 @@ in the specification's "As built" list; this guide is the reference from here on
 - In phase 1 `notifyAddress` sends at once, inside the caller's job, so the job's lane is the lane;
   a notification type's `lane` takes effect with the full pipeline in phase 2.
 - An upload is one request carrying the bytes, rather than a begun upload and a second request.
+- Vocabulary terms keep `slug`, `label`, `description` and `icon` as public columns rather than per-row
+  columns classed by the vocabulary's `term_class`: a per-row column needs a subject, which
+  `core_terms` does not have. No vocabulary core ships is internal; one that is waits on the kit
+  supporting a class taken one hop away.
+- A vocabulary is made when its module is switched on (the `core.module.enabled` listener) and,
+  for modules that are always on, the first time any vocabulary is read.
 - A file with `record` access is not served until a module answers `core.file-access`.
 - The theatre's own files (its logos) have the owner `site`, so there is no `core.branding` record.
 - A set given to `announce` is a list of `{ payload, record? }`, since each event may name its own
