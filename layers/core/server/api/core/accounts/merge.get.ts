@@ -6,12 +6,12 @@ import { mergePreview } from '../../../identity/merge'
 
 export default defineRoute({
   ability: 'core.account.merge',
-  record: event => ['core.account', String(getQuery(event).winnerId ?? '') || undefined],
+  record: event => ['core.account', String(getQuery(event).survivorId ?? '') || undefined],
   rateLimit: 'default',
-  input: z.object({ winnerId: z.string().max(40), loserId: z.string().max(40) }), // not-policy: ids are short
+  input: z.object({ survivorId: z.string().max(40), mergedAccountId: z.string().max(40) }), // not-policy: ids are short
 }, async (_event, { input, actor }) => {
-  await requireAbility(actor, 'core.account.merge', ['core.account', input.loserId])
-  const preview = await mergePreview(input.winnerId, input.loserId)
-  const side = (a: typeof preview.winner) => a && { id: a.id, name: a.name, preferredName: a.preferred_name, createdAt: a.created_at, claimed: !!a.first_signed_in_at, disabled: !!a.disabled_at }
-  return { winner: side(preview.winner), loser: side(preview.loser), moves: preview.moves }
+  await requireAbility(actor, 'core.account.merge', ['core.account', input.mergedAccountId])
+  const preview = await mergePreview(input.survivorId, input.mergedAccountId)
+  const side = (a: typeof preview.survivor) => a && { id: a.id, name: a.name, preferredName: a.preferred_name, createdAt: a.created_at, claimed: !!a.first_signed_in_at, disabled: !!a.disabled_at }
+  return { survivor: side(preview.survivor), mergedAccount: side(preview.mergedAccount), moves: preview.moves }
 })

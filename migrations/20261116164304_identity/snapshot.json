@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "e55e2173-790c-4b73-bac8-21cd103d68a0",
+  "id": "cb035d43-572f-43a5-a3be-92343b95d0a6",
   "prevIds": [
     "9c41ea35-d023-4f79-81a7-87bdc0c1c903"
   ],
@@ -236,7 +236,7 @@
     },
     {
       "table": "core_account_merges",
-      "name": "winner_id",
+      "name": "survivor_id",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -246,7 +246,7 @@
     },
     {
       "table": "core_account_merges",
-      "name": "loser_id",
+      "name": "merged_account_id",
       "type": "text",
       "notNull": true,
       "autoincrement": false,
@@ -2354,10 +2354,10 @@
     },
     {
       "table": "core_account_merges",
-      "name": "core_account_merges_loser",
+      "name": "core_account_merges_merged_account",
       "columns": [
         {
-          "value": "loser_id",
+          "value": "merged_account_id",
           "isExpression": false
         }
       ],

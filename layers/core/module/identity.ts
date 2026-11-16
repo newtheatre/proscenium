@@ -52,26 +52,26 @@ export const identityRecords = defineRecords('core', {
 })
 
 export const identityAbilities = defineAbilities('core', {
-  'account.search': ability({ risk: 'normal' }),
-  'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'] }),
-  'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'] }),
-  'account.merge': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'] }),
-  'session.end': ability({ on: 'core.account', risk: 'privileged', owner: 'grants' }),
-  'role.read': ability({ risk: 'normal', audit: false }),
-  'role.manage': ability({ risk: 'privileged', implies: ['role.read'] }),
-  'grant.read': ability({ risk: 'normal', implies: ['account.search'], audit: false }),
-  'grant.manage': ability({ on: 'core.grant', risk: 'privileged', owner: 'refuses', implies: ['grant.read'] }),
-  'identity-settings.manage': ability({ risk: 'privileged' }),
+  'account.search': ability({ risk: 'normal', grantAt: ['site'] }),
+  'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'], grantAt: ['site'] }),
+  'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
+  'account.merge': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
+  'session.end': ability({ on: 'core.account', risk: 'privileged', owner: 'grants', grantAt: ['site'] }),
+  'role.read': ability({ risk: 'normal', audit: false, grantAt: ['site'] }),
+  'role.manage': ability({ risk: 'privileged', implies: ['role.read'], grantAt: ['site'] }),
+  'grant.read': ability({ risk: 'normal', implies: ['account.search'], audit: false, grantAt: ['site'] }),
+  'grant.manage': ability({ on: 'core.grant', risk: 'privileged', owner: 'refuses', implies: ['grant.read'], grantAt: ['site', 'module', 'record'] }),
+  'identity-settings.manage': ability({ risk: 'privileged', grantAt: ['site'] }),
 })
 
 const account = z.object({ accountId: z.string() })
 
 export const identityEvents = {
-  'core.account.created': event({ version: 1, payload: z.object({ accountId: z.string(), origin: z.enum(['setup', 'self', 'guest', 'invite', 'staff', 'provider']) }), internal: true }),
+  'core.account.created': event({ version: 1, payload: z.object({ accountId: z.string(), origin: z.enum(['setup', 'self', 'guest', 'named-by-other', 'invite', 'staff']) }), internal: true }),
   'core.account.claimed': event({ version: 1, payload: account, internal: true }),
   'core.account.disabled': event({ version: 1, payload: account, internal: true }),
   'core.account.enabled': event({ version: 1, payload: account, internal: true }),
-  'core.account.merged': event({ version: 1, payload: z.object({ winnerId: z.string(), loserId: z.string(), mergeId: z.string() }), internal: true }),
+  'core.account.merged': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
   'core.account-email.verified': event({ version: 1, payload: z.object({ accountId: z.string(), emailId: z.string() }), internal: true }),
   'core.grant.created': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string() }), internal: true }),
   'core.grant.ended': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string(), reason: z.enum(['revoked', 'replaced', 'role_archived', 'account_closed', 'merged', 'given_up']) }), internal: true }),

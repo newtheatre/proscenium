@@ -77,6 +77,8 @@ export function isUsable(row: AccountRow | null): row is AccountRow {
 export async function accountForProvenAddress(unit: UnitView, address: string, origin: 'self' | 'provider' | 'setup', options: { name?: string } = {}): Promise<{ accountId: string, created: boolean, claimed: boolean, emailId: string }> {
   const normal = normaliseAddress(address)
   const at = nowMs()
+  // An account first proven through Google is still one the person made themselves.
+  const accountOrigin = origin === 'provider' ? 'self' : origin
   const existing = await addressRow(normal)
   if (existing) {
     const account = await accountById(existing.account_id)
@@ -96,12 +98,12 @@ export async function accountForProvenAddress(unit: UnitView, address: string, o
   const emailId = newId('aem')
   unit.add({
     sql: 'INSERT INTO core_accounts (id, name, origin, created_at, first_signed_in_at, audience_email_id) VALUES (?, ?, ?, ?, ?, ?)',
-    params: [accountId, options.name ?? null, origin, at, at, emailId],
+    params: [accountId, options.name ?? null, accountOrigin, at, at, emailId],
   })
   // The unique address is the lock: if a second request made an account for this address a
   // moment ago, this insert fails and the whole unit with it, rather than making a second account.
   unit.add({ sql: 'INSERT INTO core_account_emails (id, account_id, address, verified_at, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?)', params: [emailId, accountId, normal, at, origin === 'provider' ? 'provider' : origin === 'setup' ? 'setup' : 'self', at] })
-  unit.announce('core.account.created', { accountId, origin }, { record: ['core.account', accountId] })
+  unit.announce('core.account.created', { accountId, origin: accountOrigin }, { record: ['core.account', accountId] })
   unit.announce('core.account-email.verified', { accountId, emailId }, { record: ['core.account', accountId] })
   return { accountId, created: true, claimed: true, emailId }
 }

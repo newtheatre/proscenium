@@ -139,14 +139,25 @@ describe('grants (ID-23)', () => {
   })
 
   it('scope does not leak: a grant on one record allows nothing on another or at site level', async () => {
+    const roleId = await makeRole(['core.grant.manage'])
+    const holder = await staff()
+    const someone = await signInByEmail(new Browser())
+    const first = await grantDirectly(someone, [])
+    const second = await grantDirectly(someone, [])
+    const given = await owner.browser.post('/api/core/grants', { accountId: holder.accountId, roleId, scope: { kind: 'record', module: 'core', type: 'core.grant', id: first.grantId } })
+    expect(given.status).toBe(200)
+    expect((await holder.browser.post(`/api/core/grants/${second.grantId}/end`)).status).toBe(403)
+    const ended = await holder.browser.post(`/api/core/grants/${first.grantId}/end`)
+    expect(ended.body).toEqual({ id: first.grantId, ended: true })
+  })
+
+  it('an ability granted only at site level gives nothing through a narrower grant', async () => {
     const roleId = await makeRole(['core.account.read'])
     const holder = await staff()
     const mine = await signInByEmail(new Browser())
-    const theirs = await signInByEmail(new Browser())
     const given = await owner.browser.post('/api/core/grants', { accountId: holder.accountId, roleId, scope: { kind: 'record', module: 'core', type: 'core.account', id: mine } })
     expect(given.status).toBe(200)
-    expect((await holder.browser.get(`/api/core/accounts/${mine}`)).status).toBe(200)
-    expect((await holder.browser.get(`/api/core/accounts/${theirs}`)).status).toBe(403)
+    expect((await holder.browser.get(`/api/core/accounts/${mine}`)).status).toBe(403)
     expect((await holder.browser.get('/api/core/accounts?q=xx')).status).toBe(403)
   })
 })
@@ -208,8 +219,8 @@ describe('sensitive actions ask again (ID-28)', () => {
     const id = 'acc_0000000000000000000000000a'
     const samples: Record<string, { query?: string, body?: unknown }> = {
       'POST /api/core/accounts/:id/disable': { body: { reason: 'security' } },
-      'GET /api/core/accounts/merge': { query: `?winnerId=${id}&loserId=${id}` },
-      'POST /api/core/accounts/merge': { body: { winnerId: id, loserId: id } },
+      'GET /api/core/accounts/merge': { query: `?survivorId=${id}&mergedAccountId=${id}` },
+      'POST /api/core/accounts/merge': { body: { survivorId: id, mergedAccountId: id } },
       'POST /api/core/grants': { body: { accountId: id, roleId: id } },
       'PUT /api/core/modules/:id': { body: { on: true } },
       'POST /api/core/roles': { body: role([]) },

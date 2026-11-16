@@ -6,9 +6,9 @@ import { mergeAccounts } from '../../../identity/merge'
 export default defineRoute({
   ability: 'core.account.merge',
   rateLimit: 'write',
-  input: z.object({ winnerId: z.string().max(40), loserId: z.string().max(40) }), // not-policy: ids are short
+  input: z.object({ survivorId: z.string().max(40), mergedAccountId: z.string().max(40) }), // not-policy: ids are short
 }, async (_event, { input, unit, actor }) => {
-  await requireAbility(actor, 'core.account.merge', ['core.account', input.winnerId])
-  await requireAbility(actor, 'core.account.merge', ['core.account', input.loserId])
+  await requireAbility(actor, 'core.account.merge', ['core.account', input.survivorId])
+  await requireAbility(actor, 'core.account.merge', ['core.account', input.mergedAccountId])
   return { mergeId: await mergeAccounts(unit, actor, input) }
 })

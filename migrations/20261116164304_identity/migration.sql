@@ -19,8 +19,8 @@ CREATE TABLE `core_account_merge_items` (
 --> statement-breakpoint
 CREATE TABLE `core_account_merges` (
 	`id` text PRIMARY KEY,
-	`winner_id` text NOT NULL,
-	`loser_id` text NOT NULL,
+	`survivor_id` text NOT NULL,
+	`merged_account_id` text NOT NULL,
 	`started_by` text NOT NULL,
 	`performed_by` text NOT NULL,
 	`performed_at` integer NOT NULL,
@@ -188,7 +188,7 @@ CREATE TABLE `core_sessions` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `core_account_emails_address` ON `core_account_emails` (`address`);--> statement-breakpoint
 CREATE INDEX `core_account_emails_account` ON `core_account_emails` (`account_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `core_account_merges_loser` ON `core_account_merges` (`loser_id`) WHERE undone_at IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `core_account_merges_merged_account` ON `core_account_merges` (`merged_account_id`) WHERE undone_at IS NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX `core_account_tokens_hash` ON `core_account_tokens` (`token_hash`);--> statement-breakpoint
 CREATE INDEX `core_account_tokens_address` ON `core_account_tokens` (`purpose`,`address`,`created_at`);--> statement-breakpoint
 CREATE INDEX `core_account_tokens_expiry` ON `core_account_tokens` (`expires_at`);--> statement-breakpoint

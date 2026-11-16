@@ -10,7 +10,7 @@ import { integer, text, index, primaryKey, uniqueIndex, check } from 'drizzle-or
 import { sql } from 'drizzle-orm'
 import { defineTable, col } from '#kit/db'
 
-export const ACCOUNT_ORIGINS = ['setup', 'self', 'guest', 'invite', 'staff', 'provider'] as const
+export const ACCOUNT_ORIGINS = ['setup', 'self', 'guest', 'named-by-other', 'invite', 'staff'] as const
 export const DISABLED_REASONS = ['security', 'conduct', 'requested', 'duplicate'] as const
 export const TOKEN_PURPOSES = ['sign_in', 'verify_address', 'invite', 'enrol_passkey', 'owner_recovery', 'confirm_merge', 'confirm_erasure'] as const
 export const SESSION_END_REASONS = ['signed_out', 'ended_by_person', 'ended_by_staff', 'credential_changed', 'disabled', 'merged', 'erased'] as const
@@ -101,7 +101,7 @@ export const federatedIdentities = defineTable('core_federated_identities', {
   extra: t => [uniqueIndex('core_federated_identities_subject').on(t.provider, t.subject), index('core_federated_identities_account').on(t.accountId)],
 })
 
-/** On merge the losing account's codes are deleted; the winner keeps its own. */
+/** On merge the losing account's codes are deleted; the survivor keeps its own. */
 export const recoveryCodes = defineTable('core_recovery_codes', {
   id: col.id(),
   accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
@@ -257,8 +257,8 @@ export const grantEnds = defineTable('core_grant_ends', {
 /** The record of a merge, and below it the list of what moved, so that it can be undone. */
 export const accountMerges = defineTable('core_account_merges', {
   id: col.id(),
-  winnerId: col.account('winner_id', { role: 'subject', onMerge: 'alias' }),
-  loserId: col.account('loser_id', { role: 'subject', onMerge: 'alias' }),
+  survivorId: col.account('survivor_id', { role: 'subject', onMerge: 'alias' }),
+  mergedAccountId: col.account('merged_account_id', { role: 'subject', onMerge: 'alias' }),
   startedBy: col.internal(text('started_by', { enum: ['person', 'staff', 'claim'] }).notNull()),
   performedBy: col.account('performed_by', { role: 'actor', onMerge: 'alias' }),
   performedAt: col.timestamp('performed_at').notNull(),
@@ -268,7 +268,7 @@ export const accountMerges = defineTable('core_account_merges', {
 }, {
   id: 'mrg',
   realm: 'operational',
-  extra: t => [uniqueIndex('core_account_merges_loser').on(t.loserId).where(sql`undone_at IS NULL`)],
+  extra: t => [uniqueIndex('core_account_merges_merged_account').on(t.mergedAccountId).where(sql`undone_at IS NULL`)],
 })
 
 /** One row moved or ended by a merge: the list an undo walks. `row_id` is the row's SQLite rowid, or a grant's id. */
