@@ -13,6 +13,8 @@ export const settings = defineSettings('core', {
   'locale.day-start': setting.time({ default: '04:00', min: '00:00', max: '08:00', change, onChange: 'confirm' }),
 
   'units.statement-limit': setting.integer({ default: 50, min: 10, max: 1000, unit: 'core.units.statements', change }),
+  // Provisional until measured on a real D1 database (U9).
+  'units.set-rows-limit': setting.integer({ default: 500, min: 10, max: 5000, unit: 'core.units.rows', change }),
   'jobs.attempts': setting.integer({ default: 5, min: 1, max: 20, unit: 'core.units.attempts', change }),
   'jobs.backoff': setting.duration({ default: '30s', min: '5s', max: '1h', change }),
   'jobs.timeout': setting.duration({ default: '15m', min: '1m', max: '12h', change }),

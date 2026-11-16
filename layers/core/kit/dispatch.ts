@@ -15,6 +15,7 @@ export function setDispatcher(dispatcher: Dispatcher | undefined): void {
 }
 
 const MAX_DELAY = 43_200 // not-policy: the longest delay Cloudflare Queues accepts, in seconds
+const MAX_BATCH = 100 // not-policy: the most messages Cloudflare Queues takes in one sendBatch
 
 export async function dispatch(messages: JobMessage[]): Promise<void> {
   if (!messages.length) return
@@ -28,12 +29,15 @@ export async function dispatch(messages: JobMessage[]): Promise<void> {
       log.warn('core.jobs.no-queue', { lane, jobs: batch.length })
       continue
     }
-    try {
-      await queue.sendBatch(batch.map(m => ({ body: { jobId: m.jobId }, delaySeconds: m.delaySeconds ? Math.min(MAX_DELAY, Math.ceil(m.delaySeconds)) : undefined })))
-    }
-    catch (error) {
-      // The sweep sends it again; the job row is unaffected.
-      log.error('core.jobs.send-failed', { lane, error: String(error) })
+    // A set announced in one unit can make hundreds of jobs (U8); Queues takes a hundred at a time.
+    for (let start = 0; start < batch.length; start += MAX_BATCH) {
+      try {
+        await queue.sendBatch(batch.slice(start, start + MAX_BATCH).map(m => ({ body: { jobId: m.jobId }, delaySeconds: m.delaySeconds ? Math.min(MAX_DELAY, Math.ceil(m.delaySeconds)) : undefined })))
+      }
+      catch (error) {
+        // The sweep sends it again; the job row is unaffected.
+        log.error('core.jobs.send-failed', { lane, error: String(error) })
+      }
     }
   }
 }
