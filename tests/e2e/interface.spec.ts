@@ -323,3 +323,22 @@ test.describe('the starting colour mode', () => {
     }
   })
 })
+
+test.describe('confirming it is you', () => {
+  test('a save refused for a stale sign-in opens the dialogue in place rather than leaving the page', async ({ browser }) => {
+    const stale = { ...person('Stella Stale', [grant('core.settings.manage')]), assurance: 'strong' }
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(stale) })
+    const page = await context.newPage()
+    await visit(page, '/console')
+    const at = page.url()
+    // Sent and not awaited: the request waits on the dialogue, as a save button's would.
+    await page.evaluate(() => {
+      void (globalThis as unknown as { $fetch: (url: string, options: object) => Promise<unknown> })
+        .$fetch('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
+    })
+    await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
+    expect(page.url()).toBe(at)
+    await noViolations(page)
+    await context.close()
+  })
+})

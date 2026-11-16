@@ -41,6 +41,7 @@ export default defineModule({
       { id: 'gallery.list', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/list', icon: 'i-lucide-list', ability: 'gallery.sample.view', order: 10 },
       { id: 'gallery.form', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/form', icon: 'i-lucide-square-pen', ability: 'gallery.sample.view', order: 20 },
       { id: 'gallery.record', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/productions/prod-1', match: '/console/gallery/productions', icon: 'i-lucide-theater', ability: 'gallery.sample.view', order: 27 },
+      { id: 'gallery.choices', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/choices', icon: 'i-lucide-list-checks', ability: 'gallery.sample.view', order: 25 },
       { id: 'gallery.steps', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/steps', icon: 'i-lucide-footprints', ability: 'gallery.sample.view', order: 30 },
       { id: 'gallery.feedback', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/feedback', icon: 'i-lucide-message-square', ability: 'gallery.sample.view', order: 40 },
       { id: 'gallery.denied', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/denied', icon: 'i-lucide-lock', ability: 'gallery.sample.admin', order: 50 },

@@ -117,6 +117,13 @@ the server for actions and sources when it is first opened, not on every page.
   sort overdue, today, information; a card whose count is zero is absent. With nothing waiting the page
   says so and offers up to three of the viewer's quick actions.
 
+## Choice fields in forms
+
+PageForm's `radio` takes `options: [{ value, label }]` (values may be numbers) and shows one group
+with the field's label as its legend. `ticks` takes `options` and, if short notes are allowed,
+`notes: { max, label }`; its value is an array of `{ value, note? }` for the ticked options, in the
+order of the options, and a note box opens under a tick only when `notes` is given.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the
