@@ -1,6 +1,6 @@
 # 2. Data model
 
-Identity owns eighteen tables, all inside the `core` module. One row in `core_accounts` is one person; everything else hangs off it. No table stores "is a member", "is staff" or "is pending": those are read from facts at the moment they are asked.
+Identity owns twenty tables, all inside the `core` module. One row in `core_accounts` is one person; everything else hangs off it. No table stores "is a member", "is staff" or "is pending": those are read from facts at the moment they are asked.
 
 ## Reading the tables
 
