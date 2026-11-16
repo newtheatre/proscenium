@@ -8,6 +8,7 @@ import { fromControl, sameValue, toControl } from '../../shared/controls'
 
 interface SettingView {
   key: string
+  module: string
   group: string
   name: string
   kind: string
@@ -32,8 +33,10 @@ interface SettingView {
 
 const { $api } = useNuxtApp()
 const props = defineProps<{
-  /** The module whose settings these are. */
-  module: string
+  /** The module whose settings these are (its own page in the console). Leave out for the site page. */
+  module?: string
+  /** 'site' draws every setting declared with scope 'site', whichever module declares it (Site administration). */
+  scope?: 'module' | 'site'
   title: string
   /** A setting to scroll into view and highlight, from settings search. */
   highlight?: string
@@ -41,7 +44,19 @@ const props = defineProps<{
 
 const { t } = useT()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ module: string, settings: SettingView[] }>('/api/core/settings', { query: { module: props.module }, key: `core:settings:${props.module}` })
+const site = props.scope === 'site'
+const { data, status, error, refresh } = await useAPI<{ module: string | null, settings: SettingView[] }>('/api/core/settings', { query: site ? { scope: 'site' } : { module: props.module, scope: 'module' }, key: site ? 'core:settings:site' : `core:settings:${props.module}` })
+
+// A module whose console page leaves some settings to Site administration says so, when the viewer may open them.
+const { data: alsoSite } = site || !props.module
+  ? { data: ref(false) }
+  : await useAsyncData(`core:settings:also-site:${props.module}`, async () => {
+      try {
+        const found = await $api<{ settings: unknown[] }>('/api/core/settings', { query: { module: props.module, scope: 'site' } })
+        return found.settings.length > 0
+      }
+      catch { return false }
+    }, { default: () => false })
 
 const draft = reactive<Record<string, any>>({})
 const resets = reactive<Record<string, boolean>>({})
@@ -57,9 +72,10 @@ function load() {
 watch(data, load, { immediate: true })
 
 const sections = computed(() => {
+  // Sections are a module's own groups; on the site page the same group of two modules stays apart.
   const groups = new Map<string, SettingView[]>()
-  for (const s of data.value?.settings ?? []) groups.set(s.group, [...(groups.get(s.group) ?? []), s])
-  return [...groups].map(([id, settings]) => ({ id, settings }))
+  for (const s of data.value?.settings ?? []) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
+  return [...groups].map(([id, settings]) => ({ id, module: settings[0]!.module, group: settings[0]!.group, settings }))
 })
 
 const changed = (s: SettingView) => s.canChange && (resets[s.key] || (s.sensitive ? draft[s.key] !== '' : !sameValue(draft[s.key], toControl(s))))
@@ -106,8 +122,13 @@ function limit(s: SettingView, which: 'min' | 'max'): number | undefined {
   return s.kind === 'money' ? value / 100 : value // not-policy: pence to pounds
 }
 
+// On the site page a section's heading also names its module, so "Sending" of two modules differ.
+const sectionTitle = (section: { module: string, group: string }) => {
+  const name = t(`${section.module}.settings-sections.${section.group}`)
+  return site ? `${t(`${section.module}.module.name`)}: ${name}` : name
+}
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
-const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${props.module}.settings.${s.group}.${s.name}.options.${o}`) }))
+const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
 const defaultText = (s: SettingView) => {
   const v = toControl(s, s.default)
   return s.kind === 'boolean' ? (v ? t('core.settings-page.on') : t('core.settings-page.off')) : String(Array.isArray(v) ? v.join(', ') : v)
@@ -124,6 +145,13 @@ onMounted(() => {
     width="reading"
   >
     <SettingsSearch />
+    <UAlert
+      v-if="alsoSite"
+      class="mb-6"
+      icon="i-lucide-info"
+      :title="t('core.settings-page.also-in-admin')"
+      :actions="[{ label: t('core.settings-page.open-admin'), to: '/admin/settings', color: 'neutral', variant: 'outline' }]"
+    />
     <DataBoundary
       :data="data"
       :status="status"
@@ -135,7 +163,7 @@ onMounted(() => {
         :key="section.id"
         @submit.prevent="save(section.id, section.settings)"
       >
-        <PageSection :title="t(`${module}.settings-sections.${section.id}`)">
+        <PageSection :title="sectionTitle(section)">
           <div class="divide-y divide-default">
             <div
               v-for="s in section.settings"
@@ -234,7 +262,7 @@ onMounted(() => {
               </p>
               <UButton
                 type="submit"
-                :label="t('core.settings-page.save', { section: t(`${module}.settings-sections.${section.id}`) })"
+                :label="t('core.settings-page.save', { section: sectionTitle(section) })"
                 :loading="saving === section.id"
                 :disabled="!changesIn(section.settings).length || saving !== null"
               />
