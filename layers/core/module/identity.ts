@@ -11,6 +11,7 @@ export const identitySettings = defineSettings('core', {
   'sign-in.link-lifetime': setting.duration({ default: '15m', min: '5m', max: '1h', change, audience: 'public', quotable: true }),
   'sign-in.code-attempts': setting.integer({ default: 5, min: 3, max: 10, unit: 'core.units.attempts', change }),
   'sign-in.open-sign-up': setting.boolean({ default: true, change, audience: 'public' }),
+  'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
   'sign-in.google': setting.boolean({ default: false, change, audience: 'public' }),
   // Not in the specification's list: Google needs a client id as well as the secret, and an id is
   // not a secret, so it is a setting the theatre types in beside the switch.
@@ -54,6 +55,7 @@ export const identityRecords = defineRecords('core', {
 export const identityAbilities = defineAbilities('core', {
   'account.search': ability({ risk: 'normal', grantAt: ['site'] }),
   'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'], grantAt: ['site'] }),
+  'account.create': ability({ risk: 'privileged', implies: ['account.search'], grantAt: ['site'] }),
   'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'account.merge': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'session.end': ability({ on: 'core.account', risk: 'privileged', owner: 'grants', grantAt: ['site'] }),
