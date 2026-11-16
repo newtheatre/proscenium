@@ -75,6 +75,22 @@ contributes: {
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.
 
+## Calling the API, layouts and moving between pages
+
+- **Requests** go through the app's own fetch, never the global `$fetch`: `useAPI(path, options)` for
+  data a screen loads (it is `useFetch` with the same options) and `useNuxtApp().$api(path, options)`
+  for an act. A request the server refuses with "confirm it is you" opens the dialogue in place and is
+  sent again once the person confirms, so a screen writes nothing for that.
+- **Layouts** follow the address: a page under `/console` or `/members` gets that shell's layout with
+  no `definePageMeta`. A page that names a layout itself keeps it.
+- **Focus** moves to `main#main` after a navigation to another page, and stays where it is when only
+  the query changes. Every layout keeps `<main id="main" tabindex="-1">` for this and for the skip link.
+- **Titles**: a page sets its own title (PageFrame does it from `title`); the theatre's name is added
+  to every one in `app.vue`. A change that is not a navigation, such as a list's new count after a
+  filter, is announced with `useAnnouncer()`.
+- **Plain functions** live in `app/utils/` (`translate`, `toRefusal`, `callIdentity`, `isCurrent`) and
+  are auto-imported; `app/composables/` holds only `use…` composables.
+
 ## Finding things: the command palette and settings search
 
 Ctrl or Cmd K (or the Search button in the console's top bar) opens the command palette. It works by
@@ -110,7 +126,9 @@ the server for actions and sources when it is first opened, not on every page.
   with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.
 - **Colour mode**: `core.appearance.default` is what a first-time visitor sees; a person's own choice
   from the menu is kept; `let-people-choose` off removes the choice; `public-dark` off keeps the public
-  pages light.
+  pages light. The mode is kept in a cookie and decided on the server before the page renders
+  (`server/middleware/appearance.ts`, `middleware/appearance.global.ts`), so no page is drawn in one
+  mode and corrected to another.
 
 ## Record pages and home pages
 

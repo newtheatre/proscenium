@@ -2,7 +2,7 @@
      account shell, because the link works without a session. The token is in the fragment, so it never
      reaches a server log, and the page posts it, so a mail scanner that opens the link spends nothing. -->
 <script setup lang="ts">
-import type { Refusal } from '../../composables/useIdentity'
+import type { Refusal } from '../../utils/identity'
 
 useSeoMeta({ title: 'Confirming your address' })
 const refusal = ref<Refusal | null>(null)
@@ -10,7 +10,8 @@ const done = ref(false)
 
 onMounted(async () => {
   const token = window.location.hash.slice(1)
-  history.replaceState(null, '', window.location.pathname)
+  // Vue Router keeps its own data in the history state, so it is passed back rather than cleared.
+  history.replaceState(history.state, '', window.location.pathname + window.location.search)
   const answer = await callIdentity<{ verified: true }>('/api/core/me/addresses/verify', { token })
   if (!answer.ok) refusal.value = answer.refusal
   else done.value = true

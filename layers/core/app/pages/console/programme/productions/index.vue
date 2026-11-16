@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Productions (C-01): every production, with its state and season. "New production" starts a draft
 // and opens it. Dates, and so the next performance, arrive with performances.
-definePageMeta({ layout: 'console' })
 
 interface Row { id: string, title: string, kind: string, state: 'draft' | 'published' | 'withdrawn' | 'cancelled', seasonId: string | null, companyName: string | null }
 
-const { data: seasons } = await useFetch<{ rows: { id: string, name: string }[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
+const { $api } = useNuxtApp()
+const { data: seasons } = await useAPI<{ rows: { id: string, name: string }[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
 const columns = [
   { key: 'title', label: 'Production', sortable: true, card: true },
   { key: 'season', label: 'Season', card: true },
@@ -26,7 +26,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function create() {
   refusal.value = null
   try {
-    const { id } = await $fetch<{ id: string }>('/api/core/productions', { method: 'POST', body: { title: form.title, kind: form.kind } })
+    const { id } = await $api<{ id: string }>('/api/core/productions', { method: 'POST', body: { title: form.title, kind: form.kind } })
     creating.value = false
     await navigateTo(`/console/programme/productions/${id}`)
   }
