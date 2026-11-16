@@ -49,6 +49,7 @@ CREATE TABLE `core_accounts` (
 	`id` text PRIMARY KEY,
 	`name` text,
 	`preferred_name` text,
+	`pronouns` text,
 	`phone` text,
 	`locale` text,
 	`audience_email_id` text,
@@ -64,7 +65,8 @@ CREATE TABLE `core_accounts` (
 	`anonymised_at` integer,
 	CONSTRAINT "core_accounts_not_merged_into_itself" CHECK(merged_into_id IS NULL OR merged_into_id <> id),
 	CONSTRAINT "core_accounts_name_length" CHECK(name IS NULL OR length(name) BETWEEN 1 AND 120),
-	CONSTRAINT "core_accounts_preferred_name_length" CHECK(preferred_name IS NULL OR length(preferred_name) <= 60)
+	CONSTRAINT "core_accounts_preferred_name_length" CHECK(preferred_name IS NULL OR length(preferred_name) <= 60),
+	CONSTRAINT "core_accounts_pronouns_length" CHECK(pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40)
 );
 --> statement-breakpoint
 CREATE TABLE `core_fact_abilities` (
@@ -223,6 +225,6 @@ CREATE TRIGGER `core_grant_ends_append_only_update` BEFORE UPDATE ON `core_grant
 --> statement-breakpoint
 CREATE TRIGGER `core_accounts_never_deleted` BEFORE DELETE ON `core_accounts` BEGIN SELECT RAISE(ABORT, 'identity: an account is never deleted'); END;
 --> statement-breakpoint
-CREATE TRIGGER `core_accounts_tombstone` BEFORE UPDATE ON `core_accounts` WHEN OLD.`anonymised_at` IS NOT NULL AND (NEW.`anonymised_at` IS NULL OR NEW.`name` IS NOT NULL OR NEW.`preferred_name` IS NOT NULL OR NEW.`phone` IS NOT NULL OR NEW.`last_signed_in_at` IS NOT NULL) BEGIN SELECT RAISE(ABORT, 'identity: nothing personal is written to an erased account'); END;
+CREATE TRIGGER `core_accounts_tombstone` BEFORE UPDATE ON `core_accounts` WHEN OLD.`anonymised_at` IS NOT NULL AND (NEW.`anonymised_at` IS NULL OR NEW.`name` IS NOT NULL OR NEW.`preferred_name` IS NOT NULL OR NEW.`pronouns` IS NOT NULL OR NEW.`phone` IS NOT NULL OR NEW.`last_signed_in_at` IS NOT NULL) BEGIN SELECT RAISE(ABORT, 'identity: nothing personal is written to an erased account'); END;
 --> statement-breakpoint
 CREATE TRIGGER `core_grants_not_to_oneself` BEFORE INSERT ON `core_grants` WHEN NEW.`granted_by` IS NEW.`account_id` AND EXISTS (SELECT 1 FROM `core_grants`) BEGIN SELECT RAISE(ABORT, 'identity: nobody grants themselves a role'); END;

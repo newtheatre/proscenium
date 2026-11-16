@@ -21,6 +21,8 @@ export const accounts = defineTable('core_accounts', {
   id: col.id(),
   name: col.personal(text('name'), { erase: 'clear' }),
   preferredName: col.personal(text('preferred_name'), { erase: 'clear' }),
+  // Shown beside the name to members and staff and in the person's own account; never publicly.
+  pronouns: col.personal(text('pronouns'), { erase: 'clear' }),
   phone: col.personal(text('phone'), { erase: 'clear' }),
   locale: col.internal(text('locale')),
   audienceEmailId: col.internal(text('audience_email_id')),
@@ -43,6 +45,7 @@ export const accounts = defineTable('core_accounts', {
     check('core_accounts_not_merged_into_itself', sql`merged_into_id IS NULL OR merged_into_id <> id`),
     check('core_accounts_name_length', sql`name IS NULL OR length(name) BETWEEN 1 AND 120`),
     check('core_accounts_preferred_name_length', sql`preferred_name IS NULL OR length(preferred_name) <= 60`),
+    check('core_accounts_pronouns_length', sql`pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40`),
     index('core_accounts_merged_into').on(t.mergedIntoId),
   ],
 })

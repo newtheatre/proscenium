@@ -6,6 +6,7 @@ export interface AccountRow {
   id: string
   name: string | null
   preferred_name: string | null
+  pronouns: string | null
   phone: string | null
   locale: string | null
   origin: string

@@ -92,6 +92,7 @@
   "core.settings.rules.managed-domains-need-provider": "Addresses can be made to use Google only while Google sign-in is on.",
   "core.settings.rules.strong-provider-needs-managed-domain": "Google sign-in can count as strong only for addresses that must use Google. Add a domain first.",
   "core.settings.rules.google-needs-client-id": "Google sign-in needs the Google client id. Add it first.",
+  "core.settings.rules.google-needs-client-secret": "Google sign-in needs the CORE_GOOGLE_CLIENT_SECRET Worker secret. Set it first.",
   "core.settings.rules.domains-are-domains": "Each entry must be a domain, such as newtheatre.org.uk, with no @ and no spaces.",
   "core.abilities.account.search.label": "Find people by name or address",
   "core.abilities.account.read.label": "See a person's details and how they sign in",

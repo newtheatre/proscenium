@@ -3,7 +3,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createUnit } from '#kit/unit'
 import { Authenticator } from './authenticator'
-import { Browser, address, clearSetting, emailSignIn, env, grantDirectly, leaveIdentity, mailbox, passkeySignIn, reset, setSetting, signInByEmail, stubGoogle, tokenOf, useIdentity } from './helpers'
+import { Browser, address, clearSetting, emailSignIn, env, grantDirectly, leaveIdentity, mailbox, passkeySignIn, reset, setSetting, signInByEmail, staff, stubGoogle, tokenOf, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import sweep from '../../../server/tasks/sweep-identity'
 import ownerRecoveryHealth from '../../../server/contributions/core.health-check/owner-recovery'
@@ -45,6 +45,20 @@ describe('sign in with Google (ID-04)', () => {
   afterEach(async () => {
     for (const key of ['core.sign-in.google', 'core.sign-in.google-client-id', 'core.sign-in.google-domains', 'core.sign-in.managed-domains', 'core.sign-in.provider-is-strong']) await clearSetting(key)
     delete mutableEnv.CORE_GOOGLE_CLIENT_SECRET
+  })
+
+  it('cannot be turned on until the client id and the secret are both set', async () => {
+    await clearSetting('core.sign-in.google')
+    await clearSetting('core.sign-in.google-client-id')
+    delete mutableEnv.CORE_GOOGLE_CLIENT_SECRET
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.identity-settings.manage'])
+    const turnOn = () => admin.browser.put('/api/core/settings/core.sign-in.google', { value: true })
+    expect((await turnOn()).body.fields).toEqual({ value: 'core.settings.rules.google-needs-client-id' })
+    expect((await admin.browser.put('/api/core/settings/core.sign-in.google-client-id', { value: CLIENT })).status).toBe(200)
+    expect((await turnOn()).body.fields).toEqual({ value: 'core.settings.rules.google-needs-client-secret' })
+    mutableEnv.CORE_GOOGLE_CLIENT_SECRET = 'test-google-secret'
+    expect((await turnOn()).status).toBe(200)
   })
 
   it('is not there while Google sign-in is off', async () => {

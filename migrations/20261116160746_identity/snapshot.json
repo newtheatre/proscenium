@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "1ac871e0-de86-44b9-bd8a-aa3ab0f606df",
+  "id": "e55e2173-790c-4b73-bac8-21cd103d68a0",
   "prevIds": [
     "9c41ea35-d023-4f79-81a7-87bdc0c1c903"
   ],
@@ -467,6 +467,16 @@
     {
       "table": "core_accounts",
       "name": "preferred_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_accounts",
+      "name": "pronouns",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -3061,6 +3071,12 @@
       "table": "core_accounts",
       "name": "core_accounts_preferred_name_length",
       "value": "preferred_name IS NULL OR length(preferred_name) <= 60",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_accounts",
+      "name": "core_accounts_pronouns_length",
+      "value": "pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40",
       "entityType": "checks"
     },
     {

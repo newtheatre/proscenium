@@ -109,8 +109,8 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { winne
   }
   // The survivor keeps its own details, taking the old account's only where it has none.
   unit.add({
-    sql: 'UPDATE core_accounts SET name = coalesce(name, (SELECT name FROM core_accounts WHERE id = ?)), preferred_name = coalesce(preferred_name, (SELECT preferred_name FROM core_accounts WHERE id = ?)), phone = coalesce(phone, (SELECT phone FROM core_accounts WHERE id = ?)), first_signed_in_at = coalesce(first_signed_in_at, (SELECT first_signed_in_at FROM core_accounts WHERE id = ?)) WHERE id = ? AND merged_into_id IS NULL',
-    params: [loserId, loserId, loserId, loserId, winnerId],
+    sql: 'UPDATE core_accounts SET name = coalesce(name, (SELECT name FROM core_accounts WHERE id = ?)), preferred_name = coalesce(preferred_name, (SELECT preferred_name FROM core_accounts WHERE id = ?)), pronouns = coalesce(pronouns, (SELECT pronouns FROM core_accounts WHERE id = ?)), phone = coalesce(phone, (SELECT phone FROM core_accounts WHERE id = ?)), first_signed_in_at = coalesce(first_signed_in_at, (SELECT first_signed_in_at FROM core_accounts WHERE id = ?)) WHERE id = ? AND merged_into_id IS NULL',
+    params: [loserId, loserId, loserId, loserId, loserId, winnerId],
   }).expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })
   unit.add({ sql: 'UPDATE core_accounts SET merged_into_id = ?, merged_at = ? WHERE id = ? AND merged_into_id IS NULL AND anonymised_at IS NULL', params: [winnerId, at, loserId] })
     .expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })

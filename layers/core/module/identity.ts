@@ -2,7 +2,7 @@
 // rules, abilities, record types, events, background work, secrets and health checks. Phase 1
 // declares what the first stories use; the rest arrives with the stories that need it.
 import { z } from 'zod'
-import { ability, defineAbilities, defineRecords, defineSettings, event, job, record, secret, setting, task, type SettingRule } from '#kit'
+import { ability, defineAbilities, defineRecords, defineSettings, event, job, record, secret, setting, task, useContext, type SettingRule } from '#kit'
 
 const change = 'core.identity-settings.manage'
 
@@ -40,6 +40,8 @@ export const identitySettingRules: SettingRule[] = [
   { id: 'managed-domains-need-provider', check: s => !s['sign-in.managed-domains'].length || s['sign-in.google'] },
   { id: 'strong-provider-needs-managed-domain', check: s => !s['sign-in.provider-is-strong'] || s['sign-in.managed-domains'].length > 0 },
   { id: 'google-needs-client-id', check: s => !s['sign-in.google'] || !!s['sign-in.google-client-id'] },
+  // Rules run while a setting is saved, inside the request, so the Worker secret can be read here.
+  { id: 'google-needs-client-secret', check: s => !s['sign-in.google'] || !!useContext().env.CORE_GOOGLE_CLIENT_SECRET },
   { id: 'domains-are-domains', check: s => [...s['sign-in.google-domains'], ...s['sign-in.managed-domains']].every((d: string) => DOMAIN.test(d)) },
 ]
 

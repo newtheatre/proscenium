@@ -21,6 +21,16 @@ describe('my details (ID-11)', () => {
     await browser.patch('/api/core/me', { preferredName: null })
     expect(await inContext(() => accountLabel(accountId))).toBe('Harriet Vane')
   })
+
+  it('keeps pronouns as optional free text, at most 40 characters, and clears them', async () => {
+    const browser = new Browser()
+    await signInByEmail(browser)
+    expect((await browser.patch('/api/core/me', { pronouns: 'she/her' })).status).toBe(200)
+    expect((await browser.get('/api/core/me')).body.account.pronouns).toBe('she/her')
+    expect((await browser.patch('/api/core/me', { pronouns: 'x'.repeat(41) })).status).toBe(422)
+    await browser.patch('/api/core/me', { pronouns: '' })
+    expect((await browser.get('/api/core/me')).body.account.pronouns).toBeNull()
+  })
 })
 
 describe('my sessions (ID-13)', () => {
@@ -242,5 +252,6 @@ describe('the database keeps accounts', () => {
     await expect(env.DB.prepare('DELETE FROM core_accounts WHERE id = ?').bind(id).run()).rejects.toThrow(/never deleted/)
     await env.DB.prepare('UPDATE core_accounts SET name = NULL, preferred_name = NULL, last_signed_in_at = NULL, anonymised_at = 1 WHERE id = ?').bind(id).run()
     await expect(env.DB.prepare('UPDATE core_accounts SET name = \'Back again\' WHERE id = ?').bind(id).run()).rejects.toThrow(/erased account/)
+    await expect(env.DB.prepare('UPDATE core_accounts SET pronouns = \'they/them\' WHERE id = ?').bind(id).run()).rejects.toThrow(/erased account/)
   })
 })
