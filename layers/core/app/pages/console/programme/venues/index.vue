@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // Venues with their spaces nested (C-16). Adding a venue adds one space of the same name, so a
 // theatre with one room never has to think about spaces.
+import { venueInput } from '../../../../../server/places/input'
+
 definePageMeta({ layout: 'console' })
 
 interface Space { id: string, name: string, defaultCapacity: number | null, archived: boolean }
@@ -17,22 +19,13 @@ const filters = [{
   primary: true,
   options: [{ value: 'active', label: 'In use' }, { value: 'archived', label: 'Archived' }],
 }]
-const { toRefusal } = useRefusal()
 const creating = ref(false)
-const form = reactive({ name: '', locality: '' })
-const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
-
-async function create() {
-  refusal.value = null
-  try {
-    const { venueId } = await $fetch<{ venueId: string }>('/api/core/venues', { method: 'POST', body: { name: form.name, locality: form.locality || null } })
-    creating.value = false
-    await navigateTo(`/console/programme/venues/${venueId}`)
-  }
-  catch (error) {
-    refusal.value = toRefusal(error)
-  }
-}
+const fields = [
+  { name: 'name', label: 'Name', kind: 'text' as const },
+  { name: 'locality', label: 'Town or city', kind: 'text' as const, optional: true },
+]
+const create = (values: Record<string, unknown>) => $fetch<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
+const created = (result: unknown) => navigateTo(`/console/programme/venues/${(result as { venueId: string }).venueId}`)
 
 const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
   .map(s => (s.defaultCapacity ? `${s.name} (${s.defaultCapacity})` : s.name)).join(', ')
@@ -78,47 +71,16 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
       {{ spaceList(row) }}
     </template>
 
-    <UModal
+    <PageForm
       v-model:open="creating"
       title="New venue"
       description="The venue gets one space of the same name. Add more on the venue's page."
-    >
-      <template #body>
-        <form
-          id="new-venue"
-          class="space-y-4"
-          @submit.prevent="create"
-        >
-          <RefusalNotice :refusal="refusal" />
-          <UFormField
-            label="Name"
-            required
-            :error="refusal?.fields?.name ? refusal.reason : undefined"
-          >
-            <UInput
-              v-model="form.name"
-              maxlength="120"
-            />
-          </UFormField>
-          <UFormField
-            label="Town or city"
-            hint="Optional"
-          >
-            <UInput
-              v-model="form.locality"
-              maxlength="120"
-            />
-          </UFormField>
-        </form>
-      </template>
-      <template #footer>
-        <UButton
-          type="submit"
-          form="new-venue"
-          label="Create venue"
-          :disabled="!form.name.trim()"
-        />
-      </template>
-    </UModal>
+      submit-label="Create venue"
+      :schema="venueInput"
+      :fields="fields"
+      :initial="{ name: '', locality: '' }"
+      :submit="create"
+      @saved="created"
+    />
   </PageList>
 </template>

@@ -89,24 +89,16 @@ const actions = (s: Season) => [[
           description="Seasons are optional. Use them to group productions, such as Autumn 2027."
           icon="i-lucide-calendar-range"
         />
-        <ul
+        <RecordList
           v-else
-          class="divide-y divide-default rounded-lg border border-default"
-          aria-label="Seasons"
+          label="Seasons"
         >
-          <li
+          <RecordListItem
             v-for="s in data.rows"
             :key="s.id"
-            class="flex items-center gap-3 px-3 py-2"
+            :name="s.name"
+            :description="`${span(s)} · ${s.productions === 1 ? '1 production' : `${s.productions} productions`}`"
           >
-            <div class="min-w-0 flex-1">
-              <p class="font-medium">
-                {{ s.name }}
-              </p>
-              <p class="text-sm text-muted">
-                {{ span(s) }} · {{ s.productions === 1 ? '1 production' : `${s.productions} productions` }}
-              </p>
-            </div>
             <StatusBadge
               :tone="TONES[s.state]"
               :label="s.state.charAt(0).toUpperCase() + s.state.slice(1)"
@@ -120,8 +112,8 @@ const actions = (s: Season) => [[
                 :aria-label="`Actions for ${s.name}`"
               />
             </UDropdownMenu>
-          </li>
-        </ul>
+          </RecordListItem>
+        </RecordList>
       </div>
     </DataBoundary>
 
@@ -130,10 +122,11 @@ const actions = (s: Season) => [[
       :title="editId ? 'Edit season' : 'New season'"
     >
       <template #body>
-        <form
+        <UForm
           id="season-form"
+          :state="form"
           class="space-y-4"
-          @submit.prevent="save"
+          @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -143,7 +136,6 @@ const actions = (s: Season) => [[
             <UInput
               v-model="form.name"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -154,7 +146,6 @@ const actions = (s: Season) => [[
               <UInput
                 v-model="form.startsOn"
                 type="date"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -164,7 +155,6 @@ const actions = (s: Season) => [[
               <UInput
                 v-model="form.endsOn"
                 type="date"
-                class="w-full"
               />
             </UFormField>
           </div>
@@ -173,10 +163,9 @@ const actions = (s: Season) => [[
               v-model="form.summary"
               :rows="3"
               maxlength="4000"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

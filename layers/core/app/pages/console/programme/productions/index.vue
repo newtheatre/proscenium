@@ -76,10 +76,11 @@ async function create() {
       description="It starts as a draft. Nothing is public until you publish it."
     >
       <template #body>
-        <form
+        <UForm
           id="new-production"
+          :state="form"
           class="space-y-4"
-          @submit.prevent="create"
+          @submit="create"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -89,7 +90,6 @@ async function create() {
             <UInput
               v-model="form.title"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
           <UFormField label="What it is">
@@ -98,7 +98,7 @@ async function create() {
               :items="KINDS"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

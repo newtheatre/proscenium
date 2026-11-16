@@ -27,6 +27,8 @@ export interface FormField {
 
 const props = withDefaults(defineProps<{
   title: string
+  /** A line under the title, for what the form will do. */
+  description?: string
   /** The button names the act: "Create performance", "Refund £12.00". Never "Submit". */
   submitLabel: string
   /** The schema the server validates with, so both show the same message for the same value. */
@@ -45,7 +47,7 @@ const props = withDefaults(defineProps<{
   draftKey?: string
   /** Panel mode: whether the panel is open. */
   open?: boolean
-}>(), { open: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
+}>(), { description: undefined, open: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -199,6 +201,8 @@ async function cancel() {
   if (dirty.value && !(await confirm({ verb: t('core.form.leave'), thing: t('core.form.leave-thing'), consequence: t('core.form.leave-consequence') }))) return
   saved.value = true // asked once
   emit('cancel')
+  // A panel is kept by its list, so it opens clean the next time.
+  if (panel.value) Object.assign(state, base.value)
   if (panel.value) emit('update:open', false)
   else await (props.returnTo ? navigateTo(props.returnTo) : router.back())
 }
@@ -219,7 +223,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   <!-- One body, placed in the panel's body slot or the page's default slot. -->
   <component
     :is="panel ? USlideover : PageFrame"
-    v-bind="panel ? { open, title } : { title, width: 'reading' }"
+    v-bind="panel ? { open, title, description } : { title, description, width: 'reading' }"
     @update:open="(v: boolean) => { if (!v) cancel(); else emit('update:open', v) }"
   >
     <template #[bodySlot]>
