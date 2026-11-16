@@ -98,11 +98,16 @@ export default defineModule({
   secrets: {
     PAYMENTS_STRIPE_SECRET_KEY: secret({ needed: 'when-used' }),
     PAYMENTS_STRIPE_WEBHOOK_SECRET: secret({ needed: 'when-used' }),
-    // SumUp's API key, and the affiliate app id and key every reader checkout carries.
+    // SumUp's API key (the Cloud API only), and the affiliate app id and key that both the Cloud API's
+    // reader checkout and the hand-off to the SumUp app carry.
     PAYMENTS_SUMUP_API_KEY: secret({ needed: 'when-used' }),
     PAYMENTS_SUMUP_AFFILIATE_KEY: secret({ needed: 'when-used' }),
     PAYMENTS_SUMUP_APP_ID: secret({ needed: 'when-used' }),
   },
+
+  // The return address of a hand-off to the SumUp app is signed for its attempt. A key checks for a
+  // while after it stops signing, longer than any seller takes to come back from the app.
+  signing: [{ purpose: 'payments.handoff', rotateEvery: '90d', keepFor: '2d' }],
 
   contributes: {
     'finance.system-account': [
@@ -113,7 +118,7 @@ export default defineModule({
       { id: 'cash-variance', name: 'Cash over and short', kind: 'expense' },
       { id: 'unfulfilled', name: 'Payments to return', kind: 'liability' },
     ],
-    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'stripe' }, { id: 'sumup' }],
+    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'stripe' }, { id: 'sumup' }, { id: 'sumup-handoff' }],
     // Payments' own part: guided setup's test payment.
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],

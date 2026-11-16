@@ -25,6 +25,8 @@ export interface ProviderAttempt {
    * (a request started the payment). A provider that is told per payment where to report uses it.
    */
   webhookUrl?: string
+  /** The site's address, when a request started the payment, for a provider that sends a person back. */
+  origin?: string
   /** Set when a person asks again after a start had no answer, so the first may still be running. */
   retrying?: boolean
 }
@@ -61,6 +63,8 @@ export type NextStep
   = | { kind: 'redirect', url: string }
     | { kind: 'client-secret', secret: string }
     | { kind: 'waiting-for-reader' }
+    /** Open this address on the device, which hands the payment to the provider's own app. */
+    | { kind: 'handoff', url: string }
     | { kind: 'none' }
 
 export interface PaymentProvider {
