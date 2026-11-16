@@ -131,6 +131,13 @@ describe('manifests', () => {
     expect(() => defineModule({ ...base, jobs: { 'lost-property.Sweep': job({ payload: z.object({}) }) } })).toThrow(DeclarationError)
     expect(() => defineModule({ ...base, tasks: { 'lost-property.clear-items': task({ dailyAt: '25:00' }) } })).toThrow(/dailyAt/)
   })
+  it('take signing purposes under the module\'s own id, each once, with periods of at least a day (F-37)', () => {
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '90d', keepFor: '365d' }] })).not.toThrow()
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'box-office.door-code', rotateEvery: '90d', keepFor: '365d' }] })).toThrow(/signing\[0\]\.purpose/)
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '90d', keepFor: '365d' }, { purpose: 'lost-property.claim-code', rotateEvery: '30d', keepFor: '60d' }] })).toThrow(/listed twice/)
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '1h', keepFor: '365d' }] })).toThrow(/rotateEvery/)
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '90d', keepFor: 'for ever' }] })).toThrow(/keepFor/)
+  })
 })
 
 describe('tables', () => {
