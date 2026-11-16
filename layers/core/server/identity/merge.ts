@@ -3,7 +3,7 @@
 // undone; `alias` columns keep the old id, which canonicalAccount follows to the survivor; the
 // `handler` columns are identity's own, handled here. Addresses, passkeys and grants move, and the
 // old account's sessions end.
-import { all, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
+import { all, moveAccountColumn, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { accountById } from './accounts'
 import { LIVE, guardLastOwner, isOwner } from './grants'
@@ -123,6 +123,10 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
     sql: 'UPDATE core_accounts SET name = coalesce(name, (SELECT name FROM core_accounts WHERE id = ?)), preferred_name = coalesce(preferred_name, (SELECT preferred_name FROM core_accounts WHERE id = ?)), pronouns = coalesce(pronouns, (SELECT pronouns FROM core_accounts WHERE id = ?)), phone = coalesce(phone, (SELECT phone FROM core_accounts WHERE id = ?)), first_signed_in_at = coalesce(first_signed_in_at, (SELECT first_signed_in_at FROM core_accounts WHERE id = ?)) WHERE id = ? AND merged_into_id IS NULL',
     params: [mergedAccountId, mergedAccountId, mergedAccountId, mergedAccountId, mergedAccountId, survivorId],
   }).expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })
+  // merged_into_id always names the final survivor, which the kit's one-level account scope relies
+  // on: accounts already merged into this one now point at the survivor. Listed as merge items, so
+  // an undo can put them back. Run before this account's own pointer is set, so it is not caught.
+  moveAccountColumn(unit, { mergeId, table: 'core_accounts', column: 'merged_into_id', survivorId, mergedAccountId })
   unit.add({ sql: 'UPDATE core_accounts SET merged_into_id = ?, merged_at = ? WHERE id = ? AND merged_into_id IS NULL AND anonymised_at IS NULL', params: [survivorId, at, mergedAccountId] })
     .expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })
   if ((await isOwner(mergedAccountId)) || (await isOwner(survivorId))) guardLastOwner(unit)
