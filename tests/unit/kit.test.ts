@@ -295,6 +295,7 @@ describe('list sources (S1, S2)', () => {
     expect(() => bind({ sorts: { label: { columns: ['label'], index: 'nowhere' } } })).toThrow(/no index named nowhere/)
     expect(() => bind({ sorts: { label: { columns: ['owner'], index: 'lost_property_items_label' } } })).toThrow(/does not begin with/)
     expect(() => bind({ sorts: { label: { columns: ['owner'], bounded: 0 } } })).toThrow(/whole number/)
+    expect(() => bind({ sorts: { label: { columns: ['token'], bounded: 10 } } })).toThrow(/encrypted/)
     expect(bind({ sorts: { label: { columns: ['owner'], bounded: 500 } } }).list.id).toBe('lost-property.items')
   })
 

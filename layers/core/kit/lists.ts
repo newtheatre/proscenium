@@ -111,6 +111,7 @@ export function defineListSource<const L extends ListDeclaration, T extends { _:
   const sorts: ListSource['bound']['sorts'] = {}
   for (const [key, b] of Object.entries(binding.sorts as Record<string, SortBinding<string>>)) {
     const columns = b.columns.map(k => column(`sorts.${key}`, k))
+    for (const k of b.columns) if (meta.columns[k]!.meta.encrypted) throw new DeclarationError(at(`sorts.${key}`), `${k} is encrypted, so its order means nothing`)
     if ('index' in b) {
       const index = indexes.find(i => i.name === b.index)
       if (!index) throw new DeclarationError(at(`sorts.${key}.index`), `${meta.name} has no index named ${b.index}`)
