@@ -23,7 +23,7 @@ export const salesList = defineList('seats.sales', {
   filters: {
     performance: { kind: 'lookup', label: 'Performance', lookup: { search: '/api/seats/performances', resolve: '/api/seats/performances' } },
     sizes: { kind: 'choices', label: 'Size', options: [{ value: 'single', label: 'One ticket' }, { value: 'group', label: 'Several' }] },
-    buyer: { kind: 'lookup', label: 'Buyer', ability: 'seats.members.look-up', lookup: { search: '/api/core/accounts', resolve: '/api/core/accounts' } },
+    buyer: { kind: 'lookup', label: 'Buyer', ability: 'seats.orders.sell', lookup: { search: '/api/core/accounts', resolve: '/api/core/accounts' } },
   },
   sorts: {
     at: { label: 'Sold', type: 'date', natural: 'desc' },

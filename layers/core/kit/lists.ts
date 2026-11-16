@@ -12,6 +12,7 @@ import { tableMeta, type TableMeta } from './db'
 import { matchedFields, searchIndexName, searchQuery, searchWords } from './search'
 import { can } from './access'
 import { useContext } from './context'
+import { useRegistry } from './registry'
 import { instantOfLocal, previousDate } from './clock'
 import { theatreTimeZone, today } from './dates'
 import type { AbilityName } from './registry-types'
@@ -122,7 +123,11 @@ export function defineListSource<const L extends ListDeclaration, T extends { _:
   const fields = [...Object.keys(list.columns), ...(list.search ?? [])]
   sameKeys('search', Object.fromEntries(fields.map(f => [f, true])), binding.search)
   const search = Object.entries(binding.search as Record<string, SearchBinding<string>>).flatMap(([field, b]) => {
-    if (b === false) return []
+    if (b === false) {
+      // An extra is named for the search alone, so leaving it out would search less than the list says.
+      if (!(field in list.columns)) throw new DeclarationError(at(`search.${field}`), 'is a search extra; it is bound to a column of this table, since searching a child is not yet available')
+      return []
+    }
     const { column: key, ability } = typeof b === 'string' ? { column: b, ability: undefined } : b
     const c = meta.columns[key]
     if (!c) throw new DeclarationError(at(`search.${field}`), `"${key}" is not a column of ${meta.name}`)
@@ -200,6 +205,10 @@ export async function readListQuery<L extends ListDeclaration>(query: Query, sou
     ...source.search.map(s => s.ability).filter((a): a is string => !!a),
   ])
   const held = new Set<string>()
+  const registry = useRegistry()
+  for (const s of source.search) {
+    if (s.ability && registry.abilities.get(s.ability)?.decl.audit === 'read') throw new Error(`list source ${list.id}: searches ${s.field} under ${s.ability}, which is audited on read; such a search is not audited yet`)
+  }
   for (const ability of wanted) if ((await can(actor as any, ability as AbilityName)).allowed) held.add(ability)
   // The theatre's day is read only when a date filter is on, so a list without one works before setup.
   const viewName = (Array.isArray(query.view) ? query.view[0] : query.view) ?? list.defaultView

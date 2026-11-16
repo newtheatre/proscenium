@@ -22,6 +22,13 @@ const git = (...args: string[]) => {
 export async function checkMigrations(modules: Loaded[], registry: any): Promise<string[]> {
   const problems: string[] = []
   const sources = await findListSources(modules)
+  // A search covering a field under an ability audited on read is refused until such a search is
+  // itself audited (Foundations part 4, "Lists": fail closed until built).
+  for (const { file, source } of sources) {
+    for (const s of source.search as { field: string, ability?: string }[]) {
+      if (s.ability && registry.abilities.get(s.ability)?.decl.audit === 'read') problems.push(`${file}: searches ${s.field} under ${s.ability}, which is audited on read; a search that reads such a field is not audited yet, so it cannot be searched`)
+    }
+  }
   for (const owner of ['upstream', 'site'] as Owner[]) {
     // Search indexes (S1): the journal makes exactly the indexes the list sources ask for.
     for (const change of indexChanges(await wantedIndexes(sources, owner), await journalIndexes(owner))) {

@@ -65,10 +65,10 @@ describe('readList', async () => {
   const { ledger, performances } = await import('../fixtures/modules/seats/server/db/schema')
   const sales = (await import('../fixtures/modules/seats/server/lists/sales')).default
   const shows = (await import('../fixtures/modules/seats/server/lists/performances')).default
-  const lookUp = () => person(['seats.members.look-up'])
+  const seller = () => person(['seats.orders.sell'])
   const nobody = () => person([])
 
-  const page = (query: Record<string, string>, actor = lookUp(), show?: string) => inContext(async () => {
+  const page = (query: Record<string, string>, actor = seller(), show?: string) => inContext(async () => {
     const read = await readListQuery(show ? { ...query, performance: show } : query, sales)
     const found = await useDb().select({ id: ledger.id, buyerName: ledger.buyerName, note: ledger.note, quantity: ledger.quantity }).from(ledger).where(read.where()).orderBy(...read.orderBy()).limit(read.limit).offset(read.offset)
     const [{ n }] = await useDb().select({ n: count() }).from(ledger).where(read.where()) as [{ n: number }]
@@ -79,7 +79,7 @@ describe('readList', async () => {
     const show = await performance()
     const ada = await sale(show, 'Ada Pemberton', 'Booked by Quilliam')
     const quilliam = await sale(show, 'Rex Quilliam', null)
-    const both = await page({ q: 'quilliam' }, lookUp(), show)
+    const both = await page({ q: 'quilliam' }, seller(), show)
     expect(both.found.map(r => r.id).sort()).toEqual([ada, quilliam].sort())
     expect(both.total).toBe(2)
     expect(Object.fromEntries(both.found.map((r, i) => [r.id, both.matched[i]]))).toEqual({ [ada]: 'note', [quilliam]: null })
@@ -92,10 +92,10 @@ describe('readList', async () => {
     const show = await performance()
     await sale(show, 'Ida Pemberton')
     await sale(show, 'Bo Pemberton')
-    const short = await page({ q: 'Bo' }, lookUp(), show)
+    const short = await page({ q: 'Bo' }, seller(), show)
     expect(short.read).toMatchObject({ words: [], ignoredWords: ['Bo'], searchTooShort: true })
     expect(short.total).toBe(2)
-    const mixed = await page({ q: 'bo pemb' }, lookUp(), show)
+    const mixed = await page({ q: 'bo pemb' }, seller(), show)
     expect(mixed.read).toMatchObject({ words: ['pemb'], ignoredWords: ['bo'], searchTooShort: false })
     expect(mixed.read.answer([], 0)).toEqual({ rows: [], total: 0, dropped: [], ignoredWords: ['bo'], searchTooShort: false })
   })
@@ -105,15 +105,21 @@ describe('readList', async () => {
     const one = await sale(show, 'Single Buyer')
     const group = newId('sl')
     await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, created_at) VALUES (?, ?, 4, ?, ?, ?)').bind(group, show, newId('acc'), 'Group Buyer', Date.now()).run()
-    expect((await page({ sizes: 'group' }, lookUp(), show)).found.map(r => r.id)).toEqual([group])
-    expect((await page({ sizes: 'single,group' }, lookUp(), show)).total).toBe(2)
+    expect((await page({ sizes: 'group' }, seller(), show)).found.map(r => r.id)).toEqual([group])
+    expect((await page({ sizes: 'single,group' }, seller(), show)).total).toBe(2)
     const dropped = await page({ buyer: newId('acc') }, nobody(), show)
     expect(dropped.read.dropped).toEqual(['buyer'])
     expect(dropped.total).toBe(2)
-    expect((await page({ buyer: newId('acc') }, lookUp(), show)).total).toBe(0)
-    const sorted = await page({ order: 'asc' }, lookUp(), show)
+    expect((await page({ buyer: newId('acc') }, seller(), show)).total).toBe(0)
+    const sorted = await page({ order: 'asc' }, seller(), show)
     expect(sorted.read.sort).toEqual({ key: 'at', order: 'asc' })
     expect(sorted.found.map(r => r.id)).toEqual([one, group])
+  })
+
+  it('refuses to search a field under an ability audited on read, until such a search is audited', async () => {
+    const { defineListSource } = await import('#kit')
+    const audited = defineListSource(sales.list, { table: ledger, filters: { performance: { column: 'performanceId' }, sizes: { column: 'quantity' }, buyer: { column: 'buyer' } }, sorts: { at: { columns: ['at'], bounded: 10 } }, search: { buyerName: { column: 'buyerName', ability: 'seats.members.look-up' }, quantity: false, note: 'note' } } as any)
+    await expect(inContext(() => readListQuery({}, audited), seller())).rejects.toThrow(/audited on read/)
   })
 
   it('refuses a key the list does not take, and a page too deep', async () => {

@@ -1,6 +1,6 @@
 // A list of sales the fixture searches by buyer and note: personal and free text in an append-only
 // table, so an erasure must reach the index. The buyer's name is searched only by someone who may
-// look members up.
+// sell tickets.
 import { sql } from 'drizzle-orm'
 import { defineListSource } from '#kit'
 import { ledger } from '../db/schema'
@@ -16,5 +16,5 @@ export default defineListSource(salesList, {
   sorts: {
     at: { columns: ['at'], bounded: 1000 },
   },
-  search: { buyerName: { column: 'buyerName', ability: 'seats.members.look-up' }, quantity: false, note: 'note' },
+  search: { buyerName: { column: 'buyerName', ability: 'seats.orders.sell' }, quantity: false, note: 'note' },
 })

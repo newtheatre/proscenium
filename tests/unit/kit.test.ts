@@ -281,13 +281,14 @@ describe('list sources (S1, S2)', () => {
       columns: { label: { label: 'Label', sort: 'label' } },
       search: ['notes'],
     })
-    const bind = (over: Record<string, any> = {}) => defineListSource(list, { table, filters: { owner: { column: 'owner' } }, sorts: { label: { columns: ['label'], index: 'lost_property_items_label' } }, search: { label: 'label', notes: false }, ...over } as any)
+    const bind = (over: Record<string, any> = {}) => defineListSource(list, { table, filters: { owner: { column: 'owner' } }, sorts: { label: { columns: ['label'], index: 'lost_property_items_label' } }, search: { label: 'label', notes: 'label' }, ...over } as any)
     expect(bind().searchIndex).toBe('lost_property_items_search')
-    expect(bind().search).toEqual([{ field: 'label', key: 'label', sql: 'label' }])
-    expect(() => bind({ search: { label: 'health', notes: false } })).toThrow(/special data/)
-    expect(() => bind({ search: { label: 'token', notes: false } })).toThrow(/encrypted/)
-    expect(() => bind({ search: { label: 'nothing', notes: false } })).toThrow(/not a column/)
+    expect(bind({ search: { label: 'label', notes: 'label' } }).search).toEqual([{ field: 'label', key: 'label', sql: 'label' }, { field: 'notes', key: 'label', sql: 'label' }])
+    expect(() => bind({ search: { label: 'health', notes: 'label' } })).toThrow(/special data/)
+    expect(() => bind({ search: { label: 'token', notes: 'label' } })).toThrow(/encrypted/)
+    expect(() => bind({ search: { label: 'nothing', notes: 'label' } })).toThrow(/not a column/)
     expect(() => bind({ search: { label: 'label' } })).toThrow(/search.notes: has no binding/)
+    expect(() => bind({ search: { label: 'label', notes: false } })).toThrow(/searching a child is not yet available/)
     expect(() => bind({ filters: { owner: { column: 'owner' }, colour: { column: 'label' } } })).toThrow(/not a filter of the list/)
     expect(() => bind({ filters: { owner: { column: 'token' } } })).toThrow(/encrypted/)
     // A sort names an index that begins with its columns, or the most rows its scan reads.
