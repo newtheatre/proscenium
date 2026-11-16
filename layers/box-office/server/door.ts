@@ -1,7 +1,8 @@
 // The door (Box office specification, part 3, "A ticket", and part 4, "The door"; BO-40). A scanned
 // code is checked for its signature, hashed, and the ticket found by the hash. Admission is one
-// conditional update, so a ticket is admitted exactly once however many devices scan it together:
-// the scan row written in the same batch records whether this scan was the one. A desk code or a
+// conditional update that stamps the ticket with the scan's id, so a ticket is admitted exactly
+// once however many devices scan it together, and the scan row written next in the same batch takes
+// its result from that stamp: admitted if the stamp is its own id, already admitted otherwise. A desk code or a
 // booking reference admits nobody and writes no scan row.
 import { createUnit, first, newId, nowMs, useContext } from '#kit'
 import { signing } from '#kit/signing'
@@ -62,16 +63,16 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   if (ticket.state === 'void') return recorded({ result: 'void', ticketId: ticket.id, voidReason: ticket.void_reason ?? undefined }, ticket.id)
   if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ticketPerformanceId: ticket.performance_id }, ticket.id)
 
-  // One conditional update admits; the scan row beside it says whether this scan was the one.
-  unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, at, ticket.id, input.performanceId] })
+  // One conditional update admits and stamps; the scan row reads the stamp to say whether it was the one.
+  unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
   unit.view().add({
     sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
-      VALUES (?, ?, ?, CASE WHEN changes() > 0 THEN 'admitted' ELSE 'already_admitted' END, 0, ?, ?, ?, ?, 0)`,
-    params: [scanId, ticket.id, input.performanceId, actor, input.deviceLabel ?? null, at, at],
+      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, 0, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id],
   })
   await unit.commit()
   const written = await first<{ result: 'admitted' | 'already_admitted' }>('SELECT result FROM box_office_scans WHERE id = ?', scanId)
   if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id }
-  const earlier = await first<{ scanned_at: number, device_label: string | null }>("SELECT scanned_at, device_label FROM box_office_scans WHERE ticket_id = ? AND result IN ('admitted', 'admitted_by_override') ORDER BY scanned_at DESC LIMIT 1", ticket.id)
+  const earlier = await first<{ scanned_at: number, device_label: string | null }>('SELECT s.scanned_at, s.device_label FROM box_office_tickets t JOIN box_office_scans s ON s.id = t.admitted_scan_id WHERE t.id = ?', ticket.id)
   return { result: 'already_admitted', scanId, ticketId: ticket.id, admittedAt: earlier?.scanned_at, admittedAtDoor: earlier?.device_label ?? null }
 }
