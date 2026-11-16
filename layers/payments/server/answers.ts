@@ -36,7 +36,7 @@ function eventKind(answer: Answer, source: Source): string {
 
 /** Thrown when an owner refused to settle its part after the money was taken. */
 export class SettlementRefused extends Error {
-  constructor(readonly module: string, readonly cause: unknown) {
+  constructor(readonly module: string, override readonly cause: unknown) {
     super(`${module} could not settle its part: ${String((cause as Error)?.message ?? cause)}`)
   }
 }
