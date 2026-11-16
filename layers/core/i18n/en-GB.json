@@ -318,5 +318,21 @@
   "core.settings.appearance.public-dark.help": "Off keeps the public pages light, for a theatre whose posters assume it.",
   "core.settings.appearance.live-dark.label": "Dark screens in live mode",
   "core.settings.appearance.live-dark.help": "Live mode screens are dark in a dark auditorium. Off keeps them light.",
-  "core.settings-sections.appearance": "Light and dark"
+  "core.settings-sections.appearance": "Light and dark",
+  "core.home.overdue": "Overdue",
+  "core.home.today": "Due today",
+  "core.home.info": "Good to know",
+  "core.history.open": "History",
+  "core.history.title": "History",
+  "core.history.description": "Who changed what, and when.",
+  "core.history.unavailable": "The history of this record is not available to you.",
+  "core.history.empty": "Nothing has changed yet",
+  "core.history.system": "The system",
+  "core.history.loading": "Loading the history…",
+  "core.history.action.create": "Created",
+  "core.history.action.update": "Changed",
+  "core.history.action.delete": "Removed",
+  "core.history.action.read": "Viewed",
+  "core.record.more-actions": "More actions for {name}",
+  "core.abilities.history.view.label": "See the history of a record"
 }
