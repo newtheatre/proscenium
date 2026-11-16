@@ -13,7 +13,7 @@ Written in the Foundations registry formats, in the column layout the Box office
 | `bar.age-check.enabled` | boolean | true |  | staff | No | Prompt on restricted products and keep the register |
 | `bar.age-check.minimum-age` | integer (years) | 18 | 16 to 25 | public | Yes | The legal age, quoted on a public price list |
 | `bar.age-check.challenge-age` | integer (years) | 25 | 18 to 30 | public | Yes | The age in the prompt: "look under 25". Must be at least the minimum age |
-| `bar.age-check.description` | boolean | false |  | staff | No | Offer an optional short description of the person on a refusal. Off unless a licence condition asks for it |
+| `bar.age-check.description` | boolean | false |  | staff | No | Offer an optional short description of the person on a refusal. Off by default. A theatre switches it on when its licence conditions ask for it; the Nottingham New Theatre expects to. Switching it on shows what is kept and for how long |
 | `bar.age-check.review-every` | duration | 7d | 1d to 90d | staff | No | How long the register may go unsigned before the console home says so |
 | `bar.sales.max-discount-percent` | integer (percent) | 100 | 0 to 100 | staff | No | Largest discount on a line; 0 switches discounts off |
 | `bar.sales.reference-prefix` | text | B | 1 to 3 letters | staff | No | Starts a bar sale's reference, so it is not mistaken for a booking reference |
