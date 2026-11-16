@@ -288,7 +288,8 @@ test.describe('My account and counts', () => {
   test('lists the sections modules add, with the account entries as links, and has no violations', async ({ page }) => {
     await visit(page, '/account')
     await expect(page.getByRole('heading', { level: 1, name: 'My account' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Sample tickets' }).first()).toBeVisible()
+    // The card's link covers the card and has no box of its own, so it is checked by where it goes.
+    await expect(page.getByRole('link', { name: 'Sample tickets' }).first()).toHaveAttribute('href', '/account/gallery')
     await expect(page.getByText('Sample tickets section').first()).toBeVisible()
     await noViolations(page)
   })

@@ -4,6 +4,7 @@
      Changes save per section with a stated summary. A setting the viewer may read but not change
      is shown read-only with who can change it. -->
 <script setup lang="ts">
+import { parseTime } from '@internationalized/date'
 import { fromControl, sameValue, toControl } from '../../shared/controls'
 import { phrase, toRefusal } from '../composables/useRefusal'
 
@@ -106,6 +107,12 @@ function limit(s: SettingView, which: 'min' | 'max'): number | undefined {
   return s.kind === 'money' ? value / 100 : value // not-policy: pence to pounds
 }
 
+/** A time is stored as 19:30; the control works in clock times. */
+function timeOf(value: unknown) {
+  try { return typeof value === 'string' && value ? parseTime(value) : undefined }
+  catch { return undefined }
+}
+
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
 const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${props.module}.settings.${s.group}.${s.name}.options.${o}`) }))
 const defaultText = (s: SettingView) => {
@@ -181,10 +188,17 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />
+                <UInputTime
+                  v-else-if="s.kind === 'time'"
+                  :model-value="timeOf(draft[s.key])"
+                  :disabled="!s.canChange"
+                  class="w-48"
+                  @update:model-value="onEdit(s, $event ? $event.toString().slice(0, 5) : '')"
+                />
                 <UInput
                   v-else
                   :model-value="draft[s.key]"
-                  :type="s.sensitive ? 'password' : s.kind === 'time' ? 'time' : 'text'"
+                  :type="s.sensitive ? 'password' : 'text'"
                   :disabled="!s.canChange"
                   :maxlength="s.maxLength"
                   :placeholder="s.sensitive ? t('core.settings-page.hidden') : undefined"

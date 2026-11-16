@@ -16,7 +16,10 @@ const address = ref<string | null>(null)
 const refusal = ref<Refusal | null>(null)
 const busy = ref(false)
 const codeSent = ref(false)
-const code = ref('')
+const CODE_LENGTH = 6 // not-policy: the length of the code the server sends
+// One box a digit; the request takes them as one string.
+const digits = ref<number[]>([])
+const code = computed(() => digits.value.join(''))
 const strongNeeded = computed(() => props.reason === 'core.access.needs-strong-sign-in')
 
 async function usePasskey() {
@@ -93,10 +96,11 @@ onMounted(async () => {
               :label="t('core.confirm-its-you.code')"
               :help="t('core.confirm-its-you.code-sent', { address: address ?? '' })"
             >
-              <UInput
-                v-model="code"
-                inputmode="numeric"
-                autocomplete="one-time-code"
+              <UPinInput
+                v-model="digits"
+                otp
+                type="number"
+                :length="CODE_LENGTH"
                 autofocus
               />
             </UFormField>

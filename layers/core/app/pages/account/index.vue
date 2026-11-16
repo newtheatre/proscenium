@@ -16,23 +16,15 @@ const sections = computed(() => data.value.sections.flatMap((s) => {
 
 <template>
   <PageFrame :title="t('core.account.title')">
-    <ul
-      v-if="navigation?.items.length"
-      class="mb-8 flex flex-wrap gap-2"
-    >
-      <li
+    <UPageGrid v-if="navigation?.items.length">
+      <UPageCard
         v-for="item in navigation.items"
         :key="item.id"
-      >
-        <UButton
-          :to="item.to"
-          :icon="item.icon"
-          color="neutral"
-          variant="outline"
-          :label="t(item.label)"
-        />
-      </li>
-    </ul>
+        :to="item.to"
+        :icon="item.icon"
+        :title="t(item.label)"
+      />
+    </UPageGrid>
     <div class="space-y-8">
       <section
         v-for="s in sections"

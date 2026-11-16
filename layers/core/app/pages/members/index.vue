@@ -14,25 +14,14 @@ const title = computed(() => viewer.value.membersName ?? t('core.menu.members'))
       :title="t('core.members.nothing')"
       :description="t('core.members.nothing-description')"
     />
-    <ul
-      v-else
-      class="grid gap-3 sm:grid-cols-2"
-    >
-      <li
+    <UPageGrid v-else>
+      <UPageCard
         v-for="item in navigation.items"
         :key="item.id"
-      >
-        <UButton
-          :to="item.to"
-          :icon="item.icon"
-          color="neutral"
-          variant="outline"
-          size="xl"
-          block
-          class="justify-start"
-          :label="t(item.label)"
-        />
-      </li>
-    </ul>
+        :to="item.to"
+        :icon="item.icon"
+        :title="t(item.label)"
+      />
+    </UPageGrid>
   </PageFrame>
 </template>
