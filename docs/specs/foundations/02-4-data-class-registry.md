@@ -12,13 +12,13 @@ import { text } from 'drizzle-orm/sqlite-core'
 export const claims = defineTable('lost_property_claims', {
   id:          col.id(),
   itemId:      col.ref('lost_property_items'),
-  accountId:   col.account('account_id', { role: 'subject', onMerge: 'move', nullable: true }),
+  accountId:   col.account('account_id', { role: 'subject', onMerge: 'alias', nullable: true }),
   email:       col.email('contact_email'),
   phone:       col.personal(text('phone'), { erase: 'clear' }),
   note:        col.freeText(text('note')),
   accessNeeds: col.special('access_needs'),
   state:       col.internal(text('state').notNull()),
-  handledBy:   col.account('handled_by', { role: 'actor', onMerge: 'move', nullable: true }),
+  handledBy:   col.account('handled_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   createdAt:   col.createdAt(),
 }, {
   id: 'xlpc',
@@ -116,6 +116,46 @@ Erasure of one person is a single unit of work built from the registry: every ta
 
 A check requires `alias` in an append-only table, because a merge cannot rewrite it. The audit table is the first example: its actor column is `alias`.
 
+**How a merge scales, and what that asks of a column (agreed with identity, 16 November 2026; the Identity Doc, part 3, Merge, defines the flow).**
+
+- **`alias` is the default**, and `onMerge` may be left out to mean it. The column keeps the id it was written with, and reads follow the merge. Actor columns and every account column in an append-only table are `alias`.
+- **`move` is for a column whose stored id must be the survivor's**: it is part of a unique rule, or it is the person's own living record that other tables key to. The check asks for a one-line reason beside every `move`.
+- **`handler` is for a table where both accounts may hold a row that a person may hold only once.** A handler receives the survivor, the merged-away account and the merge id, fits one unit, is safe to run twice, and lists every row it changes through the kit's helper so the merge can be undone.
+- **Reads use the account scope.** Because most columns are `alias`, and because a merge moves rows in stages as a job, every read by account, and every count or claim condition on a statement, goes through the kit's account scope: the survivor and its aliases, as a subquery, never a list of ids. The kit provides it for `move` and `alias` columns alike, and the conformance check refuses a condition that compares an account column to an id directly. The kit's own erasure, export and retention use it too. Going the other way, from a stored id to the person, a helper resolves a merged-away id to its survivor.
+- **The move is a job, not one unit.** Identity's first unit records the merge and changes only identity's tables. The job `core.merge-move` then takes modules in registry order: each `move` column is one statement that lists the rows in the merge items and one that rewrites them where the column still holds the merged-away id, so a unit never grows with the number of rows and every statement can be repeated. A module's last unit carries a guard that none of its `move` columns still points at the merged-away account. Undo runs the same job backwards from the listed rows, only once the merge is complete.
+
+* **Handlers run first.** Within a module, every handler runs before that module's `move` columns are re-pointed, and identity's first unit touches identity's tables only, so a handler sees its module's rows as they were.
+* **A handler may answer "not yet"** (a row is mid-payment, say). That module's handlers and moves wait, the job carries on with the other modules and comes back with a growing pause, and the merge stays "still moving". A "not yet" is not a failed attempt and never makes the job dead; a merge still waiting after a day raises a health warning that names the module.
+* **A handler may supply its own undo.** Where a change cannot be undone by restoring the listed values (a total that has since grown), the handler gives undo statements of its own: one unit, safe to repeat. On undo each module's steps run in exact reverse: its move columns are pointed back first and its handlers' undo runs after, so an undo that reopens a once-per-person row does not break the unique rule while the row still names the survivor. A handler's undo may also answer "not yet", on the same terms. An undo returns a count, with a reason, of what could not be put back; the Merges screen shows it and the audit entry carries it. A row a handler takes out of use is not deleted: the handler lists it through the kit's helper as set aside, and the row is kept until the undo window closes, when the close deletes it, unless the handler said to keep it when it listed it: a row that is a record in its own right (a submitted form response) may stay under the module's own retention. Deleting is the default, and the merge item is deleted either way. The mark lives in the merge items, not in a column the kit adds; how the row is out of use meanwhile is the module's own state.
+
+**The account scope: names and signatures (settled 16 November 2026, so every module's stand-in matches).** All five are exported from `#kit`.
+
+```ts
+// In a statement: the condition a module writes. Works in a read, an update,
+// a count, a claim condition and inside a set-wise INSERT ... SELECT.
+inAccountScope(column: AccountColumn, account: string | SQL): SQL
+//   => column IN (<accountScope(accountId)>)
+
+// The subquery itself, for joins and for conditions the helper above does not fit.
+accountScope(account: string | SQL): SQL
+//   => SELECT id FROM core_accounts WHERE id = :s OR merged_into_id = :s
+//      where :s is the survivor of accountId, resolved inside the same statement
+
+// Outside a statement: the ids, for display, logs and tests. Never bound into an IN list.
+accountScopeIds(accountId: string): Promise<string[]>   // survivor first
+
+// Already built: a stored id to its survivor.
+canonicalAccount(accountId: string): Promise<string>
+
+// The one escape: compare to exactly this id (identity's own tables, and the
+// merge job's "where the column still holds the merged-away id").
+exactAccount(column: AccountColumn, accountId: string): SQL
+```
+
+`accountScope` accepts either a survivor's id or a merged-away id and gives the same set, because it resolves the survivor inside the statement; a unit therefore needs no read first (rule U4). The conformance check refuses `eq`, `inArray` or raw SQL that compares a `col.account` column to a value in any module, and accepts only `inAccountScope`, a join on `accountScope`, or `exactAccount`; each use of `exactAccount` outside identity needs a one-line reason.
+
+**In a set-wise statement the account is an expression, not a value.** `account` may be an id or an SQL expression, such as the account column of a row read with `json_each`, and the scope is then worked out for each row inside the one statement. That is how a fan-out asks "has anyone in this person's scope already got this?" for many people at once, without a read per person. For the same reason a key that must match across a merge (a notification's dedupe key is the first) is not computed from the account id: the key leaves the account out, and the statement's condition is "the same key, for an account in this row's scope". The kit has no set-wise form of `accountScopeIds`; a module that thinks it needs one should put the comparison in the statement.
+
 Referencing another module's table by foreign key is reading, and is allowed. Writing to it is not: that goes through its service.
 
 ## Migrations
@@ -150,13 +190,13 @@ Part 2 of each specification gives every table in this layout: a heading line, t
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `item_id` | ref `lost_property_items` | not null | internal | keep |  |
-| `account_id` | account, subject | nullable | internal | keep | Empty for a claim made by someone with no account. On merge: move |
+| `account_id` | account, subject | nullable | internal | keep | Empty for a claim made by someone with no account. On merge: alias |
 | `contact_email` | email |  | personal | anonymise |  |
 | `phone` | text |  | personal | clear |  |
 | `note` | text |  | free text | redact |  |
 | `access_needs` | text, encrypted |  | special | clear |  |
 | `state` | text | one of a named list | internal | keep | See part 3 |
-| `handled_by` | account, actor | nullable | internal | keep | On merge: move |
+| `handled_by` | account, actor | nullable | internal | keep | On merge: alias |
 | `created_at` | timestamp | not null | internal | keep |  |
 
 Types to use: id, ref, account, email, text, integer, real, boolean, timestamp, local date, minor units, currency, JSON. Write "encrypted" after the type of a column declared `encrypted: true`.

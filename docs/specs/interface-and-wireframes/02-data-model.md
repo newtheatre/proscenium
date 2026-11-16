@@ -16,7 +16,9 @@ Only `core_saved_views` has an id of its own, made by `col.id()` with the prefix
 
 ### `core_preferences`
 
-One row per person per preference. Nothing here changes what a person may do. `account_id` is declared with `col.account`, role subject, `onMerge: 'handler'`: the interface contributes a handler to identity's `core.merge-handler`, by which the surviving account keeps its own row for a key and takes the other account's row only where it has none.
+One row per person per preference. Nothing here changes what a person may do. `account_id` is declared with `col.account`, role subject, `onMerge: 'handler'` (integration ruling R-34). The reason it is neither alias nor move: the primary key is the account and the key, so there must be one row per person per preference, and read through the account scope a merged person would have two answers for one key. The interface contributes a handler to identity's `core.merge-handler`: the surviving account keeps its own row for a key, takes the other account's row only where it has none, and the other account's remaining rows are deleted. It is safe to run again, as a staged merge requires: a second run finds nothing left to take.
+
+On undo of a merge, which identity allows for 30 days, nothing is restored: preferences are convenience data of no consequence, so the deleted rows stay deleted, the account that was merged away starts again from the defaults, and the survivor keeps what it took. This is the exception identity's part 3 allows under "What a handler owes on undo".
 
 | Column | Type | Constraints | Data class | On erasure |
 | --- | --- | --- | --- | --- |
@@ -38,7 +40,7 @@ A named filter, sort and column set for one list.
 | `id` | text | Primary key, `col.id()` with prefix `svw` | Internal | Kept if shared, else row deleted |
 | `list` | text | Not null; a list's registered name, such as `box-office.orders` | Internal | As the row |
 | `name` | text | Not null, 1 to 60 characters | Personal free text | Deleted with a personal view; kept on a shared view |
-| `owner_account_id` | text | `col.account`, role subject, `onMerge: 'move'` (a merged account's views pass to the surviving account); null once anonymised | Personal | Set to null on a shared view |
+| `owner_account_id` | text | `col.account`, role subject, `onMerge: 'alias'` (integration ruling R-34): the stored id is left alone and a person's views are read through the kit's account scope, the survivor plus its aliases. Nothing else keys to the owner, and moving would break the unique rule below when both accounts hold a view of the same name for one list. Null once anonymised | Personal | Set to null on a shared view |
 | `shared` | integer (boolean) | Not null, default 0 | Internal | As the row |
 | `query` | text (JSON) | Filters, sort, columns; validated against the list's own filter schema on read | Internal | As the row |
 | `created_at`, `updated_at` | integer (UTC) | Not null | Internal | As the row |
@@ -60,6 +62,8 @@ A theatre's changes to the menus the modules declared.
 | `updated_at` | integer (UTC) | Not null | Internal | Kept |
 
 An override can hide, reorder and rename. It has no column that could widen who sees an entry. A row whose entry no longer exists is ignored and listed on the navigation settings screen for clearing.
+
+This table has no account column, so an account merge does not touch it. The audit of a change to it is foundations', whose actor column is alias.
 
 ## On the device
 

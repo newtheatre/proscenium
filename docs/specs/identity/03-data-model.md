@@ -295,7 +295,7 @@ A role given to an account. A grant is never edited: it is ended, and a renewal 
 
 ## core\_account\_merges and core\_account\_merge\_items
 
-The record of a merge, and the list of what it moved so that it can be undone.
+The record of a merge, and the list of what it moved so that it can be undone. Besides the columns below, `core_account_merges` has `completed_at` (timestamp, null while rows are still moving) and `undo_started_at` (timestamp, null unless an undo is under way or done); both Internal and kept on erasure. `core_account_merge_items` is unique on merge, table and row, so listing a row twice does nothing.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |

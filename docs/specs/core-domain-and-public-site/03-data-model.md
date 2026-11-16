@@ -82,7 +82,7 @@ Who made the show. Credits feed the public page and the archive.
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `production_id` | ref `core_productions` | not null, cascade | internal | keep |  |
-| `account_id` | account, role subject, on merge move | nullable | internal | clear | A credit with no account is a historical or outside credit |
+| `account_id` | account, role subject, on merge alias | nullable | internal | clear | A credit with no account is a historical or outside credit |
 | `credited_name` | text | not null, 1 to 120 characters | public | keep, or anonymise if the person asks | The printed name stays on erasure by default, as a printed programme would (question 5, decided) |
 | `role` | text | not null, 1 to 120 characters | public | keep | Such as "Director" or "Ophelia" |
 | `section_term_id` | ref `core_terms` | not null, restrict; vocabulary `core.credit-section` | public | keep |  |
@@ -289,6 +289,8 @@ A term's label should never be a person's name. The form refuses nothing, but th
 
 **`core_files`**: realm operational; subject `{ account: 'uploaded_by', unlinked: 'staff' }`; retention `core.files.deleted-retention`, on deleted rows; not append-only; id prefix `fil`, random.
 
+One more column than the table below shows, added on 16 November 2026 for files the server makes: `expires_at` (timestamp, nullable, `col.internal`, on erasure keep, indexed). Once it passes, the row and the bytes both go, without the deleted-retention wait. Only a file in a server-made slot may carry it; part 4 gives the rules. Such a file has no uploader, so `uploaded_by` is null and it is erased with the record that owns it.
+
 One row for every stored file in the system, whichever module it belongs to. The bytes live in R2 and the row is the only way to reach them. The id is random because it appears in the file's address and must not be guessable.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
@@ -310,7 +312,7 @@ One row for every stored file in the system, whichever module it belongs to. The
 | `access` | text | not null, one of `public`, `signed_in`, `record` | internal | keep |  |
 | `state` | text | not null, default `pending`, one of `pending`, `ready`, `rejected`, `deleted` | internal | keep | See part 3 |
 | `rejected_reason` | text | a code | internal | keep | Never free text |
-| `uploaded_by` | account, role subject, on merge move | nullable | internal | clear | Subject only for `original_name` |
+| `uploaded_by` | account, role subject, on merge alias | nullable | internal | clear | Subject only for `original_name` |
 | `ready_at`, `deleted_at` | timestamp |  | internal | keep |  |
 | `purge_after` | timestamp | set with `deleted_at` | internal | keep |  |
 
@@ -341,7 +343,7 @@ A row has an account or, for a send before any account exists, an address. The `
 | `id` | id | primary key | internal | keep |  |
 | `type_key` | text | not null | internal | keep | A declared type such as `box-office.order.confirmed` |
 | `side` | text | not null, one of `audience`, `members` | internal | keep | From the type |
-| `account_id` | account, role subject, on merge move | nullable | internal | clear |  |
+| `account_id` | account, role subject, on merge alias | nullable | internal | clear |  |
 | `address` | text | exactly one of `account_id`, `address` at creation | personal | clear | Only for a send to an address with no account. Cleared anyway once every delivery is finished. |
 | `locale` | text | not null | internal | keep |  |
 | `subject_type`, `subject_id` | text |  | internal | keep | The record this is about. No reference. |
@@ -349,6 +351,8 @@ A row has an account or, for a send before any account exists, an address. The `
 | `coalesce_key` | text |  | internal | keep |  |
 | `payload` | JSON | checked against the type's declared variables | personal | clear | Cleared anyway once every delivery is finished |
 | `actor_id` | account, role actor | nullable | internal | keep |  |
+
+One more column, added on 16 November 2026: `sealed_variables` (text, nullable, `col.internal` with `encrypted: true`, on erasure cleared). It holds the values of variables the type declares as sealed, such as a sign-in link, and is set to null when the email delivery reaches a final state. Part 4, "A variable that carries a secret", gives the rules.
 
 `dedupe_key` is how a caller makes a send safe to repeat: a second insert with the same key does nothing. The row outlives its payload, so the log can say that a receipt was sent without holding what it said.
 
@@ -380,7 +384,7 @@ The state list also holds `complained`, for a recipient's spam complaint, and `c
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
-| `account_id` | account, role subject, on merge move | not null | internal | clear |  |
+| `account_id` | account, role subject, on merge alias | not null | internal | clear |  |
 | `delivery_id` | ref `core_notification_deliveries` | nullable, set null | internal | keep |  |
 | `side` | text | not null, one of `audience`, `members` | internal | keep |  |
 | `title` | text | not null, at most 120 characters | personal | clear |  |
@@ -471,7 +475,7 @@ Addresses the system must not email, whoever asks. The Communications module rea
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
-| `account_id` | account, role subject, on merge move | not null | internal | clear |  |
+| `account_id` | account, role subject, on merge alias | not null | internal | clear |  |
 | `side` | text | not null, one of `audience`, `members` | internal | keep |  |
 | `endpoint` | text | not null, unique | personal | clear |  |
 | `keys` | text, encrypted | not null | personal | clear |  |
@@ -563,7 +567,19 @@ Core holds little about people, by design. In the one batch that the identity mo
 
 ## When two accounts are merged
 
-Every row about the losing account moves to the surviving one in the merge's own batch: inbox items, push subscriptions, notifications, credits and uploads. Preferences use a handler, because both accounts may have a row for the same topic and channel: the survivor's wins. Columns that record who did something follow the merge too. Proscenium's known issues record what happens otherwise: preferences, the log and the inbox were left behind on the losing account.
+A merge is staged and can be repeated, and a column follows it by alias unless it has a stated reason not to (integration ruling R-34, 16 November 2026). An aliased row keeps the id it was written with, and every read, count or claim by account goes through the kit's account scope: the survivor and its aliases. A column is moved only where the stored id must be the survivor's.
+
+| Column | On merge | Why |
+| --- | --- | --- |
+| `core_production_credits.account_id` | alias | No unique rule names the account, and nothing keys to a credit by account. My credits and the public credit list read through the account scope. |
+| `core_files.uploaded_by` | alias | It records who uploaded. Nothing is unique by it. |
+| `core_notifications.account_id` | alias | A log of what was sent. The dedupe check for a new send reads through the account scope, so a message already sent to the losing account is not sent again to the survivor. The dedupe key is a hash that includes the account id, so the check computes it once for each account in the scope and skips the send if any exists. The unique index remains the guard against a race on one account. |
+| `core_inbox_items.account_id` | alias | The inbox list and the unread count read through the account scope. |
+| `core_push_subscriptions.account_id` (later release) | alias | A push to a person goes to every subscription in the account scope. The endpoint, not the account, is what is unique. |
+| `core_notification_preferences.account_id` | handler | The row is keyed by account, topic and channel, so both accounts may hold one for the same pair, and only one may stand. The handler keeps the survivor's and deletes the other. Until that stage has run, a read takes the survivor's row where both exist. |
+| Every column of role actor | alias | It records who did something. |
+
+No core-domain column is moved. Proscenium's known issues record what a merge must not do: preferences, the log and the inbox were left behind on the losing account. Here they are reached through the scope instead.
 
 ## What the foundations thread ruled
 

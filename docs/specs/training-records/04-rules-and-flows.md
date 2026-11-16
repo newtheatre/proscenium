@@ -101,6 +101,7 @@ One rule runs through this part: whether a person is trained is always worked ou
 - **C4.** A verdict says met or not, until when it stays met (the earliest expiry among the courses), and when not met, each course that is missing, lapsed or about to be, with the next session the person could sign up for.
 - **C5.** Changing which courses a competency lists changes who holds it from the next read. The screen shows how many people hold it before and after the change, and the change is audited.
 - **C6.** Training never blocks anything itself. It answers; the host that asked decides whether to refuse, warn or allow with an override.
+- **C7. Merged accounts.** Every read, count and claim by account uses the kit's account scope: the surviving account and its aliases. After a merge a person's training records, sign-offs, places and evidence stay on the ids they were written under and are read together, so C1 is judged over the whole scope. Where two of the merged accounts each hold a current training record for one course, the course is held and its `until` is the later of the two expiries. The next award for that course is written to the surviving account and supersedes every awarded record for it in the scope (A5). Sign-offs from either account count towards the same steps. The facts `training.competent` and `training.course-trainer`, the source's verdicts, the one-place-per-session check (P2) and every count of holders use the same scope, so a merged person is answered once and counted once.
 
 ## Evidence
 

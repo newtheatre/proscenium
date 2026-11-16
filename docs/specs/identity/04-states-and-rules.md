@@ -112,6 +112,8 @@ Every method ends in a session, and the method decides its assurance. A basic se
 - **Every signed-in request reads its session row.** There is no window in which an ended session still works.
 - **Assurance belongs to the session, not the account.** A passkey sitting on another device proves nothing about who is using this browser.
 - **Three things need a fresh re-assertion:** changing sign-in methods or addresses, any ability its module flags as sensitive, and confirming a merge or an erasure. The person is asked in place, in a dialogue, and carries on where they were.
+
+  **How the dialogue confirms.** Any request refused as not fresh opens the dialogue where the person is and repeats the request once they have confirmed; there is no separate page. The method must be as strong as the session. A strong session confirms with a passkey, or by signing in again with the provider when that provider counts as strong; an emailed code is never offered to it, so a stolen session and a compromised mailbox together still cannot reach a sensitive action. A basic session with no passkey on the account is sent a six-digit code at the account's audience address and types it into the dialogue. The code is single-use, short-lived, tied to the session that asked, limited in attempts, and sent as a sealed variable. Confirming sets `reasserted_at` only: it never raises assurance, so a basic session stays basic.
 - **What counts as fresh** is set by the re-assertion window setting.
 
 ## Recovery
@@ -206,7 +208,7 @@ These rules keep the two sides apart, and each is a test in the test plan.
 
 ## Merge
 
-A merge joins two accounts that are one person. The survivor keeps its id; the merged-away account becomes an alias.
+A merge joins two accounts that are one person. The survivor keeps its id; the merged-away account becomes an alias. A merge happens in two stages, because the rows to move grow with every module and one unit of work has a limit on its statements (`core.units.statement-limit`). The first stage settles who the person is, at once. The second moves rows in the background, and nobody has to wait for it.
 
 | Started by | Proof needed |
 | --- | --- |
@@ -216,15 +218,35 @@ A merge joins two accounts that are one person. The survivor keeps its id; the m
 
 1. **Refuse first.** If either account is a tombstone, is already an alias, or is the actor's own (for staff), nothing is written.
 2. **Preview.** The screen shows, per module, how many rows will move and which conflicts were settled how.
-3. **One batch.** Every `move` reference is re-pointed, every `handler` supplies its statements, addresses and sign-in methods move, the merged-away account's sessions end, and it gains `merged_into_id`.
-4. **Record.** Each moved row is listed in the merge's items, in the same batch.
+3. **Stage one: settle, in one unit.** The merge is recorded, addresses and sign-in methods move, the merged-away account's sessions end, and it gains `merged_into_id`. Only identity's own tables are touched, so the size of this unit never grows with the modules installed. From this commit every read resolves the merged-away account to the survivor, the person signs in as the survivor, and the merge is announced.
+4. **Stage two: move, by a job.** The job `core.merge-move` takes the modules in registry order. Each module's `move` columns are re-pointed in that module's own units of work, and each `handler` runs in a unit of its own. A unit lists the rows it is about to move in the merge's items and then moves them, so the record and the move commit together. Every statement is safe to repeat: it moves only rows still pointing at the merged-away account, and lists a row only once. A job that fails is run again from the start and does no harm. When every module is done, a last unit sets `completed_at`. A merge still moving after an hour is picked up by the daily sweep and shown as "still moving" under Merges, where staff can run it again.
 5. **Tell both.** Every verified address on both accounts is told, with a link to report a mistake.
-6. **Undo.** Until `undo_until`, staff can reverse it: the listed rows move back and the alias is cleared. Rows created since stay with the survivor.
-7. **Close.** When the window passes, the items are deleted and the merged-away account's row is anonymised. It stays an alias for ever, so append-only history still resolves.
+6. **Undo.** Until `undo_until` (counted from stage one), and once the merge is complete, staff can reverse it, in the opposite order. First `undo_started_at` is set and the same job moves the listed rows back, module by module, while the alias still stands, so readers see no change. A last unit then clears the alias, returns the addresses and sign-in methods, and marks the merge undone; that is the moment the two accounts part. Rows created since the merge stay with the survivor.
+7. **Close.** When the window passes on a complete merge, the items are deleted and the merged-away account's row is anonymised. It stays an alias for ever, so append-only history still resolves. A merge that is not complete is never closed.
 
 - **Which account wins:** the one the person is signed in to; for staff, the claimed one; if both are claimed, the older.
 - **The survivor's values win** for name, phone and the two address pointers. Nothing is blended.
-- **The batch asserts its own completeness.** Its last statement checks that no `move` reference to the merged-away account remains, and the whole batch fails otherwise.
+- **The merge asserts its own completeness.** Each module's last unit checks that none of that module's `move` columns still points at the merged-away account, and fails otherwise. `completed_at` is set only after every module has passed.
+
+  **What a reader sees while rows are moving: the whole person, already.** Every read of rows by account, and every condition on a statement that counts or claims by account, uses the kit's account scope: the survivor and every account that is an alias of it, written as a subquery. A row not yet moved is therefore found exactly as an `alias` row is, and a limit per person counts both accounts' rows from stage one. Every new write names the survivor. Nothing on a screen tells the person a merge is in progress, because nothing is missing.
+
+  **An alias always points at the final survivor.** `merged_into_id` is indexed and never forms a chain. When an account that already has aliases is itself merged away, stage one re-points those aliases at the new survivor in the same unit and lists them in the merge's items, so an undo's last unit returns them. The account scope is therefore one level deep. Each `move` column takes two statements whatever the number of rows (one lists the rows, one rewrites them, and the closing check is a guard on the statement), so a module is split across units only when its count of `move` columns passes the limit. A module that declares no `onMerge` for a column means `alias`, and the kit's check asks for a one-line reason beside every `move`.
+
+  **Within a module, handlers run before its moves.** Stage one touches identity's tables only, so a handler finds its module's rows exactly as they were before the merge, each still carrying the id of the account that owned it, and is given both ids. Only when all of a module's handlers have finished are its `move` columns re-pointed. A handler may answer "not yet" when a row is in the middle of something (a payment in hand, say): that module's handlers and moves wait, the job carries on with the other modules and comes back with a growing pause, and the merge stays "still moving" without having failed. Nothing is wrong for readers meanwhile, because the alias stands. A handler whose change cannot be reversed by putting listed values back, such as a total that has since grown, supplies its own undo statements, under the same rules: one unit, safe to repeat.
+
+  A "not yet" is not a failed attempt and never makes the job dead. A merge still waiting after a day raises a health warning that names the module, so a stuck merge is seen by somebody.
+
+  An undo runs each module's steps in the exact reverse order: its `move` columns are pointed back first, and its handlers' undo statements run after. A handler's undo therefore finds each row back with the account that first owned it, and a rule of one row per person is never broken on the way.
+
+  **What a handler owes on undo.** An undo gives each account back what it held at the merge, so far as that still exists. It never reverses anything that has happened since, and it never leaves a person less protected than they chose to be. Four rules follow.
+  - **Set aside, do not delete.** A row a handler removes from use because both accounts had one (a second application, a second response, a clashing place) is marked as set aside by the merge and kept until the undo window closes. At the close the module decides what becomes of it: deleted, which is the usual answer, or kept under the module's own retention where the row is a record in its own right, such as a submitted form response. On undo it goes back to the account it came from, in the state it had.
+  - **The stricter choice stands.** An unsubscribe, a withdrawal of consent, a suppression or a block that the merge carried from one account to the other stays on both after an undo, as does any made since. Consent history is append-only: an undo writes a new entry and removes none.
+  - **Nothing is taken back from somebody else.** If a place, a shift or a seat the handler freed has since gone to another person, or its date has passed, it is not restored. Money paid and messages sent stand.
+  - **Say what could not be put back.** A handler's undo returns a count, with a reason, of what stood. Staff see it on the Merges screen before they confirm the undo and after it, it is in the audit entry, and both people are told.
+
+  A module may let convenience data of no consequence stand, such as display preferences, if its specification says so. Anything else that is to stand must be named in the module's specification and shown in the merge preview.
+
+  **`alias` is the default; `move` must be earned.** A column is declared `move` only where the stored id itself has to be the survivor's: it is part of a unique rule (one row per person), or the row is the person's own living record that other tables key to. Everything else is `alias`: who did something (sold by, approved by, written by), and every reference in an append-only table, which cannot be updated in any case. Where both accounts may hold a row that a unique rule allows once, the column is `handler`, and the handler says which row stays. Room under the statement limit is never a reason to choose one over the other.
 
 ## Export and erasure
 

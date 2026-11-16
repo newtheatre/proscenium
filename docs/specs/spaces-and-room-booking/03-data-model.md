@@ -101,7 +101,7 @@ No row means allowed, following the purpose. So a theatre that never opens this 
 | `id` | id | primary key | internal | keep |  |
 | `bookable_id` | ref `spaces_bookables` | not null, restrict | internal | keep |  |
 | `purpose_id` | ref `spaces_purposes` | not null, restrict | internal | keep |  |
-| `booked_for` | account, role subject | not null | personal | anonymise | Follows a merge |
+| `booked_for` | account, role subject | not null | personal | anonymise | onMerge alias |
 | `frequency` | text | not null, one of `daily`, `weekly`, `fortnightly`, `monthly-by-weekday` | internal | keep |  |
 | `weekdays` | text | JSON list of 1 to 7; weekly and fortnightly only | internal | keep |  |
 | `starts_local` | text | not null, local time | internal | keep | The wall-clock start of every occurrence |
@@ -175,4 +175,4 @@ Bookings in the past keep their time, bookable and purpose, so occupancy figures
 
 ## When two accounts are merged
 
-`booked_for`, `requested_by`, `decided_by` and `actor` move to the surviving account by column declaration. No row can collide, since no table here is unique on an account.
+`booked_for`, `requested_by`, `decided_by` and `actor`, the five account columns of this module (one on a series, three on a booking, one on a booking event), are all declared onMerge alias, and none is move: no table here is unique on an account, so no row can collide; a booking is not a record of the person that other tables key to; requested\_by and decided\_by name who acted; and booking events are append-only. So a merge rewrites nothing in this module. Every read, count and condition by account uses the kit's account scope, the survivor and its aliases together: "my bookings", the owner check on booked\_for, the cancelling of an erased person's bookings, and any rule in part 3 that counts or limits bookings per person.

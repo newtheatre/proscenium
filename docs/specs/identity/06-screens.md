@@ -1,6 +1,6 @@
 # 5. Screens
 
-Identity has 33 screens: 9 for getting in, 7 in "My account", 3 in the members' area and 14 in the console. Three are drawn here because they carry the audience and members' separation; workstream 6 owns how every screen finally looks.
+Identity has 33 screens: 9 for getting in, 7 in "My account", 3 in the members' area, 9 in the console and 5 in Site administration. Three are drawn here because they carry the audience and members' separation; workstream 6 owns how every screen finally looks.
 
 ## The header is where the two sides meet
 
@@ -71,19 +71,28 @@ Console shell. Each row names the ability that shows it.
 | Add someone | Name and address, optionally a role; creates an unclaimed account and sends an invitation | `core.account.create` | First |
 | Merge accounts | Choose the second account, see the preview, confirm | `core.account.merge` | First |
 | Merges | Recent merges, with undo while the window is open | `core.account.merge` | First |
-| Roles | Every role, how many hold it, presets not yet used | `core.role.read` | First |
-| Role | Name, description, expiry rule, abilities grouped by module with what each brings; who holds it | `core.role.manage` to edit | First |
-| Facts | Each declared fact with the abilities mapped to it, edited the same way as a role | `core.role.manage` to edit | First |
 | Who holds what | Every live, pending and soon-to-lapse grant; filter by role, scope and module; grant, renew and end | `core.grant.read`; `core.grant.manage` to change | First |
 | Data requests | Exports and erasures with their state, holds and respond-by date | `core.data-request.manage` | First |
-| Sign-in settings | Methods, managed domains, session times, generated from the settings registry | `core.identity-settings.manage` | First |
-| Retention | What each sweep would do today; arm or disarm it (the arm control alone needs core.retention.arm, held only by Owners) | `core.identity-settings.manage` | Later |
 
 ![wireframe · a person's page in the console](images/06-person-page-console.png)
 
 *wireframe · a person's page in the console*
 
 Identity draws the left card and the first three sections. The tinted section is the `core.account-section` point, so a module that is switched off leaves nothing behind.
+
+## Site administration
+
+The fourth shell, at `/admin`, holds what is set up once for the whole installation (Matt, 16 November 2026; Interface specifies the shell and its addresses). The console keeps the theatre's daily business with people. Five of identity's screens live here. Granting a role to a person stays in the console under "Who holds what"; defining what a role contains is here.
+
+| Screen | Purpose | Ability | Release |
+| --- | --- | --- | --- |
+| Roles | Every role, how many hold it, presets not yet used | `core.role.read` | First |
+| Role | Name, description, expiry rule, abilities grouped by module with what each brings; who holds it | `core.role.manage` to edit | First |
+| Facts | Each declared fact with the abilities mapped to it, edited the same way as a role | `core.role.manage` to edit | First |
+| Sign-in settings | Methods, managed domains, session times, generated from the settings registry | `core.identity-settings.manage` | First |
+| Retention | What each sweep would do today; arm or disarm it (the arm control alone needs `core.retention.arm`, held only by Owners) | `core.identity-settings.manage` | Later |
+
+All five declare menu `admin` and the group `access` (label "Access"), in this order: Roles at `/admin/roles`; Role at `/admin/roles/<role>`, reached from Roles with no menu entry of its own; Facts at `/admin/facts`; Sign-in at `/admin/sign-in`; Retention at `/admin/retention` when it ships. The shell needs no ability of its own: a holder of `core.role.read` or `core.identity-settings.manage` sees Site administration in the account menu and only the entries they may open, and anybody else gets page not found at `/admin`. A role's "who holds this" link crosses to the console's People group.
 
 ## Rules for these screens
 
@@ -106,8 +115,8 @@ On a person's page in the console, "Emergency contacts" (members' side) is close
 | My account | Public, account menu | `signed-in` |
 | Members' area | Public, account menu | Any standing |
 | Console | Public and members', account menu | Any ability with a console entry |
-| People: Accounts, Roles, Who holds what, Data requests | Console | The abilities above |
-| Settings: Sign-in, Retention | Console | `core.identity-settings.manage` |
+| People: Accounts, Who holds what, Data requests, Access scheme | Console | The abilities above |
+| Roles and facts; Sign-in settings; Retention | Site administration | `core.role.read` for roles and facts; `core.identity-settings.manage` for the other two |
 
 ## Setup steps
 

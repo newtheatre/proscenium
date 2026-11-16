@@ -86,17 +86,18 @@ Registered with Foundations on 16 November 2026 and listed in its part 4 index. 
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `shift_id` | ref `front_of_house_shifts` | not null | internal | keep |  |
-| `account_id` | account, role subject, on merge move | not null | internal | keep | One live assignment per account per shift. A merge that would make two keeps the one further along |
+| `account_id` | account, role subject, on merge move | not null | internal | keep | Move, the only one in this module, because one live assignment per account per shift is a unique rule on the stored id. The merge handler first resolves a clash: where both accounts are on one shift it keeps the assignment further along and frees the other place |
 | `state` | text | one of requested, confirmed, release\_requested, checked\_in, worked, no\_show, declined, withdrawn, released, removed | internal | keep | See part 3 |
 | `source` | text | one of sign-up, assigned, cover | internal | keep |  |
-| `assigned_by` | account, role actor, on merge move | nullable | internal | keep | The manager, when not a sign-up |
+| `assigned_by` | account, role actor, on merge alias | nullable | internal | keep | The manager, when not a sign-up |
 | `confirmed_at` | timestamp | nullable | internal | keep |  |
 | `checked_in_at`, `checked_out_at` | timestamp | nullable | internal | keep |  |
 | `ended_at` | timestamp | nullable | internal | keep | When it reached a final state |
-| `ended_by` | account, role actor, on merge move | nullable | internal | keep |  |
+| `ended_by` | account, role actor, on merge alias | nullable | internal | keep |  |
 | `release_reason` | text | at most 300 | free text | redact | The person's own words |
 | `minutes_worked` | integer | nullable, at least 0 | internal | keep | Set when the state becomes worked |
 | `reminded` | integer | not null, default 0 | internal | keep | How many reminders have gone |
+| freed\_by\_merge | text | nullable | internal | keep | The id of the merge that released this assignment because both accounts were on the shift, with the account it came from kept by the merge record. Cleared when Identity's 30-day undo window closes. See part 4, under the merge handler |
 
 On erasure the row is kept with its account reference following Identity's tombstone, so a past rota still adds up; the free text is redacted.
 
@@ -138,7 +139,7 @@ On erasure the row is kept with its account reference following Identity's tombs
 | `venue_id` | ref `core_venues` | nullable | internal | keep |  |
 | `local_date` | local date | not null | internal | keep | The operating day |
 | `state` | text | one of open, complete, complete\_with\_exceptions | internal | keep |  |
-| `completed_by` | account, role actor, on merge move | nullable | internal | keep |  |
+| `completed_by` | account, role actor, on merge alias | nullable | internal | keep |  |
 | `completed_at` | timestamp | nullable | internal | keep |  |
 
 **`front_of_house_checklist_entries`**: realm operational; subject none; retention with its run; key unique on (`run_id`, `item_id`).
@@ -153,7 +154,7 @@ On erasure the row is kept with its account reference following Identity's tombs
 | `reading` | integer | nullable | internal | keep |  |
 | `reason_code` | ref `core_terms` | required for an exception | internal | keep | From the vocabulary `front-of-house.exception-reason` |
 | `reason_note` | text | at most 200 | internal | keep | About the thing, not a person. The screen says so; anything about a person belongs in an incident |
-| `done_by` | account, role actor, on merge move | not null | internal | keep |  |
+| `done_by` | account, role actor, on merge alias | not null | internal | keep |  |
 | `done_at` | timestamp | not null | internal | keep | The device's time when queued offline |
 
 ## Incidents
@@ -176,10 +177,10 @@ On erasure the row is kept with its account reference following Identity's tombs
 | `what_happened` | text | not null, at most 4,000 | free text | retain until `front-of-house.retention.incidents`, then redact | Kept through an erasure because it is the safety record; reason key `front-of-house.retain.incident` |
 | `immediate_action` | text | at most 2,000 | free text | retain, as above |  |
 | `first_aid_given`, `emergency_services_called` | boolean | not null, default false | internal | keep | Either one raises severity to at least moderate |
-| `reported_by` | account, role actor, on merge move | not null | internal | keep |  |
+| `reported_by` | account, role actor, on merge alias | not null | internal | keep |  |
 | `reported_at` | timestamp | not null | internal | keep | Server time; `occurred_at` and the device time come from the report |
-| `reviewer_id` | account, role actor, on merge move | nullable | internal | keep |  |
-| `closed_by` | account, role actor, on merge move | nullable | internal | keep | Never the reporter alone when severity is serious; see part 3 |
+| `reviewer_id` | account, role actor, on merge alias | nullable | internal | keep |  |
+| `closed_by` | account, role actor, on merge alias | nullable | internal | keep | Never the reporter alone when severity is serious; see part 3 |
 | `closed_at` | timestamp | nullable | internal | keep |  |
 | `closing_note` | text | required to close, at most 2,000 | free text | retain, as above |  |
 
@@ -191,7 +192,7 @@ Foundations' rule is that a table with free text has a subject. The incident's f
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `incident_id` | ref `front_of_house_incidents` | not null | internal | keep |  |
-| `account_id` | account, role subject, on merge move | nullable | internal | keep | Set for a member or a known customer |
+| `account_id` | account, role subject, on merge alias | nullable | internal | keep | Set for a member or a known customer |
 | `name` | text | at most 120 | personal | retain until the retention period, then anonymise |  |
 | `contact` | text | at most 200 | personal | retain, then clear | A phone number or an email, as given. A contact column, never a subject |
 | `involvement` | text | one of affected, witness, helped, other | internal | keep |  |
@@ -205,7 +206,7 @@ Foundations' rule is that a table with free text has a subject. The incident's f
 | `id` | id | primary key | internal | keep |  |
 | `incident_id` | ref `front_of_house_incidents` | not null | internal | keep |  |
 | `what` | text | not null, at most 300 | internal | keep | "Replace the stair nosing". About a thing to do, not a person |
-| `owner_id` | account, role actor, on merge move | nullable | internal | keep |  |
+| `owner_id` | account, role actor, on merge alias | nullable | internal | keep |  |
 | `due_on` | local date | nullable | internal | keep |  |
 | `state` | text | one of open, done, dropped | internal | keep |  |
 | `resolved_at` | timestamp | nullable | internal | keep |  |
@@ -233,7 +234,7 @@ Foundations' rule is that a table with free text has a subject. The incident's f
 | `state` | text | one of draft, signed\_off | internal | keep |  |
 | `snapshot` | JSON | null until signed off | internal | keep | The compiled report: figures, timings, ids and counts. No names and no free text; see part 3 |
 | `snapshot_version` | integer | not null, default 1 | internal | keep | The shape of the snapshot |
-| `signed_off_by` | account, role actor, on merge move | nullable | internal | keep |  |
+| `signed_off_by` | account, role actor, on merge alias | nullable | internal | keep |  |
 | `signed_off_at` | timestamp | nullable | internal | keep |  |
 | `distributed_at` | timestamp | nullable | internal | keep |  |
 
@@ -258,7 +259,7 @@ A trigger refuses any change to a signed-off row except setting `distributed_at`
 | `performance_id` | ref `core_performances` | not null | internal | keep |  |
 | `kind` | text | one of house\_open, curtain\_up, interval\_start, interval\_end, curtain\_down, house\_clear | internal | keep | The backstage board (later) adds the half, the quarter, the five and beginners |
 | `at` | timestamp | not null | internal | keep |  |
-| `recorded_by` | account, role actor, on merge move | not null | internal | keep |  |
+| `recorded_by` | account, role actor, on merge alias | not null | internal | keep |  |
 
 **`front_of_house_emergency_cards`**: realm operational; subject none.
 
@@ -268,7 +269,7 @@ A trigger refuses any change to a signed-off row except setting `distributed_at`
 | `venue_id` | ref `core_venues` | not null, unique | internal | keep |  |
 | `body` | text | not null, at most 8,000 | internal | keep | Markdown: evacuation routes, assembly point, who to call. Role titles and switchboard numbers, not private numbers |
 | `reviewed_on` | local date | not null | internal | keep | The card shows it; a health check warns after `front-of-house.emergency.review-every` |
-| `reviewed_by` | account, role actor, on merge move | not null | internal | keep |  |
+| `reviewed_by` | account, role actor, on merge alias | not null | internal | keep |  |
 
 ## What is deliberately not stored
 
