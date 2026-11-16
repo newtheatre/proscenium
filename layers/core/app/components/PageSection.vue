@@ -11,6 +11,7 @@ const id = useId()
   <UCard
     as="section"
     :aria-labelledby="id"
+    :ui="{ body: 'space-y-4' }"
   >
     <template #header>
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -36,7 +37,9 @@ const id = useId()
       v-if="$slots.footer"
       #footer
     >
-      <slot name="footer" />
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <slot name="footer" />
+      </div>
     </template>
   </UCard>
 </template>

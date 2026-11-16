@@ -162,7 +162,10 @@ export async function sendRefund(refundId: string): Promise<RefundAnswer | null>
   const attempt = (await first<AttemptRow>('SELECT * FROM payments_attempts WHERE id = ?', refund.attempt_id))!
   const { provider, attempt: asked } = await forProvider(attempt)
   if (!provider?.refund) return null
-  const answer = await provider.refund({ id: refund.id, amountMinor: refund.amount_minor, currency: asked.currency, idempotencyKey: refund.idempotency_key, attempt: asked })
+  // What the provider has already refunded of this payment for other refunds (attempts.refunded_minor
+  // also counts approved refunds not yet sent, this one among them).
+  const before = await first<{ total: number }>("SELECT coalesce(sum(amount_minor), 0) AS total FROM payments_refunds WHERE attempt_id = ? AND id <> ? AND state = 'succeeded'", attempt.id, refund.id)
+  const answer = await provider.refund({ id: refund.id, amountMinor: refund.amount_minor, currency: asked.currency, idempotencyKey: refund.idempotency_key, refundedBeforeMinor: before?.total ?? 0, attempt: asked })
   await answerRefund(refund.id, answer)
   return answer
 }

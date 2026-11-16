@@ -14,8 +14,7 @@ onMounted(async () => {
     refusal.value = answer.refusal
     return
   }
-  if (answer.data.offerPasskey) return navigateTo({ path: '/account/passkey', query: { next: answer.data.next } })
-  return navigateTo(answer.data.next)
+  return arriveSignedIn(answer.data)
 })
 </script>
 

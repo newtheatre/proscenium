@@ -6,18 +6,11 @@ const { t } = useT()
 </script>
 
 <template>
-  <div
-    class="flex flex-col items-start gap-3 rounded-lg border border-default p-6"
+  <UAlert
     role="alert"
-  >
-    <p class="font-medium text-highlighted">
-      {{ reason }}
-    </p>
-    <UButton
-      :label="t('core.failed.retry')"
-      icon="i-lucide-refresh-cw"
-      :loading="retrying"
-      @click="$emit('retry')"
-    />
-  </div>
+    color="error"
+    icon="i-lucide-circle-alert"
+    :title="reason"
+    :actions="[{ label: t('core.failed.retry'), icon: 'i-lucide-refresh-cw', color: 'neutral', variant: 'outline', loading: retrying, onClick: () => $emit('retry') }]"
+  />
 </template>

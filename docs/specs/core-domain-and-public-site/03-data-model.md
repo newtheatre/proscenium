@@ -625,3 +625,53 @@ The foundations format gives every generated id the shape `<prefix>_<26 characte
 | `core_webhook_deliveries` | Webhooks | `whd` |  |
 
 Eighteen tables have a prefix and eight have a natural key. Three prefixes registered earlier (`psl`, `adv`, `pfa`) are withdrawn, because the tables they were for are keyed by a slug or a pair and generate no id.
+
+## Later slice: content warnings, staging effects and age
+
+Matt accepted the proposal "Content warnings: proposal" (https://claude.ai/artifact/CgWqVuyA9gvrGujhYTTGwL) on 16 November 2026, with all seven of its recommended choices. It is built as its own slice after the work now in hand, so everything above this heading stays as the description of what is being built today, and this section says what the slice changes. The proposal carries the evidence from NNT's live data; this section carries only the design.
+
+The one list of advisories becomes three things that behave differently:
+
+| Part | Question it answers | Graded | Shown |
+| --- | --- | --- | --- |
+| Age | Who is this for? | No | Always |
+| Staging effects | What will the room do to me? | No | Always: it is safety information |
+| Content warnings | What is the story about that I may want to know first? | Mentioned, discussed or depicted | Behind a "show" control by default, because they can spoil the plot |
+
+### Tables the slice changes or adds
+
+| Table or item | Change |
+| --- | --- |
+| Vocabulary `core.advisory` | Becomes content warnings only, labelled "Content warnings", and is grouped under headings. Its starting terms are rewritten: about fifty-five under nine headings, each with a one-line description. |
+| Vocabulary `core.staging-effect` (new) | About ten starting terms, each with an icon and a description. Not grouped. Core declares it. |
+| `core_term_groups` (new; id prefix `tgr`) | A heading within a vocabulary: `id`, `vocabulary` (text, not null), `label` (public, translatable like a term's), `sort` (integer). Realm operational, no subject, not append-only. Unique on `(vocabulary, label)`. |
+| `core_terms` | Gains `group_id` (ref `core_term_groups`, nullable, restrict). A vocabulary declared `grouped: true` requires it on every active term, and the group must belong to the same vocabulary. Any vocabulary may be grouped; headings are one level deep. |
+| `core_production_advisories` | Gains `level` (text, not null, one of `mentioned`, `discussed`, `depicted`). Loses `sort`. Keeps `detail`. The term must be of `core.advisory`. |
+| `core_production_effects` (new) | `production_id` (ref, cascade), `term_id` (a term of `core.staging-effect`), `detail` (text, nullable, at most 300 characters, public). Keyed by production and term, so no id prefix. Realm and classes as `core_production_advisories`. |
+| `core_productions` | `age_guidance` is replaced by `age_min` (integer, nullable, 0 to 21) and `age_restricted` (boolean, not null, default false; true means nobody younger is admitted, false means a recommendation). Gains `effects_confirmed_none` (boolean, not null, default false) beside `advisories_confirmed_none`. |
+| `core_performance_effect_exceptions` (new, later than the slice) | `performance_id`, `term_id`: this effect is not used at this performance. The term must be one of the production's effects. Keyed by performance and term. |
+
+That takes the core domain from 26 tables to 28 with the slice, and to 29 when performance exceptions follow.
+
+### Rules
+
+- A content warning without a level is refused. An effect carries no level. A term from the wrong vocabulary is refused in either table, by a predicate on the write.
+- The order of content warnings is derived and never stored: depicted, then discussed, then mentioned; within a level by heading order, then term order.
+- Publishing asks two questions. A production needs effects listed or `effects_confirmed_none`, and content warnings listed or `advisories_confirmed_none`. Listing one clears its "none" answer. Once published, neither answer can be emptied.
+- `age_restricted` cannot be true while `age_min` is null.
+- The setting `core.programme.advisories-collapsed` keeps its name and default, and now hides content warnings and their details only. Age and effects are never hidden.
+- A merged term shows once, under the surviving term's label; where both were on a production, the more serious level stands.
+
+### Carrying existing rows across
+
+Rows written before the slice have no level and a free-text age, so the migration converts what it safely can and leaves the rest for a person, saying where.
+
+| Existing data | What the migration does | What a person then does |
+| --- | --- | --- |
+| An advisory whose term is an effect (strobe, haze, loud noises, gunshots among the starting terms) | Moves the row to `core_production_effects`, keeping its detail. | Nothing. |
+| Any other advisory | Gives it the level `depicted`, the most serious, so nothing is understated, and sets `level_assumed` (boolean, not null, default false) on the row. | Opens the production, sets the real level and saves, which clears `level_assumed`. The public page shows an assumed row without a level word until then. |
+| `age_guidance` that parses as a number, such as "12+" or "14 and over" | Fills `age_min` as a recommendation, never as a restriction. | Nothing, unless it should be a restriction. |
+| `age_guidance` with any other text, such as "Suitable for all" | Leaves `age_min` null and appends the text to the content note, so it stays public and nothing a theatre wrote is lost. | Sets an age if one applies. |
+| A published production with no effects | Leaves it published, with `effects_confirmed_none` false. | Lists the effects or confirms none. |
+
+Site readiness gains one line for each kind of unfinished row: productions with assumed levels, productions whose age text was not converted, and published productions with no answer on effects. Each line links to the productions concerned. `level_assumed` exists only to carry this; a row written after the slice never has it set.

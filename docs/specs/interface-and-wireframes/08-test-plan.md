@@ -1,6 +1,6 @@
 # 8. Test plan
 
-Twenty-six named cases must never regress. Each is filed under the tier that runs it in workstream 1's harness: unit (pure code), integration (the real runtime and database) or browser (a real browser against a running app).
+Thirty-four named cases must never regress. Each is filed under the tier that runs it in workstream 1's harness: unit (pure code), integration (the real runtime and database) or browser (a real browser against a running app).
 
 ## Who sees what
 
@@ -29,6 +29,21 @@ Twenty-six named cases must never regress. Each is filed under the tier that run
 | **Typed text survives** | After a refusal, a failure and a conflict, every field still holds what was typed | Browser |
 | **Settings page is generated** | A module that declares a setting and writes no page gets a working, validated control with default and reset | Integration |
 | **Totals must match** | A money action whose server total differs from the shown total is refused with both figures | Integration |
+
+## Lists
+
+Added 16 November 2026 with the list design.
+
+| Case | Proves | Tier |
+| --- | --- | --- |
+| **Search reaches every field** | A term found only in a hidden column, in a named extra field or in a child finds the row, and the row says where it matched | Integration |
+| **Search respects sight** | A term found only in a field or contributed column the viewer may not see finds nothing for them | Integration |
+| **Unknown is refused** | An address with an unknown filter key, value, sort or view is refused with a standard refusal, and a filter the viewer may not use is ignored | Integration |
+| **Pages never shuffle** | With many rows equal on the sort key, walking every page forwards shows each row exactly once | Integration |
+| **Sort by what is not shown** | The Sort control lists a sort with no column, applies it, and names it on the button; a heading cycles natural, reverse, default and sets `aria-sort` | Browser |
+| **One visit, one step back** | Changing three filters in one visit to the panel, then Back, returns to the list as it was before the panel opened | Browser |
+| **Children follow parents** | A child filter keeps a parent when any child matches, shows only matching children with the count, and the page total counts parents | Integration |
+| **The way back is the list as left** | From a filtered, sorted list on page 3, opening a record and using the trail returns to the same filters, sort and page | Browser |
 
 ## Offline and live
 

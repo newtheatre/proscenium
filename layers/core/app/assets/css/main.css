@@ -20,10 +20,8 @@
 :root.light .admin-shell, :root:not(.dark) .admin-shell { --ui-primary: var(--ui-color-neutral-800); }
 .dark .admin-shell, .dark.admin-shell { --ui-primary: var(--ui-color-neutral-200); }
 
-/* Targets: 24 pixels everywhere (WCAG 2.2, 2.5.8), 44 in the public shell, 48 in live mode. */
+/* The touch target of a control used on the move or at the door (the members' tab bar, live mode). */
 :root {
-  --proscenium-target: 24px;
-  --proscenium-target-public: 44px;
   --proscenium-target-live: 48px;
 }
 

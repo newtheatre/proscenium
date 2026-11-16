@@ -1,0 +1,253 @@
+// Part 3's performance moves, C-03 to C-07, C-10 and C-12: a performance is added as a draft,
+// scheduled only into a free space that is not closed, cancelled with a reason, reinstated while it
+// has not started, and completed once by the task. Each change on a scheduled performance is
+// announced with the old and new values, and venues and spaces in use cannot be archived or deleted.
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import createProduction from '../../server/api/core/productions/index.post'
+import deleteProduction from '../../server/api/core/productions/[id]/index.delete'
+import getProduction from '../../server/api/core/productions/[id]/index.get'
+import listPerformances from '../../server/api/core/productions/[id]/performances/index.get'
+import addPerformance from '../../server/api/core/productions/[id]/performances/index.post'
+import getPerformance from '../../server/api/core/performances/[id]/index.get'
+import patchPerformance from '../../server/api/core/performances/[id]/index.patch'
+import deletePerformance from '../../server/api/core/performances/[id]/index.delete'
+import schedule from '../../server/api/core/performances/[id]/schedule.post'
+import cancel from '../../server/api/core/performances/[id]/cancel.post'
+import reinstate from '../../server/api/core/performances/[id]/reinstate.post'
+import setAccess from '../../server/api/core/performances/[id]/access.put'
+import impact from '../../server/api/core/performances/[id]/impact.get'
+import createVenue from '../../server/api/core/venues/index.post'
+import addSpace from '../../server/api/core/venues/[id]/spaces/index.post'
+import archiveVenue from '../../server/api/core/venues/[id]/archive.post'
+import archiveSpace from '../../server/api/core/venues/[id]/spaces/[space]/archive.post'
+import deleteSpace from '../../server/api/core/venues/[id]/spaces/[space]/index.delete'
+import createClosure from '../../server/api/core/closures/index.post'
+import { completeEnded } from '../../server/programme/performances'
+import { changeSetting, createUnit } from '#kit'
+import { resetRateLimits } from '#kit/ratelimit'
+import { call, env, inContext, person, rows, server } from '../../../../tests/integration/helpers'
+
+const handle = server({
+  'POST /api/core/productions': createProduction,
+  'GET /api/core/productions/:id': getProduction,
+  'DELETE /api/core/productions/:id': deleteProduction,
+  'GET /api/core/productions/:id/performances': listPerformances,
+  'POST /api/core/productions/:id/performances': addPerformance,
+  'GET /api/core/performances/:id': getPerformance,
+  'PATCH /api/core/performances/:id': patchPerformance,
+  'DELETE /api/core/performances/:id': deletePerformance,
+  'POST /api/core/performances/:id/schedule': schedule,
+  'POST /api/core/performances/:id/cancel': cancel,
+  'POST /api/core/performances/:id/reinstate': reinstate,
+  'PUT /api/core/performances/:id/access': setAccess,
+  'GET /api/core/performances/:id/impact': impact,
+  'POST /api/core/venues': createVenue,
+  'POST /api/core/venues/:id/spaces': addSpace,
+  'POST /api/core/venues/:id/archive': archiveVenue,
+  'POST /api/core/venues/:id/spaces/:space/archive': archiveSpace,
+  'DELETE /api/core/venues/:id/spaces/:space': deleteSpace,
+  'POST /api/core/closures': createClosure,
+})
+const admin = person(['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'core.closure.manage'])
+const scheduler = person(['core.performance.schedule'])
+const viewer = person(['core.production.view'])
+
+async function json<T = any>(response: Promise<Response>): Promise<{ status: number, body: T }> {
+  const r = await response
+  return { status: r.status, body: await r.json() as T }
+}
+const req = (method: string, path: string, body?: object, actor = admin) => json(call(handle, method, path, { actor, body }))
+const at = (iso: string) => Date.parse(iso)
+const term = async (vocabulary: string, slug: string) =>
+  (await rows<{ id: string }>('SELECT id FROM core_terms WHERE vocabulary_key = ? AND slug = ?', vocabulary, slug))[0]!.id
+const events = (name: string, id: string) => rows<{ payload: string }>('SELECT payload FROM core_events WHERE name = ? AND record_id = ? ORDER BY rowid', name, id)
+
+let n = 0
+async function stage(): Promise<{ productionId: string, venueId: string, main: string, studio: string }> {
+  const production = await req('POST', '/api/core/productions', { title: `Performed ${++n}`, kind: 'own' })
+  expect(production.status).toBe(200)
+  const venue = await req('POST', '/api/core/venues', { name: `Performance venue ${n}` })
+  const studio = await req('POST', `/api/core/venues/${venue.body.venueId}/spaces`, { name: 'Studio', kindTermId: await term('core.space-kind', 'studio') })
+  return { productionId: production.body.id, venueId: venue.body.venueId, main: venue.body.spaceId, studio: studio.body.id }
+}
+async function add(s: { productionId: string, venueId: string, main: string }, startsAt: string, extra: object = {}): Promise<string> {
+  const { status, body } = await req('POST', `/api/core/productions/${s.productionId}/performances`, { venueId: s.venueId, spaceId: s.main, startsAt: at(startsAt), ...extra })
+  expect(status, JSON.stringify(body)).toBe(200)
+  return body.id
+}
+const state = async (id: string) => (await rows<{ state: string }>('SELECT state FROM core_performances WHERE id = ?', id))[0]?.state
+
+beforeEach(async () => {
+  resetRateLimits()
+  await inContext(async () => {
+    const unit = createUnit()
+    await changeSetting(unit, 'core.locale.time-zone', 'Europe/London', { confirm: true })
+    await unit.commit()
+  })
+})
+afterEach(async () => {
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM core_closures'),
+    env.DB.prepare("DELETE FROM core_settings WHERE key = 'core.locale.time-zone'"),
+  ])
+})
+
+describe('performances', () => {
+  it('need the ability on the production, and can be seen with view', async () => {
+    const s = await stage()
+    expect((await call(handle, 'POST', `/api/core/productions/${s.productionId}/performances`, { actor: viewer, body: { venueId: s.venueId, spaceId: s.main, startsAt: at('2027-03-01T19:30:00Z') } })).status).toBe(403)
+    const id = await add(s, '2027-03-01T19:30:00Z')
+    expect((await call(handle, 'POST', `/api/core/performances/${id}/cancel`, { actor: scheduler, body: { reasonTermId: 'x' } })).status).toBe(403)
+    expect((await req('GET', `/api/core/performances/${id}`, undefined, viewer)).status).toBe(200)
+    expect((await req('GET', `/api/core/productions/${s.productionId}/performances`, undefined, viewer)).body.performances).toHaveLength(1)
+  })
+
+  it('start as drafts, with doors and the end from the settings, on the theatre\'s operating day', async () => {
+    const s = await stage()
+    const id = await add(s, '2027-03-02T19:30:00Z')
+    const { body } = await req('GET', `/api/core/performances/${id}`)
+    expect(body).toMatchObject({ state: 'draft', startsAt: at('2027-03-02T19:30:00Z'), doorsAt: at('2027-03-02T19:00:00Z'), endsAt: at('2027-03-02T21:30:00Z'), operatingDay: '2027-03-02' })
+    // Half past midnight belongs to the day before, which starts at 04:00.
+    const late = await add(s, '2027-03-03T00:30:00Z', { endsAt: at('2027-03-03T01:30:00Z'), doorsAt: null })
+    expect((await req('GET', `/api/core/performances/${late}`)).body).toMatchObject({ operatingDay: '2027-03-02', doorsAt: null })
+    expect((await req('POST', `/api/core/productions/${s.productionId}/performances`, { venueId: s.venueId, spaceId: s.main, startsAt: at('2027-03-04T19:30:00Z'), endsAt: at('2027-03-04T19:00:00Z') })).body.code).toBe('core.performance.times')
+  })
+
+  it('refuse a space from another venue', async () => {
+    const a = await stage()
+    const b = await stage()
+    const { status, body } = await req('POST', `/api/core/productions/${a.productionId}/performances`, { venueId: a.venueId, spaceId: b.main, startsAt: at('2027-03-05T19:30:00Z') })
+    expect(status).toBe(409)
+    expect(body.code).toBe('core.performance.space-unsuitable')
+  })
+
+  it('are scheduled into a free space only, and keep the production\'s dates', async () => {
+    const s = await stage()
+    const first = await add(s, '2027-04-01T19:30:00Z')
+    const clash = await add(s, '2027-04-01T20:00:00Z')
+    const studio = await add(s, '2027-04-01T20:00:00Z', { spaceId: s.studio })
+    expect((await req('POST', `/api/core/performances/${first}/schedule`, {})).status).toBe(200)
+    const refused = await req('POST', `/api/core/performances/${clash}/schedule`, {})
+    expect(refused.status).toBe(409)
+    expect(refused.body.code).toBe('core.performance.clash')
+    expect((await req('POST', `/api/core/performances/${studio}/schedule`, {})).status).toBe(200)
+    expect(await events('core.performance.scheduled', first)).toHaveLength(1)
+    const [production] = await rows<{ first_starts_at: number, last_ends_at: number }>('SELECT first_starts_at, last_ends_at FROM core_productions WHERE id = ?', s.productionId)
+    expect(production).toEqual({ first_starts_at: at('2027-04-01T19:30:00Z'), last_ends_at: at('2027-04-01T22:00:00Z') })
+  })
+
+  it('are not scheduled into a closed space, and warn of a closure that does not block', async () => {
+    const s = await stage()
+    await req('POST', '/api/core/closures', { venueId: s.venueId, title: 'Rewiring', allDay: true, from: '2027-05-01', to: '2027-05-01' })
+    await req('POST', '/api/core/closures', { title: 'Bank holiday', allDay: true, from: '2027-05-03', to: '2027-05-03', blocksPerformances: false })
+    const closed = await add(s, '2027-05-01T19:30:00Z')
+    expect((await req('POST', `/api/core/performances/${closed}/schedule`, {})).body.code).toBe('core.performance.closed')
+    const holiday = await add(s, '2027-05-03T19:30:00Z')
+    expect((await req('POST', `/api/core/performances/${holiday}/schedule`, {})).body.warnings).toEqual(['Bank holiday'])
+  })
+
+  it('are cancelled with a reason, and reinstated while the space is still free', async () => {
+    const s = await stage()
+    const id = await add(s, '2027-06-01T19:30:00Z')
+    await req('POST', `/api/core/performances/${id}/schedule`, {})
+    expect((await req('POST', `/api/core/performances/${id}/cancel`, { reasonTermId: await term('core.space-kind', 'studio') })).body.code).toBe('core.performance.reason-unknown')
+    const illness = await term('core.cancel-reason', 'illness')
+    expect((await req('POST', `/api/core/performances/${id}/cancel`, { reasonTermId: illness, note: 'The lead is unwell.' })).status).toBe(200)
+    expect(await state(id)).toBe('cancelled')
+    expect((await events('core.performance.cancelled', id)).map(e => JSON.parse(e.payload).reason)).toEqual(['illness'])
+    expect((await rows<{ last_ends_at: number | null }>('SELECT last_ends_at FROM core_productions WHERE id = ?', s.productionId))[0]!.last_ends_at).toBeNull()
+    expect((await req('PATCH', `/api/core/performances/${id}`, { capacity: 50 })).body.code).toBe('core.performance.cancelled')
+
+    // Another performance takes the slot, so it cannot come back until that one moves.
+    const other = await add(s, '2027-06-01T19:30:00Z')
+    await req('POST', `/api/core/performances/${other}/schedule`, {})
+    expect((await req('POST', `/api/core/performances/${id}/reinstate`, {})).body.code).toBe('core.performance.clash')
+    await req('PATCH', `/api/core/performances/${other}`, { spaceId: s.studio })
+    expect((await req('POST', `/api/core/performances/${id}/reinstate`, {})).status).toBe(200)
+    expect((await events('core.performance.scheduled', id)).map(e => JSON.parse(e.payload).reinstated)).toEqual([false, true])
+    expect((await rows('SELECT cancel_reason_term_id, cancel_note FROM core_performances WHERE id = ?', id))[0]).toEqual({ cancel_reason_term_id: null, cancel_note: null })
+  })
+
+  it('announce each kind of change on a scheduled performance, and none on a draft', async () => {
+    const s = await stage()
+    const draft = await add(s, '2027-07-01T19:30:00Z')
+    await req('PATCH', `/api/core/performances/${draft}`, { startsAt: at('2027-07-01T19:00:00Z'), capacity: 80 })
+    expect(await rows('SELECT name FROM core_events WHERE record_id = ?', draft)).toEqual([])
+
+    const id = await add(s, '2027-07-02T19:30:00Z')
+    await req('POST', `/api/core/performances/${id}/schedule`, {})
+    const moved = await req('PATCH', `/api/core/performances/${id}`, { startsAt: at('2027-07-02T19:00:00Z'), endsAt: at('2027-07-02T21:00:00Z') })
+    expect(moved.status).toBe(200)
+    expect((await req('GET', `/api/core/performances/${id}`)).body.doorsAt).toBe(at('2027-07-02T18:30:00Z'))
+    expect(JSON.parse((await events('core.performance.rescheduled', id))[0]!.payload)).toMatchObject({ oldStartsAt: at('2027-07-02T19:30:00Z'), startsAt: at('2027-07-02T19:00:00Z'), endsAt: at('2027-07-02T21:00:00Z') })
+    await req('PATCH', `/api/core/performances/${id}`, { spaceId: s.studio })
+    expect(JSON.parse((await events('core.performance.moved', id))[0]!.payload)).toMatchObject({ oldSpaceId: s.main, spaceId: s.studio })
+    await req('PATCH', `/api/core/performances/${id}`, { capacity: 120 })
+    expect(JSON.parse((await events('core.performance.capacity-changed', id))[0]!.payload)).toMatchObject({ oldCapacity: null, capacity: 120 })
+    expect(await rows('SELECT name FROM core_events WHERE name = ? AND record_id = ?', 'core.performance.rescheduled', id)).toHaveLength(1)
+  })
+
+  it('show what a change would touch, and no refusal while no module guards it', async () => {
+    const s = await stage()
+    const id = await add(s, '2027-07-03T19:30:00Z')
+    expect((await req('GET', `/api/core/performances/${id}/impact?kind=cancel`, undefined, viewer)).body).toEqual({ lines: [], refusal: null })
+    expect((await req('GET', `/api/core/performances/${id}/impact?kind=nonsense`, undefined, viewer)).status).toBe(422)
+  })
+
+  it('take access features from the vocabulary, once each', async () => {
+    const s = await stage()
+    const id = await add(s, '2027-07-04T19:30:00Z')
+    const captioned = await term('core.access-feature', 'captioned')
+    const relaxed = await term('core.access-feature', 'relaxed')
+    expect((await req('PUT', `/api/core/performances/${id}/access`, { features: [{ termId: captioned, detail: 'Stagetext' }, { termId: relaxed }] })).status).toBe(200)
+    expect((await req('GET', `/api/core/performances/${id}`)).body.access).toHaveLength(2)
+    expect((await req('PUT', `/api/core/performances/${id}/access`, { features: [{ termId: captioned }, { termId: captioned }] })).body.code).toBe('core.performance.access-repeated')
+    expect((await req('PUT', `/api/core/performances/${id}/access`, { features: [{ termId: await term('core.cancel-reason', 'illness') }] })).body.code).toBe('core.performance.access-unknown')
+    expect((await req('GET', `/api/core/performances/${id}`)).body.access).toHaveLength(2)
+  })
+
+  it('are deleted only as drafts, and go with a draft production', async () => {
+    const s = await stage()
+    const draft = await add(s, '2027-08-01T19:30:00Z')
+    const scheduled = await add(s, '2027-08-02T19:30:00Z')
+    await req('POST', `/api/core/performances/${scheduled}/schedule`, {})
+    expect((await req('DELETE', `/api/core/performances/${scheduled}`, {})).body.code).toBe('core.performance.not-deletable')
+    expect((await req('DELETE', `/api/core/performances/${draft}`, {})).status).toBe(200)
+    expect(await state(draft)).toBeUndefined()
+
+    const t = await stage()
+    const only = await add(t, '2027-08-03T19:30:00Z')
+    expect((await req('DELETE', `/api/core/productions/${t.productionId}`, {})).status).toBe(200)
+    expect(await state(only)).toBeUndefined()
+    expect((await req('DELETE', `/api/core/productions/${s.productionId}`, {})).status).not.toBe(200)
+  })
+
+  it('keep a venue and space from being archived while performances are to come, and a space that was used from deletion', async () => {
+    const s = await stage()
+    const id = await add(s, '2027-09-01T19:30:00Z', { spaceId: s.studio })
+    expect((await req('DELETE', `/api/core/venues/${s.venueId}/spaces/${s.studio}`, {})).body.code).toBe('core.space.performed')
+    await req('POST', `/api/core/performances/${id}/schedule`, {})
+    expect((await req('POST', `/api/core/venues/${s.venueId}/spaces/${s.studio}/archive`, {})).body.code).toBe('core.place.in-use')
+    expect((await req('POST', `/api/core/venues/${s.venueId}/archive`, {})).body.code).toBe('core.place.in-use')
+    await req('POST', `/api/core/performances/${id}/cancel`, { reasonTermId: await term('core.cancel-reason', 'other') })
+    expect((await req('POST', `/api/core/venues/${s.venueId}/spaces/${s.studio}/archive`, {})).status).toBe(200)
+  })
+
+  it('are completed once they end, each announced once', async () => {
+    const s = await stage()
+    const id = await add(s, '2027-10-01T19:30:00Z')
+    await req('POST', `/api/core/performances/${id}/schedule`, {})
+    await env.DB.prepare('UPDATE core_performances SET starts_at = ?, doors_at = NULL, ends_at = ? WHERE id = ?').bind(Date.now() - 7_200_000, Date.now() - 60_000, id).run()
+    const run = () => inContext(async () => {
+      const unit = createUnit()
+      const done = await completeEnded(unit)
+      await unit.commit()
+      return done
+    })
+    expect(await run()).toBeGreaterThanOrEqual(1)
+    expect(await run()).toBe(0)
+    expect(await state(id)).toBe('completed')
+    expect(await events('core.performance.completed', id)).toHaveLength(1)
+    expect((await req('PATCH', `/api/core/performances/${id}`, { capacity: 10 })).body.code).toBe('core.performance.completed')
+  })
+})
