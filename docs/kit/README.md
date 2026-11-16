@@ -80,6 +80,17 @@ Any module may import core's services without listing core: `import { notifyAddr
   core). It throws on failure, so your job retries; nothing is sent until the sending domain is set
   and verified. In tests, `setMailer(fn)` from `layers/core/server/notifications/mailer.ts`
   records messages instead of sending them.
+- `notify(unit, typeKey, { to, variables?, dedupeKey?, senderKey?, subject? })` tells accounts
+  something (C-29). `to` is an account id or a set of them, each optionally
+  `{ accountId, variables?, dedupeKey? }`. It adds the notifications, their deliveries and inbox
+  items to your unit set-wise (a handful of statements up to `core.units.set-rows-limit`), so they
+  exist only if your change is saved. Email goes out after the commit from the job
+  `core.send-notifications`, at the address `addressesFor` gives for the type's side, and is
+  retried with back-off; the inbox item is written at once. A repeat with the same dedupe key for
+  the same type and account writes nothing and returns the earlier id. A channel the person
+  switched off for an optional type's topic is recorded as suppressed; no address, an address on
+  the suppression list or the type's module being off as skipped. Declare `channels: ['email',
+  'inbox']` and, for the inbox, `link: '/path/{{ variable }}'`.
 - `operatingDayOf(instant)` and `dayBounds(day)`: the theatre's operating day, which rolls over at
   `core.locale.day-start`. A table that stores one contributes to `core.operating-day`, so
   it is recalculated when the time zone or the rollover changes.
@@ -218,6 +229,14 @@ in the specification's "As built" list; this guide is the reference from here on
 - In phase 1 `notifyAddress` sends at once, inside the caller's job, so the job's lane is the lane;
   a notification type's `lane` takes effect with the full pipeline in phase 2.
 - An upload is one request carrying the bytes, rather than a begun upload and a second request.
+- `core_notifications` has the account as its subject; the spec's `{ account, email }` subject
+  is not a form the kit allows, and the `address` column is used only once `notifyAddress` joins
+  the pipeline. Phase 1's `notifyAddress` still sends at once and records nothing.
+- The suppression list's keyed hash uses `CORE_SESSION_KEY`, so rotating that secret empties
+  the list in effect.
+- Digests are not built yet: a preference of `daily` or `weekly` is treated as `immediate`.
+- On a merge, a notification preference moves to the survivor unless the survivor has one for the
+  same topic and channel, which stands; it is not restored by undoing the merge.
 - Vocabulary terms keep `slug`, `label`, `description` and `icon` as public columns rather than per-row
   columns classed by the vocabulary's `term_class`: a per-row column needs a subject, which
   `core_terms` does not have. No vocabulary core ships is internal; one that is waits on the kit
