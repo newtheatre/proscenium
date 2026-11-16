@@ -4,8 +4,9 @@
 // payments.cash-variance. Above payments.sessions.variance-needs-second-person, a second person closes
 // a session with a difference.
 import { all, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { postEntries } from '#modules/finance'
-import { exactAccount, inAccountScope } from './account-scope'
+import { labelsOf } from './people'
 
 export interface SessionRow { id: string, point_label: string, opened_by: string, closed_by: string | null, opened_at: number, closed_at: number | null, state: 'open' | 'counting' | 'closed', float_minor: number, expected_cash_minor: number | null, counted_cash_minor: number | null, variance_note: string | null, currency: string }
 
@@ -15,8 +16,7 @@ export async function getSession(id: string): Promise<SessionRow | null> {
 
 /** The person's session not yet closed, if they have one. */
 export async function sessionOf(accountId: string): Promise<SessionRow | null> {
-  const mine = inAccountScope('opened_by', accountId)
-  return first<SessionRow>(`SELECT * FROM payments_sessions WHERE state <> 'closed' AND ${mine.sql} ORDER BY opened_at DESC LIMIT 1`, ...mine.params)
+  return first<SessionRow>(`SELECT * FROM payments_sessions WHERE state <> 'closed' AND opened_by IN (${accountScopeSql('?1')}) ORDER BY opened_at DESC LIMIT 1`, accountId)
 }
 
 /** Expected cash: the float, plus cash taken in the session, less cash handed back from it. */
@@ -37,11 +37,12 @@ export async function openSession(unit: UnitView, input: { accountId: string, po
   const currency = await useSetting('core.locale.currency') as string
   // The partial unique index on opened_by refuses a race the read did not see. It compares stored ids,
   // which is why opened_by moves on a merge.
-  const own = exactAccount('opened_by', input.accountId) // exact-account: the one-open-session index compares stored ids
   unit.add({
     sql: `INSERT INTO payments_sessions (id, point_label, opened_by, opened_at, state, float_minor, currency, created_at, updated_at)
-      SELECT ?, ?, ?, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments_sessions WHERE state <> 'closed' AND ${own.sql})`,
-    params: [id, input.pointLabel, input.accountId, at, float, currency, at, at, ...own.params],
+      SELECT ?, ?, ?, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments_sessions WHERE state <> 'closed'
+        AND opened_by = ? -- exact-account: the one-open-session index compares stored ids
+      )`,
+    params: [id, input.pointLabel, input.accountId, at, float, currency, at, at, input.accountId],
   }).expect(1, { code: 'payments.session.already-open', reason: 'You already have a till session open.' })
   return id
 }
@@ -78,8 +79,7 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
   const variance = input.countedMinor - expected
   const note = input.varianceNote?.trim() || null
   if (variance !== 0 && !note) throw new Refusal('payments.session.reason-needed', 'Say why the cash counted differs from what was expected.', { status: 422, fields: { varianceNote: 'payments.session.reason-needed' } })
-  const scope = inAccountScope('opened_by', input.by)
-  const own = !!(await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE id = ? AND ${scope.sql}`, session.id, ...scope.params))
+  const own = !!(await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE id = ?1 AND opened_by IN (${accountScopeSql('?2')})`, session.id, input.by))
   if (!own && !input.canCloseAny) throw new Refusal('core.access.denied', 'Only the person who opened this session, or someone allowed to close any, may close it.', { status: 403 })
   const limit = await useSetting('payments.sessions.variance-needs-second-person') as number
   if (own && Math.abs(variance) > limit) throw new Refusal('payments.session.second-person-needed', 'The difference is above the limit, so someone else must close this session.', { status: 409, remedy: 'Ask someone allowed to close any session to close it.' })
@@ -106,15 +106,18 @@ export async function closeSession(unit: UnitView, session: SessionRow, input: C
   return { varianceMinor: variance }
 }
 
-export interface SessionSummary { id: string, pointLabel: string, openedBy: string, closedBy: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
+export interface SessionSummary { id: string, pointLabel: string, openedBy: string, openedByName: string, closedBy: string | null, closedByName: string | null, openedAt: number, closedAt: number | null, state: string, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
 
-export async function summarise(session: SessionRow): Promise<SessionSummary> {
+export async function summarise(session: SessionRow, names?: Map<string, string>): Promise<SessionSummary> {
   const expected = session.expected_cash_minor ?? await expectedCash(session)
+  const label = names ?? await labelsOf([session.opened_by, session.closed_by])
   return {
     id: session.id,
     pointLabel: session.point_label,
     openedBy: session.opened_by,
+    openedByName: label.get(session.opened_by) ?? '',
     closedBy: session.closed_by,
+    closedByName: session.closed_by ? label.get(session.closed_by) ?? '' : null,
     openedAt: session.opened_at,
     closedAt: session.closed_at,
     state: session.state,
@@ -129,5 +132,24 @@ export async function summarise(session: SessionRow): Promise<SessionSummary> {
 
 export async function listSessions(limit: number): Promise<SessionSummary[]> {
   const rows = await all<SessionRow>('SELECT * FROM payments_sessions ORDER BY opened_at DESC LIMIT ?', limit)
-  return Promise.all(rows.map(summarise))
+  const names = await labelsOf(rows.flatMap(r => [r.opened_by, r.closed_by]))
+  return Promise.all(rows.map(r => summarise(r, names)))
+}
+
+const SECOND = 1000 // not-policy: settings hold seconds, times are milliseconds
+
+export interface WaitingAttempt { id: string, method: string, amountMinor: number, currency: string, state: string, provider: string, startedAt: number, unknownAt: number | null }
+
+/**
+ * The payments in a session still waiting for an answer: what stops it being counted. A started or
+ * pending one becomes unknown at unknownAt if nothing answers; an unknown one waits for someone to
+ * settle it on Needs attention.
+ */
+export async function waitingIn(sessionId: string): Promise<WaitingAttempt[]> {
+  const answerWithin = await useSetting('payments.attempts.answer-within') as number
+  const rows = await all<{ id: string, method: string, amount_minor: number, currency: string, state: string, label: string, started_at: number }>(
+    `SELECT a.id, a.method, a.amount_minor, i.currency, a.state, p.label, a.started_at FROM payments_attempts a
+      JOIN payments_intents i ON i.id = a.intent_id JOIN payments_provider_accounts p ON p.id = a.provider_account_id
+      WHERE i.session_id = ? AND a.state IN ('started', 'pending', 'unknown') ORDER BY a.started_at`, sessionId)
+  return rows.map(r => ({ id: r.id, method: r.method, amountMinor: r.amount_minor, currency: r.currency, state: r.state, provider: r.label, startedAt: r.started_at, unknownAt: r.state === 'unknown' ? null : r.started_at + answerWithin * SECOND }))
 }

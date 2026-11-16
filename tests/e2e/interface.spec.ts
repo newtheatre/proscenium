@@ -17,7 +17,7 @@ const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.string
 test.beforeAll(async ({ playwright }) => {
   const siteOwner = { ...person('Rate Owner', [grant('core.settings.manage')]), assurance: 'strong', reassertedAt: Date.now() }
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(siteOwner) })
-  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
+  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: { count: 10000, per: '1m' } }] } })
   await api.dispose()
 })
 
@@ -102,10 +102,12 @@ for (const scheme of ['light', 'dark'] as const) {
     test('sidebar: groups in the fixed order, everyday before set-up, a group nobody may open is absent', async ({ page }) => {
       await visit(page, '/console')
       const nav = page.getByRole('navigation', { name: 'Console' })
+      expect(await nav.innerText()).toContain('Gallery')
+      expect(await nav.innerText()).not.toContain('System') // core's own screens are not theirs to open
+      expect(await nav.innerText()).not.toContain('Everyday') // no headings that split a section
+      await nav.getByRole('button', { name: 'Gallery' }).click() // a group is a collapsible section
       const text = await nav.innerText()
-      expect(text.indexOf('Gallery')).toBeGreaterThan(-1)
-      expect(text).not.toContain('System') // core's own screens are not theirs to open
-      expect(text.indexOf('Everyday')).toBeLessThan(text.indexOf('Set up'))
+      expect(text.indexOf('Sample list')).toBeLessThan(text.indexOf('Sample steps')) // everyday before set-up
       expect(text).not.toContain('Administration') // the entry they cannot open is not greyed, it is absent
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
       await noViolations(page)
@@ -116,8 +118,10 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('heading', { level: 1, name: 'Sample list' })).toBeVisible()
       await expect(page.getByText('Page 1 of 3, 60 in all').first()).toBeVisible()
       await noViolations(page)
+      await page.getByRole('button', { name: 'Filters' }).click()
       await page.getByRole('combobox', { name: 'Status' }).click()
       await page.getByRole('option', { name: 'Draft' }).click()
+      await page.getByRole('button', { name: 'Done' }).click()
       await expect(page).toHaveURL(/status=draft/)
       await expect(page.getByText('20 in all').first()).toBeVisible()
       await expect(page.getByRole('button', { name: /Remove the filter Status: Draft/ })).toBeVisible()
@@ -127,6 +131,27 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('60 in all').first()).toBeVisible()
       await page.goForward()
       await expect(page).toHaveURL(/status=draft/)
+    })
+
+    test('the list toolbar: Sort lists every sort and says how the list is sorted, Columns hides a column on this device, a chip opens the panel', async ({ page }) => {
+      await visit(page, '/console/gallery/list')
+      await page.getByRole('button', { name: 'Sort', exact: true }).click()
+      await expect(page.getByRole('menuitemcheckbox', { name: 'Seats' })).toBeVisible()
+      await page.getByRole('menuitemcheckbox', { name: 'Seats' }).click()
+      await expect(page).toHaveURL(/sort=seats/)
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('button', { name: 'Sort: Seats, Lowest first' })).toBeVisible()
+      await page.getByRole('button', { name: 'Columns' }).click()
+      await page.getByRole('menuitemcheckbox', { name: 'Status' }).click()
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('columnheader', { name: 'Status' })).toHaveCount(0)
+      await page.reload()
+      await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+      await expect(page.getByRole('columnheader', { name: 'Status' })).toHaveCount(0)
+      await visit(page, '/console/gallery/list?status=draft')
+      await page.getByRole('button', { name: /Change the filter Status: Draft/ }).click()
+      await expect(page.getByRole('combobox', { name: 'Status' })).toBeVisible()
+      await noViolations(page)
     })
 
     test('an empty filter and an empty list say different things', async ({ page }) => {

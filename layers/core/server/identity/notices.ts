@@ -7,7 +7,7 @@ import { newId, type UnitView } from '#kit'
 import { notifyAddress } from '../notifications/send'
 import { verifiedAddressesOf } from './accounts'
 
-export type NoticeType = 'core.credential-added' | 'core.address-changed' | 'core.members-address-changed' | 'core.address-verify' | 'core.merge-undone'
+export type NoticeType = 'core.credential-added' | 'core.address-changed' | 'core.members-address-changed' | 'core.address-verify' | 'core.merge-notice' | 'core.merge-undone'
 
 /** One notice to each of these addresses, in the caller's unit. */
 export async function queueNotice(unit: UnitView, type: NoticeType, addresses: string[], variables: Record<string, string> = {}): Promise<void> {

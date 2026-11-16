@@ -1,7 +1,6 @@
 {
   "finance.module.name": "Finance",
   "finance.module.description": "The ledger: every sale, refund, fee and payout as a balanced, sealed posting, with periods a treasurer closes.",
-  "finance.navigation.groups.finance.label": "Finance",
 
   "finance.settings-sections.periods": "Accounting periods",
   "finance.settings-sections.year": "Financial year",
@@ -17,6 +16,7 @@
   "finance.settings.rules.tax-not-yet": "Charging tax on sales is not supported yet, so this must stay off.",
 
   "finance.abilities.ledger.view.label": "See the ledger",
+  "finance.abilities.ledger.export.label": "Export the ledger as a spreadsheet",
   "finance.abilities.posting.correct.label": "Reverse a posting to correct a mistake",
   "finance.abilities.account.manage.label": "Rename, recode and add ledger accounts",
   "finance.abilities.period.close.label": "Close an accounting period",

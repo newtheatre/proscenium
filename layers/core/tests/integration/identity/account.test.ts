@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { accountScopeIds, newId } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { Authenticator } from './authenticator'
-import { Browser, addPasskey, address, deliver, emailSignIn, env, goStale, grantDirectly, leaveIdentity, passkeySignIn, reset, setSetting, clearSetting, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
+import { Browser, addPasskey, address, deliver, emailSignIn, env, goStale, grantDirectly, leaveIdentity, mailbox, passkeySignIn, reset, setSetting, clearSetting, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { canonicalAccount, accountLabel } from '../../../server/identity/accounts'
 import { mergePlan } from '../../../server/identity/merge'
@@ -245,6 +245,20 @@ describe('merging two accounts (ID-32)', () => {
     // A's re-pointing is listed with the second merge, so undoing it can put A back on B.
     const [second] = await rows<{ id: string }>('SELECT id FROM core_account_merges WHERE merged_account_id = ?', b)
     expect(await rows('SELECT table_name, column_name, action FROM core_account_merge_items WHERE merge_id = ? AND table_name = \'core_accounts\'', second!.id)).toEqual([{ table_name: 'core_accounts', column_name: 'merged_into_id', action: 'moved' }])
+  })
+
+  it('a merge tells every verified address of both accounts', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.account.merge'])
+    const survivorId = await signInByEmail(new Browser())
+    const mergedAccountId = await signInByEmail(new Browser())
+    const addresses = (await rows<{ address: string }>('SELECT address FROM core_account_emails WHERE account_id IN (?, ?) AND verified_at IS NOT NULL', survivorId, mergedAccountId)).map(r => r.address).sort()
+    expect(addresses).toHaveLength(2)
+    await deliver()
+    mailbox.length = 0
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    await deliver()
+    expect(mailbox.filter(m => m.subject === 'Your accounts at The Test Theatre have been joined').map(m => m.address).sort()).toEqual(addresses)
   })
 
   it('merge refuses a tombstone and itself', async () => {

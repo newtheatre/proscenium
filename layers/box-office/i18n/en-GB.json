@@ -1,0 +1,24 @@
+{
+  "box-office.module.name": "Box office",
+  "box-office.module.description": "Selling tickets: what is on sale and for how much, seats held and sold, reservations paid for at the desk, orders, tickets and the door.",
+  "box-office.navigation.groups.box-office.label": "Box office",
+
+  "box-office.settings-sections.baskets": "Baskets",
+  "box-office.settings-sections.orders": "Orders",
+  "box-office.settings-sections.sales": "When sales close",
+  "box-office.settings-sections.retention": "Keeping records",
+
+  "box-office.settings.baskets.hold-for.label": "Hold seats in a basket for",
+  "box-office.settings.baskets.hold-for.help": "How long seats are kept for a buyer once they press Hold tickets. Changing the basket does not restart it. A performance can have its own length.",
+  "box-office.settings.orders.seat-cap.label": "Most tickets in one online order",
+  "box-office.settings.orders.seat-cap.help": "The most tickets one person can book online in a single order. A performance can have its own limit.",
+  "box-office.settings.sales.close-before.label": "Close online sales before the start",
+  "box-office.settings.sales.close-before.help": "How long before a performance starts online sales close. Nothing means they stay open until it starts. A performance can have its own closing time.",
+  "box-office.settings.retention.holds.label": "Keep the label of a staff hold for",
+  "box-office.settings.retention.holds.help": "How long after the performance a hold placed by staff keeps its label, such as the name of the guests it was for.",
+
+  "box-office.abilities.performance.manage.label": "Set up sales for a performance",
+  "box-office.abilities.performance.exceed-venue.label": "Sell more than the space holds",
+  "box-office.abilities.pricing.manage.label": "Manage ticket types and prices",
+  "box-office.abilities.settings.manage.label": "Change box office settings"
+}

@@ -5,27 +5,29 @@ import { z } from 'zod'
 import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task, useContext, type SettingRule } from '#kit'
 
 const change = 'core.identity-settings.manage'
+// How people sign in, how long sessions last and recovery are set once for the installation, so they
+// sit in Site administration (Sign-in at /admin/sign-in), not on the console's settings page.
 
 export const identitySettings = defineSettings('core', {
-  'sign-in.email-link': setting.boolean({ default: true, change, audience: 'public' }),
-  'sign-in.link-lifetime': setting.duration({ default: '15m', min: '5m', max: '1h', change, audience: 'public', quotable: true }),
-  'sign-in.code-attempts': setting.integer({ default: 5, min: 3, max: 10, unit: 'core.units.attempts', change }),
-  'sign-in.open-sign-up': setting.boolean({ default: true, change, audience: 'public' }),
-  'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
-  'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
-  'sign-in.google': setting.boolean({ default: false, change, audience: 'public' }),
+  'sign-in.email-link': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
+  'sign-in.link-lifetime': setting.duration({ default: '15m', min: '5m', max: '1h', change, scope: 'site', audience: 'public', quotable: true }),
+  'sign-in.code-attempts': setting.integer({ default: 5, min: 3, max: 10, unit: 'core.units.attempts', change, scope: 'site' }),
+  'sign-in.open-sign-up': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
+  'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, scope: 'site' }),
+  'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, scope: 'site' }),
+  'sign-in.google': setting.boolean({ default: false, change, scope: 'site', audience: 'public' }),
   // Not in the specification's list: Google needs a client id as well as the secret, and an id is
   // not a secret, so it is a setting the theatre types in beside the switch.
-  'sign-in.google-client-id': setting.text({ unset: true, maxLength: 200, change }),
-  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change }),
-  'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public' }),
-  'sign-in.provider-is-strong': setting.boolean({ default: false, change }),
+  'sign-in.google-client-id': setting.text({ unset: true, maxLength: 200, change, scope: 'site' }),
+  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, scope: 'site' }),
+  'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, scope: 'site', audience: 'public' }),
+  'sign-in.provider-is-strong': setting.boolean({ default: false, change, scope: 'site' }),
 
-  'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
-  'sessions.idle-limit': setting.duration({ default: '14d', min: '1h', max: '90d', change }),
+  'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, scope: 'site', audience: 'public', quotable: true }),
+  'sessions.idle-limit': setting.duration({ default: '14d', min: '1h', max: '90d', change, scope: 'site' }),
 
-  'recovery.enrolment-link-lifetime': setting.duration({ default: '24h', min: '1h', max: '7d', change }),
-  'recovery.code-count': setting.integer({ default: 10, min: 6, max: 20, unit: 'core.units.codes', change }),
+  'recovery.enrolment-link-lifetime': setting.duration({ default: '24h', min: '1h', max: '7d', change, scope: 'site' }),
+  'recovery.code-count': setting.integer({ default: 10, min: 6, max: 20, unit: 'core.units.codes', change, scope: 'site' }),
 
   'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
   'grants.allow-no-expiry': setting.boolean({ default: true, change }),
@@ -374,6 +376,22 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Your sign-in at {{ theatre }} has changed',
         body: 'This was added to your account: {{ what }}.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+      },
+    },
+  }, {
+    // Two accounts were joined into one (part 4, Merge, "Tell both"), to every verified address of
+    // both, read before the merge moved them. It names nobody, so it says nothing to an address
+    // about another person's account.
+    id: 'core.merge-notice',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: {},
+    wording: {
+      'en-GB': {
+        subject: 'Your accounts at {{ theatre }} have been joined',
+        body: 'Two accounts at {{ theatre }} that belong to you, including the one for this address, have been joined into one, so your bookings and history are now in one place. You sign in as before, with any of your addresses.\n\nIf you did not expect this, contact the theatre soon: for a while it can be undone.',
       },
     },
   }, {

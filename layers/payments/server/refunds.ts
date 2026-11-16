@@ -5,11 +5,12 @@
 // when it is requested, so a later change to the setting cannot loosen it.
 import { sql } from 'drizzle-orm'
 import { all, createUnit, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { assertTerm } from '#modules/core'
 import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor, forProvider, providerAccount, providers } from './providers'
-import { inAccountScope } from './account-scope'
+import { labelsOf } from './people'
 import type { AttemptRow } from './answers'
 import type { RefundAnswer } from './points/provider'
 
@@ -83,8 +84,7 @@ export async function approveRefund(unit: UnitView, refundId: string, approver: 
   if (!refund) throw new Refusal('core.not-found', 'There is no such refund.', { status: 404 })
   if (refund.state !== 'requested') throw new Refusal('payments.refund.not-requested', 'This refund is not waiting for approval.', { status: 409 })
   if (refund.requested_by && refund.amount_minor > refund.self_approve_limit_minor) {
-    const scope = inAccountScope('requested_by', approver)
-    if (await first(`SELECT 1 FROM payments_refunds WHERE id = ? AND ${scope.sql}`, refund.id, ...scope.params))
+    if (await first(`SELECT 1 FROM payments_refunds WHERE id = ?1 AND requested_by IN (${accountScopeSql('?2')})`, refund.id, approver))
       throw new Refusal('payments.refund.own', 'You cannot approve a refund you asked for.', { status: 403, remedy: 'Ask someone else who may approve refunds.' })
   }
   unit.add({ sql: "UPDATE payments_refunds SET state = 'approved', approved_by = ?, updated_at = ? WHERE id = ? AND state = 'requested'", params: [approver, nowMs(), refund.id] })
@@ -181,22 +181,24 @@ export async function confirmRefund(unit: UnitView, refundId: string, by: string
   const attempt = (await first<AttemptRow>('SELECT * FROM payments_attempts WHERE id = ?', refund.attempt_id))!
   if (await integrated(attempt)) throw new Refusal('payments.refund.goes-back-by-provider', 'This payment is refunded through its provider, the way it was paid.', { status: 409 })
   if (attempt.method === 'cash') {
-    const scope = inAccountScope('opened_by', by)
-    const session = await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE state = 'open' AND ${scope.sql}`, ...scope.params)
+    const session = await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE state = 'open' AND opened_by IN (${accountScopeSql('?1')})`, by)
     if (!session) throw new Refusal('payments.session.none', 'Open a till session to hand back cash.', { status: 409 })
     unit.add({ sql: 'UPDATE payments_refunds SET session_id = ? WHERE id = ?', params: [session.id, refund.id] })
   }
   await succeed(unit, refund)
 }
 
-export interface RefundSummary { id: string, partId: string, attemptId: string, owner: { module: string, record: string }, amountMinor: number, currency: string, method: string, state: RefundState, requestedBy: string | null, approvedBy: string | null, selfApproveLimitMinor: number, createdAt: number }
+export interface RefundSummary { id: string, partId: string, attemptId: string, owner: { module: string, record: string }, amountMinor: number, currency: string, method: string, state: RefundState, requestedBy: string | null, requestedByName: string | null, approvedBy: string | null, approvedByName: string | null, selfApproveLimitMinor: number, createdAt: number, /** A person hands the money back and confirms it: cash, or a provider that cannot refund itself. */ handBack: boolean }
 
 export async function listRefunds(states: RefundState[], limit: number): Promise<RefundSummary[]> {
-  const rows = await all<RefundRow & { owner_module: string, owner_record: string, currency: string, method: string }>(
-    `SELECT r.*, p.owner_module, p.owner_record, i.currency, a.method FROM payments_refunds r JOIN payments_intent_parts p ON p.id = r.part_id
-      JOIN payments_intents i ON i.id = p.intent_id JOIN payments_attempts a ON a.id = r.attempt_id
+  const rows = await all<RefundRow & { owner_module: string, owner_record: string, currency: string, method: string, provider: string }>(
+    `SELECT r.*, p.owner_module, p.owner_record, i.currency, a.method, pa.provider FROM payments_refunds r JOIN payments_intent_parts p ON p.id = r.part_id
+      JOIN payments_intents i ON i.id = p.intent_id JOIN payments_attempts a ON a.id = r.attempt_id JOIN payments_provider_accounts pa ON pa.id = a.provider_account_id
       WHERE r.state IN (SELECT value FROM json_each(?)) ORDER BY r.created_at DESC LIMIT ?`, JSON.stringify(states), limit)
-  return rows.map(r => ({ id: r.id, partId: r.part_id, attemptId: r.attempt_id, owner: { module: r.owner_module, record: r.owner_record }, amountMinor: r.amount_minor, currency: r.currency, method: r.method, state: r.state, requestedBy: r.requested_by, approvedBy: r.approved_by, selfApproveLimitMinor: r.self_approve_limit_minor, createdAt: r.created_at }))
+  const names = await labelsOf(rows.flatMap(r => [r.requested_by, r.approved_by]))
+  const name = (id: string | null) => (id ? names.get(id) ?? null : null)
+  const known = await providers()
+  return rows.map(r => ({ id: r.id, partId: r.part_id, attemptId: r.attempt_id, owner: { module: r.owner_module, record: r.owner_record }, amountMinor: r.amount_minor, currency: r.currency, method: r.method, state: r.state, requestedBy: r.requested_by, requestedByName: name(r.requested_by), approvedBy: r.approved_by, approvedByName: name(r.approved_by), selfApproveLimitMinor: r.self_approve_limit_minor, createdAt: r.created_at, handBack: !known.get(r.provider)?.refund }))
 }
 
 /**

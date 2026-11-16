@@ -60,7 +60,8 @@ export async function runJob(jobId: string): Promise<JobOutcome> {
   if (row.module_id && !(await isEnabled(row.module_id))) return 'waiting'
 
   const claim = await env.DB.prepare("UPDATE core_jobs SET state = 'running', attempts = attempts + 1, started_at = ? WHERE id = ? AND state = 'queued'").bind(at, jobId).run()
-  if (claim.meta.changes !== 1) return 'skipped'
+  // The claim's own condition (still queued) makes it at most one row; triggers could only add to the count.
+  if (!(claim.meta.changes > 0)) return 'skipped'
   const attempts = row.attempts + 1
   const payload = JSON.parse(row.payload)
   if (row.kind === 'task') await env.DB.prepare('UPDATE core_task_runs SET started_at = ?, job_id = ? WHERE task = ? AND due_at = ?').bind(at, jobId, row.name, payload.dueAt).run()
