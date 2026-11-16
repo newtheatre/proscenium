@@ -185,8 +185,11 @@ export interface ListRead<L extends ListDeclaration = ListDeclaration> {
    * field keys. Null where the shown fields matched every word, or there was no search.
    */
   matched: <Row extends Record<string, unknown>>(rows: readonly Row[]) => (string | null)[]
-  /** What the page needs beside the rows. */
-  answer: <Row>(rows: Row[], total: number) => { rows: Row[], total: number, dropped: string[], ignoredWords: string[], searchTooShort: boolean }
+  /**
+   * The rows with what the page needs beside them. `matched` maps a row's id to the hidden field it
+   * matched, for rows that carry an id and their values under the list's field keys.
+   */
+  answer: <Row extends Record<string, unknown>>(rows: Row[], total: number) => { rows: Row[], total: number, dropped: string[], ignoredWords: string[], searchTooShort: boolean, matched?: Record<string, string> }
 }
 
 type Query = Record<string, string | string[] | null | undefined>
@@ -281,6 +284,15 @@ export async function readListQuery<L extends ListDeclaration>(query: Query, sou
     where: () => where,
     orderBy: () => orderBy,
     matched: rows => words.length ? matchedFields(rows as any, words, matchFields as any) : rows.map(() => null),
-    answer: (rows, total) => ({ rows, total, dropped: q.dropped, ignoredWords, searchTooShort }),
+    answer: (rows, total) => {
+      const out = { rows, total, dropped: q.dropped, ignoredWords, searchTooShort }
+      if (!words.length) return out
+      const fieldsMatched = matchedFields(rows as any, words, matchFields as any)
+      const matched: Record<string, string> = {}
+      rows.forEach((row, i) => {
+        if (fieldsMatched[i] && typeof row.id === 'string') matched[row.id] = fieldsMatched[i]!
+      })
+      return { ...out, matched }
+    },
   }
 }

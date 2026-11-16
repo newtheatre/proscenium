@@ -83,6 +83,7 @@ describe('readList', async () => {
     expect(both.found.map(r => r.id).sort()).toEqual([ada, quilliam].sort())
     expect(both.total).toBe(2)
     expect(Object.fromEntries(both.found.map((r, i) => [r.id, both.matched[i]]))).toEqual({ [ada]: 'note', [quilliam]: null })
+    expect(both.read.answer(both.found, both.total).matched).toEqual({ [ada]: 'note' })
     // Without the ability that shows buyers' names, only the note is searched.
     const notes = await page({ q: 'quilliam' }, nobody(), show)
     expect(notes.found.map(r => r.id)).toEqual([ada])
@@ -97,7 +98,8 @@ describe('readList', async () => {
     expect(short.total).toBe(2)
     const mixed = await page({ q: 'bo pemb' }, seller(), show)
     expect(mixed.read).toMatchObject({ words: ['pemb'], ignoredWords: ['bo'], searchTooShort: false })
-    expect(mixed.read.answer([], 0)).toEqual({ rows: [], total: 0, dropped: [], ignoredWords: ['bo'], searchTooShort: false })
+    expect(mixed.read.answer([], 0)).toEqual({ rows: [], total: 0, dropped: [], ignoredWords: ['bo'], searchTooShort: false, matched: {} })
+    expect(short.read.answer([], 0)).toEqual({ rows: [], total: 0, dropped: [], ignoredWords: ['Bo'], searchTooShort: true })
   })
 
   it('applies filters, drops one the viewer may not use, and ends every sort with the id', async () => {

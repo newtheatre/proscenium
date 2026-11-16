@@ -256,8 +256,10 @@ const [{ n }] = await useDb().select({ n: count() }).from(table).where(read.wher
 return read.answer(rows, n)
 ```
 
-`orderBy()` ends with the id. `read.matched(rows)` names, for each row, the hidden field that matched a
-word the shown fields did not ("Matches note: …"), from rows that carry values under the list's keys.
+`orderBy()` ends with the id. `read.answer(rows, total)` adds `dropped`, `ignoredWords`,
+`searchTooShort` and, when there was a search, `matched`: for each row whose words were found only in a
+field not shown by default, its id mapped to that field ("Matches Note: …"). It reads rows that carry
+`id` and their values under the list's field keys; `read.matched(rows)` gives the same by position.
 
 ### Adding to another module's list or record page (R-35)
 
