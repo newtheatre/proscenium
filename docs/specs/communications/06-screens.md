@@ -125,9 +125,9 @@ Each shows the topic's master switch that core already draws, and under it one r
 
 | No. | Screen | Address | Notes |
 | --- | --- | --- | --- |
-| S14 | Confirm | /mailing/confirm/\<token> | One sentence and a button. Expired tokens offer to send a new link |
-| S15 | Manage | /mailing/manage/\<token> | The list named in the email with Unsubscribe; other lists on that side; "Stop all mailings". No name or address is shown |
-| S16 | Done | Inline on S14 and S15 | States what changed and offers to undo it for ten minutes |
+| S14 | Confirm | /mailing/confirm/\<token> | One sentence and a button. A link that no longer works offers to send a new one |
+| S15 | Manage | /mailing/manage/\<token> | The list named in the email with "Leave this list", and "Stop all mailings". Below them, "Email me a link to my lists", which sends a preferences link; that page, /mailing/preferences/\<token>, shows the person's lists on that side and the open ones they could join. No name or address is shown on either |
+| S16 | Done | Inline on S14 and S15 | States what changed. After leaving, it offers "Left by mistake? Email me a link to my lists" |
 
 **`CommunicationsSignup`** is the public component for a content page or the footer: an address box, one tick box per named list with its wording, and a button. It always ends with "Check your email". Signed in, it becomes switches and needs no email.
 

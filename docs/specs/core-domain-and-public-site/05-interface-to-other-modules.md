@@ -419,7 +419,11 @@ The build ran the bounce half on a real sending domain on 16 November 2026 (repo
 | After a hard bounce, `send()` to the same address did not throw. Two resends succeeded and bounced again, and Cloudflare's suppression list was still empty four and a half minutes later. | Core's own suppression is what stops repeats, checked before every send. `E_RECIPIENT_SUPPRESSED` is handled if it comes and never relied on. |
 | For about two minutes after the sending domain was onboarded, `send()` threw `E_EMAIL_SENDING_NOT_READY`, even with the DNS status ready, and once more after the first success. | The sender setup step and its verify treat that code as "try again shortly" and keep checking, not as a failed domain. A send job that meets it retries on the usual back-off and does not count it towards a Failed delivery's limit during the first hour after onboarding. |
 
-The complaint half is not yet proved. Cloudflare offers no way to simulate a complaint, so it needs a real mailbox at a provider that reports them. Until it is run, that a complained event carries the same message id is taken from the documentation and from the bounce result.
+The complaint half will not be run. Matt decided on 16 November 2026 to trust Cloudflare's documentation, because Cloudflare offers no way to simulate a complaint and proving one needs a real mailbox at a provider that reports them. So the bounce half is proved, and the complaint half is built to the documentation and unproved: that a complained event carries the same message id is taken from the documentation and from the bounce result.
+
+Because one event shape is untested, the consumer does not assume it. An event whose shape it does not recognise, or whose message id matches no delivery after the retries the section above allows, goes to the dead-letter path and raises a line on the health screen. It is never dropped silently and never guessed at. The named case "The hard bounce" keeps its complaint run against a payload made to the documented shape.
+
+How the consumer does that. It never acknowledges an event it could not read or match: it asks the queue to retry, and after the queue's last attempt the message is moved to the dead-letter queue by Cloudflare. On that last attempt the consumer writes one row to `core_email_events_set_aside` (part 2), with no address in it. A suppression the event carried is still applied where the address could be read, since stopping mail to a bad address does not depend on finding the delivery. A contribution to `core.health-check`, named core.email-events-set-aside, reads the table and warns: "N email outcomes could not be read or matched in the last 7 days".
 
 ## Access needs and access features are two lists
 
@@ -457,7 +461,7 @@ The rules are the kit's, in the foundations specification's part 3 (U7 to U9), a
 | Events and audit entries take a set (U8) | `unit.announce()` and `unit.audit()` each take one row or a set, and a set of any size is one statement. The caller passes the set it read before building the unit. The guards on the change make that set true or roll everything back. Each event is still delivered as its own event, at least once and unordered. |
 | The most one unit may carry (U9) | The kit setting `core.units.set-rows-limit`, 500 as shipped and provisional until measured on real D1. Over it the unit is refused with `core.unit.too-large`, and the work becomes a job in chunks, each its own unit and safe to repeat. Core states no figure of its own. |
 | `notify()` | Four statements for any number of recipients up to that limit: notifications, email deliveries, inbox deliveries and inbox items, plus the caller's audit entry. A repeat with the same dedupe keys writes nothing at all. It never chunks silently, because a chunked send is no longer all or nothing and the caller must know that. |
-| Still one unit | The statements join the caller's unit, so a unit whose expectation fails leaves no notification behind, as before. |
+| Still one unit | The statements join the caller's unit, so a unit whose guard does not pass leaves no notification behind, as before. |
 | After the unit commits | Email deliveries are put on the queue in calls of 100, the most one `sendBatch` takes. The sweep in part 3 covers any that are lost. |
 
 What has been measured: the build's proof ran fifty recipients on local D1 (five statements and 4 ms set-wise, against 201 statements and 10 ms row by row). Nothing larger has been run, and nothing on real D1.
@@ -466,8 +470,8 @@ Core's fan-outs under these rules:
 
 | Fan-out | How it is written |
 | --- | --- |
-| A run of performances (C-04) | The performances travel as one JSON parameter. A run within the limit is saved whole or not at all: the clash and closure guards are predicates on the insert, with an expectation that the number inserted is the number asked for, and one announce of the set. A longer run is a chunked job, as C-04 says. |
-| Cancelling a production | The scheduled performances are read first. Then one conditional `UPDATE` with an expectation of that number, one announce of that many events and one audit set. If a performance changed in between, the expectation fails and nothing is written. |
+| A run of performances (C-04) | The performances travel as one JSON parameter. A run within the limit is saved whole or not at all: the clash and closure guards are predicates on the insert, and the kit's guard, a read statement in the same batch, confirms that every performance asked for is there, with one announce of the set. Nothing relies on the database's count of changed rows, which also counts rows written by triggers and search indexes; code may test that it is above nought and no more. A longer run is a chunked job, as C-04 says. |
+| Cancelling a production | The scheduled performances are read first. Then one conditional `UPDATE`, then the kit's guard, a read statement confirming that every one of those performances is now in the new state, one announce of that many events and one audit set. If a performance changed in between, the guard does not pass and nothing is written. |
 | `notifyHolders` and a notification to a production team | The recipients are resolved first, then passed to `notify()` as one set. |
 | Webhook deliveries | One set-wise insert for the webhooks subscribed to the event. |
 | Recalculating operating days | One `UPDATE` over every performance not completed. |

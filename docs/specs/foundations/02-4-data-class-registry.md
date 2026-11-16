@@ -58,6 +58,8 @@ The arguments are the name, the columns, then the options. The column builders a
 
 A behaviour other than the default is the second argument: `col.personal(text('email'), { erase: 'clear' })`.
 
+**An internal column may be cleared on erasure (ruled 16 November 2026, raised by the box office build).** `col.internal(column, { erase: 'clear' })` is for a value that is not personal data but must not outlive the person's link to the row: the hash of a secret link token, the hash of a desk code, a resume token. Erasure sets it to null in the same unit as the row's personal columns; it never appears in a download, is never shown and is never searched. The column must be nullable, and the schema check refuses the option on a table with subject none. `clear` is the only erasure behaviour an internal column takes. A module does not declare such a column `col.personal` to get the behaviour: a personal column is offered in the person's download, and a hash has no place there.
+
 Erasure of one person is a single unit of work built from the registry: every table whose `subject` reaches that account, every non-`keep` column. A module adds an entry to the point `core.erasure-handler` only for what a column rule cannot express, such as deleting a stored file.
 
 ## Table options
@@ -69,7 +71,7 @@ Erasure of one person is a single unit of work built from the registry: every ta
 | `realm` | Yes | `audience`, `members`, `operational` or `system`. Keeps a customer's orders and a volunteer's training record apart in exports, in the privacy record and in who may see them. `system` is for the platform's own tables. `{ column: 'realm' }` lets the realm differ by row |
 | `subject` | Yes | How a row reaches the person it is about. See Subjects below |
 | `redact` | With `unlinked: 'staff'` | The ability that lets staff search the table for a person and redact their rows |
-| `retention` | No | A duration setting. A scheduled sweep erases or deletes rows older than it |
+| `retention` | No | A duration setting. A scheduled sweep erases or deletes rows older than it. A fixed duration, written { fixed: '30d' }, is allowed only on a table with subject none and no personal, special or free-text column (a technical record such as core\_email\_events\_set\_aside); anything about a person is kept for a time the theatre can set |
 | `appendOnly` | No | Rows are never edited or deleted. The build writes the triggers that enforce it |
 | `onErasure` | No, default `keep-row` | `delete-row` removes the whole row, for tables with no value once the person is gone, such as saved preferences |
 
