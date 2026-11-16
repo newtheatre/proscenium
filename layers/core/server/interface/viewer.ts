@@ -1,7 +1,7 @@
 // Who is looking, as the shells need to know it. Identity's `describeViewer` replaces `describe`
 // below; the answer keeps this shape so no component ever tests a role or an ability: it draws from
 // the name, the sides that are open and the entries the viewer may open.
-import { fact } from '#kit'
+import { fact, useSetting } from '#kit'
 import { useRegistry } from '#kit/registry'
 import type { Actor } from '#kit'
 import type { NavItem, ShellName } from '../../shared/navigation'
@@ -13,6 +13,8 @@ export type Side = 'audience' | 'members' | 'console'
 export interface ViewerDescription {
   signedIn: boolean
   name?: string
+  /** What the theatre calls the members' area (core.members-area.name). */
+  membersName?: string
   sides: Side[]
   navigation: (NavItem & { shell: ShellName })[]
 }
@@ -23,6 +25,8 @@ export function isSignedIn(actor: Actor): boolean {
 
 /** Members' area: the site-wide fact core.member, once identity declares it. Until then nobody is a member. */
 export async function isMember(actor: Actor): Promise<boolean> {
+  // With the members' area off, there is no such side for anyone.
+  if (!(await useSetting('core.members-area.enabled'))) return false
   if (!useRegistry().facts.has('core.member')) return false
   return fact('core.member', actor)
 }
@@ -53,8 +57,9 @@ export async function describe(actor: Actor): Promise<ViewerDescription> {
   for (const shell of ['account', 'members'] as const) {
     if (shell === 'members' && !sides.includes('members')) continue
     for (const e of await allowedEntries(actor, shell)) {
-      navigation.push({ id: e.id, shell, label: e.label ?? entryLabelKey(e.id), to: e.to, icon: e.icon, match: e.match, count: e.count, order: e.order ?? 0 })
+      navigation.push({ id: e.id, shell, label: e.label ?? entryLabelKey(e.id), to: e.to, icon: e.icon, match: e.match, count: e.countValue, order: e.order ?? 0 })
     }
   }
-  return { signedIn: true, name: actor.name, sides, navigation: navigation.sort((a, b) => a.order - b.order) }
+  const membersName = sides.includes('members') ? await useSetting('core.members-area.name') as string : undefined
+  return { signedIn: true, name: actor.name, membersName, sides, navigation: navigation.sort((a, b) => a.order - b.order) }
 }

@@ -4,6 +4,12 @@ import { defineSettings, defineSettingRules, setting } from '#kit'
 const change = 'core.settings.manage'
 
 export const settings = defineSettings('core', {
+  // Colour mode (UI-24, the interface): what a first-time visitor sees, and whether people may choose.
+  'appearance.default': setting.choice({ default: 'system', options: ['system', 'light', 'dark'], change, audience: 'public' }),
+  'appearance.let-people-choose': setting.boolean({ default: true, change, audience: 'public' }),
+  'appearance.public-dark': setting.boolean({ default: true, change, audience: 'public' }),
+  'appearance.live-dark': setting.boolean({ default: true, change, audience: 'public' }),
+
   'site.name': setting.text({ unset: true, minLength: 1, maxLength: 80, change, audience: 'public', quotable: true }),
 
   // Unset until setup: until then scheduled tasks run on UTC and no theatre date is computed.
