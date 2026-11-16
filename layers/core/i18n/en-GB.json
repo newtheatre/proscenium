@@ -51,7 +51,7 @@
   "core.settings.rules.language-known": "That is not a language code we recognise. Use one such as en-GB.",
   "core.abilities.settings.manage.label": "Change the platform's settings",
   "core.abilities.modules.manage.label": "Switch modules on and off",
-  "core.skip-link": "Skip to the main content",
+  "core.skip-link": "Skip to content",
   "core.loading": "Loading",
   "core.undo.button": "Undo",
   "core.failed.title": "Something went wrong",
