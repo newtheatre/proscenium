@@ -31,12 +31,15 @@ export default defineModule({
     'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }],
     'core.vocabulary': [...domain.contributes['core.vocabulary'], ...identity.identityContributions['core.vocabulary']],
     'core.file-slot': [...domain.contributes['core.file-slot'], ...identity.identityContributions['core.file-slot']],
+    'core.public-component': [...domain.contributes['core.public-component'], ...identity.identityContributions['core.public-component']],
     // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
       { id: 'core.venues', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
       { id: 'core.closures', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/closures', icon: 'i-lucide-calendar-x', ability: 'core.closure.manage', order: 35 },
       { id: 'core.email', menu: 'console', group: 'system', section: 'setup', to: '/console/system/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
+      { id: 'core.access-scheme', menu: 'account', to: '/account/access', icon: 'i-lucide-accessibility', ability: 'signed-in', order: 40, count: 'core.access-scheme-offered', hideEmpty: true },
+      { id: 'core.access-scheme-queue', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/access-scheme', icon: 'i-lucide-accessibility', ability: 'core.access-scheme.read', order: 60, count: 'core.access-scheme-waiting' },
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.seasons', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20 },
       { id: 'core.vocabularies', menu: 'console', group: 'system', section: 'setup', to: '/console/system/vocabularies', icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 40 },
