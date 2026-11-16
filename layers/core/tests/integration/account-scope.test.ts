@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { newId, useDb } from '#kit'
-import { accountScopeIds, accountScopeIdsFor, inAccountScope } from '../../server/account-scope'
+import { accountScopeIds, inAccountScope } from '../../server/account-scope'
 import { env, inContext } from '../../../../tests/integration/helpers'
 
 async function account(mergedInto: string | null = null): Promise<string> {
@@ -22,9 +22,11 @@ describe('the account scope', () => {
       expect(await accountScopeIds(survivor)).toEqual(expected)
       expect(await accountScopeIds(last)).toEqual(expected)
       expect(await accountScopeIds(other)).toEqual([other])
-      const many = await accountScopeIdsFor([last, other])
-      expect(many.get(last)).toEqual(expected)
-      expect(many.get(other)).toEqual([other])
+      // Set-wise: each row's own scope, with the account given as an expression.
+      const rows = await useDb().all<{ asked: string, id: string }>(sql`SELECT r.value AS asked, a.id FROM json_each(${JSON.stringify([last, other])}) r
+        JOIN core_accounts a ON ${inAccountScope(sql`a.id`, sql`r.value`)} ORDER BY r.value, a.id`)
+      expect(rows.filter(r => r.asked === last).map(r => r.id)).toEqual([...expected].sort())
+      expect(rows.filter(r => r.asked === other).map(r => r.id)).toEqual([other])
       for (const [id, inside] of [[survivor, true], [last, true], [other, false]] as const)
         expect(!!(await useDb().get(sql`SELECT 1 AS one WHERE ${inAccountScope(sql`${id}`, middle)}`))).toBe(inside)
     })

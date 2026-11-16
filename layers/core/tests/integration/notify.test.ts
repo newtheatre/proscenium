@@ -164,6 +164,11 @@ describe('notify', () => {
     expect(sent).toHaveLength(0)
     // A different key still sends.
     expect((await send('notify.receipt', { to: survivor, variables: { order: 'M2' }, dedupeKey: 'order-m2' })).statements).toBeGreaterThan(0)
+    // The key leaves the account out, but someone else under the same key is still told.
+    const stranger = await account()
+    const theirs = await send('notify.receipt', { to: [stranger, survivor], variables: { order: 'M1' }, dedupeKey: 'order-m1' })
+    expect(theirs.ids[0]).not.toEqual(first.ids[0])
+    expect(theirs.ids[1]).toEqual(first.ids[0])
   })
 
   it('leaves nothing behind when the caller\'s unit fails', async () => {
