@@ -7,6 +7,7 @@ import { all, createUnit, isRefusal, newId, nowMs, Refusal, useContext, type Uni
 import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, ownersOf, partsOf, releaseParts, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor } from './providers'
+import { refundInFull } from './refunds'
 import type { Method, ProviderAnswer } from './points/provider'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
@@ -145,6 +146,10 @@ async function unfulfil(attempt: AttemptRow, answer: Answer, source: Source): Pr
     entries: [...money, { account: { key: 'payments.unfulfilled' }, amountMinor: -total }],
   })
   await releaseParts(view, intent, parts)
+  // The whole payment goes back, asked for by the system and so approved at once.
+  const paid = await all<AttemptRow>("SELECT * FROM payments_attempts WHERE intent_id = ? AND state = 'succeeded' AND id <> ? ORDER BY started_at", intent.id, attempt.id)
+  const refundIds = await refundInFull(view, intent, parts, [...paid, attempt])
+  for (const refundId of refundIds) view.enqueue('payments.send-refund', { refundId })
   view.announce('payments.intent.unfulfilled', { intentId: intent.id, owners: ownersOf(parts) }, { record: ['payments.intent', intent.id] })
   await unit.commit()
 }
