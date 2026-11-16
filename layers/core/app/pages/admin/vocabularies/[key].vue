@@ -2,7 +2,7 @@
 // One vocabulary (C-20, C-21): its terms in order, to add, rename, reorder, retire, restore and
 // delete, each with the count of records that use it. A record stores the term's id, so a
 // rename reaches every record and none is rewritten.
-definePageMeta({ layout: 'console' })
+definePageMeta({ layout: 'admin' })
 
 interface Term { id: string, slug: string, label: string, description: string | null, icon: string | null, seeded: boolean, retired: boolean, mergedIntoId: string | null, uses: number }
 interface Vocabulary { key: string, owner: string, label: string, description: string | null, ordering: 'manual' | 'alphabetical', locked: boolean }

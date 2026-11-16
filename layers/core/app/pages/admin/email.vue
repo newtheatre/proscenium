@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Email sending (C-32, C-52): the sending domain, whether it is verified, a test message, and,
 // where the site has its own domain and a Cloudflare token is set, setting the domain up for you.
-definePageMeta({ layout: 'console' })
+definePageMeta({ layout: 'admin' })
 
 interface Sender {
   domain: string | null

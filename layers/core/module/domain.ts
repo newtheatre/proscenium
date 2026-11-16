@@ -227,7 +227,7 @@ export const contributes = {
   ],
   'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
-  'core.setup-step': [{ id: 'core.sender', required: true, to: '/console/system/email', order: 20 }],
+  'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
