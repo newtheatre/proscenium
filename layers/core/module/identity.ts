@@ -203,6 +203,21 @@ export const identityContributions = {
   'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
   // The other identity messages (spec part 4) arrive with the stories that send them.
   'core.notification-type': [{
+    // The code that confirms it is you in place, for a basic session with no passkey (ID-28). The
+    // code is sealed: email only, kept encrypted and cleared once sent.
+    id: 'core.reassert-code',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { code: 'sealed' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your code to confirm it is you at {{ theatre }}',
+        body: 'Type this code where you were asked to confirm it is you: **{{ code }}**\n\nIt works once, for a short while, in the browser that asked for it. If you did not ask for it, you can ignore this email; nobody can use it without your sign-in.',
+      },
+    },
+  }, {
     id: 'core.sign-in-link',
     category: 'transactional' as const,
     side: 'audience' as const,

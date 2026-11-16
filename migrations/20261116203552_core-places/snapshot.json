@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "7feed09f-5580-4b78-ab25-a745e285e18e",
+  "id": "dad7e1ea-590d-45e6-a11d-1d1bd48e9d90",
   "prevIds": [
     "3df4d1c2-528f-49ce-bcaf-6a133ffb4485"
   ],
@@ -135,6 +135,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_place_access",
+      "entityType": "tables"
+    },
+    {
       "name": "core_recovery_codes",
       "entityType": "tables"
     },
@@ -167,6 +171,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_spaces",
+      "entityType": "tables"
+    },
+    {
       "name": "core_task_runs",
       "entityType": "tables"
     },
@@ -175,35 +183,11 @@
       "entityType": "tables"
     },
     {
+      "name": "core_venues",
+      "entityType": "tables"
+    },
+    {
       "name": "core_vocabularies",
-      "entityType": "tables"
-    },
-    {
-      "name": "finance_accounts",
-      "entityType": "tables"
-    },
-    {
-      "name": "finance_entries",
-      "entityType": "tables"
-    },
-    {
-      "name": "finance_period_closes",
-      "entityType": "tables"
-    },
-    {
-      "name": "finance_periods",
-      "entityType": "tables"
-    },
-    {
-      "name": "finance_postings",
-      "entityType": "tables"
-    },
-    {
-      "name": "finance_seals",
-      "entityType": "tables"
-    },
-    {
-      "name": "finance_tax_codes",
       "entityType": "tables"
     },
     {
@@ -3187,6 +3171,66 @@
       "entityType": "columns"
     },
     {
+      "table": "core_place_access",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_place_access",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_place_access",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_place_access",
+      "name": "term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_place_access",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_place_access",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "id",
       "type": "text",
@@ -3737,6 +3781,136 @@
       "entityType": "columns"
     },
     {
+      "table": "core_spaces",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "kind_term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "default_capacity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "performable",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "exclusive",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "access_info",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_spaces",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_task_runs",
       "name": "task",
       "type": "text",
@@ -3907,6 +4081,156 @@
       "entityType": "columns"
     },
     {
+      "table": "core_venues",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "managed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "address_lines",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "locality",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "postcode",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "country",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "latitude",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "longitude",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "access_info",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "getting_here",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_venues",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_vocabularies",
       "name": "key",
       "type": "text",
@@ -3973,536 +4297,6 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'public'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "code",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "module",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "system_key",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "scope",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "active",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "posting_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "amount_minor",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "currency",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "for_module",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "production_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "performance_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "tax_code",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'none'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "tax_minor",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_entries",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "period_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "action",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "debits_minor",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "credits_minor",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "reason_term_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_periods",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_periods",
-      "name": "label",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_periods",
-      "name": "starts_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_periods",
-      "name": "ends_on",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_periods",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_periods",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "idempotency_key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "source_module",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "source_type",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "source_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "reverses_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "period_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "occurred_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "posted_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_postings",
-      "name": "posted_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_seals",
-      "name": "posting_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_seals",
-      "name": "entry_count",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_seals",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_tax_codes",
-      "name": "code",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_tax_codes",
-      "name": "label",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_tax_codes",
-      "name": "rate_basis_points",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "finance_tax_codes",
-      "name": "active",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "true",
       "generated": null,
       "entityType": "columns"
     },
@@ -5089,6 +4883,28 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_place_access",
+      "name": "core_place_access_term",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "coalesce(\"space_id\", '')",
+          "isExpression": true
+        },
+        {
+          "value": "term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "core_recovery_codes_hash",
       "columns": [
@@ -5227,6 +5043,60 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_spaces",
+      "name": "core_spaces_venue_pair",
+      "columns": [
+        {
+          "value": "id",
+          "isExpression": false
+        },
+        {
+          "value": "venue_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_spaces",
+      "name": "core_spaces_slug",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_spaces",
+      "name": "core_spaces_name",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_terms",
       "name": "core_terms_slug",
       "columns": [
@@ -5281,196 +5151,12 @@
       "entityType": "indexes"
     },
     {
-      "table": "finance_accounts",
-      "name": "finance_accounts_code",
+      "table": "core_venues",
+      "name": "core_venues_name",
       "columns": [
         {
-          "value": "code",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "finance_accounts_system_key",
-      "columns": [
-        {
-          "value": "system_key",
-          "isExpression": false
-        },
-        {
-          "value": "coalesce(\"scope\", '')",
+          "value": "lower(\"name\")",
           "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": "system_key IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_entries",
-      "name": "finance_entries_posting",
-      "columns": [
-        {
-          "value": "posting_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_entries",
-      "name": "finance_entries_account",
-      "columns": [
-        {
-          "value": "account_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_entries",
-      "name": "finance_entries_production",
-      "columns": [
-        {
-          "value": "production_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": "production_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_entries",
-      "name": "finance_entries_performance",
-      "columns": [
-        {
-          "value": "performance_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": "performance_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "finance_period_closes_period",
-      "columns": [
-        {
-          "value": "period_id",
-          "isExpression": false
-        },
-        {
-          "value": "at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_periods",
-      "name": "finance_periods_starts_on",
-      "columns": [
-        {
-          "value": "starts_on",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_postings",
-      "name": "finance_postings_idempotency_key",
-      "columns": [
-        {
-          "value": "idempotency_key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_postings",
-      "name": "finance_postings_reverses",
-      "columns": [
-        {
-          "value": "reverses_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "reverses_id IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_postings",
-      "name": "finance_postings_period",
-      "columns": [
-        {
-          "value": "period_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_postings",
-      "name": "finance_postings_source",
-      "columns": [
-        {
-          "value": "source_module",
-          "isExpression": false
-        },
-        {
-          "value": "source_type",
-          "isExpression": false
-        },
-        {
-          "value": "source_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "finance_seals",
-      "name": "finance_seals_posting",
-      "columns": [
-        {
-          "value": "posting_id",
-          "isExpression": false
         }
       ],
       "isUnique": true,
@@ -5614,12 +5300,89 @@
       "entityType": "fks"
     },
     {
+      "table": "core_place_access",
+      "name": "fk_core_place_access_venue_id_core_venues_id_fk",
+      "columns": [
+        "venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_place_access",
+      "name": "fk_core_place_access_term_id_core_terms_id_fk",
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_place_access",
+      "name": "fk_core_place_access_space_id_venue_id_core_spaces_id_venue_id_fk",
+      "columns": [
+        "space_id",
+        "venue_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id",
+        "venue_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_role_abilities",
       "name": "fk_core_role_abilities_role_id_core_roles_id_fk",
       "columns": [
         "role_id"
       ],
       "tableTo": "core_roles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_spaces",
+      "name": "fk_core_spaces_venue_id_core_venues_id_fk",
+      "columns": [
+        "venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_spaces",
+      "name": "fk_core_spaces_kind_term_id_core_terms_id_fk",
+      "columns": [
+        "kind_term_id"
+      ],
+      "tableTo": "core_terms",
       "columnsTo": [
         "id"
       ],
@@ -5650,96 +5413,6 @@
         "merged_into_id"
       ],
       "tableTo": "core_terms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "finance_entries",
-      "name": "fk_finance_entries_posting_id_finance_postings_id_fk",
-      "columns": [
-        "posting_id"
-      ],
-      "tableTo": "finance_postings",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "finance_entries",
-      "name": "fk_finance_entries_account_id_finance_accounts_id_fk",
-      "columns": [
-        "account_id"
-      ],
-      "tableTo": "finance_accounts",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "fk_finance_period_closes_period_id_finance_periods_id_fk",
-      "columns": [
-        "period_id"
-      ],
-      "tableTo": "finance_periods",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "fk_finance_period_closes_reason_term_id_core_terms_id_fk",
-      "columns": [
-        "reason_term_id"
-      ],
-      "tableTo": "core_terms",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "finance_postings",
-      "name": "fk_finance_postings_period_id_finance_periods_id_fk",
-      "columns": [
-        "period_id"
-      ],
-      "tableTo": "finance_periods",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "finance_seals",
-      "name": "fk_finance_seals_posting_id_finance_postings_id_fk",
-      "columns": [
-        "posting_id"
-      ],
-      "tableTo": "finance_postings",
       "columnsTo": [
         "id"
       ],
@@ -6051,6 +5724,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_place_access",
+      "name": "core_place_access_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "core_recovery_codes_pk",
       "columns": [
@@ -6114,8 +5796,26 @@
       "entityType": "pks"
     },
     {
+      "table": "core_spaces",
+      "name": "core_spaces_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_terms",
       "name": "core_terms_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_pk",
       "columns": [
         "id"
       ],
@@ -6132,64 +5832,19 @@
       "entityType": "pks"
     },
     {
-      "table": "finance_accounts",
-      "name": "finance_accounts_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "finance_entries",
-      "name": "finance_entries_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "finance_period_closes_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "finance_periods",
-      "name": "finance_periods_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "finance_postings",
-      "name": "finance_postings_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "finance_tax_codes",
-      "name": "finance_tax_codes_pk",
-      "columns": [
-        "code"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "core_files",
       "name": "core_files_object_key_unique",
       "columns": [
         "object_key"
+      ],
+      "nameExplicit": false,
+      "entityType": "uniques"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_slug_unique",
+      "columns": [
+        "slug"
       ],
       "nameExplicit": false,
       "entityType": "uniques"
@@ -6309,9 +5964,27 @@
       "entityType": "checks"
     },
     {
+      "table": "core_place_access",
+      "name": "core_place_access_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 200",
+      "entityType": "checks"
+    },
+    {
       "table": "core_roles",
       "name": "core_roles_expiry_days",
       "value": "(expiry_rule = 'days') = (expiry_days IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_spaces",
+      "name": "core_spaces_state",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_spaces",
+      "name": "core_spaces_capacity",
+      "value": "\"default_capacity\" IS NULL OR \"default_capacity\" > 0",
       "entityType": "checks"
     },
     {
@@ -6327,6 +6000,24 @@
       "entityType": "checks"
     },
     {
+      "table": "core_venues",
+      "name": "core_venues_state",
+      "value": "\"state\" IN ('active', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_position",
+      "value": "(\"latitude\" IS NULL) = (\"longitude\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_venues",
+      "name": "core_venues_country",
+      "value": "\"country\" IS NULL OR length(\"country\") = 2",
+      "entityType": "checks"
+    },
+    {
       "table": "core_vocabularies",
       "name": "core_vocabularies_ordering",
       "value": "\"ordering\" IN ('manual', 'alphabetical')",
@@ -6336,60 +6027,6 @@
       "table": "core_vocabularies",
       "name": "core_vocabularies_term_class",
       "value": "\"term_class\" IN ('public', 'internal')",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_accounts",
-      "name": "finance_accounts_kind",
-      "value": "\"kind\" IN ('asset', 'liability', 'income', 'expense', 'equity')",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_entries",
-      "name": "finance_entries_amount",
-      "value": "\"amount_minor\" <> 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_entries",
-      "name": "finance_entries_tax",
-      "value": "\"tax_code\" <> 'none' OR \"tax_minor\" = 0",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "finance_period_closes_action",
-      "value": "\"action\" IN ('close', 'reopen')",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_period_closes",
-      "name": "finance_period_closes_reason",
-      "value": "\"action\" = 'close' OR \"reason_term_id\" IS NOT NULL",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_periods",
-      "name": "finance_periods_order",
-      "value": "\"ends_on\" >= \"starts_on\"",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_postings",
-      "name": "finance_postings_kind",
-      "value": "\"kind\" IN ('sale', 'refund', 'fee', 'payout', 'recognition', 'transfer', 'cash_variance', 'unfulfilled', 'correction', 'opening')",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_seals",
-      "name": "finance_seals_entry_count",
-      "value": "\"entry_count\" >= 2",
-      "entityType": "checks"
-    },
-    {
-      "table": "finance_tax_codes",
-      "name": "finance_tax_codes_rate",
-      "value": "\"rate_basis_points\" >= 0",
       "entityType": "checks"
     }
   ],
