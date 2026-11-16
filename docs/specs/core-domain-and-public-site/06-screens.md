@@ -87,12 +87,18 @@ These show what is on each screen and roughly where. They are not visual designs
 
 ### Public production page
 
-&#91;embedded content: Public production page. The booking action on each date comes from the point core.booking-action, so it is Box office's button when that module is on, the external link when it is not, and absent when there is neither.\]
+![Public production page. The booking action on each date comes from the point core.booking-action, so it is Box office's button when that module is on, the external link when it is not, and absent when there is neither.](images/06-w1-public-production-page.png)
+
+*Public production page. The booking action on each date comes from the point core.booking-action, so it is Box office's button when that module is on, the external link when it is not, and absent when there is neither.*
 
 ### Console production page
 
-&#91;embedded content: Console production page, Dates tab. The dashed panels are contributed by other modules and are absent when those modules are off.\]
+![Console production page, Dates tab. The dashed panels are contributed by other modules and are absent when those modules are off.](images/06-w2-console-production-dates.png)
+
+*Console production page, Dates tab. The dashed panels are contributed by other modules and are absent when those modules are off.*
 
 ### Branding
 
-&#91;embedded content: Branding. The contrast figures are illustrative. The preview is what the theatre will get, in both modes, before anything is saved.\]
+![Branding. The contrast figures are illustrative. The preview is what the theatre will get, in both modes, before anything is saved.](images/06-w3-branding.png)
+
+*Branding. The contrast figures are illustrative. The preview is what the theatre will get, in both modes, before anything is saved.*

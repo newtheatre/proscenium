@@ -59,7 +59,7 @@ Every personal column in every module therefore still points at one id, and the 
 
 ### Account or address: which a row uses
 
-The foundations format also lets a table name its subject by an email column. The two are for different rows and are never both used for the same one.
+The foundations format also lets a table name its subject by an email column. A table may declare both columns, as the bar's tabs do, but each row is found one way: by its account if it names one, and by its email column only when it names no account. For an account, erasure and download sweep the rows that name it, plus rows with no account whose email column holds one of its verified addresses. A row that names a different account is never matched by address.
 
 | A row that | Is keyed to | Examples |
 | --- | --- | --- |
@@ -75,6 +75,44 @@ The foundations format also lets a table name its subject by an email column. Th
 | Email-subject rows carry that address | Nothing moves. They are found by address whenever the account's data is listed, downloaded or erased. | `core.account-email.verified` |
 
 Somebody with no account who wants their data or erasure signs in with the emailed link, which makes or claims an account for that address, and uses the ordinary screens; the sweep then covers their email-subject rows. Addresses are compared trimmed and lower-cased, as the foundations format stores them; identity alone also keeps the address as typed, for display.
+
+### Rows no account or address can find
+
+Some tables may hold a row about a person with no account linked, such as an incident naming a member of the public. The foundations format declares these `subject: { account: 'account_id', unlinked: 'staff' }`. Erasure and download cannot reach such a row automatically, so both flows treat it as a manual step.
+
+| Where | What identity does |
+| --- | --- |
+| The data request screen in the console | Lists every enabled table declared `unlinked: 'staff'`, by module, as a checklist: "search these by hand for this person". Each line links to the owning module's search and names the redaction ability needed. |
+| Finishing a request | An erasure or download started by staff cannot be marked complete until each line is ticked "searched, nothing found" or "found and handled", with who ticked it. A self-service request runs its automatic part at once and opens the same checklist for staff, still inside the respond-by date. |
+| The person's own screens | The confirmation says plainly that records not linked to their account are checked by a person and may take until the respond-by date. |
+| The download | Anything staff find is added by the owning module through `core.export-contributor`. |
+| Retention | Unlinked rows are covered by their module's retention rule, not by identity's sweeps. |
+
+Identity never reads or redacts these rows itself; the owning module does, under its own ability, and audits it.
+
+### Mailing lists and audiences for messages
+
+| Matter | Ruling |
+| --- | --- |
+| A signed-out mailing-list sign-up | An email-subject row in the communications module. It does not call `findOrCreateAccount` and makes no account. |
+| A confirmed double opt-in | Not proof of address for an account claim. It proves somebody with the inbox agreed to receive mail; it does not show an intent to sign in, its link is long-lived and may be opened by a mail scanner or a forwarded reader, and a claim can merge records and open My account. Only identity's own single-use, short-lived link or code, or a provider's verified address, verifies an address. |
+| A subscriber who later signs in | Their subscription is found by the verified address, like any email-subject row. Nothing moves. |
+| "Holders of a role" as an audience for a message | Identity contributes it. `holdersOfRole(roleId, scope?)` returns canonical account ids with a live grant, and identity contributes three sources to the communications audience point: holders of a role, holders of an ability on a record (`holdersOf`), and everyone for whom `core.member` is true. |
+
+Identity's three contributions to `communications.audience-source` are keyed `core.role-holders`, `core.ability-holders` and `core.members`, and return account ids only. One further service supports sending once to a person who is on a list twice: `verifiedAddressesOf(accountId)` returns every verified address of an account, normalised, for server-side matching only; it is never shown and never returned to a browser. A module that keeps email-subject rows shows them in My account through `core.account-section`, where identity hands it the same list of verified addresses.
+
+### Checking an address without seeing it
+
+Membership needs to know things about a person's addresses (a student domain, a place on a list) without holding the addresses. Two services answer without returning one.
+
+| Service | Takes | Gives back |
+| --- | --- | --- |
+| `hasVerifiedAddressAt(accountId, domains)` | An account and a list of domains | Whether any verified address of the account is at one of them, and which domain matched. Never the address. Sub-domains match only if listed. |
+| `verifiedAddressDigests(accountId, keyName)` | An account and the name of a key the calling module holds as a secret | A keyed digest (HMAC-SHA-256) of each verified, normalised address. The module stores its list as digests under the same key and compares. A plain hash is refused as a design, because addresses are guessable. |
+
+Both count verified addresses only, are server-side only, and return nothing for a disabled account, an alias or a tombstone.
+
+A module computes the matching digest of an address somebody typed with `addressDigest(address, keyName)`, which applies the same normalisation and the same key. A module that keeps a digest in place of an address (the bar's receipt address on a tab) has no email column for the sweep to find, so it contributes those rows itself: to the download through `core.export-contributor`, and to erasure through `core.erasure-handler`, each matching by digest against `verifiedAddressDigests`.
 
 ## Events announced
 

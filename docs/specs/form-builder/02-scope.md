@@ -20,7 +20,7 @@ The form builder is one module, `forms`, that lets a theatre ask its own questio
 
 ## Out of scope
 
-- **Season planning.** Placing chosen shows into slots and spaces is a calendar tool, not a form. A proposals round ends here with a decision and, optionally, a created production.
+- **Season planning.** Placing chosen shows into slots and spaces is a calendar tool, not a form. A proposals round ends here with a decision. In the first release someone then creates the production by hand; an outcome action that creates it follows (Matt's decision, tab 9).
 - **Audition slots with a panel calendar, casting offers and rehearsal calls.** A sign-up form with limited places is in scope; the production-management process around it is not.
 - **A survey analytics product.** Results are a table, an export and simple counts. Cross-tabulation and weighting are left to a spreadsheet.
 - **Marketing consent management.** A consent question records its wording and time; the mailing-list register belongs to Communications.
@@ -36,26 +36,26 @@ The design paper lists six capabilities under Programming. Five are delivered by
 | Programming capability | Delivered by |
 | --- | --- |
 | Proposal windows per season with structured submissions | A form placed on a season, with opening and closing dates |
-| Private drafts, locked after the deadline | Draft responses private to the submitter and named collaborators; the closing date locks them |
+| Private drafts, locked after the deadline | Draft responses private to the submitter; the closing date locks them. Co-authors the submitter adds follow the first release |
 | Review with private scores and conflict lockout | The review stage (tab 3) |
 | A recorded decision with reasons, feedback to proposers | A decision transition with a required reason and a message to the submitter |
 | Retention rules for unsuccessful proposals | Retention per form and per outcome |
 | A season planner | Not covered. An approved proposal can create a production through an outcome action; placing it in the calendar is core's job |
 
-## Assumptions about other workstreams
+## What this specification relies on from other workstreams
 
-These are written to be checked, and each is repeated in tab 4 beside the interface it affects.
+The first draft listed these as assumptions. Each has since been settled with its owner, and tab 4 has the detail beside the interface it affects.
 
-| Workstream | This specification assumes |
-| --- | --- |
-| 1. Foundations | A module manifest that can carry new kinds of declaration: form slots, field types, bindable attributes, respondent facts and outcome actions |
-| 1. Foundations | A data-class registry that accepts a column whose class is decided per row, because the theatre chooses the class of each question |
-| 1. Foundations | A ruling on how two modules write in one D1 batch. Proposed here: forms hands the host prepared statements |
-| 1. Foundations | An application-level encryption helper for special-category values, an events bus, a queue for retried work and an audit service |
-| 2. Identity | A stable person identifier, guest and shadow people, groups a theatre defines, abilities scoped to one record, and an erasure and merge procedure that modules take part in |
-| 3. Core domain | Record types with stable identifiers (season, production, performance, venue, space), a Files service, a notification centre with versioned templates, and reusable option lists (vocabularies) |
-| 4. Box office and payments | A charge-attempt service that accepts an expected total and announces its outcome as an event |
-| 6. Interface | The three shells, the list conventions (filters in the address, export, empty states) and the offline write queue |
+| Workstream | Forms relies on | State |
+| --- | --- | --- |
+| 1. Foundations | Points and contributions in the manifest, which carry form slots, field types, bindable attributes, outcome actions and templates | Settled |
+| 1. Foundations | A data-class registry that accepts a column whose class is decided per row, because the theatre chooses the class of each question | Settled |
+| 1. Foundations | The unit of work: a host and forms add statements to one D1 batch, and neither commits alone | Settled |
+| 1. Foundations | Encryption for special-category values, events with an internal flag for webhooks, the queue, the audit service, and scoped ids with links as separate tokens | Settled |
+| 2. Identity | The account as the person, the email subject for a signed-out respondent, roles granted on one form, facts that allow and never deny, and erasure and merge that move forms' columns | Settled |
+| 3. Core domain | Record types (season, production, performance, venue, space), files, notification types and vocabularies | Settled |
+| 4. Box office and payments | A charge service that accepts an expected total and announces its outcome | Open; not needed for the first release |
+| 6. Interface | The three shells, the Editor layout, the list conventions and the form rules | Settled |
 
 ## What the first release must prove
 

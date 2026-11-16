@@ -6,7 +6,30 @@ Workstream 5 of the detailed-design stage. This document specifies the form buil
 
 ## At a glance
 
-&#91;embedded content: how the parts fit · 6 parts, 5 kinds of plug-in\]
+```mermaid
+---
+title: One published definition drives the builder, the browser and the server
+---
+flowchart LR
+  builder["<b>Builder</b><br/>An author edits a draft;<br/>nothing is live until Publish"]
+  version["<b>Published version</b><br/>One definition, never changed:<br/>questions, logic, workflow"]
+  filler["<b>Filling in, in the browser</b><br/>The engine shows, requires,<br/>checks and routes as you type"]
+  server["<b>Submission, on the server</b><br/>The same engine checks again<br/>and trusts nothing it was sent"]
+  response["<b>Response and answers</b><br/>One row per question, each<br/>with its own data class"]
+  workflow["<b>Workflow</b><br/>Stages, review with private<br/>scores, a recorded decision"]
+  modules["<b>Other modules plug in, and forms never names them</b><br/>Slots for a form · picker question types · attributes an answer updates · actions on an outcome · templates"]
+  builder -->|Publish| version
+  version -->|definition| filler
+  filler -->|answers| server
+  version -->|its version stays with it| response
+  server -->|one unit of work| response
+  response -->|once submitted| workflow
+  modules --> response
+  style version fill:#e8f0fe,stroke:#2563eb,stroke-width:2px
+  style modules fill:#f1f5f9,stroke:#64748b
+```
+
+*how the parts fit · 6 parts, 5 kinds of plug-in*
 
 An author publishes a version; the browser and the server both run the same engine over it; the stored response keeps its version and moves through the workflow.
 
@@ -30,25 +53,25 @@ An author publishes a version; the browser and the server both run the same engi
 | Tab | Holds |
 | --- | --- |
 | 1. Scope | What is in and out, how a proposals round is covered, and what is assumed of other workstreams |
-| 2. Data model | The definition format and sixteen tables, each column with its class and erasure behaviour |
+| 2. Data model | The definition format, sixteen tables for the first release and one for later, each column with its class and erasure behaviour |
 | 3. States and rules | The life of a form, a version and a response; workflow and review rules; the engine's rules |
 | 4. Interface to other modules | Points, slots, services, events, facts and jobs |
 | 5. Screens | Twenty-one screens, the builder in detail, and two wireframes |
 | 6. Settings and abilities | Twenty settings and fourteen abilities |
 | 7. Stories | Forty-one stories with acceptance criteria, in a first release and later |
-| 8. Test plan | Twenty-four named cases that must never regress |
-| 9. Questions for Matt | Ten choices, each with a recommendation |
+| 8. Test plan | Twenty-seven named cases that must never regress |
+| 9. Questions for Matt | Ten choices, all decided, and the three points still open with workstream 4 |
 | Sources and prior art | What was read, and what was taken or left from each |
 
 ## Status
 
-First draft, complete on all nine parts, written on 16 November 2026. No product code has been written.
+Second draft, 16 November 2026: Matt's decisions and every ruling from the other workstreams are folded into the body of each tab, and the screens are checked against the interface specification's page conventions. No product code has been written.
 
 | Item | State |
 | --- | --- |
 | Aligned with foundations (workstream 1) | Yes: points and contributions, units of work, per-row data classes, naming, settings format, always-on, public components, erasure in append-only tables |
-| Aligned with interface (workstream 6) | Yes on what was asked: the Editor layout, side-by-side rows and where review and "My forms" live. The wireframes follow those rulings and still need a check against its full page conventions at integration |
-| Aligned with identity (workstream 2) | Yes in tab 4: the conflict lockout is a guard inside forms, grants stop at the form, and signed-out responses are keyed to an email address. Tabs 2, 3, 4, 6 and 7 were rechecked against these rulings on 16 November 2026; tab 2 carries them as three dated amendments under the responses table |
+| Aligned with interface (workstream 6) | Yes: the Editor layout, side-by-side rows and where review and "My forms" live. Tab 5 maps every screen to a page type, and its two departures (forms longer than five pages, and the builder locking where a form page would merge) are accepted as conventions |
+| Aligned with identity (workstream 2) | Yes: the conflict lockout is a guard inside forms, grants stop at the form, and signed-out responses are keyed to an email address. Tabs 2, 3, 4, 6, 7 and 8 carry these rulings in their tables and rules |
 | Aligned with core domain (workstream 3) | Yes: vocabularies, files, the notification-type point and the record types that slots refer to |
 | Waiting on box office and payments (workstream 4) | The charge service and its event names; the checkout slot |
 | Decided by Matt | All ten questions in tab 9, as recommended, on 16 November 2026 |

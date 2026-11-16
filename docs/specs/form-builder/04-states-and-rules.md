@@ -4,7 +4,34 @@ Three records have a life cycle: the form, its versions, and each response. Ever
 
 ## The form and its versions
 
-&#91;embedded content: life cycle of a form and of each version\]
+```mermaid
+---
+title: A form is edited only through drafts, and a published version never changes
+---
+stateDiagram-v2
+  direction LR
+  state "The form" as FORM {
+    direction LR
+    Draft --> Live: first publish
+    Live --> Live: publish a new version
+    Live --> Closed: close
+    Closed --> Archived: archive
+    Live --> Paused: pause
+    Paused --> Live: resume
+    Paused --> Closed: close
+  }
+  state "Each version" as VER {
+    direction LR
+    DraftVersion: Draft version<br/>edited freely, saved as you go
+    Published: Published<br/>never changes again
+    Superseded: Superseded<br/>kept for its responses
+    DraftVersion --> Published: publish
+    Published --> Superseded: next publish
+    Published --> DraftVersion: editing a live form starts a new draft from it
+  }
+```
+
+*life cycle of a form and of each version*
 
 The form's status says whether it takes responses; a version's state says whether its definition can still change.
 
@@ -36,7 +63,30 @@ A submitted response stays on the version it answered, always. A response return
 
 ## The response
 
-&#91;embedded content: The life cycle of one response\]
+```mermaid
+---
+title: A response moves forward through stages, and only review can send it back
+---
+flowchart LR
+  draft["Draft"] -->|submit| pay["<b>Awaiting payment</b><br/>only if the form charges"]
+  pay -->|paid| pending["Pending"]
+  pending -->|assign| review["In review"]
+  review -->|decision| approved["Approved"]
+  review -->|decision| declined["Declined"]
+  review -->|decision| closed["Closed"]
+  review -->|return for changes| returned["Returned"]
+  returned -->|resubmit| review
+  pending -->|withdraw| withdrawn["Withdrawn"]
+  returned -->|withdraw| withdrawn
+  note1["A form with no review step stops at Pending. Approval may run an outcome action."]
+  note2["Any submitted response can later be anonymised: the answers go, the row and its history stay."]
+  style pay stroke-dasharray: 5 4
+  style review fill:#e8f0fe,stroke:#2563eb,stroke-width:2px
+  style note1 fill:#fff,stroke:#64748b,stroke-dasharray: 2 3
+  style note2 fill:#fff,stroke:#64748b,stroke-dasharray: 2 3
+```
+
+*The life cycle of one response*
 
 A response only moves backwards when a reviewer returns it for changes, and it can be withdrawn until a decision is recorded.
 

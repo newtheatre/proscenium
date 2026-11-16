@@ -61,5 +61,5 @@ First full draft, 16 November 2026. A [clickable prototype of the buy, desk and 
 - **Agreed with workstream 1 (Foundations):** the navigation, page, search, card and settings declarations, the module id `core` for the interface layer, and the `/console` prefix.
 - **Agreed with workstream 5 (Form builder):** the Editor layout, the review queue's two homes, and where My forms sits.
 - **Agreed with workstream 3 (Core domain and public site):** it owns `core.public-component` and the brand function; `/files` is reserved; by Matt's decision a production lives at `/whats-on/<slug>` while current and `/shows/<slug>` once past, and neither is a reserved prefix; access features show as icon and label chips from `core.place-access`, never an icon alone.
-- **Agreed with workstream 2 (Identity and accounts):** it has named the fact `core.member` and the `describeViewer` call, and tab 3 uses them. The shift window belongs to the later front of house round; tab 3 states the assumption.
+- **Agreed with workstream 2 (Identity and accounts):** it has named the fact `core.member` and the `describeViewer` call, and tab 3 uses them. The shift window belongs to the later front of house round, tab 3 states the assumption.
 - **Waiting on Matt:** nothing. He accepted all nine recommendations in tab 9 on 16 November 2026, which is what the draft already assumed.

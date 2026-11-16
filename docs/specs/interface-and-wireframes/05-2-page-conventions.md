@@ -64,7 +64,7 @@ Public content pages are an eighth kind that the theatre owns: prose in the site
 
 ### Steps
 
-- **Three to five steps**, each a single decision, with the step names visible throughout.
+- **Three to five steps**, each a single decision, with the step names visible throughout. Where the number of steps is set by the theatre and passes five, as in a built form, the indicator shows "Page 4 of 9" and the current page's title in place of every step name.
 - **Every step can be gone back to** without losing what was entered.
 - **Setup can be left and resumed.** The console shows an unfinished setup as a card on home and a mark on the module.
 - **The last step is a summary** of what will happen, with the action named on the button.
@@ -88,7 +88,28 @@ A few console screens build a thing rather than fill in a record: the form build
 - **On a phone** one pane shows at a time, with the outline and the item panel as drawers.
 - **The canvas previews at phone and laptop width**, switched from the top bar.
 - **Changes save as a draft as they are made**; publishing is the confirmed act. Leaving never loses work.
-- The console sidebar collapses to its icons while an editor is open.
+- The console sidebar collapses to its icons while an editor is open. An editor's subject is one document, so it does not use the Form type's field-by-field conflict choice: it shows who else is editing, offers read-only or take over, and refuses a stale save.
+
+### Calendar, a shared component
+
+One `Calendar` component serves every module that shows time: Spaces' bookings, Front of house's rota and Training's sessions. No module draws its own.
+
+- **Views:** day and week, with several columns side by side (one per space, role or trainer). On a phone it shows one day and one column at a time, with the column chosen from a menu.
+- **Blocks carry state** in three ways at once: a word, a border style and a colour, so state never depends on colour alone.
+- **The list is the equal route.** Every calendar has a List view of the same items with the same filters and actions, reachable by one control and by keyboard. It is the accessible route and the default below 640 pixels when there are more than three columns.
+- **Calendar colours** are a fixed, named set of eight (`calendar-1` to `calendar-8`), each with a light and dark pair that passes 4.5 to 1 for text and 3 to 1 against the page. They are separate from the brand accent and from the status colours, so no brand can make them unreadable. A module maps its categories to names, never to colour values.
+- **Times** follow the theatre's zone and the show-night rule; a block that crosses midnight is drawn once, on the night it belongs to.
+- **Acting on a block** opens the record's side panel. Dragging to move or resize is an extra for pointer users; the same change is always available as a form.
+
+### Keypad, for live mode
+
+One `LiveKeypad` component serves any live screen that takes a number: the bar till's amounts and quantities, cash tendered at the desk, a typed ticket code.
+
+- **Keys** are the ten digits, a double zero, a decimal point where the mode allows one, Clear and Backspace, each at least 56 by 56 pixels, in the telephone layout (1 2 3 on the top row).
+- **Modes** are money, whole number and code. Money shows pounds and pence as typed and holds the value in pence; the module never parses text.
+- **The figure being typed** is shown large above the keys and announced to a screen reader as it changes. A physical keyboard types into it directly, and the keys are real buttons.
+- **It never confirms by itself.** The screen's one primary action does that, and names the amount.
+- **It works offline** like the rest of a live screen and makes no sound or vibration of its own; feedback belongs to the result, not to each key.
 
 ## Rules for every screen
 

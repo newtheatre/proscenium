@@ -116,3 +116,39 @@ Each specification keeps its own glossary, in its tab 1. This section rules on t
 | **All** | **109** | The one index of id prefixes, points, record types and facts is Foundations, tab 4 |
 
 Every id is a short table prefix and 26 characters, sortable by creation time. An id is never a secret: anything that grants access by being known is a separate random token stored hashed.
+
+## Second round additions (16 November 2026)
+
+Six more modules now have specifications, and their stories add to the totals above. The questions they raise are in the tab "Second round: questions and status".
+
+| Module | Stories | Gate | First release | Later | Tables |
+| --- | --- | --- | --- | --- | --- |
+| Front of house (FH) | 46 | 4 | 31 | 11 | 17 |
+| Spaces (SP) | 48 | 4 | 32 | 12 | 7 |
+| Bar (BAR) | 44 | 8 | 26 | 10 | 20 |
+| Training (TR) | 34 | 0 | 24 | 10 | 12 |
+| Membership (two modules) | 55 | 9 | 33 | 13 | see the specification |
+| Communications (COM) | 38 | 6 | 18 | 14 | 9 |
+
+That is 265 more stories, so 532 in all with the first round's 267 (Interface grew from 34 to 36 with the Calendar and LiveKeypad components, UI-35 and UI-36).
+
+### Changes to the order of work
+
+- FH-01 to FH-04 (the facts that say who is on shift tonight) join phase 3, because Box office's desk authority rests on them.
+- Proposed, waiting on question X1: BAR-01 to 05, 10 to 12, 14 and 22 join phase 3 after Box office's desk stories, with UI-36, so one card-reader payment can cover tickets and drinks.
+- Proposed, waiting on question X4: FB-501, FB-502 and the mechanism half of FB-506 move forward with Membership as the first host.
+- Phase 2 gains three proofs for notifications and mailings: 50 sends recorded in one D1 batch, a 10,000-recipient mailing, and what Cloudflare Email Sending reports for bounces, complaints and volume. The last is an open research item and is unverified today.
+- Everything else in the six modules follows phase 3 in an order still to be set once the questions are answered.
+
+### Rulings added to the glossary
+
+- One mechanism, `core.requirement`, answers "does this person meet this condition at this time" for every module; the host module owns the refusal and any override.
+- Preset roles stay at fifteen (the fifteenth is welfare-lead). Training adds none: managing maps to technical-manager and administrator, and a trainer is the fact `training.course-trainer` on a course.
+- A membership holder has a standing; a supporter does not. Say "membership holder", "scheme year" and "membership period", never a bare "term" or "period". "Member" stays Identity's word.
+- Say "room booking" across modules, "course" (not training module), "training record" in full, "rota place", "session waiting list", "duty" (never role) on a rota, "tranche" (not batch) in Communications, and "bar sale", "opening", "outlet", "parked sale", "stock item" and "bar tab" at the bar.
+- Templates are always named in full: form template, notification template, mailing template, rota template.
+- Finance has no income-recognition rule of its own. Each module decides for its own income; "at the performance" binds tickets only.
+
+### The kit as built (16 November 2026)
+
+The foundation kit (F-01 to F-10 and F-34) is built and up for review as [pull request 2](https://github.com/MattA-Official/proscenium/pull/2). Eleven points were settled while building and are listed as "As built" at the end of the Foundations specification's Formats tab, which prevails over older wording. The ones every module meets: `defineTable(name, columns, options)`; the content token is `:setting{name="..."}`; points are read with `usePoint(name)`; external calls are declared in a manifest `calls` section; a switched-off module's jobs wait; and naming patterns for settings, abilities, events and jobs are enforced. One story was added, F-36 (first release): rate limiting in a shared store for sign-in and public forms. Foundations is now 36 stories, so the total is 533.

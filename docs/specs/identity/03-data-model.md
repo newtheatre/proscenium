@@ -231,6 +231,14 @@ Which abilities the theatre has attached to a fact a module declares. It is the 
 - **On merge:** `created_by` is an alias.
 - A row whose fact or ability no longer exists in any enabled module is ignored by the resolver and listed on the health page.
 
+**Pinned mappings.** A fact declared `pin: true` may be mapped for one record of the type it is on, such as one competency. The table therefore has a sixth column, and its key is `fact`, `ability` and `pinned_record` together.
+
+| Column | Type | Rules | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `pinned_record` | text | Not null; empty for a mapping that applies to every record, otherwise the id of one record of the fact's `on` type. Only a fact declared `pin: true` may have a non-empty value. | Internal | Kept |
+
+A pinned mapping allows the ability only when the fact holds for the actor on that record. A mapping whose record no longer exists grants nothing and is shown as broken on the roles screen.
+
 ## core\_grants
 
 A role given to an account. A grant is never edited: it is ended, and a renewal is a new row.

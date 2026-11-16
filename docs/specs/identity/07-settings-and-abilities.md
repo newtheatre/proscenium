@@ -127,7 +127,7 @@ Identity declares one fact. The route declarations `public` and `signed-in` and 
 
 | Fact | On | Standing | True when |
 | --- | --- | --- | --- |
-| `core.member` | none (site-wide) | It is the sum of them | The members' area is enabled, and the account holds at least one standing now: a live grant of a role marked as opening the members' area, or any fact a module marks `standing: true` (a current membership, a place on a production, a confirmed shift) |
+| `core.member` | none (site-wide) | It is the sum of them | The account holds at least one standing now, whether or not the members' area is switched on (the area shows when this fact is true and the area is enabled): a live grant of a role marked as opening the members' area, or any fact a module marks `standing: true` (a current membership, a place on a production, a confirmed shift) |
 
 - **It is the single answer to "is this person a member now".** The interface reads it through `describeViewer`, and a module may map abilities to it like any fact.
 - **With no Membership module switched on** it still works: roles and other modules' standings open the area, and the `volunteer` preset role exists to give somebody a standing by hand.

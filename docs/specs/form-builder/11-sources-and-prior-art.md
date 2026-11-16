@@ -41,7 +41,7 @@ Proscenium has no form builder or custom fields; a search of its documentation f
 | --- | --- |
 | [Design paper](https://claude.ai/artifact/8Yn8fPcsngaKVrTdijBaiD): Form builder, Decisions, Module catalogue, Accounts, Part B and its sub-tabs, Roadmap, Next stage | The requirements, the conventions and the nine-part format |
 | [Foundations specification](https://claude.ai/artifact/RKRTkLkrG98jXHSBptUc1x): Module manifest and Settings registry sub-tabs, and its rulings sent on 16 November 2026 | Points and contributions, units of work, per-row data classes, naming, the settings table format, `switchable: false`, public components, erasable columns in append-only tables |
-| Interface specification (workstream 6), by message on 16 November 2026 | Page types, the form rules for rendered forms, the points for navigation, record tabs and home cards |
+| Interface specification (workstream 6): its Page conventions tab, read in full, and its rulings by message on 16 November 2026 | Page types, the form rules for rendered forms, the points for navigation, record tabs and home cards |
 
 ## Cloudflare
 
@@ -53,4 +53,4 @@ Proscenium has no form builder or custom fields; a search of its documentation f
 
 - No theatre other than NNT has been asked what forms it needs. The template list is drawn from the paper.
 - Mailflare and Flytower were not read for this workstream: neither has a form builder, and their conventions reach this document through the paper and the foundations specification.
-- The interface and core domain specifications were not read in full. Their rulings reached this document by message on 16 November 2026, and tab 5 should be checked against the interface specification's page conventions at integration.
+- The interface specification's shells, journeys and wireframes tabs, and the identity, core domain and box office specifications, were not read in full. Their rulings reached this document by message on 16 November 2026.

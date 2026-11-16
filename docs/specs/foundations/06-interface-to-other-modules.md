@@ -73,6 +73,24 @@ Added later by the form builder: `fcoa` forms\_response\_authors (the co-author 
 
 **Front of house (second round), received and accepted.** Module `front-of-house`, tables `front_of_house_`. Time-sorted: `dty` duties, `rtp` rota\_templates, `shf` shifts, `asg` assignments, `ckl` checklists, `cki` checklist\_items, `ckr` checklist\_runs, `cke` checklist\_entries, `inc` incidents, `inp` incident\_people, `ina` incident\_actions, `inu` incident\_updates, `nrp` night\_reports, `nrn` night\_report\_notes, `tmg` timings, `emg` emergency\_cards. Keyed by its own columns: rota\_template\_lines. Its facts, points and record types are declared in its own document under `front-of-house.*`.
 
+**Communications (second round), received and accepted.** Module `communications`, tables `communications_`. Time-sorted: `cml` lists, `cwd` consent\_wordings, `csub` subscriptions, `ccon` consent\_records, `cam` campaigns, `crcp` campaign\_recipients, `cmt` mailing\_templates, `cimp` imports, `cseg` segments (later release).
+
+**Training (second round), received and accepted.** Module `training`, tables `training_`. Time-sorted: `tcrs` courses, `tver` course\_versions, `tstp` course\_steps, `tcmp` competencies, `tses` sessions, `tplc` session\_places, `tsof` sign\_offs, `trec` records, `tevd` evidence. Two join tables are keyed by their own columns.
+
+Training's facts, both declared `pin: true`: training.competent (on a competency) and training.course-trainer (on training.course, not a standing). The table training\_course\_trainers is keyed by its own columns.
+
+**Spaces (second round), received and accepted.** Module `spaces`, tables `spaces_`. Time-sorted: `bkb` bookables, `bpu` purposes, `bks` booking\_series, `bkg` bookings, `bke` booking\_events. Keyed by their own columns: opening\_hours, bookable\_purposes. Record types spaces.bookable (parent core.space, optional), spaces.booking, spaces.purpose.
+
+**Bar (second round), received and accepted.** Module `bar`, tables `bar_`; requires payments and finance; uses front-of-house, membership, training. Time-sorted: `bout` outlets, `bcat` categories, `bprd` products, `bvar` variants, `bpls` price\_lists, `bprc` prices, `bsti` stock\_items, `bloc` stock\_locations, `brcp` recipe\_lines, `bage` age\_checks, `bmov` stock\_movements, `bdel` deliveries, `bdll` delivery\_lines, `bstk` stocktakes, `bskl` stocktake\_lines, `bopn` openings, `bsal` sales, `bsln` sale\_lines, `brev` sale\_reversals. Keyed by its own columns: stock\_levels. Record types bar.outlet, bar.opening, bar.sale, bar.product, bar.stock-item, bar.stocktake. Point declared: bar.report (later release).
+
+Added by the bar after Matt put named tabs in the first release: `btab` bar\_tabs, record type bar.tab (parent bar.outlet). It is the bar's only table with personal data: account subject, nullable, `unlinked: 'staff'`.
+
+Also added by the bar: `brrv` bar\_register\_reviews (append-only, subject none).
+
+**Membership (second round), received and accepted.** Two modules: `membership` (requires forms; uses communications), tables `membership_`, and `membership-fees` (requires membership, payments, finance), tables `membership_fees_`. Time-sorted: `msch` schemes, `mshp` memberships, `mbr` members, `mver` verifications, `mvl` verification lists, `mve` list entries, `mfp` prices, `mfc` charges. Points membership.verifier, membership.charge. Facts membership.holder (standing), membership.supporter, membership.scheme-holder (on membership.scheme), membership.voter. Record types membership.scheme, membership.membership, membership.verification-list, membership-fees.price, membership-fees.charge. Secret `MEMBERSHIP_LIST_KEY`. Requirement source `membership`.
+
+**Added in the second round.** Point `core.requirement` (providers judge whether a person meets a stored condition at an instant; see the ruling at the end of the Formats tab), with the kit call `requirements.check`. Deliverable event `box-office.order.reserved`, declared in box office's document. Practice mode (a live screen run on data that is not real) is a later story, led by the interface.
+
 **Forms (5), received and accepted.** Time-sorted: `frm` forms\_forms, `fver` forms\_versions, `ffld` forms\_fields, `fplc` forms\_placements, `fres` forms\_responses, `fans` forms\_answers, `fopt` forms\_option\_counts, `fstg` forms\_stage\_history, `fasg` forms\_review\_assignments, `frev` forms\_reviews, `fmsg` forms\_messages, `fpar` forms\_participation, `frun` forms\_action\_runs, `ftpl` forms\_templates. Random: `finv` forms\_invitations, `fdr` forms\_response\_drafts.
 
 **An id is never a secret.** Ids appear in logs, audit rows, event payloads and webhooks. Anything that grants access by being known (an invitation link, a resume link, a scan code, a sign-in link) is a separate random token on the row, stored hashed, and never the row's id. `random: true` only hides the moment of creation.

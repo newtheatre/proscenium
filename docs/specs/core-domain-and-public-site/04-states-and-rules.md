@@ -23,7 +23,21 @@ Archived does not mean hidden. An archived season leaves the what's-on page and 
 
 ## Production
 
-&#91;embedded content: A production's states. The table below gives who may make each move and its full guard.\]
+```mermaid
+stateDiagram-v2
+    direction LR
+    Draft --> Published: publish<br/>summary, category,<br/>advisories answered
+    Published --> Withdrawn: withdraw
+    Withdrawn --> Published: publish again
+    Published --> Cancelled: cancel<br/>reason chosen, no module refuses
+    Withdrawn --> Cancelled: cancel
+    Cancelled --> Withdrawn: undo
+    note right of Draft
+        A draft can be deleted if it was<br/>never published. Past is worked<br/>out from dates, not stored.
+    end note
+```
+
+*A production's states. The table below gives who may make each move and its full guard.*
 
 | From | To | Who | Guard |
 | --- | --- | --- | --- |
@@ -45,7 +59,19 @@ Rules that are not moves:
 
 ## Performance
 
-&#91;embedded content: A performance's states. Core holds no on-sale state: that is question 1.\]
+```mermaid
+stateDiagram-v2
+    direction LR
+    Draft --> Scheduled: schedule<br/>in the future, no clash,<br/>no blocking closure
+    Scheduled --> Completed: end time passes<br/>by the task only
+    Scheduled --> Cancelled: cancel
+    Cancelled --> Scheduled: reinstate<br/>if it has not started
+    note right of Completed
+        A new time, a new place and a new<br/>capacity are events on a scheduled<br/>performance, not states.
+    end note
+```
+
+*A performance's states. Core holds no on-sale state: that is question 1.*
 
 | From | To | Who | Guard |
 | --- | --- | --- | --- |
@@ -92,7 +118,25 @@ Rules:
 
 ## Delivery
 
-&#91;embedded content: One delivery of one notification by one channel.\]
+```mermaid
+stateDiagram-v2
+    direction LR
+    Queued --> Sending: job claims
+    Sending --> Sent: accepted
+    Sent --> Bounced: bounce reported
+    Sending --> Retrying: may pass
+    Retrying --> Sending: wait over
+    Retrying --> Failed: attempts used up
+    Sending --> Failed: permanent failure
+    note right of Queued
+        Set when created<br/>Held: waits for a digest, then Sent inside it<br/>Suppressed: switched off<br/>Skipped: no usable address
+    end note
+    note right of Bounced
+        A hard bounce also suppresses the address.<br/>A stuck Sending row is released to Retrying.
+    end note
+```
+
+*One delivery of one notification by one channel.*
 
 | From | To | Trigger | Guard |
 | --- | --- | --- | --- |

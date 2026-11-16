@@ -1,6 +1,6 @@
 # 8. Test plan
 
-Twenty-four named cases must never regress. Each has a name a contributor can search for, runs in one of the platform's three tiers, and protects a promise made elsewhere in this document.
+Twenty-seven named cases must never regress. Each has a name a contributor can search for, runs in one of the platform's three tiers, and protects a promise made elsewhere in this document.
 
 ## Named cases
 
@@ -41,10 +41,12 @@ Twenty-four named cases must never regress. Each has a name a contributor can se
 
 | Name | Tier | Proves |
 | --- | --- | --- |
-| The locked-out reviewer | Integration | A conflicted reviewer is refused by every route that returns anything about the response: page, API, export, summary, search, notification |
+| The locked-out reviewer | Integration | A conflicted reviewer is refused by every route that returns anything about the response: page, list, API, export, summary, search, notification. The Owner role is refused in the same way |
 | Blind until released | Integration | Before release no reviewer can obtain another's scores, including through a summary that would reveal them by subtraction |
 | Not your own | Integration | A person cannot decide, review or move a response they submitted, whatever abilities they hold |
 | The restricted answer | Integration | A special-category answer is ciphertext at rest, absent from the table and export without `read-special`, and each reveal is audited |
+| The id is not a key | Integration | An invitation or a link to resume a draft works only with its token; knowing the row's id opens nothing, and the token is stored only as a hash |
+| Found by address | Integration | A response made while signed out appears in My forms once its address is verified on an account, and to nobody before that |
 
 ### Privacy
 
@@ -52,6 +54,7 @@ Twenty-four named cases must never regress. Each has a name a contributor can se
 | --- | --- | --- |
 | Erased everywhere | Integration, D1 | Erasing a person treats their answers in every form by class, deletes their drafts and files, and leaves counts and history intact, in one unit of work |
 | Gone on time | Integration | The retention sweep anonymises a response the day after its date and not the day before |
+| Quiet by default | Integration | No response, review or action event reaches a webhook unless the form opts its response events in, and no event payload ever carries an answer, a name or free text |
 
 ## What each tier covers
 

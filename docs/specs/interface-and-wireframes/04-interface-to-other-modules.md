@@ -20,6 +20,10 @@ All are data points: a contribution is a plain object in the manifest. Each cont
 | `core.public-component` | A component a content page may use (what's on, booking button) | **New**; owned by workstream 3, which defines it in its part 4 |
 | `core.help-page` | The documentation page for a screen | **New**; derived from the module's `docs/` folder, not hand-declared |
 
+Two further points were added on 16 November 2026 with front of house. `core.on-shift-bar` takes a performance id, a label key with its parameters and an until time. `core.tonight-tile` puts a tile or section on Tonight and takes `ability` exactly as a navigation entry does. Two shared components were added the same day and are specified in Page conventions: `Calendar` (for Spaces, the rota and Training) and `LiveKeypad` (for the bar till and the desk).
+
+**Built on Nuxt UI** (Matt, 16 November 2026). Every shell and shared component here is built from Nuxt UI v4 components on Tailwind CSS v4, as Mailflare is, with Lucide icons; custom markup is used only where Nuxt UI has nothing suitable (the seating plan, the scanner's answer panel, the calendar grid). The page types are thin wrappers that fix the frame and the rules; they do not restyle Nuxt UI. Brand and status colours reach Nuxt UI through its colour settings, fed by `getBrand()`.
+
 ### `core.navigation`
 
 ```ts
@@ -145,6 +149,6 @@ Workstream 1 accepted these on 16 November 2026 and is logging them in its forma
 
 1. Navigation entries gain `group`, `section`, `count` and `match`. `ability` takes one ability or a list, not a fact.
 2. The shells a navigation entry may name are `account`, `members`, `console` and `live`. Reserved prefixes are `/account`, `/members`, `/console`, `/live`, `/book`, `/sign-in`, `/setup`, `/api` and anything starting with an underscore; the build refuses a theatre's page under one.
-3. The new core points above are declared here and indexed by workstream 1. The shape of `core.public-component` is owned and defined by workstream 3. `/files` is also reserved, for workstream 3. `PageEditor`, the layout added for the form builder, is specified in Page conventions.
+3. The new core points above are declared here and indexed by workstream 1. The shape of `core.public-component` is owned and defined by workstream 3. `/files` is also reserved, for workstream 3, and `/mailing` for communications' public confirm and manage pages, which are reached by token with no sign-in and drawn in the public shell. `PageEditor`, the layout added for the form builder, is specified in Page conventions.
 4. The build checks that every page under a shell prefix is covered by a navigation entry.
 5. A route declared idempotent requires an `Idempotency-Key` header and replays its stored answer. Every refusal has the body `{ code, reason, remedy?, fields? }`, where reason and remedy are translation keys.

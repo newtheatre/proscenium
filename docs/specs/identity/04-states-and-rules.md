@@ -4,7 +4,26 @@ Six records have a life cycle: the account, the address, the session, the grant,
 
 ## The account
 
-&#91;embedded content: account life cycle · 5 states\]
+```mermaid
+---
+title: An account moves towards erasure; only disabling and merging can be undone
+---
+flowchart LR
+  startA(( )) -->|"guest order or staff add"| U["Unclaimed<br/>never signed in"]
+  startB(( )) -->|"sign-up link used"| A["Active<br/>has signed in"]
+  U -->|"first sign-in"| A
+  A -->|"disable"| D["Disabled<br/>sessions ended"]
+  D -->|"enable"| A
+  A -->|"merged into another"| L["Alias<br/>points at the survivor"]
+  A -->|"erasure runs"| E["Erased<br/>anonymised for good"]
+  D -->|"erasure runs"| E
+  L -->|"undo window ends"| E
+  U -->|"untouched past retention, sweeps armed"| E
+  G["Guard on disable, merge and erasure: refused if it would leave the theatre with no usable Owner."]
+  style G stroke-dasharray: 4 3
+```
+
+*account life cycle · 5 states*
 
 None of these states is stored as a status: each is read from a fact on the row, so two of them can never disagree. Undoing a merge returns an alias to active while the undo window lasts.
 
@@ -39,7 +58,26 @@ None of these states is stored as a status: each is read from a fact on the row,
 
 ## Signing in
 
-&#91;embedded content: sign-in flow · 3 methods, 2 assurance levels\]
+```mermaid
+---
+title: Only a passkey gives a strong session
+---
+flowchart LR
+  S["Sign-in screen"] --> P["Passkey"]
+  S --> M["Emailed link, code"]
+  S --> G["Google"]
+  P -->|"device checks the person"| ST["Strong session"]
+  M --> UO["Used once, in time"]
+  G --> AV["Address verified"]
+  UO --> B["Basic session"]
+  AV --> B
+  N1["An account is created, or an unclaimed one claimed, only when a proof succeeds. Then the person lands where they were going."]
+  N2["An address in a managed domain skips the email row. A theatre may choose to count its own provider as strong."]
+  style N1 stroke-dasharray: 4 3
+  style N2 stroke-dasharray: 4 3
+```
+
+*sign-in flow · 3 methods, 2 assurance levels*
 
 Every method ends in a session, and the method decides its assurance. A basic session can do everything an audience member or ordinary member needs; privileged work asks for a passkey.
 
@@ -90,7 +128,23 @@ Recovery codes are offered to anyone and required of nobody except Owners, who a
 
 ## A grant
 
-&#91;embedded content: grant life cycle · 3 states\]
+```mermaid
+---
+title: "A grant is never edited: it starts, counts, and ends"
+---
+flowchart LR
+  s1(( )) -->|"holder has never signed in"| P["Pending<br/>counts for nothing"]
+  s2(( )) -->|"holder has signed in"| A["Active<br/>read on every request"]
+  P -->|"first sign-in"| A
+  A -->|"expiry or end"| E["Ended<br/>kept as history"]
+  P -->|"ended before the holder ever signed in"| E
+  N1["A change or a renewal ends this grant and writes a new one. Pending is a reading of the holder, not a stored state."]
+  N2["Guards on a new grant: not to yourself, only what you hold at that scope, Owner only by an Owner."]
+  style N1 stroke-dasharray: 4 3
+  style N2 stroke-dasharray: 4 3
+```
+
+*grant life cycle · 3 states*
 
 Ending is the only change a grant row ever takes, which is what lets the history answer who could do what on any past date.
 
@@ -174,7 +228,27 @@ A merge joins two accounts that are one person. The winner keeps its id; the los
 
 ## Export and erasure
 
-&#91;embedded content: erasure request · 7 states\]
+```mermaid
+---
+title: An erasure waits, can be held, and then runs once
+---
+flowchart LR
+  R["Requested"] -->|"emailed link used"| C["Confirmed"]
+  C -->|"cooling-off over"| N["Running"]
+  N -->|"one batch clears all"| D["Done"]
+  R -->|"cancels"| X["Cancelled"]
+  C -->|"module hold"| H["Held"]
+  H -->|"hold cleared"| C
+  H --> X
+  N -->|"error"| F["Failed"]
+  F -->|"retry"| N
+  N1["The person can cancel at any point before it runs. A hold names its module and its reason in plain words."]
+  N2["Running is safe to repeat: a second run finds nothing left to clear and writes nothing."]
+  style N1 stroke-dasharray: 4 3
+  style N2 stroke-dasharray: 4 3
+```
+
+*erasure request · 7 states*
 
 An export request uses the same row and the same path without the cooling-off or the holds.
 

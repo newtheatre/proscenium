@@ -34,9 +34,11 @@ Two placements deserve a note. A reviewer who is an ordinary member, not staff, 
 
 ## The builder
 
-&#91;embedded content: Wireframe: the builder on a laptop, with the third question selected\]
+![Wireframe: the builder on a laptop, with the third question selected](images/06-w1-builder.png)
 
-The builder uses the platform's Editor layout, which Workstream 6 added for it: an outline, a canvas, a panel and tabs in the top bar.
+*Wireframe: the builder on a laptop, with the third question selected*
+
+The builder uses the platform's Editor layout, which Workstream 6 added for it: an outline, a canvas, a panel and tabs in the top bar. The console sidebar collapses to its icons while the builder is open. Undo, redo and the phone and laptop switch sit in the top bar and are left out of the drawing.
 
 Three regions on a laptop, one at a time on a phone.
 
@@ -108,19 +110,21 @@ The reference project is described by its author as not very usable. These behav
 ## Filling in a form
 
 - **One page at a time**, with the page title, a progress indicator and Back and Continue. A short form with one page shows no progress indicator.
-- **Errors** appear when the person leaves a field and again on Continue, in a summary at the top that links to each field. Focus moves to the summary.
+- **Errors** appear when the person leaves a field and again on Continue, beside the field, with a summary at the top that links to each. The first invalid field takes focus, as the platform's form rules require.
 - **Saving.** A signed-in person's draft saves to the server as they go, and "Saved" is shown. A person who is not signed in has the draft kept on their device, and may ask for a link by email to continue elsewhere.
 - **A dropped connection** is said plainly. Answers stay on the device, and Submit is held and retried, never sent twice.
 - **Calculated values** such as a total appear in place and update as answers change.
-- **A review page** before Submit lists the answers by page with a Change link for each, when the form has more than one page.
+- **A review page** before sending lists the answers by page with a Change link for each, when the form has more than one page. The final button names the act in the author's words, such as "Send proposal", and is never "Submit". A question is required unless its label says "(optional)".
 - **Closed, full or not for you.** A form that cannot be answered shows only why, and what would let the person through: sign in, join, or come back when it opens.
 - **Accessibility.** Each question is one labelled control with its help text attached. Groups of choices are grouped and named. No question depends on colour, dragging or a time limit. This follows the paper's WCAG 2.2 AA rule.
 
 ## Reviewing and deciding
 
-&#91;embedded content: Wireframe: one response in review, and the locked row a conflicted reviewer sees\]
+![Wireframe: one response in review, and the locked row a conflicted reviewer sees](images/06-w2-review.png)
 
-The review queue appears in the navigation of both the members' area and the console, and a response in review is the same record page under either, so a reviewer is never sent to a shell they do not otherwise use.
+*Wireframe: one response in review, and the locked row a conflicted reviewer sees*
+
+The review queue appears in the navigation of both the members' area and the console, and a response in review is the same record page under either, so a reviewer is never sent to a shell they do not otherwise use. The drawing leaves out the record page's summary strip, tabs and history panel to show the two halves that are particular to review.
 
 - **The review queue** lists what is waiting for this reviewer, oldest first, with how many they have done.
 - **A response in review** shows the answers on the left and the reviewer's own scoring panel on the right: each criterion with its guidance and scale, a private comment, a recommendation, and Submit review.
@@ -132,7 +136,7 @@ The review queue appears in the navigation of both the members' area and the con
 
 ## The responses table
 
-Follows the platform's list conventions: filters live in the address, every view can be linked to and exported, and an empty table says what would fill it.
+Follows the platform's list conventions: filters live in the address, every view can be linked to and exported, and an empty table says what would fill it. Paging is by page with a stated total, saved views are offered, and bulk actions appear only once rows are selected.
 
 - One row per response, with reference, submitter, submitted time, stage and a column per question. Retired questions are grouped at the right and marked.
 - Restricted answers show as "restricted". Uploaded files show as a count that opens the response.
@@ -144,3 +148,23 @@ Follows the platform's list conventions: filters live in the address, every view
 - **The slot renderer** draws the attached form's questions inline in the host's own form, with the host's Submit button. The host asks forms to check the answers and adds them to its own unit of work, so the order and its answers are saved together or not at all.
 - **The record-fields panel** shows custom fields as a section of the host's record page, read-only until the host's own Edit is used.
 - **Attach a form** lists the forms that fit the slot, offers the slot's template, and opens the builder with the slot's restrictions applied.
+
+## How the screens use the platform's page types
+
+Checked against the interface specification's [Page conventions](https://claude.ai/artifact/KwZ3oXcFJSMNj98kNc9ywW) on 16 November 2026. A module picks a page type and fills it; it does not design a page.
+
+| Screens | Page type | What forms fills in |
+| --- | --- | --- |
+| 1 Forms list, 9 Version history, 10 Responses table, 12 Review queue, 13 Review summary, 17 My forms | List | Columns, filters, row actions, and which columns survive on a phone card |
+| 2 New form, 8 Share and place, 21 Attach a form | Form | The fields. Short ones open in a panel over the list |
+| 3 to 5 Builder, 6 Preview and test | Editor | Outline, canvas, panel and the three tabs |
+| 7 Publish, and deciding a response | Confirmation dialog | The thing named, the consequence stated, the verb on the button |
+| 11 Response, 18 My response | Record | Title: the form's name and the response's reference, with the stage as a badge. Summary strip: submitter, submitted, version, stage, reviews done. Tabs: Answers, Review, Messages. The history panel comes from the audit trail |
+| 14 Results charts | A tab on the form's record | The charts |
+| 15 Fill in a form, 16 Confirmation | Steps, in the public or members' shell | Each page's questions |
+| 19 Slot renderer, 20 Record-fields panel | Components inside a host's Form or Record page | The questions, drawn by the host's page under the same form rules |
+
+Two departures, both accepted by workstream 6 on 16 November 2026 and now written into its Steps and Editor conventions.
+
+- **A form may have more than five pages.** The Steps type asks for three to five steps with their names visible. A theatre's form can be longer, so beyond five pages the indicator shows "Page 4 of 9" and the current page's title instead of every name.
+- **The builder locks, it does not merge.** The Form type resolves two people's edits field by field. A form definition is one document, so the builder shows who is editing, offers read-only or take over, and refuses a stale save without overwriting anything.

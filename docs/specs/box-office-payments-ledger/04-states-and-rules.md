@@ -17,7 +17,34 @@ When the core announces `core.performance.cancelled`, the box office pauses sale
 
 ## An order
 
-&#91;embedded content: order life cycle · 5 states\]
+```mermaid
+---
+title: "A reserved order holds its seats; an order is confirmed only when paid"
+---
+flowchart LR
+  basket["Basket"]
+  awaiting["Awaiting payment"]
+  confirmed["Confirmed"]
+  cancelled["Cancelled"]
+  expired["Expired"]
+  reserved["Reserved<br/>seats held, not paid"]
+  basket -->|"check out"| awaiting
+  awaiting -->|"payment settles"| confirmed
+  confirmed -->|"last line cancelled"| cancelled
+  basket -->|"nothing to pay: confirmed at once"| confirmed
+  basket -->|"hold runs out"| expired
+  awaiting -->|"payment window ends"| expired
+  basket -->|"reserve"| reserved
+  reserved -->|"released unclaimed"| expired
+  reserved <-->|"desk takes payment; back to reserved if it fails"| awaiting
+  reserved -->|"cancelled before paying: no refund"| cancelled
+  note["Every arrow is one database batch. Confirmed and cancelled orders are never deleted."]
+  cancelled ~~~ note
+  classDef note stroke-dasharray: 4 4
+  class note note
+```
+
+*order life cycle · 5 states*
 
 | Transition | Guard | In the same batch |
 | --- | --- | --- |
@@ -70,13 +97,38 @@ Added 16 November. The Nottingham New Theatre has one card reader, and the desk 
 
 Cost now: one table (`payments_intent_parts`), the owner columns move from the intent to the part, and the settle batch loops. Left for later: the bar or shop module itself, its stock and prices, and whether items can be added to a reservation in advance.
 
+**Rules fixed the same day with the Bar specification** (contracts in part 4):
+
+- Each owner prepares its own unpaid sale in the batch that creates the intent, and releases it if the payment is cancelled, fails for good or expires.
+- Settlement is all parts or none. A refusal by any owner after money was taken makes the intent unfulfilled and refunds the whole payment.
+- Each owner returns its ledger entries; Payments writes the one sealed posting. A part's entries total the part.
+- A refund names one part and cannot exceed it. Refund abilities belong to Payments and are not worded around orders.
+- The till is Payments' component. Box office is one contributor to it among others.
+
 **Changing a basket.** Adding tickets is a new claim batch on the same hold; removing one releases that claim. The basket's expiry is set when the first ticket is added and is **not** extended by later changes, so a basket cannot be kept alive for ever. The countdown is shown to the buyer throughout.
 
 **The total.** A line's amount is its list price less its discount, both fixed when the line is written. The order total is the sum of live lines, rewritten in the same batch as any line change. Booking fees are lines, so the total a buyer sees is the total they pay.
 
 ## A claim
 
-&#91;embedded content: claim life cycle · 3 states\]
+```mermaid
+---
+title: "A claim counts against capacity until it is released, and release is final"
+---
+flowchart LR
+  held["Held<br/>counts; has an expiry"]
+  confirmed["Confirmed<br/>counts; no expiry"]
+  released["Released<br/>frees one unit; final"]
+  held -->|"order confirmed"| confirmed
+  confirmed -->|"cancelled or exchanged"| released
+  held -->|"expired, abandoned, or payment failed"| released
+  note["Only triggers move the pool counter: plus one for a live claim, minus one on release."]
+  released ~~~ note
+  classDef note stroke-dasharray: 4 4
+  class note note
+```
+
+*claim life cycle · 3 states*
 
 | Rule | How it is enforced |
 | --- | --- |
@@ -112,7 +164,31 @@ Cost now: one table (`payments_intent_parts`), the owner columns move from the i
 
 An **intent** is the decision to collect an amount. An **attempt** is one try at collecting it.
 
-&#91;embedded content: payment attempt life cycle · 6 states\]
+```mermaid
+---
+title: "A payment attempt always ends in a recorded answer"
+---
+flowchart LR
+  started["Started"]
+  pending["Pending<br/>with the provider"]
+  succeeded["Succeeded<br/>settles the intent"]
+  unknown["Unknown<br/>holds are kept"]
+  failed["Failed<br/>buyer may retry"]
+  cancelled["Cancelled"]
+  started -->|"sent"| pending
+  pending -->|"paid"| succeeded
+  pending -->|"timed out"| unknown
+  pending -->|"declined"| failed
+  unknown -->|"reconciled as paid"| succeeded
+  unknown -->|"reconciled as not paid"| failed
+  started -->|"stopped first"| cancelled
+  note["Succeeded, failed and cancelled are final. An answer comes from the provider or from a named person."]
+  failed ~~~ note
+  classDef note stroke-dasharray: 4 4
+  class note note
+```
+
+*payment attempt life cycle · 6 states*
 
 | Intent transition | Guard |
 | --- | --- |

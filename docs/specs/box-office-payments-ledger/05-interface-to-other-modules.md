@@ -206,3 +206,108 @@ All are safe to run twice: each is a guarded transition or carries an idempotenc
 1. **Provider credentials.** Foundations rules that secrets are Worker secrets and never in the database. That fits API keys. It does not fit a provider joined by an OAuth connection, where the token is issued at runtime. Part 9 asks Matt; if in-app connection is wanted, Foundations needs an encrypted-credential store.
 2. **Erasure of append-only columns.** Two columns in append-only tables hold personal free text and must be blanked on erasure. The trigger allows that one update. Foundations' data-class format should have a way to say so.
 3. **A service with its own unit of work.** `startAttempt` and `answerAttempt` commit themselves, because a provider call sits between their writes. This is the one exception to "a service never commits" and is declared here so the lint rule can allow it by name.
+
+## Added 16 November: what Communications asked for (its N7)
+
+Agreed, with the rulings below. The sources ship with the Communications module; the column and the point are designed in now.
+
+**Audience sources contributed to `communications.audience-source`.** Each returns account ids, never names or addresses. Consent and the suppression list are applied by Communications and the core, not here.
+
+| Source | Who it returns | Limits |
+| --- | --- | --- |
+| `box-office.ticket-holders-of-performance` | Accounts with a confirmed or reserved order for the performance | Cancelled and expired orders excluded |
+| `box-office.ticket-holders-of-production` | The same across a production's performances | The same |
+| `box-office.booked-recently` | Accounts with a confirmed order in the last N months | N cannot exceed the order retention period |
+| `box-office.waiting-list-of-performance` | Waiting-list entries for the performance | Returns email subjects, since an entry has no account. Usable only for a message about that performance, never for marketing: the source declares `purpose: 'service'` |
+
+An order with no account (an anonymous desk sale) appears in no source. There is nobody to write to.
+
+**The point `box-office.checkout-consent`.** Another module contributes consent questions to the details step of checkout, each with a key (an id from the core's vocabulary), wording and whether it starts ticked (it never may). Box office shows them, stores the keys that were ticked, and knows nothing of what they mean.
+
+- Stored on the order as `checkout_consent_keys` (personal; cleared on erasure): the ids ticked and nothing else. The lasting consent record belongs to Communications; this column is the evidence of what was ticked at this checkout.
+- **Keys are not carried in any event payload.** Order events are deliverable to outgoing webhooks, and a list of what one buyer agreed to is about a person. The event carries the order id; Communications reads `checkoutConsent(orderId)`, a service returning the account id and the ticked keys.
+- The event name is `box-office.order.confirmed`, not `order.paid`: an order with nothing to pay is confirmed without a payment. A reservation announces **`box-office.order.reserved`** (new; `internal: false`; payload `orderId`, `performanceIds`), and consent is read then, because that is when the buyer ticked. It is not read again when the reservation is later paid.
+- A desk or phone sale shows no consent questions in the first release, so the column is null: consent ticked by a seller on someone's behalf is weak evidence. An anonymous order can never hold keys: `CHECK (account_id IS NOT NULL OR checkout_consent_keys IS NULL)`.
+- Never-regress cases: `consent-keys-never-in-a-payload` and `anonymous-order-holds-no-consent`.
+
+**Corrected the same day, after Communications replied.** A module that only `uses` another may not call its services (Foundations), so `checkoutConsent(orderId)` cannot exist and the list above is replaced by this:
+
+- `box-office.checkout-consent` is a **code point**. A contribution supplies its questions (key, wording, never pre-ticked) and a function `record({ orderId, accountId, keys })` that returns statements.
+- Box office calls `record` once, when the order is first confirmed or first reserved, and adds the statements to that batch. Consent is written with the order or not at all, exactly once, with no listener and no second read. This is the pattern Foundations approved for forms.
+- The order has no consent column. The contributing module holds the record, including the exact wording shown, and answers for its erasure.
+- Still true from above: no keys in any event payload; `box-office.order.reserved` is a new deliverable event; desk and phone sales show no consent questions in the first release; an order with no account is never passed to `record`.
+- Rules on a contribution, enforced by the kit's point contract: `record` returns statements only and may not read or commit; a contribution that throws fails the checkout with a plain message, since silently dropping a consent the buyer gave would be worse than asking them to try again.
+- Never-regress cases, replacing the two named above: `consent-recorded-in-the-order-batch`, `consent-recorded-once-for-a-reservation-later-paid`, `consent-keys-never-in-a-payload`, `anonymous-order-records-no-consent`.
+
+## Added 16 November: requirements, and what Front of house asked for
+
+**The point `box-office.eligibility` is withdrawn.** Foundations ruled one point for every per-person condition, `core.requirement`, and no module declares its own. Member pricing (BO-20) now works like this:
+
+- A ticket type holds `requirement_refs`: plain-text references such as `membership:<the type's id>` or `fact:<name>`, chosen from the kit's picker. Box office never reads inside one and holds no foreign key.
+- When a buyer adds that ticket type, and again in the batch that confirms or reserves the order, Box office calls `requirements.check(refs, { account, at, record })` with the performance as the record.
+- **Met:** the type is offered. **Unmet:** it is not sold, and the reason the provider gives is shown. A buyer with no account is unmet and sees "sign in to use this price" where the theatre chooses to show the type at all.
+- **Unavailable** (the providing module is off or absent): see the open point below.
+- A reservation is checked when it is made and its price fixed then. It is not checked again at the desk; staff can change the ticket type there.
+- At the desk a seller with `box-office.ticket-type.override-requirement` may sell the type to someone who is unmet (a member who has not yet been recorded). The override is audited with who allowed it.
+- A concession that depends on proof shown at the door (a student card) is not a requirement. It stays a `proof_note` on the ticket type.
+
+*Open with Foundations:* its ruling says an unavailable requirement is never enforced. For a duty (who may work a shift) that is right. For a price it would hand the member price to everyone the day Membership is switched off. This specification withholds a ticket type whose requirement is unavailable, shows why on the on-sale checklist, and has asked Foundations to allow a host to withhold a benefit in that case.
+
+*Closed the same day:* Foundations withdrew "never enforced". The kit only reports unavailable and the host chooses per use. Withholding the ticket type, and saying why on the on-sale checklist, stands.
+
+**BO-44, scanning on shift.** The ability `box-office.ticket.admit` is mapped to the fact `front-of-house.on-shift` on record type `core.performance`, so a confirmed shift lets a steward scan that performance only. With Front of house off, the ability comes from a role as usual.
+
+**Contributions to Front of house**, declared under `uses`, so they do nothing while that module is absent. Numbers and ids only.
+
+| Point | From | What it gives for a performance |
+| --- | --- | --- |
+| `front-of-house.tonight-figure` | Box office | Sold, reserved and not yet paid, admitted, still to come, remaining capacity |
+| `front-of-house.tonight-figure` | Box office | Ticket takings so far by method (reader, cash, attested card, online), from Payments, which Box office requires |
+| `front-of-house.report-section` | Box office | The same figures as final numbers, plus counts of reservations released unclaimed, complimentary tickets, refunds on the night, and tickets admitted offline and flagged as duplicates |
+| `front-of-house.report-section` | Payments | Till sessions closed on that operating day: expected cash, counted cash, difference, by session id |
+
+Payments does not know what a performance is, so it answers by the performance's operating day (the core's calendar helper); takings by performance come from Box office. Finance contributes nothing: the ledger is not a night report.
+
+**`front-of-house.night-report.signed-off`: not listened to.** Income is recognised on `core.performance.completed`, and a till session closes by its own cash-up. Tying money to a volunteer signing a report would let a forgotten signature hold up the books.
+
+## Added 16 November: the contracts for one payment with several owners
+
+Fixed after the Bar specification's five points. The rules behind them are in part 3, "One payment for tickets and something else".
+
+**The till.** Payments owns a small desk component, the till, which hosts `payments.desk-basket`, shows the one total and takes the payment. Box office's desk screen is the till with Box office's own panel first. Box office contributes to the point on the same terms as any other module, so a theatre with a bar and no box office still has a till, and the contract is proved by its first user.
+
+**`payments.desk-basket` (code point).** A contribution gives:
+
+| Member | Meaning |
+| --- | --- |
+| `id`, `label` | Kebab-case id and the panel's name |
+| `ability` | The ability a seller needs to see and use the panel |
+| `panel` | The component shown in the till |
+| `summary(context)` | Lines and an amount for display. Reads only |
+| `prepare(unit, context)` | Adds to the unit of work whatever makes the sale real but unpaid, and returns `{ owner: { module, record }, amountMinor }` with `amountMinor` above zero. Called in the batch that creates the intent |
+| `release(unit, owner)` | Undoes `prepare`. Must be safe to call twice |
+
+Payments makes one intent with one part per owner. `release` is called for every part when the payment is cancelled, fails for good, or the intent expires; the intent-expiry job is the backstop, so a crash between `prepare` and payment cannot strand stock or seats.
+
+**`payments.settlement` (code point), extended.** A handler's `settle(unit, part)` and `refunded(unit, part, refund)` add their own statements and **return their ledger entries**. Payments writes one sealed posting: the money line, plus every part's entries.
+
+- A part's entries must total exactly that part's amount, or Payments refuses the batch. The seal then checks the whole posting balances.
+- A handler may post only to accounts its own module declared (below).
+- A handler never commits and never calls a provider.
+
+**No partial settlement, in both directions.** If any handler refuses or throws, nothing settles: no tickets, no bar sale, no posting. The attempt's money is real, so the intent becomes unfulfilled and the ordinary unfulfilled-payment path refunds it in full. If the bar's part refuses, the reservation stays reserved; if the tickets' part refuses, the drinks are not sold.
+
+**Refunds are per part, and the abilities are owner-neutral.** `payments.refund.request` and `payments.refund.approve` belong to Payments and say nothing of orders. The owning module decides who may start a refund of its own record with its own ability (`box-office.order.refund` here), then calls Payments with the part. A refund can never exceed its part, and a refund spanning two owners is two refunds, each approved on its own.
+
+**`finance.system-account` (data point).** A module declares the ledger accounts it posts to: `{ key, name, kind }`, where `kind` is income, liability, asset or expense. Finance creates each as a locked account keyed `<module>.<key>`, for example `bar.income`, and a module that requires Finance obtains it with `accountFor('bar.income')`. Box office declares `box-office.ticket-income` and `box-office.deferred-ticket-income` the same way, and Payments its clearing, cash and fee accounts. No module names another's account.
+
+An account belongs to one module. `finance_accounts` gains `module` (internal, keep): set by Finance for a declared account, and chosen by the administrator when they add an account of their own to the chart (for example a snacks income account given to the bar). A handler may post to any account whose `module` is its own, and to no other. So a treasurer shapes the chart, a module offers only its own accounts in its pickers, and still no module can post into another's.
+
+Never-regress cases added to part 8's list by reference: `prepare-without-payment-is-released`, `part-entries-must-total-the-part`, `handler-posts-only-to-its-own-accounts`, with the four multi-part cases already there.
+
+## Added 16 November: what Membership asked for
+
+- **Member pricing.** A ticket type's `requirement_refs` may hold `membership:<scheme id>` or `membership:any`. Box office checks it against the buyer's account when the ticket type is added and again immediately before the batch that confirms or reserves. A reservation is checked when it is made, not when it is paid at the desk weeks later, so someone whose membership lapses in between keeps the price they reserved at. Unavailable withholds the ticket type.
+- **Any module can own a payment.** An intent part's owner is a module and a record, with nothing special about orders, so `membership-fees.charge` is an owner like any other. Online, the owner calls Payments' `collect` with its parts and gets the provider's payment step back. At the desk it contributes a panel to `payments.desk-basket` and is paid inside the seller's till session, alone or beside tickets. Its settlement handler adds its own statements (marking the fee paid) and returns its entries.
+- **Accounts and tax.** `membership-fees.income` is declared through `finance.system-account`. A declaration may name a default tax code; in the first release only the no-tax code exists, so it is the default for everyone.
+- **When income counts is the owner's choice, not Finance's.** Finance has no recognition rule. An owner that returns entries crediting its income account at settlement has recognised the income when paid. An owner that credits a liability account it declared, and later posts the move to income itself, has deferred it. "At the performance" is Box office's rule for tickets and binds nobody else.

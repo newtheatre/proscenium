@@ -365,6 +365,8 @@ The tables about a person carry a `side` column, `audience` or `member`, and dec
 
 Index: `(state, next_attempt_at)`.
 
+The state list also holds `complained`, for a recipient's spam complaint, and `core_notifications` has an index on `(subject_type, subject_id)`. Both were added on 16 November 2026 for the Communications module (part 4), so that no migration is needed when it arrives.
+
 **`core_inbox_items`**: realm from `side`; subject `account_id`; retention `core.notifications.inbox-retention`; not append-only; on erasure the row is deleted; id prefix `inb`.
 
 | Column | Type | Constraints | Class | On erasure | Notes |

@@ -1,6 +1,6 @@
 # 7. Stories
 
-The interface backlog is 34 stories: 24 in the first release (roadmap phases 1 to 3) and 10 later. Each has criteria a test can check. Story ids start `UI-`; the phase is the roadmap phase the story is needed by.
+The interface backlog is 36 stories: 24 in the first release (roadmap phases 1 to 3), 11 later, and one (UI-36) whose release follows the bar's. Each has criteria a test can check. Story ids start `UI-`; the phase is the roadmap phase the story is needed by.
 
 ## First release
 
@@ -66,12 +66,16 @@ The interface backlog is 34 stories: 24 in the first release (roadmap phases 1 t
 | UI-26 | As a site owner I rearrange and rename members' sections | Order, label and hidden state are settings; nothing can be shown to someone without the ability |
 | UI-27 | As a member I see my own history across modules | Shifts, training and credits from whichever modules are on, in one place |
 | UI-28 | As a new member I am welcomed once | A one-time introduction after becoming entitled; never shown again once dismissed |
-| UI-29 | As a trainee I practise live screens safely | Practice mode uses sample data, is marked on every screen, and writes nothing real |
+| UI-29 | As a trainee I practise live screens safely | Practice mode uses sample data, is marked on every screen, and writes nothing real. Owned here with Foundations, not by Training, because it needs none of Training's tables; it covers the desk and the door |
 | UI-30 | As anyone I open help for the screen I am on | The help panel shows that screen's documentation without leaving it |
 | UI-31 | As a reader of another language I choose it | Offered languages are a setting; choice is a preference; dates, numbers and money follow it |
 | UI-32 | As someone using the installed app I get a useful offline page | A page never loaded shows what is available offline instead of a browser error |
 | UI-33 | As a site owner I preview my branding across all shells | One screen shows public, members', console and live in light and dark with contrast figures |
 | UI-34 | As anyone I undo a mistaken bulk action | A bulk action states how many it affects and offers Undo where the module supports it |
+
+**UI-35, added 16 November 2026 at the request of Spaces.** As a module author I show bookings, a rota or sessions with the shared calendar. Criteria: day and week views with several columns; every block shows its state as a word and a border as well as a colour; a List view holds the same items, filters and actions and is fully usable by keyboard and screen reader; colours come only from the eight named calendar colours, which pass contrast in light and dark under any brand. Needed by roadmap phase 4, when Spaces and the Front of house rota arrive, so it is not in the first release.
+
+**UI-36, added 16 November 2026 at the request of Bar.** As a volunteer on a till I type an amount on a keypad made for a touch screen. Criteria: keys are at least 56 by 56 pixels; money mode holds pence and shows pounds and pence; the figure is announced as it changes; a physical keyboard works too; nothing is confirmed until the screen's primary action is pressed. Needed with the bar's first stories: phase 3 if Matt accepts the bar there, otherwise with the bar.
 
 ## Not stories here
 

@@ -15,7 +15,9 @@ Proscenium has three shells, one per relationship a person has with the theatre,
 | Rendered | On the server, for search engines and social cards | In the browser | In the browser |
 | Who may restyle it | The theatre, in its site folder | Nobody; branding only | Nobody; branding only |
 
-&#91;embedded content: W1 · the four frames and the account menu\]
+![W1 · the four frames and the account menu](images/05-1-w1-four-frames-account-menu.png)
+
+*W1 · the four frames and the account menu*
 
 Each frame is recognisable at a glance, which matters most for a person who uses more than one. Larger drawings of each are in the Wireframes sub-tab.
 
@@ -91,6 +93,8 @@ Each shell owns a reserved prefix and everything else belongs to the theatre's o
 | `/console` | Console | `/console/box-office/orders` |
 | `/live` | Live mode | `/live/door` |
 | `/sign-in`, `/setup` | Centred single-task layout |  |
+
+**Which shell a screen belongs to** (ruled 16 November 2026). The shell follows whose business the screen does, never what guards it. A screen where a person deals with their own things belongs in the members' area (or My account, for an audience member) even when an ability guards it. A screen where a person acts on the theatre's behalf, on other people's records or on set-up, belongs in the console. A screen for one job during a performance is a Live page. So the bar's own-tab screen is `/members/bar/tab` and a trainer's own sessions are under `/members/training/teaching`, while the bar's stock and tabs for everyone, and the training programme and everyone's records, are under `/console`. A module whose ability opens a members' screen must also declare a standing for it, so that the members' area opens for its holder.
 
 - Within a shell the next segment is the module, so a module's pages sit together and a module that is switched off takes its whole subtree with it.
 - The prefix decides rendering, caching, security headers and the guard in one route rule each, which is what Part B asks for.

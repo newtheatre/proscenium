@@ -4,7 +4,9 @@ Identity has 31 screens: 9 for getting in, 7 in "My account", 3 in the members' 
 
 ## The header is where the two sides meet
 
-&#91;embedded content: wireframe · the header for an audience member, a member and staff\]
+![wireframe · the header for an audience member, a member and staff](images/06-header-three-people.png)
+
+*wireframe · the header for an audience member, a member and staff*
 
 An audience member's header has no gap, greyed entry or hint where the members' entry would be. On a phone the same entries sit in the menu in the same order.
 
@@ -28,7 +30,9 @@ Public shell. Every screen works on a phone and with a screen reader, and none a
 | Owner recovery | Take the one-time secret and create a passkey for an Owner | Only while the recovery secret is set | First |
 | Confirm it is you | A dialogue, not a page: re-assert with a passkey or the strongest method held, then continue the action | Anyone taking a sensitive action | First |
 
-&#91;embedded content: wireframe · sign in and check your email, on a phone\]
+![wireframe · sign in and check your email, on a phone](images/06-sign-in-phone.png)
+
+*wireframe · sign in and check your email, on a phone*
 
 The second screen is the same whether or not the address has an account. The Google button appears only when the theatre has turned it on.
 
@@ -75,7 +79,9 @@ Console shell. Each row names the ability that shows it.
 | Sign-in settings | Methods, managed domains, session and re-assertion times, generated from the settings registry | `core.identity-settings.manage` | First |
 | Retention | What each sweep would do today; arm or disarm it | `core.identity-settings.manage` | Later |
 
-&#91;embedded content: wireframe · a person's page in the console\]
+![wireframe · a person's page in the console](images/06-person-page-console.png)
+
+*wireframe · a person's page in the console*
 
 Identity draws the left card and the first three sections. The tinted section is the `core.account-section` point, so a module that is switched off leaves nothing behind.
 

@@ -112,7 +112,7 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 
 **FB-302 Fill in and submit.** As a respondent, I want to answer page by page and submit. Needs FB-106, FB-301; workstream 6 for the public and members' shells.
 
-1. Errors are listed at the top with links, and focus moves there.
+1. Errors show beside each field and in a summary at the top with links, and the first invalid field takes focus.
 2. Submission is one unit of work: response, answers, counts, history, audit entry and event are stored together or not at all.
 3. Sending the same submission twice stores one response.
 4. Answers to hidden questions are not stored.

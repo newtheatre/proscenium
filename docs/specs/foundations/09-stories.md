@@ -47,7 +47,7 @@ Thirty-four stories in six groups. Each has an id (F for foundations), who it is
 
 | Id | Story | Accepted when |
 | --- | --- | --- |
-| F-25 | As a theatre I am offered each new release as a pull request with its notes | The update action opens one pull request per release, with the lockfile resolved and checks running |
+| F-25 | As a theatre I am offered each new release as a pull request with its notes | The update action opens one pull request per release, with the lockfile resolved and checks run |
 | F-26 | As a theatre I can change my site freely and still merge releases | A fork that only changed owned paths merges every release with no conflict but the lockfile (Proofs) |
 | F-27 | As a theatre I am told before I break the rule | The owned-path check fails a pull request that edits an upstream file not listed in `site/overrides.json`, naming the file and where the change belongs |
 | F-28 | As an Owner I apply database changes knowingly | After a deploy with pending migrations, visitors see the maintenance page; Apply runs them with progress; a failed migration leaves the database unchanged and says which one |

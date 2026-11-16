@@ -151,6 +151,8 @@ Workstream 6 asked that one workstream own the shape of public components, and p
 
 By the foundations thread's ruling, each of these is a data point that core owns and a module contributes entries to: `core.vocabulary`, `core.file-slot`, `core.notification-type` and `core.notification-topic`. The rule for everyone is that anything one module lets others declare is a point.
 
+**Lane.** A notification type may declare its lane: `prompt`, which is the default, or `bulk`. The job `core.send-notification` queues each send on its type's lane, so a mailing to many people never delays a receipt or a sign-in email. This is a foundations ruling of 16 November 2026, raised by the communications specification.
+
 ### Core's own file slots
 
 | Record type | Slot | Holds | Access | Limit |
@@ -274,3 +276,29 @@ News posts add `date`, `author` (a free name, the theatre's choice to give) and 
 | Workstream 4 | A contributor to `core.booking-action`, `core.change-impact` and `core.change-guard`. Agreement that sale state is Box office's (question 1). Audience messages about cancelled and moved performances. |
 | Workstream 5 | Uses `core_terms` for reusable option lists and `core_files` for uploads, with its own slots and `core.file-access`. |
 | Workstream 6 | The shells read `getBrand()`. The expressive treatment stays in the public shell, as its note says. `/files` joins the reserved prefixes. |
+
+## Agreed for the Communications module
+
+Four requests from the communications specification, accepted on 16 November 2026 on the integrating thread's recommendation. They are built with the Communications release, not before. Only the two small table points at the end are made now, so nothing has to be migrated later.
+
+| Request | What core provides |
+| --- | --- |
+| Content from the owning module | A notification type may declare a resolver. The payload then carries ids only, and core calls the resolver at send time for the subject and body. A mailing's text is therefore stored once, by its module, and never copied into `core_notifications`. A resolver that fails counts as a failed attempt and is retried. |
+| One-click unsubscribe | Core adds the `List-Unsubscribe` and `List-Unsubscribe-Post` headers to every email whose type is not transactional. The target is core's own preference link by default, and a type may supply its own. |
+| Reach and results | Services `emailReachability(accountIds, side)`, which says for each account whether an email would be sent and, if not, a reason code, and `deliveryCounts(subjectType, subjectId)`, which counts deliveries by state for one record. `notify` takes an optional `senderKey`. Two events, both internal and so never sent to webhooks: `core.delivery.bounced` and `core.delivery.complained`, carrying the notification id and the account id. |
+| Audience sources | Core contributes "a production's team" to the point `communications.audience-source`, read from the fact `core.production-team`. "Holders of a role" is the identity module's to contribute, since roles are its records; core does not offer it. |
+
+Table points made now: the delivery state list gains `complained`, and `core_notifications` gains an index on `(subject_type, subject_id)` for the counts.
+
+## Agreed for the Spaces module
+
+Two requests from the spaces specification, accepted on 16 November 2026 on the integrating thread's recommendation. Neither changes a table.
+
+| Request | What core provides |
+| --- | --- |
+| Bookings that give way to a performance | A contribution to `core.space-busy` may mark its times as yielding. Scheduling, rescheduling or moving a performance over yielding times is not refused: the times appear as a warning through `core.change-impact`, and the person confirms. The contributing module then acts on `core.performance.scheduled`, `core.performance.rescheduled`, `core.performance.moved` and `core.closure.created`. Times not marked as yielding refuse, as before. |
+| A check another module can put on its own write | `assertSpaceFree(spaceId, from, to)`, a statement predicate like `assertTerm`. It returns a condition, not an answer: the caller places it on its own conditional insert or update, inside its own batch. The condition is false when a scheduled performance in that space overlaps the times, or when a blocking closure of the space, its venue or the whole theatre does. |
+
+Why the second one is sound. The rule for a contended claim is that the predicate sits on the statement, never in a read made beforehand. `assertSpaceFree` is only ever a fragment of the caller's statement, so it meets the rule, and the database runs one write at a time, so two claims cannot both see the space as free. It reads the existing indexes `(space_id, starts_at)` on performances and `(starts_at, ends_at)` on closures.
+
+The same rule the other way round. When core schedules a performance, a module whose times do not yield must give core a predicate of its own with its `core.space-busy` contribution, which core places on the scheduling statement. A contribution with no predicate can only warn, so it must be marked as yielding. That keeps both directions on the statement and neither on a prior read.

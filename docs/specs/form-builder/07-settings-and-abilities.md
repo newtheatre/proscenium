@@ -31,7 +31,7 @@ Columns follow the foundations format. All are changed by `forms.settings.manage
 
 Notes:
 
-- `forms.retention.default` ships unset, as the paper's rule for a number nobody has agreed. With `require-choice` on, the publisher chooses per form; tab 9 asks Matt whether to ship a default instead.
+- `forms.retention.default` ships unset, as the paper's rule for a number nobody has agreed. With `require-choice` on, the publisher chooses per form. Matt decided on 16 November 2026 that no default ships.
 - Opening and closing dates, caps, one response each and who may answer are not settings. They vary by placement, so they are columns on `forms_placements`, as the settings draft directs.
 - Rate limits on the public routes are declared per route in the platform's own registry, not here.
 - Presets: `student-society` and `amateur-company` take the defaults. `small-venue` sets `forms.review.blind-by-default` to false, since a venue with paid staff seldom runs a panel.
@@ -45,7 +45,7 @@ Notes:
 
 ## Abilities
 
-Scope says where the ability can be granted: the whole site, or one form.
+Scope says where the ability can be granted: the whole site, or one form. The preset holder is given in plain words: The mapping to preset roles was confirmed by the identity specification on 16 November 2026. "Site owner" is its owner role, which holds every ability by rule. "Officers and staff" is its administrator role, since all three abilities so marked change things; the committee-member role is read-only oversight and holds none of them, and a functional role such as membership-officer or production-lead is granted the per-form abilities on the forms that belong to its subject. "Welfare or access lead" is its welfare-lead role, which alone holds read-special in the presets; administrator does not.
 
 | Ability | Scope | Allows | Preset holder |
 | --- | --- | --- | --- |

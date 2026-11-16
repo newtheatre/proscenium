@@ -26,7 +26,9 @@ The wireframes show layout and wording, not visual design; workstream 6 owns the
 | Waiting-list offer | `/book/offer/<token>` | "2 seats are held for you until 6:40 pm" and straight to Check and pay | First |
 | Buy a pass | `/passes` | Season tickets and multi-show passes | Later |
 
-&#91;embedded content: online checkout wireframe · 3 phone screens\]
+![online checkout wireframe · 3 phone screens](images/06-w1-online-checkout-wireframe.png)
+
+*online checkout wireframe · 3 phone screens*
 
 What the three screens must get right:
 
@@ -62,7 +64,9 @@ What the three screens must get right:
 | Sales report | `/console/box-office/reports/sales` | `box-office.report.view` | By performance, ticket type and channel; export | First |
 | Bulk cancellation | reached from the core's cancel flow | `box-office.performance.manage` | The change guard's decision: refund all, offer exchange, or keep | First |
 
-&#91;embedded content: desk sale wireframe · 1 tablet screen\]
+![desk sale wireframe · 1 tablet screen](images/06-w2-desk-sale-wireframe.png)
+
+*desk sale wireframe · 1 tablet screen*
 
 What the desk must get right:
 
@@ -75,7 +79,9 @@ What the desk must get right:
 
 ## Console shell: the door
 
-&#91;embedded content: door scanning wireframe · 3 phone states\]
+![door scanning wireframe · 3 phone states](images/06-w3-door-scanning-wireframe.png)
+
+*door scanning wireframe · 3 phone states*
 
 What the door must get right:
 
@@ -119,13 +125,17 @@ Each screen above is specified with its empty, loading, error and refused states
 
 This is the screen for reserve now, pay on arrival (part 3). It lives in the console shell on a laptop, as Interface's journey 3 "Sell at the desk" does, and is the same desk screen with a reservation loaded into it. The figures are examples.
 
-&#91;embedded content: Desk · collecting a reservation, with bar items in the same payment\]
+![Desk · collecting a reservation, with bar items in the same payment](images/06-w4-desk-collecting-a-reservation.png)
+
+*Desk · collecting a reservation, with bar items in the same payment*
 
 The right-hand panel is where another module adds its lines through `payments.desk-basket`; with no such module switched on, the panel shows only the amount to pay. If the reader gives no answer the screen stays on this reservation as awaiting payment and offers Check again and Cancel; another method is offered only once the first attempt is known to have failed, so nobody pays twice.
 
 For the buyer, reserving is the ordinary checkout with a different ending. The pay step is replaced by Reserve, and the email confirmation screen appears only when that setting is on and the buyer is not signed in.
 
-&#91;embedded content: Public checkout · the last three screens when the theatre takes payment on arrival\]
+![Public checkout · the last three screens when the theatre takes payment on arrival](images/06-w5-public-checkout-pay-on-arrival.png)
+
+*Public checkout · the last three screens when the theatre takes payment on arrival*
 
 The "collect by" line appears only when the theatre has set a release time, and quotes it from the setting.
 

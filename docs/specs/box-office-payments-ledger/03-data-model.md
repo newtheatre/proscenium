@@ -115,6 +115,8 @@ A priced part of the house for one production: "Stalls", "Balcony", "Wheelchair 
 
 ### `box_office_ticket_types` (plain)
 
+*Changed 16 November:* the `eligibility` column below is replaced by `requirement_refs` (text, internal, keep): a list of plain-text requirement references such as `membership:<the type's id>`, checked through the kit's `requirements.check`. The point `box-office.eligibility` no longer exists. See the end of part 4.
+
 Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so reports compare like with like across productions.
 
 | Column | Type | Constraints | Class | On erasure |
@@ -214,6 +216,8 @@ The buyer's name, email and phone live on their account (workstream 2), not here
 **An order with no account** is valid in exactly one case: a desk sale where the buyer gave no details (integration ruling, 16 November). Such an order holds no personal data, so it has no erasure or merge duties, and it can have no access note. The online and phone paths can never create one. Enforced by `CHECK (account_id IS NOT NULL OR state IN ('basket', 'expired') OR (channel = 'desk' AND access_note IS NULL))`, and by the never-regress case `online-order-always-has-an-account` in part 8.
 
 **Reserved orders** (added 16 November, see part 3). `state` gains the value `reserved`: seats claimed, nothing paid. Three columns are added to `box_office_orders`: `desk_code_hash` (internal; the code a buyer shows at the desk, stored hashed like the link token), `release_at` (internal; when the release job may expire it, null for never) and `keep` (internal; staff asked for it not to be released). A reserved order always has an account, because `reserved` cannot be anonymous: someone must be told and found again. The desk clause of the CHECK above gains AND state <> 'reserved' to enforce it. `box_office_performance_sales` gains `payment_timing` (public; null means the theatre's setting). No new table.
+
+**Checkout consent** (16 November, see part 4). The order stores nothing about consent. The module that contributes a consent question also supplies the statements that record the answer, and Box office adds them to the batch that confirms or reserves the order. A `checkout_consent_keys` column was drafted earlier the same day and withdrawn: it would have kept a second copy of personal data that Communications already holds.
 
 ### `box_office_order_lines` (guarded)
 

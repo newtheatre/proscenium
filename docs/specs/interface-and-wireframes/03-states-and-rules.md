@@ -4,7 +4,38 @@ The interface has four life cycles of its own: which shell a request reaches, th
 
 ## Which shell a request reaches
 
-&#91;embedded content: How a request reaches a shell, or is refused\]
+```mermaid
+flowchart TD
+    c1["Does the address have a reserved prefix?"]
+    c2["Is the module switched on?"]
+    c3["Signed in, if this shell needs it?"]
+    c4["Entitled to this shell?"]
+    c5["Entitled to this screen?"]
+    c6["Is a second factor needed and missing?"]
+    done["The page renders in the prefix's shell"]
+    donen["The menu marks the matching entry as current."]
+    o1["Public shell: the theatre's own page, or not found"]
+    o2["Not found, exactly as if it never existed"]
+    o3["Sign-in, then straight back to this address"]
+    o4["Not found, exactly as a missing page answers"]
+    o5["Refusal inside the shell: why, and what would help"]
+    o6["The screen asks for it in place, then carries on"]
+    c1 -- yes --> c2
+    c1 -- no --> o1
+    c2 -- yes --> c3
+    c2 -- no --> o2
+    c3 -- yes --> c4
+    c3 -- no --> o3
+    c4 -- yes --> c5
+    c4 -- no --> o4
+    c5 -- yes --> c6
+    c5 -- no --> o5
+    c6 -- no --> done
+    c6 -- yes --> o6
+    done -.- donen
+```
+
+*How a request reaches a shell, or is refused*
 
 | Step | Rule |
 | --- | --- |
@@ -22,7 +53,35 @@ The interface has four life cycles of its own: which shell a request reaches, th
 
 ## The state of a page's data
 
-&#91;embedded content: The states of a page's data\]
+```mermaid
+stateDiagram-v2
+    direction LR
+    Loading
+    Ready
+    Empty
+    Refused
+    Failed
+    Refreshing
+    Stale
+    Loading --> Ready
+    Loading --> Empty
+    Loading --> Refused
+    Loading --> Failed
+    Empty --> Ready: data appears
+    Failed --> Loading: retry
+    Ready --> Refreshing: reload, filter or save
+    Refreshing --> Ready: new answer
+    Refreshing --> Stale: refresh fails
+    Stale --> Refreshing: retry
+    note right of Stale
+        Refused and Failed replace the whole page body.
+        Stale needs data that was once ready.
+        Refreshing and Stale keep the data on screen.
+        A refresh never moves the person.
+    end note
+```
+
+*The states of a page's data*
 
 | State | What is on screen | Leaves when |
 | --- | --- | --- |
@@ -41,7 +100,31 @@ The interface has four life cycles of its own: which shell a request reaches, th
 
 ## A write made on a live screen
 
-&#91;embedded content: The life of a queued write\]
+```mermaid
+stateDiagram-v2
+    direction LR
+    Act
+    Queued
+    Sending
+    Confirmed
+    Stuck
+    Refused
+    Dismissed
+    Act --> Queued: at once
+    Queued --> Sending: when connected
+    Sending --> Queued: no answer#colon; retry
+    Sending --> Confirmed: applied
+    Queued --> Stuck: unsent 30 minutes
+    Sending --> Refused: the server said no
+    Refused --> Dismissed: seen
+    note right of Dismissed
+        Every act carries a key made on the device, so an act sent twice is applied once.
+        A refused act is never retried, and is reported to its module's exception list.
+        A stuck act is still retried#59; it is shown on the status strip so a person knows.
+    end note
+```
+
+*The life of a queued write*
 
 | Change | Rule |
 | --- | --- |
@@ -87,4 +170,4 @@ The interface has four life cycles of its own: which shell a request reaches, th
 | Shift later today, window not open | No | No; members' home shows it as a card | Where they started |
 | Neither | No | No | Where they started |
 
-The window, and the grace either side of it, are owned by the `front-of-house` module, which is specified in the later round; the values here are this document's assumption until then. The on-shift bar is a contribution to a core point, so when that module is off the bar is simply absent. Whether someone is a member now is workstream 2's fact to name. Every screen reads the one answer, so no two screens can disagree about whether someone is on shift.
+The window, and the grace either side of it, are owned by the `front-of-house` module, which is specified in the later round; the values here are this document's assumption until then. Front of house sets the window to open 30 minutes before call time and close 60 minutes after the shift ends, both settings. The on-shift bar is a contribution to the point `core.on-shift-bar` (a performance id, a label key with its parameters, and an until time), so when that module is off the bar is simply absent. Tonight is one surface with one name on screen: modules contribute tiles and sections to it through `core.tonight-tile`, each naming an ability exactly as a navigation entry does, and front of house's board is its section of Tonight, not a second screen. A queued act that arrives after the window closes is refused with `front-of-house.shift-ended`, which is the Refused state above: shown, reported and never retried. Whether someone is a member now is workstream 2's fact to name. Every screen reads the one answer, so no two screens can disagree about whether someone is on shift.

@@ -21,7 +21,20 @@ The rules behind each step (prices, holds, eligibility, refunds) belong to the w
 
 The target: from a production page to a confirmed ticket in under two minutes on a phone, without creating an account.
 
-&#91;embedded content: Buying a ticket as a guest\]
+```mermaid
+flowchart LR
+    s1["Production page"] --> s2["Choose tickets"] --> s3["Your details"] --> s4["Payment page"] --> s5["Confirmation"]
+    s2n(["the hold starts"]) -.- s2
+    s3n(["no account needed"]) -.- s3
+    s4n(["the provider's own"]) -.- s4
+    s5n(["tickets by email too"]) -.- s5
+    s2 --> x1["Not enough seats<br/>Says so and offers other dates"]
+    s3 --> x2["The hold runs out<br/>Back to Choose tickets, with why"]
+    s4 --> x3["Payment fails or is abandoned<br/>Back to Your details, hold kept"]
+    n1["Every exit says what happened and keeps what was typed.<br/>What happens between payment and confirmation belongs to the box office workstream."]
+```
+
+*Buying a ticket as a guest*
 
 1. **Production page.** Dates are listed with availability in words ("Good availability", "Last few", "Sold out"). One button: Book tickets.
 2. **Choose a performance**, if there is more than one. Skipped when the visitor came from a specific date.

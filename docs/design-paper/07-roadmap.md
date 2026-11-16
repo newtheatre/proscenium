@@ -31,3 +31,5 @@ Allocated seating sits in phase 6 because NNT sells unreserved seats, but the se
 - [ ] Ask two or three other theatres what would stop them adopting it
 
 The repository now exists as MattA-Official/proscenium. A real deploy on 16 November confirmed that the deploy button creates the database, bucket, key-value store and queue with nothing typed. Durable Object and dead-letter queue creation are left to check in the build.
+
+**Amendment, 16 November 2026.** Phase 3 grows by two pieces. Front of house's four gate stories (FH-01 to FH-04, the facts that say who is on shift tonight) join it because desk authority rests on them. Ten bar stories (BAR-01 to 05, 10 to 12, 14 and 22: prices, the till, the desk panel and income) join it straight after Box office's desk stories BO-30 to BO-36, by Matt's decision, so one card-reader payment covers tickets and drinks from the first release of the box office. The rest of the bar follows in the next phase. The foundation kit is built and up for review, and phase 1 building (identity, core domain, interface components) began the same day.
