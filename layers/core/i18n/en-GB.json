@@ -121,6 +121,8 @@
   "core.settings.privacy.cooling-off.help": "The wait between somebody confirming an erasure and it running. They can cancel during it.",
   "core.settings.privacy.respond-within.label": "Answer data requests within",
   "core.settings.privacy.respond-within.help": "The date by which a data request should be answered. Set this to what your own law requires.",
+  "core.settings.privacy.export-lifetime.label": "Keep a data download for",
+  "core.settings.privacy.export-lifetime.help": "How long a person's download of their data is kept after it is made. It is removed after this.",
   "core.settings.privacy.contact.label": "Privacy contact",
   "core.settings.privacy.contact.help": "Who to contact about personal data. Erasure is not offered until this is set.",
   "core.settings.rules.idle-within-lifetime": "The unused time limit cannot be longer than the longest time a browser stays signed in.",
