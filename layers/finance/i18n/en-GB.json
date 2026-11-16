@@ -1,0 +1,25 @@
+{
+  "finance.module.name": "Finance",
+  "finance.module.description": "The ledger: every sale, refund, fee and payout as a balanced, sealed posting, with periods a treasurer closes.",
+  "finance.navigation.groups.finance.label": "Finance",
+
+  "finance.settings-sections.periods": "Accounting periods",
+  "finance.settings-sections.year": "Financial year",
+  "finance.settings-sections.tax": "Tax",
+  "finance.settings.periods.length.label": "Length of a period",
+  "finance.settings.periods.length.help": "How long each accounting period runs. Periods follow on from one another, so a change applies from the next period that is made.",
+  "finance.settings.periods.length.options.month": "A month",
+  "finance.settings.periods.length.options.quarter": "A quarter",
+  "finance.settings.year.starts.label": "First day of the financial year",
+  "finance.settings.year.starts.help": "A month and a day, such as 08-01 for 1 August. Periods start on this day of the month. This is Finance's own date and is not the committee year end.",
+  "finance.settings.tax.registered.label": "Charges tax on sales",
+  "finance.settings.tax.registered.help": "Whether the theatre is registered to charge tax, such as VAT. Not supported yet: it must stay off in this release.",
+  "finance.settings.rules.tax-not-yet": "Charging tax on sales is not supported yet, so this must stay off.",
+
+  "finance.abilities.ledger.view.label": "See the ledger",
+  "finance.abilities.posting.correct.label": "Reverse a posting to correct a mistake",
+  "finance.abilities.account.manage.label": "Rename, recode and add ledger accounts",
+  "finance.abilities.period.close.label": "Close an accounting period",
+  "finance.abilities.period.reopen.label": "Reopen a closed accounting period",
+  "finance.abilities.settings.manage.label": "Change finance settings"
+}
