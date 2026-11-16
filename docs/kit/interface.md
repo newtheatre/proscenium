@@ -33,18 +33,18 @@ to `core.navigation-group`:
 contributes: {
   'core.navigation-group': [{ id: 'gallery', icon: 'i-lucide-layout-grid', after: 'box-office' }],
   'core.navigation': [
-    { id: 'gallery.list', shell: 'console', group: 'gallery', section: 'everyday',
+    { id: 'gallery.list', menu: 'console', group: 'gallery', section: 'everyday',
       to: '/console/gallery/list', icon: 'i-lucide-list', ability: 'gallery.sample.view', order: 10 },
   ],
 }
 ```
 
-- The console's platform groups (Tonight to Site settings) are declared by core, in a fixed order.
+- The console's platform groups (Tonight to System) are declared by core, in a fixed order.
   A theatre's own group says `before` or `after` one of them.
 - `section` is `everyday` or `setup`; everyday entries come first in a group.
 - An entry shows only to someone holding one of its abilities (or any signed-in person, for an
   account entry with none). `match` widens the addresses an entry covers.
-- A module with settings gets an entry for its generated settings page without declaring one.
+- A module with settings gets an entry for its generated settings page without declaring one. It sits in the set-up half of the module's own group (the group of its first console entry, or one named for the module), at `/console/<module>/settings`, so a module that is off takes its settings page with it.
 - Labels are translated: `<module>.navigation.<name>.label` for an entry,
   `<module>.navigation.groups.<id>.label` for a group, `<module>.settings-sections.<group>` for a
   heading on the settings page. `bun run check:conformance` fails for a missing key, an unused one,
@@ -69,7 +69,7 @@ can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the
 actor: `{ signedIn, name?, sides, navigation }`. Components only read that, never a role or an
-ability. Sign-out posts to `/sign-in/out`; the sign-in page is read with `?next=`.
+ability. Sign-out posts `{}` to `/api/core/sign-out`; the sign-in page is read with `?next=`.
 
 ## Testing it
 

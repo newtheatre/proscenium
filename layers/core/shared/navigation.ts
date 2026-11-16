@@ -13,13 +13,14 @@ export const SHELL_PREFIXES: Record<ShellName, string> = {
 
 /** The console's groups in the fixed order that does not vary by viewer. */
 export const CONSOLE_GROUP_ORDER = [
-  'tonight', 'box-office', 'front-of-house', 'bar', 'spaces', 'training', 'membership',
-  'people', 'money', 'communications', 'forms', 'reports', 'site-settings',
+  'tonight', 'programme', 'box-office', 'front-of-house', 'bar', 'spaces', 'training', 'membership',
+  'people', 'money', 'communications', 'forms', 'reports', 'system',
 ] as const
 
 export interface NavigationEntry {
   id: string
-  shell: ShellName
+  /** Which of the three shells, or live mode, shows it. */
+  menu: ShellName
   to: string
   icon: string
   ability?: string | string[]
@@ -27,6 +28,8 @@ export interface NavigationEntry {
   group?: string
   section?: 'everyday' | 'setup'
   count?: string
+  /** Hide the entry while its count is zero (needs count; a count not yet loaded counts as zero). */
+  hideEmpty?: boolean
   match?: string
 }
 

@@ -22,9 +22,10 @@ export default defineModule({
   points,
   contributes: {
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
-    // Site settings holds every module's generated settings page.
+    // System holds core's own screens; each module's settings page sits in the module's own group.
     'core.navigation-group': [
       { id: 'tonight', icon: 'i-lucide-moon-star' },
+      { id: 'programme', icon: 'i-lucide-calendar-days' },
       { id: 'box-office', icon: 'i-lucide-ticket' },
       { id: 'front-of-house', icon: 'i-lucide-door-open' },
       { id: 'bar', icon: 'i-lucide-wine' },
@@ -36,7 +37,7 @@ export default defineModule({
       { id: 'communications', icon: 'i-lucide-mail' },
       { id: 'forms', icon: 'i-lucide-file-text' },
       { id: 'reports', icon: 'i-lucide-chart-column' },
-      { id: 'site-settings', icon: 'i-lucide-settings' },
+      { id: 'system', icon: 'i-lucide-settings' },
     ],
   },
 

@@ -15,8 +15,8 @@ export interface DeclaredEntry extends NavigationEntry {
   label?: string
 }
 
-/** The console group that holds every generated settings page. */
-export const SETTINGS_GROUP = 'site-settings'
+/** Core's own screens (modules, settings, jobs, credentials, health, audit) sit in the System group. */
+export const SYSTEM_GROUP = 'system'
 
 /** Every entry of every module that is on, plus a generated settings entry for each module with settings. */
 export async function declaredEntries(): Promise<DeclaredEntry[]> {
@@ -29,15 +29,17 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
     changers.set(module, (changers.get(module) ?? new Set()).add(entry.change))
   }
   for (const [module, abilities] of changers) {
+    // A module's settings page sits in the set-up half of the module's own group.
+    const own = out.find(e => e.module === module && e.menu === 'console' && e.group)?.group
     out.push({
       id: `${module}.settings`,
       module,
       label: `${module}.module.name`,
-      shell: 'console',
+      menu: 'console',
       to: `/console/${module}/settings`,
       icon: 'i-lucide-settings-2',
       ability: [...abilities],
-      group: SETTINGS_GROUP,
+      group: module === 'core' ? SYSTEM_GROUP : own ?? module,
       section: 'setup',
       order: module === 'core' ? 0 : 100, // not-policy: sort position, core's settings first
     })
@@ -71,7 +73,7 @@ export async function mayOpen(actor: Actor, entry: Pick<NavigationEntry, 'abilit
 export async function allowedEntries(actor: Actor, shell: ShellName): Promise<DeclaredEntry[]> {
   const out: DeclaredEntry[] = []
   for (const entry of await declaredEntries()) {
-    if (entry.shell !== shell) continue
+    if (entry.menu !== shell) continue
     if (holds(await mayOpen(actor, entry))) out.push(entry)
   }
   return out

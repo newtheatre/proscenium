@@ -95,7 +95,7 @@ for (const scheme of ['light', 'dark'] as const) {
       const nav = page.getByRole('navigation', { name: 'Console' })
       const text = await nav.innerText()
       expect(text.indexOf('Gallery')).toBeGreaterThan(-1)
-      expect(text.indexOf('Gallery')).toBeLessThan(text.indexOf('Site settings'))
+      expect(text).not.toContain('System') // core's own screens are not theirs to open
       expect(text.indexOf('Everyday')).toBeLessThan(text.indexOf('Set up'))
       expect(text).not.toContain('Administration') // the entry they cannot open is not greyed, it is absent
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)

@@ -9,7 +9,7 @@ export const points = {
     kind: 'data',
     schema: z.object({
       id: z.string(),
-      shell: z.enum(['account', 'members', 'console', 'live']),
+      menu: z.enum(['account', 'members', 'console', 'live']),
       to: z.string().startsWith('/'),
       icon: z.string(),
       ability: ability.optional(),

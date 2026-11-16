@@ -30,10 +30,10 @@ describe('shells and entries (UI-08)', () => {
   })
 
   it('keeps the platform groups in their fixed order and places a theatre group where it asks', () => {
-    const ordered = orderGroups([{ id: 'reports' }, { id: 'box-office' }, { id: 'tonight' }, { id: 'rehearsals', after: 'box-office' }, { id: 'spare', before: 'absent-group' }, { id: 'site-settings' }])
+    const ordered = orderGroups([{ id: 'reports' }, { id: 'box-office' }, { id: 'tonight' }, { id: 'rehearsals', after: 'box-office' }, { id: 'spare', before: 'absent-group' }, { id: 'system' }])
     expect(ordered.map(g => g.id).slice(0, 4)).toEqual(['tonight', 'box-office', 'rehearsals', 'reports'])
     expect(ordered.at(-1)?.id).toBe('spare')
-    expect(ordered.at(-2)?.id).toBe('site-settings')
+    expect(ordered.at(-2)?.id).toBe('system')
   })
 
   it('places a theatre group after a platform group the viewer has nothing in', () => {

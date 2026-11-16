@@ -24,12 +24,12 @@ export default defineModule({
   contributes: {
     'core.navigation-group': [{ id: 'gallery', icon: 'i-lucide-layout-grid', after: 'box-office' }],
     'core.navigation': [
-      { id: 'gallery.list', shell: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/list', icon: 'i-lucide-list', ability: 'gallery.sample.view', order: 10 },
-      { id: 'gallery.form', shell: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/form', icon: 'i-lucide-square-pen', ability: 'gallery.sample.view', order: 20 },
-      { id: 'gallery.steps', shell: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/steps', icon: 'i-lucide-footprints', ability: 'gallery.sample.view', order: 30 },
-      { id: 'gallery.feedback', shell: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/feedback', icon: 'i-lucide-message-square', ability: 'gallery.sample.view', order: 40 },
-      { id: 'gallery.denied', shell: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/denied', icon: 'i-lucide-lock', ability: 'gallery.sample.admin', order: 50 },
-      { id: 'gallery.account', shell: 'account', to: '/account/gallery', icon: 'i-lucide-ticket', order: 10 },
+      { id: 'gallery.list', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/list', icon: 'i-lucide-list', ability: 'gallery.sample.view', order: 10 },
+      { id: 'gallery.form', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/form', icon: 'i-lucide-square-pen', ability: 'gallery.sample.view', order: 20 },
+      { id: 'gallery.steps', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/steps', icon: 'i-lucide-footprints', ability: 'gallery.sample.view', order: 30 },
+      { id: 'gallery.feedback', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/feedback', icon: 'i-lucide-message-square', ability: 'gallery.sample.view', order: 40 },
+      { id: 'gallery.denied', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/denied', icon: 'i-lucide-lock', ability: 'gallery.sample.admin', order: 50 },
+      { id: 'gallery.account', menu: 'account', to: '/account/gallery', icon: 'i-lucide-ticket', order: 10 },
     ],
   },
 })

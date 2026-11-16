@@ -23,7 +23,7 @@ export async function decideAccess(actor: Actor, path: string): Promise<AccessDe
     if (!isSignedIn(actor)) return { decision: 'sign-in' }
     return (await isEntitled(actor, shell)) ? { decision: 'allow' } : { decision: 'not-found' }
   }
-  const entries = (await declaredEntries()).filter(e => e.shell === shell)
+  const entries = (await declaredEntries()).filter(e => e.menu === shell)
   const entry = resolveEntry(entries, path)
   if (!entry) return { decision: 'not-found' }
   if (!isSignedIn(actor)) return { decision: 'sign-in' }

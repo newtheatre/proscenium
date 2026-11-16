@@ -118,6 +118,9 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
     const contributed = (point: string) => ((m.manifest.contributes ?? {}) as Record<string, any[]>)[point] ?? []
     for (const entry of contributed('core.navigation')) if (!entry.label) need(entryLabelKey(entry.id), 'the navigation entry\'s label')
     for (const group of contributed('core.navigation-group')) need(groupLabelKey(id, group.id), 'the navigation group\'s label')
+    // A module with settings and no group of its own gets one named for it, which needs a label.
+    const hasSettings = [...(registry.settings as Map<string, any>).values()].some(s => s.module === id)
+    if (hasSettings && id !== 'core' && !contributed('core.navigation-group').length && !contributed('core.navigation').some((e: any) => e.group)) need(groupLabelKey(id, id), 'the label of the console group its settings page sits in')
     const sections = new Set<string>()
     for (const [key, { module }] of registry.settings as Map<string, any>) if (module === id) sections.add(key.slice(id.length + 1).split('.')[0]!)
     for (const section of sections) need(`${id}.settings-sections.${section}`, 'the heading of a group of settings on the generated settings page')

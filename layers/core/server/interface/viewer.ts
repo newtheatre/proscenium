@@ -31,7 +31,7 @@ export async function isMember(actor: Actor): Promise<boolean> {
 export async function holdsConsole(actor: Actor): Promise<boolean> {
   for (const entry of await declaredEntries()) {
     // An entry that names no ability grants no entitlement: it is open to whoever is in the shell.
-    if (entry.shell === 'console' && abilityList(entry.ability).length && holds(await mayOpen(actor, entry))) return true
+    if (entry.menu === 'console' && abilityList(entry.ability).length && holds(await mayOpen(actor, entry))) return true
   }
   return false
 }

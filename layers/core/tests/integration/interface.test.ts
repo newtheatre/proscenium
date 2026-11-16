@@ -68,9 +68,10 @@ describe('navigation and the viewer', () => {
     const body = await (await call(handle, 'GET', '/api/core/navigation?shell=console', { actor: staff() })).json() as { groups: { id: string, everyday: { id: string }[], setup: { id: string }[] }[] }
     const ids = body.groups.map(g => g.id)
     expect(ids).toContain('gallery')
-    expect(ids.indexOf('gallery')).toBeLessThan(ids.indexOf('site-settings'))
+    expect(ids).not.toContain('system') // nothing of core's is theirs to open
     const gallery = body.groups.find(g => g.id === 'gallery')!
     expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.form', 'gallery.feedback'])
+    expect(gallery.setup.map(e => e.id)).toEqual(['gallery.steps', 'gallery.settings']) // its settings page sits in its own group
     expect(gallery.setup.map(e => e.id)).not.toContain('gallery.denied')
   })
 
@@ -82,7 +83,7 @@ describe('navigation and the viewer', () => {
   it('leaves out an entry the viewer may not open, and with it its group', async () => {
     const body = await (await call(handle, 'GET', '/api/core/navigation?shell=console', { actor: person(['gallery.sample.view']) })).json() as { groups: { id: string, setup: { id: string }[] }[] }
     expect(body.groups.find(g => g.id === 'gallery')?.setup.map(e => e.id)).toEqual(['gallery.steps'])
-    expect(body.groups.map(g => g.id)).not.toContain('site-settings')
+    expect(body.groups.map(g => g.id)).not.toContain('system')
   })
 
   it('describes a signed-out visitor, an audience account and console staff', async () => {
