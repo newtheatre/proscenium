@@ -1,11 +1,59 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f22e8fb2-4a60-49c0-9848-f5bad5cd31b1",
+  "id": "7bf643ec-a253-4611-b18d-84a77f1eceb0",
   "prevIds": [
-    "72915642-ab35-49e0-9a0f-931c9b6c8ac8"
+    "0ec6aec9-cd36-4422-bfd9-aa6932e41e9c"
   ],
   "ddl": [
+    {
+      "name": "box_office_bands",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_cancellations",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_claims",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_holds",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_order_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_orders",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_performance_sales",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_pools",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_prices",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_scans",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_ticket_types",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_tickets",
+      "entityType": "tables"
+    },
     {
       "name": "core_access_profiles",
       "entityType": "tables"
@@ -289,6 +337,1446 @@
     {
       "name": "payments_webhook_events",
       "entityType": "tables"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'standard'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "displaces_band_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "displaces_units",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "2",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "order_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "line_ids",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "refund_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "fee_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "pool_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "seat_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "hold_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "displaced_for_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "released_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "release_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "order_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "held_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "order_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "band_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "ticket_type_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "claim_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "list_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "discount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "promo_redemption_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "pass_redemption_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "comp_request_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'live'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "replaces_line_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "reference",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "channel",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "signed_in",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "access_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "total_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "sold_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "session_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "intent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "link_token_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "desk_code_hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "expires_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "extended_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "release_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "keep",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "confirmed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "cancelled_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "seating",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'general'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "plan_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "on_sale_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "off_sale_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "max_per_order",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "hold_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "payment_timing",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "change_decision",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "change_decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "change_decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "band_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "capacity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "claimed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "over_venue_confirmed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "band_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "ticket_type_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "effective_from",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "set_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "ticket_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "result",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "unchecked",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "scanned_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "device_label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "scanned_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "received_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "offline",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'standard'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "requirement_refs",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "recheck_at_entry",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "max_per_holder",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "proof_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "needs_paid_ticket",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "order_line_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "code_hash",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "key_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'valid'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "void_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "attendee_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "admitted_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "requirement_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "requirement_account_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "requirement_evidence_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
     },
     {
       "table": "core_access_profiles",
@@ -6841,6 +8329,426 @@
       "entityType": "columns"
     },
     {
+      "table": "box_office_bands",
+      "name": "box_office_bands_name",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "box_office_cancellations_order",
+      "columns": [
+        {
+          "value": "order_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_one_live_per_seat",
+      "columns": [
+        {
+          "value": "pool_id",
+          "isExpression": false
+        },
+        {
+          "value": "seat_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "seat_id IS NOT NULL AND state IN ('held', 'confirmed')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_pool",
+      "columns": [
+        {
+          "value": "pool_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_hold",
+      "columns": [
+        {
+          "value": "hold_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "box_office_holds_order",
+      "columns": [
+        {
+          "value": "order_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "order_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_order",
+      "columns": [
+        {
+          "value": "order_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "performance_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_claim",
+      "columns": [
+        {
+          "value": "claim_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "claim_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_reference",
+      "columns": [
+        {
+          "value": "reference",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_link",
+      "columns": [
+        {
+          "value": "link_token_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "link_token_hash IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_desk_code",
+      "columns": [
+        {
+          "value": "desk_code_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "desk_code_hash IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "account_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_expiring",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_releasing",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "release_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_due",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "on_sale_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "box_office_pools_band",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "band_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "box_office_prices_lookup",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        },
+        {
+          "value": "band_id",
+          "isExpression": false
+        },
+        {
+          "value": "ticket_type_id",
+          "isExpression": false
+        },
+        {
+          "value": "effective_from",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "box_office_scans_ticket",
+      "columns": [
+        {
+          "value": "ticket_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "ticket_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "box_office_scans_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "received_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "box_office_ticket_types_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_code",
+      "columns": [
+        {
+          "value": "code_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_line",
+      "columns": [
+        {
+          "value": "order_line_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_one_valid",
+      "columns": [
+        {
+          "value": "order_line_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state = 'valid'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_performance",
+      "columns": [
+        {
+          "value": "performance_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_account_emails",
       "name": "core_account_emails_address",
       "columns": [
@@ -8415,6 +10323,321 @@
       "entityType": "indexes"
     },
     {
+      "table": "box_office_bands",
+      "name": "fk_box_office_bands_displaces_band_id_box_office_bands_id_fk",
+      "columns": [
+        "displaces_band_id"
+      ],
+      "tableTo": "box_office_bands",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "fk_box_office_cancellations_order_id_box_office_orders_id_fk",
+      "columns": [
+        "order_id"
+      ],
+      "tableTo": "box_office_orders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "fk_box_office_cancellations_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "fk_box_office_cancellations_refund_id_payments_refunds_id_fk",
+      "columns": [
+        "refund_id"
+      ],
+      "tableTo": "payments_refunds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "fk_box_office_claims_pool_id_box_office_pools_id_fk",
+      "columns": [
+        "pool_id"
+      ],
+      "tableTo": "box_office_pools",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "fk_box_office_claims_hold_id_box_office_holds_id_fk",
+      "columns": [
+        "hold_id"
+      ],
+      "tableTo": "box_office_holds",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "fk_box_office_claims_displaced_for_id_box_office_claims_id_fk",
+      "columns": [
+        "displaced_for_id"
+      ],
+      "tableTo": "box_office_claims",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "fk_box_office_holds_order_id_box_office_orders_id_fk",
+      "columns": [
+        "order_id"
+      ],
+      "tableTo": "box_office_orders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "fk_box_office_order_lines_order_id_box_office_orders_id_fk",
+      "columns": [
+        "order_id"
+      ],
+      "tableTo": "box_office_orders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "fk_box_office_order_lines_band_id_box_office_bands_id_fk",
+      "columns": [
+        "band_id"
+      ],
+      "tableTo": "box_office_bands",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "fk_box_office_order_lines_ticket_type_id_box_office_ticket_types_id_fk",
+      "columns": [
+        "ticket_type_id"
+      ],
+      "tableTo": "box_office_ticket_types",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "fk_box_office_order_lines_claim_id_box_office_claims_id_fk",
+      "columns": [
+        "claim_id"
+      ],
+      "tableTo": "box_office_claims",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "fk_box_office_order_lines_replaces_line_id_box_office_order_lines_id_fk",
+      "columns": [
+        "replaces_line_id"
+      ],
+      "tableTo": "box_office_order_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "fk_box_office_orders_session_id_payments_sessions_id_fk",
+      "columns": [
+        "session_id"
+      ],
+      "tableTo": "payments_sessions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "fk_box_office_orders_intent_id_payments_intents_id_fk",
+      "columns": [
+        "intent_id"
+      ],
+      "tableTo": "payments_intents",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "fk_box_office_pools_band_id_box_office_bands_id_fk",
+      "columns": [
+        "band_id"
+      ],
+      "tableTo": "box_office_bands",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "fk_box_office_prices_band_id_box_office_bands_id_fk",
+      "columns": [
+        "band_id"
+      ],
+      "tableTo": "box_office_bands",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "fk_box_office_prices_ticket_type_id_box_office_ticket_types_id_fk",
+      "columns": [
+        "ticket_type_id"
+      ],
+      "tableTo": "box_office_ticket_types",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "fk_box_office_scans_ticket_id_box_office_tickets_id_fk",
+      "columns": [
+        "ticket_id"
+      ],
+      "tableTo": "box_office_tickets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "fk_box_office_scans_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "fk_box_office_tickets_order_line_id_box_office_order_lines_id_fk",
+      "columns": [
+        "order_line_id"
+      ],
+      "tableTo": "box_office_order_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_account_merge_items",
       "name": "fk_core_account_merge_items_merge_id_core_account_merges_id_fk",
       "columns": [
@@ -9349,6 +11572,114 @@
       "entityType": "pks"
     },
     {
+      "table": "box_office_bands",
+      "name": "box_office_bands_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "box_office_cancellations_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "box_office_holds_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "box_office_pools_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "box_office_prices_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "box_office_scans_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "box_office_ticket_types_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_account_emails",
       "name": "core_account_emails_pk",
       "columns": [
@@ -9860,6 +12191,252 @@
       ],
       "nameExplicit": false,
       "entityType": "uniques"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "box_office_bands_kind",
+      "value": "\"kind\" IN ('standard', 'wheelchair', 'restricted_view')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_bands",
+      "name": "box_office_bands_displaces",
+      "value": "\"displaces_units\" >= 1 AND (\"displaces_band_id\" IS NULL OR \"kind\" = 'wheelchair')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "box_office_cancellations_kind",
+      "value": "\"kind\" IN ('customer', 'staff', 'performance_cancelled', 'exchange', 'unfulfilled_payment')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "box_office_cancellations_note",
+      "value": "\"note\" IS NULL OR length(\"note\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_cancellations",
+      "name": "box_office_cancellations_fee",
+      "value": "\"fee_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_state",
+      "value": "\"state\" IN ('held', 'confirmed', 'released')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_released",
+      "value": "(\"state\" = 'released') = (\"released_at\" IS NOT NULL) AND (\"state\" = 'released') = (\"release_reason\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_reason",
+      "value": "\"release_reason\" IS NULL OR \"release_reason\" IN ('expired', 'abandoned', 'cancelled', 'exchanged', 'staff', 'payment_failed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_claims",
+      "name": "box_office_claims_confirmed",
+      "value": "\"state\" <> 'confirmed' OR \"expires_at\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "box_office_holds_kind",
+      "value": "\"kind\" IN ('basket', 'payment', 'reservation', 'staff', 'waitlist_offer')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "box_office_holds_owner",
+      "value": "(\"kind\" = 'staff') = (\"order_id\" IS NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_holds",
+      "name": "box_office_holds_label",
+      "value": "\"label\" IS NULL OR (\"kind\" = 'staff' AND length(\"label\") <= 80)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_kind",
+      "value": "\"kind\" IN ('ticket', 'booking_fee', 'donation', 'pass_sale', 'exchange_fee', 'adjustment')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_ticket",
+      "value": "\"kind\" <> 'ticket' OR (\"performance_id\" IS NOT NULL AND \"band_id\" IS NOT NULL AND \"ticket_type_id\" IS NOT NULL AND \"claim_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_list",
+      "value": "\"list_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_discount",
+      "value": "\"discount_minor\" >= 0 AND \"discount_minor\" <= \"list_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_amount",
+      "value": "\"amount_minor\" = \"list_minor\" - \"discount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_one_discount",
+      "value": "\"promo_redemption_id\" IS NULL OR \"pass_redemption_id\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "box_office_order_lines_state",
+      "value": "\"state\" IN ('live', 'cancelled', 'exchanged')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_channel",
+      "value": "\"channel\" IN ('online', 'desk', 'phone')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_state",
+      "value": "\"state\" IN ('basket', 'reserved', 'awaiting_payment', 'confirmed', 'cancelled', 'expired')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_total",
+      "value": "\"total_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "box_office_orders_account_needed",
+      "value": "\"account_id\" IS NOT NULL OR \"state\" IN ('basket', 'expired') OR (\"channel\" = 'desk' AND \"access_note\" IS NULL AND \"state\" <> 'reserved')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_seating",
+      "value": "\"seating\" IN ('general', 'allocated')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_plan",
+      "value": "\"seating\" = 'general' OR \"plan_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_state",
+      "value": "\"state\" IN ('draft', 'on_sale', 'paused', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_cap",
+      "value": "\"max_per_order\" IS NULL OR \"max_per_order\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_hold",
+      "value": "\"hold_minutes\" IS NULL OR \"hold_minutes\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_timing",
+      "value": "\"payment_timing\" IS NULL OR \"payment_timing\" IN ('pay-now', 'reserve', 'buyer-chooses')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_performance_sales",
+      "name": "box_office_performance_sales_decision",
+      "value": "\"change_decision\" IS NULL OR \"change_decision\" IN ('refund_all', 'offer_exchange', 'keep')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "box_office_pools_capacity",
+      "value": "\"capacity\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_pools",
+      "name": "box_office_pools_claimed",
+      "value": "\"claimed\" >= 0 AND \"claimed\" <= \"capacity\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_prices",
+      "name": "box_office_prices_amount",
+      "value": "\"amount_minor\" IS NULL OR \"amount_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "box_office_scans_result",
+      "value": "\"result\" IN ('admitted', 'admitted_by_override', 'already_admitted', 'void', 'wrong_performance', 'requirement_not_met', 'unknown', 'bad_signature', 'reversed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_scans",
+      "name": "box_office_scans_reason",
+      "value": "\"result\" NOT IN ('reversed', 'admitted_by_override') OR \"reason_term_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "box_office_ticket_types_kind",
+      "value": "\"kind\" IN ('standard', 'concession', 'companion', 'complimentary')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_ticket_types",
+      "name": "box_office_ticket_types_holder",
+      "value": "\"max_per_holder\" >= 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_state",
+      "value": "\"state\" IN ('valid', 'void')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_void",
+      "value": "(\"state\" = 'void') = (\"void_reason\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_reason",
+      "value": "\"void_reason\" IS NULL OR \"void_reason\" IN ('cancelled', 'exchanged', 'reissued', 'performance_cancelled')",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "box_office_tickets_requirement",
+      "value": "\"requirement_ref\" IS NULL OR \"requirement_account_id\" IS NOT NULL OR \"requirement_evidence_id\" IS NOT NULL",
+      "entityType": "checks"
     },
     {
       "table": "core_access_profiles",
