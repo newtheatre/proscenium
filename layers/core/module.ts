@@ -22,6 +22,7 @@ export default defineModule({
   settingRules: defineSettingRules('core', [...settingRules.rules, ...identity.identitySettingRules, ...domain.settingRules]),
   abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities },
   records: { ...records, ...identity.identityRecords, ...domain.records },
+  facts: { ...identity.identityFacts },
   tables: { ...tables, ...domainTables },
   points: { ...points, ...domain.points },
   contributes: {
