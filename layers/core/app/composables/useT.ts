@@ -1,8 +1,11 @@
 // Every string a person reads goes through t(). One catalogue per language per module, merged
-// here: `<module>.<area>.<name>`. British English is the source language.
+// here: `<module>.<area>.<name>`. A module's catalogue is i18n/en-GB.json plus any parts in
+// i18n/en-GB/, as the conformance check reads it. British English is the source language.
 const catalogues = import.meta.glob<Record<string, string>>([
   '../../../*/i18n/en-GB.json',
+  '../../../*/i18n/en-GB/*.json',
   '../../../../site/layers/*/i18n/en-GB.json',
+  '../../../../site/layers/*/i18n/en-GB/*.json',
   '../../../../tests/fixtures/gallery/gallery/i18n/en-GB.json',
 ], { eager: true, import: 'default' })
 

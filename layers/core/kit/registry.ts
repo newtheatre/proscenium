@@ -1,7 +1,7 @@
 // The registry: every module's manifest and handler files, collected by the build into
 // .generated/registry.ts and checked here across modules (F-02).
 import { DeclarationError } from './refusal'
-import { snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl } from './manifest'
+import { DELIVERABLE, snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
 import type { SettingEntry, SettingRule } from './settings'
 import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
@@ -106,6 +106,17 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       return !!m.uses?.includes(owner) && !r.modules.has(owner)
     }
     for (const [event, listener] of Object.entries(m.events?.listens ?? {})) {
+      if (event === DELIVERABLE) {
+        if (!entry.handlers.listeners?.[listener]) fail(entry, `events.listens.${event}`, `the listener file ${entry.root}/server/listeners/${listener}.ts does not exist`)
+        // It hears every event any module may announce that is not internal (Formats tab).
+        for (const [name, announced] of r.events) {
+          if (announced.decl.internal) continue
+          const list = r.listeners.get(name) ?? []
+          list.push({ module: m.id, listener })
+          r.listeners.set(name, list)
+        }
+        continue
+      }
       if (absent(event)) continue
       const announced = r.events.get(event)
       if (!announced) fail(entry, `events.listens.${event}`, 'no module announces this event')
