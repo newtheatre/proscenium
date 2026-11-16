@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // Every vocabulary, the platform's and the theatre's own (C-20), with "New vocabulary" for a list
 // of the theatre's own.
-definePageMeta({ layout: 'console' })
 
 interface Row { key: string, owner: string, label: string, description: string | null, locked: boolean, live: number, retired: number }
 
+const { $api } = useNuxtApp()
 const columns = [
   { key: 'label', label: 'Vocabulary', sortable: true, card: true },
   { key: 'owner', label: 'Belongs to', card: true },
@@ -25,7 +25,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function create() {
   refusal.value = null
   try {
-    const { key } = await $fetch<{ key: string }>('/api/core/vocabularies', { method: 'POST', body: { label: form.label, description: form.description || null } })
+    const { key } = await $api<{ key: string }>('/api/core/vocabularies', { method: 'POST', body: { label: form.label, description: form.description || null } })
     creating.value = false
     await navigateTo(`/console/system/vocabularies/${encodeURIComponent(key)}`)
   }

@@ -97,6 +97,8 @@ export async function getBrand() {
     name: await useSetting('core.site.name') as string | null,
     choice,
     tokens: tokensFor(choice),
+    /** The tokens as the stylesheet the shells put in the page's head (themeCss). */
+    css: themeCss(tokensFor(choice)),
     logo: await logo('core.brand.logo'),
     logoDark: await logo('core.brand.logo-dark'),
     creditLine: await useSetting('core.brand.credit-line') as boolean,

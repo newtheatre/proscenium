@@ -16,7 +16,7 @@ import type { EventRow } from './handlers'
 import type { JobName, JobPayload } from './registry-types'
 import type { EnqueueOptions, UnitView } from './unit'
 
-export type JobOutcome = 'done' | 'skipped' | 'waiting' | 'retrying' | 'dead'
+export type JobOutcome = 'done' | 'skipped' | 'waiting' | 'deferred' | 'retrying' | 'dead'
 
 interface JobRow {
   id: string
@@ -27,6 +27,7 @@ interface JobRow {
   payload: string
   state: string
   attempts: number
+  deferrals: number
   max_attempts: number
   run_after: number
 }
@@ -64,6 +65,8 @@ export async function runJob(jobId: string): Promise<JobOutcome> {
   const payload = JSON.parse(row.payload)
   if (row.kind === 'task') await env.DB.prepare('UPDATE core_task_runs SET started_at = ?, job_id = ? WHERE task = ? AND due_at = ?').bind(at, jobId, row.name, payload.dueAt).run()
 
+  let deferred: string | undefined
+  let delay = 0
   try {
     const handler = handlerFor(row) as any
     if (!handler) throw new Error(`No handler for ${row.kind} ${row.name}`)
@@ -81,12 +84,27 @@ export async function runJob(jobId: string): Promise<JobOutcome> {
         unit.add({ sql: "UPDATE core_task_runs SET finished_at = ?, outcome = 'done' WHERE task = ? AND due_at = ?", params: [nowMs(), row.name, payload.dueAt] })
       }
       else {
-        await handler(payload, view, { id: row.id, name: row.name, attempts })
+        const defer = (reason: string) => { deferred = String(reason).slice(0, 200) } // not-policy: keeps the row small
+        await handler(payload, view, { id: row.id, name: row.name, attempts, deferrals: row.deferrals ?? 0, defer })
       }
-      unit.add({ sql: "UPDATE core_jobs SET state = 'done', finished_at = ?, last_error = NULL WHERE id = ? AND state = 'running'", params: [nowMs(), jobId] })
-        .expect(1, { code: 'core.job.lost', reason: 'The job was reclaimed while it ran.' })
+      if (deferred !== undefined) {
+        // "Not yet": what the job did so far commits, the attempt is given back and it runs again later.
+        const base = await useSetting('core.jobs.backoff') as number
+        delay = Math.min(base * 2 ** (row.deferrals ?? 0), 43_200) // not-policy: the longest delay a queue accepts
+        unit.add({ sql: "UPDATE core_jobs SET state = 'queued', attempts = attempts - 1, deferrals = deferrals + 1, run_after = ?, last_error = ? WHERE id = ? AND state = 'running'", params: [nowMs() + delay * 1000, `deferred: ${deferred}`, jobId] }) // not-policy: seconds to milliseconds
+          .expect(1, { code: 'core.job.lost', reason: 'The job was reclaimed while it ran.' })
+      }
+      else {
+        unit.add({ sql: "UPDATE core_jobs SET state = 'done', finished_at = ?, last_error = NULL WHERE id = ? AND state = 'running'", params: [nowMs(), jobId] })
+          .expect(1, { code: 'core.job.lost', reason: 'The job was reclaimed while it ran.' })
+      }
       await unit.commit()
     })
+    if (deferred !== undefined) {
+      await dispatch([{ jobId: row.id, lane: row.lane, delaySeconds: delay }])
+      log.info('core.jobs.deferred', { jobId: row.id, job: row.name, deferrals: (row.deferrals ?? 0) + 1, delay, reason: deferred })
+      return 'deferred'
+    }
     return 'done'
   }
   catch (error) {

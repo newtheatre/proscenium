@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Venues with their spaces nested (C-16). Adding a venue adds one space of the same name, so a
 // theatre with one room never has to think about spaces.
-definePageMeta({ layout: 'console' })
 
 interface Space { id: string, name: string, defaultCapacity: number | null, archived: boolean }
 interface Row { id: string, name: string, locality: string | null, managed: boolean, archived: boolean, spaces: Space[] }
 
+const { $api } = useNuxtApp()
 const columns = [
   { key: 'name', label: 'Venue', card: true },
   { key: 'locality', label: 'Town or city', card: true },
@@ -25,7 +25,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function create() {
   refusal.value = null
   try {
-    const { venueId } = await $fetch<{ venueId: string }>('/api/core/venues', { method: 'POST', body: { name: form.name, locality: form.locality || null } })
+    const { venueId } = await $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: { name: form.name, locality: form.locality || null } })
     creating.value = false
     await navigateTo(`/console/programme/venues/${venueId}`)
   }

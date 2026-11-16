@@ -54,7 +54,10 @@ const query = computed(() => ({
   page: state.value.page,
   size: state.value.pageSize,
 }))
-const { data, status, error, refresh } = await useFetch<ListResult<Row>>(props.route, { query, key: `core:list:${props.route}`, watch: [query] })
+// One key for the list whatever its query, on purpose: the rows on screen stay while the next
+// query loads, where a key that followed the query would empty the list at each change. A reactive
+// `query` is fetched again when it changes without being named in `watch`.
+const { data, status, error, refresh } = await useAPI<ListResult<Row>>(props.route, { query, key: `core:list:${props.route}` })
 
 const total = computed(() => data.value?.total ?? 0)
 const pages = computed(() => Math.max(1, Math.ceil(total.value / state.value.pageSize)))
@@ -109,6 +112,13 @@ function open(row: Row) {
   if (props.rowTo) void navigateTo(props.rowTo(row))
 }
 const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page, pages: pages.value, total: total.value }))
+
+// A filter, a search or a new page changes only the query, so the route announcer says nothing:
+// the new count is announced here.
+const { polite } = useAnnouncer()
+watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, old]) => {
+  if (now === 'success' && (before !== 'success' || label !== old)) polite(`${props.title}. ${label}`)
+})
 </script>
 
 <template>

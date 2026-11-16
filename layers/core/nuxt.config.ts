@@ -3,17 +3,30 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { kitAliases } from './aliases'
+import { MODE_COOKIE_AGE, MODE_KEY } from './shared/appearance'
+
+/** The layout of each shell that has one of its own, by the prefix of its addresses. */
+const SHELL_LAYOUTS = { '/console': 'console', '/members': 'members' }
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const publicComponentsFile = fileURLToPath(new URL('../../.generated/public-components.json', import.meta.url))
 const generatedTypes = fileURLToPath(new URL('../../.generated/types/registry.d.ts', import.meta.url))
 
 export default defineNuxtConfig({
+  // Loads Cloudflare Turnstile for TurnstileCheck. The site key is public and set at run time with
+  // NUXT_PUBLIC_TURNSTILE_SITE_KEY, beside CORE_TURNSTILE_SECRET_KEY; the kit verifies the token itself.
+  modules: ['@nuxtjs/turnstile'],
   app: { head: { htmlAttrs: { lang: 'en-GB' } } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
-  // Turnstile's site key is public; set NUXT_PUBLIC_TURNSTILE_SITE_KEY beside CORE_TURNSTILE_SECRET_KEY.
-  runtimeConfig: { public: { turnstileSiteKey: '' } },
+  // The colour mode is kept in a cookie, so the server knows it before it renders (shared/appearance.ts).
+  colorMode: { storage: 'cookie', storageKey: MODE_KEY, cookieAttrs: { path: '/', maxAge: MODE_COOKIE_AGE, sameSite: 'lax' } },
+  runtimeConfig: { public: { turnstile: { siteKey: '' } } },
   alias: kitAliases(root),
+  experimental: {
+    // A link's page is fetched when a person points at or focuses it, not when the link scrolls
+    // into view: a menu is a column of links, and most are never followed.
+    defaults: { nuxtLink: { prefetchOn: { interaction: true, visibility: false } } },
+  },
   nitro: {
     // Nitro drops imports of packages it thinks have no side effects; this polyfill is nothing else.
     moduleSideEffects: ['reflect-metadata'],
@@ -22,6 +35,24 @@ export default defineNuxtConfig({
   // The app's typed $fetch reads the server routes, and with them the kit's Cloudflare types.
   typescript: { tsConfig: { compilerOptions: { types: ['@cloudflare/workers-types'] } } },
   hooks: {
+    // A page under a shell's prefix gets that shell's layout from its address, so no page has to
+    // name it. A page that names a layout itself keeps it.
+    'pages:extend'(pages) {
+      const visit = (list: typeof pages) => {
+        for (const page of list) {
+          const layout = Object.entries(SHELL_LAYOUTS).find(([prefix]) => page.path === prefix || page.path.startsWith(`${prefix}/`))?.[1]
+          if (layout) page.meta = { layout, ...page.meta }
+          if (page.children?.length) visit(page.children)
+        }
+      }
+      visit(pages)
+    },
+    // The public pages do not ask the browser to fetch the signed-in shells' pages in advance.
+    'build:manifest'(manifest) {
+      for (const chunk of Object.values(manifest)) {
+        if (chunk.src && /\/app\/pages\/(console|members|account)\//.test(chunk.src)) chunk.prefetch = false
+      }
+    },
     // A public component is written in content by its alias (::access-application), so register its
     // file a second time under that name, globally, as Nuxt Content resolves components by name.
     'components:extend'(components) {

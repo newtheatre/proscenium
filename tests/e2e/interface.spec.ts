@@ -334,8 +334,8 @@ test.describe('confirming it is you', () => {
     const at = page.url()
     // Sent and not awaited: the request waits on the dialogue, as a save button's would.
     await page.evaluate(() => {
-      void (globalThis as unknown as { $fetch: (url: string, options: object) => Promise<unknown> })
-        .$fetch('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
+      void (globalThis as unknown as { useNuxtApp: () => { $api: (url: string, options: object) => Promise<unknown> } })
+        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
     })
     await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
     expect(page.url()).toBe(at)
