@@ -47,6 +47,16 @@ Named exports of `layers/core/server/services.ts`, imported as `#modules/core`. 
 | `isSpaceFree(spaceId, from, to)` | True if no scheduled performance or blocking closure overlaps. For showing, never for deciding a write. |
 | `assertSpaceFree(spaceId, from, to)` | A statement predicate for the same test, which a caller puts on its own write. See "Agreed for the Spaces module". |
 
+Three more services read closures, added on 16 November 2026 at the Spaces module's request, so that no module works out venue and whole-theatre scope for itself:
+
+| Service | Returns or does |
+| --- | --- |
+| `listClosures({ from, to, spaceId, venueId, blocking })` | Closures and public holidays overlapping the window, in time order. With `spaceId`, only those that cover that space: a closure of the space, of its venue, or of the whole theatre. With `venueId`, those of the venue or the whole theatre. With `blocking: true`, only those that block performances. Each carries its `scope`, one of `space`, `venue`, `site`. |
+| `closureSpaceIds(closureId)` | The ids of the active spaces one closure covers: one space, every space of a venue, or every space. For showing and for small sets. |
+| `closureSpaces(closureId)` | A statement fragment, like `assertSpaceFree`: a subquery selecting the same space ids, which a caller places in its own set-wise write. A write over everything a closure covers uses this, never a list of ids read beforehand. |
+
+A closure of a venue covers spaces added to that venue later, because the scope is worked out when asked and is not stored.
+
 **Capacity has one owner for each level.** Core owns the house capacity of a performance, the `capacity` column, changed with `core.performance.schedule`. Box office owns how that house is divided into pools and seats. The total Box office puts on sale may not exceed `capacityOf()` unless its own override allows. Lowering the house capacity goes through `core.change-guard`, where Box office refuses a figure below what is held or sold, and it announces `core.performance.capacity-changed`.
 
 ### Vocabularies
@@ -67,6 +77,16 @@ Named exports of `layers/core/server/services.ts`, imported as `#modules/core`. 
 | `deleteFile(fileId)`, `deleteFilesOf(owner)` | Statements that mark files deleted. The owner's deletion calls the second. |
 | `eraseFilesOf(owner)` | For erasure handlers: marks deleted with no waiting period. |
 
+**Files the server makes.** Added on 16 November 2026; the identity module's data download (ID-15) is the first user.
+
+| Part | What is specified |
+| --- | --- |
+| The slot | A file slot may declare `source: 'server'`. Nobody can upload into it: `beginUpload` refuses. Only such a slot may accept JSON, ZIP or CSV, because those types are never taken from a person. |
+| Making the file | `storeFile(unit, { slot, ownerType, ownerId, bytes, mediaType, title?, expiresAt? })`, inside the caller's unit of work. The file is ready at once, with no cleaning step and no uploader. |
+| Expiry | With `expiresAt`, the row and the bytes are removed once the time passes, by the same sweep that clears deleted files, without the deleted-retention wait. `core.file.deleted` is announced as for any file. |
+| Who may read it | A contribution to `core.file-access` is keyed by the owning record type and supplies `canRead(actor, record, file)`. Core asks it on every request for a private file. With no contribution for the record type, a private file answers not found, so its existence is not revealed. An upload aimed at a server slot is refused with \`core.files.not-uploadable\`. |
+| How it is served | A record's private files are served with `Cache-Control: private, no-store`, so no shared cache or browser history keeps a copy. |
+
 Named image sizes: `thumb` 320, `card` 640, `page` 1280, `full` 1920 pixels wide, and `social` 1200 by 630. Nothing else can be requested, which keeps the count of distinct resizes small and predictable (see Sources for the pricing this guards against).
 
 ### Notifications
@@ -80,6 +100,19 @@ Named image sizes: `thumb` 320, `card` 640, `page` 1280, `full` 1920 pixels wide
 | `emailReachability(accountIds, side)`, `deliveryCounts(subjectType, subjectId)` | For the Communications module. See "Agreed for the Communications module". |
 
 **When `notifyAddress` is right.** The identity specification rules that every person a module records is an account, and that someone who books as a guest is an unclaimed account, reached by `notify`. So `notifyAddress` is only for a send before any account exists: a sign-in link to an address not yet known, or the confirmation of a mailing-list sign-up. A desk sale with no account sends nothing.
+
+**A variable that carries a secret.** Some messages carry something that works like a key: a sign-in link, an invitation link, a reset code. A notification's variables are otherwise kept in clear in its row, so a type declares such a variable with the kind `sealed`, and these rules follow. They were decided on 16 November 2026, when the identity build's invitation needed them.
+
+| Rule | What it means |
+| --- | --- |
+| Declared, not guessed | A variable is sealed because its type says so. `notify` and `notifyAddress` both accept one, and refuse a sealed value passed under a variable not declared sealed. |
+| Email only | A type with a sealed variable allows the email channel and nothing else: no inbox item, no push, no digest, no coalescing, and it never reaches a webhook. Registering such a type with another channel is refused at start-up. |
+| Kept encrypted, apart | Sealed values are kept in `core_notifications.sealed_variables`, encrypted with the core key like a webhook's secret, and never in the `variables` column. |
+| Cleared when done | The column is set to null in the same unit of work that moves the email delivery to sent, failed or skipped (a suppressed address is a skip). A bounce or a complaint only ever follows sent, so the value has gone by then. A sweep clears any left after seven days. A cleared notification is never sent again: a further attempt is skipped with the reason erased, and the caller issues a new one. |
+| Never shown | The console, the delivery log, the preview, the audit trail, events and logs show the variable's name and the word "hidden", never its value. The rendered message is not stored. |
+| The caller keeps the lifetime | Core does not know when a link expires. The module that issues it sets the expiry, and should issue links that are spent on first use where it can. |
+
+So a module need not hold a secret-bearing send in a job of its own, or use `notifyAddress` for someone who has an account: it calls `notify` with a type that declares the variable sealed. `notifyAddress` remains only for a send before any account exists.
 
 **The suppression list applies to every email, transactional or not.** An address that hard-bounced or complained is skipped whatever the type, and the delivery records why.
 
@@ -410,7 +443,7 @@ The identity specification defines an access scheme a person applies to. Its pub
 
 Identity has confirmed the component's name and behaviour. It shows "Apply" to a person who is signed out or has not applied, and the state of their own application to one who has. While `core.access-scheme.enabled` is off it shows nothing, so the seeded wording is written to read sensibly without it, and the site-readiness screen says the page has nothing to offer. The page names the scheme with `:setting{name="core.access-scheme.name"}`, so it uses the theatre's own name for it. The form itself lives under `/account`.
 
-Identity's eighteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks.
+Identity's nineteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks. The nineteenth, `core.grants-expiring`, was added on 16 November 2026: members' side, transactional, sent once per sweep to those who can renew. Its key clashes with none of core's own types, and a transactional type on the members' side is one the format already allows.
 
 ## Fan-out: many rows in one unit of work
 
@@ -440,3 +473,33 @@ Core's fan-outs under these rules:
 | Recalculating operating days | One `UPDATE` over every performance not completed. |
 
 Sources: the proof report at `/mnt/project-files/core-domain-proofs/report.md`; D1's limits (developers.cloudflare.com/d1/platform/limits) for 100 bound parameters, 2 MB for one value and a batch counting as one query; Queues' limits (developers.cloudflare.com/queues/platform/limits) for 100 messages or 256 KB in one `sendBatch`. Both read on 16 November 2026.
+
+## Setting up the sending domain automatically
+
+Matt asked, through the build thread on 16 November 2026, for the sending domain to be set up the way Mailflare adds one, without the administrator touching DNS. This is story C-52. It is an addition: with no token, everything above stays as it is, and an administrator types the domain and verifies it.
+
+| Part | What is specified |
+| --- | --- |
+| The secret | An optional Worker secret, `CORE_CLOUDFLARE_TOKEN`, holding a Cloudflare API token limited to Email Sending edit and Zone read on the theatre's own zone. The foundations specification's secrets table is the index of every core secret, and lists it as optional. |
+| The button | With the token present, the Sending screen and the "Your sender" setup step show "Set up automatically" to a holder of `core.sender.manage`. Pressing it asks for a fresh passkey check and is audited, because it changes DNS. |
+| Finding the zone | Core finds the zone from the site's own hostname, by the longest matching suffix among the zones the token can read. |
+| Creating the domain | Core asks Cloudflare to create the sending subdomain `<label>.<site host>`, and Cloudflare writes the DNS records. The call is one of the kit's declared external calls, so it is audited and can be retried. If the subdomain already exists on that zone, core adopts it and creates nothing. |
+| Afterwards | Core sets `core.notifications.sending-domain`, waits out `E_EMAIL_SENDING_NOT_READY` as the section above describes, and runs the existing verify. It never replaces a sending domain that is already set without the administrator confirming the change, showing the old and new names. |
+| No zone | On a `workers.dev` address there is no zone. The button is replaced by a sentence saying a custom domain is needed first, with the manual route still offered. |
+| The label | A new text setting, `core.notifications.sending-label`, changed by `core.sender.manage`. It sits under the site's hostname, not the zone's apex, so it cannot clash with mail the theatre already runs, and it leaves the Communications module its own subdomain for mailings. Its default is `mail`, which Matt chose over `notifications` and `notify`. |
+| The token is never seen | It is never shown, logged, returned by any route or stored outside the secret. The health check reports only whether it is present and whether it can read the zone. |
+| What it does not do | It does not create the email outcomes subscription. That needs wider permission than this token has, so the setup step for it stays as written. Widening the token to do it is a possible later change, not part of this story. |
+
+Matt chose `mail` as the label's default on 16 November 2026, so the setting ships as `mail` and holds one DNS label. Two details the build added, both accepted: a site hostname that starts `www.` drops the `www.` before the label is put in front, and the verify job tries once a minute for up to ten minutes before leaving the matter to the health check.
+
+The names the build registers for this story:
+
+| Kind | Name |
+| --- | --- |
+| Setting | `core.notifications.sending-label` |
+| External call | `core.create-sending-domain` |
+| Job | `core.verify-sending-domain` |
+| Health check | `core.cloudflare-token` |
+| Setup step | `core.sender`, at `/console/system/email` |
+
+Not checked by this specification: the exact Cloudflare API call for creating a sending subdomain. The pull request that builds this story records it.

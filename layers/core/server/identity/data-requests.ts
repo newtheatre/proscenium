@@ -4,7 +4,7 @@
 // every request with its respond-by date and close it once each table that may hold rows linked to
 // no account has been searched by hand.
 import type { H3Event } from 'h3'
-import { all, first, isEnabled, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
+import { all, createUnit, first, isEnabled, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { formatDuration } from '#kit/duration'
 import type { TableMeta } from '#kit/db'
@@ -160,7 +160,10 @@ export async function runErasure(unit: UnitView, requestId: string): Promise<voi
   // Told once, at the address as it was, after the erasure has committed.
   if (address) {
     unit.afterCommit(async () => {
-      await notifyAddress(unit, 'core.erasure-done', { address, variables: {}, dedupeKey: request.id })
+      // notifyAddress writes into a unit, so the notice gets its own once the erasure is in.
+      const notice = createUnit()
+      await notifyAddress(notice, 'core.erasure-done', { address, variables: {}, dedupeKey: request.id })
+      await notice.commit()
     })
   }
 }

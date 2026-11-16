@@ -11,7 +11,7 @@ export const points = {
     // is for account entries every signed-in person sees.
     schema: z.object({
       id: z.string(),
-      menu: z.enum(['account', 'members', 'console', 'live']),
+      menu: z.enum(['account', 'members', 'console', 'admin', 'live']),
       to: z.string().startsWith('/'),
       icon: z.string(),
       ability: ability.optional(),
@@ -23,14 +23,17 @@ export const points = {
       match: z.string().optional(),
     }).strict()
       .refine(e => e.ability !== 'signed-in' || e.menu === 'account', { message: "only an account entry may give ability 'signed-in'", path: ['ability'] })
-      .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] }),
+      .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] })
+      .refine(e => e.menu !== 'admin' || e.group !== undefined || e.to === '/admin', { message: 'an admin entry names one of the admin groups; only the Overview, /admin, has none', path: ['group'] }),
   }),
   // A console group is declared once, by the module that owns it. A theatre's own module places its
-  // group with `before` or `after`; the platform's own groups keep the fixed order.
+  // group with `before` or `after`; the platform's own groups keep the fixed order. `menu: 'admin'`
+  // declares one of Site administration's groups instead (R-33).
   'core.navigation-group': point({
     kind: 'data',
     schema: z.object({
       id: z.string(),
+      menu: z.enum(['console', 'admin']).optional(),
       icon: z.string(),
       order: z.number().int().optional(),
       before: z.string().optional(),
@@ -47,7 +50,7 @@ export const points = {
       record: z.string(),
       ability,
       route: z.string().startsWith('/api/'),
-      shells: z.array(z.enum(['console', 'members'])).min(1).default(['console']),
+      shells: z.array(z.enum(['console', 'members', 'admin'])).min(1).default(['console']),
     }).strict(),
   }),
   // A common action offered in the palette (and on an empty home): a place to go, with words that find it.
@@ -77,6 +80,32 @@ export const points = {
       count: z.string().optional(),
       hideEmpty: z.boolean().optional(),
     }).strict().refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] }),
+  }),
+  // A card on a home page: one fact and one action, drawn by the module's own component. Cards are
+  // sorted overdue, today, information, and a card whose count is zero is not shown.
+  'core.home-card': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      home: z.enum(['console', 'members', 'tonight', 'admin']),
+      ability,
+      component: z.string(),
+      urgency: z.enum(['overdue', 'today', 'info']),
+      count: z.string().optional(),
+    }).strict(),
+  }),
+  // A tab another module adds to a record page. The owner's own tabs come first. The label is
+  // `<module>.record-tabs.<name>.label`; the component receives `recordId` and nothing else.
+  'core.record-tab': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      record: z.string(),
+      ability,
+      component: z.string(),
+      order: z.number().int(),
+      count: z.string().optional(),
+    }).strict(),
   }),
   // A registered count, shown beside a menu entry or on a card. A module registers its own; another
   // module's is named by it. The contribution says how to count for the person asking.

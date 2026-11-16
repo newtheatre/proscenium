@@ -33,7 +33,7 @@ describe('the route check', () => {
 
 describe('the reserved address list', () => {
   it('holds the platform\'s prefixes', () => {
-    expect(RESERVED_PREFIXES).toEqual(expect.arrayContaining(['account', 'console', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing']))
+    expect(RESERVED_PREFIXES).toEqual(expect.arrayContaining(['account', 'console', 'admin', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing']))
   })
 })
 
@@ -80,5 +80,10 @@ describe('the account scope check', () => {
     expect(problems("await all('SELECT * FROM lost_property_ledger WHERE account_id = ?', id)")).toEqual([])
     expect(problems('where(exactAccount(claims.accountId, id))')).toHaveLength(1)
     expect(problems('where(exactAccount(claims.accountId, id)) // exact-account: the claim is keyed by the person who made it')).toEqual([])
+  })
+  it('passes an assignment in an UPDATE and a stand-in declaring exactAccount', () => {
+    expect(problems("sql: 'UPDATE lost_property_claims SET account_id = ?, updated_at = ? WHERE id = ?'")).toEqual([])
+    expect(problems("sql: 'UPDATE lost_property_claims SET note = ? WHERE account_id = ?'")).toHaveLength(1)
+    expect(problems('export function exactAccount(column: string, accountId: string) {')).toEqual([])
   })
 })

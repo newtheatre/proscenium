@@ -236,7 +236,10 @@ if the actor holds that ability, and the read is audited against the account; a 
 holds it. A check carrying a typed value counts against the `presented-value` rate-limit class, by
 session and by address; past it, those pairs answer not met and the source is not called.
 `requirements.holder(ref, evidence)` gives staff with the source's `holderAbility` a display name,
-and audits the read.
+and audits the read. A met answer may also carry `holderAccountId`, the account a source knows a
+presented value belongs to (R-34). It is for the host's server code only: the property is not
+enumerable, so an answer turned into JSON (a route returning it, a summary, an event or job
+payload) leaves it out, and it is dropped from any verdict that is not met.
 
 ## Email outcomes
 

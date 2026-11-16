@@ -90,7 +90,6 @@ async function create() {
             <UInput
               v-model="form.label"
               maxlength="80"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -100,7 +99,6 @@ async function create() {
             <UTextarea
               v-model="form.description"
               maxlength="300"
-              class="w-full"
             />
           </UFormField>
         </form>

@@ -125,7 +125,6 @@ async function setUp() {
             v-if="data.automatic.unavailable"
             class="mt-3"
             color="info"
-            variant="subtle"
             icon="i-lucide-info"
             :description="UNAVAILABLE[data.automatic.unavailable]"
           />
@@ -146,7 +145,6 @@ async function setUp() {
         <UAlert
           v-if="notice"
           color="success"
-          variant="subtle"
           icon="i-lucide-circle-check"
           :description="notice"
           role="status"
