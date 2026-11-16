@@ -8,6 +8,7 @@ import { sessions } from '../../../../payments/server/db/schema'
 import { Browser, deliver, env, grantDirectly, leaveIdentity, reset, signInByEmail, staff, useIdentity } from './helpers'
 import { inContext, rows, sent } from '../../../../../tests/integration/helpers'
 import { restartStalledMerges } from '../../../server/identity/merge-move'
+import { closeMerges } from '../../../server/identity/merge-undo'
 
 beforeAll(useIdentity)
 afterAll(leaveIdentity)
@@ -123,5 +124,60 @@ describe('stage two of a merge', () => {
       expect((await mergeOf(mergedAccountId)).completed_at).not.toBeNull()
       expect(calls).toHaveLength(1)
     })
+  })
+})
+
+describe('undoing a merge, and closing it', () => {
+  it('waits until the merge is complete, then puts every listed row back and parts the accounts', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    const till = await tillSession(mergedAccountId)
+    const [email] = await rows<{ id: string }>('SELECT id FROM core_account_emails WHERE account_id = ?', mergedAccountId)
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    const merge = await mergeOf(mergedAccountId)
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).body.code).toBe('core.merge.still-moving')
+
+    await deliver()
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).status).toBe(200)
+    // The alias stands until the job's last unit.
+    expect(await rows('SELECT merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ merged_into_id: survivorId }])
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).body.code).toBe('core.merge.undoing')
+
+    await deliver()
+    expect(await rows('SELECT opened_by FROM payments_sessions WHERE id = ?', till)).toEqual([{ opened_by: mergedAccountId }])
+    expect(await rows('SELECT account_id FROM core_account_emails WHERE id = ?', email!.id)).toEqual([{ account_id: mergedAccountId }])
+    expect(await rows('SELECT merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ merged_into_id: null }])
+    expect(await rows<{ undone_at: number | null }>('SELECT undone_at FROM core_account_merges WHERE id = ?', merge.id)).toEqual([{ undone_at: expect.any(Number) }])
+  })
+
+  it('gives back, as a new grant, a grant the merge ended as a duplicate', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    const { roleId } = await grantDirectly(survivorId, ['core.role.read'])
+    const { grantId } = await grantDirectly(mergedAccountId, [], { roleId })
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    expect(await rows('SELECT ended_reason FROM core_grant_ends WHERE grant_id = ?', grantId)).toEqual([{ ended_reason: 'replaced' }])
+    await deliver()
+    const merge = await mergeOf(mergedAccountId)
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).status).toBe(200)
+    await deliver()
+    expect(await rows('SELECT account_id FROM core_grants g WHERE role_id = ? AND NOT EXISTS (SELECT 1 FROM core_grant_ends e WHERE e.grant_id = g.id) ORDER BY account_id', roleId))
+      .toEqual([survivorId, mergedAccountId].sort().map(account_id => ({ account_id })))
+  })
+
+  it('closes a complete merge once its window has passed: items go, the old account keeps only its alias', async () => {
+    const { admin, survivorId, mergedAccountId } = await twoAccounts()
+    await env.DB.prepare('UPDATE core_accounts SET name = \'Old Name\' WHERE id = ?').bind(mergedAccountId).run()
+    await tillSession(mergedAccountId)
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+    await deliver()
+    const merge = await mergeOf(mergedAccountId)
+    await env.DB.prepare('UPDATE core_account_merges SET undo_until = 1 WHERE id = ?').bind(merge.id).run()
+    await inContext(async () => {
+      const unit = createUnit()
+      await closeMerges(unit.view())
+      await unit.commit()
+    })
+    expect(await rows('SELECT count(*) AS n FROM core_account_merge_items WHERE merge_id = ?', merge.id)).toEqual([{ n: 0 }])
+    expect(await rows('SELECT name, merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ name: null, merged_into_id: survivorId }])
+    expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).body.code).toBe('core.merge.cannot-undo')
   })
 })

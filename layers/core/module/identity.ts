@@ -118,6 +118,8 @@ export const identityEvents = {
   'core.account.erased': event({ version: 1, payload: account, internal: true }),
   'core.data-request.finished': event({ version: 1, payload: z.object({ requestId: z.string(), kind: z.enum(['export', 'erasure']) }), internal: true }),
   'core.account.merged': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
+  // The two accounts parted again: the last unit of an undo.
+  'core.account.merge-undone': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
   'core.account-email.verified': event({ version: 1, payload: z.object({ accountId: z.string(), emailId: z.string() }), internal: true }),
   'core.grant.created': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string() }), internal: true }),
   'core.grant.ended': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string(), reason: z.enum(['revoked', 'replaced', 'role_archived', 'account_closed', 'merged', 'given_up']) }), internal: true }),
@@ -135,7 +137,7 @@ export const identityJobs = {
   'core.merge-move': job({
     payload: z.object({
       mergeId: z.string(),
-      stage: z.enum(['start', 'module', 'finish']),
+      stage: z.enum(['start', 'module', 'finish', 'undo-start', 'undo-module', 'undo-finish']),
       module: z.string().optional(),
       step: z.number().int().min(0).optional(),
     }),
