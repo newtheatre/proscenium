@@ -124,12 +124,18 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
     for (const entry of contributed('core.navigation')) if (!entry.label) need(entryLabelKey(entry.id), 'the navigation entry\'s label')
     for (const group of contributed('core.navigation-group')) need(groupLabelKey(id, group.id), 'the navigation group\'s label')
     // A module with settings and no group of its own gets one named for it, which needs a label.
+    for (const action of contributed('core.quick-action')) {
+      const name = String(action.id).slice(id.length + 1)
+      need(`${id}.quick-actions.${name}.label`, 'the quick action\'s label')
+      if (action.keywords) need(action.keywords, 'the quick action\'s search words')
+    }
+    for (const source of contributed('core.search-source')) need(`${id}.records.${String(source.record).slice(id.length + 1)}`, 'the name of the kind of record the search finds')
     const hasSettings = [...(registry.settings as Map<string, any>).values()].some(s => s.module === id)
     if (hasSettings && id !== 'core' && !contributed('core.navigation-group').length && !contributed('core.navigation').some((e: any) => e.group)) need(groupLabelKey(id, id), 'the label of the console group its settings page sits in')
     const sections = new Set<string>()
     for (const [key, { module }] of registry.settings as Map<string, any>) if (module === id) sections.add(key.slice(id.length + 1).split('.')[0]!)
     for (const section of sections) need(`${id}.settings-sections.${section}`, 'the heading of a group of settings on the generated settings page')
-    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`]
+    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.quick-actions.`, `${id}.records.`]
     for (const key of keys) if (derived.some(p => key.startsWith(p))) problems.push(`${rel(file)}: "${key}" is not used by any declaration`)
   }
   return problems
@@ -196,6 +202,15 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
   const entries: { to: string, match?: string }[] = []
   for (const m of modules) {
     for (const entry of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.navigation'] ?? []) entries.push(entry)
+  }
+  // A count named by an entry or a section is registered by some module's core.count contribution.
+  const counts = new Set<string>()
+  for (const m of modules) for (const c of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.count'] ?? []) counts.add(c.id)
+  for (const m of modules) {
+    const contributes = (m.manifest.contributes ?? {}) as Record<string, any[]>
+    for (const point of ['core.navigation', 'core.account-section']) {
+      for (const e of contributes[point] ?? []) if (e.count && !counts.has(e.count)) problems.push(`${m.found.root}: ${point} ${e.id} names the count "${e.count}", which no module registers in core.count`)
+    }
   }
   const withSettings = new Set<string>()
   for (const { module } of registry.settings.values() as Iterable<{ module: string }>) withSettings.add(module)

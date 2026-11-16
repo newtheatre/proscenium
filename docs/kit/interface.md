@@ -65,6 +65,43 @@ contributes: {
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.
 
+## Finding things: the command palette and settings search
+
+Ctrl or Cmd K (or the Search button in the console's top bar) opens the command palette. It works by
+keyboard alone and offers only what the viewer may reach: the screens in their navigation, the quick
+actions and record types they hold the ability for, and the settings on pages they may open. It asks
+the server for actions and sources when it is first opened, not on every page.
+
+- `core.quick-action` (data point): `{ id, to, icon, ability, keywords? }`. The label is
+  `<module>.quick-actions.<name>.label`; `keywords` is a translation key of extra search words.
+- `core.search-source` (data point): `{ id, record, ability, route, shells }`. `route` is an `/api/`
+  route taking `?q=` and returning `{ ids: string[] }`; the palette resolves the ids to titles and
+  addresses through that type's `core.record-resolver`, so every kind of record looks the same. The
+  type's name is `<module>.records.<name>`.
+- Settings search (UI-15) sits above every generated settings page and in the palette. Every word
+  typed must appear in a setting's label or help text; label matches come first; a result opens the
+  page with the setting highlighted (`?setting=<key>`). Settings on pages the viewer may not open,
+  sensitive settings and settings of modules that are off are never listed.
+
+## Members' area, My account and counts
+
+- **Members' area** (`/members`, layout `members.vue`): a top bar of sections on a laptop; below 640
+  pixels a bottom bar of the first four plus More. Its entries are `core.navigation` entries with
+  `menu: 'members'`. With `core.members-area.enabled` off, or for anyone for whom the fact
+  `core.member` is not true, every `/members` address answers "not found". The name shown is
+  `core.members-area.name`.
+- **My account** (`/account`): the same page for everyone signed in. A module adds a section through
+  `core.account-section` (`target`, `side`, `ability`, `component`, `order`, optional `to`, `icon`,
+  `count`, `hideEmpty`). The `component` is the file name of a component in the module's
+  `app/account-sections/` folder; it receives `headingId` for its heading. A module that is off
+  leaves nothing behind.
+- **Counts**: a module registers one through `core.count` (a code point; the contribution's `value(actor)`
+  returns a number; a count that fails reads as zero). An entry or section names it with `count`, and
+  with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.
+- **Colour mode**: `core.appearance.default` is what a first-time visitor sees; a person's own choice
+  from the menu is kept; `let-people-choose` off removes the choice; `public-dark` off keeps the public
+  pages light.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the

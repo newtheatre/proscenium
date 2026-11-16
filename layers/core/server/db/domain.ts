@@ -1,6 +1,6 @@
-// The core domain's tables (workstream 3, part 2): stored files, who mail comes from, and the
-// vocabularies every module shares. The rest of the domain's tables arrive with the later slices.
-import { check, integer, text, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
+// The core domain's tables (workstream 3, part 2): stored files, who mail comes from, the
+// vocabularies every module shares, and notifications. The rest arrive with the later slices.
+import { check, integer, text, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { defineTable, col } from '#kit/db'
 
@@ -118,4 +118,133 @@ export const terms = defineTable('core_terms', {
   ],
 })
 
-export const tables = { files, senderIdentities, notificationRouting, vocabularies, terms }
+const SIDES = sql`('audience', 'members')`
+
+/**
+ * One thing the system has to tell one person (group 5). Its deliveries are the attempts, one for
+ * each channel. The payload is what the wording is filled with; it is cleared once every delivery
+ * is finished, and the row outlives it so the log can say what was sent without holding it.
+ */
+export const notifications = defineTable('core_notifications', {
+  id: col.id(),
+  typeKey: col.internal(text('type_key').notNull()),
+  side: col.internal(text('side').notNull()),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', nullable: true }),
+  // Only for a send to an address with no account yet (notifyAddress, once it joins the pipeline).
+  address: col.email('address'),
+  locale: col.internal(text('locale').notNull()),
+  subjectType: col.internal(text('subject_type')),
+  subjectId: col.internal(text('subject_id')),
+  dedupeKey: col.internal(text('dedupe_key')),
+  coalesceKey: col.internal(text('coalesce_key')),
+  payload: col.personal(text('payload', { mode: 'json' }), { erase: 'clear' }),
+  // A type's sealed variables, such as a link that signs someone in: encrypted with the core key,
+  // never in payload, and cleared in the unit that finishes the email delivery.
+  sealedVariables: col.personal(text('sealed_variables'), { encrypted: true, erase: 'clear' }),
+  actorId: col.account('actor_id', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'ntf',
+  realm: { column: 'side' },
+  subject: { account: 'account_id', unlinked: 'staff' },
+  retention: 'core.notifications.log-retention',
+  extra: t => [
+    uniqueIndex('core_notifications_dedupe').on(t.dedupeKey).where(sql`${t.dedupeKey} IS NOT NULL`),
+    index('core_notifications_subject').on(t.subjectType, t.subjectId),
+    index('core_notifications_account').on(t.accountId, t.createdAt),
+    check('core_notifications_side', sql`${t.side} IN ${SIDES}`),
+    check('core_notifications_recipient', sql`(${t.accountId} IS NULL) <> (${t.address} IS NULL) OR ${t.payload} IS NULL`),
+  ],
+})
+
+/** One attempt to tell one notification's recipient by one channel. */
+export const deliveries = defineTable('core_notification_deliveries', {
+  id: col.id(),
+  notificationId: col.internal(text('notification_id').notNull().references(() => notifications.id, { onDelete: 'cascade' })),
+  side: col.internal(text('side').notNull()),
+  channel: col.internal(text('channel').notNull()),
+  state: col.internal(text('state').notNull()),
+  reason: col.internal(text('reason')),
+  templateId: col.internal(text('template_id')),
+  senderKey: col.internal(text('sender_key').references(() => senderIdentities.key, { onDelete: 'restrict' })),
+  providerRef: col.internal(text('provider_ref')),
+  attempts: col.internal(integer('attempts').notNull().default(0)),
+  nextAttemptAt: col.timestamp('next_attempt_at'),
+  lastError: col.internal(text('last_error')),
+  rolledIntoId: col.internal(text('rolled_into_id').references(() => notifications.id, { onDelete: 'set null' })),
+  sentAt: col.timestamp('sent_at'),
+  createdAt: col.createdAt(),
+}, {
+  id: 'ndl',
+  realm: { column: 'side' },
+  subject: { via: 'notification_id' },
+  extra: t => [
+    uniqueIndex('core_notification_deliveries_channel').on(t.notificationId, t.channel),
+    index('core_notification_deliveries_due').on(t.state, t.nextAttemptAt),
+    index('core_notification_deliveries_provider').on(t.providerRef),
+    check('core_notification_deliveries_side', sql`${t.side} IN ${SIDES}`),
+    check('core_notification_deliveries_state', sql`${t.state} IN ('queued', 'held', 'sending', 'sent', 'retrying', 'failed', 'suppressed', 'skipped', 'bounced', 'complained')`),
+  ],
+})
+
+/** A message in a person's inbox on one side. The unread count reads the account index. */
+export const inboxItems = defineTable('core_inbox_items', {
+  id: col.id(),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move' }),
+  deliveryId: col.internal(text('delivery_id').references(() => deliveries.id, { onDelete: 'set null' })),
+  side: col.internal(text('side').notNull()),
+  title: col.personal(text('title').notNull()),
+  body: col.personal(text('body')),
+  link: col.internal(text('link')),
+  readAt: col.timestamp('read_at'),
+  archivedAt: col.timestamp('archived_at'),
+  expiresAt: col.timestamp('expires_at').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'inb',
+  realm: { column: 'side' },
+  retention: 'core.notifications.inbox-retention',
+  onErasure: 'delete-row',
+  extra: t => [
+    index('core_inbox_items_account').on(t.accountId, t.side, t.archivedAt, t.createdAt),
+    check('core_inbox_items_side', sql`${t.side} IN ${SIDES}`),
+    check('core_inbox_items_title', sql`length(${t.title}) BETWEEN 1 AND 120`),
+    check('core_inbox_items_body', sql`${t.body} IS NULL OR length(${t.body}) <= 500`),
+  ],
+})
+
+/** A person's choice for one topic and channel. No row means the type's default. */
+export const notificationPreferences = defineTable('core_notification_preferences', {
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
+  topicKey: col.internal(text('topic_key').notNull()),
+  channel: col.internal(text('channel').notNull()),
+  side: col.internal(text('side').notNull()),
+  enabled: col.personal(integer('enabled', { mode: 'boolean' }).notNull()),
+  digest: col.personal(text('digest').notNull().default('immediate')),
+}, {
+  realm: { column: 'side' },
+  onErasure: 'delete-row',
+  extra: t => [
+    primaryKey({ columns: [t.accountId, t.topicKey, t.channel] }),
+    check('core_notification_preferences_side', sql`${t.side} IN ${SIDES}`),
+    check('core_notification_preferences_digest', sql`${t.digest} IN ('immediate', 'daily', 'weekly')`),
+  ],
+})
+
+/**
+ * Addresses no email goes to, whoever asks, kept as a keyed hash of the lower-cased address so the
+ * list names nobody and still stops mail to an erased person.
+ */
+export const emailSuppressions = defineTable('core_email_suppressions', {
+  addressHash: col.internal(text('address_hash').primaryKey()),
+  reason: col.internal(text('reason').notNull()),
+  createdAt: col.createdAt(),
+  liftedAt: col.timestamp('lifted_at'),
+  liftedBy: col.account('lifted_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [check('core_email_suppressions_reason', sql`${t.reason} IN ('hard_bounce', 'complaint', 'manual')`)],
+})
+
+export const tables = { files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }

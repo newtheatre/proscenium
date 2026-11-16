@@ -2,6 +2,7 @@
 // (isMember, from the fact core.member and the members' area setting); identity's describeViewer
 // gives the whole answer, in this shape, so no component ever tests a role or an ability: it
 // draws from the name, the sides that are open and the entries the viewer may open.
+import { useSetting } from '#kit'
 import type { Actor } from '#kit'
 import type { NavItem, ShellName } from '../../shared/navigation'
 import { allowedEntries, declaredEntries, holds, mayOpen } from './navigation'
@@ -13,6 +14,8 @@ export type Side = 'audience' | 'members' | 'console'
 export interface ViewerDescription {
   signedIn: boolean
   name?: string
+  /** What the theatre calls the members' area (core.members-area.name). */
+  membersName?: string
   sides: Side[]
   navigation: (NavItem & { shell: ShellName })[]
 }
@@ -50,8 +53,9 @@ export async function describeViewer(actor: Actor): Promise<ViewerDescription> {
   for (const shell of ['account', 'members'] as const) {
     if (shell === 'members' && !sides.includes('members')) continue
     for (const e of await allowedEntries(actor, shell)) {
-      navigation.push({ id: e.id, shell, label: e.label ?? entryLabelKey(e.id), to: e.to, icon: e.icon, match: e.match, count: e.count, order: e.order ?? 0 })
+      navigation.push({ id: e.id, shell, label: e.label ?? entryLabelKey(e.id), to: e.to, icon: e.icon, match: e.match, count: e.countValue, order: e.order ?? 0 })
     }
   }
-  return { signedIn: true, name: actor.name, sides, navigation: navigation.sort((a, b) => a.order - b.order) }
+  const membersName = sides.includes('members') ? await useSetting('core.members-area.name') as string : undefined
+  return { signedIn: true, name: actor.name, membersName, sides, navigation: navigation.sort((a, b) => a.order - b.order) }
 }

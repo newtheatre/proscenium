@@ -23,7 +23,7 @@ for (const [file, module] of Object.entries(files)) {
 export const handle = server(routes)
 
 /** A sign-in email as a test reads it: the address, and the link and code taken from its text. */
-export interface SignInMessage { address: string, variables: { link: string, code: string } }
+export interface SignInMessage { address: string, subject: string, variables: { link: string, code: string } }
 
 export const mailbox: SignInMessage[] = []
 
@@ -36,7 +36,7 @@ export async function useIdentity(): Promise<void> {
   setMailer(async (email) => {
     const link = /(https?:\/\/\S+\/sign-in\/link#[\w-]+)/.exec(email.text)?.[1] ?? ''
     const code = /\b(\d{6})\b/.exec(email.text)?.[1] ?? ''
-    mailbox.push({ address: email.to, variables: { link, code } })
+    mailbox.push({ address: email.to, subject: email.subject, variables: { link, code } })
     return {}
   })
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -107,7 +107,8 @@ export async function emailSignIn(browser: Browser, to: string, next?: string): 
   const before = mailbox.length
   const asked = await browser.post('/api/core/sign-in/email', { address: to, ...(next ? { next } : {}) }, { 'cf-turnstile-response': 'pass' })
   await deliver()
-  return { ...asked, message: mailbox.slice(before).find(m => m.address === to) }
+  // Security notices to the same address land in the mailbox too; the sign-in email is the one with a link.
+  return { ...asked, message: mailbox.slice(before).find(m => m.address === to && m.variables.link) }
 }
 
 export function tokenOf(message: SignInMessage): string {

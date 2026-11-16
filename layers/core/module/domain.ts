@@ -2,13 +2,15 @@
 // settings and the operating day, files, the brand, sending email, and the public site's points.
 // module.ts spreads each field into the core manifest, beside foundations' and identity's parts.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, secret, setting, task } from '#kit'
 import type { SettingRule } from '#kit'
+import { parseDuration } from '#kit/duration'
 
 const organisation = 'core.organisation.edit'
 const branding = 'core.branding.edit'
 const filesConfigure = 'core.file.configure'
 const sender = 'core.sender.manage'
+const notificationConfigure = 'core.notification.configure'
 
 export const settings = defineSettings('core', {
   // Organisation. The theatre's name, time zone, currency, language and day start are foundations'
@@ -47,6 +49,14 @@ export const settings = defineSettings('core', {
   'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender }),
   'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true }),
   'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
+  // The delivery pipeline (C-29). Each retry waits four times as long as the one before.
+  'notifications.max-attempts': setting.integer({ default: 5, min: 1, max: 10, change: notificationConfigure }),
+  'notifications.first-retry': setting.duration({ default: '2m', min: '1m', max: '1h', change: notificationConfigure }),
+  'notifications.stuck-after': setting.duration({ default: '10m', min: '5m', max: '2h', change: notificationConfigure }),
+  'notifications.log-retention': setting.duration({ default: '400d', min: '30d', max: '2555d', change: notificationConfigure }),
+  'notifications.inbox-retention': setting.duration({ default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in' }),
+  // C-52: the label put before the site's host when the sending domain is set up automatically.
+  'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender }),
 })
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] // not-policy: the calendar; 29 February is not every year's end
@@ -65,6 +75,8 @@ export const settingRules: SettingRule[] = [
   { id: 'contact-email', check: s => s['organisation.contact-email'] === null || z.email().safeParse(s['organisation.contact-email']).success },
   { id: 'year-end', check: s => s['organisation.year-end'] === null || isDayOfYear(s['organisation.year-end']) },
   { id: 'sending-domain', check: s => s['notifications.sending-domain'] === null || /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(s['notifications.sending-domain']) },
+  { id: 'stuck-after', check: s => parseDuration(s['notifications.stuck-after']) > parseDuration(s['notifications.first-retry']) },
+  { id: 'sending-label', check: s => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(s['notifications.sending-label']) }, // not-policy: a DNS label
 ]
 
 export const records = defineRecords('core', {
@@ -79,6 +91,7 @@ export const abilities = defineAbilities('core', {
   'file.configure': ability(),
   'sender.manage': ability({ risk: 'privileged' }),
   'template.edit': ability(),
+  'notification.configure': ability(),
   // Granted on one vocabulary, it lets a module's manager look after that list only.
   'vocabulary.manage': ability({ on: 'core.vocabulary', grantAt: ['site', 'record'] }),
 })
@@ -88,8 +101,8 @@ const wording = z.object({ subject: z.string().min(1).max(200), body: z.string()
 
 export const points = {
   /**
-   * A message a module sends. Phase 1 sends transactional email to an explicit address; the inbox,
-   * preferences and other channels arrive with the full pipeline, without a change to this shape.
+   * A message a module sends: to accounts with notify(), by email and to the inbox, or by email to
+   * an address with no account yet with notifyAddress().
    */
   'core.notification-type': point({
     kind: 'data',
@@ -97,12 +110,16 @@ export const points = {
       id: z.string().regex(/^[a-z][a-z0-9-]*\.[a-z0-9.-]+$/),
       category: z.enum(['transactional', 'optional']),
       side: z.enum(['audience', 'members']),
-      channels: z.array(z.enum(['email'])).min(1),
+      channels: z.array(z.enum(['email', 'inbox'])).min(1),
+      /** The inbox item's link: a path inside the application, which may use the type's variables. */
+      link: z.string().startsWith('/').optional(),
       lane: z.enum(['prompt', 'bulk']).optional(),
       topic: z.string().optional(),
-      variables: z.record(variableName, z.enum(['url', 'text'])),
+      // 'sealed' carries a secret, such as a link that signs someone in: encrypted at rest and email only.
+      variables: z.record(variableName, z.enum(['url', 'sealed', 'text'])),
       wording: z.record(z.string(), wording).refine(w => 'en-GB' in w, 'wording needs en-GB'),
-    }).strict(),
+    }).strict()
+      .refine(t => !Object.values(t.variables).includes('sealed') || (t.channels.length === 1 && t.channels[0] === 'email'), { message: 'a type with a sealed variable is sent by email only', path: ['channels'] }),
   }),
   /** A group of optional messages a person can switch off, and the unit a sender is chosen for. */
   'core.notification-topic': point({
@@ -193,7 +210,8 @@ export const contributes = {
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
   'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
-  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }],
+  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
+  'core.setup-step': [{ id: 'core.sender', required: true, to: '/console/system/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
@@ -217,6 +235,10 @@ export const announces = {
   'core.file.rejected': event({ version: 1, payload: z.object({ fileId: z.string(), reason: code() }), internal: true }),
   'core.file.deleted': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.term.retired': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code() }), internal: true }),
+  'core.delivery.failed': event({ version: 1, payload: z.object({ notificationId: z.string(), typeKey: code(), channel: z.enum(['email', 'inbox']) }), internal: true }),
+  'core.delivery.bounced': event({ version: 1, payload: z.object({ notificationId: z.string(), accountId: z.string().nullable() }), internal: true }),
+  'core.delivery.complained': event({ version: 1, payload: z.object({ notificationId: z.string(), accountId: z.string().nullable() }), internal: true }),
+  'core.address.suppressed': event({ version: 1, payload: z.object({ reason: z.enum(['hard_bounce', 'complaint', 'manual']) }), internal: true }),
   'core.term.merged': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code(), intoId: z.string() }), internal: true }),
 }
 
@@ -228,8 +250,20 @@ export const listens = {
 export const jobs = {
   'core.check-file': job({ payload: z.object({ fileId: z.string() }) }),
   'core.recompute-days': job({ payload: z.object({}), lane: 'bulk' }),
+  'core.send-notifications': job({ payload: z.object({ deliveryIds: z.array(z.string()).min(1) }) }),
+  'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
+}
+
+// C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard.
+export const secrets = {
+  CORE_CLOUDFLARE_TOKEN: secret({ needed: 'optional' }),
+}
+
+export const calls = {
+  'core.create-sending-domain': call({ reconcileAfter: '5m' }),
 }
 
 export const tasks = {
   'core.sweep-files': task({ every: '1h' }),
+  'core.sweep-notifications': task({ every: '5m' }),
 }

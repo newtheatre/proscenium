@@ -13,8 +13,8 @@ const { data: navigation } = await useNavigation('console')
 const open = ref(false)
 watch(() => route.fullPath, () => { open.value = false })
 
-function toItem(i: { id: string, label: string, to: string, icon: string, match?: string, count?: string }): NavigationMenuItem {
-  return { label: t(i.label), icon: i.icon, to: i.to, active: isCurrent(i, route.path), onSelect: () => { open.value = false } }
+function toItem(i: { id: string, label: string, to: string, icon: string, match?: string, count?: number }): NavigationMenuItem {
+  return { label: t(i.label), icon: i.icon, to: i.to, active: isCurrent(i, route.path), badge: i.count, onSelect: () => { open.value = false } }
 }
 
 const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
@@ -66,6 +66,8 @@ const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
       </template>
     </UDashboardSidebar>
 
+    <CommandPalette />
+
     <UDashboardPanel>
       <template #header>
         <UDashboardNavbar>
@@ -73,6 +75,11 @@ const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
             <UDashboardSidebarCollapse />
           </template>
           <template #right>
+            <UDashboardSearchButton
+              :label="t('core.palette.open')"
+              color="neutral"
+              variant="outline"
+            />
             <AccountMenu />
           </template>
         </UDashboardNavbar>
