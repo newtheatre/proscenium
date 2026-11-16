@@ -1,4 +1,4 @@
-// The core's twelve tables (Foundations part 2).
+// The core's thirteen tables (Foundations part 2).
 import { integer, text, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { defineTable, col } from '#kit/db'
@@ -149,9 +149,29 @@ export const idempotencyKeys = defineTable('core_idempotency_keys', {
   createdAt: col.timestamp('created_at').notNull(),
 }, { realm: 'system', retention: 'core.idempotency.keep-for', extra: t => [primaryKey({ columns: [t.key, t.route] })] })
 
+// The signing service's key pairs (F-37). The private part is sealed with CORE_ENCRYPTION_KEY, never
+// leaves this table, and is erased once the key stops signing; the public part is kept for ever.
+export const signingKeys = defineTable('core_signing_keys', {
+  id: col.id(),
+  purpose: col.internal(text('purpose').notNull()),
+  publicKey: col.internal(text('public_key').notNull()),
+  privateKey: col.internal(text('private_key'), { encrypted: true }),
+  state: col.internal(text('state').notNull()),
+  createdAt: col.timestamp('created_at').notNull(),
+  checkingFrom: col.timestamp('checking_from'),
+  retiredAt: col.timestamp('retired_at'),
+}, {
+  id: 'sgk',
+  realm: 'system',
+  extra: t => [
+    uniqueIndex('core_signing_keys_current').on(t.purpose).where(sql`state = 'current'`),
+    index('core_signing_keys_purpose').on(t.purpose, t.state),
+  ],
+})
+
 export const guard = defineTable('core_guard', {
   ok: col.internal(integer('ok').notNull()),
   code: col.internal(text('code')),
 }, { realm: 'system' })
 
-export const tables = { modules, settings, settingChanges, migrations, events, jobs, taskRuns, externalCalls, audit, credentials, idempotencyKeys, guard, ...identityTables }
+export const tables = { modules, settings, settingChanges, migrations, events, jobs, taskRuns, externalCalls, audit, credentials, idempotencyKeys, signingKeys, guard, ...identityTables }

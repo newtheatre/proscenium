@@ -2,14 +2,18 @@
 import { ability, defineAbilities, defineRecords, record } from '#kit'
 
 export const records = defineRecords('core', {
-  module: record({ table: 'core_modules' }),
-  setting: record({ table: 'core_settings' }),
-  job: record({ table: 'core_jobs' }),
-  credential: record({ table: 'core_credentials' }),
+  'module': record({ table: 'core_modules' }),
+  'setting': record({ table: 'core_settings' }),
+  'job': record({ table: 'core_jobs' }),
+  'credential': record({ table: 'core_credentials' }),
+  'signing-key': record({ table: 'core_signing_keys' }),
 })
 
 export const abilities = defineAbilities('core', {
   'settings.manage': ability({ risk: 'privileged' }),
   'modules.manage': ability({ risk: 'privileged', grantAt: ['site'] }),
   'job.manage': ability({ on: 'core.job' }),
+  'health.view': ability({ grantAt: ['site'], audit: false }),
+  // Retiring a key at once invalidates every code it signed (F-37).
+  'signing-key.retire': ability({ risk: 'privileged', grantAt: ['site'], implies: ['health.view'] }),
 })
