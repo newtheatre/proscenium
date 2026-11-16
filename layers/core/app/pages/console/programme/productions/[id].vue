@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // One production (C-02, C-03): its details, advisories and web address, with publish, withdraw and
 // delete. Publishing names what is still missing. Dates, credits and media arrive with their slices.
-definePageMeta({ layout: 'console' })
 
 type State = 'draft' | 'published' | 'withdrawn' | 'cancelled'
 interface Option { id: string, label: string, retired: boolean }
@@ -30,9 +29,10 @@ interface Production {
 }
 interface Answer { production: Production, needs: string[], options: { categories: Option[], advisories: Option[], seasons: { id: string, name: string }[] } }
 
+const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/productions/${String(route.params.id)}`)
-const { data, status, error, refresh } = await useFetch<Answer>(base, { key: `core:production:${String(route.params.id)}` })
+const { data, status, error, refresh } = await useAPI<Answer>(base, { key: `core:production:${String(route.params.id)}` })
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -40,7 +40,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const production = computed(() => data.value?.production)
 
 function api(path: string, method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: object = {}): Promise<unknown> {
-  return $fetch<unknown>(`${base.value}${path}` as string, { method, body })
+  return $api<unknown>(`${base.value}${path}` as string, { method, body })
 }
 async function run(fn: () => Promise<unknown>, done?: string) {
   refusal.value = null

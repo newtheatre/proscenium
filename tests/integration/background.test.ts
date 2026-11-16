@@ -8,6 +8,7 @@ import { provider } from '../fixtures/modules/seats/server/calls/take-payment'
 import { deliver, env, inContext, performance, rows, sent, setModule } from './helpers'
 
 const HOUR = 3_600_000
+const DAY = 86_400_000 // not-policy: a day in milliseconds
 
 beforeEach(() => {
   sent.length = 0
@@ -80,6 +81,26 @@ describe('jobs (F-07)', () => {
     expect(await inContext(() => runJob(id))).toBe('retrying')
     setClock(Date.now() + HOUR)
     expect(await inContext(() => runJob(id))).toBe('done')
+  })
+
+  it('answers "not yet" without spending an attempt, commits what it did, and waits longer each time', async () => {
+    const title = `Deferred ${crypto.randomUUID()}`
+    const id = await inContext(() => enqueue('seats.wait-a-while', { deferTimes: 3, title }))
+    const base = Date.now()
+    const runs: { state: string, attempts: number, deferrals: number, run_after: number }[] = []
+    for (let i = 0; i < 3; i++) {
+      setClock(base + i * DAY)
+      expect(await inContext(() => runJob(id))).toBe('deferred')
+      runs.push((await rows<{ state: string, attempts: number, deferrals: number, run_after: number }>('SELECT state, attempts, deferrals, run_after FROM core_jobs WHERE id = ?', id))[0]!)
+    }
+    // Three deferrals on a job allowed one attempt: still queued, never dead, and the pause doubles.
+    expect(runs.map(r => [r.state, r.attempts, r.deferrals])).toEqual([['queued', 0, 1], ['queued', 0, 2], ['queued', 0, 3]])
+    const pauses = runs.map((r, i) => r.run_after - (base + i * DAY))
+    expect(pauses[1]).toBe(pauses[0]! * 2)
+    expect(pauses[2]).toBe(pauses[1]! * 2)
+    setClock(base + 3 * DAY)
+    expect(await inContext(() => runJob(id))).toBe('done')
+    expect(await rows('SELECT title FROM seats_performances WHERE title LIKE ? ORDER BY title', `${title} %`)).toHaveLength(4)
   })
 
   it('leaves a switched-off module\'s jobs waiting until it is on again', async () => {

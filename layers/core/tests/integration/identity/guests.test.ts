@@ -165,13 +165,15 @@ describe('adding and inviting people (ID-06)', () => {
     expect((await new Browser().post('/api/core/sign-in/link', { token: tokenOf(message!) })).body.code).toBe('core.sign-in.link-used')
   })
 
-  it('an invitation already used or lapsed is not sent', async () => {
+  it('the invitation\'s link is sealed: never stored in clear', async () => {
     const roleId = await makeRole(['core.role.read'])
     const to = address()
-    await owner.browser.post('/api/core/grants', { person: { address: to, name: 'Ivy Invited' }, roleId })
-    await env.DB.prepare('UPDATE core_account_tokens SET expires_at = 1 WHERE address = ? AND purpose = \'invite\'').bind(to).run()
+    const given = await owner.browser.post('/api/core/grants', { person: { address: to, name: 'Ivy Invited' }, roleId })
+    const [before] = await rows<{ sealed_variables: string | null }>('SELECT sealed_variables FROM core_notifications WHERE type_key = \'core.invitation\' AND account_id = ?', given.body.accountId)
+    expect(before!.sealed_variables).toMatch(/^v1\./)
     await deliver()
-    expect(mailbox.find(m => m.address === to)).toBeUndefined()
+    const message = mailbox.find(m => m.address === to)!
+    expect(await rows('SELECT count(*) AS n FROM core_notifications WHERE payload LIKE ?', `%${tokenOf(message)}%`)).toEqual([{ n: 0 }])
   })
 
   it('the invitation lasts for the invite-lifetime setting', async () => {

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // Email sending (C-32, C-52): the sending domain, whether it is verified, a test message, and,
 // where the site has its own domain and a Cloudflare token is set, setting the domain up for you.
-definePageMeta({ layout: 'console' })
 
 interface Sender {
   domain: string | null
@@ -10,9 +9,10 @@ interface Sender {
   automatic: { proposed: string | null, unavailable: 'no-token' | 'workers-dev' | 'local' | null }
 }
 
+const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
-const { data, status, error, refresh } = useFetch<Sender>('/api/core/notifications/sender')
+const { data, status, error, refresh } = useAPI<Sender>('/api/core/notifications/sender')
 const busy = ref<'set-up' | 'verify' | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const toast = useToast()
@@ -28,7 +28,7 @@ async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}
   busy.value = kind
   try {
     const path = kind === 'set-up' ? '/api/core/notifications/set-up-domain' : '/api/core/notifications/verify-domain'
-    const answer = await $fetch<{ domain: string }>(path, { method: 'POST', body })
+    const answer = await $api<{ domain: string }>(path, { method: 'POST', body })
     toast.add({
       color: 'success',
       icon: 'i-lucide-circle-check',

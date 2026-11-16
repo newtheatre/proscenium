@@ -3,8 +3,9 @@
 export const SIGN_OUT_PATH = '/api/core/sign-out'
 
 export function useSignOut() {
+  const { $api } = useNuxtApp()
   async function signOut() {
-    await $fetch(SIGN_OUT_PATH, { method: 'POST', body: {} }).catch(() => undefined)
+    await $api(SIGN_OUT_PATH, { method: 'POST', body: {} }).catch(() => undefined)
     // A full reload, so nothing of the signed-in person's pages stays in memory.
     reloadNuxtApp({ path: '/', persistState: false })
   }

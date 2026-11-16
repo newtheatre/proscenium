@@ -42,7 +42,7 @@ export const readers = defineTable('payments_readers', {
 export const sessions = defineTable('payments_sessions', {
   id: col.id(),
   pointLabel: col.internal(text('point_label').notNull()),
-  openedBy: col.account('opened_by', { role: 'subject', onMerge: 'move' }),
+  openedBy: col.account('opened_by', { role: 'subject', onMerge: 'move', reason: 'a person has one open till session, a unique rule on this id' }),
   closedBy: col.account('closed_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   openedAt: col.timestamp('opened_at').notNull(),
   closedAt: col.timestamp('closed_at'),
@@ -186,6 +186,8 @@ export const refunds = defineTable('payments_refunds', {
   selfApproveLimitMinor: col.minor('self_approve_limit_minor').notNull(),
   approvedBy: col.account('approved_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   declineReasonTermId: col.ref('core_terms', { nullable: true }),
+  // A cash refund is handed back from a till session, and counts against its expected cash.
+  sessionId: col.ref('payments_sessions', { nullable: true }),
   feeReturnedMinor: col.minor('fee_returned_minor'),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),

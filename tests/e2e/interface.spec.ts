@@ -335,11 +335,39 @@ test.describe('confirming it is you', () => {
     const at = page.url()
     // Sent and not awaited: the request waits on the dialogue, as a save button's would.
     await page.evaluate(() => {
-      void (globalThis as unknown as { $fetch: (url: string, options: object) => Promise<unknown> })
-        .$fetch('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
+      void (globalThis as unknown as { useNuxtApp: () => { $api: (url: string, options: object) => Promise<unknown> } })
+        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
     })
     await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
     expect(page.url()).toBe(at)
+    await noViolations(page)
+    await context.close()
+  })
+})
+
+test.describe('the access scheme screens', () => {
+  const reviewerActor = { ...person('Rhea Reviewer', [grant('core.access-scheme.review')]), assurance: 'strong', reassertedAt: Date.now() }
+
+  test('My account\'s access scheme page offers the scheme, with no accessibility violations', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(audience) })
+    const page = await context.newPage()
+    await visit(page, '/account/access')
+    await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('link', { name: 'Apply' }).click()
+    await expect(page).toHaveURL(/\/account\/access\/apply$/)
+    await expect(page.getByRole('radio', { name: 'None' })).toBeVisible()
+    await noViolations(page)
+    await context.close()
+  })
+
+  test('the reviewers\' queue lists what is waiting and offers "Invite to apply"', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(reviewerActor) })
+    const page = await context.newPage()
+    await visit(page, '/console/people/access-scheme')
+    await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
+    await page.getByRole('button', { name: 'Invite to apply' }).first().click()
+    await expect(page.getByRole('dialog', { name: 'Invite to apply' })).toBeVisible()
     await noViolations(page)
     await context.close()
   })

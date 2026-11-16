@@ -30,7 +30,7 @@ the bundled migrations and the types that make `useSetting('x')`, `enqueue('x')`
 export const items = defineTable('lost_property_items', {
   id: col.id(),
   description: col.freeText(text('description')),
-  finder: col.account('finder_id', { role: 'subject', onMerge: 'move' }),
+  finder: col.account('finder_id', { role: 'subject' }),
   foundAt: col.timestamp('found_at').notNull(),
 }, { id: 'lpi', realm: 'operational' })
 ```
@@ -44,6 +44,41 @@ platform's own tables). An account subject column that may be empty needs
 search. `col.internal()` and `col.personal()` take `encrypted: true`, sealed with the one core key as
 `col.special()` always is. After changing a table run `bun run db:generate -- --name <what>`;
 the conformance check fails while the code and the migrations disagree.
+
+### Accounts, the account scope and merges
+
+`col.account(name, { role, onMerge })` refers to an account. `onMerge` is `alias` when left out: the
+column keeps the id it was written with and reads follow the merge. `move` (the stored id must be
+the survivor's: a unique rule, or the person's own living record) needs a one-line `reason`;
+`handler` leaves the column to the module's merge handler. Actor columns, and every account
+column in an append-only table, are alias.
+
+Because a merge leaves most columns alone and moves the rest in stages, every read by account,
+and every count or claim condition, goes through the account scope, all from `#kit`:
+
+- `inAccountScope(column, account)`: the condition `column IN (the scope)`, for reads, updates,
+  counts, claim conditions and inside a set-wise `INSERT ... SELECT`.
+- `accountScope(account)`: the subquery itself, the survivor and every account merged into it.
+  `account` is an id (a survivor's or a merged-away one) or an SQL expression, such as a
+  `json_each` value, so a set works it out row by row; the survivor is resolved inside the
+  statement, so a unit needs no read first.
+- `accountScopeIds(accountId)`: the ids, survivor first, for display, logs and tests only.
+- `exactAccount(column, accountId)`: `column = accountId`, the one escape, for identity's own
+  tables and the merge job; anywhere else the line ends `// exact-account: <why>`.
+- `canonicalAccount(id)` (core's services) resolves a stored id to its survivor.
+
+`bun run check:conformance` refuses `eq`, `inArray` or raw SQL that compares an account column to a
+value outside identity's code. Erasure matches the person's rows through the scope.
+
+A module with `onMerge: 'handler'` columns supplies a `MergeHandler`: `merge(unit, { mergeId,
+survivorId, mergedAccountId })` fits one unit, is safe to run twice, may answer `NOT_YET`, and lists
+every row it changes with `recordMergeItems(unit, { mergeId, table, column, mergedAccountId, action })`
+before changing it. `action` is `moved`, `ended` or `set-aside`; a set-aside row also says what the
+close of the undo window does with it, `onClose: 'delete'` (the default) or `'keep'`. An optional
+`undo` puts things back itself and answers `{ notRestored, reason }`. `moveAccountColumn` is the
+merge job's two statements for one move column: list the rows, then re-point them. Identity owns
+the merge job (`core.merge-move`) and its order: within a module, handlers before moves; on undo,
+the reverse.
 
 ## Routes
 
@@ -164,6 +199,9 @@ a module that is switched on. Payloads hold ids, numbers, enums and `code()` val
 person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is the truth, so a
 duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
 with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`.
+A job that cannot go on yet calls `job.defer(code)`: what it did commits, the attempt is given
+back, and it runs again after a pause that doubles with each deferral (`job.deferrals`); a
+deferral never makes a job dead.
 Core alone may declare `events.listens: { deliverable: '<listener>' }`, the listener on
 `'deliverable'`: it hears every event not marked `internal: true`, for the webhook sender. Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
 `POST /api/core/jobs/<id>/cancel`, ability `core.job.manage`) cancels a job that has not started. A
@@ -198,7 +236,10 @@ if the actor holds that ability, and the read is audited against the account; a 
 holds it. A check carrying a typed value counts against the `presented-value` rate-limit class, by
 session and by address; past it, those pairs answer not met and the source is not called.
 `requirements.holder(ref, evidence)` gives staff with the source's `holderAbility` a display name,
-and audits the read.
+and audits the read. A met answer may also carry `holderAccountId`, the account a source knows a
+presented value belongs to (R-34). It is for the host's server code only: the property is not
+enumerable, so an answer turned into JSON (a route returning it, a summary, an event or job
+payload) leaves it out, and it is dropped from any verdict that is not met.
 
 ## Email outcomes
 

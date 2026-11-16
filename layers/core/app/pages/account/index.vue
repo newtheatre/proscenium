@@ -4,7 +4,7 @@
      leaves nothing behind. Identity draws its own sections (details, sign-in, sessions) the same way. -->
 <script setup lang="ts">
 const { t } = useT()
-const { data } = await useFetch<{ sections: { id: string, component: string, to?: string, icon?: string, count?: number }[] }>('/api/core/account-sections', { query: { side: 'audience' }, key: 'core:account-sections', default: () => ({ sections: [] }) })
+const { data } = await useAPI<{ sections: { id: string, component: string, to?: string, icon?: string, count?: number }[] }>('/api/core/account-sections', { query: { side: 'audience' }, key: 'core:account-sections', default: () => ({ sections: [] }) })
 const { data: navigation } = await useNavigation('account')
 
 // A name that no component answers to is left out rather than breaking the page.

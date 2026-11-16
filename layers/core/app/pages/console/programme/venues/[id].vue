@@ -6,16 +6,15 @@ import type { FormSubmitEvent } from '@nuxt/ui'
 import type { z } from 'zod'
 import { spaceInput, venuePatch } from '../../../../../server/places/input'
 
-definePageMeta({ layout: 'console' })
-
 interface Option { id: string, label: string, icon: string | null, retired: boolean }
 interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, archived: boolean }
 interface Place { id: string, name: string, managed: boolean, addressLines: string | null, locality: string | null, postcode: string | null, country: string | null }
 interface Venue extends Place { description: string | null, accessInfo: string | null, gettingHere: string | null, archived: boolean, spaces: Space[], access: { spaceId: string | null, termId: string, note: string | null }[] }
 
+const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/venues/${String(route.params.id)}`)
-const { data, status, error, refresh } = await useFetch<{ venue: Venue, kinds: Option[], features: Option[] }>(base, { key: `core:venue:${String(route.params.id)}` })
+const { data, status, error, refresh } = await useAPI<{ venue: Venue, kinds: Option[], features: Option[] }>(base, { key: `core:venue:${String(route.params.id)}` })
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -27,7 +26,7 @@ const kindLabel = (id: string) => data.value?.kinds.find(k => k.id === id)?.labe
 
 // One call to the venue's routes. The path is built at run time, so it is typed as a string.
 function api(path: string, method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: object = {}): Promise<unknown> {
-  return $fetch<unknown>(`${base.value}${path}` as string, { method, body })
+  return $api<unknown>(`${base.value}${path}` as string, { method, body })
 }
 async function run(fn: () => Promise<unknown>, done?: string) {
   refusal.value = null

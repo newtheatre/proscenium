@@ -1,7 +1,14 @@
 <!-- Sign in (ID-01, ID-02, ID-04, ID-07): a passkey first, an emailed link and code, or Google. -->
 <script setup lang="ts">
-import type { Refusal } from '../../composables/useIdentity'
+import type { Refusal } from '../../utils/identity'
 
+// Someone already signed in is sent on before the page is made. The page reads the same answer.
+definePageMeta({
+  middleware: async (to) => {
+    const { data } = await useAPI<{ signedIn: boolean }>('/api/core/me', { key: 'core:me' })
+    if (data.value?.signedIn) return navigateTo(nextPath(to.query.next) ?? '/')
+  },
+})
 useSeoMeta({ title: 'Sign in' })
 const route = useRoute()
 const next = nextPath(route.query.next)
@@ -14,8 +21,7 @@ const digits = ref<number[]>([])
 const code = computed(() => digits.value.join(''))
 const challenge = ref('')
 const sent = ref(false)
-const { data: me } = await useFetch<{ signedIn: boolean, signIn?: { email: boolean, google: boolean } }>('/api/core/me')
-if (me.value?.signedIn) await navigateTo(next ?? '/')
+const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, google: boolean } }>('core:me')
 const errorCode = typeof route.query.error === 'string' ? route.query.error : null
 const providerErrors: Record<string, string> = {
   'core.sign-in.provider-unverified': 'Google has not confirmed this account\'s email address. Confirm it with Google, or sign in another way.',

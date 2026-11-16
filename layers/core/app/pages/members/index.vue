@@ -1,6 +1,5 @@
 <!-- The members' area home: a short list of where to go, from the sections modules contribute. -->
 <script setup lang="ts">
-definePageMeta({ layout: 'members' })
 const { t } = useT()
 const { viewer } = useViewer()
 const { data: navigation } = await useNavigation('members')

@@ -4,7 +4,6 @@
      already answered "not found", so nothing here tests membership. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
-import { isCurrent } from '../composables/useNavigation'
 
 const { t } = useT()
 const route = useRoute()

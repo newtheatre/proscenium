@@ -3,10 +3,9 @@
 // of the theatre's own.
 import { vocabularyInput } from '../../../../../server/vocabularies/input'
 
-definePageMeta({ layout: 'console' })
-
 interface Row { key: string, owner: string, label: string, description: string | null, locked: boolean, live: number, retired: number }
 
+const { $api } = useNuxtApp()
 const columns = [
   { key: 'label', label: 'Vocabulary', sortable: true, card: true },
   { key: 'owner', label: 'Belongs to', card: true },
@@ -24,7 +23,7 @@ const fields = [
   { name: 'label', label: 'Name', kind: 'text' as const },
   { name: 'description', label: 'Description', kind: 'textarea' as const, optional: true },
 ]
-const create = (values: Record<string, unknown>) => $fetch<{ key: string }>('/api/core/vocabularies', { method: 'POST', body: { ...values, description: values.description || null } })
+const create = (values: Record<string, unknown>) => $api<{ key: string }>('/api/core/vocabularies', { method: 'POST', body: { ...values, description: values.description || null } })
 const created = (result: unknown) => navigateTo(`/console/system/vocabularies/${encodeURIComponent((result as { key: string }).key)}`)
 </script>
 

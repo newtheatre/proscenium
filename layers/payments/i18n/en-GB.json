@@ -35,5 +35,7 @@
   "payments.abilities.session.open.label": "Open and cash up your own till session",
   "payments.abilities.session.view.label": "See till sessions and their counts",
   "payments.abilities.session.close-any.label": "Close someone else's till session, or countersign a cash difference",
+  "payments.abilities.refund.request.label": "Ask for a refund from the Payments screens",
+  "payments.abilities.refund.approve.label": "Approve or decline a refund someone else asked for",
   "payments.abilities.attempt.reconcile.label": "Answer a payment with no answer from the provider's own records"
 }

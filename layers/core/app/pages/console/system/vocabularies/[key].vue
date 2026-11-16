@@ -2,15 +2,15 @@
 // One vocabulary (C-20, C-21): its terms in order, to add, rename, reorder, retire, restore and
 // delete, each with the count of records that use it. A record stores the term's id, so a
 // rename reaches every record and none is rewritten.
-definePageMeta({ layout: 'console' })
 
 interface Term { id: string, slug: string, label: string, description: string | null, icon: string | null, seeded: boolean, retired: boolean, mergedIntoId: string | null, uses: number }
 interface Vocabulary { key: string, owner: string, label: string, description: string | null, ordering: 'manual' | 'alphabetical', locked: boolean }
 
+const { $api } = useNuxtApp()
 const route = useRoute()
 const key = computed(() => String(route.params.key))
 const base = computed(() => `/api/core/vocabularies/${encodeURIComponent(key.value)}`)
-const { data, status, error, refresh } = await useFetch<{ vocabulary: Vocabulary, terms: Term[] }>(base, { key: `core:vocabulary:${key.value}` })
+const { data, status, error, refresh } = await useAPI<{ vocabulary: Vocabulary, terms: Term[] }>(base, { key: `core:vocabulary:${key.value}` })
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -22,7 +22,7 @@ const locked = computed(() => !!data.value?.vocabulary.locked)
 const manual = computed(() => data.value?.vocabulary.ordering === 'manual')
 // One call to the vocabulary's routes. The path is built at run time, so it is typed as a string.
 function api(path: string, method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: object = {}): Promise<unknown> {
-  return $fetch<unknown>(`${base.value}${path}` as string, { method, body })
+  return $api<unknown>(`${base.value}${path}` as string, { method, body })
 }
 const labelOf = (id: string | null) => data.value?.terms.find(t => t.id === id)?.label ?? ''
 

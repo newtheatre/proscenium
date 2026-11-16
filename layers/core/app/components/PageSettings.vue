@@ -6,7 +6,6 @@
 <script setup lang="ts">
 import { parseTime } from '@internationalized/date'
 import { fromControl, sameValue, toControl } from '../../shared/controls'
-import { phrase, toRefusal } from '../composables/useRefusal'
 
 interface SettingView {
   key: string
@@ -32,6 +31,7 @@ interface SettingView {
   of?: string
 }
 
+const { $api } = useNuxtApp()
 const props = defineProps<{
   /** The module whose settings these are. */
   module: string
@@ -42,7 +42,7 @@ const props = defineProps<{
 
 const { t } = useT()
 const toast = useToast()
-const { data, status, error, refresh } = await useFetch<{ module: string, settings: SettingView[] }>('/api/core/settings', { query: { module: props.module }, key: `core:settings:${props.module}` })
+const { data, status, error, refresh } = await useAPI<{ module: string, settings: SettingView[] }>('/api/core/settings', { query: { module: props.module }, key: `core:settings:${props.module}` })
 
 const draft = reactive<Record<string, any>>({})
 const resets = reactive<Record<string, boolean>>({})
@@ -84,7 +84,7 @@ async function save(sectionId: string, settings: SettingView[]) {
   saving.value = sectionId
   for (const s of settings) Reflect.deleteProperty(problems, s.key)
   try {
-    await $fetch('/api/core/settings', { method: 'PUT', body: { changes } })
+    await $api('/api/core/settings', { method: 'PUT', body: { changes } })
     toast.add({ title: t('core.settings-page.saved', { count: changes.length }), color: 'success', icon: 'i-lucide-circle-check' })
     await refresh()
   }

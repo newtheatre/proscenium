@@ -3,7 +3,7 @@
      A basic sign-in on an account with no passkey gets a six-digit code by email instead, typed
      here. A strong sign-in is never confirmed by email. -->
 <script setup lang="ts">
-import type { Refusal } from '../composables/useIdentity'
+import type { Refusal } from '../utils/identity'
 import type { ConfirmReason } from '../composables/useConfirmItsYou'
 
 const props = defineProps<{ reason: ConfirmReason }>()

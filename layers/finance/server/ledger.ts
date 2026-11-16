@@ -56,6 +56,23 @@ export async function declaredAccounts(): Promise<Map<string, { module: string, 
 }
 
 /** One statement adding accounts that are not there yet; one another unit added meanwhile is ignored. */
+// Accounts made by postings earlier in a unit that has not committed yet, so a second posting in the
+// same unit (a sale and its fee, say) uses the account the first one makes rather than making another.
+// Forgotten when the unit commits; the few left by units that fail are dropped oldest first.
+const unitAccounts = new Map<string, Map<string, { id: string, module: string }>>()
+const UNITS_REMEMBERED = 64 // not-policy: a bound on memory, far above the units open at once
+
+function madeIn(unit: UnitView): Map<string, { id: string, module: string }> {
+  let made = unitAccounts.get(unit.id)
+  if (!made) {
+    made = new Map()
+    unitAccounts.set(unit.id, made)
+    unit.afterCommit(() => unitAccounts.delete(unit.id))
+    if (unitAccounts.size > UNITS_REMEMBERED) unitAccounts.delete(unitAccounts.keys().next().value!)
+  }
+  return made
+}
+
 function addAccounts(unit: UnitView, rows: { id: string, code: string, name: string, kind: string, module: string, systemKey: string, scope: string | null }[]) {
   if (!rows.length) return
   const at = nowMs()
@@ -129,7 +146,7 @@ export async function postEntries(unit: UnitView, posting: PostingInput): Promis
       continue
     }
     const decl = declared.get(key)
-    const pending = toMake.find(r => r.systemKey === key && r.scope === (scope ?? null))
+    const pending = toMake.find(r => r.systemKey === key && r.scope === (scope ?? null)) ?? madeIn(unit).get(`${key}\u0000${scope ?? ''}`)
     if (pending) {
       resolved.push({ id: pending.id, module: pending.module })
       continue
@@ -151,6 +168,7 @@ export async function postEntries(unit: UnitView, posting: PostingInput): Promis
   })
 
   addAccounts(unit, toMake)
+  for (const made of toMake) madeIn(unit).set(`${made.systemKey}\u0000${made.scope ?? ''}`, made)
   addPeriods(unit, await missingPeriods(date))
 
   const postingId = newId('post')

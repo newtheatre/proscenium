@@ -3,11 +3,10 @@
 // theatre with one room never has to think about spaces.
 import { venueInput } from '../../../../../server/places/input'
 
-definePageMeta({ layout: 'console' })
-
 interface Space { id: string, name: string, defaultCapacity: number | null, archived: boolean }
 interface Row { id: string, name: string, locality: string | null, managed: boolean, archived: boolean, spaces: Space[] }
 
+const { $api } = useNuxtApp()
 const columns = [
   { key: 'name', label: 'Venue', card: true },
   { key: 'locality', label: 'Town or city', card: true },
@@ -24,7 +23,7 @@ const fields = [
   { name: 'name', label: 'Name', kind: 'text' as const },
   { name: 'locality', label: 'Town or city', kind: 'text' as const, optional: true },
 ]
-const create = (values: Record<string, unknown>) => $fetch<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
+const create = (values: Record<string, unknown>) => $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
 const created = (result: unknown) => navigateTo(`/console/programme/venues/${(result as { venueId: string }).venueId}`)
 
 const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
