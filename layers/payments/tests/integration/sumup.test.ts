@@ -120,8 +120,8 @@ describe('a checkout on the reader', () => {
     const checkout = seen.find(r => r.path.endsWith('/checkout'))!
     expect(checkout.body.total_amount).toEqual({ value: 1250, currency: 'GBP', minor_unit: 2 })
     expect(checkout.body.affiliate).toEqual({ app_id: 'com.example.theatre', key: 'sup_afk_test', foreign_transaction_id: out.attemptId })
-    const token = await inContext(() => webhookToken(account))
-    expect(checkout.body.return_url).toBe(`https://theatre.example/api/payments/webhooks/${account}?token=${token}`)
+    const token = await inContext(() => webhookToken(account, out.attemptId))
+    expect(checkout.body.return_url).toBe(`https://theatre.example/api/payments/webhooks/${account}?attempt=${out.attemptId}&token=${token}`)
     expect(out.next).toEqual({ kind: 'waiting-for-reader' })
     expect(await attemptRow(out.attemptId)).toMatchObject({ state: 'pending', provider_ref: `ctx_${out.attemptId}` })
   })
@@ -135,10 +135,13 @@ describe('a checkout on the reader', () => {
   it('settles from the transaction, with its fee, after a webhook carrying the token', async () => {
     const { out, orderId, intentId } = await onReader(2000, 'https://theatre.example')
     transactions.set(out.attemptId, { id: 'tx_1', status: 'SUCCESSFUL', amount: 20, currency: 'GBP', fee_amount: 0.35 })
-    const token = await inContext(() => webhookToken(account))
+    const token = await inContext(() => webhookToken(account, out.attemptId))
+    const other = await onReader(500)
     const event = { id: 'wh_1', event_type: 'solo.transaction.updated', payload: { client_transaction_id: `ctx_${out.attemptId}`, merchant_code: 'MC123', status: 'successful' }, timestamp: '2026-11-16T19:00:00Z' }
-    expect((await call(handle, 'POST', `/api/payments/webhooks/${account}?token=wrong`, { body: event })).status).toBe(400)
-    expect((await call(handle, 'POST', `/api/payments/webhooks/${account}?token=${token}`, { body: { ...event, id: 'wh_2' } })).status).toBe(200)
+    expect((await call(handle, 'POST', `/api/payments/webhooks/${account}?attempt=${out.attemptId}&token=wrong`, { body: event })).status).toBe(400)
+    // One attempt's address cannot speak for another attempt.
+    expect((await call(handle, 'POST', `/api/payments/webhooks/${account}?attempt=${other.out.attemptId}&token=${token}`, { body: { ...event, id: 'wh_x' } })).status).toBe(400)
+    expect((await call(handle, 'POST', `/api/payments/webhooks/${account}?attempt=${out.attemptId}&token=${token}`, { body: { ...event, id: 'wh_2' } })).status).toBe(200)
     expect(await deliver()).toEqual(['done'])
     expect((await rows<{ state: string }>('SELECT state FROM tickets_orders WHERE id = ?', orderId))[0]!.state).toBe('paid')
     expect(await rows('SELECT kind FROM finance_postings WHERE source_id IN (?, ?) ORDER BY kind', intentId, out.attemptId)).toEqual([{ kind: 'fee' }, { kind: 'sale' }])

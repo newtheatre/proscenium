@@ -90,7 +90,9 @@ export interface PaymentProvider {
   /**
    * Check a webhook's signature; give the provider's event id, its type and the reference it
    * concerns. Null when the body cannot be read at all. Nothing in the body is trusted beyond which
-   * attempt to ask about: the handler always asks `status` for the truth.
+   * attempt to ask about: the handler always asks `status` for the truth. A provider whose webhook
+   * address names the attempt (and is signed for it) gives `attemptId`, which is used instead of
+   * `providerRef` to find the attempt, within this provider account.
    */
-  verifyWebhook?: (request: { body: string, headers: Record<string, string>, secret: string | undefined, url: string, providerAccountId: string }) => Promise<{ ok: boolean, eventId: string, type: string, providerRef?: string } | null>
+  verifyWebhook?: (request: { body: string, headers: Record<string, string>, secret: string | undefined, url: string, providerAccountId: string }) => Promise<{ ok: boolean, eventId: string, type: string, providerRef?: string, attemptId?: string } | null>
 }

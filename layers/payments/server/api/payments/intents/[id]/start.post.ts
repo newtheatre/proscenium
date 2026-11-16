@@ -1,7 +1,8 @@
 // Starts a payment with an integrated provider for a desk sale, such as a card reader.
 import { z } from 'zod'
-import { getRequestURL, getRouterParam } from 'h3'
+import { getRouterParam } from 'h3'
 import { defineRoute, idSchema } from '#kit'
+import { siteOrigin } from '../../../../origin'
 import { startAttempt } from '../../../../start'
 
 export default defineRoute({
@@ -14,4 +15,4 @@ export default defineRoute({
     readerId: idSchema('rdr').optional(),
     amountMinor: z.number().int().positive().optional(),
   }).strict(),
-}, async (event, { input }) => startAttempt(getRouterParam(event, 'id') ?? '', { ...input, origin: getRequestURL(event).origin }))
+}, async (event, { input }) => startAttempt(getRouterParam(event, 'id') ?? '', { ...input, origin: siteOrigin(event) }))

@@ -38,9 +38,11 @@ export default defineRoute({
 
   const seen = await first<{ id: string }>('SELECT id FROM payments_webhook_events WHERE provider_account_id = ? AND provider_event_id = ? AND signature_ok = 1', account.id, verified.eventId)
   if (seen) return { received: true }
-  const attempt = verified.providerRef
-    ? await first<{ id: string }>('SELECT id FROM payments_attempts WHERE provider_account_id = ? AND provider_ref = ?', account.id, verified.providerRef)
-    : null
+  const attempt = verified.attemptId
+    ? await first<{ id: string }>('SELECT id FROM payments_attempts WHERE provider_account_id = ? AND id = ?', account.id, verified.attemptId)
+    : verified.providerRef
+      ? await first<{ id: string }>('SELECT id FROM payments_attempts WHERE provider_account_id = ? AND provider_ref = ?', account.id, verified.providerRef)
+      : null
   // A race with the same delivery meets the unique index and inserts nothing; its job finds no row.
   unit.add({
     sql: `INSERT INTO payments_webhook_events (id, provider_account_id, provider_event_id, type, signature_ok, attempt_id, received_at, handled_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?)

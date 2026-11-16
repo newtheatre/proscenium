@@ -8,9 +8,11 @@
 // transaction and does not ask the reader again; a refund compares what SumUp has already refunded
 // with what Payments had refunded before it, and sends nothing when SumUp has it already.
 //
-// SumUp does not sign the webhook a reader checkout sends. Its address carries a token made from the
-// API key and the provider account, so a delivery without it is stored and not acted on; and, as for
-// every provider, the body is never trusted: the job reads the transaction.
+// SumUp does not sign the webhook a reader checkout sends. Its address names the attempt and carries a
+// token made from the API key, the provider account and that attempt, so a delivery without it is
+// stored and not acted on, and one address prompts a look at its own attempt only. As for every
+// provider, the body is never trusted: the job reads the transaction. Payments never logs the
+// address; Cloudflare's request logs record it, as they do every request.
 import { credential, nowMs } from '#kit'
 import { sumup, SumUpError } from '../../calls/sumup/client'
 import type { PaymentProvider, ProviderAnswer, ProviderAttempt, RefundAnswer } from '../../points/provider'
@@ -77,12 +79,12 @@ async function read(attempt: ProviderAttempt): Promise<ProviderAnswer | 'unknown
 
 const hex = (bytes: ArrayBuffer) => [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('') // not-policy: hexadecimal
 
-/** The token in this account's webhook address, from the API key, so it changes when the key does. */
-export async function webhookToken(providerAccountId: string): Promise<string | null> {
+/** The token in an attempt's webhook address, from the API key, so it changes when the key does. */
+export async function webhookToken(providerAccountId: string, attemptId: string): Promise<string | null> {
   const key = await credential(API_KEY)
   if (!key) return null
   const hmac = await crypto.subtle.importKey('raw', new TextEncoder().encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  return hex(await crypto.subtle.sign('HMAC', hmac, new TextEncoder().encode(`payments.sumup.webhook:${providerAccountId}`)))
+  return hex(await crypto.subtle.sign('HMAC', hmac, new TextEncoder().encode(`payments.sumup.webhook:${providerAccountId}:${attemptId}`)))
 }
 
 function sameText(a: string, b: string): boolean {
@@ -105,14 +107,14 @@ export default {
     const existing = await transactionOf(attempt)
     if (existing) return { next: { kind: 'none' }, answer: answerOf(existing, attempt) }
     if (!attempt.readerExternalRef) return { next: { kind: 'none' }, answer: { state: 'failed', failureCode: 'no-reader' } }
-    const token = attempt.webhookUrl ? await webhookToken(attempt.providerAccountId) : null
+    const token = attempt.webhookUrl ? await webhookToken(attempt.providerAccountId, attempt.id) : null
     try {
       const created = await sumup<{ data: { client_transaction_id: string } }>('POST', `/v0.1/merchants/${merchant(attempt)}/readers/${encodeURIComponent(attempt.readerExternalRef)}/checkout`, {
         key: await secret(API_KEY),
         body: {
           total_amount: { value: attempt.amountMinor, currency: attempt.currency, minor_unit: minorDigits(attempt.currency) },
           affiliate: { app_id: await secret(APP_ID), key: await secret(AFFILIATE_KEY), foreign_transaction_id: attempt.id },
-          return_url: attempt.webhookUrl && token ? `${attempt.webhookUrl}?token=${token}` : undefined,
+          return_url: attempt.webhookUrl && token ? `${attempt.webhookUrl}?${new URLSearchParams({ attempt: attempt.id, token })}` : undefined,
         },
       })
       return { next: { kind: 'waiting-for-reader' }, providerRef: created?.data.client_transaction_id }
@@ -167,8 +169,10 @@ export default {
       return null
     }
     if (!event.id || !event.event_type) return null
-    const expected = await webhookToken(providerAccountId)
-    const token = new URL(url).searchParams.get('token') ?? ''
-    return { ok: !!expected && sameText(token, expected), eventId: event.id, type: event.event_type, providerRef: event.payload?.client_transaction_id }
+    const query = new URL(url).searchParams
+    const attemptId = query.get('attempt') ?? ''
+    const expected = attemptId ? await webhookToken(providerAccountId, attemptId) : null
+    const ok = !!expected && sameText(query.get('token') ?? '', expected)
+    return { ok, eventId: event.id, type: event.event_type, attemptId: ok ? attemptId : undefined }
   },
 } satisfies PaymentProvider
