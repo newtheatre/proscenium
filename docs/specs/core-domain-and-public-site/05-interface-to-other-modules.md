@@ -108,7 +108,7 @@ An event's payload carries ids and times, never names or free text. "Internal" i
 | `core.performance.completed` | The task marks it complete | The operating day | No |
 | `core.venue.archived`, `core.space.archived` | The move happens |  | No |
 | `core.closure.created`, `core.closure.removed` | A closure is saved or deleted | Scope and times | No |
-| `core.term.retired`, `core.term.merged` | The move happens | The vocabulary key, and the term merged into | No |
+| `core.term.retired`, `core.term.merged` | The move happens | `termId` and `vocabulary` for both, and `intoId` for a merge. `core.term.merged` is declared from the first release so listeners can be written against it, and is first announced when merging terms ships (C-22, later). | No |
 | `core.file.ready`, `core.file.deleted` | The move happens | The owner and slot | Yes |
 | `core.branding.changed` | The brand is saved | The new revision | No |
 | `core.delivery.failed` | A transactional delivery reaches Failed | The type key and channel | Yes |
