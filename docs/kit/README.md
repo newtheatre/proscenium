@@ -114,7 +114,9 @@ put in an event, a job's payload or an audit row. A route that takes one in its 
 `tokens: ['token']` for `[token].get.ts`: the kit then writes `[token]` in its place in the log, error
 reports and the idempotency record, and refuses an audit row, event or job payload that holds it. The
 check refuses `sealSpecial` in a module with no special or encrypted column, and a call that seals a
-token.
+token. A column declared `encrypted: true` that is not special (a ticket's code kept to show again) is
+written with `sealColumn` and read with `openColumn`, the same pair under its own name; the check treats
+it as it treats `sealSpecial`.
 
 ## Core's services
 
