@@ -206,3 +206,55 @@ pointing at the repository's docs until screens have help pages), a Site adminis
 who holds an admin entry, and the account menu. In Site administration the theatre's mark sits where it
 does in the console and "Back to console" (or "Back to the site") sits at the foot instead of the
 Site administration link. The navbar keeps only search.
+## Lists: defineList, filters, sort and columns
+
+A list is declared once and read by the page, the data route and the export. The declaration is
+pure data in `layers/core/shared/list.ts` (the kit's `readList` and `defineListSource` import it and add
+the SQL side). `defineList(id, { filters, sorts, columns, search, views, defaultView, defaultSort, subRows })`
+keeps filter and sort keys literal and refuses a reserved key (`q`, `sort`, `order`, `page`, `size`,
+`view`), an undeclared sort or a view naming something undeclared.
+
+`PageList` takes `:list` (a declaration) and, for a choice filter whose options are the theatre's own
+(seasons), `:filter-options="{ seasonId: [...] }"`. A page that still passes `columns` and `filters`
+gets the same declaration made for it: each filter is a `choice`, each `sortable` column a text sort
+(`sortType` words it as numbers or dates).
+
+- **Toolbar:** search (always first, across every field), **Filters** with a count, **Sort**, **Columns**.
+  Filters opens a popover on a laptop and a drawer on a phone, one labelled field for each filter, in six
+  kinds: `choice`, `choices`, `grouped`, `lookup`, `dates` (relative presets or two days; days are the
+  device's until the theatre's day is passed in) and `yes-no`. Changes made in one visit to the panel make
+  one history entry. A chip for each filter that is on opens the panel; its cross is named "Remove the
+  filter State: Draft".
+- **Sort** says how the list is sorted ("Sort: Seats, Lowest first") and lists every declared sort, shown or not.
+  A heading sorts in its natural direction, again reverses, a third press returns to the default.
+- **Columns** ticks optional columns; the choice is kept on the device for each list
+  (`core:list-columns:<id>`), is not in the address, and is cleared on sign-out.
+- **Address:** one key for each filter (`state=draft,published`, `when=7d`, `action=orders.refund`),
+  `view`, `sort`, `order`, `page`, `size` (25, 50 or 100), left out when default.
+- **Server:** `decodeList(query, list, { can, today })` (alias `parse`) validates strictly and answers a typed
+  `ListQuery` (folded search words, validated filters, dropped filters, view, sort, page, size) or a
+  `ListRefusal` naming the key. Routes call the kit's `readList`, not this.
+
+### Adding to another module's list or record page (R-35)
+
+A module adds to another module's list or record page only through four points:
+`core.record-tab`, `core.record-fact`, `core.record-check` and `core.list-column`. There are no slots
+and no overrides. All are read-only, gated by `ability`, and absent when the module is off.
+
+| Point | A contribution adds | Built as |
+| --- | --- | --- |
+| `core.record-fact` | One fact in the summary strip, after the owner's | `{ id, record, ability, component, order }`; the component (in `app/record-facts/`) renders a `<div><dt/><dd/></div>` and gets `recordId` |
+| `core.record-check` | One line of the record's checklist | Code point. The file under `server/contributions/core.record-check/` exports `{ record, ability, order, check(recordId) }` answering `{ done, sentence, link }`. It reports only |
+| `core.list-column` | A column after the owner's | `{ id, list, ability, component, order }`; the component (in `app/list-columns/`) gets `listId`, `query` and `rowId` and fetches once for the page (one fetch key for the query). Label `<module>.list-columns.<name>.label`. Not yet sortable |
+
+`PageRecord` shows the checklist and an `aside` slot beside the tabs on a laptop; on a phone the
+checklist folds to one line above the tabs ("Checklist: 3 of 5").
+
+### The trail and the way back
+
+`trail: { label, to }[]` (parents only, nearest last) on `PageFrame`, `PageRecord`, `PageList` and
+`PageSettings`; `PageFrame` alone draws it and never fetches a label. In the console and Site
+administration a `UBreadcrumb` of the parents sits in the navbar after the sidebar toggle from 640
+pixels up, and below that an icon-only back button ("Back to Productions") takes its place. Outside
+the console a worded back link sits above the title. A link to a list returns the list as it was left
+(`useListMemory`, kept for the tab's session). A page passes its own parent once its record has arrived.

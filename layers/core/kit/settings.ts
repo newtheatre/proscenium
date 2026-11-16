@@ -50,7 +50,7 @@ const KINDS = ['boolean', 'integer', 'money', 'duration', 'time', 'text', 'choic
 /** A rate as written: a count in a period, `{ count: 10, per: '10m' }`. Read with `per` in seconds. */
 export interface RateInput { count: number, per: string }
 export interface Rate { count: number, per: number }
-const RATE_COUNT = { min: 1, max: 10_000 }
+export const RATE_COUNT = { min: 1, max: 10_000 }
 const RATE_PERIOD = { min: '1m', max: '1d' }
 export type SettingKind = typeof KINDS[number]
 

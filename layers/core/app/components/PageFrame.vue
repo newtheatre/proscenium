@@ -11,7 +11,9 @@ const props = withDefaults(defineProps<{
   /** reading (forms, settings), standard (lists, records) or full (calendars, seating plans). */
   width?: 'reading' | 'standard' | 'full'
   description?: string
-}>(), { width: 'standard', description: undefined })
+  /** The parents of this page, nearest last: where it sits below a navigation entry. Drawn here and nowhere else. */
+  trail?: { label: string, to: string }[]
+}>(), { width: 'standard', description: undefined, trail: undefined })
 
 defineSlots<{
   default?: () => unknown
@@ -24,6 +26,11 @@ defineSlots<{
 }>()
 
 useHead({ title: () => props.title })
+const { t } = useT()
+// A link to a list returns it as it was left (the same view, filters, search, sort and page).
+const { recall } = useListMemory()
+const parents = computed(() => (props.trail ?? []).map(c => ({ label: c.label, to: recall(c.to), active: false })))
+const nearest = computed(() => parents.value.at(-1))
 const dashboard = inject(DASHBOARD_SHELL, false)
 const widths = { reading: 'width-reading', standard: 'width-standard', full: 'width-full' } as const
 </script>
@@ -37,6 +44,21 @@ const widths = { reading: 'width-reading', standard: 'width-standard', full: 'wi
       <UDashboardNavbar :title="title">
         <template #leading>
           <UDashboardSidebarCollapse />
+          <template v-if="nearest">
+            <UBreadcrumb
+              :items="parents"
+              :aria-label="t('core.trail.label')"
+              class="max-sm:hidden"
+            />
+            <UButton
+              :to="nearest.to"
+              icon="i-lucide-chevron-left"
+              color="neutral"
+              variant="ghost"
+              class="sm:hidden"
+              :aria-label="t('core.trail.back-to', { where: nearest.label })"
+            />
+          </template>
         </template>
         <template #trailing>
           <slot name="status" />
@@ -82,6 +104,20 @@ const widths = { reading: 'width-reading', standard: 'width-standard', full: 'wi
         :title="title"
         :description="description"
       >
+        <template
+          v-if="nearest"
+          #headline
+        >
+          <UButton
+            :to="nearest.to"
+            icon="i-lucide-chevron-left"
+            color="neutral"
+            variant="link"
+            :label="nearest.label"
+            :aria-label="t('core.trail.back-to', { where: nearest.label })"
+            class="-ms-2.5"
+          />
+        </template>
         <template #links>
           <slot name="primary" />
         </template>

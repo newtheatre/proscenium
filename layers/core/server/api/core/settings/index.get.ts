@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { can, defineRoute, refuse } from '#kit'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
-import { defaultValue } from '#kit/settings'
+import { defaultValue, RATE_COUNT } from '#kit/settings'
 import { isOverridden, useSetting } from '#kit/settings-store'
 import { holds, mayOpen } from '../../../interface/navigation'
 
@@ -51,11 +51,12 @@ export default defineRoute({
       sensitive: entry.sensitive === true,
       managed: entry.managed === true,
       quotable: entry.quotable === true,
+      onChange: entry.onChange ?? null,
       changeAbility: entry.change,
       changeLabelKey: `${abilityModule}.abilities.${entry.change.slice(abilityModule.length + 1)}.label`,
       canChange: decision.allowed && !entry.managed,
-      min: entry.min,
-      max: entry.max,
+      min: entry.kind === 'rate' ? RATE_COUNT.min : entry.min,
+      max: entry.kind === 'rate' ? RATE_COUNT.max : entry.max,
       maxLength: entry.maxLength,
       options: entry.options,
       of: entry.of,
