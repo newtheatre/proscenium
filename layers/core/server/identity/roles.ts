@@ -3,6 +3,7 @@
 // Owner, and no change leaves the theatre without an Owner who can sign in.
 import { all, first, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
+import { nextYearEnd, yearEndIsSet } from './year-end'
 import { LIVE, OWNER, guardLastOwner, isOwner, kitGrantsOf, roleAbilities, withImplied } from './grants'
 import { accountById } from './accounts'
 
@@ -65,6 +66,8 @@ export interface RoleInput {
 }
 
 async function checkExpiryRule(input: RoleInput): Promise<void> {
+  if (input.expiryRule === 'year_end' && !(await yearEndIsSet()))
+    refuse('core.role.year-end-unset', 'The theatre\'s year end has not been set, so a role cannot end at the year end yet.', { status: 422, remedy: 'Set the year end on the organisation page, or choose a number of days.' })
   if (input.expiryRule === 'none' && !(await useSetting('core.grants.allow-no-expiry')))
     refuse('core.role.needs-expiry', 'Roles must end: this theatre does not allow roles with no end date.', { status: 422, remedy: 'Choose the year end or a number of days.' })
   if ((input.expiryRule === 'days') !== (input.expiryDays != null))
@@ -146,9 +149,10 @@ async function endDate(role: RoleRow, given: number | null | undefined): Promise
     return given
   }
   if (role.expiry_rule === 'days') return at + role.expiry_days! * 86_400_000 // not-policy: milliseconds in a day
-  // The committee year end comes from the core domain's year pattern, which is not built yet, so
-  // a year-end role needs its end date given for now.
-  if (role.expiry_rule === 'year_end') refuse('core.grant.needs-end-date', 'This role ends at the year end. Give the end date.', { status: 422, fields: { expiresAt: 'required' } })
+  if (role.expiry_rule === 'year_end') {
+    // A role made with the rule before the year end was cleared still needs an end date.
+    return await nextYearEnd() ?? refuse('core.grant.year-end-unset', 'This role ends at the year end, which the theatre has not set.', { status: 422, fields: { expiresAt: 'required' }, remedy: 'Set the year end on the organisation page, or give an end date.' })
+  }
   if (role.key !== OWNER && !(await useSetting('core.grants.allow-no-expiry'))) refuse('core.grant.needs-end-date', 'Roles must end. Give the end date.', { status: 422, fields: { expiresAt: 'required' } })
   return null
 }
@@ -224,4 +228,17 @@ export async function changeGrant(unit: UnitView, actor: Actor, id: string, chan
   const next = await createGrant(unit, actor, { accountId: grant.account_id, roleId: grant.role_id, scope: change.scope ?? scopeOf(grant), expiresAt: change.expiresAt }, { endedGrant: id })
   if (grant.role_key === OWNER) guardLastOwner(unit)
   return next
+}
+
+/**
+ * Renews a grant (ID-24) with a new end from its role's rule. A live grant is changed (ended as
+ * replaced, and a new one written); a lapsed or ended one is given again as a new grant.
+ */
+export async function renewGrant(unit: UnitView, actor: Actor, id: string): Promise<string> {
+  const grant = await grantById(id)
+  if (!grant) refuse('core.not-found', 'There is no such grant.', { status: 404 })
+  const at = nowMs()
+  const live = await first(`SELECT 1 AS one FROM core_grants g WHERE g.id = ? AND ${LIVE}`, id, at, at)
+  if (live) return changeGrant(unit, actor, id, { expiresAt: undefined })
+  return createGrant(unit, actor, { accountId: grant.account_id, roleId: grant.role_id, scope: scopeOf(grant) }, { endedGrant: id })
 }

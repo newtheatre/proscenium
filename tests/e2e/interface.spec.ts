@@ -220,6 +220,18 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('button', { name: 'Set up my theatre' })).toHaveCount(0)
     })
 
+    test('core\'s own settings page shows wording for every setting, never a catalogue key', async ({ browser }) => {
+      const owner = { ...person('Olive Owner', ['core.settings.manage', 'core.identity-settings.manage', 'core.organisation.edit', 'core.branding.edit', 'core.sender.manage', 'core.template.edit'].map(grant)), assurance: 'strong', reassertedAt: Date.now() }
+      const context = await browser.newContext(as(owner))
+      const page = await context.newPage()
+      await visit(page, '/console/system/settings')
+      await expect(page.getByRole('heading', { level: 1, name: 'Core settings' })).toBeVisible()
+      await expect(page.getByText('Short name', { exact: true }).first()).toBeVisible()
+      // A part of the catalogue that is not loaded shows as its key, such as core.settings.x.label.
+      expect((await page.locator('main').innerText()).match(/\b[a-z][a-z0-9-]*\.[a-z0-9.-]+\.(label|help)\b/g) ?? []).toEqual([])
+      await context.close()
+    })
+
     test('the generated settings page: each setting shows its default, who may change it and a quoted tag', async ({ page }) => {
       await visit(page, '/console/gallery/settings')
       await expect(page.getByRole('heading', { level: 1, name: 'Gallery settings' })).toBeVisible()
@@ -231,7 +243,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('1 change')).toBeVisible()
       await page.getByRole('button', { name: 'Save Sample show settings' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
-      await page.reload()
+      await visit(page, '/console/gallery/settings') // waits for hydration, as a bare reload does not
       await expect(page.getByLabel('Show title', { exact: true })).toHaveValue('Macbeth')
       await expect(page.getByText('Default: Hamlet.')).toBeVisible()
       await page.getByRole('button', { name: /Reset Show title to its default/ }).click()
