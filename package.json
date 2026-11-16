@@ -28,6 +28,8 @@
   "dependencies": {
     "@iconify-json/lucide": "^1.2.153",
     "@nuxt/content": "3.16.2",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.1.0",
     "@nuxt/ui": "^4.12.0",
     "drizzle-orm": "1.0.0-rc.5",
     "h3": "1.15.11",

@@ -1,10 +1,11 @@
 // The core: always on. Identity, the core domain and the interface are areas inside it, named by
 // the second segment of their names. This manifest holds foundations' part.
 import { z } from 'zod'
-import { code, defineModule, event, secret, task } from '#kit'
+import { code, defineModule, defineSettingRules, event, secret, task } from '#kit'
 import { settings, settingRules } from './module/settings'
 import { abilities, records } from './module/abilities'
 import { points } from './module/points'
+import * as identity from './module/identity'
 import { tables } from './server/db/schema'
 
 export default defineModule({
@@ -14,10 +15,10 @@ export default defineModule({
   stability: 'experimental',
   switchable: false,
 
-  settings,
-  settingRules,
-  abilities,
-  records,
+  settings: { ...settings, ...identity.identitySettings },
+  settingRules: defineSettingRules('core', [...settingRules.rules, ...identity.identitySettingRules]),
+  abilities: { ...abilities, ...identity.identityAbilities },
+  records: { ...records, ...identity.identityRecords },
   tables,
   points,
 
@@ -28,15 +29,21 @@ export default defineModule({
       'core.setting.changed': event({ version: 1, payload: z.object({ key: code() }), internal: true }),
       'core.release.applied': event({ version: 1, payload: z.object({ version: code() }), internal: true }),
       'core.job.died': event({ version: 1, payload: z.object({ jobId: z.string(), name: code() }), internal: true }),
+      ...identity.identityEvents,
     },
   },
 
+  jobs: { ...identity.identityJobs },
+  contributes: { ...identity.identityContributions },
+
   tasks: {
     'core.prune-history': task({ dailyAt: '04:00' }),
+    ...identity.identityTasks,
   },
 
   secrets: {
     CORE_ENCRYPTION_KEY: secret({ needed: 'when-used' }),
     CORE_TURNSTILE_SECRET_KEY: secret({ needed: 'optional' }),
+    ...identity.identitySecrets,
   },
 })
