@@ -7,3 +7,5 @@ export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from '.
 export { attachFile, detachFile, fileUrl } from './files/service'
 export { listTerms, getTerm, assertTerm } from './vocabularies/service'
 export type { Term } from './vocabularies/service'
+export { addressFor, addressesFor } from './identity/addresses'
+export type { Side } from './identity/addresses'
