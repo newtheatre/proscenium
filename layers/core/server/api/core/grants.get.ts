@@ -10,8 +10,14 @@ export default defineRoute({
 }, async (_event, { input }) => {
   const where: string[] = []
   const params: unknown[] = []
-  if (input.accountId) { where.push('g.account_id = ?'); params.push(input.accountId) }
-  if (input.roleId) { where.push('g.role_id = ?'); params.push(input.roleId) }
+  if (input.accountId) {
+    where.push('g.account_id = ?')
+    params.push(input.accountId)
+  }
+  if (input.roleId) {
+    where.push('g.role_id = ?')
+    params.push(input.roleId)
+  }
   const rows = await all<{ id: string, account_id: string, role_id: string, role_name: string, scope: string, scope_module: string | null, scope_type: string | null, scope_id: string | null, starts_at: number, expires_at: number | null, granted_by: string | null, granted_at: number, ended_at: number | null, ended_reason: string | null, first_signed_in_at: number | null }>(
     `SELECT g.*, r.name AS role_name, e.ended_at, e.ended_reason, a.first_signed_in_at
        FROM core_grants g JOIN core_roles r ON r.id = g.role_id JOIN core_accounts a ON a.id = g.account_id

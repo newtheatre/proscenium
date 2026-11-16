@@ -19,6 +19,12 @@ export async function holdsPrivileged(accountId: string): Promise<boolean> {
   return (await kitGrantsOf(accountId)).some(g => g.ability && registry.abilities.get(g.ability)?.decl.risk === 'privileged')
 }
 
+// The ways in a signed-out browser is offered. Passkeys are always on.
+export async function signInMethods(): Promise<{ email: boolean, google: boolean }> {
+  const google = !!(await useSetting('core.sign-in.google')) && !!(await useSetting('core.sign-in.google-client-id'))
+  return { email: !!(await useSetting('core.sign-in.email-link')), google }
+}
+
 export async function describeMe(session: CurrentSession) {
   const account = await accountById(session.accountId)
   const passkeys = (await first<{ n: number }>('SELECT count(*) AS n FROM core_passkeys WHERE account_id = ?', session.accountId))?.n ?? 0

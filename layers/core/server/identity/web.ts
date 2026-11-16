@@ -34,7 +34,7 @@ export function safeNext(raw: unknown): string | null {
   for (const candidate of [raw, decoded]) {
     if (!candidate.startsWith('/')) return null
     if (candidate.startsWith('//') || candidate.startsWith('/\\')) return null
-    if (/[\u0000-\u001f\u007f\\]/.test(candidate)) return null
+    if ([...candidate].some(c => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f || c === '\\')) return null // not-policy: control characters and backslashes
     if (/^\/[a-z][a-z0-9+.-]*:/i.test(candidate)) return null // not-policy: a scheme's characters
   }
   try {

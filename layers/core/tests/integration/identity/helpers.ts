@@ -74,9 +74,13 @@ export class Browser {
       else this.cookies.set(name!.trim(), value)
     }
     const text = await response.text()
-    let json: any = null
-    try { json = text ? JSON.parse(text) : null }
-    catch { json = text }
+    let json: any
+    try {
+      json = text ? JSON.parse(text) : null
+    }
+    catch {
+      json = text
+    }
     return { status: response.status, body: json, headers: response.headers }
   }
 

@@ -19,7 +19,7 @@ export interface LiveGrant {
 }
 
 /** SQL for "this grant is live now"; `g` is core_grants. Takes the time twice. */
-export const LIVE = `g.starts_at <= ? AND (g.expires_at IS NULL OR g.expires_at > ?) AND NOT EXISTS (SELECT 1 FROM core_grant_ends e WHERE e.grant_id = g.id)`
+export const LIVE = 'g.starts_at <= ? AND (g.expires_at IS NULL OR g.expires_at > ?) AND NOT EXISTS (SELECT 1 FROM core_grant_ends e WHERE e.grant_id = g.id)'
 
 export async function liveGrantsOf(accountId: string): Promise<LiveGrant[]> {
   const at = nowMs()
