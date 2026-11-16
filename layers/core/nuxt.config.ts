@@ -15,6 +15,8 @@ export default defineNuxtConfig({
   runtimeConfig: { public: { turnstileSiteKey: '' } },
   alias: kitAliases(root),
   nitro: {
+    // Nitro drops imports of packages it thinks have no side effects; this polyfill is nothing else.
+    moduleSideEffects: ['reflect-metadata'],
     typescript: { tsConfig: { include: [generatedTypes], compilerOptions: { types: ['@cloudflare/workers-types'] } } },
   },
   // The app's typed $fetch reads the server routes, and with them the kit's Cloudflare types.

@@ -8,7 +8,7 @@ import { resetRateLimits } from '#kit/ratelimit'
 import { newId } from '#kit/ids'
 import { server, deliver, env, testAccess } from '../../../../../tests/integration/helpers'
 import { identityAccess } from '../../../server/identity/access'
-import { setMailer, type SignInMessage } from '../../../server/identity/notify'
+import { setMailer } from '../../../server/notifications/mailer'
 import { Authenticator } from './authenticator'
 
 const files = import.meta.glob<{ default: EventHandler }>('../../../server/api/core/**/*.ts', { eager: true })
@@ -22,13 +22,22 @@ for (const [file, module] of Object.entries(files)) {
 }
 export const handle = server(routes)
 
+/** A sign-in email as a test reads it: the address, and the link and code taken from its text. */
+export interface SignInMessage { address: string, variables: { link: string, code: string } }
+
 export const mailbox: SignInMessage[] = []
 
 /** Installs identity's real access provider, the mailbox and a passing bot check. Call in beforeAll. */
-export function useIdentity(): void {
+export async function useIdentity(): Promise<void> {
   setAccessProvider(identityAccess)
-  setMailer(async (message) => {
-    mailbox.push(message)
+  // The core domain sends only from a verified domain.
+  for (const [key, value] of Object.entries({ 'core.notifications.sending-domain': 'mail.example.org', 'core.notifications.verified-domain': 'mail.example.org', 'core.organisation.contact-email': 'box-office@example.org', 'core.site.name': 'The Test Theatre' }))
+    await setSetting(key, value)
+  setMailer(async (email) => {
+    const link = /(https?:\/\/\S+\/sign-in\/link#[\w-]+)/.exec(email.text)?.[1] ?? ''
+    const code = /\b(\d{6})\b/.exec(email.text)?.[1] ?? ''
+    mailbox.push({ address: email.to, variables: { link, code } })
+    return {}
   })
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input)
@@ -59,12 +68,12 @@ export function reset(): void {
 /** A browser: keeps its cookies and sends this site's Origin, as a real one would. */
 export class Browser {
   cookies = new Map<string, string>()
-  constructor(public origin = 'http://test') {}
+  constructor(public origin = 'https://test') {}
 
   async call(method: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
     const sent: Record<string, string> = { 'content-type': 'application/json', 'host': 'test', 'origin': this.origin, ...headers }
     if (this.cookies.size) sent.cookie = [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ')
-    const response = await handle(new Request(`http://test${path}`, { method, headers: sent, body: body === undefined ? undefined : JSON.stringify(body) }))
+    const response = await handle(new Request(`https://test${path}`, { method, headers: sent, body: body === undefined ? undefined : JSON.stringify(body) }))
     for (const line of response.headers.getSetCookie()) {
       const [pair, ...attributes] = line.split(';')
       const [name, ...rest] = pair!.split('=')
