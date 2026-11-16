@@ -9,6 +9,7 @@ import { digest, randomCode, randomToken, sealValue, sameText } from './crypto'
 import { addressRow, accountById, accountForProvenAddress, domainOf, normaliseAddress } from './accounts'
 import { BROWSER_COOKIE, readCookie, relyingParty, setShortCookie } from './web'
 import { startSession } from './sessions'
+import { useEnrolmentLink } from './recovery'
 
 export interface TokenRow {
   id: string
@@ -72,8 +73,9 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
 }
 
 async function tokenByHash(hash: string): Promise<TokenRow | null> {
+  // A staff-issued enrolment link lands on the same page and opens a recovery session (ID-08).
   // An invitation's link signs in exactly as a sign-in link does, and so claims the account.
-  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose IN (\'sign_in\', \'invite\')', hash)
+  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose IN (\'sign_in\', \'enrol_passkey\', \'invite\')', hash)
 }
 
 export interface SignedIn { accountId: string, next: string | null, offerPasskey: boolean, created: boolean }
@@ -105,6 +107,7 @@ export async function useLink(unit: UnitView, event: H3Event, token: string): Pr
   if (row.expires_at <= nowMs()) refuse('core.sign-in.link-expired', 'This link has expired.', { status: 410, remedy: 'Ask for a new email.' })
   unit.add({ sql: 'UPDATE core_account_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL', params: [nowMs(), row.id] })
     .expect(1, { code: 'core.sign-in.link-used', reason: 'This link has been used.', remedy: 'Ask for a new email if you need to sign in again.' })
+  if (row.purpose === 'enrol_passkey') return { ...(await useEnrolmentLink(unit, event, row)), offerPasskey: true, created: false }
   return finish(unit, event, row, 'link')
 }
 

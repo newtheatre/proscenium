@@ -107,7 +107,8 @@ export async function emailSignIn(browser: Browser, to: string, next?: string): 
   const before = mailbox.length
   const asked = await browser.post('/api/core/sign-in/email', { address: to, ...(next ? { next } : {}) }, { 'cf-turnstile-response': 'pass' })
   await deliver()
-  return { ...asked, message: mailbox.slice(before).find(m => m.address === to) }
+  // Security notices to the same address land in the mailbox too; the sign-in email is the one with a link.
+  return { ...asked, message: mailbox.slice(before).find(m => m.address === to && m.variables.link) }
 }
 
 export function tokenOf(message: SignInMessage): string {
