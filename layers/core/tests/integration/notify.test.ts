@@ -7,6 +7,8 @@ import { runJob } from '#kit/jobs'
 import { MailError, setMailer, type OutgoingEmail } from '../../server/notifications/mailer'
 import { notify } from '../../server/services'
 import { addressHash } from '../../server/notifications/suppression'
+import { emailEventsConsumer } from '../../server/email-events'
+import sweep from '../../server/tasks/sweep-notifications'
 import { env, inContext, rows, sent, setModule } from '../../../../tests/integration/helpers'
 
 const mails: (OutgoingEmail & { messageId: string })[] = []
@@ -230,5 +232,89 @@ describe('sending', () => {
     const message = sent.splice(0)[0]!
     await Promise.all([inContext(() => runJob(message.jobId), { kind: 'job' }), inContext(() => runJob(message.jobId), { kind: 'job' })])
     expect(mails.filter(m => m.subject === 'Your order J1')).toHaveLength(1)
+  })
+})
+
+/** Hands one Email Sending outcome to core's consumer, as the kit does, and commits on 'done'. */
+async function outcome(type: string, messageId: string, extra: Record<string, unknown> = {}, attempts = 1) {
+  return inContext(async () => {
+    const unit = createUnit()
+    const answer = await emailEventsConsumer({ type: `cf.email.sending.message.${type}`, payload: { messageId, ...extra } }, unit.view(), { id: 'q1', attempts })
+    if (answer === 'done') await unit.commit()
+    return answer
+  }, { kind: 'job' })
+}
+
+async function sentTo(address: string, order: string) {
+  const to = await account(address)
+  const { ids } = await send('notify.receipt', { to, variables: { order } })
+  await deliver()
+  const [email] = await deliveriesOf(ids)
+  return { to, id: ids[0]!, messageId: email!.provider_ref! }
+}
+
+async function suppressed(address: string) {
+  return (await rows<{ reason: string, lifted_at: number | null }>('SELECT reason, lifted_at FROM core_email_suppressions WHERE address_hash = ?', await inContext(() => addressHash(address))))[0]
+}
+
+describe('what Cloudflare reports afterwards', () => {
+  it('records a hard bounce on the delivery it names, suppresses the address and stops the next send', async () => {
+    const first = await sentTo('gone@example.org', 'K1')
+    expect(await outcome('bounced', first.messageId, { recipient: 'gone@example.org', bounce: { type: 'hard', classification: 'permanent_failure' } })).toBe('done')
+    expect((await deliveriesOf([first.id]))[0]).toMatchObject({ state: 'bounced', reason: 'suppressed_address' })
+    expect(await suppressed('gone@example.org')).toMatchObject({ reason: 'hard_bounce', lifted_at: null })
+    const [event] = await rows<{ payload: string }>("SELECT payload FROM core_events WHERE name = 'core.delivery.bounced' ORDER BY announced_at DESC LIMIT 1")
+    expect(JSON.parse(event!.payload)).toEqual({ notificationId: first.id, accountId: first.to })
+
+    // A repeat of the report changes nothing; the next message to that address is skipped.
+    expect(await outcome('bounced', first.messageId, { recipient: 'gone@example.org', bounce: { type: 'hard' } })).toBe('done')
+    const { ids } = await send('notify.receipt', { to: first.to, variables: { order: 'K2' } })
+    expect((await deliveriesOf(ids))[0]).toMatchObject({ state: 'skipped', reason: 'suppressed_address' })
+  })
+
+  it('records a complaint, and lets a soft bounce, a deferral or a delivery change nothing', async () => {
+    const soft = await sentTo('busy@example.org', 'L1')
+    for (const type of ['delivered', 'deferred']) expect(await outcome(type, soft.messageId, { recipient: 'busy@example.org' })).toBe('done')
+    expect(await outcome('bounced', soft.messageId, { recipient: 'busy@example.org', bounce: { type: 'soft' } })).toBe('done')
+    expect((await deliveriesOf([soft.id]))[0]!.state).toBe('sent')
+    expect(await suppressed('busy@example.org')).toBeUndefined()
+
+    const angry = await sentTo('angry@example.org', 'L2')
+    expect(await outcome('complained', angry.messageId, { recipient: 'angry@example.org' })).toBe('done')
+    expect((await deliveriesOf([angry.id]))[0]!.state).toBe('complained')
+    expect(await suppressed('angry@example.org')).toMatchObject({ reason: 'complaint' })
+  })
+
+  it('suppresses an address whose send it never recorded, after giving the send a moment to be recorded', async () => {
+    expect(await outcome('bounced', '<unknown@mail.example.org>', { recipient: 'stranger@example.org', bounce: { type: 'hard' } }, 1)).toBe('not-yet')
+    expect(await suppressed('stranger@example.org')).toBeUndefined()
+    expect(await outcome('bounced', '<unknown@mail.example.org>', { recipient: 'stranger@example.org', bounce: { type: 'hard' } }, 3)).toBe('done')
+    expect(await suppressed('stranger@example.org')).toMatchObject({ reason: 'hard_bounce' })
+  })
+})
+
+describe('the sweep', () => {
+  it('frees a delivery stuck in sending, queues a lost one again, and clears finished payloads', async () => {
+    const to = await account()
+    const { ids } = await send('notify.receipt', { to, variables: { order: 'M1' } })
+    sent.length = 0 // the queue lost the message
+    await env.DB.prepare('UPDATE core_notification_deliveries SET state = \'sending\', next_attempt_at = ? WHERE notification_id = ? AND channel = \'email\'').bind(Date.now() - 1000, ids[0]).run()
+    await inContext(async () => {
+      const unit = createUnit()
+      await sweep(unit.view(), { dueAt: Date.now() })
+      await unit.commit()
+    }, { kind: 'job' })
+    expect((await deliveriesOf(ids))[0]).toMatchObject({ state: 'retrying', last_error: 'stuck' })
+    expect(sent).toHaveLength(1)
+    await deliver()
+    expect((await deliveriesOf(ids))[0]!.state).toBe('sent')
+
+    await inContext(async () => {
+      const unit = createUnit()
+      await sweep(unit.view(), { dueAt: Date.now() })
+      await unit.commit()
+    }, { kind: 'job' })
+    const [row] = await rows<{ payload: string | null }>('SELECT payload FROM core_notifications WHERE id = ?', ids[0])
+    expect(row!.payload).toBeNull()
   })
 })

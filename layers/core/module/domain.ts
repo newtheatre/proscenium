@@ -211,6 +211,9 @@ export const announces = {
   'core.file.rejected': event({ version: 1, payload: z.object({ fileId: z.string(), reason: code() }), internal: true }),
   'core.term.retired': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code() }), internal: true }),
   'core.delivery.failed': event({ version: 1, payload: z.object({ notificationId: z.string(), typeKey: code(), channel: z.enum(['email', 'inbox']) }), internal: true }),
+  'core.delivery.bounced': event({ version: 1, payload: z.object({ notificationId: z.string(), accountId: z.string().nullable() }), internal: true }),
+  'core.delivery.complained': event({ version: 1, payload: z.object({ notificationId: z.string(), accountId: z.string().nullable() }), internal: true }),
+  'core.address.suppressed': event({ version: 1, payload: z.object({ reason: z.enum(['hard_bounce', 'complaint', 'manual']) }), internal: true }),
   'core.term.merged': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code(), intoId: z.string() }), internal: true }),
 }
 
@@ -227,4 +230,5 @@ export const jobs = {
 
 export const tasks = {
   'core.sweep-files': task({ every: '1h' }),
+  'core.sweep-notifications': task({ every: '5m' }),
 }

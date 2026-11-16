@@ -91,6 +91,12 @@ Any module may import core's services without listing core: `import { notifyAddr
   switched off for an optional type's topic is recorded as suppressed; no address, an address on
   the suppression list or the type's module being off as skipped. Declare `channels: ['email',
   'inbox']` and, for the inbox, `link: '/path/{{ variable }}'`.
+  Cloudflare's later reports arrive on the EMAIL_EVENTS queue and are matched by the message id
+  `send()` returned: a hard bounce or a complaint marks the delivery Bounced or Complained,
+  announces `core.delivery.bounced` or `.complained`, and puts the address on core's suppression
+  list, which is what stops the next send (Cloudflare does not, soon enough). The task
+  `core.sweep-notifications` frees deliveries stuck in Sending, re-queues lost ones and clears a
+  notification's payload once every delivery is finished.
 - `operatingDayOf(instant)` and `dayBounds(day)`: the theatre's operating day, which rolls over at
   `core.locale.day-start`. A table that stores one contributes to `core.operating-day`, so
   it is recalculated when the time zone or the rollover changes.
