@@ -92,6 +92,9 @@ Real units of work against local D1. Each case states what must be in the databa
 | --- | --- | --- |
 | `settle-is-atomic` | A successful attempt leaves the charge paid, one balanced posting to `membership-fees.income` and an active membership; with the posting made to refuse (closed period resolved, then a forced failure) none of the three exists (I5) | Yes |
 | `settle-twice` | A webhook and a poll answering the same attempt settle once |  |
+| `settle-entries-total-part` | The entries the handler returns total the fees module's part of the payment and go only to its own accounts, and the posting Payments writes is marked for\_module membership-fees; with the handler made to post short, or to another module's account, Payments records the provider's answer, nothing settles, the intent is unfulfilled and refunded, and no membership is active (P4) |  |
+| `release-twice` | The settlement handler's release(unit, part) lets go of a charge prepared at the desk; a second call changes nothing; the desk panel offers no release of its own (P4, P8) |  |
+| `no-period-close-blocker` | The fees module contributes nothing to finance.period-close-check, and after any scripted run no paid charge lacks its posting (P4, I5) |  |
 | `cannot-settle-after-expiry` | Payment for an expired application is marked unfulfilled and no membership exists |  |
 | `one-charge-per-membership` | The unique index refuses a second live charge |  |
 | `price-change-does-not-move-charge` | A charge made before a price change is still for the old amount |  |
@@ -105,7 +108,7 @@ Real units of work against local D1. Each case states what must be in the databa
 
 | Case | Checks | Never regress |
 | --- | --- | --- |
-| `merge-moves-memberships` | Rule X2 in each of its three cases; undo restores both accounts |  |
+| `merge-moves-memberships` | Rule X2 in each of its three cases; running the merge's stages twice changes nothing more; with the move not yet run, the holder fact and the requirement answer for the survivor already count the loser's membership through the account scope; two active memberships of one scheme count once and each keeps its evidence; actor columns still read as the survivor; undo restores both accounts |  |
 | `claim-keeps-membership` | A membership added to an unclaimed account is the claimed person's on first sign-in, with no row changed |  |
 | `erasure-walk` | The Foundations walking erasure test over all nine tables: live memberships end as `erased`, notes are redacted, numbers remain, no personal value survives |  |
 | `events-ids-only-and-internal` | Every event of both modules carries ids only, and every membership and charge event is internal, checked against the data-class registry (I8) | Yes |
@@ -172,6 +175,7 @@ The four marked never-regress guard invariants I9 and I10.
 | Integration, never regress | `reference-off-never-met`: a scheme without `accepts_reference` never answers met for a presented value | V8 |
 | End to end | `member-ticket-by-student-id`: a buyer with no membership account buys a member ticket with a student ID, and a second for a friend with the friend's | MEM-58, V14, with Box office |
 | End to end | `reference-buyer-later-joins`: the same person joins, is verified at once, and the members' area appears | V9, MEM-06 |
+| Integration | `reference-answer-names-holder-account`: a reference whose membership belongs to an account answers met with holderAccountId, the surviving account after a merge; an unclaimed entry answers with evidence alone; nothing the buyer is sent contains the id | V11, X2 |
 | End to end | `card-scan-at-door`: a steward scans a membership card on the door page and sees the summary; nobody is admitted by it | MEM-51, with Box office |
 
 The kit's rate limit on typed values, the limit of tickets per holder, the field itself and the door's handling of a failed check are tested by Foundations and Box office.

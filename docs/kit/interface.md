@@ -102,6 +102,21 @@ the server for actions and sources when it is first opened, not on every page.
   from the menu is kept; `let-people-choose` off removes the choice; `public-dark` off keeps the public
   pages light.
 
+## Record pages and home pages
+
+- **`PageRecord`** (UI-12): `title`, `status` (always a word, with a tone), one `primary` action, an
+  `actions` menu (destructive last), a `summary` strip of four to six facts, the record's `record-type`
+  and `record-id`, and the owner's own `tabs` with their contents in the slots `tab-<id>`. Other modules'
+  tabs come from `core.record-tab` (`{ id, record, ability, component, order, count? }`): a component in
+  the module's `app/record-tabs/` folder that receives `recordId` and nothing else, labelled by
+  `<module>.record-tabs.<name>.label`. A tab the viewer may not open, or of a module that is off, is
+  absent. The history panel reads the record's audit entries through `GET /api/core/history`, which
+  needs the ability `core.history.view`.
+- **`PageHome`** (UI-16): a queue. Cards come from `core.home-card` (`{ id, home, ability, component,
+  urgency, count? }`), components in the module's `app/home-cards/` folder that receive `count`. They
+  sort overdue, today, information; a card whose count is zero is absent. With nothing waiting the page
+  says so and offers up to three of the viewer's quick actions.
+
 ## Choice fields in forms
 
 PageForm's `radio` takes `options: [{ value, label }]` (values may be numbers) and shows one group

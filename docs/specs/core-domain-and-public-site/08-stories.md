@@ -4,7 +4,7 @@
 
 Each story has an id, who it is for, and acceptance criteria that a test can check. **First** means the first release of this workstream's subject, which is roadmap phase 2: "a theatre publishes a season and a what's-on page". **Later** means after it. The person named in a story describes who does the job and is not a preset role: part 6 maps every ability onto the identity specification's presets.
 
-51 stories: 43 first, 8 later. Six were added at the end after Matt's decisions.
+52 stories: 44 first, 8 later. Seven were added at the end after Matt's decisions.
 
 ## Programme
 
@@ -99,4 +99,10 @@ All six are for the first release. Where an earlier story names a production's a
 | C-50 | As the receiver of a webhook I can trust what arrives. | Each signed delivery carries a time and a signature I can check with the secret, and an id that is the same on a retry. The body holds the event's name, time and ids and the record's public title, and no personal data. Only events not marked internal can be chosen. | First |
 | C-51 | As an administrator I am told when a webhook stops working. | A failing delivery is retried with growing waits up to the setting. After the set number of failures in a row the webhook is paused, its managers get a message, and no more deliveries are attempted. I can read the log, retry a delivery, rotate the secret and resume. | First |
 
-That makes 51 stories: 43 first, 8 later.
+One more was added on 16 November 2026 at Matt's request, for the first release:
+
+| Id | Story | Acceptance criteria | Release |
+| --- | --- | --- | --- |
+| C-52 | As an administrator I have the sending domain set up for me. | With the optional Cloudflare token present, "Set up automatically" creates the sending subdomain under the site's hostname, sets the sending domain, waits while Cloudflare reports it not ready, and verifies it, with no DNS typed by anyone. It asks for a fresh passkey check and is audited. Pressing it twice creates nothing twice. A sending domain already set is not replaced without confirmation. On a `workers.dev` address the button is replaced by an explanation. Without the token nothing changes and the manual route works. The token appears in no response, log or audit entry. | First |
+
+That makes 52 stories: 44 first, 8 later.

@@ -2,17 +2,19 @@
 
 ## Six console screens and Setup
 
-Foundations' screens are for the people who run the system, not for audiences or ordinary members. Setup is a page of its own at `/setup`. The other six live in the console, in the interface's System group (group id system, shared with the core domain's organisation, branding and webhooks screens), at addresses under /console/system, because a person reads the address and system is a place where the module id is a code name (integration's ruling R-31). The module id remains `core`. Layout, components and wording style follow workstream 6; this part says what each screen is for, what is on it and what it must never do.
+Foundations' screens are for the people who run the system, not for audiences or ordinary members. Setup is a page of its own at `/setup`. The other six live in Site administration, the fourth shell, at addresses under `/admin` (Matt's decision of 16 November 2026 and integration's ruling R-33, which replaces R-31). Site administration holds the screens that are about the installation and not about a night's work: email sending, vocabularies, modules, branding, updates, audit and health. The console's System group is gone, and each old address under `/console/system` redirects to its new one. The module id remains `core`. Layout, components and wording style follow workstream 6; this part says what each screen is for, what is on it and what it must never do.
+
+**Where they sit in Site administration (agreed with the interface, 16 November 2026).** The shell has no ability of its own: a person sees it when they hold the ability of at least one entry in the `admin` menu, sees only those entries, and otherwise gets page not found at `/admin`. It has six groups in a fixed order, declared by core: Theatre, Modules and settings, Access, Email, Connections, Upkeep. Foundations' screens are Modules and Settings in *Modules and settings*, Credentials in *Connections*, and Jobs, Health, Audit log and Updates in *Upkeep*. Updates has its own address, `/admin/updates`, because it carries the Apply button and is one of the three routes that still answer while migrations are pending (rule G1); the card on the shell's Overview page links to it. The other screens in the shell belong to identity, the core domain and the interface, and the Interface Doc lists every address.
 
 | Screen | Address | Who (default) | Purpose |
 | --- | --- | --- | --- |
 | Setup | `/setup` | Whoever holds the setup code, then the Owner | Take a fresh deploy to a usable site |
-| Modules | `/console/system/modules` | Owner; administrator to view | See what the system can do and switch parts on or off |
-| Settings | `/console/system/settings` | Owner, administrator; managers for their own module's settings | Change how the theatre works, with limits and history |
-| Jobs | `/console/system/jobs` | Owner, administrator | See background work, retry or cancel it |
-| Credentials | `/console/system/credentials` | Owner; administrator to view | Enter and replace keys for outside services |
-| Updates and health | `/console/system/health` | Owner; administrator to view | Know whether the system is well and up to date |
-| Audit | `/console/system/audit` | Owner, administrator | Answer who did what, when and why they could |
+| Modules | `/admin/modules` | Owner; administrator to view | See what the system can do and switch parts on or off |
+| Settings | `/admin/settings` | Owner, administrator; managers for their own module's settings | Change how the theatre works, with limits and history |
+| Jobs | `/admin/jobs` | Owner, administrator | See background work, retry or cancel it |
+| Credentials | `/admin/credentials` | Owner; administrator to view | Enter and replace keys for outside services |
+| Updates and health | `/admin/updates and /admin/health` | Owner; administrator to view | Know whether the system is well and up to date |
+| Audit | `/admin/audit` | Owner, administrator | Answer who did what, when and why they could |
 
 The roles named are identity's preset roles; part 6 gives the abilities.
 
@@ -27,7 +29,7 @@ This is the one statement of the setup sequence. Foundations owns the order and 
 3. **Create the Owner.** Identity's step, and identity's rules: name, email address, a passkey, and recovery codes typed back to prove they were saved. It writes the first grant.
 4. **The theatre.** Name, time zone, currency, language (`core.site.name` and `core.locale.*`). The time zone has no default and must be chosen. Everything else has a default.
 5. **Choose a starting point.** One of the three presets, `student-society`, `amateur-company` or `small-venue`, or Start empty. A preset switches on a set of modules and applies settings, and lists exactly what it will switch on and change before it is applied. There is no sample data.
-6. **Checklist.** The remaining setup steps contributed through `core.setup-step`, each with a link, shown on the console home until all are done or dismissed. The core domain's are the look (brand colour and logo), the first venue, the year end, the sender address and the email outcomes subscription; each switched-on module adds its own.
+6. **Checklist.** The remaining setup steps contributed through `core.setup-step`, each with a link (to an /admin address where the step is about the installation), shown on the console home until all are done or dismissed. The core domain's are the look (brand colour and logo), the first venue, the year end, the sender address and the email outcomes subscription; each switched-on module adds its own.
 
 Where the interface's Steps page allows five steps, Check and Prepare the database share the first.
 
@@ -44,7 +46,7 @@ A card for each module: name, one sentence on what it does, stability (experimen
 
 ## Settings
 
-One page per module, generated from the settings registry and found at /console/\<module>/settings in that module's own group; /console/system/settings is the index and the search across all of them; no module writes its own settings screen unless a setting's kind is `custom`.
+One page per module, generated from the settings registry and found at /console/\<module>/settings in that module's own group; /admin/settings is the index and the search across all of them, and the place where every setting declared scope: 'site' is shown and changed; no module writes its own settings screen unless a setting's kind is `custom`.
 
 - Each setting shows its label, a sentence of help, its current value, its default, its limits, and when and by whom it was last changed.
 - Search across all settings by label, help text or key.

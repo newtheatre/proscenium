@@ -23,7 +23,7 @@ What the design comes to:
 - **Five groups of services every module calls:** programme, vocabularies, files, notifications, and brand and organisation.
 - **Vocabularies are core's**, by the integrating thread's ruling, so the form builder and every module share one way to keep an editable list of options.
 - **Thirteen points** through which other modules join in without core knowing them, including the booking button, the impact shown before a cancellation, and the components a content page may use.
-- **51 stories**, 43 for the first release, and **63 named test cases** that must never regress.
+- **52 stories**, 44 for the first release, and **64 named test cases** that must never regress.
 
 It is aligned with the platform foundations draft: its names, its four ways for modules to talk, and its table, setting and ability layouts. Every request this workstream made of the foundations thread has been ruled on, and the rulings are recorded in parts 2 and 4. A consistency review on 16 November 2026 then brought every part into line with the other specifications and the integrating thread's rulings.
 

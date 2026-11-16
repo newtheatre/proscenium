@@ -106,7 +106,7 @@ A response has a coarse `state` the platform fixes and, once submitted, a `stage
 
 | Change | Guard |
 | --- | --- |
-| Start a draft response | The placement is active and open, and the person is in its audience. Where one response each applies, the person has none |
+| Start a draft response | The placement is active and open, and the person is in its audience. Where one response each applies, the person has none, counted across the account scope (the account and any merged into it) |
 | Save a draft response | The person owns the draft response or is a co-author the submitter added. Nothing is validated except size |
 | Submit | The placement is still open. The server rebuilds visibility from the answers and its own facts, discards hidden answers, validates, recalculates, and checks the cap and limited options by database constraint. Sent totals are compared where money is involved |
 | Submit on someone's behalf | Ability `forms.response.manage`; recorded in `entered_by` |
@@ -137,7 +137,7 @@ A workflow is part of the form definition, so it is versioned with it.
 - **Private until released.** A reviewer sees only their own scores and comment until the round is released. Release is a transition a chair performs; from then the panel sees all scores: every reviewer assigned to that response in that round, the chair and whoever decides. A reviewer locked out by a conflict stays locked out. The form may instead allow open review from the start.
 - **Never shown to the submitter.** Scores and reviewer comments never reach the submitter through the platform: not in their view and not in their download of their own answers. Matt decided this on 16 November 2026; a data-protection request may still oblige a theatre to disclose them, and the site owner's documentation says so.
 - **Declared conflict.** A reviewer may declare a conflict on a response. Their assignment becomes `conflicted`, and from that moment they cannot open that response's answers, scores, comments or messages. The declaration is recorded; its reason is not required.
-- **Automatic conflict.** A reviewer is conflicted without declaring it when they submitted the response, are a co-author of it, or are named in a person question the form marks as "people involved".
+- **Automatic conflict.** A reviewer is conflicted without declaring it when they submitted the response, are a co-author of it, or are named in a person question the form marks as "people involved". Each test reads the account scope, so an account merged into the reviewer's counts as the reviewer.
 - **Lockout is enforced on read**, on the server, on every route that returns anything about that response, including lists, search, exports and totals that would reveal a single score. It is a guard in forms' own service that runs after the platform's authorisation, because identity ruled that roles, facts and ownership only ever allow. It applies to every role, the Owner included.
 - **A summary** shows, per response, the number of reviews, the mean and spread per criterion and the weighted total. It appears to the panel only after release.
 - **The decision** is a transition by someone with `forms.response.decide`, with a reason for the record and a separate message to the submitter. The reason is never sent to the submitter automatically.
