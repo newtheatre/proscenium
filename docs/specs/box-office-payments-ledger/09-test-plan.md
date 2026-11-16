@@ -130,10 +130,10 @@ Tested with a stand-in second owner, so the cases do not wait for the Bar module
 | --- | --- | --- |
 | `parts-sum-to-the-intent` | PAY-07 | An intent whose parts do not add up to its amount is refused when it is created |
 | `one-open-intent-per-record` | PAY-07 | Two intents racing for the same owner record: one is created, the other is refused by the unique index on open parts |
-| `prepare-without-payment-is-released` | PAY-07 | A desk basket prepared and never paid has `release` called for every part when the intent is cancelled or expires, and calling it twice changes nothing |
+| `prepare-without-payment-is-released` | PAY-07 | A part prepared and never paid, at the desk or online, has its settlement handler's `release` called for every part when the intent is cancelled or expires, and calling it twice changes nothing |
 | `all-parts-settle-or-none` | PAY-07 | If one owner's settlement refuses, no part settles, no ticket is issued, nothing is posted, and the money is refunded as unfulfilled |
-| `part-entries-must-total-the-part` | PAY-07 | A handler returning entries that do not total its part's amount fails the batch |
-| `handler-posts-only-to-its-own-accounts` | PAY-07 | A handler returning an entry for another module's account fails the batch |
+| `part-entries-must-total-the-part` | PAY-07 | A handler returning entries that do not total its part's amount is treated as refusing: the answer is recorded, nothing settles, and the intent is unfulfilled and refunded |
+| `handler-posts-only-to-its-own-accounts` | PAY-07 | A handler returning an entry for another module's account is treated the same way, and no entry reaches that account |
 | `posting-splits-by-part` | PAY-07 | The one sealed posting credits each owner's account with its own part and balances |
 | `refund-stays-inside-its-part` | PAY-07 | Refunding more than a part's amount is refused even when the intent as a whole has room |
 

@@ -70,7 +70,7 @@ The bar does not call `postEntries` for a sale. The money line and the income li
 
 | Point | Contribution |
 | --- | --- |
-| `payments.settlement` | Handlers for parts whose owner module is `bar`, whether the owner record is a bar sale or a bar tab: `settle(unit, part)`, `cannotSettle(part)`, `refunded(unit, part, refund)` |
+| `payments.settlement` | Handlers for parts whose owner module is `bar`, whether the owner record is a bar sale or a bar tab: `settle(unit, part)`, `cannotSettle(part)`, `refunded(unit, part, refund)` and the optional `release(unit, part)`. `release` is safe to call twice; Payments calls it when the desk cancels the payment or removes the bar's part, on final failure and on intent expiry, and the bar returns its sale to open or its tab from settling to open |
 | `payments.desk-basket` | The "Bar" panel for the desk's payment step, and the functions that turn its open bar sale into a part |
 
 `payments.desk-basket` is a code point. A contribution has these members:
@@ -82,14 +82,13 @@ The bar does not call `postEntries` for a sale. The money line and the income li
 | `panel` | A component shown in the desk's right-hand panel. It is given the desk's context: the till session, and the performance the desk is serving if any |
 | `summary(context)` | read. The lines to show under the tickets and the amount to add to the total, or nothing when the panel is empty |
 | `prepare(unit, context)` | write. Adds the statements that ready this module's part and returns `{ owner: { module, record }, amountMinor }` with an amount above zero, or nothing when empty. Called in the batch that creates the intent |
-| `release(unit, owner)` | write. Safe to call twice. Called when the desk cancels the payment or removes this module's part, on final failure and on intent expiry: the bar returns its sale to open |
 
 The rules of `payments.settlement` the bar relies on:
 
 | Rule | Effect on the bar |
 | --- | --- |
-| `settle(unit, part)` and `refunded(unit, part, refund)` return the owner's ledger entries: account, signed amount, production, performance, tax code. Payments adds the money line and writes one sealed posting for the intent | The bar never posts for a sale. A part's entries total exactly the part |
-| A handler posts only to accounts whose module is its own | A category's income account is one of the bar's: `bar.income`, or an income account an administrator created and gave to the bar |
+| `settle(unit, part)` and `refunded(unit, part, refund)` return the owner's ledger entries: account, signed amount, production, performance, tax code. Payments adds the money line, writes one sealed posting for the intent and sets `for_module` on each entry from the part's owner | The bar never posts for a sale and never sets `for_module`. Its entries total exactly the part |
+| A handler posts only to accounts whose module is its own. A handler whose entries do not total its part, or that names another module's account, is treated as that owner refusing: the provider's answer is recorded, nothing settles, and the intent is unfulfilled and refunded. It does not fail the batch | A category's income account is one of the bar's: `bar.income`, or an income account an administrator created and gave to the bar |
 | No partial settlement. Any refusal settles nothing; if money was taken the intent is unfulfilled and refunded whole | Tickets failing stops the drinks; drinks failing leaves the reservation reserved |
 | A refund names one part and cannot exceed it. `payments.refund.request` and `payments.refund.approve` are owner-neutral. A refund across two owners is two refunds | `bar.sale.refund` gates who may start a bar refund, then the bar calls Payments |
 | A till session's expected cash counts attempts, which belong to no owner | Bar cash and ticket cash are cashed up together |
@@ -126,13 +125,26 @@ The bar declares no point for a per-person condition. Who may sell at an outlet 
 | `front-of-house.tonight-figure` | Bar takings for tonight's openings |
 | `front-of-house.report-section` | A bar section for the night report: takings by outlet, refusals, floating tabs written off |
 
-`core.merge-handler`: none. Staff columns and `bar_tabs.holder_account` follow `col.account`, so a merge repoints them.
+`core.merge-handler`: one step, for the single once-only row the bar has, a person's live staff tab. Staff columns are `alias` and are left alone; `bar_tabs.holder_account` is `move`. The step runs in the merge's handler stage, before the move stage. If both accounts hold a live staff tab, the move would break the rule of one live staff tab per holder, so the step joins the tabs first. A sale's `tab_id` is set once, so no sale row is re-pointed; the balance moves instead. In one unit the absorbed account's tab becomes `joined` with `joined_to` naming the survivor's tab, and the survivor's tab total rises by the absorbed tab's total. From then on the survivor's tab is the only live one: settling it pays, in the same statement, every sale on it and on each tab joined to it; writing it off leaves them all `on_tab`; and its statement, on the record and on "My bar tab", reads across them. A tab already joined to the absorbed tab is re-pointed to the survivor's. The joined tab may stand over its limit; it then takes no charges until it is paid. If either tab is settling, the step answers "not yet" and the staged merge tries again. The step is safe to repeat: a tab already joined is left as it is.
+
+Undoing a merge. A merge can be undone for 30 days, and the survivor's tab will have changed since, so the bar supplies its own undo statements and no listed values are put back. They are one unit, safe to repeat, and act only on a tab that is still `joined`. Undo is the exact reverse of the forward order: Identity points the module's move columns back first, and these statements run after. Sales charged after the merge stay with the survivor's tab.
+
+| The survivor's tab is | The undo does |
+| --- | --- |
+| open | Takes the joined tab's own total, as it stands now, off the survivor's tab; returns the joined tab to open and clears `joined_to`. The move's undo has already given it back to its former holder, so the rule of one live staff tab per holder is never broken |
+| settling | Answers "not yet", as the merge step does |
+| settled | Nothing is taken off: the joined tab's sales were paid with the survivor's tab and stay paid. The joined tab becomes settled, with the survivor tab's closing time and `closed_by`, and `joined_to` is cleared |
+| written\_off | Nothing is taken off. The joined tab becomes written\_off with the same reason, time and `closed_by`, its sales stay `on_tab`, and `joined_to` is cleared |
+
+Each case writes an audit entry naming both tabs. A sale taken off a joined tab before the undo has already lowered both totals, which is why the undo reads the joined tab's total as it stands and not the figure carried at the merge.
+
+`finance.period-close-check`: none in the first release. Bar income is posted only when money is taken, so an open outlet, an unapproved stocktake or an unpaid bar tab leaves nothing waiting to arrive in a period that is closing; a bar tab paid later posts into the earliest open period. An open till session and a payment in hand are Payments' own blockers. When stock gains a value in the ledger (later story BAR-55), a submitted stocktake dated in the period becomes a blocker, with the sentence "A stocktake for this period has not been approved" and a link to it.
 
 ## Facts and secrets
 
 | Kind | Name | Detail |
 | --- | --- | --- |
-| Fact | `bar.tab-holder` | `standing: true`, site-wide. True for an account that has `bar.tab.hold` or holds an open staff tab, and never for a floating tab. Its `holders` lists those accounts. It exists so that a holder with no other standing can open the members' area, where "My bar tab" lives. It grants nothing by itself; `bar.tab.hold` still guards the screen |
+| Fact | `bar.tab-holder` | `standing: true`, site-wide. True for an account that has `bar.tab.hold` or holds an open staff tab, and never for a floating tab. Its `holders` lists those accounts, and both it and the check read by account scope, so an alias answers as its survivor. It exists so that a holder with no other standing can open the members' area, where "My bar tab" lives. It grants nothing by itself; `bar.tab.hold` still guards the screen |
 | Secret key name | `bar.tab-receipt` | Declared to the core's key store, for `addressDigest`. The bar holds no credential and reaches no outside service |
 
 ## Events
@@ -161,7 +173,7 @@ Payloads are identifiers and amounts only, never a name or an address. Each even
 | `payments.intent.expired`, `payments.intent.unfulfilled` (a part owned by `bar`) | Handled through `cannotSettle` and `release`; the event is the safety net that returns a sale to open, or a tab from settling to open, if neither ran |
 | `payments.session.closed` | Nothing stored; the till signs the person out of selling |
 | `core.performance.cancelled`, `core.performance.rescheduled`, `core.performance.moved` | Nothing changes. An opening keeps its performance |
-| `core.account.merged` | Nothing: `col.account` columns follow the merge |
+| `core.account.merged` | Nothing: the merge step above and the `col.account` declarations do the work |
 
 Notifications. The bar declares five notification types through Core domain (part 6): three to staff as preferences, and the tab receipt and the staff tab reminder as transactional messages.
 
@@ -183,11 +195,11 @@ None. "My bar tab" is in the members' area and is guarded by `bar.tab.hold`. A p
 
 | From | Need | Status |
 | --- | --- | --- |
-| Payments | The `payments.desk-basket` contract above, with `prepare` in the intent's batch and an idempotent `release` | Agreed; in part 4 of the Box office, payments and ledger specification |
+| Payments | The `payments.desk-basket` contract above (`id`, `label`, `ability`, `panel`, `summary`, `prepare`), with `prepare` in the intent's batch; and an optional, idempotent `release` on the `payments.settlement` handler | Agreed; in part 4 of the Box office, payments and ledger specification |
 | Payments | `settle` and `refunded` return the owner's ledger entries, and Payments seals one posting per intent | Agreed |
 | Payments | Refund abilities that act on any owner's part | Agreed: owner-neutral |
 | Finance | `finance.system-account`, and `accountsFor(module, kind)` | Agreed. Every account belongs to one module |
-| Box office | The desk's payment step calls `summary`, `prepare` and `release`, shows one total, and passes the performance it is serving | Agreed. Box office is a contributor to Payments' till like the bar |
+| Box office | The desk's payment step calls `summary` and `prepare`, shows one total, and passes the performance it is serving. Removing a part goes through Payments, which calls that owner's `release` | Agreed. Box office is a contributor to Payments' till like the bar |
 | Foundations | `core.requirement` with `whenUnavailable`; a subject with both an account and an email; `col.freeText` in a table with a retention; id prefixes | Agreed; the 21 prefixes are registered |
 | Core domain | Ten vocabularies; `operatingDayOf`; a file slot on a product; transactional messages | Matches its specification |
 | Identity | `verifiedAddressDigests`; the person picker; a fact with `standing: true` opening the members' area | Agreed |

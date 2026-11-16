@@ -50,7 +50,7 @@ Public content pages are an eighth kind that the theatre owns: prose in the site
 
 ### Settings
 
-- **Generated, not hand-built.** Each setting's control, default, help text and validation come from the registry. A module writes no settings screen. Its generated page is at `/console/<module>/settings`, in the set-up half of the module's own group; foundations' Settings screen at `/console/system/settings` is the index and search across every group and links to each.
+- **Generated, not hand-built.** Each setting's control, default, help text and validation come from the registry. A module writes no settings screen. Its generated page is at `/console/<module>/settings`, in the set-up half of the module's own group. A setting declared `scope: 'site'` is drawn in site administration at `/admin/settings` instead, grouped by module. Foundations' Settings screen at `/admin/settings` is also the index and search across every setting and links to each module's page.
 - **Each setting shows** its current value, its default with a "Reset" link when changed, its limits, who may change it, when and by whom it was last changed, and a "Quoted on public pages" tag where a content page shows it live. A setting managed by the deployment is shown read-only and says so. This is foundations' list for its Settings screen, which this page type draws.
 - **Changes save per section** with a stated summary ("3 changes"), and each links to its audit entry.
 - **Settings search** in the console finds a setting by its label, by the words in its help text or by its key.

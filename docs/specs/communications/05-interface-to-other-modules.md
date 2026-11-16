@@ -7,15 +7,27 @@ Communications meets other modules in four ways: it offers a point where they co
 title: Communications chooses the audience; core carries every message
 ---
 flowchart LR
-  BO["Box office<br/>four audience sources, and checkout tick boxes recorded in the order batch"] --> C
-  ID["Identity<br/>role, ability and member holders, read by its own sources; verified addresses"] --> C
-  MB["Membership and others<br/>audience sources such as current members, when their module is switched on"] --> C
-  FB["Form builder<br/>a consent question that stores the wording with the answer"] --> C
+  subgraph LEFT["Modules it reads or is fed by"]
+    BO["Box office<br/>four audience sources, and checkout tick boxes recorded in the order batch"]
+    ID["Identity<br/>role, ability and member holders, read by its own sources; verified addresses"]
+    MB["Membership and others<br/>audience sources such as current members, when their module is switched on"]
+    FB["Form builder<br/>a consent question that stores the wording with the answer"]
+  end
+  subgraph RIGHT["What it relies on and answers to"]
+    CN["Core notifications<br/>notify, once per recipient; core sends and adds the unsubscribe headers"]
+    CP["Core preferences<br/>the two mailing topics are the master switch for each side"]
+    CR["Core delivery results<br/>reachability, counts, and bounce and complaint events if the provider reports them"]
+    PE["The person, by link<br/>confirm and manage pages, one-click unsubscribe from the mail client"]
+  end
+  BO --> C
+  ID --> C
+  MB --> C
+  FB --> C
   C["Communications<br/>lists and wordings<br/>subscriptions<br/>consent records<br/>mailings and notices<br/>recipient snapshots<br/>creates no accounts and sends no email itself"]
-  C --> CN["Core notifications<br/>notify, once per recipient; core sends and adds the unsubscribe headers"]
-  C --> CP["Core preferences<br/>the two mailing topics are the master switch for each side"]
-  CR["Core delivery results<br/>reachability, counts, and bounce and complaint events if the provider reports them"] --> C
-  PE["The person, by link<br/>confirm and manage pages, one-click unsubscribe from the mail client"] --> C
+  C --> CN
+  C --> CP
+  CR --> C
+  PE --> C
 ```
 
 *Communications and its neighbours · 4 contributors, 3 core services, the person*
@@ -113,7 +125,7 @@ A content block a body may use: a name, its properties, an email rendering and a
 | core.health-check | Foundations | Campaigns stuck; a consent list with no wording; an automatic list whose source is gone; confirmations failing |
 | core.record-resolver | Foundations | Label, address and parent for both record types |
 | core.erasure-handler | Foundations | None needed: column behaviours cover it |
-| core.merge-handler | Identity | The two handlers in part 2 |
+| core.merge-handler | Identity | One step, `communications.settle-subscriptions`, run before the move stage: for each list on which both accounts hold a subscription it applies the stricter state to the survivor's row, sets the other row aside and writes one merge consent record (part 2). The move of communications\_subscriptions.account\_id then re-points what is left. Its undo, run after the move is reversed, returns the set-aside rows, lets every unsubscribe stand on both accounts, adds consent records and removes none, and returns a count of what stood |
 | core.export-contributor | Identity | A person's subscriptions and consent records |
 | core.privacy-record | Foundations | Three entries: subscriptions, consent records, campaign recipients |
 | core.change-impact | Core | "1 scheduled notice about this performance" before a cancel or move |
@@ -182,7 +194,7 @@ The subscription event is internal because it is about a person, under the found
 | --- | --- | --- |
 | core.delivery.complained | Core | Finds the recipient by the notification id and marks that subject's subscriptions on that side unsubscribed, reason complaint |
 | `core.delivery.bounced`, `core.delivery.failed` | Core | Nothing to subscriptions: core suppresses a hard bounce itself. Listed because the campaign's live counts refresh on them |
-| core.account.merged | Identity | Nothing by event: the merge runs the handlers in its own batch |
+| core.account.merged | Identity | Nothing by event: the staged merge runs this module's handler step and then the column declarations in part 2 |
 | core.module.disabled | Foundations | For a module that contributed a source: nothing is changed. Lists and drafts using it show as unavailable |
 
 No box office event is listened for. Consent at checkout arrives through the code point `box-office.checkout-consent`: this module's contribution supplies the questions (key, wording, never pre-ticked) and `record({ orderId, accountId, keys })`, which returns statements and neither reads nor commits. Box office adds them to its own batch when an order is first confirmed or first reserved, once. A key is the list's key and the wording's id. If `record` throws, the checkout fails with a plain message, because a consent lost silently is worse. Desk and phone sales ask no consent questions in the first release.
