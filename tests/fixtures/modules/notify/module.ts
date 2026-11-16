@@ -43,6 +43,14 @@ export default defineModule({
       lane: 'bulk',
       variables: { shift: 'text' },
       wording: { 'en-GB': { subject: 'Your shift: {{ shift }}', body: 'You are on the rota for {{ shift }}.' } },
+    }, {
+      // A link that signs someone in: sealed at rest, sent by email only.
+      id: 'notify.invite',
+      category: 'transactional',
+      side: 'members',
+      channels: ['email'],
+      variables: { link: 'sealed' },
+      wording: { 'en-GB': { subject: 'You are invited', body: 'Join the team.\n\n[Accept the invitation]({{ link }})' } },
     }],
     'core.notification-topic': [{ id: 'notify.rota', side: 'members' }],
   },

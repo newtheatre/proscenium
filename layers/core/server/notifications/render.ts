@@ -3,7 +3,10 @@
 // [links](...). Every value is escaped; a url variable is the only thing that can become a link.
 import { refuse } from '#kit'
 
-export type VariableKind = 'url' | 'text'
+export type VariableKind = 'url' | 'sealed' | 'text'
+
+// A sealed value may be a link; it becomes one only if it is a safe address.
+const isLink = (kind: VariableKind | undefined) => kind === 'url' || kind === 'sealed'
 
 /** Filled by core, never by the caller. */
 export const RESERVED = ['theatre'] as const
@@ -120,7 +123,7 @@ function fragment(source: string, values: Record<string, string>, options: Rende
     parts.push(escapeHtml(source.slice(last, match.index)))
     const name = match[1]!
     const value = values[name] ?? ''
-    parts.push(options.kinds[name] === 'url' && isSafeUrl(value)
+    parts.push(isLink(options.kinds[name]) && isSafeUrl(value)
       ? `<a href="${escapeHtml(value)}" style="color:${options.accent}">${escapeHtml(value)}</a>`
       : escapeHtml(value))
     last = match.index! + match[0].length

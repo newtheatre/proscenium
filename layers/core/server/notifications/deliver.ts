@@ -3,7 +3,7 @@
 // own small unit too, so one delivery's failure never undoes another's success. The provider's
 // message id is kept exactly as send() returns it, angle brackets included, because Cloudflare's
 // bounce and complaint events carry that same string (proof P-COM-3).
-import { all, createUnit, isRefusal, nowMs, useSetting } from '#kit'
+import { all, createUnit, isRefusal, nowMs, openSpecial, useSetting } from '#kit'
 import type { UnitView } from '#kit'
 import { addressesFor } from '../identity/addresses'
 import { brandTokens } from '../brand/theme'
@@ -24,6 +24,7 @@ interface DueRow {
   address: string | null
   locale: string
   payload: string | null
+  sealed_variables: string | null
 }
 
 /** Codes that are the recipient's, not a fault: the delivery fails at once and is not retried. */
@@ -42,6 +43,16 @@ async function settle(id: string, change: { state: 'sent' | 'retrying' | 'failed
     sql: 'UPDATE core_notification_deliveries SET state = ?, reason = coalesce(?, reason), provider_ref = coalesce(?, provider_ref), last_error = ?, next_attempt_at = ?, sent_at = CASE WHEN ? = \'sent\' THEN ? ELSE sent_at END WHERE id = ? AND state = \'sending\'',
     params: [change.state, change.reason ?? null, change.providerRef ?? null, change.error ?? null, change.nextAttemptAt ?? null, change.state, nowMs(), id],
   })
+  if (change.state !== 'retrying') {
+    // The email is finished: its sealed variables go in the same unit (part 4, "A variable that
+    // carries a secret"), and the payload once no other delivery of the notification needs it.
+    unit.add({
+      sql: `UPDATE core_notifications SET sealed_variables = NULL,
+        payload = CASE WHEN EXISTS (SELECT 1 FROM core_notification_deliveries WHERE notification_id = core_notifications.id AND state IN ('queued', 'held', 'sending', 'retrying')) THEN payload ELSE NULL END
+        WHERE id = (SELECT notification_id FROM core_notification_deliveries WHERE id = ?)`,
+      params: [id],
+    })
+  }
   return unit
 }
 
@@ -51,7 +62,7 @@ async function settle(id: string, change: { state: 'sent' | 'retrying' | 'failed
  */
 export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitView): Promise<{ sent: number, retrying: number, failed: number, skipped: number }> {
   const counts = { sent: 0, retrying: 0, failed: 0, skipped: 0 }
-  const due = await all<DueRow>(`SELECT d.id, d.notification_id, d.sender_key, d.attempts, n.type_key, n.side, n.account_id, n.address, n.locale, n.payload
+  const due = await all<DueRow>(`SELECT d.id, d.notification_id, d.sender_key, d.attempts, n.type_key, n.side, n.account_id, n.address, n.locale, n.payload, n.sealed_variables
       FROM core_notification_deliveries d JOIN core_notifications n ON n.id = d.notification_id
      WHERE d.id IN (SELECT value FROM json_each(?)) AND d.channel = 'email' AND d.state IN ('queued', 'retrying')`, JSON.stringify(deliveryIds))
   if (!due.length) return counts
@@ -84,15 +95,18 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
     const attempt = row.attempts + 1
     const found = declaredType(row.type_key)
     const address = addressOf(row)
-    if (!found || !address || suppressed.has(address.toLowerCase()) || row.payload === null) {
-      const reason = !found ? 'unknown_type' : !address ? 'no_address' : row.payload === null ? 'erased' : 'suppressed_address'
+    // A cleared notification cannot be re-sent: the caller issues a new one.
+    const cleared = row.payload === null || (!!found && Object.values(found.type.variables).includes('sealed') && row.sealed_variables === null)
+    if (!found || !address || suppressed.has(address.toLowerCase()) || cleared) {
+      const reason = !found ? 'unknown_type' : !address ? 'no_address' : cleared ? 'erased' : 'suppressed_address'
       await (await settle(row.id, { state: 'skipped', reason })).commit()
       counts.skipped++
       continue
     }
     const { type } = found
     const wording = type.wording[row.locale] ?? type.wording['en-GB']!
-    const message = render(wording, { values: JSON.parse(row.payload), kinds: type.variables, accent: brand.light.link, theatre, footer })
+    const values = { ...JSON.parse(row.payload!), ...(row.sealed_variables ? JSON.parse((await openSpecial(row.sealed_variables))!) : {}) }
+    const message = render(wording, { values, kinds: type.variables, accent: brand.light.link, theatre, footer })
     const sender = (row.sender_key ? await senderByKey(row.sender_key, domain) : undefined) ?? await senderFor(type.topic ?? 'transactional', domain)
     try {
       const result = await useMailer()({ from: { name: sender.name, email: sender.email }, to: address, replyTo: sender.replyTo, ...message, headers: { 'X-Entity-Ref-ID': row.id } })

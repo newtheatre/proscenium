@@ -72,6 +72,7 @@ CREATE TABLE `core_notifications` (
 	`dedupe_key` text,
 	`coalesce_key` text,
 	`payload` text,
+	`sealed_variables` text,
 	`actor_id` text,
 	`created_at` integer NOT NULL,
 	CONSTRAINT "core_notifications_side" CHECK("side" IN ('audience', 'members')),

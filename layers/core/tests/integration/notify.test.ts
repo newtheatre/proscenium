@@ -99,6 +99,38 @@ describe('notify', () => {
     expect(mails[0]).toMatchObject({ to: 'reader@example.org', subject: 'Your order A12' })
     const [email] = await deliveriesOf(ids)
     expect(email).toMatchObject({ state: 'sent', attempts: 1, provider_ref: mails[0]!.messageId })
+    expect((await rows<{ payload: string | null }>('SELECT payload FROM core_notifications WHERE id = ?', ids[0]))[0]!.payload).toBeNull()
+  })
+
+  it('keeps a sealed variable encrypted in its own column, sends it by email only and clears it once sent', async () => {
+    const to = await account('invitee@example.org')
+    const link = 'https://theatre.example.org/invite#k3y-that-signs-in'
+    const { ids } = await send('notify.invite', { to, variables: { link } })
+    const [row] = await rows<{ payload: string, sealed_variables: string }>('SELECT payload, sealed_variables FROM core_notifications WHERE id = ?', ids[0])
+    expect(JSON.parse(row!.payload)).toEqual({})
+    expect(row!.sealed_variables).toMatch(/^v1\./)
+    expect(row!.sealed_variables).not.toContain('k3y-that-signs-in')
+    expect(await deliveriesOf(ids)).toMatchObject([{ channel: 'email', state: 'queued' }])
+    expect(await rows('SELECT id FROM core_inbox_items WHERE account_id = ?', to)).toHaveLength(0)
+    await deliver()
+    expect(mails[0]!.text).toContain(link)
+    expect((await rows<{ payload: string | null, sealed_variables: string | null }>('SELECT payload, sealed_variables FROM core_notifications WHERE id = ?', ids[0]))[0]).toEqual({ payload: null, sealed_variables: null })
+  })
+
+  it('clears a sealed variable when the email fails for good, and will not send a cleared one', async () => {
+    const to = await account()
+    failWith = { code: 'E_RECIPIENT_NOT_ALLOWED', retryable: false }
+    const { ids } = await send('notify.invite', { to, variables: { link: 'https://theatre.example.org/invite#once' } })
+    await deliver()
+    expect(await deliveriesOf(ids)).toMatchObject([{ state: 'failed' }])
+    expect((await rows<{ sealed_variables: string | null }>('SELECT sealed_variables FROM core_notifications WHERE id = ?', ids[0]))[0]!.sealed_variables).toBeNull()
+
+    failWith = undefined
+    const again = await send('notify.invite', { to, variables: { link: 'https://theatre.example.org/invite#twice' } })
+    await env.DB.prepare('UPDATE core_notifications SET sealed_variables = NULL WHERE id = ?').bind(again.ids[0]).run()
+    await deliver()
+    expect(mails).toHaveLength(0)
+    expect(await deliveriesOf(again.ids)).toMatchObject([{ state: 'skipped', reason: 'erased' }])
   })
 
   it('writes fifty recipients in a handful of statements, and nothing at all when repeated with the same keys', async () => {
