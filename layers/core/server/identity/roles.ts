@@ -157,11 +157,14 @@ async function endDate(role: RoleRow, given: number | null | undefined): Promise
  * Gives a role (ID-23). The database refuses a self-grant too; the "one live grant" rule is a
  * guarded insert, so two requests at once make one grant.
  */
-export async function createGrant(unit: UnitView, actor: Actor, input: GrantInput, options: { endedGrant?: string } = {}): Promise<string> {
+export async function createGrant(unit: UnitView, actor: Actor, input: GrantInput, options: { endedGrant?: string, newAccount?: boolean } = {}): Promise<string> {
   if (input.accountId === actor.accountId) refuse('core.grant.self', 'You cannot give yourself a role.', { status: 403, remedy: 'Ask someone else who can give roles.' })
-  const account = await accountById(input.accountId)
-  if (!account || account.merged_into_id || account.anonymised_at) refuse('core.not-found', 'There is no such person.', { status: 404 })
-  if (account.disabled_at) refuse('core.account.disabled', 'This account is disabled.', { status: 409, remedy: 'Enable it first.' })
+  // An account made earlier in this unit is not in the database yet, and is live by definition.
+  if (!options.newAccount) {
+    const account = await accountById(input.accountId)
+    if (!account || account.merged_into_id || account.anonymised_at) refuse('core.not-found', 'There is no such person.', { status: 404 })
+    if (account.disabled_at) refuse('core.account.disabled', 'This account is disabled.', { status: 409, remedy: 'Enable it first.' })
+  }
   const role = await roleById(input.roleId)
   if (!role || role.archived_at) refuse('core.not-found', 'There is no such role.', { status: 404 })
   if (role.key === OWNER) {

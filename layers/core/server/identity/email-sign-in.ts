@@ -72,7 +72,8 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
 }
 
 async function tokenByHash(hash: string): Promise<TokenRow | null> {
-  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose = \'sign_in\'', hash)
+  // An invitation's link signs in exactly as a sign-in link does, and so claims the account.
+  return first<TokenRow>('SELECT * FROM core_account_tokens WHERE token_hash = ? AND purpose IN (\'sign_in\', \'invite\')', hash)
 }
 
 export interface SignedIn { accountId: string, next: string | null, offerPasskey: boolean, created: boolean }
