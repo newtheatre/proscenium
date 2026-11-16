@@ -5,7 +5,10 @@
 const props = withDefaults(defineProps<{
   title: string
   home?: 'console' | 'members' | 'tonight' | 'admin'
-}>(), { home: 'console' })
+  /** Translation keys for the page when nothing is waiting; the console's own by default. */
+  emptyTitle?: string
+  emptyDescription?: string
+}>(), { home: 'console', emptyTitle: 'core.console.home.empty.title', emptyDescription: 'core.console.home.empty.description' })
 
 const { t } = useT()
 interface Card { id: string, component: string, urgency: 'overdue' | 'today' | 'info', count?: number }
@@ -54,8 +57,8 @@ const bands = computed(() => (['overdue', 'today', 'info'] as const)
     </div>
     <EmptyState
       v-else
-      :title="t('core.console.home.empty.title')"
-      :description="t('core.console.home.empty.description')"
+      :title="t(emptyTitle)"
+      :description="t(emptyDescription)"
       icon="i-lucide-circle-check"
     >
       <template #actions>

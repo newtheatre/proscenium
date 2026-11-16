@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createUnit } from '#kit/unit'
 import { useRegistry } from '#kit/registry'
 import type { TableMeta } from '#kit/db'
-import { Browser, deliver, env, goStale, grantDirectly, leaveIdentity, reassert, reset, setSetting, clearSetting, signInByEmail, staff, useIdentity } from './helpers'
+import { Browser, deliver, env, goStale, grantDirectly, leaveIdentity, reassert, reset, setSetting, clearSetting, signInByEmail, staff, unclaimedAccount, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
 import { eraseAccount, erasurePlan } from '../../../server/identity/erasure'
@@ -139,6 +139,22 @@ describe('asking for erasure (ID-16)', () => {
     })
     expect(again).toBeNull()
     expect(await rows('SELECT * FROM core_accounts WHERE id = ?', accountId)).toEqual(before)
+  })
+
+  it('reaches rows written under an account merged into this one, through the account scope', async () => {
+    const survivor = await unclaimedAccount()
+    const merged = await unclaimedAccount()
+    await env.DB.prepare('UPDATE core_accounts SET merged_into_id = ?, merged_at = ? WHERE id = ?').bind(survivor, Date.now(), merged).run()
+    // core_inbox_items.account_id is alias: the row keeps the merged-away id it was written with.
+    await env.DB.prepare('INSERT INTO core_inbox_items (id, account_id, side, title, expires_at, created_at) VALUES (?, ?, \'audience\', \'Your tickets\', ?, ?)').bind('inb_aaaaaaaaaaaaaaaaaaaaaaaaaa', merged, Date.now() + 86_400_000, Date.now()).run()
+    await inContext(async () => {
+      const unit = createUnit()
+      await eraseAccount(unit, survivor)
+      await unit.commit()
+    })
+    expect(await rows('SELECT id FROM core_inbox_items WHERE account_id = ?', merged)).toEqual([])
+    expect(await rows<{ id: string, anonymised: number }>('SELECT id, anonymised_at IS NOT NULL AS anonymised FROM core_accounts WHERE id IN (?, ?) ORDER BY id', survivor, merged)).toEqual(
+      [survivor, merged].sort().map(id => ({ id, anonymised: 1 })))
   })
 
   it('ends live grants, keeping them as history', async () => {

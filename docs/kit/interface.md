@@ -134,6 +134,26 @@ with the field's label as its legend. `ticks` takes `options` and, if short note
 `notes: { max, label }`; its value is an array of `{ value, note? }` for the ticked options, in the
 order of the options, and a note box opens under a tick only when `notes` is given.
 
+## Site administration (R-33)
+
+The fourth shell, at `/admin` (menu value `admin`). It holds install-level screens; the console keeps
+day-to-day work and each module's own settings. Someone enters it by holding the ability of at least
+one admin entry (the viewer then has the side `admin` and the account menu shows "Site administration");
+anyone else finds `/admin` is not there. The layout is `layouts/admin.vue`: the console's frame with a
+strip above the page header that says where you are at every width (and carries the drawer toggle
+below 1024 pixels), a "Back to console" (or "Back to the site") row where the theatre's mark is,
+neutral buttons (the `admin-shell` class on `body` swaps the brand colour out), and a browser title
+that starts "Site administration". A page uses it with `definePageMeta({ layout: 'admin' })`.
+
+- **Overview** at `/admin`: `PageHome` with `home="admin"`, cards from `core.home-card` with `home: 'admin'`.
+- **Site settings** at `/admin/settings`: `PageSettings scope="site"` shows every setting declared
+  with `scope: 'site'`, grouped by module; a module's console settings page links to it when some of
+  that module's settings are there. Settings search and the palette link to the right page.
+- The palette offers both shells' screens to someone entitled to both, each named with its shell.
+- Moving a screen from the console's System group: give it an admin entry (`menu: 'admin'`, a group
+  from `ADMIN_GROUP_ORDER`), move its page under `pages/admin/`, and add a redirect from its old address
+  in `layers/core/nuxt.config.ts` `routeRules`.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the
