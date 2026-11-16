@@ -20,6 +20,7 @@ export const identityAccess: AccessProvider = {
     return {
       kind: 'person',
       accountId: session.accountId,
+      sessionId: session.id,
       name: row?.preferred_name || row?.name || undefined,
       assurance: session.assurance,
       reassertedAt: session.reassertedAt ?? undefined,
