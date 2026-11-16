@@ -79,9 +79,13 @@ This table is the single index of every secret in `core`, whichever area declare
 | `CORE_GOOGLE_CLIENT_SECRET` | identity | when-used | As declared in identity's document |
 | `CORE_OWNER_RECOVERY` | identity | when-used | As declared in identity's document |
 
+**One optional secret, added 16 November 2026 at Matt's request for automatic setup of the sending domain (core domain's story C-52):** `CORE_CLOUDFLARE_TOKEN`, a Cloudflare API token limited to Email Sending edit and Zone read on the theatre's own zone. When it is absent everything stays a manual setup step and nothing fails. It is never shown, logged or stored anywhere but the secret; the health check reports only whether it is present and can read the zone; the call that creates the sending subdomain goes through `externalCall`. It is the only secret that can act on the theatre's Cloudflare account, so its permissions are never widened without a decision.
+
 ## Rate-limit classes
 
 A route names a class. Each allowance is the setting `core.rate-limits.<class>`; the figures are proposals.
+
+**What each class counts by (as built, 16 November 2026).** A route's class counts by the signed-in account, or by the network address when nobody is signed in. `sign-in` also counts by the email address typed, and over either limit the person sees the same quiet "sent" screen. `presented-value` counts each check twice, by session and by network address, and over either the check is refused. The `sign-in`, `public-form` and `presented-value` classes count in the shared counter (a SQLite-backed Durable Object, so it runs on Cloudflare's free plan; an object clears its storage when its window ends); the others count in memory. The shipped figures are in the Formats tab's fourth "As built" list and prevail over the proposals below.
 
 | Class | Counted per | Proposed allowance | Used for |
 | --- | --- | --- | --- |

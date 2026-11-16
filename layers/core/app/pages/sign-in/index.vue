@@ -67,7 +67,6 @@ async function useCode() {
       v-if="providerError"
       role="alert"
       color="error"
-      variant="subtle"
       :title="providerError"
     />
     <RefusalNotice :refusal="refusal" />

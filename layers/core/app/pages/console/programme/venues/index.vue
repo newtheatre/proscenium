@@ -63,7 +63,6 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
             v-if="!row.managed"
             label="Visiting"
             color="neutral"
-            variant="subtle"
             size="sm"
           />
           <StatusBadge
@@ -101,7 +100,6 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
             <UInput
               v-model="form.name"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -111,7 +109,6 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
             <UInput
               v-model="form.locality"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
         </form>

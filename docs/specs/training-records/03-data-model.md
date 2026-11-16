@@ -80,7 +80,7 @@ All ids are time-sorted. Nothing in Training grants access by being known, so no
 | `self_sign_up` | boolean | not null, default true | internal | keep | False where places are given by staff only |
 | `status` | text | one of `unpublished`, `live`, `retired` | internal | keep | Part 3 |
 | `live_version_id` | ref `training_course_versions` | nullable | internal | keep | Null until first published |
-| `created_by` | account, actor | not null | internal | keep | Follows a merge |
+| `created_by` | account, actor | not null | internal | keep | On merge: alias, as every actor column is |
 | `created_at`, `updated_at` | timestamp | not null | internal | keep |  |
 
 **`training_course_versions`**: realm operational; subject none; no retention; not append-only. Unique on (`course_id`, `number`).
@@ -144,8 +144,8 @@ A competency with no courses is held by nobody. The screen refuses to make one a
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `course_id` | ref `training_courses` | not null | internal | delete the row | Rows go when the course is deleted |
-| `account_id` | `col.account`, role subject | not null; on merge: handler | personal | delete the row | A merge that would make two rows keeps one |
-| `added_by` | `col.account`, role actor | nullable; on merge: move | internal | delete the row | Who named the trainer |
+| `account_id` | `col.account`, role subject | not null; on merge: alias | personal | delete the row | Read through the account scope, so a merged person listed twice is one trainer |
+| `added_by` | `col.account`, role actor | nullable; on merge: alias | internal | delete the row | Who named the trainer |
 | `added_at` | timestamp | not null | internal | delete the row |  |
 
 A row means the person may teach that course: run its sessions and sign off its steps. The fact `training.course-trainer` reads this table (part 6), so naming a trainer needs `training.course.manage` at the course and never a grant from Identity. `training_session_trainers`, below, says who is leading one session, and may only name a trainer of the course or a holder of `training.session.manage`.
@@ -177,7 +177,7 @@ A row means the person may teach that course: run its sessions and sign off its 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `session_id` | ref `training_sessions` | not null | internal | keep |  |
-| `account_id` | account, subject | not null; on merge: handler | internal | keep | A merge that would make two rows keeps one |
+| `account_id` | account, subject | not null; on merge: alias | internal | keep | Read through the account scope, so a merged person listed twice is one trainer |
 | `created_at` | timestamp | not null | internal | keep |  |
 
 **`training_session_places`**: realm members; subject `account_id`; retention `training.retention.attendance`; not append-only. Unique on (`session_id`, `account_id`) where `state` is not `cancelled`.
@@ -186,14 +186,14 @@ A row means the person may teach that course: run its sessions and sign off its 
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `session_id` | ref `training_sessions` | not null | internal | keep |  |
-| `account_id` | account, subject | not null; on merge: handler | internal | keep | May be an unclaimed account, for a person staff added by name |
+| `account_id` | account, subject | not null; on merge: handler | internal | keep | May be an unclaimed account, for a person staff added by name. Handler, because a place is once only for a person and a session: where two merged accounts each hold a place on one session, the stronger is kept and the other cancelled, which frees it. Every other row stays as written and is read through the account scope |
 | `state` | text | one of `booked`, `waiting`, `cancelled`, `attended`, `absent` | internal | keep | Part 3 |
 | `counted` | integer | 0 or 1 | internal | keep | 1 while the place takes capacity: booked, attended or absent. The trigger sums it into `places_taken` |
 | `waiting_since` | timestamp | nullable | internal | keep | Orders the session waiting list |
-| `added_by` | account, actor | not null; on merge: move | internal | keep | The person themselves, or staff |
+| `added_by` | account, actor | not null; on merge: alias | internal | keep | The person themself, or staff |
 | `cancelled_at` | timestamp | nullable | internal | keep |  |
-| `cancel_kind` | text | one of `self`, `staff`, `session-cancelled`; nullable | internal | keep |  |
-| `marked_by` | account, actor | nullable; on merge: move | internal | keep | Who marked attendance |
+| `cancel_kind` | text | one of `self`, `staff`, `session-cancelled`, `merge`; nullable | internal | keep | `merge` marks a place the merge handler cancelled, so that undoing the merge can find it |
+| `marked_by` | account, actor | nullable; on merge: alias | internal | keep | Who marked attendance |
 | `marked_at` | timestamp | nullable | internal | keep |  |
 | `note` | text | at most 300 | free text | redact | A trainer's note, such as "left at the interval" |
 | `created_at`, `updated_at` | timestamp | not null | internal | keep |  |
@@ -223,13 +223,13 @@ A row means the person may teach that course: run its sessions and sign off its 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
-| `account_id` | account, subject | not null; on merge: handler | internal | keep | Two awarded rows for one course cannot both move |
+| `account_id` | account, subject | not null; on merge: alias | internal | keep | Rows stay as written after a merge and are read through the account scope. Two merged accounts may each hold an awarded row for one course; part 3, C7, says how that reads |
 | `course_id` | ref `training_courses` | not null | internal | keep |  |
 | `version_id` | ref `training_course_versions` | not null | internal | keep | The version completed |
 | `origin` | text | one of `steps`, `direct`, `import` | internal | keep |  |
 | `sign_off_ids` | JSON | list of ids; empty unless `origin` is `steps` | internal | keep | The sign-offs that earned it |
 | `awarded_at` | timestamp | not null | internal | keep |  |
-| `awarded_by` | account, actor | nullable; on merge: move | internal | keep | Set for `direct` and `import` |
+| `awarded_by` | account, actor | nullable; on merge: alias | internal | keep | Set for `direct` and `import` |
 | `direct_reason` | text | at most 500; required for `direct` | free text | redact | Why it was awarded without the steps |
 | `expires_at` | timestamp | nullable | internal | keep | Null means it never lapses. The one date every reader uses |
 | `natural_expires_at` | timestamp | nullable | internal | keep | What `expires_at` was before it was cut short |
@@ -237,7 +237,7 @@ A row means the person may teach that course: run its sessions and sign off its 
 | `status` | text | one of `awarded`, `superseded`, `revoked` | internal | keep | Lapsed is not stored: it is `awarded` with `expires_at` in the past |
 | `ended_at` | timestamp | nullable | internal | keep | When it was superseded or revoked |
 | `superseded_by` | ref `training_records` | nullable | internal | keep |  |
-| `revoked_by` | account, actor | nullable; on merge: move | internal | keep |  |
+| `revoked_by` | account, actor | nullable; on merge: alias | internal | keep |  |
 | `revoke_code` | text | one of `entered-in-error`, `no-longer-competent`, `left`, `other`; nullable | internal | keep |  |
 | `revoke_note` | text | at most 500 | free text | redact |  |
 | `warned_at` | timestamp | nullable | internal | keep | When the expiry warning was sent |
@@ -250,7 +250,7 @@ A row means the person may teach that course: run its sessions and sign off its 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
-| `account_id` | account, subject | not null; on merge: move | internal | keep |  |
+| `account_id` | account, subject | not null; on merge: alias | internal | keep |  |
 | `course_id` | ref `training_courses` | not null | internal | keep |  |
 | `step_id` | ref `training_course_steps` | not null | internal | keep | A certificate step |
 | `issuer` | text | not null, at most 120 | personal | clear | "St John Ambulance" |
@@ -260,8 +260,8 @@ A row means the person may teach that course: run its sessions and sign off its 
 | `file_id` | ref `core_files` | nullable | internal | keep | File slot `training.evidence-file`. Null and refused where the step forbids a file |
 | `seen_only` | boolean | not null | internal | keep | True where a verifier looked at the original and nothing was kept |
 | `state` | text | one of `submitted`, `verified`, `rejected`, `withdrawn` | internal | keep | Part 3 |
-| `submitted_by` | account, actor | not null; on merge: move | internal | keep | The person, or staff for them |
-| `decided_by` | account, actor | nullable; on merge: move | internal | keep |  |
+| `submitted_by` | account, actor | not null; on merge: alias | internal | keep | The person, or staff for them |
+| `decided_by` | account, actor | nullable; on merge: alias | internal | keep |  |
 | `decided_at` | timestamp | nullable | internal | keep |  |
 | `reject_reason` | text | at most 300 | free text | redact |  |
 | `retention_due_at` | timestamp | nullable | internal | keep | The training record's end plus `training.retention.evidence` |
@@ -283,11 +283,11 @@ A row means the person may teach that course: run its sessions and sign off its 
 - **A person's download** holds their places, sign-offs, training records and evidence, under the members' realm. Evidence files come through Training's contribution to `core.export-contributor`.
 - **Erasure** removes evidence and its files at once, takes the person off every course's and session's list of trainers, and redacts every free-text note. Places, sign-offs and training records keep their rows: with the account a tombstone they say only that somebody was trained, which the session counts and the course history still need.
 - **Retention.** A training record that is no longer current is anonymised when `retention_due_at` passes, by the task `training.sweep-retention`, along with the sign-offs it lists. Evidence is deleted on its own, shorter date. Places and session-trainer rows use the registry's ordinary sweep.
-- **A merge** moves evidence and actor columns, aliases sign-offs, and calls Training's merge handler for places, session trainers, course trainers and training records, which keeps one row where two would collide: the place with the stronger state, and the training record with the later expiry, the other superseded.
+- **A merge** moves nothing in Training. Every account column is `alias`, the default: rows stay on the id they were written under, and every read, count and claim by account uses the kit's account scope, the surviving account and its aliases (part 3, C7). No column is `move`, because no unique rule breaks when rows stay put and no other table keys to a person's row here. One column is `handler`, the subject of `training_session_places`, because a place is once only for a person and a session: Training's merge handler keeps the place with the stronger state and cancels the other. The handler is safe to repeat, as the staged merge requires. A merge can be undone for 30 days (Identity part 3, "What a handler owes on undo"). The place the handler cancelled carries the cancel kind merge and is kept, as every place is, for the attendance retention period, which is far longer than that window. Training's undo is one unit, safe to repeat, and runs after Identity has put its own columns back. It restores the place to the account it came from only if the session has not started and a place is still free; nothing is taken back from anybody else. Otherwise the place stays cancelled, and the undo reports it in its count with the reason. Since no column in Training is moved, nothing else needs undoing.
 
 ## What is deliberately not stored
 
 - No "current" flag on a training record and no stored list of who holds a competency. Both are read from dates, so neither can be stale.
 - No copy of a person's name or address. Every person is an account, unclaimed if need be.
 - No result, number or image of a criminal-record check (question 3).
-- No per-venue or per-production settings. A value that varies is a column that defaults from a setting as `valid_for` and `capacity` do.
+- No per-venue or per-production settings. A value that varies is a column that defaults from a setting, as `valid_for` and `capacity` do.

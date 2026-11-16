@@ -9,7 +9,7 @@ export const modules = defineTable('core_modules', {
   enabled: col.internal(integer('enabled', { mode: 'boolean' }).notNull().default(false)),
   enabledAt: col.timestamp('enabled_at'),
   disabledAt: col.timestamp('disabled_at'),
-  changedBy: col.account('changed_by', { role: 'actor', onMerge: 'move', nullable: true }),
+  changedBy: col.account('changed_by', { role: 'actor', nullable: true }),
   manifestSeen: col.internal(text('manifest_seen')),
 }, { realm: 'system' })
 
@@ -17,7 +17,7 @@ export const settings = defineTable('core_settings', {
   key: col.internal(text('key').primaryKey()),
   value: col.internal(text('value').notNull()),
   updatedAt: col.timestamp('updated_at').notNull(),
-  updatedBy: col.account('updated_by', { role: 'actor', onMerge: 'move', nullable: true }),
+  updatedBy: col.account('updated_by', { role: 'actor', nullable: true }),
 }, { realm: 'system' })
 
 export const settingChanges = defineTable('core_setting_changes', {
@@ -60,6 +60,8 @@ export const jobs = defineTable('core_jobs', {
   dedupeKey: col.internal(text('dedupe_key')),
   state: col.internal(text('state').notNull()),
   attempts: col.internal(integer('attempts').notNull().default(0)),
+  // Times the job answered "not yet" (JobInfo.defer): never an attempt, and it sets the pause.
+  deferrals: col.internal(integer('deferrals').notNull().default(0)),
   maxAttempts: col.internal(integer('max_attempts').notNull()),
   runAfter: col.timestamp('run_after').notNull(),
   lastError: col.internal(text('last_error')),
@@ -133,7 +135,7 @@ export const credentials = defineTable('core_credentials', {
   ciphertext: col.internal(text('ciphertext').notNull()),
   keyVersion: col.internal(integer('key_version').notNull()),
   setAt: col.timestamp('set_at').notNull(),
-  setBy: col.account('set_by', { role: 'actor', onMerge: 'move', nullable: true }),
+  setBy: col.account('set_by', { role: 'actor', nullable: true }),
   lastUsedAt: col.timestamp('last_used_at'),
   expiresAt: col.timestamp('expires_at'),
   hint: col.internal(text('hint')),
@@ -142,7 +144,7 @@ export const credentials = defineTable('core_credentials', {
 export const idempotencyKeys = defineTable('core_idempotency_keys', {
   key: col.internal(text('key').notNull()),
   route: col.internal(text('route').notNull()),
-  accountId: col.account('account_id', { role: 'actor', onMerge: 'move', nullable: true }),
+  accountId: col.account('account_id', { role: 'actor', nullable: true }),
   requestHash: col.internal(text('request_hash').notNull()),
   status: col.internal(integer('status').notNull()),
   response: col.personal(text('response'), { erase: 'clear' }),

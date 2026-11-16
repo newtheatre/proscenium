@@ -51,7 +51,6 @@ const lastGoodText = computed(() => lastGood.value?.toLocaleTimeString('en-GB', 
         v-if="failedRefresh"
         class="mb-4"
         color="warning"
-        variant="subtle"
         icon="i-lucide-wifi-off"
         :title="t('core.failed.stale', { time: lastGoodText })"
         :description="reason"

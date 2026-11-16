@@ -193,7 +193,7 @@ A `core.navigation` entry, as agreed with workstream 6:
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `id` | Yes | Unique within the point |
-| `menu` | Yes | `account`, `members`, `console` or `live`. These are menus, not shells: the interface has three shells (public, members and console) and a live mode with no navigation of its own; the account menu sits in the public shell |
+| `menu` | Yes | `account`, `members`, `console`, `admin` or `live`. These are menus, not shells: the interface has four shells (public, members, console and Site administration) and a live mode with no navigation of its own; the account menu sits in the public shell. `admin` is for screens about the installation (R-33, 16 November 2026); an entry there names one of the six admin groups (theatre, modules, access, email, connections, upkeep), which core declares through core.navigation-group with menu 'admin'; the Interface Doc defines them |
 | `to` | Yes | The address it opens |
 | `icon` | Yes | A bundled icon name |
 | `ability` | Yes | One ability, or a list meaning any of them, or 'signed-in' for an entry every signed-in person sees (the account menu). Never a fact name: a fact shows an entry by being mapped to the ability |
@@ -210,7 +210,7 @@ This is the one list. Every other mention in any document points here.
 
 | Prefix | Belongs to |
 | --- | --- |
-| `/account`, `/members`, `/console`, `/live` | The menus above |
+| `/account`, `/members`, `/console`, `/admin, /live` | The menus above |
 | `/sign-in`, `/setup` | Identity and first-run setup |
 | `/api` | Every module's routes, at `/api/<module>/...` |
 | `/files` | Core's file delivery |

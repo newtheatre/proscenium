@@ -77,7 +77,7 @@ The Foundations formats give one core point for this, `core.requirement`, shared
 | A verdict | `met`, `not-met` or `unavailable` for each pair, with `until` (when a met verdict stops being met), a translated `reason` for the person, and optionally a `summary` for staff, `evidence`, a help link and a `quantity`. Training gives `until`; a `reason` naming each course that is missing, lapsed or about to lapse; a help link to that course, where the next session is; and a `summary` such as "Till operator: current until 14 March 2027". It gives no `evidence` and no `quantity` |
 
 - A reference is the text `<source>:<id>`, such as `training:tcmp_01J...`. The host stores it on its own record and never interprets it.
-- `check` takes many accounts and many references because a rota screen asks about forty people at once. Training answers any call in at most two queries, whatever the numbers.
+- `check` takes many accounts and many references because a rota screen asks about forty people at once. Training answers any call in at most two queries, whatever the numbers, and reads each account through the kit's account scope (part 3, C7).
 - `unavailable` is what the kit answers for a reference whose source module is switched off or whose option was retired. The host chooses what that means each time it asks: `requirements.check` takes a required argument `whenUnavailable`, and there is no default. A host passes `met` where the requirement restricts who may do something, such as a duty or a booking, so a theatre is never locked out by a module being switched off. It passes `not-met` where the requirement grants a benefit, such as a member price, so switching a module off never gives the benefit to everyone. Every use of a training requirement restricts, so none is enforced while Training is off. The answer still says it came from an unavailable source, and the host's screen says so.
 - A source's reader runs as a plain read with no actor: the verdict is about the subject, not the person asking. Reasons and summaries name courses and dates only, which the host may show to a rota manager. They never include a revocation's reason or an evidence detail. For that reason Training names no `checkAbility` and answers for any account, as a rota needs, and it offers no `holder`, because none of its answers needs a name.
 - The host owns the consequence. It stores the reference on its own record, checks with the instant that matters (the start of the shift, not now), and decides whether not met refuses, warns or allows. Training's suggested default, which Matt accepted on 16 November 2026 for the hosts to adopt (part 9, question 6): refuse at the moment of acting, with the verdict's reason as the refusal's remedy, and offer a privileged, audited override that the host declares.
@@ -91,7 +91,7 @@ Two parts of the contract are not used by Training. Any declared fact also answe
 | `training.competent` | `training.competency` | The account holds that competency now (part 3, C1) | No. Being trained does not by itself open the members' area |
 | `training.course-trainer` | `training.course` | The account is listed as a trainer of that course in `training_course_trainers` (part 2) | No. A trainer is expected to be a member already (part 5) |
 
-A theatre maps abilities to a fact as it does to a role. Both facts are declared `pin: true`, so a mapping may name one record: "holders of Lighting desk may book the lighting desk" pins `training.competent` to that competency, and the fact is then judged against that record whatever record the ability is being used on. Identity owns the mapping table, `core_fact_abilities`, keyed by fact, ability and pinned record, and the permission screen. A mapping whose pinned record no longer exists grants nothing and shows there as broken. The presets map `training.course-trainer` unpinned, so it is judged against the course in hand: a trainer of a course runs its sessions and signs off its steps, and nothing else (part 6). Each fact is resolved in one keyed read. A fact never carries a privileged ability by default, and none of the abilities the presets map to these facts is privileged.
+A theatre maps abilities to a fact as it does to a role. Both facts are declared `pin: true`, so a mapping may name one record: "holders of Lighting desk may book the lighting desk" pins `training.competent` to that competency, and the fact is then judged against that record whatever record the ability is being used on. Identity owns the mapping table, `core_fact_abilities`, keyed by fact, ability and pinned record, and the permission screen. A mapping whose pinned record no longer exists grants nothing and shows there as broken. The presets map `training.course-trainer` unpinned, so it is judged against the course in hand: a trainer of a course runs its sessions and signs off its steps, and nothing else (part 6). Each fact is resolved in one keyed read over the account scope, so a merged person's records under either account count (part 3, C7). A fact never carries a privileged ability by default, and none of the abilities the presets map to these facts is privileged.
 
 | Use | Route |
 | --- | --- |
@@ -145,7 +145,7 @@ Each is written in the same unit of work as its change. Payloads carry ids and i
 
 ## Events listened for
 
-None in the first release. A merge is handled by Training's contribution to `core.merge-handler` inside the merge's own batch; an erasure by the registry and `core.erasure-handler`; a space disappearing by `core.delete-guard`.
+None in the first release. A merge is handled by Training's contribution to `core.merge-handler` as a step of the staged merge that is safe to repeat; an erasure by the registry and `core.erasure-handler`; a space disappearing by `core.delete-guard`.
 
 ## Points offered
 
@@ -169,7 +169,7 @@ None in the first release. A merge is handled by Training's contribution to `cor
 | `core.file-access` | Step material: anyone with `training.course.view`. Evidence: its subject and holders of `training.evidence.verify`, each other opening audited |
 | `core.space-busy` | A published session with a space is busy there from start to end. The contribution carries the module id and the label "Training session", so the room calendar can name it. Training calls core's isSpaceFree before publishing a session into a space and refuses if the space is taken; a session never bumps a booking |
 | `core.delete-guard` | A space with a published future session cannot be deleted; the guard names the sessions |
-| `core.merge-handler` | Places, session trainers, course trainers and training records (part 2) |
+| `core.merge-handler` | Places only, where two merged accounts hold a place on one session (part 2). Every other account column is alias and is read through the kit's account scope (part 3, C7). The handler also gives the undo that Identity asks of it (part 2) |
 | `core.erasure-handler` | Deletes evidence files |
 | `core.export-contributor` | Adds evidence files to a person's download |
 | `core.setup-step` | "Add your first course" (required) and "Say who can train" (optional) |

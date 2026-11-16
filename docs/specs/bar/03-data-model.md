@@ -55,7 +55,7 @@ Tables follow the Foundations layout: a heading line (realm, subject, retention,
 - `id` is `col.id()` with the table's prefix, primary key, internal, keep.
 - `created_at` and, unless append-only, `updated_at` are UTC milliseconds, internal, keep.
 - Money is `col.minor` with `col.currency` beside it. Quantities are whole integers in a stock item's base unit. No `real` column is used anywhere: a quantity is a count, which the Foundations ruling on `real` excludes.
-- A staff column is `col.account(name, { role: 'actor', onMerge })`, with `onMerge: 'alias'` in append-only tables and `'move'` elsewhere. On erasure the reference is kept and Identity anonymises the account.
+- A staff column is `col.account(name, { role: 'actor', onMerge })`. Every staff column is `onMerge: 'alias'`, in every table: who sold, opened, closed, received, counted, approved or reviewed is a record of an act and is never rewritten by a merge. One account column in the module is `'move'`, `bar_tabs.holder_account`, and its declaration states why. On erasure the reference is kept and Identity anonymises the account. Every read, count or guard by account uses the kit's account scope (the survivor and its aliases): a staff tab's limit and total, the fact `bar.tab-holder`, the rule that a tab is not written off by its opener or holder, and the rule that a stocktake is not approved by the person who submitted it. Where a CHECK compares two account columns, the unit's guard makes the same comparison by account scope, since a CHECK sees only stored ids.
 - A reference to another module's record (a performance, a ledger account, a payment part) is by id only. The bar reads no other module's tables.
 - Every table except `bar_tabs` has `subject: 'none'`, so by the Foundations rule none of them holds a personal or special column. Reasons are terms from a vocabulary, never typed text. The one free-text column, `bar_age_checks.description`, is `col.freeText` with erasure in a table that declares a retention, which is the case the rule allows.
 
@@ -182,7 +182,7 @@ Trigger: a list with `percent_off` set may not have rows in `bar_prices`.
 | `occasion_term` | text | nullable; a term of the vocabulary `bar.occasion` | internal | keep | "Social", "Private hire"; used when there is no performance |
 | `operating_day` | local date | not null | internal | keep | From the core's `operatingDayOf` |
 | `state` | text | one of open, closed | internal | keep |  |
-| `opened_by`, `closed_by` | account (actor, move) |  | internal | keep | Null `closed_by` when closed by the task |
+| `opened_by`, `closed_by` | account (actor, alias) |  | internal | keep | Null `closed_by` when closed by the task |
 | `opened_at`, `closed_at` | timestamp |  | internal | keep |  |
 
 Partial unique index on `outlet_id` where `state = 'open'`: an outlet has one open opening. Trigger: closed is final.
@@ -205,7 +205,7 @@ Partial unique index on `outlet_id` where `state = 'open'`: an outlet has one op
 | `intent_id` | text | nullable; a Payments intent id (`pay_`) | internal | keep | Set when payment starts. A sale paid through a bar tab has none: the tab holds the intent |
 | `part_id` | text | nullable; a Payments part id (`pip_`) | internal | keep | This sale's part of that intent |
 | `channel` | text | one of till, desk, self | internal | keep | desk when it came through `payments.desk-basket`; self when self-served |
-| `sold_by` | account (actor, move) | not null | internal | keep | The seller; the tab's holder on a self-served sale |
+| `sold_by` | account (actor, alias) | not null | internal | keep | The seller; the tab's holder on a self-served sale |
 | `client_key` | text | not null, unique | internal | keep | Made on the device, so a repeated request creates one sale |
 | `paid_at`, `voided_at` | timestamp |  | internal | keep |  |
 | `void_reason_term` | text | nullable; vocabulary `bar.void-reason` | internal | keep | Required when a sale with lines is voided |
@@ -244,7 +244,7 @@ Trigger: lines may be inserted, changed or deleted only while the sale is open.
 | `amount_minor` | minor units | above 0 | internal | keep |  |
 | `reason_term` | text | not null; vocabulary `bar.refund-reason` | internal | keep |  |
 | `stock_outcome` | text | one of returned, wasted, none | internal | keep | What happened to the goods |
-| `requested_by` | account (actor, move) | not null | internal | keep |  |
+| `requested_by` | account (actor, alias) | not null | internal | keep |  |
 
 Triggers, as Payments does for its own refunds: a reversal entering requested adds its quantity and amount to the line's `reversed_quantity` and `reversed_minor`; one entering failed subtracts them. The line's CHECKs therefore refuse a refund past what was sold, however two refunds race. A reversal's quantity, amount and line cannot change after insert.
 
@@ -259,23 +259,24 @@ bar\_tabs: realm by row (`members` for a staff tab, `audience` for a floating ta
 | `outlet_id` | ref `bar_outlets` | required for a floating tab; null for a staff tab | internal | keep | A floating tab belongs to one outlet. A staff tab belongs to none |
 | `opening_id` | ref `bar_openings` | required for a floating tab; null for a staff tab | internal | keep | The opening a floating tab was started in |
 | `holder_name` | `col.personal` text | 1 to 80 characters; null only after erasure | personal | erase | Floating: typed by staff, "Priya", "Hamlet company". Staff: copied from the account's display name when opened |
-| `holder_account` | account (subject, move) | required for a staff tab; on a floating tab nullable, set only when staff pick a known person with the core's person picker; null after erasure | personal | erase | Never set from a typed email address |
+| `holder_account` | account (subject, move). It is `'move'` because one live staff tab per holder is a unique rule on the stored id, and the tab is the holder's living record | required for a staff tab; on a floating tab nullable, set only when staff pick a known person with the core's person picker; null after erasure | personal | erase | Never set from a typed email address |
 | `holder_email` | `col.email` | nullable; floating tabs only | personal | erase | Where the receipt is sent. Cleared in the batch that records `receipt_sent_at` |
 | `holder_email_digest` | text | nullable; indexed | personal | erase | The core's `addressDigest(address, 'bar.tab-receipt')`. Stays after the address is cleared, and shows the tab to the account whose verified address matches (part 3) |
 | `receipt_sent_at` | timestamp | nullable | internal | keep |  |
-| `state` | text | one of open, settling, settled, written\_off | internal | keep | settled and written\_off are final |
+| `state` | text | one of open, settling, settled, written\_off, joined | internal | keep | settled and written\_off are final. A joined tab takes no charges and is never paid by itself: its sales are paid, or left unpaid, with the tab it was joined to |
 | `limit_minor` | minor units | nullable; above 0 | internal | keep | Copied when opened from `bar.tabs.staff-limit` or `bar.tabs.limit`; null when that setting is 0. A person with `bar.tab.write-off` may raise a floating tab's |
 | `total_minor` | minor units | not null, at least 0; trigger-kept | internal | keep | The sum of the bar sales charged to it |
 | `currency` | currency | not null | internal | keep |  |
 | `intent_id`, `part_id` | text | nullable; Payments ids | internal | keep | Set while the tab is settling and kept once settled |
-| `opened_by` | account (actor, move) | not null | internal | keep | The seller, or the holder when a staff tab opened itself by self-service |
-| `closed_by` | account (actor, move) | nullable | internal | keep | Who settled it or wrote it off |
+| `opened_by` | account (actor, alias) | not null | internal | keep | The seller, or the holder when a staff tab opened itself by self-service |
+| `closed_by` | account (actor, alias) | nullable | internal | keep | Who settled it or wrote it off |
+| `joined_to` | ref bar\_tabs | nullable; set exactly when the state is joined | internal | keep | The staff tab this one was joined to when two accounts were merged |
 | `opened_at`, `closed_at` | timestamp |  | internal | keep |  |
 | `write_off_reason_term` | text | nullable; vocabulary `bar.write-off-reason` | internal | keep | Required when written off |
 
 Guards, each a CHECK, a trigger or a partial unique index:
 
-- One live staff tab per account: unique on `holder_account` where `kind` is staff and `state` is open or settling.
+- One live staff tab per account: unique on `holder_account` where `kind` is staff and `state` is open or settling. When two accounts that each hold a live staff tab are merged, the bar's merge step joins the two tabs first (part 4), so the move never meets this rule. A sale's `tab_id` is set once and is not re-pointed: the absorbed tab becomes joined, keeps its sales, and its total is carried onto the survivor's tab.
 - One live floating tab per name per outlet: unique on (`outlet_id`, `holder_name`) where `kind` is floating and `state` is open or settling.
 - `total_minor` changes only by the trigger on `bar_sales`. A final state cannot change.
 - When the state is written\_off, `closed_by` differs from `opened_by` and from `holder_account`.
@@ -389,7 +390,7 @@ Trigger: a direct update that does not come from a movement insert is refused. T
 | `supplier_term` | text | nullable; vocabulary `bar.supplier` | internal | keep | A business name from a list the theatre keeps |
 | `supplier_ref` | text | nullable, at most 40 characters | internal | keep | The delivery note number |
 | `state` | text | one of draft, received | internal | keep | received is final |
-| `received_by` | account (actor, move) |  | internal | keep |  |
+| `received_by` | account (actor, alias) |  | internal | keep |  |
 | `received_at` | timestamp |  | internal | keep |  |
 
 **`bar_delivery_lines`**: realm operational; subject none. Editable only while the delivery is a draft.
@@ -412,7 +413,7 @@ Trigger: a direct update that does not come from a movement insert is refused. T
 | `state` | text | one of counting, submitted, approved, abandoned | internal | keep |  |
 | `scope` | text | one of full, category | internal | keep |  |
 | `category_id` | ref `bar_categories` | required when scope is category | internal | keep |  |
-| `started_by`, `submitted_by`, `approved_by` | account (actor, move) | CHECK `approved_by` is null or differs from `submitted_by`, unless the variance is under the setting (part 3) | internal | keep |  |
+| `started_by`, `submitted_by`, `approved_by` | account (actor, alias) | CHECK `approved_by` is null or differs from `submitted_by`, unless the variance is under the setting (part 3) | internal | keep |  |
 | `started_at`, `submitted_at`, `approved_at` | timestamp |  | internal | keep |  |
 | `variance_value_minor` | minor units | nullable; signed; set at submission | internal | keep | At last pack cost |
 
