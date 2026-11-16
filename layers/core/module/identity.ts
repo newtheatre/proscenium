@@ -53,7 +53,7 @@ export const identityRecords = defineRecords('core', {
 
 export const identityAbilities = defineAbilities('core', {
   'account.search': ability({ risk: 'normal' }),
-  'account.read': ability({ on: 'core.account', risk: 'privileged', owner: 'grants', implies: ['account.search'] }),
+  'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'] }),
   'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'] }),
   'account.merge': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'] }),
   'session.end': ability({ on: 'core.account', risk: 'privileged', owner: 'grants' }),

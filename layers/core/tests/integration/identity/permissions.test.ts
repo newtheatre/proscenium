@@ -235,6 +235,15 @@ describe('sensitive actions ask again (ID-28)', () => {
     expect((await admin.browser.post('/api/core/roles', body)).status).toBe(200)
   })
 
+  it('reading a person needs a strong session but not a fresh one, and every read is audited', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.account.read'])
+    const someone = await signInByEmail(new Browser())
+    await goStale(admin.accountId)
+    expect((await admin.browser.get(`/api/core/accounts/${someone}`)).status).toBe(200)
+    expect(await rows('SELECT action FROM core_audit WHERE record_id = ? AND actor_account_id = ? AND action = \'read\'', someone, admin.accountId)).toEqual([{ action: 'read' }])
+  })
+
   it('a basic session cannot be upgraded by an emailed link', async () => {
     const browser = new Browser()
     const device = new Authenticator()
