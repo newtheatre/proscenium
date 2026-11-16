@@ -5,7 +5,7 @@
 // a merge.
 import type { H3Event } from 'h3'
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
-import { takeRate } from '#kit/ratelimit'
+import { countAgainstRate } from '#kit/ratelimit'
 import { accountById, addressRow, isUsable, normaliseAddress, type AccountRow, type AddressRow } from './accounts'
 import { digest, randomToken } from './crypto'
 import { mergeAccounts } from './merge'
@@ -47,7 +47,7 @@ async function claimOn(held: AddressRow): Promise<'merge' | 'take'> {
 /** Adds an address and sends its verification link. Nothing else is ever sent to it until it is verified. */
 export async function addAddress(unit: UnitView, event: H3Event, accountId: string, typed: string): Promise<{ id: string | null }> {
   const address = normaliseAddress(typed)
-  if (!(await takeRate('sign-in', `address:${address}`))) refuse('core.rate-limited', 'Too many tries for this address.', { status: 429, remedy: 'Wait a while, then try again.' })
+  if (!(await countAgainstRate('sign-in', `address:${address}`)).allowed) refuse('core.rate-limited', 'Too many tries for this address.', { status: 429, remedy: 'Wait a while, then try again.' })
   const existing = await addressRow(address)
   let id: string | null = null
   if (existing?.account_id === accountId) {

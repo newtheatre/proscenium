@@ -3,7 +3,7 @@
 // passkey. Every recovery tells all the account's verified addresses.
 import type { H3Event } from 'h3'
 import { first, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
-import { takeRate } from '#kit/ratelimit'
+import { countAgainstRate } from '#kit/ratelimit'
 import { addressRow, accountById, isUsable, normaliseAddress } from './accounts'
 import { digest, normaliseRecoveryCode, randomToken } from './crypto'
 import { credentialNotice } from './notices'
@@ -21,7 +21,7 @@ const WRONG = { code: 'core.recovery.code-wrong', reason: 'That address and code
  */
 export async function useRecoveryCode(unit: UnitView, event: H3Event, input: { address: string, code: string }): Promise<{ next: string }> {
   const address = normaliseAddress(input.address)
-  if (!(await takeRate('sign-in', `address:${address}`))) refuse(WRONG.code, WRONG.reason, { status: 422, remedy: WRONG.remedy })
+  if (!(await countAgainstRate('sign-in', `address:${address}`)).allowed) refuse(WRONG.code, WRONG.reason, { status: 422, remedy: WRONG.remedy })
   const row = await addressRow(address)
   const account = row?.verified_at ? await accountById(row.account_id) : null
   if (!isUsable(account) || !account.first_signed_in_at) refuse(WRONG.code, WRONG.reason, { status: 422, remedy: WRONG.remedy })
