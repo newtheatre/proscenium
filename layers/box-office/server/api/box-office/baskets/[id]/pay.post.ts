@@ -10,6 +10,7 @@ import { fromRequest } from '../../../../links'
 export default defineRoute({
   public: true,
   rateLimit: 'write',
+  idempotent: true,
   input: z.object({ providerAccountId: idSchema('ppa').optional() }).strict(),
 }, async (event, { input }) => {
   // Noted for the message sent when the payment settles, which a job may do with no request.

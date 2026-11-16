@@ -45,6 +45,6 @@ export async function issueTickets(unit: UnitView, lines: readonly { id: string,
     return { line, keyId, codeHash: await hashOf(code), doorCode: `${signedPart(TICKET_KIND, keyId, code)}.${signature}` }
   }))
   unit.insertSet(tickets, made.map(m => ({ orderLineId: m.line.id, performanceId: m.line.performance_id, codeHash: m.codeHash, keyId: m.keyId, state: 'valid' })))
-  unit.expect(made.length)
+  unit.expect(made.length, { code: 'box-office.ticket.not-issued', reason: 'The tickets could not be issued.' })
   return made.map(m => m.doorCode)
 }
