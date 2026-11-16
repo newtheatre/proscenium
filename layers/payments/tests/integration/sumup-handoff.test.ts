@@ -4,13 +4,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, newId, nowMs, setClock } from '#kit'
 import { confirmRefund, createIntent, requestRefund, startAttempt } from '../../server/services'
 import returnRoute from '../../server/api/payments/handoff/[attempt]/[proof].get'
-import { call, env, inContext, rows, server, setModule } from '../../../../tests/integration/helpers'
+import providersRoute from '../../server/api/payments/providers.get'
+import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 19)
 const MINUTE = 60_000
 let account: string
 const secrets = env as unknown as Record<string, string | undefined>
-const handle = server({ 'GET /api/payments/handoff/:attempt/:proof': returnRoute })
+const handle = server({ 'GET /api/payments/handoff/:attempt/:proof': returnRoute, 'GET /api/payments/providers': providersRoute })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
   return inContext(async () => {
@@ -106,5 +107,15 @@ describe('the hand-off', () => {
     const { refundId } = await commit(unit => requestRefund(unit.view(), { partId, amountMinor: 500, requestedBy: null }))
     await commit(unit => confirmRefund(unit.view(), refundId, 'acc_seller'))
     expect(await state('payments_refunds', refundId)).toBe('succeeded')
+  })
+})
+
+describe('Providers and readers', () => {
+  it('pairs readers with the Cloud API only; the hand-off uses the phone\'s own app', async () => {
+    const listed = await (await call(handle, 'GET', '/api/payments/providers', { actor: person(['payments.provider.manage']) })).json() as any
+    const byId = Object.fromEntries(listed.providers.map((p: any) => [p.id, p]))
+    expect(byId.sumup.pairsReaders).toBe(true)
+    expect(byId['sumup-handoff'].pairsReaders).toBe(false)
+    expect(byId.cash).toMatchObject({ pairsReaders: false, missingSecrets: [] })
   })
 })

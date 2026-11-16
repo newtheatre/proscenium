@@ -87,16 +87,20 @@ export async function releaseParts(unit: UnitView, intent: IntentRow, parts: Par
 }
 
 /** Cancels an open intent with no attempt pending, unknown or succeeded, and releases its parts. */
-export async function cancelIntent(unit: UnitView, intentId: string): Promise<void> {
+export async function cancelIntent(unit: UnitView, intentId: string): Promise<{ waiting: string[] }> {
   const intent = await getIntent(intentId)
   if (!intent) throw new Refusal('core.not-found', 'There is no such payment.', { status: 404 })
   if (intent.state !== 'open') throw new Refusal('payments.intent.not-open', 'This payment is no longer open.', { status: 409 })
+  // A payment still waiting for its answer may be given up on: the seller takes the money another way,
+  // and if the provider takes it after all, it is held and refunded in full (answers.ts, holdAndRefund).
   unit.add({
     sql: `UPDATE payments_intents SET state = 'cancelled', updated_at = ? WHERE id = ? AND state = 'open'
-      AND NOT EXISTS (SELECT 1 FROM payments_attempts WHERE intent_id = ? AND state IN ('started', 'pending', 'unknown', 'succeeded'))`,
+      AND NOT EXISTS (SELECT 1 FROM payments_attempts WHERE intent_id = ? AND state = 'succeeded')`,
     params: [nowMs(), intentId, intentId],
-  }).expect(1, { code: 'payments.intent.in-flight', reason: 'Money has been taken or is still being taken for this payment, so it cannot be cancelled.', remedy: 'Wait for the answer, or refund what was taken.' })
+  }).expect(1, { code: 'payments.intent.paid-in-part', reason: 'Money has been taken for this payment, so it cannot be cancelled.', remedy: 'Take the rest, or refund what was taken.' })
   await releaseParts(unit, intent, await partsOf(intentId))
+  const waiting = await all<{ id: string }>("SELECT id FROM payments_attempts WHERE intent_id = ? AND state IN ('started', 'pending', 'unknown')", intentId)
+  return { waiting: waiting.map(w => w.id) }
 }
 
 export interface IntentStatus {

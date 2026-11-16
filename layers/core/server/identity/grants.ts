@@ -18,6 +18,16 @@ export interface LiveGrant {
   expires_at: number | null
 }
 
+/**
+ * SQL for the account that holds grant `g` now: the account it was given to, or the survivor that
+ * account was merged into. A merge leaves grants where they are (core_grants is append-only, so its
+ * account column is an alias); every read of who holds a grant goes through this.
+ */
+export const HOLDER = 'coalesce((SELECT h.merged_into_id FROM core_accounts h WHERE h.id = g.account_id), g.account_id)'
+
+/** SQL for "grant `g` is held by the person behind the account in the one `?`", whichever of their ids it is. */
+export const HELD_BY = `${HOLDER} = (SELECT coalesce(s.merged_into_id, s.id) FROM core_accounts s WHERE s.id = ?)`
+
 /** SQL for "this grant is live now"; `g` is core_grants. Takes the time twice. */
 export const LIVE = 'g.starts_at <= ? AND (g.expires_at IS NULL OR g.expires_at > ?) AND NOT EXISTS (SELECT 1 FROM core_grant_ends e WHERE e.grant_id = g.id)'
 
@@ -26,7 +36,7 @@ export async function liveGrantsOf(accountId: string): Promise<LiveGrant[]> {
   return all<LiveGrant>(
     `SELECT g.id, g.account_id, g.role_id, r.key AS role_key, g.scope, g.scope_module, g.scope_type, g.scope_id, g.expires_at
        FROM core_grants g JOIN core_roles r ON r.id = g.role_id
-      WHERE g.account_id = ? AND r.archived_at IS NULL AND ${LIVE}
+      WHERE ${HELD_BY} AND r.archived_at IS NULL AND ${LIVE}
       ORDER BY g.granted_at`,
     accountId, at, at,
   )
@@ -115,7 +125,7 @@ export async function factAbilityMap(): Promise<Record<string, string[]>> {
 export const USABLE_OWNER_EXISTS = `EXISTS (
   SELECT 1 FROM core_grants g
     JOIN core_roles r ON r.id = g.role_id AND r.key = '${OWNER}'
-    JOIN core_accounts a ON a.id = g.account_id
+    JOIN core_accounts a ON a.id = ${HOLDER}
    WHERE ${LIVE}
      AND a.first_signed_in_at IS NOT NULL AND a.disabled_at IS NULL AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL
      AND EXISTS (SELECT 1 FROM core_passkeys p WHERE p.account_id = a.id))`

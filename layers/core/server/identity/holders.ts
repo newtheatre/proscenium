@@ -4,7 +4,7 @@
 // grant waiting for its first sign-in is never a holder.
 import { all, can, factHolders, nowMs, type Actor } from '#kit'
 import { useRegistry } from '#kit/registry'
-import { LIVE, OWNER, OWNER_DOES_NOT_READ, factAbilityMap, withImplied } from './grants'
+import { HOLDER, LIVE, OWNER, OWNER_DOES_NOT_READ, factAbilityMap, withImplied } from './grants'
 import type { Scope } from './roles'
 
 const USABLE = 'a.first_signed_in_at IS NOT NULL AND a.disabled_at IS NULL AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL'
@@ -45,9 +45,9 @@ export async function holdersOf(ability: string, record?: RecordRef): Promise<st
   const ownerBrings = !OWNER_DOES_NOT_READ.has(ability)
   const placeholders = bringers.map(() => '?').join(', ')
   const granted = await all<{ account_id: string }>(
-    `SELECT DISTINCT g.account_id FROM core_grants g
+    `SELECT DISTINCT a.id AS account_id FROM core_grants g
        JOIN core_roles r ON r.id = g.role_id AND r.archived_at IS NULL
-       JOIN core_accounts a ON a.id = g.account_id
+       JOIN core_accounts a ON a.id = ${HOLDER}
       WHERE ${USABLE} AND ${LIVE}
         AND (${ownerBrings ? `r.key = '${OWNER}' OR ` : ''}EXISTS (SELECT 1 FROM core_role_abilities ra WHERE ra.role_id = r.id AND ra.ability IN (${placeholders})))`,
     at, at, ...bringers,
@@ -86,11 +86,11 @@ export async function holdersOfRole(roleId: string, scope?: Scope): Promise<stri
     ? [scope.kind, scope.kind === 'site' ? null : scope.module, scope.kind === 'record' ? scope.type : null, scope.kind === 'record' ? scope.id : null]
     : []
   const rows = await all<{ account_id: string }>(
-    `SELECT DISTINCT g.account_id FROM core_grants g
+    `SELECT DISTINCT a.id AS account_id FROM core_grants g
        JOIN core_roles r ON r.id = g.role_id AND r.archived_at IS NULL
-       JOIN core_accounts a ON a.id = g.account_id
+       JOIN core_accounts a ON a.id = ${HOLDER}
       WHERE g.role_id = ? AND ${USABLE} AND ${LIVE}${where}
-      ORDER BY g.account_id`,
+      ORDER BY a.id`,
     roleId, at, at, ...params,
   )
   return rows.map(r => r.account_id)

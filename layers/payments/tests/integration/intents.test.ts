@@ -120,7 +120,7 @@ describe('prepare-without-payment-is-released', () => {
   it('does not cancel an intent once money has been taken for it', async () => {
     const { intentId } = await prepare({ amount: 1000 })
     await inContext(() => attest({ intentId, providerAccountId: cashAccount, method: 'cash', amountMinor: 400 }))
-    await expect(commit(unit => cancelIntent(unit.view(), intentId))).rejects.toMatchObject({ code: 'payments.intent.in-flight' })
+    await expect(commit(unit => cancelIntent(unit.view(), intentId))).rejects.toMatchObject({ code: 'payments.intent.paid-in-part' })
   })
 })
 
