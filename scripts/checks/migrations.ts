@@ -8,6 +8,7 @@ import { ROOT } from '../lib/paths.ts'
 import { JOURNALS } from '../lib/write.ts'
 import { bundleSchema, drizzleKit } from '../lib/drizzle.ts'
 import type { Loaded, Owner } from '../lib/load.ts'
+import { findListSources, indexChanges, journalIndexes, wantedIndexes } from '../lib/lists.ts'
 
 const git = (...args: string[]) => {
   try {
@@ -20,7 +21,12 @@ const git = (...args: string[]) => {
 
 export async function checkMigrations(modules: Loaded[], registry: any): Promise<string[]> {
   const problems: string[] = []
+  const sources = await findListSources(modules)
   for (const owner of ['upstream', 'site'] as Owner[]) {
+    // Search indexes (S1): the journal makes exactly the indexes the list sources ask for.
+    for (const change of indexChanges(await wantedIndexes(sources, owner), await journalIndexes(owner))) {
+      problems.push(`${JOURNALS[owner]}: the search index for ${change.table} ${change.columns ? `should hold ${change.columns.join(', ')}` : 'is no longer asked for'}. Run bun run db:generate -- --name <what>${owner === 'site' ? ' --owner site' : ''}`)
+    }
     const journal = join(ROOT, JOURNALS[owner])
     const hasTables = modules.some(m => m.found.owner === owner && Object.keys(m.manifest.tables ?? {}).length)
     if (!hasTables) continue

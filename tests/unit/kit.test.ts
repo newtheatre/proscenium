@@ -244,3 +244,45 @@ describe('notification types', () => {
     expect(schema.safeParse({ ...base, channels: ['email', 'inbox'], variables: { link: 'url' } }).success).toBe(true)
   })
 })
+
+describe('list search words (S3)', () => {
+  it('folds case and accents, and ignores a word under three letters', async () => {
+    const { searchWords, searchQuery } = await import('../../layers/core/kit/search')
+    expect(searchWords('Zoë  Brontë jo')).toEqual({ words: ['zoe', 'bronte'], ignoredWords: ['jo'], searchTooShort: false })
+    expect(searchWords('jo li')).toEqual({ words: [], ignoredWords: ['jo', 'li'], searchTooShort: true })
+    expect(searchWords('  ')).toEqual({ words: [], ignoredWords: [], searchTooShort: false })
+    expect(searchQuery(['zoe', 'say "hi"'], ['name', 'note'])).toBe('{name note} : ("zoe" AND "say ""hi""")')
+  })
+
+  it('names the hidden field that matched a row (S5)', async () => {
+    const { matchedFields } = await import('../../layers/core/kit/search')
+    const fields = [{ key: 'title', hidden: false }, { key: 'season', hidden: true }]
+    expect(matchedFields([{ title: 'Hamlet', season: 'Autumn 2026' }, { title: 'Autumn Fair', season: 'Autumn 2026' }], ['hamlet', 'autumn'], fields)).toEqual(['season', null])
+  })
+})
+
+describe('list sources (S1, S2)', () => {
+  it('refuse a searched column that is special, encrypted or not a column', async () => {
+    const { text } = await import('drizzle-orm/sqlite-core')
+    const { col, defineTable } = await import('../../layers/core/kit/db')
+    const { defineListSource } = await import('../../layers/core/kit/lists')
+    const table = defineTable('lost_property_items', {
+      id: col.id(),
+      owner: col.account('owner_id', { role: 'subject' }),
+      label: col.public(text('label')),
+      health: col.special('health'),
+      token: col.internal(text('token'), { encrypted: true }),
+    }, { id: 'lpi', realm: 'operational' })
+    expect(defineListSource({ id: 'lost-property.items' }, { table, search: ['label'] }).searchIndex).toBe('lost_property_items_search')
+    expect(() => defineListSource({ id: 'lost-property.items' }, { table, search: ['health'] })).toThrow(/special data/)
+    expect(() => defineListSource({ id: 'lost-property.items' }, { table, search: ['token'] })).toThrow(/encrypted/)
+    expect(() => defineListSource({ id: 'lost-property.items' }, { table, search: ['nothing' as any] })).toThrow(/not a column/)
+  })
+
+  it('tell the generator which index to make, remake or drop', async () => {
+    const { indexChanges } = await import('../../scripts/lib/lists')
+    const wanted = new Map([['a', ['name']], ['b', ['note', 'title']]])
+    const made = new Map<string, string[] | null>([['a', ['name']], ['b', ['title']], ['c', ['x']], ['d', null]])
+    expect(indexChanges(wanted, made)).toEqual([{ table: 'b', columns: ['note', 'title'] }, { table: 'c', columns: null }])
+  })
+})
