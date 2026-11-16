@@ -118,6 +118,21 @@ describe('readList', async () => {
     expect(sorted.found.map(r => r.id)).toEqual([one, group])
   })
 
+  it('gives its search as one condition outside readList, for a service to use as a subquery', async () => {
+    const { searchCondition } = await import('#kit')
+    const { useRegistry } = await import('#kit/registry')
+    expect(useRegistry().lists.get('seats.sales')).toMatchObject({ module: 'seats', source: { list: { id: 'seats.sales' } } })
+    const show = await performance()
+    const kept = await sale(show, 'Hester Vaughan-Quist', 'Aisle seat')
+    const found = (can: (a: string) => boolean) => inContext(async () => {
+      const condition = await searchCondition(sales, 'vaughan quist', { can })
+      return (await useDb().select({ id: ledger.id }).from(ledger).where(condition.where)).map(r => r.id)
+    })
+    expect(await found(() => true)).toEqual([kept])
+    expect(await found(() => false)).toEqual([])
+    expect(await inContext(() => searchCondition(sales, 'va qu', { can: () => true }))).toMatchObject({ where: undefined, searchTooShort: true, ignoredWords: ['va', 'qu'] })
+  })
+
   it('refuses to search a field under an ability audited on read, until such a search is audited', async () => {
     const { defineListSource } = await import('#kit')
     const audited = defineListSource(sales.list, { table: ledger, filters: { performance: { column: 'performanceId' }, sizes: { column: 'quantity' }, buyer: { column: 'buyer' } }, sorts: { at: { columns: ['at'], bounded: 10 } }, search: { buyerName: { column: 'buyerName', ability: 'seats.members.look-up' }, quantity: false, note: 'note' } } as any)

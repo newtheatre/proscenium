@@ -3,6 +3,7 @@
 import { DeclarationError } from './refusal'
 import { DELIVERABLE, snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
+import type { ListSource } from './lists'
 import type { SettingEntry, SettingRule } from './settings'
 import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
 import type { ModuleHandlers } from './handlers'
@@ -41,13 +42,15 @@ export interface Registry {
   points: Map<string, { module: string, decl: PointDecl }>
   /** Signing purposes (F-37), by purpose. */
   signing: Map<string, { module: string, decl: SigningDecl }>
+  /** List sources by list id (server/lists/<name>.ts). */
+  lists: Map<string, { module: string, source: ListSource }>
 }
 
 /** The events, jobs and tasks of the core itself are always present, so other modules may name them. */
 export function buildRegistry(entries: ModuleEntry[]): Registry {
   const r: Registry = {
     modules: new Map(), settings: new Map(), settingRules: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
-    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(),
+    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(), lists: new Map(),
   }
   const fail = (entry: ModuleEntry, field: string, message: string): never => {
     throw new DeclarationError(field, message, `${entry.root}/module.ts`)
@@ -128,6 +131,14 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       const list = r.listeners.get(event) ?? []
       list.push({ module: m.id, listener })
       r.listeners.set(event, list)
+    }
+    for (const [file, value] of Object.entries(entry.handlers.lists ?? {})) {
+      const source = value as ListSource | undefined
+      const where = `${entry.root}/server/lists/${short(file)}.ts`
+      if (!source?.list?.id || !source.table) throw new DeclarationError('default', 'is not a list source made with defineListSource', where)
+      if (!source.list.id.startsWith(`${m.id}.`)) throw new DeclarationError('list', `"${source.list.id}" is not named under ${m.id}.`, where)
+      if (r.lists.has(source.list.id)) throw new DeclarationError('list', `"${source.list.id}" has two sources`, where)
+      r.lists.set(source.list.id, { module: m.id, source })
     }
     for (const name of Object.keys(m.jobs ?? {})) if (!entry.handlers.jobs?.[name]) fail(entry, `jobs.${name}`, `the handler ${entry.root}/server/jobs/${short(name)}.ts does not exist`)
     for (const name of Object.keys(m.tasks ?? {})) if (!entry.handlers.tasks?.[name]) fail(entry, `tasks.${name}`, `the handler ${entry.root}/server/tasks/${short(name)}.ts does not exist`)

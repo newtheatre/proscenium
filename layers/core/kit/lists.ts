@@ -209,10 +209,7 @@ export async function readListQuery<L extends ListDeclaration>(query: Query, sou
     ...source.search.map(s => s.ability).filter((a): a is string => !!a),
   ])
   const held = new Set<string>()
-  const registry = useRegistry()
-  for (const s of source.search) {
-    if (s.ability && registry.abilities.get(s.ability)?.decl.audit === 'read') throw new Error(`list source ${list.id}: searches ${s.field} under ${s.ability}, which is audited on read; such a search is not audited yet`)
-  }
+  refuseReadAudited(source)
   for (const ability of wanted) if ((await can(actor as any, ability as AbilityName)).allowed) held.add(ability)
   // The theatre's day is read only when a date filter is on, so a list without one works before setup.
   const viewName = (Array.isArray(query.view) ? query.view[0] : query.view) ?? list.defaultView
@@ -226,8 +223,7 @@ export async function readListQuery<L extends ListDeclaration>(query: Query, sou
   if (q.page * q.size > LIST_MAX_DEPTH) refuse('core.list.too-deep', `A list shows its first ${LIST_MAX_DEPTH.toLocaleString('en-GB')} rows.`, { status: 422, remedy: 'Narrow the list with a filter or a search, or export it.' })
 
   const typed = Array.isArray(query.q) ? query.q[0] : query.q
-  const { words, ignoredWords, searchTooShort } = searchWords(typed ?? undefined)
-  const fields = source.search.filter(s => !s.ability || held.has(s.ability))
+  const { where: searchWhere, words, ignoredWords, searchTooShort, fields } = searchFor(source, typed ?? undefined, a => held.has(a))
   const zone = hasDates && Object.values(bound.filters).some(f => f.column?.timestamp) ? await theatreTimeZone() : null
   const table = bound.table as any
 
@@ -255,11 +251,7 @@ export async function readListQuery<L extends ListDeclaration>(query: Query, sou
     }
     else conditions.push(eq(c, value as string | boolean))
   }
-  if (words.length) {
-    conditions.push(fields.length
-      ? sql`${table}.rowid IN (SELECT rowid FROM ${sql.identifier(source.searchIndex!)} WHERE ${sql.identifier(source.searchIndex!)} MATCH ${searchQuery(words, [...new Set(fields.map(f => f.sql))])})`
-      : sql`0`)
-  }
+  if (searchWhere) conditions.push(searchWhere)
   const where = conditions.length ? and(...conditions) : undefined
 
   const sortKey = q.sort.key as keyof L['sorts'] & string
@@ -296,4 +288,52 @@ export async function readListQuery<L extends ListDeclaration>(query: Query, sou
       return { ...out, matched }
     },
   }
+}
+
+/** A search the formats do not yet allow fails closed (Foundations part 4, Lists). */
+function refuseReadAudited(source: ListSource): void {
+  const registry = useRegistry()
+  for (const s of source.search) {
+    if (s.ability && registry.abilities.get(s.ability)?.decl.audit === 'read') throw new Error(`list source ${source.list.id}: searches ${s.field} under ${s.ability}, which is audited on read; such a search is not audited yet`)
+  }
+}
+
+export interface SearchCondition {
+  /** The rows every word matches, in the fields the viewer may see; undefined when nothing is searched. */
+  where: SQL | undefined
+  words: string[]
+  ignoredWords: string[]
+  searchTooShort: boolean
+}
+
+function searchFor(source: ListSource, text: string | undefined, holds: (ability: string) => boolean): SearchCondition & { fields: ListSource['search'] } {
+  const { words, ignoredWords, searchTooShort } = searchWords(text)
+  const fields = source.search.filter(s => !s.ability || holds(s.ability))
+  if (!words.length) return { where: undefined, words, ignoredWords, searchTooShort, fields }
+  const table = source.bound.table as any
+  const index = sql.identifier(source.searchIndex ?? 'none')
+  const where = fields.length
+    ? sql`${table}.rowid IN (SELECT rowid FROM ${index} WHERE ${index} MATCH ${searchQuery(words, [...new Set(fields.map(f => f.sql))])})`
+    : sql`0`
+  return { where, words, ignoredWords, searchTooShort, fields }
+}
+
+/**
+ * A list source's search as one condition, outside readList: for a service that finds rows by what
+ * a person typed and hands on a subquery (identity's findAccounts). The same index and rules as
+ * readList: three letters, folding, every word, no ranking, only fields the viewer may see. `can`
+ * says whether the viewer holds an ability; left out, the request's actor is asked.
+ */
+export async function searchCondition(source: ListSource, text: string, options: { can?: (ability: string) => boolean } = {}): Promise<SearchCondition> {
+  refuseReadAudited(source)
+  let holds = options.can
+  if (!holds) {
+    const actor = useContext().actor ?? { kind: 'anonymous' as const }
+    const held = new Set<string>()
+    for (const ability of new Set(source.search.map(s => s.ability).filter((a): a is string => !!a)))
+      if ((await can(actor as any, ability as AbilityName)).allowed) held.add(ability)
+    holds = a => held.has(a)
+  }
+  const { fields: _fields, ...condition } = searchFor(source, text, holds)
+  return condition
 }
