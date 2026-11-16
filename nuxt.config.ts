@@ -53,6 +53,9 @@ export default defineNuxtConfig({
         // Cloudflare Email Sending. Sends only from a domain onboarded in the dashboard.
         send_email: [{ name: 'EMAIL' }],
         triggers: { crons: ['* * * * *'] },
+        // The shared rate-limit counts (F-36). The class is exported from layers/core/server/entry.ts.
+        durable_objects: { bindings: [{ name: 'RATE_LIMITS', class_name: 'RateLimitCounter' }] },
+        migrations: [{ tag: 'core-rate-limits', new_sqlite_classes: ['RateLimitCounter'] }],
         queues: {
           producers: [
             { binding: 'JOBS_PROMPT', queue: queue.prompt },
