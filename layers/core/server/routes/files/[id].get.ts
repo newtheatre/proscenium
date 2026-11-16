@@ -4,7 +4,8 @@
 import { defineEventHandler, getHeader, getRouterParam, setResponseHeaders, setResponseStatus } from 'h3'
 import { runInContext } from '#kit/context'
 import { useAccessProvider } from '#kit/access'
-import { first, isId, files as store } from '#kit'
+import { first, isId, nowMs, files as store } from '#kit'
+import { mayReadRecordFile } from '../../files/service'
 
 export default defineEventHandler(async (event) => {
   const env = (event.context as any).cloudflare?.env
@@ -17,16 +18,19 @@ export default defineEventHandler(async (event) => {
       return 'Not found'
     }
     if (!isId('fil', id)) return notFound()
-    const row = await first<{ object_key: string, media_type: string, access: string, sha256: string, byte_size: number }>(
-      "SELECT object_key, media_type, access, sha256, byte_size FROM core_files WHERE id = ? AND state = 'ready'", id,
+    const row = await first<{ object_key: string, media_type: string, access: string, sha256: string, byte_size: number, slot: string, owner_type: string, owner_id: string, expires_at: number | null }>(
+      "SELECT object_key, media_type, access, sha256, byte_size, slot, owner_type, owner_id, expires_at FROM core_files WHERE id = ? AND state = 'ready'", id,
     )
-    if (!row) return notFound()
+    if (!row || (row.expires_at !== null && row.expires_at <= nowMs())) return notFound()
     if (row.access === 'signed_in') {
       const actor = await useAccessProvider().actor(event)
       if (actor.kind !== 'person') return notFound()
     }
-    // Record access asks the owning module (point core.file-access), which arrives with the first
-    // module that keeps private files. Until then nothing with record access is served.
+    // Record access asks the module that owns the record (point core.file-access).
+    else if (row.access === 'record') {
+      const actor = await useAccessProvider().actor(event)
+      if (actor.kind !== 'person' || !await mayReadRecordFile(actor, { id, ...row })) return notFound()
+    }
     else if (row.access !== 'public') return notFound()
 
     const etag = `"${row.sha256}"`
@@ -34,7 +38,7 @@ export default defineEventHandler(async (event) => {
       'content-type': row.media_type,
       'x-content-type-options': 'nosniff',
       'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-      'cache-control': row.access === 'public' ? 'public, max-age=31536000, immutable' : 'private, max-age=300', // not-policy: a ready file never changes under its id
+      'cache-control': row.access === 'public' ? 'public, max-age=31536000, immutable' : row.access === 'record' ? 'private, no-store' : 'private, max-age=300', // not-policy: a ready file never changes under its id
       'etag': etag,
     }
     if (getHeader(event, 'if-none-match') === etag) {
