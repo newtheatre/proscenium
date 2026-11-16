@@ -16,6 +16,10 @@
   --ui-primary: var(--ui-color-primary-400);
 }
 
+/* Site administration is not the theatre's brand: its filled buttons are neutral (R-33). */
+:root.light .admin-shell, :root:not(.dark) .admin-shell { --ui-primary: var(--ui-color-neutral-800); }
+.dark .admin-shell, .dark.admin-shell { --ui-primary: var(--ui-color-neutral-200); }
+
 /* The touch target of a control used on the move or at the door (the members' tab bar, live mode). */
 :root {
   --proscenium-target-live: 48px;
@@ -50,3 +54,6 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Site administration: the strip above each page's panel takes 2.25rem off the panel's full height. */
+.admin-shell .admin-main > div { height: calc(100svh - 2.25rem); }
