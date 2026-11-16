@@ -258,3 +258,7 @@ administration a `UBreadcrumb` of the parents sits in the navbar after the sideb
 pixels up, and below that an icon-only back button ("Back to Productions") takes its place. Outside
 the console a worded back link sits above the title. A link to a list returns the list as it was left
 (`useListMemory`, kept for the tab's session). A page passes its own parent once its record has arrived.
+
+`PageList` reads four optional fields of the data route's answer: `dropped` (its chips go), `ignoredWords` and
+`searchTooShort` ("Words under three letters are not searched"; "Nothing was searched"), and `matched`
+(row id to the hidden column that matched, shown under the row's first cell as "Matches Venue: Studio").
