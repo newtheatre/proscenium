@@ -10,14 +10,14 @@ export const modules = defineTable('core_modules', {
   disabledAt: col.timestamp('disabled_at'),
   changedBy: col.account('changed_by', { role: 'actor', onMerge: 'move', nullable: true }),
   manifestSeen: col.internal(text('manifest_seen')),
-}, { realm: 'operational' })
+}, { realm: 'system' })
 
 export const settings = defineTable('core_settings', {
   key: col.internal(text('key').primaryKey()),
   value: col.internal(text('value').notNull()),
   updatedAt: col.timestamp('updated_at').notNull(),
   updatedBy: col.account('updated_by', { role: 'actor', onMerge: 'move', nullable: true }),
-}, { realm: 'operational' })
+}, { realm: 'system' })
 
 export const settingChanges = defineTable('core_setting_changes', {
   id: col.id(),
@@ -27,7 +27,7 @@ export const settingChanges = defineTable('core_setting_changes', {
   reason: col.freeText(text('reason')),
   at: col.timestamp('at').notNull(),
   actor: col.account('actor', { role: 'actor', onMerge: 'alias', nullable: true }),
-}, { id: 'sch', realm: 'operational', appendOnly: true, retention: 'core.retention.setting-changes', extra: t => [index('core_setting_changes_key').on(t.key, t.at)] })
+}, { id: 'sch', realm: 'system', appendOnly: true, retention: 'core.retention.setting-changes', extra: t => [index('core_setting_changes_key').on(t.key, t.at)] })
 
 export const migrations = defineTable('core_migrations', {
   owner: col.internal(text('owner').notNull()),
@@ -36,7 +36,7 @@ export const migrations = defineTable('core_migrations', {
   appliedAt: col.timestamp('applied_at').notNull(),
   durationMs: col.internal(integer('duration_ms').notNull()),
   release: col.internal(text('release').notNull()),
-}, { realm: 'operational', appendOnly: true, extra: t => [primaryKey({ columns: [t.owner, t.name] })] })
+}, { realm: 'system', appendOnly: true, extra: t => [primaryKey({ columns: [t.owner, t.name] })] })
 
 export const events = defineTable('core_events', {
   id: col.id(),
@@ -47,7 +47,7 @@ export const events = defineTable('core_events', {
   announcedAt: col.timestamp('announced_at').notNull(),
   unitId: col.internal(text('unit_id').notNull()),
   dispatchedAt: col.timestamp('dispatched_at'),
-}, { id: 'evt', realm: 'operational', extra: t => [index('core_events_name').on(t.name, t.announcedAt)] })
+}, { id: 'evt', realm: 'system', extra: t => [index('core_events_name').on(t.name, t.announcedAt)] })
 
 export const jobs = defineTable('core_jobs', {
   id: col.id(),
@@ -67,7 +67,7 @@ export const jobs = defineTable('core_jobs', {
   finishedAt: col.timestamp('finished_at'),
 }, {
   id: 'job',
-  realm: 'operational',
+  realm: 'system',
   extra: t => [
     uniqueIndex('core_jobs_dedupe').on(t.name, t.dedupeKey).where(sql`dedupe_key IS NOT NULL AND state IN ('queued', 'running')`),
     index('core_jobs_due').on(t.state, t.runAfter),
@@ -81,7 +81,7 @@ export const taskRuns = defineTable('core_task_runs', {
   finishedAt: col.timestamp('finished_at'),
   outcome: col.internal(text('outcome')),
   jobId: col.internal(text('job_id')),
-}, { realm: 'operational', extra: t => [primaryKey({ columns: [t.task, t.dueAt] })] })
+}, { realm: 'system', extra: t => [primaryKey({ columns: [t.task, t.dueAt] })] })
 
 export const externalCalls = defineTable('core_external_calls', {
   id: col.id(),
@@ -95,7 +95,7 @@ export const externalCalls = defineTable('core_external_calls', {
   at: col.timestamp('at').notNull(),
 }, {
   id: 'ext',
-  realm: 'operational',
+  realm: 'system',
   appendOnly: true,
   extra: t => [
     uniqueIndex('core_external_calls_attempt').on(t.idempotencyKey).where(sql`phase = 'attempt'`),
@@ -120,7 +120,7 @@ export const audit = defineTable('core_audit', {
   unitId: col.internal(text('unit_id')),
 }, {
   id: 'aud',
-  realm: 'operational',
+  realm: 'system',
   appendOnly: true,
   retention: 'core.retention.audit',
   extra: t => [index('core_audit_record').on(t.recordType, t.recordId, t.at), index('core_audit_actor').on(t.actorAccountId, t.at)],
@@ -136,7 +136,7 @@ export const credentials = defineTable('core_credentials', {
   lastUsedAt: col.timestamp('last_used_at'),
   expiresAt: col.timestamp('expires_at'),
   hint: col.internal(text('hint')),
-}, { realm: 'operational', extra: t => [primaryKey({ columns: [t.moduleId, t.name] })] })
+}, { realm: 'system', extra: t => [primaryKey({ columns: [t.moduleId, t.name] })] })
 
 export const idempotencyKeys = defineTable('core_idempotency_keys', {
   key: col.internal(text('key').notNull()),
@@ -146,11 +146,11 @@ export const idempotencyKeys = defineTable('core_idempotency_keys', {
   status: col.internal(integer('status').notNull()),
   response: col.personal(text('response'), { erase: 'clear' }),
   createdAt: col.timestamp('created_at').notNull(),
-}, { realm: 'operational', retention: 'core.idempotency.keep-for', extra: t => [primaryKey({ columns: [t.key, t.route] })] })
+}, { realm: 'system', retention: 'core.idempotency.keep-for', extra: t => [primaryKey({ columns: [t.key, t.route] })] })
 
 export const guard = defineTable('core_guard', {
   ok: col.internal(integer('ok').notNull()),
   code: col.internal(text('code')),
-}, { realm: 'operational' })
+}, { realm: 'system' })
 
 export const tables = { modules, settings, settingChanges, migrations, events, jobs, taskRuns, externalCalls, audit, credentials, idempotencyKeys, guard }

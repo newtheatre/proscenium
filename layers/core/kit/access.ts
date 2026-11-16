@@ -159,6 +159,21 @@ export async function fact(name: string, actor: Actor, record?: Ref | readonly [
   return holdsFact(name, actor, r)
 }
 
+/**
+ * The account ids that hold a fact now, for one record or for any. Null when the fact's resolver
+ * gives no holders, so it cannot be enumerated; empty when its module is switched off.
+ */
+export async function factHolders(name: string, record?: Ref | readonly [string, string]): Promise<string[] | null> {
+  const registry = useRegistry()
+  const declared = registry.facts.get(name)
+  if (!declared) throw new Error(`"${name}" is not a declared fact`)
+  const resolver = registry.modules.get(declared.module)!.handlers.facts?.[name]
+  if (!resolver?.holders) return null
+  if (!(await isEnabled(declared.module))) return []
+  const r = Array.isArray(record) ? { type: record[0], id: record[1] } : record as Ref | undefined
+  return resolver.holders(r)
+}
+
 async function holdsFact(name: string, actor: Actor, record?: Ref): Promise<boolean> {
   if (actor.facts) return actor.facts.includes(name)
   const declared = useRegistry().facts.get(name)!

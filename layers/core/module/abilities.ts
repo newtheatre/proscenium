@@ -11,4 +11,5 @@ export const records = defineRecords('core', {
 export const abilities = defineAbilities('core', {
   'settings.manage': ability({ risk: 'privileged' }),
   'modules.manage': ability({ risk: 'privileged', grantAt: ['site'] }),
+  'job.manage': ability({ on: 'core.job' }),
 })

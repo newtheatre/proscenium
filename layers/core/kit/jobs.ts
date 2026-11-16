@@ -10,11 +10,11 @@ import { useSetting } from './settings-store'
 import { nowMs, localDateOf, localParts, instantOfLocal, previousDate } from './clock'
 import { dispatch, type Lane } from './dispatch'
 import { log } from './log'
-import { isRefusal } from './refusal'
+import { isRefusal, Refusal } from './refusal'
 import type { TaskDecl, Weekday } from './manifest'
 import type { EventRow } from './handlers'
 import type { JobName, JobPayload } from './registry-types'
-import type { EnqueueOptions } from './unit'
+import type { EnqueueOptions, UnitView } from './unit'
 
 export type JobOutcome = 'done' | 'skipped' | 'waiting' | 'retrying' | 'dead'
 
@@ -114,6 +114,20 @@ async function fail(env: KitEnv, row: JobRow, attempts: number, message: string)
   await dispatch([{ jobId: row.id, lane: row.lane, delaySeconds: delay }])
   log.warn('core.jobs.retrying', { jobId: row.id, job: row.name, attempts, delay, error })
   return 'retrying'
+}
+
+/**
+ * Cancels a job that has not started, in the caller's unit of work. Only a queued job can be
+ * cancelled: a running one finishes or fails, and a scheduled task is due again at its next slot.
+ * The route guards it with core.job.manage.
+ */
+export async function cancelJob(unit: UnitView, jobId: string): Promise<void> {
+  const { env } = useContext()
+  const row = await env.DB.prepare('SELECT kind, state FROM core_jobs WHERE id = ?').bind(jobId).first<{ kind: JobRow['kind'], state: string }>()
+  if (!row) throw new Refusal('core.job.unknown', 'There is no such job.', { status: 404 })
+  if (row.kind === 'task') throw new Refusal('core.job.not-cancellable', 'A scheduled task cannot be cancelled. It runs again at its next time.', { status: 409 })
+  unit.add({ sql: "UPDATE core_jobs SET state = 'cancelled', finished_at = ? WHERE id = ? AND state = 'queued'", params: [nowMs(), jobId] })
+    .expect(1, { code: 'core.job.not-cancellable', reason: 'Only a job that is waiting to run can be cancelled.' })
 }
 
 const DAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']

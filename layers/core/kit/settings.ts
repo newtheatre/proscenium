@@ -40,7 +40,13 @@ export interface SettingEntry<V = unknown, K extends string = string> extends Co
   readonly __value?: V
 }
 
-const KINDS = ['boolean', 'integer', 'money', 'duration', 'time', 'text', 'choice', 'list', 'reference', 'custom', 'colour'] as const
+const KINDS = ['boolean', 'integer', 'money', 'duration', 'time', 'text', 'choice', 'list', 'reference', 'custom', 'colour', 'rate'] as const
+
+/** A rate as written: a count in a period, `{ count: 10, per: '10m' }`. Read with `per` in seconds. */
+export interface RateInput { count: number, per: string }
+export interface Rate { count: number, per: number }
+const RATE_COUNT = { min: 1, max: 10_000 }
+const RATE_PERIOD = { min: '1m', max: '1d' }
 export type SettingKind = typeof KINDS[number]
 
 type Value<V, U> = U extends { unset: true } ? V | null : V
@@ -61,6 +67,8 @@ export const setting = {
   reference: <const O extends Common & { record: string }>(o: O) => ({ kind: 'reference', unset: true, ...o }) as SettingEntry<string | null, 'reference'> & O,
   /** The escape hatch: anything a Zod schema accepts. Needs its own editor; never quotable. */
   custom: <S extends z.ZodType, const O extends Common & { schema: S, default?: z.infer<S>, unset?: boolean }>(o: O & { schema: S }) => ({ kind: 'custom', ...o }) as SettingEntry<z.infer<S>, 'custom'> & O,
+  /** A count in a period, from 1 to 10,000 in 1 minute to 1 day: rate limits. */
+  rate: <const O extends Common & WithDefault<RateInput>>(o: O) => ({ kind: 'rate', ...o }) as SettingEntry<Value<Rate, O>, 'rate'> & O,
   /** A colour such as #1d4ed8, checked for contrast against `on` where given. */
   colour: <const O extends Common & WithDefault<string> & { on?: string }>(o: O) => ({ kind: 'colour', ...o }) as SettingEntry<Value<string, O>, 'colour'> & O,
 }
@@ -173,6 +181,16 @@ export function validateSettingValue(entry: SettingEntry, raw: unknown): Validat
       return typeof raw === 'string' && /^[a-z]{2,4}_[2-7a-z]{26}$/.test(raw) ? { ok: true, value: raw } : { ok: false, reason: 'must be the id of a record' }
     case 'colour':
       return typeof raw === 'string' && COLOUR.test(raw) ? { ok: true, value: raw.toLowerCase() } : { ok: false, reason: 'must be a colour such as #1d4ed8' }
+    case 'rate': {
+      const r = raw as { count?: unknown, per?: unknown }
+      if (!r || typeof r !== 'object' || typeof r.count !== 'number' || !Number.isInteger(r.count)) return { ok: false, reason: 'must be a whole number of times in a period, such as 10 in 10m' }
+      if (r.count < RATE_COUNT.min || r.count > RATE_COUNT.max) return { ok: false, reason: `must be between ${RATE_COUNT.min} and ${RATE_COUNT.max.toLocaleString('en-GB')} times`, limit: 'count' }
+      let per: number
+      try { per = parseDuration(r.per as string | number) }
+      catch { return { ok: false, reason: 'must have a period such as 1m, 10m or 1h' } }
+      if (per < parseDuration(RATE_PERIOD.min) || per > parseDuration(RATE_PERIOD.max)) return { ok: false, reason: 'must have a period between 1 minute and 1 day', limit: 'per' }
+      return { ok: true, value: { count: r.count, per } }
+    }
     case 'custom': {
       const parsed = entry.schema!.safeParse(raw)
       return parsed.success ? { ok: true, value: parsed.data } : { ok: false, reason: parsed.error.issues[0]?.message ?? 'is not valid' }
@@ -202,6 +220,10 @@ export function formatSetting(entry: SettingEntry, value: unknown, options: { un
       return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}` // not-policy: a twelve-hour clock
     }
     case 'list': return (value as string[]).join(', ')
+    case 'rate': {
+      const { count, per } = value as Rate
+      return `${count} in ${formatDuration(per)}`
+    }
     default: return String(value)
   }
 }

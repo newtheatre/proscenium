@@ -2,7 +2,11 @@
 // screens belong to identity; this is the format they read.
 import { DeclarationError } from './refusal'
 
-export interface RecordDecl { table: string, parent?: string, owner?: string }
+/**
+ * A record type. Most have a table; one without a table has a fixed set of ids instead, such as
+ * core.branding with the one id `site`. Its resolver gives the label, the address and the parent.
+ */
+export type RecordDecl = { parent?: string, owner?: string } & ({ table: string, ids?: undefined } | { table?: undefined, ids: readonly string[] })
 export interface AbilityDecl {
   /** The record type it acts on. Without it the ability is site-wide only. */
   on?: string

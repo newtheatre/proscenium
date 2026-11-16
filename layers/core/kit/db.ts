@@ -19,10 +19,16 @@ export interface ColumnMeta {
   ref?: { table: string, nullable: boolean }
   account?: { role: 'subject' | 'actor', onMerge: 'move' | 'alias' | 'handler', nullable: boolean }
   classColumn?: string
+  /** Sealed with the core key before it is written (`seal`/`open`). Always so for special. */
+  encrypted?: boolean
 }
 
-export type Realm = 'audience' | 'member' | 'operational' | { column: string }
-export type Subject = 'none' | { via: string } | { email: string } | string | string[]
+export type Realm = 'audience' | 'members' | 'operational' | 'system' | { column: string }
+/**
+ * Whom a row is about. `{ account, unlinked: 'staff' }` names a nullable account column and says
+ * rows it cannot link are found by staff with the module's redaction ability, by search.
+ */
+export type Subject = 'none' | { via: string } | { email: string } | { account: string, unlinked: 'staff' } | string | string[]
 
 export interface TableOptions {
   /** The id prefix: two to four lower-case letters, unique across the registry. */
@@ -67,6 +73,7 @@ const DEFAULT_ERASE: Record<DataClass, Erasure> = {
 }
 
 type EraseOptions = { erase?: Erasure, until?: string, reason?: string }
+type Sealable = { encrypted?: boolean }
 
 function tag<B extends object>(builder: B, meta: Omit<ColumnMeta, 'erase'> & { erase?: Erasure }): B {
   const erase = meta.erase ?? DEFAULT_ERASE[meta.class]
@@ -124,14 +131,15 @@ export const col = {
   email: (name: string, options: EraseOptions = {}) => tag(email(name), { class: 'personal', helper: 'email', ...options }),
 
   public: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: EraseOptions = {}) => tag(builder, { class: 'public', helper: 'wrapped', ...options }),
-  internal: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B) => tag(builder, { class: 'internal', helper: 'wrapped' }),
-  personal: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: EraseOptions = {}) => tag(builder, { class: 'personal', helper: 'wrapped', ...options }),
+  /** `encrypted: true` seals the value with the core key, as for special data (webhook secrets, push keys). */
+  internal: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: Sealable = {}) => tag(builder, { class: 'internal', helper: 'wrapped', ...options }),
+  personal: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: EraseOptions & Sealable = {}) => tag(builder, { class: 'personal', helper: 'wrapped', ...options }),
   freeText: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: EraseOptions = {}) => tag(builder, { class: 'freeText', helper: 'wrapped', ...options }),
   /**
    * Special category data (access needs, health). Encrypted before it reaches the database with
    * `sealSpecial`, so it cannot be searched or indexed, and the helper takes only a name.
    */
-  special: (name: string) => tag(text(name), { class: 'special', helper: 'special' }),
+  special: (name: string) => tag(text(name), { class: 'special', helper: 'special', encrypted: true }),
   /** A value whose class is chosen row by row, held in a sibling column. For the form builder. */
   perRow: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: { classColumn: string }) => tag(builder, { class: 'perRow', helper: 'wrapped', classColumn: options.classColumn }),
 }
@@ -160,8 +168,8 @@ export function defineTable<TName extends string, TColumns extends Record<string
   if (!/^[a-z][a-z0-9]*(_[a-z0-9]+)+$/.test(name)) throw new DeclarationError(field('name'), 'a table name is the module id in snake_case, then a plural noun')
   if (!options || typeof options !== 'object') throw new DeclarationError(field('options'), 'options are required: at least { realm }')
   const realm = options.realm
-  if (!(realm === 'audience' || realm === 'member' || realm === 'operational' || (typeof realm === 'object' && typeof realm.column === 'string')))
-    throw new DeclarationError(field('realm'), "must be 'audience', 'member', 'operational' or { column }")
+  if (!(realm === 'audience' || realm === 'members' || realm === 'operational' || realm === 'system' || (typeof realm === 'object' && typeof realm.column === 'string')))
+    throw new DeclarationError(field('realm'), "must be 'audience', 'members', 'operational', 'system' or { column }")
 
   const metas: TableMeta['columns'] = {}
   let idColumn: string | undefined
@@ -190,6 +198,17 @@ export function defineTable<TName extends string, TColumns extends Record<string
     const target = all.find(c => c.sql === subject.email)
     if (!target || target.meta.helper !== 'email') throw new DeclarationError(field('subject'), `subject { email: '${subject.email}' } must name a col.email column`)
     if (subjects.length) throw new DeclarationError(field('subject'), 'a subject is an account or an email, never both')
+  }
+  const unlinked = subject && typeof subject === 'object' && 'unlinked' in subject ? subject : undefined
+  if (unlinked) {
+    const target = all.find(c => c.sql === unlinked.account)
+    if (!target?.meta.account || target.meta.account.role !== 'subject') throw new DeclarationError(field('subject'), `subject { account: '${unlinked.account}' } must name a col.account(..., { role: 'subject' }) column`)
+    if (!target.meta.account.nullable) throw new DeclarationError(field('subject'), `${unlinked.account} is never empty, so it needs no unlinked`)
+    if (unlinked.unlinked !== 'staff') throw new DeclarationError(field('subject'), "unlinked is 'staff'")
+  }
+  for (const c of all) {
+    if (c.meta.account?.role === 'subject' && c.meta.account.nullable && unlinked?.account !== c.sql)
+      throw new DeclarationError(field('subject'), `the subject column ${c.sql} may be empty: say what happens to rows it cannot link with subject: { account: '${c.sql}', unlinked: 'staff' }`)
   }
   if (holdsPersonal && !subjects.length && !subject && !options.retention)
     throw new DeclarationError(field('subject'), 'this table holds personal data but no subject reaches a person and it has no retention. Add a col.account(..., { role: \'subject\' }) column, a subject or a retention setting')

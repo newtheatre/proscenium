@@ -38,7 +38,11 @@ export const items = defineTable('lost_property_items', {
 Every column has a data class (`public`, `internal`, `personal`, `freeText`, `special`); a column
 without one fails the build. Ids are `<prefix>_<26 characters>`, sorted by creation time unless
 `random: true`. `appendOnly: true` adds database triggers that refuse updates and deletes, except
-erasure writing its placeholder. After changing a table run `bun run db:generate -- --name <what>`;
+erasure writing its placeholder. A realm is `audience`, `members`, `operational` or `system` (the
+platform's own tables). An account subject column that may be empty needs
+`subject: { account: 'account_id', unlinked: 'staff' }`: staff reach the rows it cannot link by
+search. `col.internal()` and `col.personal()` take `encrypted: true`, sealed with the one core key as
+`col.special()` always is. After changing a table run `bun run db:generate -- --name <what>`;
 the conformance check fails while the code and the migrations disagree.
 
 ## Routes
@@ -98,9 +102,22 @@ insert into `core_guard` that a trigger aborts). A service receives the unit wit
 a module that is switched on. Payloads hold ids, numbers, enums and `code()` values only, never a
 person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is the truth, so a
 duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
-with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`. A
+with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`.
+Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
+`POST /api/core/jobs/<id>/cancel`, ability `core.job.manage`) cancels a job that has not started. A
 switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `weeklyOn` in the
 theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
+
+## Modules, records, facts and pages
+
+`uses` may name a module that is not written yet if the design has reserved its id
+(`RESERVED_MODULE_IDS` in the registry); listening to it or contributing to its points then does
+nothing. A record type may have no table and a fixed list of ids (`record({ ids: ['site'] })`). A
+fact resolver may give the accounts that hold it, `defineFact(resolve, { holders })`, read with
+`factHolders(name, record?)`; without it the fact cannot be enumerated. A `core.navigation` entry
+names a `menu` (account, members, console or live) and may set `hideEmpty` beside `count`; only an
+account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
+address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
 
 ## External calls
 
