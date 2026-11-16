@@ -1,7 +1,7 @@
-// The operating day (C-37): a theatre's day runs from the rollover time to the next, so a show that
+// The operating day (C-37): a theatre's day runs from its day start (core.locale.day-start) to the next, so a show that
 // ends at 00:30 belongs to the evening it started. Every module asks here rather than doing its own
 // arithmetic with the time zone.
-import { all, createUnit, usePoint, useSetting } from '#kit'
+import { all, createUnit, refuse, usePoint, useSetting } from '#kit'
 import { instantOfLocal, localDateOf, localParts, previousDate } from '#kit/clock'
 
 export interface DayRule { timeZone: string, rollover: string }
@@ -20,17 +20,23 @@ export function operatingDayBounds(day: string, rule: DayRule): { start: number,
   return { start: instantOfLocal(day, rule.rollover, rule.timeZone), end: instantOfLocal(previousDate(day, -1), rule.rollover, rule.timeZone) }
 }
 
-export async function dayRule(): Promise<DayRule> {
-  return { timeZone: await useSetting('core.locale.time-zone') as string, rollover: await useSetting('core.organisation.day-rollover') as string }
+/** The theatre's rule, or null until setup has set the time zone. */
+export async function dayRule(): Promise<DayRule | null> {
+  const timeZone = await useSetting('core.locale.time-zone') as string | null
+  return timeZone ? { timeZone, rollover: await useSetting('core.locale.day-start') as string } : null
+}
+
+async function requireRule(): Promise<DayRule> {
+  return await dayRule() ?? refuse('core.locale.time-zone-unset', 'The theatre\'s time zone has not been set yet. Finish setup first.', { status: 409 })
 }
 
 /** The operating day of an instant, with the theatre's own settings. */
 export async function operatingDayOf(ms: number): Promise<string> {
-  return operatingDayAt(ms, await dayRule())
+  return operatingDayAt(ms, await requireRule())
 }
 
 export async function dayBounds(day: string): Promise<{ start: number, end: number }> {
-  return operatingDayBounds(day, await dayRule())
+  return operatingDayBounds(day, await requireRule())
 }
 
 interface OperatingDayTable { id: string, table: string, key: string, instant: string, day: string, done?: string }
@@ -52,7 +58,9 @@ export async function rowsToRecompute(rule: DayRule): Promise<{ table: Operating
 
 /** Rewrites stored operating days, a statement-limit's worth of rows to a unit. */
 export async function recomputeDays(): Promise<number> {
-  const changes = await rowsToRecompute(await dayRule())
+  const rule = await dayRule()
+  if (!rule) return 0
+  const changes = await rowsToRecompute(rule)
   const limit = await useSetting('core.units.statement-limit') as number
   for (let i = 0; i < changes.length; i += limit) {
     const unit = createUnit()

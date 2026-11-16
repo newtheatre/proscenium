@@ -15,6 +15,8 @@ interface Common {
   managed?: boolean
   replaces?: string
   since?: string
+  /** What the screen asks before saving: a written reason, or a second confirmation. */
+  onChange?: 'reason' | 'confirm'
 }
 
 type WithDefault<V> = { default: V, unset?: false } | { default?: undefined, unset: true }
@@ -26,6 +28,7 @@ export interface SettingEntry<V = unknown, K extends string = string> extends Co
   min?: unknown
   max?: unknown
   maxLength?: number
+  minLength?: number
   options?: readonly string[]
   unit?: string
   record?: string
@@ -49,9 +52,9 @@ export const setting = {
   money: <const O extends Common & WithDefault<number> & { min?: number, max?: number }>(o: O) => ({ kind: 'money', ...o }) as SettingEntry<Value<number, O>, 'money'> & O,
   /** Written '30m', '2h', '14d'; read as whole seconds. */
   duration: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'duration', ...o }) as SettingEntry<Value<number, O>, 'duration'> & O,
-  /** HH:MM in the theatre's time zone. */
-  time: <const O extends Common & WithDefault<string>>(o: O) => ({ kind: 'time', ...o }) as SettingEntry<Value<string, O>, 'time'> & O,
-  text: <const O extends Common & WithDefault<string> & { maxLength: number }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
+  /** HH:MM in the theatre's time zone; limits written the same way. */
+  time: <const O extends Common & WithDefault<string> & { min?: string, max?: string }>(o: O) => ({ kind: 'time', ...o }) as SettingEntry<Value<string, O>, 'time'> & O,
+  text: <const O extends Common & WithDefault<string> & { maxLength: number, minLength?: number }>(o: O) => ({ kind: 'text', ...o }) as SettingEntry<Value<string, O>, 'text'> & O,
   choice: <const Opt extends readonly string[], const O extends Common & WithDefault<Opt[number]> & { options: Opt }>(o: O & { options: Opt }) => ({ kind: 'choice', ...o }) as SettingEntry<Value<Opt[number], O>, 'choice'> & O,
   list: <const O extends Common & WithDefault<readonly string[]> & { of: 'text' | 'choice', options?: readonly string[], maxLength?: number }>(o: O) => ({ kind: 'list', ...o }) as SettingEntry<Value<string[], O>, 'list'> & O,
   /** A record of the named type. Always starts unset. */
@@ -108,6 +111,11 @@ function checkEntry(key: string, entry: SettingEntry) {
   if (entry.kind === 'text' && !(typeof entry.maxLength === 'number' && entry.maxLength > 0)) throw new DeclarationError(f('maxLength'), 'a text setting declares maxLength')
   if ((entry.kind === 'choice' || (entry.kind === 'list' && entry.of === 'choice')) && !(Array.isArray(entry.options) && entry.options.length && entry.options.every(o => KEBAB.test(o))))
     throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case')
+  if (entry.onChange !== undefined && !['reason', 'confirm'].includes(entry.onChange)) throw new DeclarationError(f('onChange'), "is 'reason' or 'confirm'")
+  if (entry.kind === 'text' && entry.minLength !== undefined && !(Number.isInteger(entry.minLength) && entry.minLength >= 0 && entry.minLength <= entry.maxLength!)) throw new DeclarationError(f('minLength'), 'a whole number no larger than maxLength')
+  if (entry.kind === 'time') {
+    for (const limit of ['min', 'max'] as const) if (entry[limit] !== undefined && !(typeof entry[limit] === 'string' && TIME.test(entry[limit]))) throw new DeclarationError(f(limit), 'a time limit is written like 08:00')
+  }
   if (entry.kind === 'duration') {
     for (const limit of ['min', 'max'] as const) if (entry[limit] !== undefined && !isDuration(entry[limit])) throw new DeclarationError(f(limit), 'a duration limit is written like 30m, 2h or 14d')
   }
@@ -144,9 +152,14 @@ export function validateSettingValue(entry: SettingEntry, raw: unknown): Validat
       return range(seconds, entry.min !== undefined ? parseDuration(entry.min as string) : undefined, entry.max !== undefined ? parseDuration(entry.max as string) : undefined, formatDuration)
     }
     case 'time':
-      return typeof raw === 'string' && TIME.test(raw) ? { ok: true, value: raw } : { ok: false, reason: 'must be a time such as 09:30' }
+      if (!(typeof raw === 'string' && TIME.test(raw))) return { ok: false, reason: 'must be a time such as 09:30' }
+      // HH:MM strings sort as times do.
+      if (typeof entry.min === 'string' && raw < entry.min) return { ok: false, reason: `must be ${entry.min} or later`, limit: 'min' }
+      if (typeof entry.max === 'string' && raw > entry.max) return { ok: false, reason: `must be ${entry.max} or earlier`, limit: 'max' }
+      return { ok: true, value: raw }
     case 'text':
       if (typeof raw !== 'string') return { ok: false, reason: 'must be text' }
+      if (entry.minLength && raw.length < entry.minLength) return { ok: false, reason: `must be at least ${entry.minLength} ${entry.minLength === 1 ? 'character' : 'characters'}`, limit: 'minLength' }
       return raw.length <= entry.maxLength! ? { ok: true, value: raw } : { ok: false, reason: `must be at most ${entry.maxLength} characters`, limit: 'maxLength' }
     case 'choice':
       return typeof raw === 'string' && entry.options!.includes(raw) ? { ok: true, value: raw } : { ok: false, reason: `must be one of ${entry.options!.join(', ')}`, limit: 'options' }

@@ -67,7 +67,7 @@ export async function senderFor(topic: string, domain: string): Promise<Sender> 
 }
 
 export async function theatreName(fallback: string): Promise<string> {
-  return (await useSetting('core.organisation.name') as string | null) ?? fallback
+  return (await useSetting('core.site.name') as string | null) ?? fallback
 }
 
 async function dedupeKeyFor(typeKey: string, key: string): Promise<string> {

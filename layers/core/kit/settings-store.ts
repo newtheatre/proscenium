@@ -39,9 +39,6 @@ export async function useSetting<K extends SettingKey>(key: K): Promise<SettingV
   return (map.has(key) ? map.get(key) : defaultValue(entry)) as SettingValue<K>
 }
 
-/** The same as useSetting, under the name part 4 of the specification gives it. */
-export const setting = useSetting
-
 /** Whether a setting has been changed from its default. */
 export async function isOverridden(key: string): Promise<boolean> {
   return (await overrides()).has(key)
@@ -65,11 +62,13 @@ async function moduleValues(module: string, change?: { key: string, value: unkno
  * rules, then writes the override, the history row, the audit row and core.setting.changed.
  * Passing `null` for a setting that has a default resets it (the override is deleted).
  */
-export async function changeSetting(unit: UnitView, key: string, raw: unknown, options: { reason?: string, reset?: boolean } = {}): Promise<unknown> {
+export async function changeSetting(unit: UnitView, key: string, raw: unknown, options: { reason?: string, reset?: boolean, confirm?: boolean } = {}): Promise<unknown> {
   const registry = useRegistry()
   const found = registry.settings.get(key)
   if (!found) throw new Refusal('core.setting.unknown', `There is no setting called ${key}.`, { status: 404 })
   const { entry, module } = found
+  if (entry.onChange === 'reason' && !options.reason?.trim()) throw new Refusal('core.setting.reason-needed', 'Say why you are changing this setting.', { status: 422, fields: { reason: 'required' } })
+  if (entry.onChange === 'confirm' && options.confirm !== true) throw new Refusal('core.setting.confirm-needed', 'This change affects dates and scheduled work. Confirm it to save.', { status: 422, fields: { confirm: 'required' } })
   const reset = options.reset === true
   let value: unknown = null
   if (!reset) {

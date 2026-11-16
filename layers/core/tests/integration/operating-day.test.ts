@@ -1,4 +1,4 @@
-// C-37: changing the time zone or the rollover says first how many operating days would move, then
+// C-37: changing the time zone or the day start says first how many operating days would move, then
 // recalculates every one not yet completed, in a job.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit } from '#kit'
@@ -27,6 +27,12 @@ async function show(id: string, startsAt: string, day: string, completed = false
 beforeEach(async () => {
   sent.length = 0
   resetRateLimits()
+  await inContext(async () => {
+    const unit = createUnit()
+    await changeSetting(unit, 'core.locale.time-zone', 'Europe/London', { confirm: true })
+    await unit.commit()
+  })
+  sent.length = 0
   // 00:30 in London on 15 November: the 14th's operating day with a 04:00 rollover.
   await show('sp_midnight', '2026-11-15T00:30:00Z', '2026-11-14')
   await show('sp_evening', '2026-11-14T19:30:00Z', '2026-11-14')
@@ -35,25 +41,25 @@ beforeEach(async () => {
 afterEach(async () => {
   await env.DB.batch([
     env.DB.prepare("DELETE FROM seats_performances WHERE id LIKE 'sp\\_%' ESCAPE '\\' AND starts_at IS NOT NULL"),
-    env.DB.prepare("DELETE FROM core_settings WHERE key IN ('core.organisation.day-rollover', 'core.locale.time-zone')"),
+    env.DB.prepare("DELETE FROM core_settings WHERE key IN ('core.locale.day-start', 'core.locale.time-zone')"),
     env.DB.prepare('DELETE FROM core_jobs'),
   ])
 })
 
 describe('the time zone and the rollover (C-37)', () => {
   it('says how many operating days a change would move, before anything changes', async () => {
-    const response = await call(handle, 'GET', '/api/core/organisation/day-change?rollover=00:00', { actor: admin() })
+    const response = await call(handle, 'GET', '/api/core/organisation/day-change?dayStart=00:00', { actor: admin() })
     expect(await response.json()).toEqual({ changes: 1 })
     const far = await call(handle, 'GET', '/api/core/organisation/day-change?timeZone=Pacific/Auckland', { actor: admin() })
     expect(await far.json()).toEqual({ changes: 2 })
     expect((await call(handle, 'GET', '/api/core/organisation/day-change?timeZone=Mars/Olympus', { actor: admin() })).status).toBe(422)
-    expect((await call(handle, 'GET', '/api/core/organisation/day-change?rollover=00:00', { actor: person([]) })).status).toBe(403)
+    expect((await call(handle, 'GET', '/api/core/organisation/day-change?dayStart=00:00', { actor: person([]) })).status).toBe(403)
   })
 
-  it('recalculates every performance not yet completed after the rollover changes', async () => {
+  it('recalculates every performance not yet completed after the day start changes', async () => {
     await inContext(async () => {
       const unit = createUnit()
-      await changeSetting(unit, 'core.organisation.day-rollover', '00:00')
+      await changeSetting(unit, 'core.locale.day-start', '00:00', { confirm: true })
       await unit.commit()
     })
     await deliver()
@@ -64,10 +70,10 @@ describe('the time zone and the rollover (C-37)', () => {
     ])
   })
 
-  it('refuses a rollover later than 08:00', async () => {
+  it('refuses a day start later than 08:00', async () => {
     await expect(inContext(async () => {
       const unit = createUnit()
-      await changeSetting(unit, 'core.organisation.day-rollover', '09:00')
-    })).rejects.toMatchObject({ code: 'core.setting.rule-failed' })
+      await changeSetting(unit, 'core.locale.day-start', '09:00', { confirm: true })
+    })).rejects.toMatchObject({ code: 'core.setting.invalid' })
   })
 })

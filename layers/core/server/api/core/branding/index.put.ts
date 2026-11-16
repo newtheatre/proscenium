@@ -10,7 +10,6 @@ const SETTINGS = {
   neutral: 'core.brand.neutral',
   displayFont: 'core.brand.display-font',
   radius: 'core.brand.radius',
-  defaultMode: 'core.brand.default-mode',
   creditLine: 'core.brand.credit-line',
 } as const
 const LOGOS = { logo: ['core.brand.logo', 'core.brand-logo'], logoDark: ['core.brand.logo-dark', 'core.brand-logo-dark'] } as const

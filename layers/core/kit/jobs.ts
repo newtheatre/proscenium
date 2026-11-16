@@ -144,7 +144,8 @@ export function latestSlot(decl: TaskDecl, at: number, timeZone: string): number
 export async function runScheduler(at = nowMs()): Promise<string[]> {
   const registry = useRegistry()
   const { env } = useContext()
-  const timeZone = await useSetting('core.locale.time-zone') as string
+  // Until setup sets the theatre's zone, scheduled tasks keep UTC.
+  const timeZone = (await useSetting('core.locale.time-zone') as string | null) ?? 'UTC'
   const timeout = await useSetting('core.jobs.timeout') as number
   const on = await enabledModules()
   const queued: string[] = []

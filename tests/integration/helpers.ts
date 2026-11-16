@@ -65,7 +65,8 @@ export function server(routes: Record<string, EventHandler>): (request: Request)
 }
 
 export function call(handle: (request: Request) => Promise<Response>, method: string, path: string, options: { actor?: Actor, body?: unknown, headers?: Record<string, string> } = {}) {
-  const headers: Record<string, string> = { 'content-type': 'application/json', ...options.headers }
+  // h3 builds the request URL from the Host header, so set it, or origin checks see localhost.
+  const headers: Record<string, string> = { 'content-type': 'application/json', 'host': 'test', ...options.headers }
   if (options.actor) headers['x-test-actor'] = JSON.stringify(options.actor)
   return handle(new Request(`http://test${path}`, { method, headers, body: options.body === undefined ? undefined : JSON.stringify(options.body) }))
 }

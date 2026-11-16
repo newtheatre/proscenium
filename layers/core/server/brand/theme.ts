@@ -30,7 +30,6 @@ export interface BrandChoice {
   neutral: Neutral
   displayFont: keyof typeof FONTS
   radius: keyof typeof RADIUS
-  defaultMode: 'auto' | 'light' | 'dark'
 }
 export interface ModeTokens {
   background: string
@@ -48,7 +47,7 @@ export interface ModeTokens {
   danger: string
   info: string
 }
-export interface BrandTokens { light: ModeTokens, dark: ModeTokens, radius: string, displayFont: string, defaultMode: BrandChoice['defaultMode'] }
+export interface BrandTokens { light: ModeTokens, dark: ModeTokens, radius: string, displayFont: string, neutral: readonly string[] }
 
 /** Pure: the tokens for a choice. The preview and the saved brand both come from here. */
 export function tokensFor(choice: BrandChoice): BrandTokens {
@@ -62,7 +61,7 @@ export function tokensFor(choice: BrandChoice): BrandTokens {
     dark: mode(grey[n950], grey[n900], grey[n800], grey[n100], grey[n400], STATUS.dark),
     radius: RADIUS[choice.radius],
     displayFont: FONTS[choice.displayFont],
-    defaultMode: choice.defaultMode,
+    neutral: grey,
   }
 }
 
@@ -72,7 +71,6 @@ export async function brandChoice(): Promise<BrandChoice> {
     neutral: await useSetting('core.brand.neutral') as Neutral,
     displayFont: await useSetting('core.brand.display-font') as BrandChoice['displayFont'],
     radius: await useSetting('core.brand.radius') as BrandChoice['radius'],
-    defaultMode: await useSetting('core.brand.default-mode') as BrandChoice['defaultMode'],
   }
 }
 
@@ -96,7 +94,7 @@ export async function getBrand() {
   const choice = await brandChoice()
   return {
     revision: await useSetting('core.brand.revision') as number,
-    name: await useSetting('core.organisation.name') as string | null,
+    name: await useSetting('core.site.name') as string | null,
     choice,
     tokens: tokensFor(choice),
     logo: await logo('core.brand.logo'),
@@ -105,24 +103,28 @@ export async function getBrand() {
   }
 }
 
-function block(t: ModeTokens): string {
+function block(t: ModeTokens, grey: readonly string[]): string {
   return [
     `--brand-background:${t.background}`, `--brand-surface:${t.surface}`, `--brand-border:${t.border}`,
     `--brand-text:${t.text}`, `--brand-muted:${t.muted}`, `--brand-link:${t.link}`,
     `--brand-solid:${t.solid}`, `--brand-on-solid:${t.onSolid}`,
     `--brand-success:${t.success}`, `--brand-warning:${t.warning}`, `--brand-danger:${t.danger}`, `--brand-info:${t.info}`,
-    // Nuxt UI reads these.
-    `--ui-primary:${t.solid}`, `--ui-bg:${t.background}`, `--ui-text:${t.text}`, `--ui-border:${t.border}`,
+    // Nuxt UI uses its primary both as text on the page and as a fill under its inverted text
+    // (white in light mode, near-black in dark), so the link colour, readable on the background,
+    // serves for both. Its greys are the brand's.
+    `--ui-primary:${t.link}`,
+    ...SCALE.map((step, i) => `--ui-color-neutral-${step}:${grey[i]}`),
   ].join(';')
 }
 
-/** The stylesheet the shells load: tokens for both modes, honouring the default mode. */
+const SCALE = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900', '950']
+
+/**
+ * The stylesheet the shells load: tokens for light on :root and for dark on .dark, the class Nuxt
+ * UI's colour mode sets. Which mode a visitor starts in is the interface's (core.appearance.*).
+ */
 export function themeCss(tokens: BrandTokens): string {
   const shared = `--brand-radius:${tokens.radius};--ui-radius:${tokens.radius};--brand-display-font:${tokens.displayFont}`
-  const light = block(tokens.light)
-  const dark = block(tokens.dark)
-  const lines = [`:root{${shared};${tokens.defaultMode === 'dark' ? dark : light};color-scheme:${tokens.defaultMode === 'dark' ? 'dark' : 'light'}}`]
-  if (tokens.defaultMode === 'auto') lines.push(`@media (prefers-color-scheme:dark){:root:not([data-mode="light"]){${dark};color-scheme:dark}}`)
-  lines.push(`:root[data-mode="light"]{${light};color-scheme:light}`, `:root[data-mode="dark"]{${dark};color-scheme:dark}`)
-  return `${lines.join('\n')}\n`
+  // html:root and html.dark outrank the bundled stylesheet's :root and .dark, whatever the order.
+  return `html:root{${shared};${block(tokens.light, tokens.neutral)}}\nhtml.dark{${block(tokens.dark, tokens.neutral)}}\n`
 }

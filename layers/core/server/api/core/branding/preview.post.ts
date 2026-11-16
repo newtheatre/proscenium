@@ -9,7 +9,7 @@ import { brandInput } from '../../../brand/input'
 export default defineRoute({
   ability: 'signed-in',
   rateLimit: 'default',
-  input: brandInput.pick({ accent: true, neutral: true, displayFont: true, radius: true, defaultMode: true }),
+  input: brandInput.pick({ accent: true, neutral: true, displayFont: true, radius: true }),
 }, async (_event, { input }) => {
   const tokens = tokensFor({ ...(await brandChoice()), ...stripUndefined(input) })
   const email = render(

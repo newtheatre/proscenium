@@ -57,8 +57,8 @@ export default defineRoute({
 ```
 
 Before the handler runs the kit checks, in order: the module is on (else 404), the rate limit
-(429), Turnstile if `protect: 'turnstile'`, the input (422 naming the fields), and the ability (401
-or 403). Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
+(429), Turnstile if `protect: 'turnstile'`, the ability (401 or 403), and then the input (422
+naming the fields), so a caller without the ability learns nothing about the input. Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
 of work after the handler returns, with an audit entry when the ability is audited.
 
 A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the body unread for the
@@ -77,7 +77,7 @@ Any module may import core's services without listing core: `import { notifyAddr
   and verified. In tests, `setMailer(fn)` from `layers/core/server/notifications/mailer.ts`
   records messages instead of sending them.
 - `operatingDayOf(instant)` and `dayBounds(day)`: the theatre's operating day, which rolls over at
-  `core.organisation.day-rollover`. A table that stores one contributes to `core.operating-day`, so
+  `core.locale.day-start`. A table that stores one contributes to `core.operating-day`, so
   it is recalculated when the time zone or the rollover changes.
 - `attachFile(unit, fileId, { slot, ownerType, ownerId })` and `detachFile(unit, fileId)`. Declare
   where your records hold files as contributions to `core.file-slot`; uploads go to
@@ -100,7 +100,7 @@ person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is t
 duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
 with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`. A
 switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `weeklyOn` in the
-theatre's time zone; the cron trigger runs only the latest due slot, once.
+theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
 
 ## External calls
 
@@ -117,9 +117,25 @@ defineSettings('box-office', {
 })
 ```
 
-Read with `await useSetting('box-office.holds.length')` (seconds for a duration). A value outside
-the limits cannot be saved. A quotable public setting can be quoted in content as
-`:setting{name="box-office.fees.booking"}`.
+Read with `await useSetting('box-office.holds.length')` on the server (seconds for a duration);
+components use `usePublicSettings()`, which sees only public settings. A value outside the limits
+cannot be saved. A quotable public setting can be quoted in content as
+`:setting{name="box-office.fees.booking"}`. `onChange: 'reason'` makes a change need a written
+reason and `onChange: 'confirm'` a second confirmation; the `change` ability still decides who may.
+
+The core's locale settings are `core.site.name` and `core.locale.time-zone` (both unset until
+setup), `core.locale.currency` (GBP), `core.locale.language` (en-GB) and `core.locale.day-start`
+(04:00). Until the time zone is set, scheduled tasks run on UTC and `today()` and `localDate()`
+refuse rather than give a date in the wrong zone.
+
+## The interface
+
+Screens use Nuxt UI v4 components first, on Tailwind CSS v4, as in Mailflare; reach for custom
+markup only where Nuxt UI has nothing suitable. The core layer registers the module, its stylesheet
+(`layers/core/app/assets/css/main.css`) and the shared component defaults (`app.config.ts`).
+Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs. The
+public shell in `layers/core/app/layouts/default.vue` is a plain placeholder until the interface
+workstream's shells land; a theatre's colours will come from its branding settings.
 
 ## Testing
 
@@ -127,6 +143,9 @@ Unit tests run in Node; integration tests run in workerd with a local D1, using 
 modules in `tests/fixtures/modules` (their migrations are in `tests/fixtures/migrations`,
 written with `bun run db:generate -- --name <what> --owner fixtures`). Browser tests run the built
 Worker under wrangler. Everything runs on Linux.
+
+In an integration test that calls a route, send a `Host` header (the `call()` helper does): h3
+builds the request URL from it, and without one origin checks see `localhost`.
 
 ## Where the build departs from the specification's wording
 
@@ -150,9 +169,6 @@ in the specification's "As built" list; this guide is the reference from here on
 - Pending migrations are applied automatically only where `PROSCENIUM_AUTO_MIGRATE=1` (dev,
   preview and tests). It is not a production option and is removed when F-28's maintenance page
   and Apply button land.
-- The theatre's time zone and currency stay `core.locale.time-zone` and `core.locale.currency`,
-  which the scheduler already reads, rather than the core domain's `core.organisation.*` names.
-  The organisation's language setting waits for a second language.
 - In phase 1 `notifyAddress` sends at once, inside the caller's job, so the job's lane is the lane;
   a notification type's `lane` takes effect with the full pipeline in phase 2.
 - An upload is one request carrying the bytes, rather than a begun upload and a second request.

@@ -1,5 +1,6 @@
-<!-- The public shell until workstream 6's interface lands: the brand's stylesheet, a skip link, the
-     theatre's name or logo, the menu from site/content/navigation.yml (C-40) and a footer. -->
+<!-- The public shell, plain until the interface workstream's design lands: a skip link, a header
+     with the theatre's name or logo, the menu from site/content/navigation.yml (C-40) and the
+     colour-mode switch, the page, and a footer. The brand's colours come from its stylesheet (C-35). -->
 <script setup lang="ts">
 const { data: brand } = await useBrand()
 const { data: navigation } = await useAsyncData('core:navigation', () => queryCollection('navigation').first())
@@ -8,22 +9,27 @@ useHead(() => ({
   link: [{ rel: 'stylesheet', href: `/api/core/branding/theme.css?v=${brand.value?.revision ?? 0}` }],
 }))
 
-const name = computed(() => brand.value?.name ?? '')
-const external = (to: string) => /^(https:|mailto:)/.test(to)
+const name = computed(() => brand.value?.name ?? 'Home')
+const items = (links?: { label: string, to: string }[]) => (links ?? []).map(link => ({ label: link.label, to: link.to, target: /^https:/.test(link.to) ? '_blank' : undefined }))
+const header = computed(() => items(navigation.value?.header))
+const footer = computed(() => items(navigation.value?.footer))
 </script>
 
 <template>
-  <div class="shell">
+  <div>
     <a
       href="#main"
-      class="skip"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-default focus:px-3 focus:py-2"
     >Skip to content</a>
-    <header class="header">
-      <NuxtLink
-        to="/"
-        class="home"
+    <UHeader
+      :title="name"
+      :toggle="false"
+    >
+      <template
+        v-if="brand?.logo"
+        #title
       >
-        <picture v-if="brand?.logo">
+        <picture>
           <source
             v-if="brand.logoDark"
             :srcset="brand.logoDark.url"
@@ -34,76 +40,37 @@ const external = (to: string) => /^(https:|mailto:)/.test(to)
             :alt="brand.logo.alt || name"
             :width="brand.logo.width ?? undefined"
             :height="brand.logo.height ?? undefined"
-            class="logo"
+            class="h-10 w-auto"
           >
         </picture>
-        <span v-else>{{ name || 'Home' }}</span>
-      </NuxtLink>
-      <nav
-        v-if="navigation?.header?.length"
+      </template>
+      <UNavigationMenu
+        v-if="header.length"
+        :items="header"
         aria-label="Main"
-      >
-        <ul>
-          <li
-            v-for="link in navigation.header"
-            :key="link.to"
-          >
-            <a
-              v-if="external(link.to)"
-              :href="link.to"
-            >{{ link.label }}</a>
-            <NuxtLink
-              v-else
-              :to="link.to"
-            >
-              {{ link.label }}
-            </NuxtLink>
-          </li>
-        </ul>
-      </nav>
-    </header>
-    <main id="main">
+      />
+      <template #right>
+        <UColorModeButton />
+      </template>
+    </UHeader>
+    <UMain id="main">
       <slot />
-    </main>
-    <footer class="footer">
-      <nav
-        v-if="navigation?.footer?.length"
+    </UMain>
+    <UFooter>
+      <template #left>
+        <p
+          v-if="brand?.creditLine"
+          class="text-sm text-muted"
+        >
+          Runs on Proscenium
+        </p>
+      </template>
+      <UNavigationMenu
+        v-if="footer.length"
+        :items="footer"
+        variant="link"
         aria-label="Footer"
-      >
-        <ul>
-          <li
-            v-for="link in navigation.footer"
-            :key="link.to"
-          >
-            <a
-              v-if="external(link.to)"
-              :href="link.to"
-            >{{ link.label }}</a>
-            <NuxtLink
-              v-else
-              :to="link.to"
-            >
-              {{ link.label }}
-            </NuxtLink>
-          </li>
-        </ul>
-      </nav>
-      <p v-if="brand?.creditLine">
-        Powered by Proscenium
-      </p>
-    </footer>
+      />
+    </UFooter>
   </div>
 </template>
-
-<style scoped>
-.shell { min-height: 100vh; display: flex; flex-direction: column; background: var(--brand-background); color: var(--brand-text); }
-.skip { position: absolute; left: -999px; }
-.skip:focus { left: 1rem; top: 1rem; }
-.header, .footer { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; padding: 1rem; }
-.home { font-family: var(--brand-display-font); font-weight: 600; color: inherit; text-decoration: none; }
-.logo { max-height: 3rem; width: auto; }
-nav ul { display: flex; flex-wrap: wrap; gap: 1rem; list-style: none; margin: 0; padding: 0; }
-a { color: var(--brand-link); }
-main { flex: 1; padding: 0 1rem; }
-.footer { border-top: 1px solid var(--brand-border); color: var(--brand-muted); }
-</style>

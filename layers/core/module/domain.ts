@@ -11,11 +11,9 @@ const filesConfigure = 'core.file.configure'
 const sender = 'core.sender.manage'
 
 export const settings = defineSettings('core', {
-  // Organisation (C-37). The time zone and currency stay foundations' core.locale.* settings, which
-  // the scheduler already reads; the specification's core.organisation.time-zone is that one.
-  'organisation.name': setting.text({ unset: true, maxLength: 80, change: organisation, audience: 'public', quotable: true }),
+  // Organisation. The theatre's name, time zone, currency, language and day start are foundations'
+  // (core.site.name, core.locale.*); the operating day (C-37) reads core.locale.day-start.
   'organisation.short-name': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
-  'organisation.day-rollover': setting.time({ default: '04:00', change: organisation }),
   'organisation.week-start': setting.choice({ default: 'monday', options: ['monday', 'sunday', 'saturday'], change: organisation, audience: 'public' }),
   'organisation.country': setting.text({ default: 'GB', maxLength: 2, change: organisation }),
   'organisation.contact-email': setting.text({ unset: true, maxLength: 254, change: organisation, audience: 'public', quotable: true }),
@@ -25,11 +23,11 @@ export const settings = defineSettings('core', {
   'organisation.charity-number': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
 
   // Brand (C-35, C-36). Saved together through PUT /api/core/branding, which raises the revision.
+  // Light or dark is the interface's (core.appearance.*), not the brand's.
   'brand.accent': setting.colour({ default: '#2563eb', change: branding, audience: 'public' }),
   'brand.neutral': setting.choice({ default: 'slate', options: ['slate', 'stone', 'zinc', 'neutral'], change: branding, audience: 'public' }),
   'brand.display-font': setting.choice({ default: 'system', options: ['system', 'serif', 'rounded'], change: branding, audience: 'public' }),
   'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], change: branding, audience: 'public' }),
-  'brand.default-mode': setting.choice({ default: 'auto', options: ['auto', 'light', 'dark'], change: branding, audience: 'public' }),
   'brand.credit-line': setting.boolean({ default: true, change: branding, audience: 'public' }),
   'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.logo-dark': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
@@ -48,10 +46,7 @@ export const settings = defineSettings('core', {
   'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
 })
 
-const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3)) // not-policy: minutes in an hour
-
 export const settingRules: SettingRule[] = [
-  { id: 'day-rollover-early', check: s => minutes(s['organisation.day-rollover']) <= minutes('08:00') },
   { id: 'country-code', check: s => /^[A-Z]{2}$/.test(s['organisation.country']) },
   { id: 'contact-email', check: s => s['organisation.contact-email'] === null || z.email().safeParse(s['organisation.contact-email']).success },
   { id: 'sending-domain', check: s => s['notifications.sending-domain'] === null || /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(s['notifications.sending-domain']) },

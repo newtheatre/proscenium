@@ -4,7 +4,7 @@ import { useSetting, enqueue, defineRoute } from '#kit'
 import type { SettingValue } from '#kit/registry-types'
 
 export async function settingsAreTyped() {
-  const zone: string = await useSetting('core.locale.time-zone')
+  const zone: string | null = await useSetting('core.locale.time-zone')
   const attempts: number = await useSetting('core.jobs.attempts')
   // @ts-expect-error an undeclared setting is a type error
   await useSetting('core.no-such.setting')

@@ -68,6 +68,20 @@ describe('settings', () => {
   it('refuse a sensitive setting that is public', () => {
     expect(() => defineSettings('x', { 'a.b': setting.text({ default: '', maxLength: 10, change: 'x.settings.manage', sensitive: true, audience: 'public' }) })).toThrow(DeclarationError)
   })
+  it('keep a time within its limits', () => {
+    const { 'x.day.start': start } = defineSettings('x', { 'day.start': setting.time({ default: '04:00', min: '00:00', max: '08:00', change: 'x.settings.manage' }) })
+    expect(validateSettingValue(start, '07:59')).toEqual({ ok: true, value: '07:59' })
+    expect(validateSettingValue(start, '08:01')).toMatchObject({ ok: false, limit: 'max' })
+    expect(() => defineSettings('x', { 'a.b': setting.time({ default: '04:00', max: '8am', change: 'x.settings.manage' }) })).toThrow(DeclarationError)
+  })
+  it('refuse text shorter than its least length', () => {
+    const { 'x.site.name': name } = defineSettings('x', { 'site.name': setting.text({ unset: true, minLength: 1, maxLength: 80, change: 'x.settings.manage' }) })
+    expect(validateSettingValue(name, '')).toMatchObject({ ok: false, limit: 'minLength' })
+    expect(validateSettingValue(name, null)).toEqual({ ok: true, value: null })
+  })
+  it('refuse an unknown onChange', () => {
+    expect(() => defineSettings('x', { 'a.b': setting.integer({ default: 1, change: 'x.settings.manage', onChange: 'shout' as 'reason' }) })).toThrow(DeclarationError)
+  })
 })
 
 describe('abilities', () => {
@@ -77,6 +91,9 @@ describe('abilities', () => {
   })
   it('refuse a privileged ability without freshness', () => {
     expect(() => defineAbilities('finance', { 'refunds.issue': ability({ risk: 'privileged', fresh: false }) })).toThrow(DeclarationError)
+  })
+  it('let a privileged ability that only reads, audited, skip freshness', () => {
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', fresh: false, audit: 'read' }) })).not.toThrow()
   })
 })
 

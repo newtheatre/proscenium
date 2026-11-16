@@ -17,7 +17,7 @@ const u32le = (n: number) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>>
 const text = (b: Uint8Array) => new TextDecoder('latin1').decode(b)
 
 describe('brand colours (C-35)', () => {
-  const choice = (accent: string): BrandChoice => ({ accent, neutral: 'slate', displayFont: 'system', radius: 'medium', defaultMode: 'auto' })
+  const choice = (accent: string): BrandChoice => ({ accent, neutral: 'slate', displayFont: 'system', radius: 'medium' })
   const colours = ['#ffff00', '#00ff00', '#ffffff', '#000000', '#2563eb', '#f4a7b9', '#7c3aed', '#0e7490', '#fde047', '#808080']
 
   it.each(colours)('keeps text readable whatever colour is chosen: %s', (accent) => {
@@ -38,13 +38,12 @@ describe('brand colours (C-35)', () => {
     expect(solidFill('#ffff00').text).toBe('#0c0a09')
   })
 
-  it('writes both modes into the stylesheet, honouring the default mode', () => {
-    const auto = themeCss(tokensFor(choice('#2563eb')))
-    expect(auto).toContain('prefers-color-scheme:dark')
-    expect(auto).toContain('--brand-link:')
-    const dark = themeCss(tokensFor({ ...choice('#2563eb'), defaultMode: 'dark' }))
-    expect(dark).not.toContain('prefers-color-scheme')
-    expect(dark).toMatch(/^:root\{[^}]*color-scheme:dark\}/)
+  it('writes light onto :root and dark onto the colour mode\'s .dark class', () => {
+    const tokens = tokensFor(choice('#2563eb'))
+    const css = themeCss(tokens)
+    expect(css).toContain(':root{--brand-radius:0.5rem')
+    expect(css).toContain(`--brand-link:${tokens.light.link}`)
+    expect(css).toMatch(new RegExp(`html\\.dark\\{[^}]*--brand-link:${tokens.dark.link}`))
   })
 })
 

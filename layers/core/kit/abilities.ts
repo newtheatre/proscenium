@@ -58,7 +58,9 @@ export function defineAbilities<const M extends string, const A extends Record<s
     for (const implied of decl.implies ?? []) {
       if (!(implied in abilities)) throw new DeclarationError(`abilities.${key}.implies`, `"${implied}" is not an ability of ${module}`)
     }
-    if (decl.risk === 'privileged' && decl.fresh === false) throw new DeclarationError(`abilities.${key}.fresh`, 'a privileged ability needs a fresh sign-in')
+    // A privileged ability may skip freshness only when it reads and its reads are audited; one that
+    // changes anything always needs a fresh sign-in.
+    if (decl.risk === 'privileged' && decl.fresh === false && decl.audit !== 'read') throw new DeclarationError(`abilities.${key}.fresh`, "a privileged ability needs a fresh sign-in, unless it only reads and says audit: 'read'")
   }
   return out as any
 }

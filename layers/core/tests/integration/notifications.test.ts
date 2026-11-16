@@ -41,7 +41,7 @@ async function sendTicket(address = 'guest@example.org', key?: string) {
 }
 
 async function verify() {
-  await setSettings({ 'core.notifications.sending-domain': 'mail.example.org', 'core.organisation.contact-email': 'box-office@example.org', 'core.organisation.name': 'The Little Theatre' })
+  await setSettings({ 'core.notifications.sending-domain': 'mail.example.org', 'core.organisation.contact-email': 'box-office@example.org', 'core.site.name': 'The Little Theatre' })
   const response = await call(handle, 'POST', '/api/core/notifications/verify-domain', { actor: admin(), body: {} })
   expect(response.status).toBe(200)
   mails.length = 0
@@ -61,7 +61,7 @@ beforeEach(() => {
 afterEach(async () => {
   setMailer()
   await env.DB.batch([
-    env.DB.prepare("DELETE FROM core_settings WHERE key LIKE 'core.notifications.%' OR key LIKE 'core.organisation.%'"),
+    env.DB.prepare("DELETE FROM core_settings WHERE key LIKE 'core.notifications.%' OR key LIKE 'core.organisation.%' OR key = 'core.site.name'"),
     env.DB.prepare('DELETE FROM core_notification_routing'),
     env.DB.prepare('DELETE FROM core_sender_identities'),
     env.DB.prepare('DELETE FROM core_jobs'),

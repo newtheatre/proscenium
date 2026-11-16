@@ -7,7 +7,6 @@ export const brandInput = z.object({
   neutral: z.enum(['slate', 'stone', 'zinc', 'neutral']).optional(),
   displayFont: z.enum(['system', 'serif', 'rounded']).optional(),
   radius: z.enum(['none', 'small', 'medium', 'large']).optional(),
-  defaultMode: z.enum(['auto', 'light', 'dark']).optional(),
   creditLine: z.boolean().optional(),
   logo: idSchema('fil').nullable().optional(),
   logoDark: idSchema('fil').nullable().optional(),
