@@ -124,10 +124,21 @@ export const points = {
       done: z.string().regex(/^[a-z][a-z0-9_]*$/).optional(),
     }).strict(),
   }),
-  /** A component a fork's Markdown page may use, such as ::whats-on. `setting` switches it off. */
+  /**
+   * A component a fork's Markdown page may use, such as ::whats-on. `component` is its own name,
+   * starting with its module's id (PublicSiteWhatsOn); `alias` is the short, kebab-case name a
+   * content file writes, unique across the system. An entry without them names a component that is
+   * already global under its id (core's `setting`). `setting` switches it off.
+   */
   'core.public-component': point({
     kind: 'data',
-    schema: z.object({ id: z.string().regex(/^[a-z][a-z0-9-]*$/), setting: z.string().optional() }).strict(),
+    schema: z.object({
+      id: z.string().regex(/^[a-z][a-z0-9-]*$/),
+      component: z.string().regex(/^[A-Z][A-Za-z0-9]*$/).optional(),
+      alias: z.string().regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/).optional(),
+      description: z.string().optional(),
+      setting: z.string().optional(),
+    }).strict().refine(c => (c.component === undefined) === (c.alias === undefined), { message: 'component and alias come together', path: ['alias'] }),
   }),
 }
 
