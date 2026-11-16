@@ -11,7 +11,7 @@ export const points = {
     // is for account entries every signed-in person sees.
     schema: z.object({
       id: z.string(),
-      menu: z.enum(['account', 'members', 'console', 'live']),
+      menu: z.enum(['account', 'members', 'console', 'admin', 'live']),
       to: z.string().startsWith('/'),
       icon: z.string(),
       ability: ability.optional(),
@@ -23,14 +23,17 @@ export const points = {
       match: z.string().optional(),
     }).strict()
       .refine(e => e.ability !== 'signed-in' || e.menu === 'account', { message: "only an account entry may give ability 'signed-in'", path: ['ability'] })
-      .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] }),
+      .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] })
+      .refine(e => e.menu !== 'admin' || e.group !== undefined || e.to === '/admin', { message: 'an admin entry names one of the admin groups; only the Overview, /admin, has none', path: ['group'] }),
   }),
   // A console group is declared once, by the module that owns it. A theatre's own module places its
-  // group with `before` or `after`; the platform's own groups keep the fixed order.
+  // group with `before` or `after`; the platform's own groups keep the fixed order. `menu: 'admin'`
+  // declares one of Site administration's groups instead (R-33).
   'core.navigation-group': point({
     kind: 'data',
     schema: z.object({
       id: z.string(),
+      menu: z.enum(['console', 'admin']).optional(),
       icon: z.string(),
       order: z.number().int().optional(),
       before: z.string().optional(),
@@ -47,7 +50,7 @@ export const points = {
       record: z.string(),
       ability,
       route: z.string().startsWith('/api/'),
-      shells: z.array(z.enum(['console', 'members'])).min(1).default(['console']),
+      shells: z.array(z.enum(['console', 'members', 'admin'])).min(1).default(['console']),
     }).strict(),
   }),
   // A common action offered in the palette (and on an empty home): a place to go, with words that find it.

@@ -126,10 +126,47 @@ describe('the generated settings page (UI-14)', () => {
 })
 
 describe("core's own settings page", () => {
-  it('is served at /console/system/settings, not /console/core/settings', async () => {
-    const admin = person(['core.settings.manage'])
-    expect((await decide('/console/system/settings', admin)).decision).toBe('allow')
-    expect((await decide('/console/core/settings', admin)).decision).toBe('not-found')
+  it('is served at /console/system/settings, not /console/core/settings, for core\'s settings of module scope', async () => {
+    const organiser = person(['core.organisation.edit'])
+    expect((await decide('/console/system/settings', organiser)).decision).toBe('allow')
+    expect((await decide('/console/core/settings', organiser)).decision).toBe('not-found')
+  })
+})
+
+describe('Site administration (R-33)', () => {
+  const admin = () => person(['core.settings.manage'])
+  type Settings = { settings: { key: string, module: string, scope: string }[] }
+  const settings = async (query: string, actor = admin()) => (await call(handle, 'GET', `/api/core/settings?${query}`, { actor }))
+
+  it('opens to a person who holds the ability of an admin entry, and is not found for anyone else', async () => {
+    expect((await decide('/admin', admin())).decision).toBe('allow')
+    expect((await decide('/admin/settings', admin())).decision).toBe('allow')
+    expect((await decide('/admin', staff())).decision).toBe('not-found')
+    expect((await decide('/admin/settings', staff())).decision).toBe('not-found')
+    expect((await decide('/admin')).decision).toBe('sign-in')
+  })
+
+  it('shows foundations\' settings under /admin/settings in the modules group, and not in the console', async () => {
+    const nav = await (await call(handle, 'GET', '/api/core/navigation?shell=admin', { actor: admin() })).json() as { groups: { id: string, everyday: { id: string, to: string }[] }[] }
+    expect(nav.groups.map(g => g.id)).toEqual(['modules'])
+    expect(nav.groups[0]!.everyday).toEqual([expect.objectContaining({ id: 'core.site-settings', to: '/admin/settings' })])
+    // Nothing of theirs is left in the console, so it is no business of theirs.
+    expect((await call(handle, 'GET', '/api/core/navigation?shell=console', { actor: admin() })).status).toBe(404)
+  })
+
+  it('lists the site\'s settings across modules, and narrows a module\'s page to its own', async () => {
+    const site = await (await settings('scope=site')).json() as Settings
+    expect(site.settings.length).toBeGreaterThan(0)
+    expect(site.settings.every(s => s.scope === 'site')).toBe(true)
+    expect(site.settings.map(s => s.key)).toContain('core.units.set-rows-limit')
+    // Compatible: a module's settings without a scope are all of them, each saying where it belongs.
+    const all = await (await settings('module=core', person(['core.settings.manage', 'core.organisation.edit']))).json() as Settings
+    expect(new Set(all.settings.map(s => s.scope))).toEqual(new Set(['module', 'site']))
+    const own = await (await settings('module=core&scope=module', person(['core.organisation.edit']))).json() as Settings
+    expect(own.settings.every(s => s.scope === 'module')).toBe(true)
+    expect(own.settings.map(s => s.key)).toContain('core.organisation.week-start')
+    expect((await settings('scope=site', staff())).status).toBe(404)
+    expect((await settings('scope=module')).status).toBe(422) // a scope of 'module' needs a module
   })
 })
 

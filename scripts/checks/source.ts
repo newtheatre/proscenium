@@ -213,8 +213,13 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
     }
   }
   const withSettings = new Set<string>()
-  for (const { module } of registry.settings.values() as Iterable<{ module: string }>) withSettings.add(module)
+  let siteSettings = false
+  for (const { module, entry } of registry.settings.values() as Iterable<{ module: string, entry: { scope?: string } }>) {
+    if (entry.scope === 'site') siteSettings = true
+    else withSettings.add(module)
+  }
   for (const module of withSettings) entries.push({ to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings` })
+  if (siteSettings) entries.push({ to: '/admin/settings' })
   const homes = new Set(Object.values(SHELL_PREFIXES))
   for (const m of modules) {
     const pagesDir = join(ROOT, m.found.root, 'app/pages')

@@ -6,7 +6,7 @@ import { shows } from './counts'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import {
-  abilityList, entryLabelKey, groupLabelKey, orderGroups,
+  ADMIN_GROUP_ORDER, abilityList, entryLabelKey, groupLabelKey, orderGroups,
   type NavGroup, type NavItem, type NavigationEntry, type NavigationGroupDecl, type ShellName,
 } from '../../shared/navigation'
 
@@ -21,15 +21,26 @@ export interface DeclaredEntry extends NavigationEntry {
 /** Core's own screens (modules, settings, jobs, credentials, health, audit) sit in the System group. */
 export const SYSTEM_GROUP = 'system'
 
-/** Every entry of every module that is on, plus a generated settings entry for each module with settings. */
+/** Where the site's own settings are shown (R-33): every setting declared with scope 'site'. */
+export const SITE_SETTINGS_PATH = '/admin/settings'
+
+/**
+ * Every entry of every module that is on, plus a generated settings entry for each module with
+ * settings of its own and one Site administration entry for the site's settings.
+ */
 export async function declaredEntries(): Promise<DeclaredEntry[]> {
   const out: DeclaredEntry[] = []
   for (const c of await usePoint<NavigationEntry>('core.navigation')) out.push({ ...c.value, module: c.module })
   const on = await enabledModules()
   const changers = new Map<string, Set<string>>()
+  const siteChangers = new Set<string>()
   for (const { module, entry } of useRegistry().settings.values()) {
     if (!on.has(module)) continue
-    changers.set(module, (changers.get(module) ?? new Set()).add(entry.change))
+    if (entry.scope === 'site') siteChangers.add(entry.change)
+    else changers.set(module, (changers.get(module) ?? new Set()).add(entry.change))
+  }
+  if (siteChangers.size) {
+    out.push({ id: 'core.site-settings', module: 'core', label: 'core.settings-page.site-title', menu: 'admin', group: 'modules', to: SITE_SETTINGS_PATH, icon: 'i-lucide-settings-2', ability: [...siteChangers], order: 20 }) // not-policy: after Modules
   }
   for (const [module, abilities] of changers) {
     // A module's settings page sits in the set-up half of the module's own group.
@@ -94,17 +105,20 @@ function item(entry: DeclaredEntry): NavItem {
 /** The flat list for a shell without groups, or the grouped sidebar for the console. */
 export async function navigationFor(actor: Actor, shell: ShellName): Promise<{ items: NavItem[], groups: NavGroup[] }> {
   const entries = await allowedEntries(actor, shell)
-  if (shell !== 'console') return { items: entries.map(item).sort(byOrder), groups: [] }
-  const declared = await declaredGroups()
-  const used = [...new Set(entries.map(e => e.group ?? e.module))]
+  // The console and Site administration are grouped; the others are flat lists.
+  if (shell !== 'console' && shell !== 'admin') return { items: entries.map(item).sort(byOrder), groups: [] }
+  const declared = (await declaredGroups()).filter(g => (g.menu ?? 'console') === shell)
+  // Site administration's Overview is the shell's home and sits in no group.
+  const grouped = shell === 'admin' ? entries.filter(e => e.group) : entries
+  const used = [...new Set(grouped.map(e => e.group ?? e.module))]
   const groups: NavGroup[] = []
   const placed = orderGroups(used.map((id) => {
     const decl = declared.find(g => g.id === id)
     return { id, order: decl?.order, before: decl?.before, after: decl?.after }
-  }))
+  }), shell === 'admin' ? ADMIN_GROUP_ORDER : undefined)
   for (const { id } of placed) {
     const decl = declared.find(g => g.id === id)
-    const members = entries.filter(e => (e.group ?? e.module) === id)
+    const members = grouped.filter(e => (e.group ?? e.module) === id)
     groups.push({
       id,
       label: groupLabelKey(decl?.module ?? members[0]?.module ?? 'core', id),
