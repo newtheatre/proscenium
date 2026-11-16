@@ -1,8 +1,8 @@
 // The pretend provider. Tests say what it "knows" about each reference in `world`, and sign a
 // webhook with `sign`.
-import type { PaymentProvider, ProviderAnswer } from '#modules/payments'
+import type { PaymentProvider, ProviderAnswer, RefundAnswer } from '#modules/payments'
 
-export const world = { answers: new Map<string, ProviderAnswer | 'unknown'>(), statusCalls: 0, failStatus: false }
+export const world = { answers: new Map<string, ProviderAnswer | 'unknown'>(), statusCalls: 0, failStatus: false, refundAnswer: { state: 'succeeded' } as RefundAnswer, refundKeys: [] as string[] }
 const KEY = 'cardco-test-key'
 
 export function sign(eventId: string): string {
@@ -20,6 +20,10 @@ export default {
     world.statusCalls++
     if (world.failStatus) throw new Error('cardco is down')
     return world.answers.get(attempt.providerRef ?? '') ?? 'unknown'
+  },
+  async refund(refund) {
+    world.refundKeys.push(refund.idempotencyKey)
+    return world.refundAnswer
   },
   async verifyWebhook({ body, headers }) {
     let event: { id?: string, type?: string, ref?: string }
