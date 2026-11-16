@@ -3,11 +3,12 @@
 // through the point payments.settlement, so it never imports Box office, a bar or anything else that
 // sells. Cash and attested card ship with it, so a desk works on day one with no account anywhere.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'payments.settings.manage'
-const owners = z.array(z.object({ moduleId: code(), recordId: z.string() }))
+const owner = z.object({ moduleId: code(), recordId: z.string() })
+const owners = z.array(owner)
 
 export default defineModule({
   id: 'payments',
@@ -33,13 +34,15 @@ export default defineModule({
     'provider-account': { table: 'payments_provider_accounts' },
     'intent': { table: 'payments_intents' },
     'attempt': { table: 'payments_attempts' },
-    'refund': { table: 'payments_refunds' },
+    'refund': { table: 'payments_refunds', owner: 'requested_by' },
     'session': { table: 'payments_sessions', owner: 'opened_by' },
   }),
   abilities: defineAbilities('payments', {
     'provider.manage': ability({ risk: 'privileged' }),
     'attempt.reconcile': ability({ on: 'payments.attempt', risk: 'privileged' }),
     'attempt.attest': ability(),
+    'refund.request': ability(),
+    'refund.approve': ability({ on: 'payments.refund', risk: 'privileged', owner: 'refuses' }),
     'session.open': ability(),
     'session.view': ability({ on: 'payments.session', owner: 'grants' }),
     'session.close-any': ability({ on: 'payments.session', risk: 'privileged', owner: 'refuses', implies: ['session.view'] }),
@@ -61,6 +64,10 @@ export default defineModule({
       'payments.intent.expired': event({ version: 1, payload: z.object({ intentId: z.string(), owners }), internal: true }),
       // An operational alarm for staff.
       'payments.attempt.unknown': event({ version: 1, payload: z.object({ attemptId: z.string() }), internal: true }),
+      'payments.refund.requested': event({ version: 1, payload: z.object({ refundId: z.string(), partId: z.string(), owner }), internal: true }),
+      'payments.refund.failed': event({ version: 1, payload: z.object({ refundId: z.string(), partId: z.string(), owner }), internal: true }),
+      // Money left: the counterpart of a sale, with ids only.
+      'payments.refund.succeeded': event({ version: 1, payload: z.object({ refundId: z.string(), partId: z.string(), owner }), internal: false }),
       // A till cashed up. No subject: only the session's id.
       'payments.session.closed': event({ version: 1, payload: z.object({ sessionId: z.string() }), internal: false }),
     },
@@ -74,9 +81,16 @@ export default defineModule({
     'payments.prune-webhooks': task({ dailyAt: '03:40' }),
   },
 
+  calls: {
+    // Asking a provider to start a payment. The reconcile task asks after one with no answer as well.
+    'payments.start-payment': call({ reconcileAfter: '3m' }),
+  },
+
   jobs: {
     // One stored, verified webhook event. Retried while the provider has no answer.
     'payments.handle-webhook': job({ payload: z.object({ webhookEventId: z.string() }), retries: 8 }),
+    // Asks the provider to send one approved refund, with its idempotency key. Retried while pending.
+    'payments.send-refund': job({ payload: z.object({ refundId: z.string() }), retries: 8 }),
   },
 
   contributes: {
@@ -89,7 +103,19 @@ export default defineModule({
       { id: 'unfulfilled', name: 'Payments to return', kind: 'liability' },
     ],
     'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }],
+    // Payments' own part: guided setup's test payment.
+    'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
+    'core.vocabulary': [{
+      id: 'payments.refund-decline-reason',
+      label: 'Reasons for declining a refund',
+      terms: [
+        { slug: 'outside-policy', label: 'Outside the refund policy' },
+        { slug: 'already-refunded', label: 'Already refunded another way' },
+        { slug: 'duplicate', label: 'Asked for twice' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }],
   },
 })

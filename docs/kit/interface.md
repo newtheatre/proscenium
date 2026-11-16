@@ -72,6 +72,17 @@ contributes: {
 - **PageFrame**, **DataBoundary**, **EmptyState**, **PageFailed**, **RefusalPanel**, **StatusBadge**:
   one title per page, load and fail states, refusals shown from the standard body.
 
+Every page type sits in **PageFrame**, and a page that fits none of them uses it directly. In the
+console it is the page's own dashboard panel: the title in the top bar, with the search button and
+account menu (**ShellTools**) beside it; elsewhere it is a page header in a container. Its slots are
+the same in both: `status` beside the title, `primary` for the page's main action, `toolbar` for
+filters under the top bar, the default slot for the body and `footer` for the buttons that act on
+the whole page, which stay in view while the body scrolls. `width` is `reading`, `standard` or `full`.
+
+Inside a page, **PageSection** is a titled card (`title`, `description`, and `actions` and `footer`
+slots) and **RecordList** with **RecordListItem** (`to`, `icon`, `name`, `description`, `muted`) is a
+bordered list of records. Use these two for headings and lists; do not hand-build either.
+
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.
 

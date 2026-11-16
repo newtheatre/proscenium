@@ -3,10 +3,11 @@
 // person or the system. When an answer makes the intent whole, every part's owner settles in the same
 // batch and Payments writes one sealed posting: the money received, plus each owner's entries. If an
 // owner refuses after the money was taken, nothing settles and the intent becomes unfulfilled.
-import { all, createUnit, isRefusal, newId, nowMs, Refusal, useContext, type UnitView } from '#kit'
+import { all, createUnit, first, isRefusal, newId, nowMs, Refusal, useContext, type UnitView } from '#kit'
 import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, ownersOf, partsOf, releaseParts, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor } from './providers'
+import { refundInFull } from './refunds'
 import type { Method, ProviderAnswer } from './points/provider'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
@@ -58,6 +59,26 @@ function recordMove(unit: UnitView, attempt: AttemptRow, answer: Answer, source:
   })
 }
 
+/** Whether any payment on the intent, or this one, was taken on a test-mode account. Test money posts nothing. */
+export async function isTestMoney(intentId: string, including?: AttemptRow): Promise<boolean> {
+  const row = await first<{ n: number }>(`SELECT count(*) AS n FROM payments_attempts a JOIN payments_provider_accounts p ON p.id = a.provider_account_id
+    WHERE p.mode = 'test' AND (a.id = ? OR (a.intent_id = ? AND a.state = 'succeeded'))`, including?.id ?? '', intentId)
+  return (row?.n ?? 0) > 0
+}
+
+/** A fee the provider reported with its answer: an expense, out of the clearing account. */
+async function postFee(unit: UnitView, attempt: AttemptRow, answer: Answer, currency: string): Promise<void> {
+  if (answer.state !== 'succeeded' || !answer.feeMinor || await isTestMoney(attempt.intent_id, attempt)) return
+  await postEntries(unit, {
+    key: `payments:attempt:${attempt.id}:fee`,
+    source: { module: 'payments', type: 'payments.attempt', id: attempt.id },
+    kind: 'fee',
+    currency,
+    postedBy: null,
+    entries: [{ account: { key: 'payments.provider-fees' }, amountMinor: answer.feeMinor }, { account: clearingFor(attempt.method, attempt.provider_account_id), amountMinor: -answer.feeMinor }],
+  })
+}
+
 /** The money lines of an intent's posting: each succeeded attempt into its clearing account. */
 async function moneyLines(intentId: string, including?: AttemptRow): Promise<EntryInput[]> {
   const succeeded = await all<AttemptRow>("SELECT * FROM payments_attempts WHERE intent_id = ? AND state = 'succeeded' AND id <> ?", intentId, including?.id ?? '')
@@ -74,6 +95,9 @@ async function settle(unit: UnitView, intent: IntentRow, parts: PartRow[], attem
     .expect(1, { code: 'payments.intent.not-open', reason: 'This payment is no longer open.' })
   unit.add({ sql: 'UPDATE payments_intent_parts SET settled_at = ? WHERE intent_id = ?', params: [at, intent.id] })
     .expect(parts.length)
+  // Test money settles only Payments' own test payment, posts nothing, and never confirms a live sale.
+  const test = await isTestMoney(intent.id, attempt)
+  if (test && parts.some(p => p.owner_module !== 'payments')) throw new SettlementRefused('payments', new Refusal('payments.attempt.test-mode', 'A test payment cannot pay for a real sale.', { status: 409 }))
   const handlers = await settlements()
   const owned: EntryInput[] = []
   for (const part of parts) {
@@ -86,24 +110,27 @@ async function settle(unit: UnitView, intent: IntentRow, parts: PartRow[], attem
     catch (error) {
       throw new SettlementRefused(part.owner_module, error)
     }
+    if (test) continue
     const total = entries.reduce((sum, e) => sum + e.amountMinor, 0)
     if (total !== -part.amount_minor) throw new SettlementRefused(part.owner_module, new Refusal('payments.settlement.part-mismatch', `${part.owner_module}'s ledger entries for its part total ${-total}, not the part's ${part.amount_minor}.`, { status: 500 }))
     for (const e of entries) owned.push({ account: e.account, amountMinor: e.amountMinor, forModule: part.owner_module, productionId: e.productionId ?? null, performanceId: e.performanceId ?? null })
   }
-  try {
-    await postEntries(unit, {
-      key: `payments:intent:${intent.id}:paid`,
-      source: { module: 'payments', type: 'payments.intent', id: intent.id },
-      kind: 'sale',
-      currency: intent.currency,
-      postedBy: null,
-      entries: [...await moneyLines(intent.id, attempt), ...owned],
-    })
-  }
-  catch (error) {
-    // An owner's entry reached an account that is not its own.
-    if (isRefusal(error) && error.code === 'finance.entry.wrong-module') throw new SettlementRefused([...new Set(parts.map(p => p.owner_module))].join(', '), error)
-    throw error
+  if (!test) {
+    try {
+      await postEntries(unit, {
+        key: `payments:intent:${intent.id}:paid`,
+        source: { module: 'payments', type: 'payments.intent', id: intent.id },
+        kind: 'sale',
+        currency: intent.currency,
+        postedBy: null,
+        entries: [...await moneyLines(intent.id, attempt), ...owned],
+      })
+    }
+    catch (error) {
+      // An owner's entry reached an account that is not its own.
+      if (isRefusal(error) && error.code === 'finance.entry.wrong-module') throw new SettlementRefused([...new Set(parts.map(p => p.owner_module))].join(', '), error)
+      throw error
+    }
   }
   unit.announce('payments.intent.succeeded', { intentId: intent.id, owners: ownersOf(parts) }, { record: ['payments.intent', intent.id] })
 }
@@ -119,6 +146,7 @@ export async function applyAnswer(unit: UnitView, attempt: AttemptRow, answer: A
   if (answer.state === 'unknown') unit.announce('payments.attempt.unknown', { attemptId: attempt.id }, { record: ['payments.attempt', attempt.id] })
   if (answer.state !== 'succeeded') return { changed: true, settled: false }
   const intent = (await getIntent(attempt.intent_id))!
+  await postFee(unit, attempt, answer, intent.currency)
   const paid = (await moneyLines(intent.id)).reduce((sum, l) => sum + l.amountMinor, 0) + attempt.amount_minor
   if (intent.state !== 'open' || paid !== intent.amount_minor) return { changed: true, settled: false }
   await settle(unit, intent, await partsOf(intent.id), attempt)
@@ -136,7 +164,7 @@ async function unfulfil(attempt: AttemptRow, answer: Answer, source: Source): Pr
     .expect(1, { code: 'payments.intent.not-open', reason: 'This payment is no longer open.' })
   const money = await moneyLines(intent.id, { ...attempt, state: 'succeeded' })
   const total = money.reduce((sum, l) => sum + l.amountMinor, 0)
-  await postEntries(view, {
+  if (!await isTestMoney(intent.id, attempt)) await postEntries(view, {
     key: `payments:intent:${intent.id}:unfulfilled`,
     source: { module: 'payments', type: 'payments.intent', id: intent.id },
     kind: 'unfulfilled',
@@ -144,7 +172,12 @@ async function unfulfil(attempt: AttemptRow, answer: Answer, source: Source): Pr
     postedBy: null,
     entries: [...money, { account: { key: 'payments.unfulfilled' }, amountMinor: -total }],
   })
+  await postFee(view, attempt, answer, intent.currency)
   await releaseParts(view, intent, parts)
+  // The whole payment goes back, asked for by the system and so approved at once.
+  const paid = await all<AttemptRow>("SELECT * FROM payments_attempts WHERE intent_id = ? AND state = 'succeeded' AND id <> ? ORDER BY started_at", intent.id, attempt.id)
+  const refundIds = await refundInFull(view, intent, parts, [...paid, attempt])
+  for (const refundId of refundIds) view.enqueue('payments.send-refund', { refundId })
   view.announce('payments.intent.unfulfilled', { intentId: intent.id, owners: ownersOf(parts) }, { record: ['payments.intent', intent.id] })
   await unit.commit()
 }
