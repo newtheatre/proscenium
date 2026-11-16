@@ -2,14 +2,16 @@
 
 ## How to read this part
 
-Three modules, 37 tables. Names follow Foundations draft 1: the module id in snake\_case, then a plural noun. The column tables use the Foundations layout (column, type, constraints, class, on erasure). They were written an hour before the Foundations data-class format settled, so two things differ in wording only, and the section "Each table in the Foundations format" below gives the mapping and every table's heading line.
+Three modules, 38 tables: 22 for Box office, 9 for Payments and 7 for Finance. Names follow the Foundations format: the module id in snake\_case, then a plural noun. The column tables use the Foundations layout (column, type, constraints, class, on erasure), and the section "Each table in the Foundations format" below gives the wording map and every table's heading line.
 
 **Conventions on every table, not repeated in each:**
 
-- `id` is an opaque text id, primary key, class Internal.
+- `id` is `col.id()`: the table's prefix, an underscore and 26 characters. Primary key, class Internal.
 - `created_at` and `updated_at` are UTC integers (milliseconds), class Internal. Append-only tables have no `updated_at`.
 - Money is an integer in minor units with a three-letter currency code beside it. There is no floating point anywhere.
-- A column that names an account (`account_id`, `sold_by`, `approved_by` and the like) is a reference to `core.account`, class Personal. On erasure the reference is **kept**: the core anonymises the account it points to, so the row still says "someone sold this" without saying who.
+- A column that names an account (`account_id`, `sold_by`, `approved_by` and the like) is `col.account`, a reference to `core.account`. Its class is Personal in every table, whether the account is the row's subject or an actor. On erasure the reference is **kept**: the core anonymises the account it points to, so the row still says "someone sold this" without saying who.
+- A nullable account column that is a row's subject declares `unlinked`, as Foundations requires (integration ruling R-15). Only `box_office_orders.account_id` is one.
+- A value that grants access (a ticket code, a pass code, a desk code, a link or offer token) is stored only as a hash.
 - A reference to another module's record (a performance, a production, a space) is by id only. No module here reads another module's tables.
 
 **Data classes:** Public, Internal, Personal, Personal free text, Special category (encrypted). **Erasure behaviours:** keep (not personal), keep reference (see above), blank (set to null), delete row.
@@ -30,7 +32,7 @@ Three modules, 37 tables. Names follow Foundations draft 1: the module id in sna
 | --- | --- | --- | --- | --- |
 | `box_office_performance_sales`, `_bands`, `_ticket_types`, `_pools`, `_promo_codes`, `_pass_types` | operational | none | no | kept |
 | `box_office_prices` | operational | none | yes | kept |
-| `box_office_orders` | audience | `account_id` | no | keep-row; the access note is cleared with the account |
+| `box_office_orders` | audience | `account_id`, `unlinked: 'staff'` | no | keep-row; the access note is cleared with the account |
 | `box_office_order_lines`, `_promo_redemptions` | audience | via `order_id` | no | with the order |
 | `box_office_tickets` | audience | via `order_line_id` | no | with the order |
 | `box_office_holds` | audience | via `order_id`; none for a staff hold | no | `box-office.retention.holds` redacts a staff hold's label |
@@ -44,9 +46,9 @@ Three modules, 37 tables. Names follow Foundations draft 1: the module id in sna
 | `box_office_seating_plans`, `_plan_seats`, `_performance_seats` | operational | none | no (guarded) | kept |
 | `payments_provider_accounts`, `_readers` | operational | none | no | kept |
 | `payments_sessions` | operational | `opened_by` | no | `variance_note` redacted |
-| `payments_intents`, `_attempts`, `_refunds` | operational | none | no (guarded) | kept |
+| `payments_intents`, `_intent_parts`, `_attempts`, `_refunds` | operational | none | no (guarded) | kept |
 | `payments_attempt_events` | operational | none | yes | kept |
-| `payments_webhook_events` | operational | none | no | `payments.retention.webhooks`; rows deleted |
+| `payments_webhook_events` | operational | none | no | `payments.retention.webhooks`; rows deleted by the task `payments.prune-webhooks` |
 | `finance_accounts`, `_periods`, `_tax_codes` | operational | none | no | kept |
 | `finance_postings`, `_entries`, `_seals`, `_period_closes` | operational | none | yes | kept for ever |
 
@@ -80,7 +82,7 @@ Foundations amended the id format on 16 November: every id is `<prefix>_<26 char
 | `box_office_comp_requests` | `comp` | `finance_tax_codes` | `tax` |
 | `box_office_waitlist_entries` | `wle` |  |  |
 
-A 38th table was added later the same day: `payments_intent_parts`, prefix `pip` (see Payments below). This list plus that one is the final table list for the three modules.
+`payments_intent_parts` has the prefix `pip`. With it, the list above is the final table list for the three modules.
 
 ## Box office: what is on sale
 
@@ -98,9 +100,13 @@ One row per performance the box office sells. It is the box office's own view of
 | `off_sale_at` | integer | null means the setting's default before curtain | Public | keep |
 | `max_per_order` | integer | null means the setting; CHECK > 0 | Public | keep |
 | `hold_minutes` | integer | null means the setting; CHECK > 0 | Internal | keep |
-| `doors_open_at` | integer | copied from the core when set on sale; scanning opens from here | Public | keep |
+| `payment_timing` | text | `pay-now`, `reserve`, `buyer-chooses`; null means the setting | Public | keep |
+| `change_decision` | text | null, `refund_all`, `offer_exchange` or `keep`: what happens to tickets when the core cancels, reschedules or moves this performance (part 3) | Internal | keep |
+| `change_decided_by`, `change_decided_at` | account (actor), integer | set with `change_decision` | Personal | keep reference |
 
-Lists a theatre edits (concession kinds, complimentary reasons, cancellation reasons) are the core's vocabularies. Wherever this part says "from a list", the column stores a `core_terms` id.
+The time doors open is the core's `doors_at`, read through the performance service whenever scanning needs it. No copy is kept here, so a rescheduled performance cannot leave a stale one.
+
+Lists a theatre edits are the core's vocabularies, declared in each module's manifest (part 6): complimentary reasons, cancellation reasons, door reasons, refund decline reasons and period reopen reasons. A column that takes its value from one stores a `core_terms` id and is named `..._term_id`. Lists that drive behaviour (a ticket type's `kind`, every `state`) are fixed in code and are not vocabularies.
 
 ### `box_office_bands` (plain)
 
@@ -115,15 +121,15 @@ A priced part of the house for one production: "Stalls", "Balcony", "Wheelchair 
 
 ### `box_office_ticket_types` (plain)
 
-*Changed 16 November:* the `eligibility` column below is replaced by `requirement_refs` (text, internal, keep): a list of plain-text requirement references such as `membership:<the type's id>`, checked through the kit's `requirements.check`. The point `box-office.eligibility` no longer exists. See the end of part 4.
-
 Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so reports compare like with like across productions.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
 | `name` | text | unique, not null | Public | keep |
-| `kind` | text | `standard`, `concession`, `companion`, `complimentary` | Public | keep |
-| `eligibility` | text | null, or the id of a contribution to the point `box-office.eligibility` | Internal | keep |
+| `kind` | text | `standard`, `concession`, `companion`, `complimentary`; fixed, because each changes behaviour | Public | keep |
+| `requirement_refs` | text | null, or a list of plain-text requirement references such as `membership:<scheme id>` or `fact:<name>`, checked through the kit's `requirements.check` (part 4). Box office never reads inside one and holds no foreign key | Internal | keep |
+| `recheck_at_entry` | integer | boolean, default true; only meaningful with `requirement_refs` | Internal | keep |
+| `max_per_holder` | integer | default 1; live tickets of this type per performance for one holder, counted by evidence id when the answer carries one and by account otherwise; only meaningful with `requirement_refs` | Internal | keep |
 | `proof_note` | text | shown to the buyer and the door, such as "Bring student ID" | Public | keep |
 | `needs_paid_ticket` | integer | boolean; a companion ticket needs a paid ticket in the same order | Internal | keep |
 | `active` | integer | boolean | Internal | keep |
@@ -165,7 +171,7 @@ Why a group of claims exists and who owns it.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
-| `kind` | text | `basket`, `payment`, `staff`, `waitlist_offer` | Internal | keep |
+| `kind` | text | `basket`, `payment`, `reservation`, `staff`, `waitlist_offer` | Internal | keep |
 | `order_id` | text | null for a staff hold | Internal | keep |
 | `label` | text | staff holds only, such as "Director's guests"; max 80 | Personal free text | blank |
 | `held_by` | text | account; staff holds only | Personal | keep reference |
@@ -198,26 +204,30 @@ Enforced in the database:
 | --- | --- | --- | --- | --- |
 | `reference` | text | unique; short, readable, no ambiguous characters | Internal | keep |
 | `channel` | text | `online`, `desk`, `phone` | Internal | keep |
-| `state` | text | `basket`, `awaiting_payment`, `confirmed`, `cancelled`, `expired` | Internal | keep |
-| `account_id` | account (subject) | required to confirm an online or phone order; null for a basket not yet checked out and for an anonymous desk sale | Internal | keep reference |
+| `state` | text | `basket`, `reserved`, `awaiting_payment`, `confirmed`, `cancelled`, `expired` | Internal | keep |
+| `account_id` | account (subject) | required to confirm or reserve an online or phone order; null for a basket not yet checked out and for an anonymous desk sale. Declared `unlinked: 'staff'` | Personal | keep reference |
 | `signed_in` | boolean | false when the order was made without signing in | Internal | keep |
 | `access_note` | text, encrypted | optional | Special category | clear |
 | `currency` | currency | not null | Internal | keep |
 | `total_minor` | minor units | at least 0; the sum of live lines, rewritten in the same batch as any line change | Internal | keep |
-| `sold_by` | account (actor) | desk and phone orders | Internal | keep reference |
+| `sold_by` | account (actor) | desk and phone orders | Personal | keep reference |
 | `session_id` | ref `payments_sessions` | desk orders | Internal | keep |
-| `intent_id` | ref `payments_intents` | null for a free order | Internal | keep |
-| `link_token_hash` | text | opens the order from the confirmation email without signing in | Internal | clear |
-| `expires_at` | timestamp | baskets and unpaid orders | Internal | keep |
+| `intent_id` | ref `payments_intents` | the intent whose part pays for this order; null for a free order and for a reservation not yet being paid | Internal | keep |
+| `link_token_hash` | text | opens the order from the confirmation message without signing in | Internal | clear |
+| `desk_code_hash` | text | reserved orders: the code a buyer shows at the desk | Internal | clear |
+| `expires_at` | timestamp | baskets and orders awaiting payment | Internal | keep |
+| `extended_at` | timestamp | set by the one hold extension; null until then | Internal | keep |
+| `release_at` | timestamp | reserved orders: when the release task may expire it; null for never | Internal | keep |
+| `keep` | boolean | reserved orders: staff asked for it not to be released | Internal | keep |
 | `confirmed_at`, `cancelled_at` | timestamp |  | Internal | keep |
 
 The buyer's name, email and phone live on their account (workstream 2), not here. An erased buyer's order keeps its lines, tickets and ledger postings; the account it points to is anonymised, and the order loses its access note and its email link.
 
-**An order with no account** is valid in exactly one case: a desk sale where the buyer gave no details (integration ruling, 16 November). Such an order holds no personal data, so it has no erasure or merge duties, and it can have no access note. The online and phone paths can never create one. Enforced by `CHECK (account_id IS NOT NULL OR state IN ('basket', 'expired') OR (channel = 'desk' AND access_note IS NULL))`, and by the never-regress case `online-order-always-has-an-account` in part 8.
+**An order with no account** is valid in exactly one case: a desk sale where the buyer gave no details (integration ruling R-15). The table declares `subject: { account: 'account_id', unlinked: 'staff' }`, and Identity lists it under "People without a sign-in". Such an order holds no personal data, so it has no erasure or merge duties, and it can have no access note. The online and phone paths can never create one, and an order can never be `reserved` without an account, because someone must be told and found again. Enforced by `CHECK (account_id IS NOT NULL OR state IN ('basket', 'expired') OR (channel = 'desk' AND access_note IS NULL AND state <> 'reserved'))`, and by the never-regress cases `online-order-always-has-an-account` and `reservation-needs-an-account` in part 8.
 
-**Reserved orders** (added 16 November, see part 3). `state` gains the value `reserved`: seats claimed, nothing paid. Three columns are added to `box_office_orders`: `desk_code_hash` (internal; the code a buyer shows at the desk, stored hashed like the link token), `release_at` (internal; when the release job may expire it, null for never) and `keep` (internal; staff asked for it not to be released). A reserved order always has an account, because `reserved` cannot be anonymous: someone must be told and found again. The desk clause of the CHECK above gains AND state <> 'reserved' to enforce it. `box_office_performance_sales` gains `payment_timing` (public; null means the theatre's setting). No new table.
+**What retention does.** An order keeps no name, email or phone, so `box-office.retention.orders` governs only what the order itself holds: when it passes, the access note, the link and desk code hashes and any attendee names on its tickets are cleared, and the rows stay for the ledger. `box-office.retention.baskets` deletes expired baskets that never became orders. Unclaimed accounts are anonymised by Identity under its own setting.
 
-**Checkout consent** (16 November, see part 4). The order stores nothing about consent. The module that contributes a consent question also supplies the statements that record the answer, and Box office adds them to the batch that confirms or reserves the order. A `checkout_consent_keys` column was drafted earlier the same day and withdrawn: it would have kept a second copy of personal data that Communications already holds.
+**Checkout consent.** The order stores nothing about consent. The module that contributes a consent question also supplies the statements that record the answer, and Box office adds them to the batch that confirms or reserves the order (part 4).
 
 ### `box_office_order_lines` (guarded)
 
@@ -246,12 +256,15 @@ Issued when the order is confirmed. One per ticket line.
 | --- | --- | --- | --- | --- |
 | `order_line_id` | text | unique, not null | Internal | keep |
 | `performance_id` | text | not null; copied, so the door reads one table | Internal | keep |
-| `code` | text | unique; 128 random bits; what the QR code carries with a signature | Internal | keep |
-| `key_version` | integer | which signing key signed it | Internal | keep |
+| `code_hash` | text | unique; the hash of the ticket's code, which is 128 random bits. The code itself goes to the buyer inside a signed door code and is never stored. A scan is verified, hashed, then looked up here | Internal | keep |
+| `key_id` | text | the kit signing key that signed the door code, under the purpose `box-office.door-code` | Internal | keep |
 | `state` | text | `valid`, `void` | Internal | keep |
 | `void_reason` | text | `cancelled`, `exchanged`, `reissued`, `performance_cancelled` | Internal | keep |
 | `attendee_name` | text | optional, for named tickets | Personal | blank |
 | `admitted_at` | integer | null until admitted; set by a conditional update `WHERE admitted_at IS NULL AND state = 'valid'` | Internal | keep |
+| `requirement_ref` | text | the requirement reference that was met; null for a ticket type with none | Internal | keep |
+| `requirement_account_id` | account (actor) | the account the requirement was met by, when it was met by account | Personal | keep reference |
+| `requirement_evidence_id` | text | the opaque evidence id the source returned. At least one of this and the account is set when `requirement_ref` is. The value a buyer presented is never stored | Internal | keep |
 
 ### `box_office_scans` (append-only)
 
@@ -259,10 +272,12 @@ Every scan, including refusals and scans made offline. The audit trail of the do
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
-| `id` | text | generated on the device, so a scan sent twice is stored once | Internal | keep |
+| `id` | text | made on the device in the standard form, `scan_` and 26 characters, so a scan sent twice is stored once | Internal | keep |
 | `ticket_id` | text | null when the code was unknown | Internal | keep |
 | `performance_id` | text | the performance the scanner was set to | Internal | keep |
-| `result` | text | `admitted`, `already_admitted`, `void`, `wrong_performance`, `unknown`, `bad_signature`, `reversed` | Internal | keep |
+| `result` | text | `admitted`, `admitted_by_override` ("Admit anyway" after a requirement was not met; the person who allowed it is `scanned_by`), `already_admitted`, `void`, `wrong_performance`, `requirement_not_met`, `unknown`, `bad_signature`, `reversed` | Internal | keep |
+| `reason_term_id` | ref `core_terms` | required for `reversed` and for `admitted_by_override`; from the door reasons | Internal | keep |
+| `unchecked` | integer | boolean; admitted without the requirement check being made (source unavailable, or offline) | Internal | keep |
 | `scanned_by` | text | account | Personal | keep reference |
 | `device_label` | text | such as "Door 2" | Internal | keep |
 | `scanned_at` | integer | the device's clock | Internal | keep |
@@ -277,12 +292,12 @@ One row each time lines of an order are cancelled or exchanged.
 | --- | --- | --- | --- | --- |
 | `order_id` | text | not null | Internal | keep |
 | `kind` | text | `customer`, `staff`, `performance_cancelled`, `exchange`, `unfulfilled_payment` | Internal | keep |
-| `reason_code` | text | from a fixed list (illness, cannot attend, booked in error, other) | Internal | keep |
+| `reason_term_id` | ref `core_terms` | from the cancellation reasons the theatre edits (illness, cannot attend, booked in error, other) | Internal | keep |
 | `note` | text | optional; max 200 | Personal free text | blank |
 | `line_ids` | text | JSON array of order line ids | Internal | keep |
 | `refund_id` | text | `payments_refunds`; null when nothing was refunded | Internal | keep |
 | `fee_minor` | integer | the cancellation or exchange fee kept | Internal | keep |
-| `by` | text | account; null when the customer did it as a guest | Personal | keep reference |
+| `by` | text | account; null when the customer did it from the email link without signing in | Personal | keep reference |
 
 `note` is the one append-only column that erasure blanks; the trigger allows exactly that update and no other.
 
@@ -334,8 +349,8 @@ A season ticket or a multi-show pass as a product.
 | --- | --- | --- | --- | --- |
 | `pass_type_id` | ref | not null | Internal | keep |
 | `order_line_id` | ref | the line that sold it; null when issued by staff | Internal | keep |
-| `account_id` | account (subject) | not null; the holder | Internal | keep reference |
-| `code` | text | unique | Internal | keep |
+| `account_id` | account (subject) | not null; the holder | Personal | keep reference |
+| `code_hash` | text | unique; the hash of the pass's code, stored like a ticket's | Internal | keep |
 | `uses_total` | integer | null means unlimited within scope | Internal | keep |
 | `uses_taken` | integer | **CHECK (uses\_taken >= 0 AND (uses\_total IS NULL OR uses\_taken <= uses\_total))**; trigger-kept | Internal | keep |
 | `state` | text | `active`, `void`, `expired` | Internal | keep |
@@ -354,11 +369,11 @@ A season ticket or a multi-show pass as a product.
 | --- | --- | --- | --- | --- |
 | `performance_id`, `band_id` | ref | not null | Internal | keep |
 | `quantity` | integer | CHECK > 0 | Internal | keep |
-| `for_account_id` | account (subject) | who the tickets are for; an unclaimed account with origin `named-by-other` when the requester names someone new, who then receives service messages only | Internal | keep reference |
-| `reason_term_id` | ref `core_terms` | from a list the theatre edits (cast, crew, press, reviewer, sponsor, other) | Internal | keep |
-| `requested_by` | account (actor) |  | Internal | keep reference |
+| `for_account_id` | account (subject) | who the tickets are for; an unclaimed account with origin `named-by-other` when the requester names someone new, who then receives service messages only | Personal | keep reference |
+| `reason_term_id` | ref `core_terms` | from the complimentary reasons the theatre edits (cast, crew, press, reviewer, sponsor, other) | Internal | keep |
+| `requested_by` | account (actor) |  | Personal | keep reference |
 | `state` | text | `requested`, `approved`, `declined`, `issued`, `withdrawn` | Internal | keep |
-| `decided_by` | account (actor) | **CHECK (decided\_by IS NULL OR decided\_by <> requested\_by)** | Internal | keep reference |
+| `decided_by` | account (actor) | **CHECK (decided\_by IS NULL OR decided\_by <> requested\_by)** | Personal | keep reference |
 | `order_id` | ref | set when issued | Internal | keep |
 
 ## Box office: waiting list
@@ -416,7 +431,7 @@ A seat taken off sale (a sound desk position, a broken seat) is a staff hold on 
 
 ## Payments
 
-**Added 16 November: a 38th table, `payments_intent_parts` (guarded, id prefix `pip`).** One payment can cover things owned by different modules, such as tickets and bar items on the one card reader (part 3, "One payment for tickets and something else"). Columns: `id`; `intent_id` (ref to the intent); `owner_module` and `owner_record` (internal; moved here from `payments_intents`, which no longer has them); `amount_minor` (internal, greater than zero); `refunded_minor` (internal) with `CHECK (refunded_minor >= 0 AND refunded_minor <= amount_minor)`; `settled_at` (internal). Unique on (`intent_id`, `owner_module`, `owner_record`). The parts of an intent sum to its amount: a trigger refuses an intent leaving `created` unless they do, in the same way the ledger seal refuses an unbalanced posting. `payments_refunds` gains `part_id`. The table holds no personal data and has no subject; it follows its intent's retention.
+One payment can cover things owned by different modules, such as tickets and bar items on the one card reader (part 3, "One payment for tickets and something else"). So an intent says how much is being collected, and its **parts** say what for.
 
 Payments knows about money moving, never about tickets. It holds no card data: an integrated provider keeps the card, and the platform keeps only the provider's reference.
 
@@ -468,14 +483,34 @@ A decision to collect one amount for one purpose.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
-| `owner_module`, `owner_type`, `owner_id` | text | who it is for, such as `box-office`, `order`, an id; unique together among open intents | Internal | keep |
-| `amount_minor` | integer | CHECK > 0 | Internal | keep |
+| `amount_minor` | integer | CHECK > 0; the sum of its parts | Internal | keep |
 | `currency` | text |  | Internal | keep |
 | `channel` | text | `online`, `desk` | Internal | keep |
 | `state` | text | `open`, `succeeded`, `cancelled`, `expired`, `unfulfilled` | Internal | keep |
 | `expires_at` | integer |  | Internal | keep |
 | `session_id` | text | desk only | Internal | keep |
 | `settled_at` | integer |  | Internal | keep |
+
+An intent has no owner of its own. Who it is for is said by its parts.
+
+### `payments_intent_parts` (guarded)
+
+One row per thing an intent pays for. An ordinary ticket order is an intent with one part.
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `intent_id` | ref `payments_intents` | not null | Internal | keep |
+| `owner_module`, `owner_record` | text | who the part is for: a module id and one of its record ids, such as `box-office` and an order id. Unique with `intent_id` | Internal | keep |
+| `open` | integer | 1 while the intent is `open`, null afterwards; kept by the trigger that moves the intent's state | Internal | keep |
+| `amount_minor` | integer | CHECK > 0 | Internal | keep |
+| `refunded_minor` | integer | default 0; **CHECK (refunded\_minor >= 0 AND refunded\_minor <= amount\_minor)**; trigger-kept | Internal | keep |
+| `settled_at` | integer | set in the settle batch | Internal | keep |
+
+Enforced in the database:
+
+- Unique index on `(owner_module, owner_record)` where `open` is 1: a record has at most one open intent collecting for it. This is where the one-open-intent rule lives.
+- The parts of an intent sum to its amount. The intent and its parts are written in one batch whose last statement asserts the sum, and a trigger refuses any later insert, delete or change of amount on a part, so the sum cannot drift.
+- The table holds no personal data and has no subject. It follows its intent's retention.
 
 ### `payments_attempts` (guarded)
 
@@ -501,7 +536,7 @@ One try at collecting an intent by one method. A split payment is several attemp
 Enforced in the database:
 
 - Unique index on `reader_id` where state is `started` or `pending`: a reader runs one payment at a time.
-- Trigger: `succeeded`, `failed` and `cancelled` are final. `unknown` may move to `succeeded` or `failed` only.
+- Trigger on state: `started` may move to `pending`, `succeeded`, `failed` or `cancelled`; `pending` to `succeeded`, `failed`, `cancelled` or `unknown`; `unknown` to `succeeded` or `failed` only. `succeeded`, `failed` and `cancelled` are final. A `pending` attempt becomes `cancelled` only on the provider's word that it stopped (part 3).
 - Trigger on the intent: the sum of succeeded attempts never exceeds the intent's amount.
 
 ### `payments_attempt_events` (append-only)
@@ -522,18 +557,22 @@ Everything that was heard about an attempt, in the order it was heard.
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
 | `attempt_id` | text | the payment being refunded; a refund always goes back the way the money came | Internal | keep |
+| `part_id` | ref `payments_intent_parts` | not null; the part being refunded, which names the owner | Internal | keep |
 | `amount_minor` | integer | CHECK > 0 | Internal | keep |
-| `owner_module`, `owner_type`, `owner_id` | text | what asked for it, such as a cancellation | Internal | keep |
 | `state` | text | `requested`, `approved`, `sent`, `succeeded`, `failed`, `declined` | Internal | keep |
 | `idempotency_key` | text | unique | Internal | keep |
 | `provider_ref` | text |  | Internal | keep |
 | `requested_by` | text | account; null for an automatic refund | Personal | keep reference |
-| `approved_by` | text | account; **CHECK (approved\_by IS NULL OR approved\_by <> requested\_by)** | Personal | keep reference |
+| `self_approve_limit_minor` | integer | not null; the value of `payments.refunds.self-approve-up-to` copied when the refund was requested; 0 means two people | Internal | keep |
+| `approved_by` | text | account; **CHECK (approved\_by IS NULL OR requested\_by IS NULL OR approved\_by <> requested\_by OR amount\_minor <= self\_approve\_limit\_minor)** | Personal | keep reference |
+| `decline_reason_term_id` | ref `core_terms` | required for `declined`; from the refund decline reasons | Internal | keep |
 | `fee_returned_minor` | integer | provider fee handed back, if any | Internal | keep |
 
-Trigger: a refund entering `approved` adds its amount to the attempt's `refunded_minor`; one entering `failed` or `declined` subtracts it. The CHECK on the attempt therefore refuses a refund that would take the total past what was paid, however two refunds race.
+One trigger keeps both counters. A refund entering `approved` adds its amount to its part's `refunded_minor` and to its attempt's `refunded_minor`; one entering `failed` subtracts it from both. Nothing else moves them: a `declined` refund was never approved, so it was never counted. The CHECKs on the part and on the attempt therefore refuse a refund that would take either total past what was paid, however two refunds race.
 
-### `payments_webhook_events` (guarded, with a retention sweep)
+The CHECK on `approved_by` is what makes the self-approve limit real. The requester may be the approver only when the amount is at or under the limit stored on that refund. The limit is a copy, so the database needs no setting to judge it and a later change to the setting cannot loosen a refund already requested. With the limit at zero, which is how it ships, the CHECK is the plain two-person rule.
+
+### `payments_webhook_events` (plain, with a retention sweep)
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
@@ -544,7 +583,7 @@ Trigger: a refund entering `approved` adds its amount to the attempt's `refunded
 | `attempt_id` | text | once matched | Internal | keep |
 | `received_at`, `handled_at` | integer |  | Internal | keep |
 
-The event body is not stored. The handler keeps the id and type, then asks the provider for the current state of the payment, so nothing personal from a provider's payload rests in the database. Rows older than the retention setting are deleted by a scheduled task; this is the one deletion the append-only trigger allows.
+The event body is not stored. The handler keeps the id and type, then asks the provider for the current state of the payment, so nothing personal from a provider's payload rests in the database. The table is not append-only: `attempt_id` and `handled_at` are filled in after the row is written, and the task `payments.prune-webhooks` deletes rows older than the retention setting.
 
 ## Finance: the ledger
 
@@ -557,10 +596,19 @@ Double-entry. Every posting is a set of entries that sum to zero in one currency
 | `code` | text | unique; the theatre's own nominal code | Internal | keep |
 | `name` | text |  | Internal | keep |
 | `kind` | text | `asset`, `liability`, `income`, `expense`, `equity` | Internal | keep |
-| `system_key` | text | unique when not null; names an account modules post to | Internal | keep |
+| `module` | text | not null; the one module that may post to this account. Set by Finance for a declared account, and chosen by the administrator for an account they add | Internal | keep |
+| `system_key` | text | unique when not null; `<module>.<key>` for an account a module declared through `finance.system-account` | Internal | keep |
+| `scope` | text | null, or the record the account is for, such as a provider account id for a clearing account; unique with `system_key` | Internal | keep |
 | `active` | integer | boolean; an account with entries can be retired, never deleted | Internal | keep |
 
-System accounts created at set-up: `cash`, `card_clearing` (one per provider account), `ticket_income`, `deferred_ticket_income`, `booking_fee_income`, `donation_income`, `pass_liability`, `provider_fees`, `refunds_payable`, `cash_variance`, `unfulfilled_payments`. A theatre renames and recodes them but cannot remove them.
+Finance ships no accounts of its own. Each module declares the accounts it posts to through `finance.system-account` (part 4), and Finance creates them, locked, when the module is switched on. A theatre renames and recodes them but cannot remove them.
+
+| Module | Accounts it declares |
+| --- | --- |
+| Box office | `box-office.ticket-income`, `box-office.deferred-ticket-income`, `box-office.booking-fee-income`, `box-office.donation-income`, `box-office.pass-liability` |
+| Payments | `payments.cash` (cash in tills), `payments.card-clearing` (one per provider account, by `scope`), `payments.bank`, `payments.provider-fees`, `payments.cash-variance`, `payments.unfulfilled` |
+
+A trigger refuses an entry whose posting's `source_module` is not the account's `module`, except that Payments may write the entries an owner returned for its own part (part 4).
 
 ### `finance_postings` (append-only)
 
@@ -568,7 +616,7 @@ System accounts created at set-up: `cash`, `card_clearing` (one per provider acc
 | --- | --- | --- | --- | --- |
 | `idempotency_key` | text | **unique**: the same business fact is posted once | Internal | keep |
 | `source_module`, `source_type`, `source_id` | text | what caused it | Internal | keep |
-| `kind` | text | `sale`, `refund`, `fee`, `payout`, `recognition`, `cash_variance`, `correction`, `opening` | Internal | keep |
+| `kind` | text | `sale`, `refund`, `fee`, `payout`, `recognition`, `transfer`, `cash_variance`, `unfulfilled`, `correction`, `opening`. `transfer` moves value between a module's own accounts with no money moving, such as a pass used or a cancellation fee kept | Internal | keep |
 | `reverses_id` | text | the posting this one undoes; unique when not null, so a posting is reversed once | Internal | keep |
 | `period_id` | text | not null | Internal | keep |
 | `occurred_at` | integer | when the fact happened | Internal | keep |
@@ -623,7 +671,7 @@ Closing is a row, not a flag. The newest row for a period says whether it is clo
 | `by` | text | account | Personal | keep reference |
 | `at` | integer |  | Internal | keep |
 | `debits_minor`, `credits_minor` | integer | the period's totals at that moment, so a later mismatch is detectable | Internal | keep |
-| `reason_code` | text | required for `reopen` | Internal | keep |
+| `reason_term_id` | text | required for `reopen` | Internal | keep |
 
 ### `finance_tax_codes` (plain)
 

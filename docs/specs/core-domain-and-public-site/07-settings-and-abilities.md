@@ -8,14 +8,11 @@ Settings are site-wide. Where a value varies by record, such as a performance's 
 
 ## Settings: organisation
 
+Five facts about the theatre are foundations settings, because the kit is built on them, and are not repeated here: its name (`core.site.name`), time zone (`core.locale.time-zone`), language (`core.locale.language`), currency (`core.locale.currency`) and the hour the operating day begins (`core.locale.day-start`, default 04:00). Wherever this specification speaks of the theatre's name, time zone, language, currency or day rollover, it means those keys. The organisation screen shows them beside the settings below, so an administrator sees one page.
+
 | Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `core.organisation.name` | text | unset | 1 to 80 characters | `core.organisation.edit` | public | Yes | The theatre's name everywhere |
 | `core.organisation.short-name` | text | unset | up to 30 characters | `core.organisation.edit` | public | Yes | Used where space is tight: text messages, the passkey prompt |
-| `core.organisation.time-zone` | choice | unset | An IANA zone name | `core.organisation.edit` | public | No | Every date shown, and the operating day |
-| `core.organisation.locale` | choice | `en-GB` | Shipped languages | `core.organisation.edit` | public | No | Language and date format |
-| `core.organisation.currency` | choice | `GBP` | ISO 4217 codes | `core.organisation.edit` | public | No | Every money value. Refused once any money has been recorded. |
-| `core.organisation.day-rollover` | time | 04:00 | 00:00 to 08:00 | `core.organisation.edit` | staff | No | When one operating day ends and the next begins |
 | `core.organisation.week-start` | choice | monday | monday, sunday, saturday | `core.organisation.edit` | public | No | Calendars |
 | `core.organisation.country` | choice | `GB` | ISO country codes | `core.organisation.edit` | staff | No | Which public holidays to import |
 | `core.organisation.contact-email` | text | unset | An email address | `core.organisation.edit` | public | Yes | Public contact. A role address, not a person's. |
@@ -25,7 +22,15 @@ Settings are site-wide. Where a value varies by record, such as a performance's 
 | `core.organisation.legal-name` | text | unset | up to 120 characters | `core.organisation.edit` | public | Yes | Footer and receipts, where it differs from the name |
 | `core.organisation.charity-number` | text | unset | up to 30 characters | `core.organisation.edit` | public | Yes | Footer, where the theatre is a charity |
 
-The 04:00 rollover is Proscenium's show-night rule (its decision 0014), here as a default a theatre can change.
+The 04:00 day start is Proscenium's show-night rule (its decision 0014), here as a default a theatre can change.
+
+One more organisation setting, added on 16 November 2026 by the integrating thread's ruling, which is reported to Matt as an assumption:
+
+| Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `core.organisation.year-end` | text | unset | A day and a month, such as 31 July | `core.organisation.edit` | staff | No | The day the theatre's own year ends. The single source for the identity module's year-end expiry of roles. While it is unset, "year end" cannot be chosen as an expiry. The financial year is the Finance module's own setting. |
+
+The time zone stays unset until setup, and its audience is public, because public pages and the calendar feed show local times.
 
 ## Settings: brand
 
@@ -35,11 +40,10 @@ The 04:00 rollover is Proscenium's show-night rule (its decision 0014), here as 
 | `core.brand.neutral` | choice | `slate` | slate, stone, zinc, neutral | `core.branding.edit` | public | No | The tone of greys: cool, warm or plain |
 | `core.brand.display-font` | choice | `system` | The bundled fonts, or `system` | `core.branding.edit` | public | No | Headings in the public shell |
 | `core.brand.radius` | choice | `medium` | none, small, medium, large | `core.branding.edit` | public | No | How rounded corners are |
-| `core.brand.default-mode` | choice | `auto` | auto, light, dark | `core.branding.edit` | public | No | The mode a first-time visitor sees |
 | `core.brand.credit-line` | boolean | true |  | `core.branding.edit` | public | No | Shows "Powered by Proscenium" in the public footer |
 | `core.brand.revision` | integer | 0 | Managed | Nobody: raised on save | public | No | Cache-busting for the stylesheet and logos |
 
-How deep branding should go is question 3.
+The depth of branding is as Matt decided on question 3. Light and dark mode are not brand settings: the interface specification owns them, as `core.appearance.default` and `core.appearance.public-dark`, by Matt's decision there. The credit line is declared here and nowhere else.
 
 ## Settings: programme
 
@@ -51,6 +55,7 @@ How deep branding should go is question 3.
 | `core.programme.archive-seasons` | boolean | true |  | `core.programme.configure` | staff | No | Archive a season automatically once it ends |
 | `core.programme.advisories-collapsed` | boolean | true |  | `core.programme.configure` | public | No | Hide advisories behind a "show" control, so they do not spoil the plot for those who do not want them |
 | `core.programme.credits-public` | boolean | true |  | `core.programme.configure` | public | No | Starting value for whether a new production's credits are public (question 5) |
+| `core.programme.team-standing-after` | duration | 30d | 0d to 365d | `core.programme.configure` | staff | No | How long after a production's last performance its team keeps the fact `core.production-team` |
 | `core.programme.cancel-reasons` | reference | `core.cancel-reason` | A vocabulary | Fixed | staff | No | The reasons offered when cancelling. Edited as a vocabulary, listed here for completeness. |
 
 ## Settings: files
@@ -81,12 +86,22 @@ The brand limit is Flytower's figure for a raw logo. The others are judgement.
 
 400 days keeps one full year of sends plus a month, so "did last year's renewal reminder go out?" can be answered.
 
+## Settings: webhooks
+
+| Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `core.webhooks.max-attempts` | integer | 8 | 1 to 15 | `core.webhook.manage` | staff | No | Tries before a webhook delivery fails for good |
+| `core.webhooks.pause-after` | integer | 20 | 5 to 100 | `core.webhook.manage` | staff | No | Failures in a row before the system pauses a webhook |
+| `core.webhooks.log-retention` | duration | 30d | 1d to 365d | `core.webhook.manage` | staff | No | How long the webhook delivery log is kept |
+| `core.webhooks.timeout` | duration | 10s | 1s to 30s | `core.webhook.manage` | staff | No | How long core waits for a receiver to answer |
+
 ## Settings: public site
 
 | Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `public-site.search.hidden` | boolean | true until setup completes, then false |  | `public-site.site.configure` | public | No | Ask search engines to stay away |
-| `public-site.meta.title-pattern` | text | \`{page} | {name}\` | Must contain `{page}` | `public-site.site.configure` | public | No |
+| `public-site.meta.title-pattern` | text | `{page} - {name}` | Must contain `{page}` | `public-site.site.configure` | public | No | The browser title of every public page |
+| `public-site.archive.public` | boolean | true |  | `public-site.site.configure` | public | No | Whether past shows are public. Off makes `/shows`, every past production, archived seasons and the archive search answer "not found" (question 7). |
 | `public-site.archive.from-year` | integer | unset | 1800 to this year | `public-site.site.configure` | public | Yes | The earliest year the archive shows. Unset shows everything. |
 | `public-site.listing.cancelled-visible` | boolean | true |  | `public-site.site.configure` | public | No | Keep cancelled performances visible until their date passes |
 | `public-site.feeds.calendar` | boolean | true |  | `public-site.site.configure` | public | No | Offer the calendar feed |
@@ -96,39 +111,45 @@ The brand limit is Flytower's figure for a raw logo. The others are judgement.
 
 ## Abilities
 
-| Ability | Acts on | Risk | Owner | Implies | Purpose | Suggested holders |
+23 abilities. "Preset roles" names the identity specification's preset keys that hold each ability when a theatre first sets up. The owner holds everything and is not repeated.
+
+| Ability | Acts on | Risk | Owner | Implies | Purpose | Preset roles |
 | --- | --- | --- | --- | --- | --- | --- |
-| `core.production.view` | `core.production` | normal | ignored |  | See productions that are not yet public, and the console programme screens | Every member of staff |
-| `core.production.create` | site | normal |  | `production.view` | Start a new production | Programme manager |
-| `core.production.edit` | `core.production` | normal | ignored | `production.view` | Edit details, credits, media, advisories. Delete a draft. | Programme manager; a production's own team, by a grant on that production |
-| `core.production.publish` | `core.production` | normal | ignored | `production.edit` | Publish and withdraw | Programme manager, marketing |
-| `core.production.cancel` | `core.production` | privileged | ignored | `production.view` | Cancel a whole production | Theatre manager |
-| `core.performance.schedule` | `core.production` | normal | ignored | `production.view` | Add, schedule, reschedule and move performances; change capacity | Programme manager |
-| `core.performance.cancel` | `core.production` | privileged | ignored | `production.view` | Cancel or reinstate a performance | Theatre manager, duty manager |
-| `core.season.manage` | site | normal |  |  | Create, edit, publish and archive seasons | Programme manager |
-| `core.venue.manage` | site | normal |  |  | Venues and spaces | Theatre manager |
-| `core.closure.manage` | site | normal |  |  | Closures | Theatre manager |
-| `core.vocabulary.manage` | `core.vocabulary` | normal | ignored |  | Add, rename, reorder, retire and merge terms | Administrator; a module's manager, by a grant on that vocabulary |
-| `core.file.manage` | site | normal |  |  | The file library: see every file, restore, delete | Administrator |
-| `core.file.configure` | site | normal |  |  | File settings | Administrator |
-| `core.branding.edit` | site | privileged |  |  | Change the brand | Administrator, marketing |
-| `core.organisation.edit` | site | privileged |  |  | Organisation settings | Administrator |
-| `core.programme.configure` | site | normal |  |  | Programme settings | Programme manager |
-| `core.template.edit` | site | normal |  |  | Message wording | Marketing, administrator |
-| `core.sender.manage` | site | privileged |  |  | Sender identities and the sending domain | Administrator |
-| `core.delivery.read` | site | privileged |  |  | The delivery log and health screens. Lift a suppression. Retry a delivery. | Administrator |
-| `core.notification.configure` | site | normal |  |  | Notification settings | Administrator |
-| `public-site.readiness.view` | site | normal |  |  | The site-readiness screen | Administrator, marketing |
-| `public-site.site.configure` | site | normal |  |  | Public site settings | Administrator, marketing |
+| `core.production.view` | `core.production` | normal | ignored |  | See productions that are not yet public, and the console programme screens | `administrator`, `committee-member`, `communications-officer`, `technical-manager`, `front-of-house-manager`, `box-office-manager`; `production-lead` and `visiting-company` on their own production |
+| `core.production.create` | site | normal |  | `production.view` | Start a new production | `administrator` |
+| `core.production.edit` | `core.production` | normal | ignored | `production.view` | Edit details, credits, media, advisories. Delete a draft. | `administrator`; `production-lead` and `visiting-company` on their own production |
+| `core.production.publish` | `core.production` | normal | ignored | `production.edit` | Publish and withdraw | `administrator`, `communications-officer` |
+| `core.production.cancel` | `core.production` | privileged | ignored | `production.view` | Cancel a whole production | `administrator` |
+| `core.performance.schedule` | `core.production` | normal | ignored | `production.view` | Add, schedule, reschedule and move performances; change capacity | `administrator`; `production-lead` on their own production |
+| `core.performance.cancel` | `core.production` | privileged | ignored | `production.view` | Cancel or reinstate a performance | `administrator`, `front-of-house-manager` |
+| `core.season.manage` | site | normal |  |  | Create, edit, publish and archive seasons | `administrator` |
+| `core.venue.manage` | `core.venue` | normal | ignored |  | A venue and its spaces. Creating a venue needs it site-wide. | `administrator`, `technical-manager` |
+| `core.closure.manage` | site | normal |  |  | Closures | `administrator`, `technical-manager` |
+| `core.vocabulary.manage` | `core.vocabulary` | normal | ignored |  | Add, rename, reorder, retire and merge terms | `administrator`; a module's manager, by a grant on that vocabulary |
+| `core.file.manage` | site | normal |  |  | The file library: see every file, restore, delete | `administrator` |
+| `core.file.configure` | site | normal |  |  | File settings | `administrator` |
+| `core.branding.edit` | site | privileged |  |  | Change the brand | `administrator`, `communications-officer` |
+| `core.organisation.edit` | site | privileged |  |  | Organisation settings | `administrator` |
+| `core.programme.configure` | site | normal |  |  | Programme settings | `administrator` |
+| `core.template.edit` | site | normal |  |  | Message wording | `administrator`, `communications-officer` |
+| `core.sender.manage` | site | privileged |  |  | Sender identities and the sending domain | `administrator` |
+| `core.delivery.read` | site | privileged |  |  | The delivery log and health screens. Lift a suppression. Retry a delivery. | `administrator` |
+| `core.notification.configure` | site | normal |  |  | Notification settings | `administrator` |
+| `core.webhook.manage` | site | privileged |  |  | Create, edit, pause and resume webhooks, rotate a secret, send a test, read the webhook delivery log, change webhook settings | `administrator` |
+| `public-site.readiness.view` | site | normal |  |  | The site-readiness screen | `administrator`, `communications-officer` |
+| `public-site.site.configure` | site | normal |  |  | Public site settings | `administrator`, `communications-officer` |
 
 Notes on the choices:
 
 - **Scheduling and cancelling act on the production, not the performance.** A new performance has no record to check against yet, and a grant on a production should cover all its dates.
 - **Cancelling is privileged and scheduling is not.** Cancelling is the one programme action that reaches ticket holders and money.
 - **Branding is privileged** because the brand appears on the sign-in screen. This is where Flytower's passkey check on saving the brand comes from.
-- **The delivery log is privileged** because it shows who was sent what.
-- **No role is named in any module.** "Suggested holders" are for the presets, which workstream 2 and the integrating thread own.
+- **The delivery log is privileged** because it shows who was sent what. **Webhooks are privileged** because they send the theatre's events to an outside address.
+- **Production and venue can scope a grant.** A grant of `core.production.edit` on one production, or `core.venue.manage` on one venue (a hirer's own manager, say), is possible. Seasons, closures and spaces cannot scope a grant; a space is covered by its venue.
+- **No role is defined in any module.** The preset column uses the identity specification's keys and adds none. With these presets only an administrator or the owner builds the season and schedules across productions. If a theatre wants a programming role it makes its own, which the identity specification allows.
+- **Work on the night is not a role.** Cancelling tonight's performance from the door is covered by `front-of-house-manager`; a duty manager's authority comes from the shift, which is the Front of house module's to say.
 - **Uploading a file needs no ability of its own.** It needs the ability to edit the record the file is going onto.
+- **Hiding your own credit needs no ability.** The person a credit is linked to may change that credit's visibility. The route checks that the credit's account is the caller, and nothing else about the credit can be changed that way.
 
 ## Facts
 

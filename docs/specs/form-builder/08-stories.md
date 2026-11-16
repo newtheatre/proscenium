@@ -1,6 +1,6 @@
 # 7. Stories
 
-The backlog has 41 stories: 27 in the first release, which ends with a proposals round run entirely in the platform, and 14 later. Stories are in build order within each release, and each criterion is written to be turned into a failing test first.
+The backlog has 43 stories: 31 in the first release, which ends with a proposals round run entirely in the platform and with membership as the first host of slots, record mode and outcome actions, and 12 later. Four of the 31 (FB-501, FB-502, FB-503 and FB-506) sit in the table near the end because they came forward on 16 November 2026. Stories are in build order within each release, and each criterion is written to be turned into a failing test first.
 
 ## How to read it
 
@@ -50,7 +50,7 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 
 ### Builder
 
-**FB-201 Create a form and edit its draft.** As an author, I want to add, edit, reorder and delete questions and pages, with every change saved. Needs FB-101; workstream 6 for the console shell.
+**FB-201 Create a form and edit its draft version.** As an author, I want to add, edit, reorder and delete questions and pages, with every change saved. Needs FB-101; workstream 6 for the console shell.
 
 1. A change is saved within two seconds without a save button, and survives a reload.
 2. A save with a stale `edit_revision` is refused and the author is told who saved last.
@@ -88,7 +88,7 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 2. An error blocks Publish; a warning does not.
 3. The list updates as the author works.
 
-**FB-207 Publish, with the impact stated.** As an author, I want to publish knowing what my changes do to existing answers and drafts. Needs FB-206.
+**FB-207 Publish, with the impact stated.** As an author, I want to publish knowing what my changes do to existing answers and draft responses. Needs FB-206.
 
 1. Publishing creates a new immutable version; an update to a published version is refused by the database.
 2. Each change is classed safe, caution or breaking as tab 3 defines, and the summary is shown before confirmation.
@@ -117,12 +117,12 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 3. Sending the same submission twice stores one response.
 4. Answers to hidden questions are not stored.
 
-**FB-303 Save a draft and come back.** As a respondent, I want to stop and resume. Needs FB-302.
+**FB-303 Save a draft response and come back.** As a respondent, I want to stop and resume. Needs FB-302.
 
-1. A signed-in person's draft is restored on any device, at the page they left.
-2. A person not signed in finds their draft on the same device, and can request an emailed link.
-3. A draft blob is unreadable in the database without the application key.
-4. A draft untouched for the setting's period is deleted after one reminder.
+1. A signed-in person's draft response is restored on any device, at the page they left.
+2. A person not signed in finds their draft response on the same device, and can request an emailed link.
+3. A draft response blob is unreadable in the database without the application key.
+4. A draft response untouched for the setting's period is deleted after one reminder.
 
 **FB-304 My forms.** As a respondent, I want to see what I have submitted and its status. Needs FB-302.
 
@@ -157,7 +157,7 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 2. Resubmitting creates a new revision and leaves earlier revisions unchanged.
 3. Staff can compare two revisions.
 
-**FB-405 Review with private scores.** As a chair, I want reviewers to score against criteria without seeing each other's scores. Needs FB-403; workstream 2 for groups.
+**FB-405 Review with private scores.** As a chair, I want reviewers to score against criteria without seeing each other's scores. Needs FB-403; workstream 2 for the holders of a role.
 
 1. Entering a review stage creates one assignment per reviewer.
 2. Before release, a reviewer can read only their own review, on every route.
@@ -181,7 +181,7 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 **FB-601 A data class on every question, and erasure.** As the theatre, I want every answer classed so erasure works on forms as on built-in data. Needs FB-302; workstream 1 for the registry.
 
 1. A question cannot be saved without a class, and the builder proposes one from its type.
-2. Erasing a person treats each of their answers by its class, in the same unit of work as the rest of the erasure, and removes their drafts and files.
+2. Erasing a person treats each of their answers by its class, in the same unit of work as the rest of the erasure, and removes their draft responses and files.
 3. A special-category answer is stored only as ciphertext.
 4. The privacy record lists every question that holds personal data, with its form and retention.
 
@@ -197,10 +197,10 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 | --- | --- | --- |
 | FB-501 | Slots: a module declares a place for a form and a theatre attaches one, with the slot's restrictions applied in the builder | Foundations' points; the first host |
 | FB-502 | The slot renderer and `addResponse`: a host saves its own record and the answers in one unit of work | FB-501 |
-| FB-503 | Custom fields: a form in record mode on a production, a person and a venue, edited on the record's page, with revisions | FB-501; workstream 3 |
+| FB-503 | Record mode: a form attached to a slot on a host module's own record, edited on the record's page, with revisions. First release, with membership as the first host | FB-501 |
 | FB-504 | Picker questions: person, production, performance and space, contributed by their modules | Foundations' points; workstreams 2 and 3 |
 | FB-505 | Bindings: an answer prefills from and updates an attribute of the person's record, on submission or on a chosen stage | FB-403; workstream 2 |
-| FB-506 | Outcome actions: an approved response creates a production, with answers mapped to its fields, exactly once | FB-407; workstream 3 |
+| FB-506 | Outcome actions: a module declares an action and a transition runs it exactly once, with retries, and with answers mapped to its inputs. First release, with membership as the first host | FB-407 |
 | FB-507 | Limited options: a choice whose options each have a number of places, enforced by database constraint | FB-302 |
 | FB-508 | Payment: a form ends in a charge for a fixed or calculated amount, and is submitted when the charge succeeds | Workstream 4 |
 | FB-509 | Embedding a form in a content page by a content component | FB-301; workstream 3 |
@@ -208,11 +208,26 @@ The backlog has 41 stories: 27 in the first release, which ends with a proposals
 | FB-603 | Anonymous forms with one response each, by the participation register | FB-301 |
 | FB-604 | Invitations: a form open only to invited people, by person or by address | FB-301 |
 | FB-605 | Results charts: counts per option and averages for numbers and ratings | FB-401 |
-| FB-606 | A shared draft: the submitter adds named people as co-authors of a draft, for a proposal written by a team; it ends when the draft is submitted | FB-303; workstream 2 |
+| FB-606 | A shared draft response: the submitter adds named people as co-authors of a draft response, for a proposal written by a team; it ends when the draft response is submitted | FB-303; workstream 2 |
+| FB-511 | Custom fields on a production, a person and a venue: record-mode slots on those three records. Split from FB-503 on 16 November 2026 | FB-503; workstreams 2 and 3 |
+| FB-512 | An approved proposal creates a production: the outcome action declared by the core domain. Split from FB-506 on 16 November 2026 | FB-506; workstream 3 |
 
 ## Order across workstreams
 
 - FB-101 to FB-106 depend on nothing outside the module and can start as soon as the repository and test harness exist.
 - The builder and the filler need the shells from workstream 6 and sign-in from workstream 2.
-- The integration stories wait for hosts. FB-503 on a production can follow workstream 3's first release; `box-office.checkout-questions` is added to the box office after both exist, so the box office never waits for forms.
-- Without FB-506, a proposals round ends in a recorded decision and someone creates the production by hand. That is acceptable for a first release and is why FB-506 is not in it.
+- The integration stories wait for hosts. FB-511 on a production can follow workstream 3's first release; `box-office.checkout-questions` is added to the box office after both exist, so the box office never waits for forms.
+- Without FB-512, a proposals round ends in a recorded decision and someone creates the production by hand. That is acceptable for a first release and is why FB-512 is not in it.
+
+### Stories membership brings forward
+
+Decided by Matt on 16 November 2026, in accepting question 11 of the membership specification (integration tracks it as X4). Membership is in the first release with members' custom fields, so four stories from the table above come forward with membership as their first host.
+
+| Story | What comes forward | What stays later |
+| --- | --- | --- |
+| FB-501 | All of it |  |
+| FB-502 | All of it |  |
+| FB-503 | Record mode itself, on membership's own record, with revisions | Custom fields on a production, a person and a venue, which wait for workstream 3's records |
+| FB-506 | The outcome-action mechanism: run once, retried, answers mapped to inputs | The action that creates a production |
+
+Nothing in the mechanisms changes. FB-503 and FB-506 now name only the half that comes forward. The halves that stay later are new stories, FB-511 and FB-512. The module has 43 stories: 31 in the first release and 12 later.

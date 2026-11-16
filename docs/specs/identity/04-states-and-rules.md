@@ -34,7 +34,7 @@ None of these states is stored as a status: each is read from a fact on the row,
 | Claimed | Whoever proves the address: a sign-in link, an invite link, or Google asserting that address | The account is unclaimed and live | `first_signed_in_at` set; address verified; pending grants become live with nothing further written |
 | Disabled | Staff with the disable ability | Not their own account; never the last usable Owner | Sessions ended; sign-in refused with a plain reason; nothing deleted |
 | Enabled | Staff with the disable ability | The account is disabled | Sign-in works again; sessions are not restored |
-| Merged away | See Merge | See Merge | Becomes an alias of the winner |
+| Merged away | See Merge | See Merge | Becomes an alias of the survivor |
 | Anonymised | The erasure batch, or the retention sweep | See Erasure | Becomes a tombstone, for good |
 
 - **A disabled account keeps its tickets.** Disabling stops sign-in, not the door: a ticket bought before still admits.
@@ -53,7 +53,7 @@ None of these states is stored as a status: each is read from a fact on the row,
 | Removed | Not the last verified address; not the audience address; recent re-assertion | Row deleted; notice to the removed address |
 | Unverified for too long | Past the address-expiry setting | Row deleted by a sweep |
 
-- **An unverified address cannot be used to sign in** and receives only its own verification message.
+- **An** address the person added themselves and has not verified cannot be used to sign in and receives only its own verification message. The address an unclaimed account was created with is different: it receives service messages about the thing that made the account, and nothing else.
 - **A managed-domain address** (a theatre's own Workspace, for instance) can be verified only by its provider. No link is ever emailed to it for sign-in.
 
 ## Signing in
@@ -95,7 +95,7 @@ Every method ends in a session, and the method decides its assurance. A basic se
 | Single use | A token, a code and a recovery code are each spent by a conditional write. A second use is refused. |
 | Disabled | A disabled account is told it is disabled and who to contact, only after it has proved the mailbox. |
 | Provider match | A provider sign-in joins an existing account only when the provider states the address is verified and the address is already verified on the account, or the account is unclaimed. Otherwise the person signs in to their account first and links the provider from inside. |
-| Limits | Link requests are limited per address and per network address; code attempts per token. Turnstile guards the request when a key is set. |
+| Limits | Link requests are limited per address and per network address; code attempts per token. Turnstile guards the request always, through core's bot challenge declared on the route. |
 
 ## A session
 
@@ -198,15 +198,15 @@ These rules keep the two sides apart, and each is a test in the test plan.
 1. **Signing up asks for a name and an address, and nothing else.** No member question appears on any audience screen.
 2. **A person with no standing is never sent a members' navigation entry**, in the page or in any response that describes them.
 3. **A person with a standing sees exactly one extra entry** on the public site: the members' area, under the theatre's own name for it.
-4. **A members' address that somebody without a standing opens** shows a short page saying the area is for members, with the theatre's own getting-involved link. It does not reveal what the address would have shown.
+4. **A members' address that somebody without a standing opens** answers exactly as a missing page does, and no link is offered.
 5. **Standing is read at the request.** When the last standing ends, the members' area is gone at the next page load, and nothing on the audience side changes.
-6. **Member benefits reach the audience side as answers, not as navigation.** A member sees a member price because box office asked the benefits service, not because they switched mode.
+6. **Member benefits reach the audience side as answers, not as navigation.** A member sees a member price because box office called requirements.check, not because they switched mode.
 7. **Each side has its own address and its own consent.** A members' notice is never sent on the strength of audience consent, or the reverse.
 8. **Staff see a person through the side their ability belongs to.** A box-office ability shows orders and the audience address; a training ability shows records and the members' address. Neither shows the other's.
 
 ## Merge
 
-A merge joins two accounts that are one person. The winner keeps its id; the loser becomes an alias.
+A merge joins two accounts that are one person. The survivor keeps its id; the merged-away account becomes an alias.
 
 | Started by | Proof needed |
 | --- | --- |
@@ -216,15 +216,15 @@ A merge joins two accounts that are one person. The winner keeps its id; the los
 
 1. **Refuse first.** If either account is a tombstone, is already an alias, or is the actor's own (for staff), nothing is written.
 2. **Preview.** The screen shows, per module, how many rows will move and which conflicts were settled how.
-3. **One batch.** Every `move` reference is re-pointed, every `handler` supplies its statements, addresses and sign-in methods move, the loser's sessions end, and the loser gains `merged_into_id`.
+3. **One batch.** Every `move` reference is re-pointed, every `handler` supplies its statements, addresses and sign-in methods move, the merged-away account's sessions end, and it gains `merged_into_id`.
 4. **Record.** Each moved row is listed in the merge's items, in the same batch.
 5. **Tell both.** Every verified address on both accounts is told, with a link to report a mistake.
-6. **Undo.** Until `undo_until`, staff can reverse it: the listed rows move back and the alias is cleared. Rows created since stay with the winner.
-7. **Close.** When the window passes, the items are deleted and the loser's row is anonymised. It stays an alias for ever, so append-only history still resolves.
+6. **Undo.** Until `undo_until`, staff can reverse it: the listed rows move back and the alias is cleared. Rows created since stay with the survivor.
+7. **Close.** When the window passes, the items are deleted and the merged-away account's row is anonymised. It stays an alias for ever, so append-only history still resolves.
 
 - **Which account wins:** the one the person is signed in to; for staff, the claimed one; if both are claimed, the older.
-- **The winner's values win** for name, phone and the two address pointers. Nothing is blended.
-- **The batch asserts its own completeness.** Its last statement checks that no `move` reference to the loser remains, and the whole batch fails otherwise.
+- **The survivor's values win** for name, phone and the two address pointers. Nothing is blended.
+- **The batch asserts its own completeness.** Its last statement checks that no `move` reference to the merged-away account remains, and the whole batch fails otherwise.
 
 ## Export and erasure
 
@@ -267,13 +267,13 @@ An export request uses the same row and the same path without the cooling-off or
 - **Free text about the person in other people's records** is each module's to declare. Identity's own tables hold none.
 - **The batch asserts its own completeness**, as merge does: its last statement checks that no Personal column of the account is still set.
 - **A second run is harmless.** Erasing a tombstone succeeds and changes nothing, so a retried job never fails for having worked.
-- **Backups** made before the erasure still hold the data until they age out. The retention of backups is workstream 1's setting, and the privacy page quotes it.
+- **Earlier states of the database.** The platform takes no backups of its own (decided by Matt, 16 November 2026). Cloudflare keeps its own history of the database, which holds earlier states for up to 30 days and then ages out. If a theatre ever restores its database from that history, every erasure completed after the restore point must be run again. This is a known limit: the erasure record in `core_data_requests` holds no personal data but lives in the same database, so a restore also loses the record of those erasures. Before restoring, the theatre must note the account ids of erasures completed since the restore point from the data-request queue, and run them again afterwards. The privacy page says this.
 
 ## Retention of unused accounts
 
 | Sweep | Acts on | Default |
 | --- | --- | --- |
-| Unclaimed | An unclaimed account with no order, record, grant or booking newer than the unclaimed-days setting | Off until armed |
+| Unclaimed | An unclaimed account with no order, record, grant or booking newer than the setting core.retention.unclaimed-after | Off until armed |
 | Dormant | A claimed account with no sign-in and no activity for the dormant-days setting, after two warnings | Off until armed |
 | Tokens, challenges, ended sessions | Rows past their time | Always on |
 

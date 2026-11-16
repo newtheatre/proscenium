@@ -43,7 +43,7 @@ Each frame is recognisable at a glance, which matters most for a person who uses
 - **Page header:** sidebar toggle, page title, the page's one primary action, search, help for this screen.
 - **Console home** is a work queue: things awaiting this person (refunds to approve, bookings to confirm, failed sends), then today's performances. Modules contribute the cards.
 - **Command palette** (Ctrl or Cmd K): go to any screen the viewer may open, find a person, an order or a production, run a common action.
-- **Site settings** is the last group: organisation, branding, modules, roles, people, updates and health.
+- **System** is the last group. It holds foundations' screens at `/console/system/...` (modules, settings, jobs, credentials, health, audit; integration ruling R-31), with core's organisation, branding and webhooks screens in its set-up half.
 - On a phone the sidebar becomes a drawer and tables become stacked cards. Every console screen works on a phone; none is designed there first.
 
 ### Live mode
@@ -53,7 +53,7 @@ Live mode is a layout, not a fourth shell. It has no navigation of its own becau
 - Full screen, dark by default, every control at least 48 by 48 pixels.
 - A thin status strip: what this screen is, which performance, the connection state, how many actions are waiting to send, and a way out.
 - It opens from a tile on the Tonight hub, which is offered wherever a person who can work tonight looks: first in the account menu, as a bar across the public site and members' area while they are on shift, and as the landing page after sign-in during their shift.
-- Desk sales belong to the console, because they are done sitting at a laptop. Door, till, tonight board and checklists belong to live mode.
+- Desk sales belong to the console, because they are done sitting down: the desk is laptop first and usable on a tablet, with the sidebar collapsed. The door, the till, the tonight board and checklists belong to live mode.
 
 ## Moving between shells
 
@@ -62,16 +62,18 @@ The account menu is the one component every shell renders, so it is the only way
 | Entry | Shown when | Goes to |
 | --- | --- | --- |
 | Tonight | The person can work tonight (a confirmed shift in its window, or a standing ability) | The Tonight hub |
-| My account | Always | Tickets and orders in the public shell |
+| My account | Signed in (the menu itself shows only then; a visitor sees "Sign in") | Tickets and orders in the public shell |
 | Members' area | The person is entitled to it | Members' home |
 | Console | The person holds any console ability | Console home |
-| Notifications | Always | The inbox |
-| Appearance, language | Always | A small menu |
-| Sign out | Always | The public home |
+| Notifications | Signed in | The inbox of the side the person is on: the audience inbox under My account from the public shell, the member inbox in the members' area from there and from the console |
+| Appearance, language | Signed in | A small menu |
+| Sign out | Signed in | The public home |
 
-- An audience member's menu is therefore three lines long: My account, Notifications, Sign out. They are never shown a locked or greyed members' entry.
+There are two inboxes, as core and identity decided, and they never mix: a person who is both audience and member has one on each side. The menu's one Notifications entry, and the bell in the members' top bar, open the inbox of the current side.
+
+- An audience member's menu is therefore short: My account, Notifications, the appearance and language choices, and Sign out. They are never shown a locked or greyed members' entry.
 - The current shell's own entry is marked, not removed, so the menu does not rearrange as a person moves.
-- A deep link into a shell the person is not entitled to is refused by the server with a page that says why and what would let them through. A hidden link is tidiness, never enforcement.
+- A deep link into a shell the person is not entitled to answers "page not found", the same answer at every members' and console address, so it does not confirm that the shell exists. Inside a shell the person may enter, an address whose ability they lack shows the refusal page, which says why and what would let them through. A hidden link is tidiness, never enforcement.
 
 ## Where a person lands
 
@@ -86,20 +88,27 @@ Each shell owns a reserved prefix and everything else belongs to the theatre's o
 
 | Prefix | Shell | Example |
 | --- | --- | --- |
-| `/` and anything not reserved | Public: the theatre's content pages | `/about`, `/`whats-on``, `/``whats-on``/hamlet` |
-| `/book` | Public, booking flow | `/book/hamlet/thu-14-mar` |
+| `/` and anything not reserved | Public: the theatre's content pages | `/about` |
+| `/whats-on`, `/shows` | Public: core's listing and production pages. A production is at `/whats-on/<slug>` while current and `/shows/<slug>` once past | `/whats-on/hamlet` |
+| `/book` | Public, booking flow | `/book/<performance>`, where the segment is box office's address for one performance |
 | `/account` | Public, My account | `/account/tickets` |
+| `/files`, `/mailing` | Public: the public site's files, and communications' confirm and manage pages reached by token. `/forms` is reserved the same way for the form builder's public forms |  |
 | `/members` | Members' area | `/members/shifts` |
 | `/console` | Console | `/console/box-office/orders` |
 | `/live` | Live mode | `/live/door` |
 | `/sign-in`, `/setup` | Centred single-task layout |  |
+| `/api` | No shell: the routes |  |
+
+This is the whole reserved list, the same as foundations', together with anything starting with an underscore.
 
 **Which shell a screen belongs to** (ruled 16 November 2026). The shell follows whose business the screen does, never what guards it. A screen where a person deals with their own things belongs in the members' area (or My account, for an audience member) even when an ability guards it. A screen where a person acts on the theatre's behalf, on other people's records or on set-up, belongs in the console. A screen for one job during a performance is a Live page. So the bar's own-tab screen is `/members/bar/tab` and a trainer's own sessions are under `/members/training/teaching`, while the bar's stock and tabs for everyone, and the training programme and everyone's records, are under `/console`. A module whose ability opens a members' screen must also declare a standing for it, so that the members' area opens for its holder.
+
+**Forms have two homes each, by the same rule** (agreed with workstream 5). My forms, a person's own drafts and responses, is a `core.account-section` on each side: under My account for an audience member and in the members' area for a member, each hidden while the person has nothing there. The review queue is in the members' area for a member reviewing as one of a panel (their own task, `/members/forms/reviews`) and in the console for the person who runs a form and sees every response (`/console/forms/...`).
 
 - Within a shell the next segment is the module, so a module's pages sit together and a module that is switched off takes its whole subtree with it.
 - The prefix decides rendering, caching, security headers and the guard in one route rule each, which is what Part B asks for.
 - A theatre's content page can never collide with a platform page, now or after an update, because the reserved list is short and fixed. The build refuses a content page under a reserved prefix.
-- This departs from today's Proscenium, which names the domain first (`/rooms` and `/rooms/manage`). That suits one theatre with a fixed set of modules; it does not suit a fork whose owner adds pages at the root. It is question 2 for Matt.
+- This departs from today's Proscenium, which names the domain first (`/rooms` and `/rooms/manage`). That suits one theatre with a fixed set of modules; it does not suit a fork whose owner adds pages at the root. Matt accepted this as question 2.
 
 ## How navigation is built
 
@@ -108,9 +117,9 @@ Each shell owns a reserved prefix and everything else belongs to the theatre's o
 - **Filtered by ability, shaped by posture.** The viewer's abilities, including those derived from facts such as tonight's shift, decide what is listed. The order never changes with the viewer.
 - **Counts are opt-in.** A destination may name a count (refunds awaiting approval). Counts load after the page, never block it, and are announced to screen readers as part of the link's name.
 - **A theatre may reorder and rename members' sections and hide a destination** in settings. It cannot show a destination to someone who lacks the ability.
-- **Group order in the console** is set by the platform: Tonight, Box office, Front of house, Bar, Spaces, Training, Membership, People, Money, Communications, Forms, Reports, Site settings. A theatre's own module declares where it sits relative to these.
+- **Group order in the console** is set by the platform: Tonight, Programme, Box office, Front of house, Bar, Spaces, Training, Membership, People, Money, Communications, Forms, Reports, System. Programme is core's group (productions, calendar, seasons, venues and places, files, vocabularies). People is identity's (people and roles). Money holds Payments and Finance. Core's message screens sit under Communications, and under System while that module is off. Forms is the form builder's. System is the group for foundations' screens, described above. A theatre's own module declares where it sits relative to these.
 
-The formats are in tab 4. They follow draft 1 of workstream 1's manifest, in which a navigation entry is a contribution to the core's navigation point.
+The formats are in tab 4. They follow workstream 1's manifest, in which a navigation entry is a contribution to the core's navigation point.
 
 ## Where this comes from
 

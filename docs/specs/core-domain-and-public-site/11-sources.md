@@ -64,9 +64,9 @@ On the last row: five named sizes mean each image costs at most five unique tran
 
 | Claim the design leans on | Standing | What depends on it |
 | --- | --- | --- |
-| Cloudflare Email Sending reports bounces and complaints back to the Worker | Not checked against documentation | The Sent to Bounced move and automatic suppression. Without it, suppression is manual only, and the health screen says so. |
-| A theatre-owned `site/content.config.ts` survives an upstream merge | Under test by the foundations owned-paths proof | Theatre-defined content collections. Pages and news do not depend on it. |
 | A rendered social card for each production can be generated on a Worker | Proscenium could not; not re-tested | Only the later "rendered card" improvement. The first release uses the poster or the brand's social image. |
 | The United Kingdom's bank-holiday feed format and address | Not read | Story C-19, a later release |
 | Whether a theatre may lawfully publish cast names by default | Not legal advice | Question 5 |
 | No other theatre has been consulted | As the design paper already records | Every default in part 6 |
+
+Two claims that stood in this table are now settled. Cloudflare Email Sending reports bounces, complaints, failures and rejections as events on a queue, through an event subscription for each sending domain: read in Cloudflare's documentation on 16 November 2026 and set out in part 4. A theatre-owned `site/content.config.ts` survives an upstream merge: shown by the foundations owned-paths proof.

@@ -43,7 +43,7 @@ Email is the only allowance a busy theatre is likely to pass. A month with 10,00
 ## Still to check
 
 - Durable Object duration charges for screens that stay connected all evening.
-- Whether a deploy button can create every resource in one step for a fork.
+- Whether a deploy button can also provide a Durable Object and dead-letter queues in one step. (Checked on 16 November 2026: it creates the database, file store, cache and queue with nothing typed.)
 - Limits on Cloudflare Images and Turnstile, which were not read.
 
 ## Sources
@@ -54,3 +54,5 @@ Email is the only allowance a busy theatre is likely to pass. A month with 10,00
 - [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)
 - [R2 pricing](https://developers.cloudflare.com/r2/pricing/)
 - [Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/)
+
+**Checked on 16 November 2026, from Cloudflare's documentation.** Email Sending is for transactional email only; its FAQ says it may not be used for marketing email, which is why mailings are not in the first release. It reports each message's outcome (delivered, deferred, bounced, failed, rejected, complained) as events on a queue, and suppresses hard bounces and complaints itself. One message takes at most 50 recipients. The daily quota starts low and grows with reputation, with no published figure, and the product is in beta. Still to prove on a real sending domain: that those events reach a Worker carrying the message id.

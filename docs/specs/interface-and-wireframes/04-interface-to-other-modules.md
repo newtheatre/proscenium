@@ -1,8 +1,8 @@
 # 4. Interface to other modules
 
-The interface layer is part of the core (module id `core`). It offers modules nine extension points to appear in the shells, seven page components to build screens from, and a handful of composables. A module never writes its own frame, menu, settings page or home page.
+The interface layer is part of the core (module id `core`). It owns nine extension points through which modules appear in the shells (`core.navigation-group`, `core.home-card`, `core.record-tab`, `core.account-section`, `core.search-source`, `core.quick-action`, `core.help-page`, `core.on-shift-bar` and `core.tonight-tile`) and draws three owned elsewhere (`core.navigation` and `core.setup-step` are foundations', `core.public-component` is the public site's). It gives modules seven page components, an editor layout, two shared components (`Calendar` and `LiveKeypad`) and a handful of composables. A module never writes its own frame, menu, settings page or home page.
 
-Everything here is written in draft 1 of [workstream 1's formats](https://claude.ai/artifact/RKRTkLkrG98jXHSBptUc1x): points and contributions, names starting with the module id, labels as derived translation keys. Where this asks for something draft 1 does not yet have, it is marked **new**.
+Everything here is written in [workstream 1's formats](https://claude.ai/artifact/RKRTkLkrG98jXHSBptUc1x): points and contributions, names starting with the module id, labels as derived translation keys. In the tables, **new** marks a point or field this workstream added to those formats; foundations accepted every one of them on 16 November 2026, as the last section records.
 
 ## Points the interface offers
 
@@ -14,7 +14,7 @@ All are data points: a contribution is a plain object in the manifest. Each cont
 | `core.setup-step` | A step of a module's guided setup | In draft 1 |
 | `core.home-card` | A card on console home, members' home or the Tonight hub | **New** |
 | `core.record-tab` | A tab on another module's record page (Tickets on a production) | **New** |
-| `core.account-section` | A section of My account in the public shell (Tickets, Passes) | **New** |
+| `core.account-section` | A section of My account (Tickets, Passes), of a member's own account pages, or of a person's page in the console | **New** |
 | `core.search-source` | A kind of thing the command palette can find (orders, people) | **New**; uses `core.record-resolver` for titles and links |
 | `core.quick-action` | An action in the command palette ("Sell tickets", "New booking") | **New** |
 | `core.public-component` | A component a content page may use (what's on, booking button) | **New**; owned by workstream 3, which defines it in its part 4 |
@@ -30,14 +30,14 @@ Two further points were added on 16 November 2026 with front of house. `core.on-
 contributes: {
   'core.navigation': [{
     id: 'box-office.orders',
-    shell: 'console',
+    menu: 'console',
     group: 'box-office',
     section: 'everyday',
     to: '/console/box-office/orders',
     icon: 'i-lucide-receipt',
-    ability: 'box-office.order.read',
+    ability: 'box-office.order.view',
     order: 20,
-    count: 'box-office.refunds-awaiting',
+    count: 'payments.refunds-awaiting',
   }],
 },
 ```
@@ -45,14 +45,14 @@ contributes: {
 | Field | Type | Meaning | Status |
 | --- | --- | --- | --- |
 | `id` | `<module>.<name>` | Unique. Its label is the translation key `<module>.navigation.<name>.label` | Draft 1 |
-| `shell` | `account`, `members`, `console` or `live` | Which menu it joins. `account` is My account in the public shell; `live` is a tile on the Tonight hub | Draft 1; this is the list workstream 1 left to this workstream |
-| `to` | Address | Must sit under the shell's prefix and the module's id | Draft 1 |
+| `menu` | `account`, `members`, `console` or `live` | Which menu it joins. `account` is My account in the public shell; `live` is a tile on the Tonight hub | Draft 1; this is the list workstream 1 left to this workstream |
+| `to` | Address | Must sit under the menu's prefix and the module's id | Draft 1 |
 | `icon` | Bundled icon name | Shown beside the label | Draft 1 |
-| `ability` | One ability, or a list meaning any of. Never a fact: a fact shows an entry by being mapped to an ability | Hides the entry and guards the address. Omitted only for `account` entries, which every signed-in person has | Draft 1; "any of" is **new** |
+| `ability` | One ability, or a list meaning any of. Never a fact: a fact shows an entry by being mapped to an ability | Required on every entry. Hides the entry and guards the address. An `account` entry that every signed-in person has gives the route keyword `signed-in` | Draft 1; "any of" is **new** |
 | `order` | Number | Position within its section | Draft 1 |
 | `group` | Group id | Console only. Defaults to the module's own group. A module may join another's group (Payments under Money) | **New** |
 | `section` | `everyday` or `setup` | Console only. Which half of the group | **New** |
-| `count` | Count name | A number shown beside the label, from a count the module registers | **New** |
+| `count` | Count name | A number shown beside the label, from a count the module registers (its own or one of another module it requires). With `hideEmpty: true` the entry is not shown while the count is zero, which is how "only when the person has a draft" is written: a data condition is a count, never an ability | **New** |
 | `match` | Address prefix | Which addresses mark this entry as current, when not simply `to` | **New** |
 
 - The public shell's own header and footer links are the theatre's, declared in its site folder, not contributed by modules. The public shell takes exactly two things from modules: account sections and public components.
@@ -89,7 +89,7 @@ The owning module's tabs always come first. A contributed tab receives the recor
 
 | Point | Fields beyond `id` |
 | --- | --- |
-| `core.account-section` | `to` (under `/account`), `icon`, `order`, optional `count` |
+| `core.account-section` | `target` (`account` or `console-person`), `side` (`audience` or `members`), `ability`, `component`, `order`; optional `to`, `icon` and `count`. This is the one definition of the point (integration ruling R-05); identity and the form builder contribute to it |
 | `core.search-source` | `record` (a record type), `ability`, `route` (the module's search route, returning ids), `shells` (where it may be searched from) |
 | `core.quick-action` | `to` or `action`, `icon`, `ability`, `keywords` (a translation key) |
 
@@ -141,14 +141,14 @@ These components, their props and slots are part of the public interface that a 
 
 ## Events
 
-The interface layer announces none and listens for none. It reads `core.module.switched` (from workstream 1) only to refresh menus on open pages.
+The interface layer announces none. It listens for foundations' `core.module.enabled` and `core.module.disabled`, only to refresh menus on open pages.
 
 ## Agreed with workstream 1
 
 Workstream 1 accepted these on 16 November 2026 and is logging them in its formats.
 
 1. Navigation entries gain `group`, `section`, `count` and `match`. `ability` takes one ability or a list, not a fact.
-2. The shells a navigation entry may name are `account`, `members`, `console` and `live`. Reserved prefixes are `/account`, `/members`, `/console`, `/live`, `/book`, `/sign-in`, `/setup`, `/api` and anything starting with an underscore; the build refuses a theatre's page under one.
+2. The field is named `menu`, not shell, because there are only three shells. The menus a navigation entry may name are `account`, `members`, `console` and `live`. There are three shells (public, members' area, console) and a live mode, which is not a fourth shell. The whole reserved list, the same as foundations', is `/account`, `/members`, `/console`, `/live`, `/book`, `/sign-in`, `/setup`, `/api`, `/files`, `/mailing`, `/forms`, `/whats-on`, `/shows` and anything starting with an underscore; the build refuses a theatre's page under one.
 3. The new core points above are declared here and indexed by workstream 1. The shape of `core.public-component` is owned and defined by workstream 3. `/files` is also reserved, for workstream 3, and `/mailing` for communications' public confirm and manage pages, which are reached by token with no sign-in and drawn in the public shell. `PageEditor`, the layout added for the form builder, is specified in Page conventions.
 4. The build checks that every page under a shell prefix is covered by a navigation entry.
 5. A route declared idempotent requires an `Idempotency-Key` header and replays its stored answer. Every refusal has the body `{ code, reason, remedy?, fields? }`, where reason and remedy are translation keys.

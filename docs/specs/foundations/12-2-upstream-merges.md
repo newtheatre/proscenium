@@ -75,6 +75,8 @@ A major version lists every break with the action to take, ships a check that re
 | GitHub has disabled the scheduled workflow (it does so in forks until enabled, and after long inactivity) | The Updates screen in the console still shows that a release is waiting and how to enable the action or merge by hand. |
 | The theatre never updates | Nothing breaks. The Updates screen shows how far behind it is and flags security releases. |
 
+**No backup of its own.** The platform takes no backup, before a migration or at any other time (Matt, 16 November 2026). Cloudflare keeps its own history of the database for up to 30 days, and a theatre that must go back uses that in the Cloudflare dashboard; the platform has no restore feature. One step goes with it: before such a restore the theatre notes, from the data-request queue, the account ids of every erasure completed since the point it is going back to, and runs those erasures again afterwards, because the record of an erasure lives in the same database and is lost with it (Identity, part 3).
+
 ## Giving back
 
 A fix a theatre makes to upstream's code belongs upstream. `docs/contributing.md` shows how to open it as a pull request to `next` from a branch that excludes `site/`. The AGPL requires a theatre that changes upstream's code to offer its source to its users; a public fork already does, and the footer link to the source is on by default.

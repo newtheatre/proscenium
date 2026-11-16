@@ -29,8 +29,8 @@ export default defineModule({
 
   events: {
     announces: {
-      'lost-property.item.logged':   event({ version: 1, payload: z.object({ itemId: z.string() }) }),
-      'lost-property.item.returned': event({ version: 1, payload: z.object({ itemId: z.string() }) }),
+      'lost-property.item.logged':   event({ version: 1, internal: false, payload: z.object({ itemId: z.string() }) }),
+      'lost-property.item.returned': event({ version: 1, internal: false, payload: z.object({ itemId: z.string() }) }),
     },
     listens: {
       'core.performance.cancelled': 'performance-cancelled',
@@ -44,7 +44,7 @@ export default defineModule({
   contributes: {
     'core.navigation': [{
       id: 'lost-property.items',
-      shell: 'console',
+      menu: 'console',
       to: '/console/lost-property',
       icon: 'i-lucide-umbrella',
       ability: 'lost-property.item.view',
@@ -91,7 +91,7 @@ export const settings = defineSettings('lost-property', {
 })
 ```
 
-A theatre's lost-property page can then say: "We keep items for `:setting{key="lost-property.items.keep-for"}`." The page shows "28 days" and changes the moment the setting does.
+A theatre's lost-property page can then say: "We keep items for `:setting{name="lost-property.items.keep-for"}`." The page shows "28 days" and changes the moment the setting does.
 
 ## Abilities and the record type
 
@@ -108,6 +108,7 @@ export const abilities = defineAbilities('lost-property', {
   'item.log':        ability({ on: 'core.performance', implies: ['item.view'] }),
   'item.return':     ability({ on: 'lost-property.item', implies: ['item.view'] }),
   'item.dispose':    ability({ on: 'lost-property.item', implies: ['item.view'] }),
+  'item.redact':     ability({ on: 'lost-property.item', risk: 'privileged', implies: ['item.view'] }),
   'settings.manage': ability({ risk: 'privileged' }),
 })
 ```
@@ -120,9 +121,6 @@ import { defineTable, col } from '#kit/db'
 import { text } from 'drizzle-orm/sqlite-core'
 
 export const items = defineTable('lost_property_items', {
-  realm: 'operational',
-  retention: 'lost-property.items.keep-for',
-}, {
   id:            col.id(),
   performanceId: col.ref('core_performances', { nullable: true }),
   description:   col.internal(text('description').notNull()),
@@ -134,6 +132,12 @@ export const items = defineTable('lost_property_items', {
   claimNote:     col.freeText(text('claim_note')),
   returnedAt:    col.timestamp('returned_at'),
   createdAt:     col.createdAt(),
+}, {
+  id: 'xlpi',
+  realm: 'operational',
+  subject: { unlinked: 'staff' },
+  redact: 'lost-property.item.redact',
+  retention: 'lost-property.items.keep-for',
 })
 
 export const tables = { items }
@@ -141,7 +145,7 @@ export const tables = { items }
 
 The same table as a specification would give it:
 
-**`lost_property_items`**: realm operational; subject none through an account (the claimant is recorded by name only, see the note); retention `lost-property.items.keep-for`; not append-only.
+**`lost_property_items`**: id prefix `xlpi`; realm operational; subject unlinked, for staff (the claimant is recorded by name only; redact ability `lost-property.item.redact`); retention `lost-property.items.keep-for`; not append-only.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -157,7 +161,7 @@ The same table as a specification would give it:
 | `returned_at` | timestamp |  | internal | keep |  |
 | `created_at` | timestamp | not null | internal | keep |  |
 
-Note: the claimant has no account, so no erasure request can reach these columns by account. The retention sweep is what removes them, and that is why the table must declare `retention`. A check refuses a table that holds personal columns with neither a subject nor a retention.
+Note: the claimant has no account and no email here, so no erasure request can reach these columns by itself. That is what `subject: { unlinked: 'staff' }` says: the table holds personal data, and only a member of staff with the redact ability can find a person in it. Such a table must declare a `retention`, because the sweep is what removes the rows in the ordinary course, and it appears on the erasure and download screens as a manual step. `subject: 'none'` would be refused here, because the table has personal columns.
 
 ## A route, a service and a unit of work
 

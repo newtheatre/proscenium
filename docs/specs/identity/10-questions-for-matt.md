@@ -22,9 +22,9 @@ Twelve questions, all decided. On 16 November 2026 Matt accepted the recommendat
 | Matter | With | State |
 | --- | --- | --- |
 | Identity lives inside the `core` module, not a module of its own | Foundations | Agreed |
-| Abilities carry assurance, freshness and an owner rule; scope derives from the record type | Foundations | Agreed; being added to the formats |
+| Abilities carry assurance, freshness and an owner rule; scope derives from the record type | Foundations | Agreed and in the formats |
 | Facts can be marked as a standing | Foundations | Agreed |
 | Every column that references an account declares its merge rule | Foundations | Agreed |
 | Who specifies the audit log | Foundations | Foundations will; identity supplies the actor, session and assurance level |
-| Preset role keys every workstream maps abilities to | All, through integration | Proposed in part 6 |
+| Preset role keys every workstream maps abilities to | All, through integration | Settled: the fifteen keys in part 6, and every workstream maps onto them |
 | Who owns the Turnstile secret when box office also needs bot protection | Integration | Settled: core owns one bot-challenge service and its secret; routes opt in by declaration |

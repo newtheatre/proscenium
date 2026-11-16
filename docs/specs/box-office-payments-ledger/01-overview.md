@@ -6,15 +6,17 @@ Workstream 4 of the detailed-design stage. It specifies ticketing, the payment p
 
 ## Summary
 
-- **Three modules:** Box office, Payments and Finance (the ledger only). Bar and Membership can later take money through Payments and the ledger without the box office existing.
-- **The last seat sells once because the database refuses a second sale.** Claims are rows, a trigger keeps a counter, and a CHECK caps it at capacity. Proved on local D1: 11 of 11 cases, including 40 buyers racing for one seat. A run on a deployed database is waiting on a yes from Matt.
+- **Three modules:** Box office, Payments and Finance (the ledger only). Bar and Membership take money through Payments and the ledger without the box office existing.
+- **The last seat sells once because the database refuses a second sale.** Claims are rows, a trigger keeps a counter, and a CHECK caps it at capacity. Proved on local D1 and on a deployed D1 database: 11 of 11 cases on each, including 40 buyers racing for one seat.
 - **Paid means ticketed.** A payment's success, the order's confirmation, its tickets and its ledger posting are one database batch. The one way it can fail (money arriving after the seats have gone) ends in an automatic refund, never an oversell.
+- **Reserve now, pay on arrival** is a first-class way to sell, because it is how the first theatre sells. A reservation claims seats exactly as a sale does and posts nothing until it is paid at the desk.
 - **Every payment attempt ends in a recorded answer**, from the provider or from a named person. "No answer" is its own state, and the seats stay held until it is resolved.
+- **One payment can have several owners.** An intent is split into parts, so one tap on the one card reader can pay for tickets and bar items, and each part settles and refunds on its own.
 - **The ledger is double entry and append-only.** A posting balances or does not exist. Periods are closed by adding a row; late facts post into the next open period.
-- **Buying needs no sign-in**, and the audience screens never mention membership. An order is still keyed to an account, which identity creates unclaimed for the buyer's address.
-- **Size:** 37 tables, 59 stories (51 in the first release), 52 named never-regress tests, 9 questions for Matt.
+- **Buying needs no sign-in.** An order is still keyed to an account, which Identity creates unclaimed for the buyer's address. The audience screens say nothing of membership, except the provider's own phrase inside a ticket type that depends on one.
+- **Size:** 38 tables, 69 stories (63 in the first release), 92 named never-regress tests, 11 questions for Matt, all answered.
 
-Start with **9. Questions for Matt**; everything else can be read in any order.
+The parts can be read in any order. **9. Questions for Matt** records the eleven answers the rest is written to.
 
 ## At a glance
 
@@ -33,7 +35,7 @@ flowchart LR
   end
   subgraph pay["Payments"]
     direction TB
-    pay1["Intents<br/>one amount, one purpose"]
+    pay1["Intents<br/>one amount, a part per owner"]
     pay2["Attempts<br/>always a recorded answer"]
     pay3["Refunds<br/>never more than was paid"]
     pay4["Providers plug in: cash,<br/>card online, card reader"]
@@ -51,7 +53,7 @@ flowchart LR
   pay -->|"2"| bo
   pay -->|"3"| fin
   bo -->|"4"| fin
-  key["1 Box office asks Payments to collect or refund an amount. It never talks to a provider.<br/>2 When the money is in, Payments runs Box office's settle step: paid, ticketed and posted in one batch.<br/>3 Payments posts fees, payouts and cash differences.<br/>4 Box office posts sales, refunds and earned income, each tagged with its performance."]
+  key["1 Box office asks Payments to collect or refund an amount. It never talks to a provider.<br/>2 When the money is in, Payments runs Box office's settle step: paid, ticketed and posted in one batch.<br/>3 Payments writes the one sealed posting for each sale and refund, and posts fees and cash differences.<br/>4 Box office returns the ledger entries for sales and refunds, and posts earned income itself."]
   fin ~~~ key
 ```
 
@@ -61,19 +63,19 @@ Payments reaches Box office only through an extension point, so it does not depe
 
 ## Status
 
-Draft 1, 16 November 2026. All nine parts and the proof are written.
+Draft 2, 16 November 2026. All nine parts and the proof are written, Matt's eleven answers are in, and the integration rulings and consistency worklist items W-128 to W-168 are applied. Nothing waits on another workstream.
 
-| Part | State | Waits on |
-| --- | --- | --- |
-| 1. Scope | Drafted |  |
-| 2. Data model | Drafted, in the Foundations format |  |
-| 3. States and rules | Drafted, three life-cycle diagrams |  |
-| 4. Interface to other modules | Drafted; agreed with Foundations, Identity and Core domain by message | Identity: whether an anonymous desk sale may have no account |
-| 5. Screens | Drafted, three wireframes | Workstream 6 for the shells and the look |
-| 6. Settings and abilities | Drafted | Workstream 2 for preset role names |
-| 7. Stories | Drafted |  |
-| 8. Test plan | Drafted |  |
-| 9. Questions for Matt | Nine questions, each with a recommendation | Matt |
-| Proof: last seat on D1 | Passed locally | Matt's yes to a run on a deployed database |
+| Part | State |
+| --- | --- |
+| 1. Scope | Written |
+| 2. Data model | Written, in the Foundations format: 38 tables |
+| 3. States and rules | Written, three life-cycle diagrams |
+| 4. Interface to other modules | Written; agreed with Foundations, Identity, Core domain, Interface, Form builder, Communications, Front of house, Bar and Membership |
+| 5. Screens | Written, three wireframes; the door is a Live page |
+| 6. Settings and abilities | Written; abilities are mapped to Identity's preset role keys |
+| 7. Stories | 69 stories |
+| 8. Test plan | 92 never-regress cases |
+| 9. Questions for Matt | Eleven questions, all answered |
+| Proof: last seat on D1 | Passed locally and on deployed D1 |
 
-**What this draft does not do.** It names no visual design. It does not choose a first payment provider (question 2). Its defaults in part 6 are proposals. Its claims about Stripe, SumUp, pretix and Cloudflare are sourced to their own documentation where they appear; nothing was tested against a real provider.
+**What this specification does not do.** It names no visual design. Its defaults in part 6 are proposals. Its claims about Stripe, SumUp, pretix and Cloudflare are sourced to their own documentation where they appear; nothing was tested against a real provider.

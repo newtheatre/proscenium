@@ -42,3 +42,5 @@ Online, the two meet at a £20 basket: below it SumUp's flat 2.5% is cheaper, ab
 - [SumUp UK pricing](https://www.sumup.com/en-gb/pricing/)
 - [Stripe and Square compared](https://www.businessexpert.co.uk/payment-processing/stripe-vs-square/) (third party, source of the Square figures)
 - [UK payment gateways compared](https://www.businessexpert.co.uk/payment-processing/best-payment-gateway) (third party, source of the GoCardless figures)
+
+**Decided on 16 November 2026 (B2).** The order in which providers are built is: cash and attested card always (attested card means staff confirm a card payment taken on a separate machine), then Stripe for online card, then the SumUp reader in person. Invoice is not a payment method in any specification. Where this tab calls SumUp the natural first in-person provider, read that as the first reader integration, after attested card.

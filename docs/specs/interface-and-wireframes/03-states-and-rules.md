@@ -134,7 +134,7 @@ stateDiagram-v2
 | Sending to queued | No answer, or a server fault. Retried with growing gaps; never dropped |
 | Sending to refused | The server understood and said no (ticket already refunded, shift ended). Never retried |
 | Refused to dismissed | The person, or the duty manager, has seen it. A refusal is also reported to the module's own exception list |
-| Queued to stuck | Unsent after 30 minutes of being connected (a setting). Shown in red on the status strip |
+| Queued to stuck | Unsent after 30 minutes of being connected (a setting), and still retried. Shown in red on the status strip. An entry that reaches 48 hours old, foundations' idempotency window, is never sent again: it stays stuck until the person checks the record and dismisses it or does it again by hand |
 
 - **The server decides.** The device's answer is a prediction. When they differ, the server's stands and the difference is shown, not hidden.
 - **Only acts a module marks as safe to queue can be queued.** Admitting a ticket and ticking a checklist line are. Taking a card payment is not: a live screen that needs the server says so and waits.

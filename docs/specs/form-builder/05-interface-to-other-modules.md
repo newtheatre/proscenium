@@ -8,7 +8,7 @@ This tab follows the formats in the foundations draft ([Module manifest](https:/
 
 | Point | Kind | A contribution is | Example contributor |
 | --- | --- | --- | --- |
-| `forms.slot` | data | A place a form can be attached: id, the record type it is about, mode (`submission` or `record`), who answers, how many forms it takes, and the abilities that may attach one | Box office: questions at checkout for a ticket type. Core: custom fields on a production |
+| `forms.slot` | data | A place a form can be attached: id, the record type it is about, mode (`submission` or `record`), who answers, how many forms it takes, and the abilities that may attach one | Membership: an application to join a scheme. Forms itself: custom fields on a production |
 | `forms.field-type` | code | A picker question type: search for candidates the respondent may see, check an id is valid, give its label | Core: person, production, performance, space. Inventory: item |
 | `forms.bindable` | code | An attribute an answer can prefill from and write to: its type, its data class, a reader, and a writer that adds statements to a unit of work | Identity: phone number, emergency contact. Membership: course and year |
 | `forms.outcome-action` | code | Something to do when a response reaches a stage: an input schema the form designer maps answers to, and a runner that is safe to call twice | Core: create a production. Membership: start a membership. Finance: raise an expense claim |
@@ -22,34 +22,35 @@ Rules for every point:
 
 ## Slots in detail
 
-A slot is how "a form attached to a ticket type" or "custom fields on a production" exists without forms knowing what a ticket type is.
+A slot is how "an application to a membership scheme" or "custom fields on a production" exists without forms knowing what a scheme is.
 
 | Slot field | Meaning |
 | --- | --- |
-| `id` | `<module>.<name>`, such as `box-office.checkout-questions` |
+| `id` | `<module>.<name>`, such as `membership.application` |
 | `subject` | The record type the response is about, from the abilities registry's record types |
 | `mode` | `submission`: answered once, at a moment the host chooses. `record`: custom fields, always editable with the record |
-| `scope` | Whether a form is attached to one record (this ticket type), to all records of the type, or either |
+| `scope` | Whether a form is attached to one record (this scheme), to all records of the type, or either |
 | `respondent` | Who answers: the acting person, or staff only |
+| side | Only for a slot on core.account: audience or members, the side of the person the fields belong to |
 | `limit` | The most forms one record may carry in this slot |
 | `attach` | The ability needed to attach or detach a form here |
 | `features` | What a form here may not use: for instance no pages, no workflow, no payment at checkout |
 
 The builder reads `features` and hides what the slot forbids, so a theatre cannot build a three-page form with a review stage and attach it to a checkout.
 
-Slots this specification expects, each owned by its module's workstream:
+Slots, and who declares each. A module that hosts a form lists `forms` in `requires` and contributes its own slot. The core imports no module and never contributes to a module's point (integration's ruling R-06), so the slots on core records are declared by forms itself, under forms' name, against the record types that core and identity publish.
 
-| Slot | Mode | Asked when |
-| --- | --- | --- |
-| `forms.link` (forms' own) | submission | Someone opens the form's link or an embedded form on a content page |
-| `core.season-call` | submission | A season's call for proposals is open |
-| `core.production-fields`, `core.person-fields`, `core.venue-fields` | record | The record is created or edited |
-| `core.production-signup` | submission | A production invites sign-ups, such as auditions |
-| `box-office.checkout-questions` | submission | An order containing the ticket type is placed |
-| `membership.application` | submission | Someone applies to join |
-| `spaces.booking-extras` | submission | A booking of the space is requested |
-| `front-of-house.incident-report` | submission | An incident is logged |
-| `finance.expense-claim` | submission | A claim is made |
+| Slot | Declared by | Mode | Asked when | Release |
+| --- | --- | --- | --- | --- |
+| `forms.link` | Forms | submission | Someone opens the form's link, or later a form embedded in a content page | First |
+| `membership.application` | Membership, accepted in its specification | submission | Someone applies to join a scheme | First, with membership |
+| `membership.member-fields` | Membership, accepted in its specification | record | A membership is created or edited | First, with membership |
+| `forms.season-call` | Forms, on `core.season` | submission | A season's call for proposals is open | Later. Until then a call is a form on `forms.link` with opening and closing dates |
+| `forms.production-fields`, `forms.venue-fields` | Forms, on `core.production` and `core.venue` | record | The record is created or edited | Later (FB-511) |
+| `forms.account-fields` | Forms, on `core.account`, with a `side` | record | The person's details are edited | Later (FB-511) |
+| `forms.production-signup` | Forms, on `core.production` | submission | A production invites sign-ups, such as auditions | Later |
+| `box-office.checkout-questions` | Box office, on `box-office.ticket-type` (integration's ruling R-17) | submission | An order containing the ticket type is placed | Later |
+| `spaces.booking-extras`, `front-of-house.incident-report`, `finance.expense-claim` | Their modules. These are requests until each specification accepts them | submission | A booking is requested, an incident is logged, a claim is made | Later |
 
 ## Services forms offers
 
@@ -57,7 +58,7 @@ Exported from the module's services file. A module that calls them lists `forms`
 
 | Service | Does | Writes |
 | --- | --- | --- |
-| `slotForms(slot, subject)` | Returns the forms attached there for the current person, with definition, resolved facts, prefill and any draft | Nothing |
+| `slotForms(slot, subject)` | Returns the forms attached there for the current person, with definition, resolved facts, prefill and any draft response | Nothing |
 | `checkAnswers(slot, subject, answers)` | Runs the engine on the server and returns visibility, errors and calculated values | Nothing |
 | `addResponse(unit, input)` | Adds to the caller's unit of work every statement for a submitted response: the response, its answers, counts, stage history, audit entry and event. Returns the response id. Never commits | Through the unit |
 | `addRecordFields(unit, subject, answers)` | The same for custom fields: a new revision of the record's response | Through the unit |
@@ -70,9 +71,22 @@ Exported from the module's services file. A module that calls them lists `forms`
 
 Forms also publishes two interface components for hosts to place on their own pages: `FormsSlot`, the slot renderer, and `FormsRecordFields`, the record-fields panel. Foundations confirmed the rule on 16 November 2026: a module's public components live in its `app/components/public/` folder, carry the module's name as a prefix, and a change to their props is a breaking change to the module's interface.
 
+## Addresses
+
+| Page | Address |
+| --- | --- |
+| A form on `forms.link` open to anyone, to anyone signed in, or to invited people | `/forms/<slug>`, in the public site's frame |
+| The same form's confirmation | `/forms/<slug>/received` |
+| A form open to members or to the holders of a role | `/members/forms/<slug>` |
+| My forms, and one response | `/account/forms` and `/members/forms`, then the response's id |
+| The review queue | `/members/reviews` and `/console/forms/reviews` |
+| The console's forms list and builder | `/console/forms` |
+
+`/forms` is one of foundations' reserved prefixes, added on 16 November 2026 at forms' request, so a theatre's own content page cannot take it. A slug may not be `reviews` or any other word forms uses under these addresses.
+
 ## Events forms announces
 
-Each is written in the same unit of work as the change. Payloads hold identifiers and public or internal values only, never an answer, a name or free text. Since outgoing webhooks joined the first release, foundations makes every announced event deliverable to a webhook unless it is declared internal. The form events (published, closed) are not internal. Every response, review and action event is declared internal, because the fact that someone answered a form can itself be sensitive; a form's settings may opt its response events in to webhooks, and the builder says what a webhook would then receive.
+Each is written in the same unit of work as the change. Payloads hold identifiers and public or internal values only, never an answer, a name or free text. Since outgoing webhooks joined the first release, foundations makes every announced event deliverable to a webhook unless it is declared internal. The form events (published, closed) are not internal. Every response, review and action event is declared internal, because the fact that someone answered a form can itself be sensitive. The internal flag is fixed per event and cannot vary by form, so a form opts in through a second event: `forms.response.shared`, which is not internal and is announced only for a form whose settings turn sharing on. The builder says what a webhook would then receive.
 
 | Event | When | Payload |
 | --- | --- | --- |
@@ -83,18 +97,18 @@ Each is written in the same unit of work as the change. Payloads hold identifier
 | `forms.response.decided` | A response reaches `approved` or `declined` | response id, form id, slot, subject, outcome |
 | `forms.response.withdrawn` | The submitter or a host withdraws it | response id, subject |
 | `forms.response.revised` | A record's custom fields change | response id, subject, revision |
+| forms.response.shared | A response to a form that has opted in is submitted, decided or withdrawn. The only response event that is not internal | response id, form id, what happened |
 | `forms.review.requested` | A reviewer is assigned | assignment id, response id |
 | `forms.review.released` | A review round is opened to the panel | response id, round |
 | `forms.action.failed` | An outcome action is abandoned after its retries | action run id, action key |
 
 ## Events forms listens for
 
-Names outside `forms.` are placeholders until their owners publish them.
+The merge event is identity's `core.account.merged`. Payment is not here: Payments calls forms' settlement handler, described under the contributions below.
 
 | Event | Owner | Forms does |
 | --- | --- | --- |
-| A charge succeeded or failed | Payments (workstream 4) | Moves a response from `awaiting_payment` to `submitted`, or leaves it and tells the person |
-| Two people were merged | Identity (workstream 2) | Nothing to repoint, because the merge has already moved forms' account columns in its own batch. Where the merged person now has two responses to a one-each placement, forms keeps both and flags them |
+| Two people were merged | Identity (workstream 2) | Nothing to repoint: the merge moves or aliases forms' account columns as tab 2 declares. Where the merged person now has two responses to a one-each placement, forms keeps both and flags them |
 | A record was deleted or archived | Its owner | Nothing by itself. The owner calls `withdrawResponses` if it wants responses withdrawn |
 
 Erasure is not an event for forms. The data-class registry handles the columns, using the per-row class on `forms_answers`, and forms contributes a handler for what the registry cannot express.
@@ -103,21 +117,23 @@ Erasure is not an event for forms. The data-class registry handles the columns, 
 
 | Point | Contribution |
 | --- | --- |
-| `core.navigation` | "Forms" in the console, shown to holders of any forms ability. "Reviews" in both the members' area and the console, shown to anyone with a review waiting. "My forms" in the members' area, shown when the person has a draft or a response |
-| `core.account-section` | "My forms" under the audience account, so an audience member finds their responses without entering the members' area. Each response opens in the shell it was answered in |
-| `core.home-card` | Drafts to finish, and responses awaiting this person's review |
-| `core.record-tab` | The record-fields panel on a core record, and the forms attached to it. This is how custom fields reach core records without core importing forms |
+| `core.navigation` | "Forms" in the console, shown to holders of any forms ability. "Reviews" in both the members' area and the console, shown to anyone with a review waiting. "My forms" in the members' area, shown when the person has a draft response or a submitted one |
+| `core.account-section` | "My forms" under the audience account, so an audience member finds their responses without entering the members' area. The point is the interface specification's, and forms supplies its fields: id, target, side, ability, component and order. Each response opens in the shell it was answered in |
+| `core.home-card` | Draft responses to finish, and responses awaiting this person's review |
+| `core.record-tab` | A "Custom fields" tab on a core record, holding the record-fields panel (FB-511). A tab is the only way onto a core record, because core imports no module and so cannot place a component. A module that requires forms places `FormsRecordFields` as a section of its own record page instead |
 | `core.file-access` | Who may open a file uploaded as an answer: whoever may read that answer |
 | `core.setup-step` | Choose starting templates; set the default retention period |
-| `core.erasure-handler` | Delete draft blobs and uploaded files of the erased person; redact free-text answers and messages; remove invitations and participation rows |
+| `core.erasure-handler` | Delete draft response blobs and uploaded files of the erased person; redact free-text answers and messages; remove invitations and participation rows |
 | `core.privacy-record` | One entry per question that is not Internal or Public: the form, the question, its class, its retention and whether it is bound to an attribute |
 | `core.record-resolver` | Titles and links for a form and a response |
 | `core.health-check` | Outcome actions stuck or abandoned; forms live past their closing date with responses undecided |
-| core.notification-type | Receipt, returned for changes, decision, review requested, reminder of an unfinished draft, closing soon. The shipped wording lives in forms' code and a theatre's rewording is a core template row, so forms has no template table for messages. Forms sends with core's notify service inside its own unit of work |
+| core.notification-type | Receipt, returned for changes, decision, review requested, reminder of an unfinished draft response, closing soon. The shipped wording lives in forms' code and a theatre's rewording is a core template row, so forms has no template table for messages. Forms sends with core's `notify` inside its own unit of work, and with `notifyAddress`, which is email only, to a respondent with no account: the receipt, the notice that a response is returned for changes, and the link to resume |
+| core.public-component | FormsEmbed, which places a form in a content page by its slug. Later, with FB-509 |
+| payments.settlement (Payments' point, not core's) | A handler for intent parts owned by forms.response: it moves the response from awaiting payment to submitted inside Payments' unit of work. Later, with FB-508 |
 
 ## What forms calls in core
 
-Two core services from the core domain draft ([Workstream 3](https://claude.ai/artifact/Qt8cFSyEekr7tfpiMCqe2E), by message on 16 November 2026).
+Three core services from the core domain specification: vocabularies, files, and notifications (`notify` and `notifyAddress`, in the table above).
 
 - **Vocabularies.** Core owns reusable option lists. A choice question may take its options from one through `listTerms`, the server checks a submitted option with `assertTerm`, and the answer stores the term's id with a snapshot of its label, never the label alone. A retired term stays readable on old answers and is not offered on new ones. The builder can create a theatre's own vocabulary, with a key beginning `x.`, for a holder of `core.vocabulary.manage`. Forms needs neither a hierarchy of terms nor a value per term; a cap on an option is forms' own, in `forms_option_counts`.
 - **Files.** An uploaded answer is a row in `core_files` in a file slot that forms declares on its response record type. Forms stores no file bytes of its own. The file slot is contributed to core.file-slot, and a vocabulary forms ships is contributed to core.vocabulary. Slot subjects use the record types their owners publish: core.production, core.performance, core.season, core.venue and core.space from workstream 3, and core.account for a person from workstream 2.
@@ -129,12 +145,12 @@ Two core services from the core domain draft ([Workstream 3](https://claude.ai/a
 | Record type `forms.form` | A form. Its parent is the record it is attached to, if any | Abilities granted on one form: edit, read responses, review, decide. A grant on a form covers its responses |
 | Record type `forms.response` | A response. Its parent is the form and its owner is the submitting account | Ownership lets the submitter read, revise when returned and withdraw. Nothing is granted on a single response |
 | Fact `forms.submitter` | The person submitted this response | The same ownership for a response keyed to an email address, matched through the account's verified addresses |
-| Fact `forms.co-author` | The submitter added this person to the draft | Editing one draft, for a proposal written by a team |
+| Fact `forms.co-author` | The submitter added this person to the draft response | Editing one draft response, for a proposal written by a team |
 | Fact `forms.reviewer` | The person has a live assignment on this response | Read the answers and submit a review |
 
 A conflict of interest is not a fact. Workstream 2 ruled on 16 November 2026 that roles, facts and ownership only ever allow, so nothing in the permission model can take access away. The lockout is a guard in forms' own service: after the platform's authorisation passes, forms refuses when the person is on the response's conflict list, with a refusal code the interface explains. The guard applies to every role including the Owner, and to lists, search, counts and exports as well as the response page.
 
-Facts forms reads from others, for conditions on "who is answering": signed in, is a current member, membership type, belongs to a group, age band where the theatre holds a date of birth. Each is declared by its owner in the `facts` section; forms lists whatever is declared and invents none.
+Facts forms reads from others, for conditions on "who is answering": `core.member`, the membership module's facts (`membership.holder`, `membership.supporter`, `membership.scheme-holder`, `membership.voter`), whether the person holds a named role, and anything a `core.requirement` source declares. Each is declared by its owner; forms lists whatever is declared and invents none. Whether the person is signed in is not a fact, because the placement's audience decides it. There is no age band, because no module declares one.
 
 ## Jobs and scheduled tasks
 
@@ -143,8 +159,8 @@ Facts forms reads from others, for conditions on "who is answering": signed in, 
 | `forms.run-action` | Job | Applies bindings or runs one outcome action for one stage change, with its idempotency key |
 | `forms.build-export` | Job | Builds a results export in pages and stores it through Files |
 | `forms.sweep-retention` | Task, daily | Anonymises responses past `retention_due_at` |
-| `forms.sweep-drafts` | Task, daily | Deletes drafts untouched for longer than the setting allows, after a reminder |
-| `forms.send-reminders` | Task, daily | Unfinished-draft and closing-soon reminders; reviews outstanding |
+| `forms.sweep-drafts` | Task, daily | Deletes draft responses untouched for longer than the setting allows, after a reminder |
+| `forms.send-reminders` | Task, daily | Reminders of an unfinished draft response and of a closing date; reviews outstanding |
 
 ## Points settled and still open with other workstreams
 
@@ -156,18 +172,20 @@ Facts forms reads from others, for conditions on "who is answering": signed in, 
 | A data class per row | 1 | Settled | The registry accepts a column whose class is named by a sibling column, which `forms_answers` uses |
 | A fact that denies | 2 | Settled: no | Facts only allow. The conflict lockout is a guard in forms' own service, applied to every role and to lists, search and exports |
 | Abilities scoped to one form or one response | 2 | Settled | Grants stop at the form and cover its responses. One response is reached by ownership or by a fact forms declares |
-| Guests and people without accounts as respondents | 2 | Settled | A response made while signed out is keyed to the email address given, using foundations' email subject, never to an account. It is not re-keyed when the person later claims an account: "My forms" finds it by the account's verified addresses. A response made while signed in is keyed to the account. No row carries both |
-| Custom fields on a person | 2 | Settled | They attach to `core.account` with a side, audience or members, and appear through `core.account-section` |
+| Guests and people without accounts as respondents | 2 | Settled | A response made while signed out is keyed to the email address given, using foundations' email subject, never to an account. It is not re-keyed when the person later claims an account: "My forms" finds it by the account's verified addresses. A response made while signed in is keyed to the account |
+| Custom fields on a person | 2 | Settled | Later, with FB-511 (integration's ruling R-14). They attach to `core.account` through the slot `forms.account-fields` with a side, audience or members, and appear through `core.account-section`. Identity's bindable attributes are later too, with FB-505 |
 | Membership as a fact | 2 | Settled | `core.member` is the single "is a member now" fact for conditions on who is answering |
 | Person merge and claim events | 2 | Settled | `core.account.merged` and `core.account.claimed` |
 | Vocabularies | 3 | Settled | Core owns them; forms stores the term id and a label snapshot |
 | Files | 3 | Settled | Uploads live in `core_files`; forms contributes to `core.file-access` |
 | Notifications and record type names | 3 | Settled | Types are contributed to `core.notification-type`; slot subjects use core's published record types |
 | The builder, filler and review screens | 6 | Settled | A named Editor layout exists for the builder. Two short related questions may sit side by side at laptop width. Review and My forms are placed as tab 5 says |
-| Charges from a form | 4 | Open | Proposed: forms requests a charge with an expected total and a reference to the response; Payments owns the attempt and the ledger entry. Not needed for the first release |
+| Charges from a form | 4 | Open | Payments has answered: any module can own a part of an intent. Forms calls `collect` with a part owned by `forms.response` and contributes a `payments.settlement` handler, which moves the response from `awaiting_payment` to `submitted` inside Payments' unit of work. Forms listens for no payment event. What remains is for box office to list forms as an owner. Not in the first release (FB-508) |
+| Questions at checkout | 4 | Settled by integration (R-17) | The slot is box-office.checkout-questions, about a ticket type, on forms' slot model. Box office drops its own point and declares the record type. It stays a later story, and the exact call is settled when that story is specified |
+| The address /forms | 1 | Asked | Settled on 16 November 2026: /forms is reserved, and foundations has taken back the four id prefixes forms no longer needs |
 
 ## Rulings given to other workstreams
 
 - **A contributed field type may store more than one value in its answer** (asked by communications, 16 November 2026). The contributing module declares the shape of its answer value, and forms validates and stores it whole in the one answer row, under that row's data class. A consent field can therefore keep the id of the wording the person saw beside their yes or no. An outcome action receives the answers it is mapped to as stored, so the wording id reaches it with no special case. Forms does not read inside the value; results and exports show the label the contributor's display function returns.
 
-* **Membership's four declarations fit as specified** (asked by membership, 16 November 2026). `membership.application` is a slot in submission mode with a membership scheme as its subject (FB-501, FB-502). `membership.member-fields` is a slot in record mode (FB-503's mechanism, on membership's own record). `membership.start-membership` is an outcome action, run exactly once on the approving transition (FB-506's mechanism, with FB-403 and FB-407). `membership.simple-application` is a module-contributed template (the second half of FB-510). All four rest on stories in the later list, so they arrive when membership is scheduled, not with the forms first release.
+* **Membership's four declarations fit as specified** (asked by membership, 16 November 2026). `membership.application` is a slot in submission mode with a membership scheme as its subject (FB-501, FB-502). `membership.member-fields` is a slot in record mode (FB-503's mechanism, on membership's own record). `membership.start-membership` is an outcome action, run exactly once on the approving transition (FB-506's mechanism, with FB-403 and FB-407). `membership.simple-application` is a module-contributed template (the second half of FB-510). Matt brought the first three forward into the first release on 16 November 2026 (tab 7). The template waits for FB-510.

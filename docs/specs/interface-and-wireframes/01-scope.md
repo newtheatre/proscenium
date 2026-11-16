@@ -47,8 +47,8 @@ The tabs are the nine parts every workstream delivers, in the same order.
 | 3. States and rules | Request routing, page data states, queued writes and form saving, each drawn and then tabulated |
 | 4. Interface to other modules | What a module declares to appear in the interface, and the shared components it builds from |
 | 5. Screens | The inventory of screens, with four sub-tabs: Shells and navigation, Page conventions, Key journeys, Wireframes |
-| 6. Settings and abilities | The interface layer's own 20 settings and its abilities |
-| 7. Stories | 34 stories, UI-01 to UI-34 |
+| 6. Settings and abilities | The interface layer's own 15 settings and 3 abilities |
+| 7. Stories | 36 stories, UI-01 to UI-36 |
 | 8. Test plan | 26 named test cases |
 | 9. Questions for Matt | Nine decisions, each with options and a recommendation, and what has been agreed with other workstreams |
 
@@ -56,10 +56,10 @@ Someone short of time should read Shells and navigation, look at the Wireframes,
 
 ## Status
 
-First full draft, 16 November 2026. A [clickable prototype of the buy, desk and door journeys](https://claude.ai/artifact/CRHCxGx74xquxnRa6qVi4C) accompanies it; it uses sample data and is to be thrown away. Every part is written and every drawing is in place.
+Agreed with the other workstreams and brought into line with the consistency review and Integration's rulings, 16 November 2026. A [clickable prototype of the buy, desk and door journeys](https://claude.ai/artifact/CRHCxGx74xquxnRa6qVi4C) accompanies it; it uses sample data and is to be thrown away. Every part is written and every drawing is in place.
 
 - **Agreed with workstream 1 (Foundations):** the navigation, page, search, card and settings declarations, the module id `core` for the interface layer, and the `/console` prefix.
 - **Agreed with workstream 5 (Form builder):** the Editor layout, the review queue's two homes, and where My forms sits.
-- **Agreed with workstream 3 (Core domain and public site):** it owns `core.public-component` and the brand function; `/files` is reserved; by Matt's decision a production lives at `/whats-on/<slug>` while current and `/shows/<slug>` once past, and neither is a reserved prefix; access features show as icon and label chips from `core.place-access`, never an icon alone.
-- **Agreed with workstream 2 (Identity and accounts):** it has named the fact `core.member` and the `describeViewer` call, and tab 3 uses them. The shift window belongs to the later front of house round, tab 3 states the assumption.
-- **Waiting on Matt:** nothing. He accepted all nine recommendations in tab 9 on 16 November 2026, which is what the draft already assumed.
+- **Agreed with workstream 3 (Core domain and public site):** it owns `core.public-component` and the brand function; `/files` is reserved; by Matt's decision a production lives at `/whats-on/<slug>` while current and `/shows/<slug>` once past, and both prefixes are reserved for core's pages (they answer not found while the public site module is off); a performance's access features show as icon and label chips from core's `core.access-feature` vocabulary, never an icon alone.
+- **Agreed with workstream 2 (Identity and accounts):** it has named the fact `core.member` and the `describeViewer` call, and tab 3 uses them. The shift window belongs to the later front of house round; tab 3 states the assumption.
+- **Waiting on Matt:** nothing. He accepted all nine recommendations in tab 9 on 16 November 2026, which is what the specification already assumed.

@@ -38,10 +38,10 @@ The form's status says whether it takes responses; a version's state says whethe
 | Change | Guard |
 | --- | --- |
 | Create a form | Ability `forms.form.create` |
-| Edit the draft | Ability `forms.form.edit` on this form. The save states the draft's `edit_revision`; a stale one is refused and the editor is shown who saved last |
-| Publish | Ability `forms.form.publish`. The definition has no errors in the problems list. A form with a personal, free-text or special question has a retention period. The draft differs from the live version |
+| Edit the draft version | Ability `forms.form.edit` on this form. The save states the draft version's `edit_revision`; a stale one is refused and the editor is shown who saved last |
+| Publish | Ability `forms.form.publish`. The definition has no errors in the problems list. A form with a personal, free-text or special question has a retention period. The draft version differs from the live version |
 | Publish a breaking change | As publish, and the person has confirmed the impact statement, which names each retired question and the number of answers it holds |
-| Pause, resume | Ability `forms.form.publish`. Pausing stops new responses; drafts in progress are kept |
+| Pause, resume | Ability `forms.form.publish`. Pausing stops new responses; draft responses in progress are kept |
 | Close | Ability `forms.form.publish`. No new responses or submissions; staff work on existing responses continues |
 | Archive | The form is closed and no response is short of a final stage |
 | Delete | Only a form that was never published. A published form is archived, and its responses leave by retention |
@@ -55,9 +55,9 @@ Rules for versions:
 
 | Impact | Examples | What happens to responses in progress |
 | --- | --- | --- |
-| Safe | Wording, help text, order, a new optional question, a new option | Drafts move to the new version unchanged |
-| Caution | A new required question, an option removed, tighter validation, a changed condition | Drafts move to the new version and are checked again when next opened; the person is told what needs attention |
-| Breaking | A question retired, a page with answers removed | Drafts move and lose the retired answers after a notice; the publisher confirms first |
+| Safe | Wording, help text, order, a new optional question, a new option | Draft responses move to the new version unchanged |
+| Caution | A new required question, an option removed, tighter validation, a changed condition | Draft responses move to the new version and are checked again when next opened; the person is told what needs attention |
+| Breaking | A question retired, a page with answers removed | Draft responses move and lose the retired answers after a notice; the publisher confirms first |
 
 A submitted response stays on the version it answered, always. A response returned for changes is revised on its own version, so the applicant is never asked new questions mid-review.
 
@@ -68,18 +68,21 @@ A submitted response stays on the version it answered, always. A response return
 title: A response moves forward through stages, and only review can send it back
 ---
 flowchart LR
-  draft["Draft"] -->|submit| pay["<b>Awaiting payment</b><br/>only if the form charges"]
-  pay -->|paid| pending["Pending"]
+  draft["Draft"] -->|"submit, form has no workflow"| received["<b>Received</b><br/>closed, final"]
+  draft -->|submit| pay["<b>Awaiting payment</b><br/>only if the form charges"]
+  draft -->|no charge| pending["Pending"]
+  pay -->|paid| pending
   pending -->|assign| review["In review"]
   review -->|decision| approved["Approved"]
   review -->|decision| declined["Declined"]
   review -->|decision| closed["Closed"]
-  review -->|return for changes| returned["Returned"]
+  review -->|return| returned["Returned"]
   returned -->|resubmit| review
   pending -->|withdraw| withdrawn["Withdrawn"]
   returned -->|withdraw| withdrawn
-  note1["A form with no review step stops at Pending. Approval may run an outcome action."]
-  note2["Any submitted response can later be anonymised: the answers go, the row and its history stay."]
+  review --> withdrawn
+  note1["A form with no workflow goes straight to Received, a closed stage. A workflow may decide without a review stage."]
+  note2["Withdrawal is open from any stage that is not final. Any submitted response can later be anonymised."]
   style pay stroke-dasharray: 5 4
   style review fill:#e8f0fe,stroke:#2563eb,stroke-width:2px
   style note1 fill:#fff,stroke:#64748b,stroke-dasharray: 2 3
@@ -88,7 +91,7 @@ flowchart LR
 
 *The life cycle of one response*
 
-A response only moves backwards when a reviewer returns it for changes, and it can be withdrawn until a decision is recorded.
+A response only moves backwards when a reviewer returns it for changes, and it can be withdrawn from any stage that is not final. A form with no workflow has one stage, Received, which is closed and final, so retention starts at once.
 
 A response has a coarse `state` the platform fixes and, once submitted, a `stage` the theatre defines. Every stage has one of six kinds, so other modules and reports can reason about a workflow they have never seen.
 
@@ -103,14 +106,14 @@ A response has a coarse `state` the platform fixes and, once submitted, a `stage
 
 | Change | Guard |
 | --- | --- |
-| Start a draft | The placement is active and open, and the person is in its audience. Where one response each applies, the person has none |
-| Save a draft | The person owns the draft or is a co-author the submitter added. Nothing is validated except size |
+| Start a draft response | The placement is active and open, and the person is in its audience. Where one response each applies, the person has none |
+| Save a draft response | The person owns the draft response or is a co-author the submitter added. Nothing is validated except size |
 | Submit | The placement is still open. The server rebuilds visibility from the answers and its own facts, discards hidden answers, validates, recalculates, and checks the cap and limited options by database constraint. Sent totals are compared where money is involved |
 | Submit on someone's behalf | Ability `forms.response.manage`; recorded in `entered_by` |
-| Pay | Payments announces a successful charge for this response's attempt; the response moves from `awaiting_payment` to `submitted` |
+| Pay | Forms owns the payment as a part of a Payments intent. When Payments settles the intent it calls forms' settlement handler inside its own unit of work, and the handler moves the response from `awaiting_payment` to `submitted`. After the first release (FB-508) |
 | Move between stages | The transition exists from the current stage, and the actor satisfies its "who may" rule. A transition to `approved` or `declined` requires a reason when the form says so |
 | Decide your own response | Refused. Nobody moves a response they submitted, whatever their abilities |
-| Return for changes | A transition whose target stage is of kind `returned`. The submitter may then edit; resubmitting creates revision n + 1 and moves to the stage the transition names |
+| Return for changes | A transition whose target stage is of kind `returned`. The submitter may then edit; resubmitting creates revision n + 1 and moves to the stage the transition names. A respondent who answered signed out has no account to find the response through, so the notice they are emailed carries a fresh single-use link to it |
 | Edit after submitting | Only as the placement allows: never, until it closes, or when returned. Each edit is a new revision |
 | Withdraw | The submitter, while no final stage is reached. Frees the one-each key, the cap count and any limited option |
 | Anonymise | The retention sweep once `retention_due_at` has passed, or erasure of the person |
@@ -122,7 +125,7 @@ A form in `record` mode (custom fields) has a simpler life: one response per rec
 A workflow is part of the form definition, so it is versioned with it.
 
 - **Stages** have a key, a name, a kind, and what the submitter is told their status is. A theatre may hide the real stage name from submitters.
-- **Transitions** have a key, a from and a to stage, a label, and a "who may" rule: an ability, a group, the assigned reviewers, the submitter, or the system on a timer or an event.
+- **Transitions** have a key, a from and a to stage, a label, and a "who may" rule: an ability, the holders of a role, the assigned reviewers, the submitter, or the system on a timer or an event.
 - **On entering a stage**, the form can send a notification, apply bindings, run an outcome action, request payment, or ask for review. These are queued and retried; the stage change itself never waits on them.
 - **The default workflow** is one stage, Received, of kind `closed`. A theatre that wants no workflow never sees one.
 - **A workflow can change in a new version.** A response keeps the workflow of its own version. If a later version removes a stage, responses in that stage stay there and staff see the old transitions.
@@ -130,8 +133,8 @@ A workflow is part of the form definition, so it is versioned with it.
 ## Review rules
 
 - **Criteria.** The form defines up to a setting's limit of criteria, each with a name, guidance, a whole-number scale and an optional weight.
-- **Assignment.** Reviewers are a group, named people, or both. An assignment row is made per reviewer per response when the response enters review.
-- **Private until released.** A reviewer sees only their own scores and comment until the round is released. Release is a transition a chair performs; from then the panel sees all scores. The form may instead allow open review from the start.
+- **Assignment.** Reviewers are the holders of a role, named people, or both. Forms asks identity for the role's holders when the response enters review; identity defines no groups, so forms has none. An assignment row is made per reviewer per response when the response enters review.
+- **Private until released.** A reviewer sees only their own scores and comment until the round is released. Release is a transition a chair performs; from then the panel sees all scores: every reviewer assigned to that response in that round, the chair and whoever decides. A reviewer locked out by a conflict stays locked out. The form may instead allow open review from the start.
 - **Never shown to the submitter.** Scores and reviewer comments never reach the submitter through the platform: not in their view and not in their download of their own answers. Matt decided this on 16 November 2026; a data-protection request may still oblige a theatre to disclose them, and the site owner's documentation says so.
 - **Declared conflict.** A reviewer may declare a conflict on a response. Their assignment becomes `conflicted`, and from that moment they cannot open that response's answers, scores, comments or messages. The declaration is recorded; its reason is not required.
 - **Automatic conflict.** A reviewer is conflicted without declaring it when they submitted the response, are a co-author of it, or are named in a person question the form marks as "people involved".

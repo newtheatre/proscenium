@@ -4,9 +4,7 @@
 
 The roadmap's gate for the box office phase is that "a full house sells its last seat once". D1 has no interactive transactions, so the usual answer (open a transaction, read what is left, write the sale) is not available. This proof asks whether the database itself can be made to refuse the second sale, so that no application code path can oversell whatever it does.
 
-**Answer: yes, on local D1.** All 11 cases passed, 20 rounds each. It has not yet been run against a deployed D1 database; see Limitations.
-
-**Confirmed on deployed D1, 16 November:** the same 11 cases passed on a real D1 database in Cloudflare, 20 rounds each. See "Deployed run" below.
+**Answer: yes, on local D1 and on deployed D1.** All 11 cases passed on each, 20 rounds each. The local run is described first; the run on a real D1 database in Cloudflare, made on 16 November, is under "Deployed run".
 
 ## The mechanism under test
 
@@ -63,13 +61,13 @@ What the deployed run adds:
 - **The race is worse in production than locally.** Locally the unprotected control oversold only when attempts shared an isolate. Deployed, separate requests oversold too, in 9 rounds of 10. A design that reads then writes would oversell in ordinary use, not only in a contrived test.
 - **The mechanism held under that worse race.** Every protected case gave the same answer as locally.
 - **A batch is all or nothing on deployed D1.** No party was part-filled in 6,000 competing party claims, and a refused ledger posting left no rows.
-- The limitation "not run on deployed D1" below is closed. What remains untested is load beyond 300 simultaneous claims and behaviour with read replication switched on, which the design does not use for writes.
+- What remains untested is load beyond 300 simultaneous claims and behaviour with read replication switched on, which the design does not use for writes.
 
 The runner and the raw output are with the proof files: `run-deployed.mjs` and `deployed-result-2026-11-16.txt`.
 
 ## What it found beyond pass and fail
 
-- **The control only oversold when attempts shared an isolate.** With separate local requests, each arrived about 6 ms apart, slower than a local database round trip, so read-then-write happened to be safe. A test that races only by separate requests would have passed a broken design. The never-regress tests in part 8 must race inside one isolate.
+- **Locally, the control only oversold when attempts shared an isolate.** With separate local requests, each arrived about 6 ms apart, slower than a local database round trip, so read-then-write happened to be safe. A test that races only by separate local requests would have passed a broken design, so the never-regress tests in part 8 race inside one isolate. Deployed, separate requests oversold too.
 - **A refused purchase is an error, not an empty result.** D1 reports `CHECK constraint failed` or `UNIQUE constraint failed` and the service maps those to "sold out" and "seat taken". This avoids the trap Proscenium recorded, where a guarded insert that matches no rows does not raise and the batch must be made to fail explicitly ([decision 0035](https://github.com/newtheatre/proscenium/blob/main/docs/decisions/0035-a-multi-row-claim-asserts-its-own-completeness.md)).
 - **Triggers, partial unique indexes and table CHECKs all work in D1**, and a constraint that fails inside a trigger-fired update aborts the whole batch.
 - **Lazy expiry works.** Releasing expired holds as the first statement of every purchase means a missed sweep never blocks a sale. The scheduled sweep becomes housekeeping, not correctness.
@@ -79,10 +77,10 @@ The runner and the raw output are with the proof files: `run-deployed.mjs` and `
 
 | Limitation | Why it matters | How to close it |
 | --- | --- | --- |
-| Local D1 only | Deployed D1 adds a network hop, replication and its own queueing; the semantics are documented as the same but were not observed | Run the same script against a real D1 database. That needs a database created in a Cloudflare account, so it is a question for Matt (part 9) |
-| Modest volume | 300 concurrent parties, not thousands | Repeat at on-sale scale during the phase 3 build, and measure latency under queueing |
+| Modest volume | 300 concurrent parties, not thousands | Repeat at on-sale scale during the phase 3 build, and measure latency under queueing (part 8, load checks) |
 | No retry behaviour tested | D1 does not retry writes automatically ([D1 error list](https://developers.cloudflare.com/d1/observability/debug-d1/)), so a lost connection mid-purchase must be retried by the application with an idempotency key | Covered by a named case in part 8, not by this proof |
-| Counter contention | Every purchase for a performance updates one pool row. D1 serialises writes anyway, so this adds nothing, but it was not measured | Same deployed run |
+| Counter contention not measured | Every purchase for a performance updates one pool row. D1 serialises writes anyway, so this should add nothing, but neither run timed it | The same load check |
+| Read replication | The deployed database had it off. The design sends every write and every read that guards a write to the primary | Confirm in the build that no claim path reads from a replica |
 
 ## What it changes in the design
 

@@ -81,6 +81,6 @@ The design paper asked for three technical proofs before the build starts. Each 
 - Twenty concurrent purchases of the last seat: exactly one succeeds and the count never exceeds capacity.
 - An append-only table refuses update and delete by trigger, with the one permitted exception (anonymising a name on erasure).
 
-**Finding.** D1 has no way to roll back a batch on a condition, so the guard is a statement inside the batch that fails deliberately when the expected row count is wrong (an insert of a null into a not-null column of `core_guard`). This is what `unit.expect(rows)` compiles to.
+**Finding.** D1 has no way to roll back a batch on a condition, so the guard is a statement inside the batch that fails deliberately when the expected row count is wrong (as built, an insert into the table core\_guard, whose trigger lets a passing row vanish and aborts the batch on a failing one, so the table stays empty; the proof itself used a null into a not-null column of `core_guard`). This is what `unit.expect(rows)` compiles to.
 
 **Closed.** Matt decided on 16 November 2026 that Windows and macOS runs are not needed: Workers run on Linux and the application depends on the browser, not the operating system. Linux is the supported system for tests, locally and in CI. A contributor on another system can use a Linux container or CI.

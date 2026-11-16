@@ -4,27 +4,27 @@ The module has 21 screens: 9 for people who build and run forms, 5 for people wh
 
 ## Inventory
 
-Shells are the paper's three: public, members' area and console. Workstream 6 owns their layout; these screens sit inside them.
+Shells are the interface specification's: the account, the members' area and the console, with the public site's frame for a form open to anyone. Forms has nothing in the Live shell. Workstream 6 owns their layout; these screens sit inside them.
 
 | # | Screen | Shell | Purpose | Who sees it |
 | --- | --- | --- | --- | --- |
 | 1 | Forms list | Console | Every form the person may see, with status, open responses and what needs attention | Any forms ability |
 | 2 | New form | Console | Start blank, from a template, or by importing a file | `forms.form.create` |
-| 3 | Builder: Questions | Console | Build and edit the draft | `forms.form.edit` |
+| 3 | Builder: Questions | Console | Build and edit the draft version | `forms.form.edit` |
 | 4 | Builder: Workflow | Console | Stages, transitions, review set-up, outcome actions | `forms.form.edit` |
 | 5 | Builder: Settings | Console | Mode, anonymity, retention, messages, payment | `forms.form.edit` |
-| 6 | Preview and test | Console | Fill the draft in as a chosen kind of respondent; nothing is kept | `forms.form.edit` |
+| 6 | Preview and test | Console | Fill the draft version in as a chosen kind of respondent; nothing is kept | `forms.form.edit` |
 | 7 | Publish | Console | The change summary, its impact, and confirmation | `forms.form.publish` |
 | 8 | Share and place | Console | The link, embed code, audience, dates, cap, and slots the form is attached to | `forms.form.publish` and the slot's ability |
 | 9 | Version history | Console | Each published version, who published it, what changed; open any version read-only | `forms.form.edit` |
 | 10 | Responses table | Console | All responses with filters in the address, columns per question, export | `forms.response.read` |
 | 11 | Response | Console | One response: answers by revision, status, history, messages, actions | `forms.response.read` or a reviewer |
 | 12 | Review queue | Console or members' area | The responses waiting for this reviewer | `forms.review.score` |
-| 13 | Review summary | Console | Scores side by side after release, and the decision | `forms.review.chair` or `forms.response.decide` |
+| 13 | Review summary | Console | Scores side by side after release, and the decision | `forms.review.chair`, `forms.response.decide`, or after release a reviewer assigned to that response |
 | 14 | Results charts | Console | Counts and averages per question | `forms.response.read` |
 | 15 | Fill in a form | Public or members' area | Answer, page by page, with saving and resuming | The placement's audience |
 | 16 | Confirmation | Public or members' area | What was received, the reference, what happens next | The submitter |
-| 17 | My forms | Audience account and members' area | Drafts to finish and responses with their status | Any signed-in person with one |
+| 17 | My forms | Audience account and members' area | Draft responses to finish and responses with their status | Any signed-in person with one |
 | 18 | My response | Audience account and members' area | Own answers, status, messages from the theatre, revise or withdraw | The submitter |
 | 19 | Slot renderer | Inside a host's screen | The attached form's questions inline, such as at checkout | Whoever the host shows it to |
 | 20 | Record-fields panel | Inside a host's screen | Custom fields on a record, to view and edit | The host record's abilities |
@@ -83,35 +83,37 @@ The reference project is described by its author as not very usable. These behav
 | --- | --- |
 | Nothing is lost | Every change saves by itself within two seconds. A failed save is shown and retried; the editor is never left unsure |
 | Mistakes are cheap | Undo and redo cover every change in the session, including deletes and moves |
-| The draft is safe to play with | Edits never touch the live form until Publish |
+| The draft version is safe to play with | Edits never touch the live form until Publish |
 | Problems are found before respondents find them | The Problems list updates as the author works; each problem links to its question |
-| Consequences are stated before they happen | Publish shows what changed and what it does to drafts and existing answers, in words |
+| Consequences are stated before they happen | Publish shows what changed and what it does to draft responses and existing answers, in words |
 | Starting is easy | Templates for the common forms, each a complete working example |
 | Testing is safe | Preview fills in the form for real, as a chosen kind of person, and discards everything |
 | Common things are one step | Duplicate a question or page; turn two questions into a side-by-side row; convert a list of pasted lines into options |
 | It works without a mouse | Every action has a keyboard path, and reordering is announced to screen readers |
-| Two authors do not collide | The second person to open a draft sees who is editing and may view read-only or take over |
+| Two authors do not collide | The second person to open a draft version sees who is editing and may view read-only or take over |
 
-### Templates shipped with the first release
+### Templates
 
-| Template | Slot | Shows off |
-| --- | --- | --- |
-| Show proposal | `core.season-call` | Pages, a repeating team list, a budget total, review with criteria, a decision with feedback |
-| Joining form | `membership.application` | Bindings to the person's record, a consent question |
-| Audition or workshop sign-up | `core.production-signup` | Limited options, one response each |
-| Questions at checkout | `box-office.checkout-questions` | A short inline form with no pages |
-| Access requirements | `forms.link` | Special-category questions, restricted reading |
-| Room booking extras | `spaces.booking-extras` | Conditional questions |
-| Incident report | `front-of-house.incident-report` | Staff-only questions, routing by severity |
-| Feedback survey | `forms.link` | An anonymous form, ratings |
-| Expense claim | `finance.expense-claim` | File upload, a calculated total, an approval stage |
-| Production details | `core.production-fields` | Custom fields in record mode |
+Ten templates are designed. Three ship with the first release, because they need only a link, and they are the fixtures that FB-208 and the test plan mean by "shipped templates". The others arrive with the slot or the story they depend on.
+
+| Template | Where it is placed | Shows off | Release |
+| --- | --- | --- | --- |
+| Show proposal | `forms.link`, with opening and closing dates | Pages, a repeating team list, a budget total, review with criteria, a decision with feedback | First |
+| Access requirements | `forms.link` | Special-category questions, restricted reading | First |
+| Feedback survey | `forms.link` | An anonymous form, ratings | First |
+| Joining form | `membership.application` | A consent question, and bindings to the person's record once FB-505 exists | With membership, which ships it as its own template |
+| Audition or workshop sign-up | `forms.production-signup` | Limited options, one response each | Later, with its slot |
+| Questions at checkout | `box-office.checkout-questions` | A short inline form with no pages | Later, with its slot |
+| Room booking extras | `spaces.booking-extras` | Conditional questions | Later, with its slot |
+| Incident report | `front-of-house.incident-report` | Staff-only questions, routing by severity | Later, with its slot |
+| Expense claim | `finance.expense-claim` | File upload, a calculated total, an approval stage | Later, with its slot |
+| Production details | `forms.production-fields` | Custom fields in record mode | Later (FB-511) |
 
 ## Filling in a form
 
 - **One page at a time**, with the page title, a progress indicator and Back and Continue. A short form with one page shows no progress indicator.
 - **Errors** appear when the person leaves a field and again on Continue, beside the field, with a summary at the top that links to each. The first invalid field takes focus, as the platform's form rules require.
-- **Saving.** A signed-in person's draft saves to the server as they go, and "Saved" is shown. A person who is not signed in has the draft kept on their device, and may ask for a link by email to continue elsewhere.
+- **Saving.** A signed-in person's draft response saves to the server as they go, and "Saved" is shown. A person who is not signed in has the draft response kept on their device for seven days, the interface specification's limit for a draft kept on a device, and may ask for a link by email to continue elsewhere. Asking moves the draft response to the server, where `forms.drafts.keep-for` applies. A form with a special-category question is never kept on the device: a signed-out person finishes in one sitting or asks for the link first, and the page says so before they start.
 - **A dropped connection** is said plainly. Answers stay on the device, and Submit is held and retried, never sent twice.
 - **Calculated values** such as a total appear in place and update as answers change.
 - **A review page** before sending lists the answers by page with a Change link for each, when the form has more than one page. The final button names the act in the author's words, such as "Send proposal", and is never "Submit". A question is required unless its label says "(optional)".
@@ -130,7 +132,7 @@ The review queue appears in the navigation of both the members' area and the con
 - **A response in review** shows the answers on the left and the reviewer's own scoring panel on the right: each criterion with its guidance and scale, a private comment, a recommendation, and Submit review.
 - **Declare a conflict** is always visible on that panel. Using it replaces the response with a notice at once.
 - **A conflicted reviewer** sees the response in their queue as a locked row that names the form and nothing else.
-- **The summary** appears to the chair after release: one row per response, a column per criterion with the mean and the spread, the number of reviews, and the weighted total. Selecting a row shows each reviewer's scores and comment.
+- **The summary** appears after release to the chair, to whoever decides and to each reviewer assigned to that response: one row per response, a column per criterion with the mean and the spread, the number of reviews, and the weighted total. Selecting a row shows each reviewer's scores and comment.
 - **Deciding** opens a dialog with the transition's name, a reason for the record, and a separate message to the submitter with a preview of what they will receive.
 - **Several at once.** The chair may select several responses and apply one transition, with one message template; each is still its own audited change.
 
@@ -146,7 +148,7 @@ Follows the platform's list conventions: filters live in the address, every view
 ## Screens inside other modules
 
 - **The slot renderer** draws the attached form's questions inline in the host's own form, with the host's Submit button. The host asks forms to check the answers and adds them to its own unit of work, so the order and its answers are saved together or not at all.
-- **The record-fields panel** shows custom fields as a section of the host's record page, read-only until the host's own Edit is used.
+- **The record-fields panel** shows custom fields read-only until Edit is used. A module that requires forms places it as a section of its own record page. On a core record it is a "Custom fields" tab, because core cannot place a module's component.
 - **Attach a form** lists the forms that fit the slot, offers the slot's template, and opens the builder with the slot's restrictions applied.
 
 ## How the screens use the platform's page types

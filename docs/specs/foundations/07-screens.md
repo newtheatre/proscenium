@@ -1,49 +1,55 @@
 # 5. Screens
 
-## Seven screens, all in the console
+## Six console screens and Setup
 
-Foundations' screens are for the people who run the system, not for audiences or ordinary members. All but Setup live in the console shell under a group called System. Layout, components and wording style follow workstream 6; this part says what each screen is for, what is on it and what it must never do.
+Foundations' screens are for the people who run the system, not for audiences or ordinary members. Setup is a page of its own at `/setup`. The other six live in the console, in the interface's System group (group id system, shared with the core domain's organisation, branding and webhooks screens), at addresses under /console/system, because a person reads the address and system is a place where the module id is a code name (integration's ruling R-31). The module id remains `core`. Layout, components and wording style follow workstream 6; this part says what each screen is for, what is on it and what it must never do.
 
 | Screen | Address | Who (default) | Purpose |
 | --- | --- | --- | --- |
 | Setup | `/setup` | Whoever holds the setup code, then the Owner | Take a fresh deploy to a usable site |
-| Modules | `/console/system/modules` | Owner | See what the system can do and switch parts on or off |
-| Settings | `/console/system/settings` | Owner; managers for their own module's settings | Change how the theatre works, with limits and history |
-| Jobs | `/console/system/jobs` | Owner | See background work, retry or cancel it |
-| Credentials | `/console/system/credentials` | Owner | Enter and replace keys for outside services |
-| Updates and health | `/console/system/health` | Owner | Know whether the system is well and up to date |
-| Audit | `/console/system/audit` | Owner; data-protection lead | Answer who did what, when and why they could |
+| Modules | `/console/system/modules` | Owner; administrator to view | See what the system can do and switch parts on or off |
+| Settings | `/console/system/settings` | Owner, administrator; managers for their own module's settings | Change how the theatre works, with limits and history |
+| Jobs | `/console/system/jobs` | Owner, administrator | See background work, retry or cancel it |
+| Credentials | `/console/system/credentials` | Owner; administrator to view | Enter and replace keys for outside services |
+| Updates and health | `/console/system/health` | Owner; administrator to view | Know whether the system is well and up to date |
+| Audit | `/console/system/audit` | Owner, administrator | Answer who did what, when and why they could |
+
+The roles named are identity's preset roles; part 6 gives the abilities.
 
 ## Setup
 
 Shown only while the system has no Owner. The first deploy prints nothing secret in logs: the setup code is the Worker secret `CORE_SETUP_CODE`, set by the person who deployed. Without it the page explains where to set it and does nothing else.
 
-1. **Check.** Database reachable, migrations pending (count), file store, queue, cron and encryption key present. Each line is a health check with a remedy. Cannot continue while a required one fails.
-2. **Prepare the database.** One button applies all migrations, with progress per migration.
-3. **Create the Owner.** Name, email, sign-in method (from identity).
-4. **The theatre.** Name, time zone, currency, language. Everything else has a default.
-5. **Choose a starting point.** A preset (for example a student theatre, a receiving house, a society with no building) switches on a set of modules and applies settings. Each preset lists exactly what it will switch on and change. Start empty is always offered.
-6. **Checklist.** The remaining setup steps contributed by modules (`core.setup-step`), each with a link, shown on the console home until all are done or dismissed.
+This is the one statement of the setup sequence. Foundations owns the order and the setup code; the interface draws it; identity and the core domain supply the steps named as theirs.
 
-Setup can be left and resumed at any step. Once an Owner exists `/setup` answers 404 for ever, and the setup code is no longer read.
+1. **Check.** Database reachable, migrations pending (count), file store, queues, cron and encryption key present. Each line is a health check with a remedy. Cannot continue while a required one fails.
+2. **Prepare the database.** One button applies all migrations, with progress per migration.
+3. **Create the Owner.** Identity's step, and identity's rules: name, email address, a passkey, and recovery codes typed back to prove they were saved. It writes the first grant.
+4. **The theatre.** Name, time zone, currency, language (`core.site.name` and `core.locale.*`). The time zone has no default and must be chosen. Everything else has a default.
+5. **Choose a starting point.** One of the three presets, `student-society`, `amateur-company` or `small-venue`, or Start empty. A preset switches on a set of modules and applies settings, and lists exactly what it will switch on and change before it is applied. There is no sample data.
+6. **Checklist.** The remaining setup steps contributed through `core.setup-step`, each with a link, shown on the console home until all are done or dismissed. The core domain's are the look (brand colour and logo), the first venue, the year end, the sender address and the email outcomes subscription; each switched-on module adds its own.
+
+Where the interface's Steps page allows five steps, Check and Prepare the database share the first.
+
+Setup can be left and resumed at any step. Once an Owner exists `/setup` answers page not found for ever, and the setup code is no longer read.
 
 ## Modules
 
-A card for each module: name, one sentence on what it does, stability (stable, beta, experimental), on or off, and what it needs. Grouped as Always on, On, Available, and Your theatre's own (`x-` modules).
+A card for each module: name, one sentence on what it does, stability (experimental, stable or deprecated), on or off, and what it needs. Grouped as Always on, On, Available, and Your theatre's own (`x-` modules).
 
 - Switching on shows a confirmation that lists: modules it will also switch on, secrets it needs and whether they are set, presets on offer, and the screens that will appear.
-- Switching off shows: what will disappear, what will be kept (always the data), and which modules prevent it if any.
+- Switching off shows: what will disappear, what will be kept (always the data), which modules prevent it if any, and the counted statements the module itself gives of what the switch will cost (its switchOff.impact).
 - A module that is on but missing something it needs shows a warning with a link to the remedy.
 - Experimental modules carry a plain statement that their data format may change before they are stable.
 
 ## Settings
 
-One page per module, generated from the settings registry; no module writes its own settings screen unless a setting's kind is `custom`.
+One page per module, generated from the settings registry and found at /console/\<module>/settings in that module's own group; /console/system/settings is the index and the search across all of them; no module writes its own settings screen unless a setting's kind is `custom`.
 
 - Each setting shows its label, a sentence of help, its current value, its default, its limits, and when and by whom it was last changed.
 - Search across all settings by label, help text or key.
 - A changed value is validated against its limits before save; the refusal names the limit.
-- Settings marked `change: 'reason'` ask for a reason; settings marked `change: 'confirm'` show what will be affected first.
+- Settings `declared onChange: 'reason' ask for a reason; settings declared onC``hange: 'confirm'` show what will be affected first.
 - History for any setting: every change with who, when, old and new value (sensitive values shown only as changed).
 - A setting managed by the deployment (`managed`) is shown read-only with a note that it is set outside the app.
 - A filter for Changed from default, so a successor can see at a glance what this theatre has decided.
@@ -69,7 +75,7 @@ One page per module, generated from the settings registry; no module writes its 
 
 One page, two halves.
 
-**Health.** Every health check with a state (ok, warning, failing), a sentence and a remedy. Foundations' own checks: migrations pending, cron last fired, queue consumers alive, dead jobs, external calls unknown, secrets missing, credentials expiring within 30 days, settings outside limits or orphaned, files in upstream's paths changed, storage and database size against the plan's limits. A warning or failure that lasts more than a day is sent to the Owner once, through notifications.
+**Health.** Every health check with a state (ok, warning, failing), a sentence and a remedy. Foundations' own checks: migrations pending, cron last fired, queue consumers alive, dead jobs, external calls unknown, secrets missing, credentials expiring within 30 days, signing keys due for rotation (with Retire now, which needs core.signing-key.retire and says what it will invalidate), settings outside limits or orphaned, files in upstream's paths changed, storage and database size against the plan's limits. A warning or failure that lasts more than a day is sent to the Owner once, through notifications.
 
 **Updates.** The version running, the release channel, the latest release on that channel, and for each release in between: its notes, whether it has migrations, whether it is marked breaking, and what the theatre must do. A button opens the update pull request in the theatre's repository when one is waiting. After a deploy with pending migrations, this is the screen with the Apply button and per-migration progress. The app never changes the repository or deploys itself.
 
@@ -78,9 +84,9 @@ One page, two halves.
 - Search by person, record, module, action, ability and date. Results show who, what, which record (as a link), when, and what allowed it.
 - Opening a row shows the fields that changed, without personal free text.
 - Every search and every export of the audit is itself audited.
-- Export as a file needs `core.audit.export`, risk high.
+- Export as a file needs `core.audit.export`, a privileged ability.
 - The log cannot be edited or deleted from any screen.
 
 ## States every screen must handle
 
-Empty (with what to do first), loading, refused (the standard refusal with its remedy), partly unavailable (a module off, a secret missing) and stale (the page reloads its data when a change is announced on the live channel). Each screen is usable by keyboard alone and on a phone; tables collapse to cards below the narrow breakpoint defined by workstream 6.
+Empty (with what to do first), loading, refused (the standard refusal with its remedy), partly unavailable (a module off, a secret missing) and stale (the page reloads its data when a change is announced on the live channel). Each screen is usable by keyboard alone and on a phone; tables collapse to cards below the interface's laptop breakpoint (1024 pixels).

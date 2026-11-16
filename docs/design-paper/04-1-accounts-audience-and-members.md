@@ -29,7 +29,7 @@ The usual cause of duplicate accounts is two email addresses: a personal one use
 - An account holds several verified email addresses and several sign-in methods.
 - A theatre can require its own domain's sign-in for the members' area while the same person keeps a personal address for tickets and receipts.
 - Each kind of message goes to the address the person chooses for it.
-- When the system sees a second account being created for an address pattern or name it already knows, it offers to link, and merging two accounts is one confirmed step.
+- When someone adds an address that another account already holds, the system offers to merge the two. Staff can merge two accounts in the first release, and a person merging their own two accounts comes later. Matching on names or address patterns is out of scope.
 
 ## Separate data, separate consent
 

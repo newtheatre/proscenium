@@ -32,7 +32,7 @@ Public content pages are an eighth kind that the theatre owns: prose in the site
 - **The title is the thing's own name** ("Hamlet", "Order 4F7K2"), with its status as a badge beside it. A status badge always carries a word.
 - **One primary action** for the most likely next step in this state; everything else in an action menu. Destructive actions are last in the menu, separated.
 - **A summary strip** of four to six facts sits above the tabs and stays put as tabs change.
-- **Tabs come from modules.** A production's record shows Overview from the core, and Tickets, Rota, Budget from whichever modules are on. A tab the viewer may not open is absent.
+- **Tabs come from modules.** A production's record shows core's own tabs first (Overview, Details, Dates, Credits, Media, Advisories and access), then Tickets, Rota and Budget from whichever modules are on, each contributed through `core.record-tab`, the one way to add to a record page. A tab the viewer may not open is absent.
 - **History** is a panel on every record: who changed what and when, from the audit trail, with no personal free text.
 - **Related records are links**, never repeated data that can go stale.
 
@@ -50,10 +50,10 @@ Public content pages are an eighth kind that the theatre owns: prose in the site
 
 ### Settings
 
-- **Generated, not hand-built.** Each setting's control, default, help text and validation come from the registry. A module writes no settings screen.
-- **Each setting shows** its current value, its default with a "Reset" link when changed, who may change it, and a "Quoted on public pages" tag where a content page shows it live.
+- **Generated, not hand-built.** Each setting's control, default, help text and validation come from the registry. A module writes no settings screen. Its generated page is at `/console/<module>/settings`, in the set-up half of the module's own group; foundations' Settings screen at `/console/system/settings` is the index and search across every group and links to each.
+- **Each setting shows** its current value, its default with a "Reset" link when changed, its limits, who may change it, when and by whom it was last changed, and a "Quoted on public pages" tag where a content page shows it live. A setting managed by the deployment is shown read-only and says so. This is foundations' list for its Settings screen, which this page type draws.
 - **Changes save per section** with a stated summary ("3 changes"), and each links to its audit entry.
-- **Settings search** in the console finds a setting by its label or by the words in its help text.
+- **Settings search** in the console finds a setting by its label, by the words in its help text or by its key.
 - **A setting the viewer may read but not change** is shown read-only with who can change it.
 
 ### Home
@@ -76,7 +76,7 @@ Public content pages are an eighth kind that the theatre owns: prose in the site
 - **Dark ground by default**, for a dim foyer or wings. A theatre can turn that off.
 - **The status strip** always shows the connection state in words and the number of actions waiting to send.
 - **It works without a connection.** The screen loads tonight's data when opened, keeps working from that copy, and sends what was done when the connection returns. Tab 3 has the rules.
-- **Results are unmistakable:** a full-width band with a word, a shape and a colour, and a sound or vibration where the device allows. Never colour alone.
+- **Results are unmistakable:** a full-width band with a word, a shape and a colour, and a vibration where the device allows, with a sound when the owning module's setting allows one (the door's is box office's, off by default) and the device is not muted. Never colour alone.
 - **The screen stays awake** while it is open.
 
 ### Editor, a named layout
@@ -96,7 +96,7 @@ One `Calendar` component serves every module that shows time: Spaces' bookings, 
 
 - **Views:** day and week, with several columns side by side (one per space, role or trainer). On a phone it shows one day and one column at a time, with the column chosen from a menu.
 - **Blocks carry state** in three ways at once: a word, a border style and a colour, so state never depends on colour alone.
-- **The list is the equal route.** Every calendar has a List view of the same items with the same filters and actions, reachable by one control and by keyboard. It is the accessible route and the default below 640 pixels when there are more than three columns.
+- **The list is the equal route.** Every calendar has a List view of the same items with the same filters and actions, reachable by one control and by keyboard. It is the accessible route and the default at phone width when there are more than three columns.
 - **Calendar colours** are a fixed, named set of eight (`calendar-1` to `calendar-8`), each with a light and dark pair that passes 4.5 to 1 for text and 3 to 1 against the page. They are separate from the brand accent and from the status colours, so no brand can make them unreadable. A module maps its categories to names, never to colour values.
 - **Times** follow the theatre's zone and the show-night rule; a block that crosses midnight is drawn once, on the night it belongs to.
 - **Acting on a block** opens the record's side panel. Dragging to move or resize is an extra for pointer users; the same change is always available as a form.
@@ -162,6 +162,8 @@ The standard is WCAG 2.2 at level AA, checked by automated tests in CI and by ha
 - **Motion** respects the reduced-motion setting. Nothing flashes.
 - **Seating plans and calendars have a list equivalent** that does the same job.
 - **Timeouts are announced.** A basket about to expire says so with time to extend it.
+
+**One set of widths.** Every screen uses the same three, which are Tailwind's and Nuxt UI's own steps: phone is below 640 pixels, tablet is 640 to 1023, laptop is 1024 and above. At phone width the members' section links become the bottom tab bar and a calendar defaults to its List view. Below laptop width (phone and tablet) a table becomes stacked cards and the console sidebar becomes a drawer. No screen names a width of its own; "the narrow breakpoint" in foundations' screens means below laptop width.
 
 ### Appearance
 

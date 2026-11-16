@@ -23,12 +23,12 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 | The double booking | Integration | Two requests schedule overlapping performances in one exclusive space at the same moment. | Exactly one succeeds. The other is refused with the clash named. |
 | The moved matinee | Integration, end to end | A scheduled performance is rescheduled. | One event with old and new times. The public page shows the new time within a minute. The old time appears nowhere. |
 | The cancelled night | Integration | Cancel a performance with a test module contributing an impact line and, in a second run, a refusal. | First run: the line is shown and the cancel completes with one event. Second run: nothing changes and the refusal's reason is shown. |
-| The whole run cancelled | Integration | Cancel a production with 12 future and 3 completed performances. | The 12 are cancelled in the same batch with the same reason. The 3 are untouched. |
+| The whole run cancelled | Integration | Cancel a production with 12 scheduled future, 2 draft and 3 completed performances. | The 12 are cancelled in the same batch with the same reason. The drafts stay drafts and the 3 are untouched. The production is past at once and its page says cancelled. |
 | The changed slug | Integration, end to end | Change a slug twice. Then try to give the first slug to another production. | Both old addresses redirect permanently to the current one. The reuse is refused. |
 | The draft leak | End to end | A draft production with a draft performance, and a published production with one draft performance. | No public page, feed, open-data route, sitemap or search result mentions any draft. Each returns "not found", not "forbidden". |
 | The silent warning | Integration | A production with no advisories and no confirmation. | It cannot be published. |
 | The closed week | Integration | A blocking closure, then a performance inside it. Then a closure created over an existing performance. | The first is refused. The second saves, lists the performance as a warning, and changes nothing. |
-| The long run | Integration | A run that would create 200 performances. | Saved in batches that respect the 90-parameter limit, all or nothing. |
+| The long run | Integration | A run that would create 200 performances. | Created by a job in chunks that respect the 90-parameter limit, each chunk its own unit of work. Running a chunk twice creates nothing twice. A job stopped part way reports how many were created, and can be finished or undone. |
 
 ## Vocabularies
 
@@ -59,7 +59,7 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 | The rolled-back receipt | Integration | A caller's batch fails after `notify()` added its statements. | No notification, no delivery, no inbox item. |
 | The muted receipt | Integration | A person with every switch off receives a transactional type. | It is sent. The preferences screen offers no switch for it. |
 | The muted newsletter | Integration | The same person receives an optional type. | Suppressed, with the reason recorded, and nothing sent. |
-| The hard bounce | Integration | The provider reports a hard bounce. | The delivery is bounced. The address is suppressed. The next send to it is skipped with that reason. |
+| The hard bounce | Integration | Cloudflare reports a hard bounce on the email events queue and, in a second run, a complaint. Each report arrives twice. | The delivery is bounced, or complained. The address is suppressed with the matching reason. One event is announced, not two. The next send to the address is skipped with that reason, whatever the type. |
 | The wrong side | End to end | A person who is audience and member gets one message of each kind. | Each appears only in its own side's inbox and count. |
 | The unknown variable | Unit | A template using a variable its type does not declare. | Refused at save. |
 | The old wording | Integration | Send, edit the template, send again. | The log shows each send with the wording it used. |
@@ -84,7 +84,7 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 | The stale listing | End to end | Publish, cancel and withdraw, checking the public page after each. | Each change shows within a minute. |
 | The unknown token | Unit | A page quoting a missing setting, an unquotable one, and an unknown component. | The check fails for each, naming the file and line. |
 | The missing module | End to end | A page uses a component from a module that is switched off. | The page renders without it, with no error, and the readiness screen lists it. |
-| The clean merge | Integration | A fork with changed `site/` content, an overridden page and its own component merges a new upstream release. | No conflict in `site/`. The override still wins. |
+| The clean merge | Integration | A fork with changed `site/` content, its own content configuration, an overridden page and its own component merges a new upstream release. | No conflict in `site/`. The override still wins. |
 | The unready site | End to end | A fresh install. | Every page carries `noindex` and `robots.txt` disallows everything until setup completes. |
 | No scripts | End to end | Scripts disabled. | What's on, a production page and a content page are readable and navigable. |
 | The broken redirect | Unit | A redirect to a page that does not exist. | The check fails. |
@@ -93,7 +93,7 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 
 | Name | Tier | Set up | Must hold |
 | --- | --- | --- | --- |
-| The erased director | Integration | Erase an account that has credits, uploads, an inbox, preferences and sent notifications. | The outcomes in part 2's erasure table, each checked. Their name is not findable in the archive search unless question 5's answer keeps printed names. |
+| The erased director | Integration | Erase an account that has credits, uploads, an inbox, preferences and sent notifications. | The outcomes in part 2's erasure table, each checked. The printed name stays on each credit with no link to an account, as decided on question 5. In a second run the person asked for the name to go: it is gone, and the archive search does not find it. |
 | The merged account | Integration | Merge two accounts that both have inbox items and preferences. | Nothing remains on the losing account. Where both set a preference, the survivor's stands. |
 | The suppressed ghost | Integration | Erase an account whose address was suppressed. | The suppression still blocks a later send to that address. |
 
@@ -102,7 +102,7 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 | Name | Tier | Set up | Must hold |
 | --- | --- | --- | --- |
 | Core alone | End to end | Only core and the public site on. | A season and a what's-on page can be published. No booking button shows unless an external link is set. This is the phase 2 gate. |
-| Public site off | End to end | Switch the public site off. | The console works. Public routes return "not found". Nothing is deleted, and switching it on restores everything. |
+| Public site off | End to end | Switch the public site off. | The console works. The public site's addresses stay reserved and return "not found". Nothing is deleted, and switching it on restores everything. |
 | The upgrade | Integration | A database from the previous release with data in every core table. | Migrations apply, and every row reads back correctly. |
 
 ## Added after Matt's decisions of 16 November 2026

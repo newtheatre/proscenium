@@ -17,7 +17,7 @@ Columns follow the foundations format. All are changed by `forms.settings.manage
 | `forms.uploads.file-size` | integer (megabytes) | 10 | 1 to 100 | public | Largest single uploaded file |
 | `forms.uploads.files-per-response` | integer | 10 | 1 to 50 | public | Most files on one response |
 | `forms.uploads.types` | list of choice | PDF, images, common document formats | The platform's list | public | File types a form may accept |
-| `forms.drafts.keep-for` | duration | 30d | 1d to 365d | signed-in | How long an untouched draft is kept |
+| `forms.drafts.keep-for` | duration | 30d | 1d to 365d | signed-in | How long an untouched draft response is kept |
 | `forms.drafts.reminder-before` | duration | 7d | 1d to 30d | staff | How long before deletion the reminder goes |
 | `forms.retention.default` | duration | unset | 30d to 3,650d | staff | Retention offered when a form is first published |
 | `forms.retention.require-choice` | boolean | true |  | staff | Whether a form holding personal answers must state its retention before publishing |
@@ -32,7 +32,7 @@ Columns follow the foundations format. All are changed by `forms.settings.manage
 Notes:
 
 - `forms.retention.default` ships unset, as the paper's rule for a number nobody has agreed. With `require-choice` on, the publisher chooses per form. Matt decided on 16 November 2026 that no default ships.
-- Opening and closing dates, caps, one response each and who may answer are not settings. They vary by placement, so they are columns on `forms_placements`, as the settings draft directs.
+- Opening and closing dates, caps, one response each and who may answer are not settings. They vary by placement, so they are columns on `forms_placements`, as the foundations settings format directs.
 - Rate limits on the public routes are declared per route in the platform's own registry, not here.
 - Presets: `student-society` and `amateur-company` take the defaults. `small-venue` sets `forms.review.blind-by-default` to false, since a venue with paid staff seldom runs a panel.
 
@@ -45,24 +45,24 @@ Notes:
 
 ## Abilities
 
-Scope says where the ability can be granted: the whole site, or one form. The preset holder is given in plain words: The mapping to preset roles was confirmed by the identity specification on 16 November 2026. "Site owner" is its owner role, which holds every ability by rule. "Officers and staff" is its administrator role, since all three abilities so marked change things; the committee-member role is read-only oversight and holds none of them, and a functional role such as membership-officer or production-lead is granted the per-form abilities on the forms that belong to its subject. "Welfare or access lead" is its welfare-lead role, which alone holds read-special in the presets; administrator does not.
+The columns are the foundations format. An ability that acts on `forms.form` can be granted on one form or site-wide. One that acts on `forms.response` is granted on the form, which is the response's parent, and never on a single response. "Owner" is the record's owner: the creator of a form, the submitting account of a response. Suggested holders are identity's preset role keys, confirmed by the identity specification on 16 November 2026: the three abilities that change things site-wide go to `administrator`, the read-only `committee-member` role holds none, and a functional role such as `membership-officer` or `production-lead` is granted the per-form abilities on the forms that belong to its subject.
 
-| Ability | Scope | Allows | Preset holder |
-| --- | --- | --- | --- |
-| `forms.form.create` | Site | Start a new form, from blank or a template | Officers and staff |
-| `forms.form.edit` | Site or one form | Edit the draft, preview, run test mode | The form's creator, for that form |
-| `forms.form.publish` | Site or one form | Publish, pause, close and archive; attach to `forms.link` | Officers and staff |
-| `forms.form.share` | Site or one form | Grant and remove the per-form abilities on a form | The form's creator, for that form |
-| `forms.response.read` | Site or one form | See responses and results, except restricted answers | Granted per form |
-| `forms.response.manage` | Site or one form | Move responses along transitions marked for managers, message submitters, answer on someone's behalf, withdraw | Granted per form |
-| `forms.response.decide` | Site or one form | Perform a transition to an approved or declined stage | Granted per form |
-| `forms.response.export` | Site or one form | Build and download an export | Granted per form |
-| `forms.response.read-special` | Site or one form | See special-category answers, one response at a time, each view audited | Welfare or access lead |
-| `forms.review.score` | Site or one form | Be assigned as a reviewer and submit reviews | Granted per form or by group |
-| `forms.review.chair` | Site or one form | Assign reviewers, release a round, see the summary | Granted per form |
-| `forms.template.manage` | Site | Save, rename and delete the theatre's own templates; import a form file | Officers and staff |
-| `forms.action.retry` | Site | Retry or dismiss an abandoned outcome action | Site owner |
-| `forms.settings.manage` | Site | Change the settings above | Site owner |
+| Ability | Acts on | Risk | Owner | Implies | Purpose | Suggested holders |
+| --- | --- | --- | --- | --- | --- | --- |
+| `forms.form.create` | Site only | normal | ignored |  | Start a new form, from blank or a template | `administrator` |
+| `forms.form.edit` | `forms.form` | normal | grants |  | Edit the draft version, preview, run test mode | The form's creator, as owner |
+| `forms.form.publish` | `forms.form` | normal | ignored | `form.edit` | Publish, pause, close and archive; attach to `forms.link` | `administrator` |
+| `forms.form.share` | `forms.form` | normal | grants |  | Grant and remove the per-form abilities on a form | The form's creator, as owner |
+| `forms.response.read` | `forms.response` | normal | grants |  | See responses and results, except restricted answers. The submitter always sees their own | Granted per form |
+| `forms.response.manage` | `forms.response` | normal | refuses | `response.read` | Move responses along transitions marked for managers, message submitters, answer on someone's behalf, withdraw | Granted per form |
+| `forms.response.decide` | `forms.response` | normal | refuses | `response.read` | Perform a transition to an approved or declined stage | Granted per form |
+| `forms.response.export` | `forms.form` | privileged | ignored | `response.read` | Build and download an export | Granted per form |
+| `forms.response.read-special` | `forms.response` | privileged | ignored | `response.read` | See special-category answers, one response at a time. Declares `audit: 'read'`, so each view is recorded | `welfare-lead` only |
+| `forms.review.score` | `forms.response` | normal | refuses |  | Be assigned as a reviewer and submit reviews. After release, open the summary of a response they were assigned | Granted per form, or to the holders of a role |
+| `forms.review.chair` | `forms.form` | normal | ignored | `response.read` | Assign reviewers, release a round, see the summary | Granted per form |
+| `forms.template.manage` | Site only | normal | ignored |  | Save, rename and delete the theatre's own templates; import a form file | `administrator` |
+| `forms.action.retry` | Site only | normal | ignored |  | Retry or dismiss an abandoned outcome action | `owner` |
+| `forms.settings.manage` | Site only | privileged | ignored |  | Change the settings above | `owner` |
 
 Rules:
 
@@ -72,7 +72,9 @@ Rules:
 - **Nobody decides, reviews or moves their own response**, and nobody grants themselves an ability on a form. Both are refused at the write.
 - **A conflict of interest removes access** to that one response from every ability above, including `read-special` and export. It is a guard in forms' own service, run after the platform's authorisation, because the permission model only ever allows (workstream 2's ruling).
 - **Site owners are not exempt.** An override of a lockout is possible only by removing the assignment's conflict, which is itself recorded and shown to the chair.
-- **Derived authority.** The submitter may read, revise when returned and withdraw their own response without any ability. A co-author the submitter adds to a draft may edit that draft and nothing else, until it is submitted.
+- **Derived authority.** The submitter may read, revise when returned and withdraw their own response without any ability. A co-author the submitter adds to a draft response may edit that draft response and nothing else, until it is submitted.
+
+**The privileged set is deliberate, and it is three abilities.** A privileged ability asks for a second factor re-asserted in the session. Reading special-category answers and taking personal data out in bulk carry that cost, as does changing the limits; a welfare lead will be asked once per session before opening access needs. Reading and deciding ordinary responses stay normal, so that a committee running a proposals round is not asked for a second factor at every sitting. `owner: 'refuses'` is how nobody moves, decides or reviews their own response; a response keyed to an address has no owner, so forms' service applies the same refusal by matching the address.
 
 ## What the submitter can always do
 

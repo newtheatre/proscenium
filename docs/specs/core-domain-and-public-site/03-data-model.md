@@ -59,7 +59,7 @@ The centre of the model. A production is anything the theatre puts in front of p
 | `listed` | boolean | not null, default true | internal | keep | False keeps a published production out of lists and feeds while its page still answers |
 | `published_at` | timestamp |  | internal | keep |  |
 | `first_starts_at` | timestamp |  | public | keep | Earliest performance that is not a draft |
-| `last_ends_at` | timestamp |  | public | keep | Latest performance that is not a draft. Decides current or past, and so the address (question 7). |
+| `last_ends_at` | timestamp |  | public | keep | Latest performance that is neither a draft nor cancelled. Decides current or past, and so the address (question 7). |
 | `created_by` | account, role actor | nullable | internal | keep |  |
 
 `first_starts_at` and `last_ends_at` are copies, kept in step by every performance write in the same batch, so the lists sort and filter on one indexed table. Indexes: `(state, last_ends_at)`, `(season_id)`, `(category_term_id)`.
@@ -74,7 +74,7 @@ Every slug a production has had, so an old link redirects for ever.
 | `production_id` | ref `core_productions` | not null, cascade | internal | keep |  |
 | `retired_at` | timestamp | not null | internal | keep |  |
 
-**`core_production_credits`**: realm members; subject `account_id`; no retention; not append-only; id prefix `crd`.
+**`core_production_credits`**: realm members; subject `{ account: 'account_id', unlinked: 'staff' }`; no retention; not append-only; id prefix `crd`.
 
 Who made the show. Credits feed the public page and the archive.
 
@@ -90,6 +90,8 @@ Who made the show. Credits feed the public page and the archive.
 | `sort` | integer | not null, default 0 | internal | keep |  |
 
 Indexes: `(production_id, section_term_id, sort)`, `(account_id)`.
+
+A credit may have no account: a historical credit, or someone outside the theatre. The format requires a table like this to say how such rows are found for a data request, and the answer is by staff, searching the printed name on the credits screen.
 
 **`core_production_advisories`**: realm operational; subject none; no retention; not append-only; keyed by production and term, so no id prefix.
 
@@ -112,7 +114,7 @@ One occasion on which a production happens. Everything record-like in every othe
 | `starts_at` | timestamp | not null | public | keep |  |
 | `doors_at` | timestamp | at or before `starts_at` | public | keep | Starts from `core.programme.doors-before` |
 | `ends_at` | timestamp | not null, after `starts_at` | public | keep | Always stored, so overlap checks never guess |
-| `operating_day` | local date | not null | internal | keep | From `starts_at`, the time zone and the rollover hour. A show at 00:30 belongs to the night before. |
+| `operating_day` | local date | not null | internal | keep | From `starts_at`, the time zone and the day start (core.locale.time-zone and core.locale.day-start). A show at 00:30 belongs to the night before. |
 | `interval_count` | integer | not negative | public | keep | Null takes the production's |
 | `capacity` | integer | not negative | internal | keep | Null takes the space's. 0 is a closed house. |
 | `label` | text | at most 40 characters | public | keep | Such as "Preview" |
@@ -258,7 +260,7 @@ The per row columns take their class from the vocabulary's `term_class`, one hop
 
 The four rules that keep history intact:
 
-- **A record stores a term's id, never its label.** Renaming a term renames it everywhere, past and present.
+- **A record stores a term's id, never its label.** Renaming a term renames it everywhere, past and present. The one exception, ruled by the integrating thread: an immutable submitted record, such as a form answer or an order line, may keep a snapshot of the label beside the id, because it is evidence of what the person saw.
 - **A term is never deleted once anything has pointed at it.** Every reference to `core_terms` is `restrict`. A term nothing has ever used can be deleted.
 - **Retiring hides a term from pickers and nothing else.** Old records still show its label, marked as retired in staff screens. Retiring can be undone.
 - **Merging retires one term into another.** Reads follow `merged_into_id`, so reports group the two together, and the old records are not rewritten.
@@ -281,7 +283,7 @@ A term's label should never be a person's name. The form refuses nothing, but th
 
 ## Group 4: files
 
-**`core_files`**: realm operational; subject `uploaded_by`; retention `core.files.deleted-retention`, on deleted rows; not append-only; id prefix `fil`, random.
+**`core_files`**: realm operational; subject `{ account: 'uploaded_by', unlinked: 'staff' }`; retention `core.files.deleted-retention`, on deleted rows; not append-only; id prefix `fil`, random.
 
 One row for every stored file in the system, whichever module it belongs to. The bytes live in R2 and the row is the only way to reach them. The id is random because it appears in the file's address and must not be guessable.
 
@@ -324,15 +326,17 @@ A **notification** is one thing the system has to tell one recipient. A **delive
 
 Notification types are not a table. A module declares each type in its manifest (part 4), so the list is the same in every theatre on the same release.
 
-The tables about a person carry a `side` column, `audience` or `member`, and declare it as their realm, which the foundations format allows. The side comes from the declared type or topic and never changes on a row.
+The tables about a person carry a `side` column, `audience` or `members`, and declare it as their realm, which the foundations format allows. The side comes from the declared type or topic and never changes on a row.
 
-**`core_notifications`**: realm from `side`; subject `account_id`; retention `core.notifications.log-retention`; not append-only; id prefix `ntf`.
+**`core_notifications`**: realm from `side`; subject `{ account: 'account_id', email: 'address' }`; retention `core.notifications.log-retention`; not append-only; id prefix `ntf`.
+
+A row has an account or, for a send before any account exists, an address. The `address` column is an email column, so a data request by email address finds those rows.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `type_key` | text | not null | internal | keep | A declared type such as `box-office.order.confirmed` |
-| `side` | text | not null, one of `audience`, `member` | internal | keep | From the type |
+| `side` | text | not null, one of `audience`, `members` | internal | keep | From the type |
 | `account_id` | account, role subject, on merge move | nullable | internal | clear |  |
 | `address` | text | exactly one of `account_id`, `address` at creation | personal | clear | Only for a send to an address with no account. Cleared anyway once every delivery is finished. |
 | `locale` | text | not null | internal | keep |  |
@@ -350,7 +354,7 @@ The tables about a person carry a `side` column, `audience` or `member`, and dec
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `notification_id` | ref `core_notifications` | not null, cascade; `(notification_id, channel)` unique | internal | keep |  |
-| `side` | text | not null, one of `audience`, `member` | internal | keep | Copied from the notification |
+| `side` | text | not null, one of `audience`, `members` | internal | keep | Copied from the notification |
 | `channel` | text | not null | internal | keep | A registered channel: `email`, `inbox`, later `push` |
 | `state` | text | not null, one of `queued`, `held`, `sending`, `sent`, `retrying`, `failed`, `suppressed`, `skipped`, `bounced` | internal | keep | See part 3 |
 | `reason` | text | a code | internal | keep | Such as `preference`, `no_address`, `suppressed_address`, `module_off` |
@@ -374,7 +378,7 @@ The state list also holds `complained`, for a recipient's spam complaint, and `c
 | `id` | id | primary key | internal | keep |  |
 | `account_id` | account, role subject, on merge move | not null | internal | clear |  |
 | `delivery_id` | ref `core_notification_deliveries` | nullable, set null | internal | keep |  |
-| `side` | text | not null, one of `audience`, `member` | internal | keep |  |
+| `side` | text | not null, one of `audience`, `members` | internal | keep |  |
 | `title` | text | not null, at most 120 characters | personal | clear |  |
 | `body` | text | at most 500 characters | personal | clear |  |
 | `link` | text |  | internal | keep | A path inside the application, never a full address |
@@ -390,7 +394,7 @@ Index: `(account_id, side, archived_at, created_at)`. The unread count is a coun
 | `account_id` | account, role subject, on merge handler | not null; primary key part | internal | clear | On a merge the survivor's row wins where both have one |
 | `topic_key` | text | not null; primary key part | internal | keep | A declared topic |
 | `channel` | text | not null; primary key part | internal | keep |  |
-| `side` | text | not null, one of `audience`, `member` | internal | keep | From the topic |
+| `side` | text | not null, one of `audience`, `members` | internal | keep | From the topic |
 | `enabled` | boolean | not null | personal | clear |  |
 | `digest` | text | not null, default `immediate`, one of `immediate`, `daily`, `weekly` | personal | clear |  |
 
@@ -464,7 +468,7 @@ Addresses the system must not email, whoever asks. The Communications module rea
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `account_id` | account, role subject, on merge move | not null | internal | clear |  |
-| `side` | text | not null, one of `audience`, `member` | internal | keep |  |
+| `side` | text | not null, one of `audience`, `members` | internal | keep |  |
 | `endpoint` | text | not null, unique | personal | clear |  |
 | `keys` | text, encrypted | not null | personal | clear |  |
 | `device_label` | text |  | personal | clear |  |
@@ -490,7 +494,7 @@ Added on 16 November 2026 by Matt's decision on question 9, which has the rules.
 | `created_by` | account, role actor | nullable | internal | keep |  |
 | `created_at`, `updated_at` | timestamp | not null | internal | keep |  |
 
-**`core_webhook_deliveries`**: realm operational; subject none; retention `core.webhooks.log-retention`; not append-only.
+**`core_webhook_deliveries`**: realm operational; subject none; retention `core.webhooks.log-retention`; not append-only; id prefix `whd`.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -521,7 +525,9 @@ What goes with the tables:
 | Event | `core.webhook.paused` | Announced when the system pauses one. Never itself sent to webhooks, to avoid a loop. |
 | Screen | Console, Webhooks | List with state and last success. Editor with event picker and "send a test". Delivery log with retry. |
 
-How a delivery is made: core listens to every event. In the batch that records the event, it adds one `queued` delivery for each active webhook subscribed to it. The job sends it. The existing five-minute sweep re-queues anything stuck.
+How a delivery is made. A listener cannot write into the batch that announces an event, so core's webhook listener runs afterwards, in its own unit on the prompt lane. It is declared with `on: 'deliverable'`, which means every event not marked internal, and which only core may use. For each active webhook subscribed to the event it adds one `queued` delivery; the unique pair of webhook and event makes a repeat harmless. The job sends it. The five-minute sweep re-queues anything stuck.
+
+The url and the secret are `col.internal` with `encrypted: true`, the option the foundations format added on 16 November 2026: the value is encrypted with the core key, carries its key version and never reaches a browser. The console shows a masked hint. `core_push_subscriptions.keys` is `col.personal` with the same option.
 
 The foundations format now supports this (its rules E6 and E7). Every announced event can go to a webhook unless its module declares `internal: true` on it, and a check makes every event about a record with a person as its subject say which it is. The webhook screen offers only events not marked internal, read from the registry. Core's system events, such as `core.setting.changed`, are internal. `core.send-webhook` runs in the bulk lane and calls out through the kit's fetch wrapper, which is where the check on outside addresses lives.
 

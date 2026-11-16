@@ -8,13 +8,13 @@ Matt's [form-builder](https://github.com/MattA-Official/form-builder) was read t
 
 | What it does | Taken as inspiration | Done differently here, and why |
 | --- | --- | --- |
-| One ordered list of questions, sections and text blocks, with drag and drop and autosave | The single ordered list and saving without a button | Edits go to a draft, never the live form, so a half-finished change cannot reach respondents |
+| One ordered list of questions, sections and text blocks, with drag and drop and autosave | The single ordered list and saving without a button | Edits go to a draft version, never the live form, so a half-finished change cannot reach respondents |
 | Validation rules with custom messages, "enforced identically on the client and the server" (README) | One definition checked in both places | The agreement is proved by a shared case set run in both runtimes |
 | Repeating groups, and two questions side by side | Both | A calculation can sum or count across a group |
 | Rules held in their own table: a condition group (`all` or `any`) and an action (`show`, `hide`, `skip_to`, `terminate`, `submit_now`) | The five things a rule can do, and operators offered by question type | Logic sits on the item it affects and is read as a sentence. A separate list of rules is the "rule table" the paper rules out, and it lets two rules contradict each other about one question |
 | Condition values are text, and groups do not nest |  | Typed comparisons, and nesting to a limited depth |
 | Items are rows edited in place; a response is one JSON object keyed by item id |  | Immutable versions, and a field catalogue, so an old response still knows what it answered |
-| No accounts, permissions, drafts, windows or stages |  | All specified here, because the platform has people and records to connect to |
+| No accounts, permissions, draft responses, windows or stages |  | All specified here, because the platform has people and records to connect to |
 
 ## Other form systems
 
@@ -30,7 +30,7 @@ Read for what a proposals process needs, not as a base.
 
 | Source | Used for |
 | --- | --- |
-| [`docs/backlog/B-productions.md`](https://github.com/newtheatre/proscenium/blob/main/docs/backlog/B-productions.md), stories B-301 to B-303 | The requirements of a proposals round: windows per season, private drafts, immutable after the deadline, private scores, declared conflicts with lockout, a recorded decision with feedback, and acceptance creating the production. Each is mapped in tab 1 |
+| [`docs/backlog/B-productions.md`](https://github.com/newtheatre/proscenium/blob/main/docs/backlog/B-productions.md), stories B-301 to B-303 | The requirements of a proposals round: windows per season, private draft responses, immutable after the deadline, private scores, declared conflicts with lockout, a recorded decision with feedback, and acceptance creating the production. Each is mapped in tab 1 |
 | `docs/data-model.md`, the incident and checklist tables | An example of fixed-layout records (incident severity, checklist items) that a theatre cannot reshape, which is the gap a form builder fills |
 
 Proscenium has no form builder or custom fields; a search of its documentation for either found nothing.

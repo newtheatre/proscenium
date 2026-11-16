@@ -16,7 +16,7 @@ Each is a named export other modules import. A service that writes adds its stat
 | `notSelf` | Actor, the account whose record it is | Stops the request when they are the same person | No |
 | `describeViewer` | Actor | What the interface needs: name, the sides open to them, and the navigation entries they may see | No |
 | `findOrCreateAccount` | An address, a name, an origin | The account id, and whether it was created. Never creates a second account for an address. | Yes |
-| `canonicalAccount` | An account id | The id reads should use: the winner, if the account was merged away | No |
+| `canonicalAccount` | An account id | The id reads should use: the survivor, if the account was merged away | No |
 | `accountLabel` | An account id | A name safe to show: the person's name, or "Former account" for a tombstone | No |
 | `searchAccounts` | A query, the caller's ability | Up to 20 matches as id and name only | No |
 | `addressFor` | An account id, a side | The verified address that side should write to, or nothing | No |
@@ -53,9 +53,11 @@ Box office asked how erasure and download reach a guest buyer, a complimentary-t
 | Somebody is named by another person (a complimentary ticket, a group booking) | An unclaimed account with origin `named-by-other`. Its first email says who holds their details and why, with the privacy contact. It receives service messages only. |
 | A person with no address (a name on the door list) | An unclaimed account with no address. It can never be claimed; staff can add an address or merge it later. |
 | Erasure or download for somebody who has never signed in | They sign in with the emailed link, which claims the account, and use the ordinary screens. There is no second path. |
-| Retention | An unclaimed account is anonymised `core.retention.unclaimed-after` after the last record that references it, and at the next sweep if nothing references it at all. Accounts with origin `named-by-other` use the same rule. |
+| Retention | Only once the sweep is armed, an unclaimed account is anonymised when `core.retention.unclaimed-after` has passed since the later of its creation and the last order, record, grant or booking that references it. Accounts with origin `named-by-other` use the same rule. |
 
 Every personal column in every module therefore still points at one id, and the walking erasure test covers guests with no extra code.
+
+One case makes no person at all: an anonymous walk-up sale at the desk, where nobody's name or address is taken. It creates no account. The order's account column is empty and declares `subject: { account: 'account_id', unlinked: 'staff' }`, so the row holds no personal data and nothing is owed to anybody for it. This is the only valid order with no account, and every nullable account column in any module declares `unlinked` in the same way.
 
 ### Account or address: which a row uses
 
@@ -97,9 +99,11 @@ Identity never reads or redacts these rows itself; the owning module does, under
 | A signed-out mailing-list sign-up | An email-subject row in the communications module. It does not call `findOrCreateAccount` and makes no account. |
 | A confirmed double opt-in | Not proof of address for an account claim. It proves somebody with the inbox agreed to receive mail; it does not show an intent to sign in, its link is long-lived and may be opened by a mail scanner or a forwarded reader, and a claim can merge records and open My account. Only identity's own single-use, short-lived link or code, or a provider's verified address, verifies an address. |
 | A subscriber who later signs in | Their subscription is found by the verified address, like any email-subject row. Nothing moves. |
-| "Holders of a role" as an audience for a message | Identity contributes it. `holdersOfRole(roleId, scope?)` returns canonical account ids with a live grant, and identity contributes three sources to the communications audience point: holders of a role, holders of an ability on a record (`holdersOf`), and everyone for whom `core.member` is true. |
+| "Holders of a role" as an audience for a message | Communications declares the audience sources itself (`communications.role-holders`, `communications.ability-holders`, `communications.members`), because the core never contributes to a module's point. Identity supplies the services they read: `holdersOfRole(roleId, scope?)` returns canonical account ids with a live grant, `holdersOf` returns the holders of an ability on a record, and the fact `core.member` says who is a member now. |
 
-Identity's three contributions to `communications.audience-source` are keyed `core.role-holders`, `core.ability-holders` and `core.members`, and return account ids only. One further service supports sending once to a person who is on a list twice: `verifiedAddressesOf(accountId)` returns every verified address of an account, normalised, for server-side matching only; it is never shown and never returned to a browser. A module that keeps email-subject rows shows them in My account through `core.account-section`, where identity hands it the same list of verified addresses.
+Those services return account ids only. One further service supports sending once to a person who is on a list twice: `verifiedAddressesOf(accountId)` returns every verified address of an account, normalised, for server-side matching only; it is never shown and never returned to a browser. A module that keeps email-subject rows shows them in My account through the Interface's `core.account-section`, where identity hands it the same list of verified addresses.
+
+Listing who holds a fact needs more than the fact's yes-or-no answer. The foundations fact format grows an optional `holders(record?)` enumerator for this; `holdersOf` and the members list call it for each fact mapped to the ability, and a fact without one contributes nobody to a list (it still grants authority to the person asking).
 
 ### Checking an address without seeing it
 
@@ -126,8 +130,8 @@ Payloads carry ids only. An event is written in the same batch as the change and
 | `core.account.claimed` | The first sign-in | Account id |
 | `core.account.disabled` | Staff disabled it | Account id |
 | `core.account.enabled` | Staff enabled it | Account id |
-| `core.account.merged` | A merge committed | Winner id, loser id, merge id |
-| `core.account.unmerged` | A merge was undone | Winner id, loser id, merge id |
+| `core.account.merged` | A merge committed | Survivor id, merged-away account id, merge id |
+| `core.account.unmerged` | A merge was undone | Survivor id, merged-away account id, merge id |
 | `core.account.erased` | The erasure batch committed | Account id |
 | `core.account-email.verified` | An address was proved | Account id, address id |
 | `core.account-email.removed` | An address was removed | Account id, address id |
@@ -155,11 +159,10 @@ Identity listens for nothing from a feature module. What it needs from them arri
 | --- | --- | --- | --- |
 | `core.sign-in-method` | code | A way of proving who somebody is: its id, whether it reaches strong assurance, how it starts and how it finishes. Identity contributes passkey, email link and Google itself. | Cannot be empty: passkey is always present |
 | `core.erasure-hold` | code | Given an account, a list of hold codes or none. A hold code has a translated explanation for staff and one for the person. | Nothing holds an erasure |
-| `core.merge-handler` | code | Given winner and loser, the statements for rows a plain move would break, and a count for the preview | Every reference is a plain move or an alias |
+| `core.merge-handler` | code | Given the survivor and the merged-away account, the statements for rows a plain move would break, and a count for the preview | Every reference is a plain move or an alias |
 | `core.export-contributor` | code | Given an account, extra material for the export that the data-class registry cannot find, such as files | The export holds registry rows only |
-| `core.account-section` | data | A section on the "My account" page or on the console's account page: its id, side, the ability that shows it, and the component | Only identity's own sections show |
 
-Identity also uses three points the foundations draft already offers: `core.navigation` for its own screens, `core.erasure-handler` for anything a module must do beyond the registry, and `core.record-resolver` to turn an account id into a label and a link.
+Identity also uses points other workstreams offer: `core.navigation` for its own screens, `core.erasure-handler` for anything a module must do beyond the registry, `core.record-resolver` to turn an account id into a label and a link, and `core.account-section`. That last point is the Interface workstream's to define (its fields are `id`, `target` of `account` or `console-person`, `side`, `ability`, `component`, `order`, and optionally `to`, `icon` and `count`). Identity is a contributor to it: its own sections of "My account" and of the console's person page are entries like any module's.
 
 ## Facts read
 
@@ -205,15 +208,36 @@ Identity has no record a grant can be scoped to. The record types that can scope
 | `core.review-data-requests` | Task, daily | Re-checks held erasures; warns staff of any request nearing its respond-by date |
 | `core.sweep-accounts` | Task, daily | The unclaimed and dormant sweeps, in report-only mode until armed |
 
+## Notification types
+
+Identity contributes these types to `core.notification-type`. All are service messages: none can be switched off by the person, and none carries marketing.
+
+| Type | Sent when | To |
+| --- | --- | --- |
+| `core.sign-in-link` | A link and code are requested | The address asked for |
+| `core.address-verify` | An address is added or changed | The new address |
+| `core.address-changed` | A side's address changes | The old address |
+| `core.invitation` | A role is granted to an address with no account, or staff invite a person | The invited address |
+| `core.credential-added` | A passkey or recovery codes are added, or a staff enrolment link is issued | Every verified address |
+| `core.grant-expiring` | A grant nears its end | The holder and whoever can renew it |
+| `core.export-ready` | A download of personal data is built | The person |
+| `core.erasure-confirm` | Erasure is asked for, opening the cooling-off | The person |
+| `core.erasure-done` | Erasure has run | The address as it was, once |
+| `core.dormant-warning` | An account is due to be anonymised by the dormant sweep | The person |
+| `core.named-by-other` | Somebody else gives a person's details (a complimentary ticket, a group booking) | The person named, on first use |
+| `core.merge-notice` | Two accounts are merged | Every verified address of both |
+
+Each is declared in core domain's type format. Kind is `transactional` for all of them, so none has a topic. Lane is `prompt`. Side is `audience` for every type except `core.grant-expiring`, which is `members`; a change to the members' address is announced by a second type, `core.members-address-changed`, on the `members` side, because a type has exactly one side. Channel is email for all; `core.grant-expiring`, `core.export-ready` and `core.merge-notice` also go to the inbox. `core.sign-in-link` and `core.address-verify` go to an address that may have no account yet, so they call `notifyAddress`; the rest call `notify`. Each ships a template whose variables are the theatre's name, the person's name where there is one, and the link, code or date the message is about.
+
 ## Secrets
 
 | Secret | Needed | For |
 | --- | --- | --- |
 | `CORE_SESSION_KEY` | Always | Deriving the hashes of tokens and the browser binding |
-| `CORE_PROFILE_KEY` | Always | Encrypting access profiles; versioned so it can be rotated |
 | `CORE_GOOGLE_CLIENT_SECRET` | When used | Google sign-in |
 | `CORE_OWNER_RECOVERY` | Optional | Present only while an owner is being recovered |
-| `CORE_TURNSTILE_SECRET` | Optional | Not identity's: bot protection is one core service with the secret CORE\_TURNSTILE\_SECRET\_KEY, and the sign-in routes opt in through their route declaration |
+
+Access profiles are a special column and use the platform's one key, `CORE_ENCRYPTION_KEY`, versioned so it can be rotated; identity has no key of its own for them. Bot protection is one core service with the secret `CORE_TURNSTILE_SECRET_KEY`, and the sign-in routes opt in through their route declaration. Foundations' secrets table is the single index of every core secret, including the three above.
 
 ## What each workstream must do to fit
 
@@ -221,6 +245,6 @@ Identity has no record a grant can be scoped to. The record types that can scope
 | --- | --- |
 | 3. Core domain | Declare the fact for a place on a production's team; mark production and venue as grantable record types; take a side when sending a notification |
 | 4. Box office | Call `findOrCreateAccount` at checkout and at the desk; declare its account references as move or alias; contribute an erasure hold for unsettled money and unused tickets; contribute its "Tickets and orders" section to My account on the audience side |
-| 5. Form builder | Let a form attach fields to `core.account` with a side; contribute those fields as account sections |
+| 5. Form builder | Later, with its story FB-505: bind form fields to identity's `forms.bindable` contributions (phone, preferred name, emergency contact). Custom fields on a person are later still (FB-511). In the first release the access-needs and emergency-contact questions are identity's own screens, written straight to `core_access_profiles` and `core_emergency_contacts`, not a form builder form. |
 | 6. Interface | Draw the header from `describeViewer` and nothing else; never test for a role in a page |
 | Later modules | Membership, Front of house and Training each declare their fact and say whether it is a standing |

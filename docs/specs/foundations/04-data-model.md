@@ -2,7 +2,7 @@
 
 ## The tables foundations owns
 
-Twelve tables, all prefixed `core_`. None holds a theatre's content; they hold the state of the system itself. Each is described with the heading line every workstream uses: realm, subject, append-only, retention. Ids are sortable text ids made by `col.id()` unless stated.
+Thirteen tables, all prefixed `core_`. None holds a theatre's content; they hold the state of the system itself. Each is described with the heading line every workstream uses: realm, subject, append-only, retention. Ids are scoped ids (the prefixes are in part 4's index) made by `col.id()` unless stated.
 
 | Table | Purpose | Realm | Subject | Append-only | Retention |
 | --- | --- | --- | --- | --- | --- |
@@ -11,13 +11,14 @@ Twelve tables, all prefixed `core_`. None holds a theatre's content; they hold t
 | `core_setting_changes` | Every change to a setting | system | none | yes | 7 years |
 | `core_migrations` | Which migrations have been applied | system | none | yes | for ever |
 | `core_events` | Announced events waiting to be delivered (the outbox) | system | none | no | 30 days after delivery |
-| `core_jobs` | Every job, listener delivery and task run, with its state | system | none | no | 30 days after finishing; dead-lettered rows 180 days |
-| `core_task_runs` | One row per scheduled task per due time, so a task runs once | system | none | no | 90 days |
+| `core_jobs` | Every job, listener delivery and task run, with its state | system | none | no | core.jobs.retention after finishing (default 30 days); dead rows 180 days |
+| `core_task_runs` | One row per scheduled task per due time, so a task runs once | system | none | no | as jobs (core.jobs.retention) |
 | `core_external_calls` | The attempt and outcome of every call to an outside service | system | none | yes (outcome is a second row) | 2 years |
 | `core_audit` | Who did what to which record, and what allowed it | system | none (actor is a `col.account` with role actor) | yes | 7 years, a setting |
 | `core_credentials` | Encrypted credentials for outside services entered in the console | system | none | no | until replaced |
 | `core_idempotency_keys` | Remembered responses for repeated requests | system | none | no | 48 hours |
 | `core_guard` | Empty. Target of the deliberate failure that aborts a batch | system | none | no | never holds a row |
+| core\_signing\_keys | The key pairs of the signing service, one current key per declared purpose | system | none | no | the private part is erased when the key is retired; the public part is kept for ever |
 
 ## Columns
 
@@ -60,13 +61,15 @@ Twelve tables, all prefixed `core_`. None holds a theatre's content; they hold t
 | `lane` | `prompt` or `bulk` |
 | `payload` | JSON, ids only |
 | `dedupe_key` | Optional. Unique with `name` while the job is not finished. |
-| `state` | `queued`, `running`, `done`, `failed`, `dead`, `cancelled` |
+| `state` | `queued`, `running`, `done`, `dead, cancelled. There is no failed state: a failed attempt with attempts left returns the row to queued with a later run time` |
 | `attempts`, `max_attempts` |  |
 | `run_after` | For delay and back-off |
 | `last_error` | Class internal. The error's code and message, never a payload dump. |
 | `created_at`, `started_at`, `finished_at` |  |
 
 ### core\_task\_runs
+
+Besides the task's name and due time the row holds `job_id`, the job the scheduler created for that run, and the run's result, done or failed. The daily task `core.prune-history` removes rows of this table, of `core_jobs`, `core_events` and `core_idempotency_keys` once they pass their retention.
 
 `task` (manifest name), `due_at`, `started_at`, `finished_at`, `outcome`. Primary key (`task`, `due_at`): the scheduler claims a run by inserting the row, so two overlapping cron invocations cannot both run it.
 
@@ -79,7 +82,7 @@ Twelve tables, all prefixed `core_`. None holds a theatre's content; they hold t
 | Column | Class | Notes |
 | --- | --- | --- |
 | `id`, `at` | internal |  |
-| `actor_account_id` | personal | `col.account`, role actor, on merge move. Null for the system. |
+| `actor_account_id` | personal | `col.account`, role actor, on merge alias, because the table is append-only and a merge cannot rewrite it. Null for the system. |
 | `actor_name` | personal, anonymise | The name as it was then. Erasure replaces it with the theatre's term for a former member; this is the one update the append-only trigger permits. |
 | `actor_kind` | internal | `person`, `system`, `job`, `setup` |
 | `action` | internal | `create`, `update`, `delete`, `state`, `grant`, `sign-in`, `export`, `erase`, `read` |
@@ -116,3 +119,9 @@ erDiagram
   core_modules ||--o{ core_credentials : "owns"
   core_settings ||--o{ core_setting_changes : "history"
 ```
+
+### core\_signing\_keys
+
+**`core_signing_keys`**: id prefix `sgk`; realm system; subject none; not append-only; the private part is erased at retirement.
+
+`id`, `purpose` (the declared purpose, for example `box-office.door-code`), `public_key`, `private_key` (internal, `encrypted: true`, cleared when the key is retired), `state` (`current`, `checking`, `retired`), `created_at`, `checking_from`, `retired_at`. One current key for each purpose, enforced by a unique index on purpose where the state is current. Story F-37.

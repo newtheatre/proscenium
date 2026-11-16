@@ -7,21 +7,21 @@ The same commands run on a contributor's machine and in CI, releases reach forks
 - **bun only.** Never npm, pnpm or yarn.
 - TypeScript in strict mode, one lint configuration for the whole repository.
 - Generated files are never edited by hand, and each carries a marker saying so.
-- Commands are the same in every module: `dev`, `preview`, `build`, `typecheck`, `lint`, `test`, `check`.
+- Commands are repository-wide, and the foundations specification holds the current set (dev, check, test, test:browser, db:generate and verify, where check covers lint, types and the conformance checks). The first draft of this list read: `dev`, `preview`, `build`, `typecheck`, `lint`, `test`, `check`.
 
 ## Tests
 
-- **Tests run locally on any platform**, against the real Workers runtime and a real local D1. This reverses Proscenium's CI-only rule and closes its gap of never exercising the D1 driver.
+- **Tests run on Linux, locally and in CI (decided: no Windows or macOS runs)**, against the real Workers runtime and a real local D1. This reverses Proscenium's CI-only rule and closes its gap of never exercising the D1 driver.
 - **Three tiers:** unit, integration against D1, and end-to-end in a browser. A module ships with all three.
 - **Named regression cases** for races: the last seat, the double refund, the shift claimed twice.
-- **Upgrade tests.** Every release is tested as an upgrade from the previous two releases with data in place.
-- **Module isolation tests.** The suite runs with each module switched off in turn.
+- **Upgrade tests.** Every release is tested as an upgrade from every earlier release, using a stored snapshot of each with data in place.
+- **Module isolation tests.** Each module's suite is also run with the modules it only uses switched off.
 - CI runs its gates in parallel and only what a change can reach. Nothing is skipped to get a green run.
 
 ## Environments
 
 - **Local:** the dev server for interface work; the preview command for queues, cron, email and the Durable Object.
-- **Preview:** every branch deploys to a preview bound to preview-only resources, so a branch never touches production data, as Mailflare does.
+- **Preview:** pull-request previews are off by default, because a preview would share the production database; a theatre that wants them connects a second Worker with its own resources, so a branch never touches production data, as Mailflare does.
 - **Production:** Cloudflare's own build service deploys the fork's main branch. Nobody deploys by hand.
 
 ## How work is done

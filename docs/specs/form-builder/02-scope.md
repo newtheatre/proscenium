@@ -7,10 +7,10 @@ The form builder is one module, `forms`, that lets a theatre ask its own questio
 | Area | What is specified |
 | --- | --- |
 | Form definition | Pages, questions, repeating groups, side-by-side rows, explanatory content, endings |
-| Question types | Text, number, money, date and time, choice, yes or no, email, phone, address, file, rating, consent, and pickers that other modules supply |
+| Question types | Text, number, money, date and time, choice, yes or no, email, phone, address, file, rating, consent, and pickers that other modules supply. The paper also lists a signature: it is not in the first release and has no story yet, so it is recorded here as later. The paper's "sections" are this specification's pages and repeating groups |
 | Logic engine | Show, require, route to a page, end early, calculated values and validation, from one definition checked in the browser and on the server |
-| Versions | A draft that is edited, published versions that never change, and what happens to answers when a form changes |
-| Responses | Drafts and resuming, submission, revisions, windows, caps, one response per person, anonymous responses |
+| Versions | A draft version that is edited, published versions that never change, and what happens to answers when a form changes |
+| Responses | Draft responses and resuming, submission, revisions, windows, caps, one response per person, anonymous responses |
 | Workflows | Stages with who may move a response, review with private scores, conflicts of interest, decisions with feedback, actions on an outcome |
 | Custom fields | A form attached to a built-in record type and edited in place on that record |
 | Placement | How a module offers a place for a form (a slot) and how a theatre attaches one |
@@ -24,7 +24,7 @@ The form builder is one module, `forms`, that lets a theatre ask its own questio
 - **Audition slots with a panel calendar, casting offers and rehearsal calls.** A sign-up form with limited places is in scope; the production-management process around it is not.
 - **A survey analytics product.** Results are a table, an export and simple counts. Cross-tabulation and weighting are left to a spreadsheet.
 - **Marketing consent management.** A consent question records its wording and time; the mailing-list register belongs to Communications.
-- **Taking money.** A form can ask the Payments module for a charge. It never handles a card, a reader or the ledger.
+- **Taking money.** A form can own a part of a Payments intent, after the first release. It never handles a card, a reader or the ledger.
 - **Editing public content pages.** Forms can be embedded in a content page, but pages remain content in the fork.
 - **Live co-editing of one form by two people at once.** The second editor is told and may take over.
 - **Product code.** This document holds formats and rules only.
@@ -36,7 +36,7 @@ The design paper lists six capabilities under Programming. Five are delivered by
 | Programming capability | Delivered by |
 | --- | --- |
 | Proposal windows per season with structured submissions | A form placed on a season, with opening and closing dates |
-| Private drafts, locked after the deadline | Draft responses private to the submitter; the closing date locks them. Co-authors the submitter adds follow the first release |
+| Private draft responses, locked after the deadline | Draft responses private to the submitter; the closing date locks them. Co-authors the submitter adds follow the first release |
 | Review with private scores and conflict lockout | The review stage (tab 3) |
 | A recorded decision with reasons, feedback to proposers | A decision transition with a required reason and a message to the submitter |
 | Retention rules for unsuccessful proposals | Retention per form and per outcome |
@@ -54,7 +54,7 @@ The first draft listed these as assumptions. Each has since been settled with it
 | 1. Foundations | Encryption for special-category values, events with an internal flag for webhooks, the queue, the audit service, and scoped ids with links as separate tokens | Settled |
 | 2. Identity | The account as the person, the email subject for a signed-out respondent, roles granted on one form, facts that allow and never deny, and erasure and merge that move forms' columns | Settled |
 | 3. Core domain | Record types (season, production, performance, venue, space), files, notification types and vocabularies | Settled |
-| 4. Box office and payments | A charge service that accepts an expected total and announces its outcome | Open; not needed for the first release |
+| 4. Box office and payments | Payments' collect service and its settlement point, which any module may use as the owner of an intent part | Open; not needed for the first release |
 | 6. Interface | The three shells, the Editor layout, the list conventions and the form rules | Settled |
 
 ## What the first release must prove

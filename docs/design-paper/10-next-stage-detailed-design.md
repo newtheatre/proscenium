@@ -1,6 +1,6 @@
 # Next stage: detailed design
 
-The next stage turns this paper into specifications detailed enough to build from, written by several threads in parallel and reconciled by one. It produces documents and a few technical proofs, not product code. Nothing here has started; it waits for Matt's go-ahead.
+The next stage turns this paper into specifications detailed enough to build from, written by several threads in parallel and reconciled by one. It produces documents and a few technical proofs, not product code. This stage is complete, and so is the second round it names: twelve specifications exist and all four proofs passed. The tab is kept as the record of the plan. Where it differs from the two status tabs or the build backlog, they are right; in particular tests run on Linux only, and the theatre's site folder is the Nuxt project itself, not a layer.
 
 "Phase 2" is read here as the second stage of this planning project. Phase 2 of the build roadmap (core domain and public site) is a different thing and is one of the workstreams below.
 

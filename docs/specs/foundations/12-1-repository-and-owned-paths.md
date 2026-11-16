@@ -71,7 +71,7 @@ The first row matters most: nearly everything a committee wants to change is in 
 
 **Overriding is a promise in one direction.** Published components (`layers/*/app/components/public/`) keep their names and inputs within a major version, so a theatre's override or page keeps working. Other components may change in any release; a theatre that overrides one is told by the update pull request when the original changed (the action lists overridden files whose upstream version differs in the release).
 
-**Reserved addresses.** `/account`, `/members`, `/console`, `/live`, `/book`, `/sign-in`, `/setup`, `/api`, `/files` and anything starting with an underscore are upstream's. A page in `site/` at one of those is refused by the check unless it is an override of an existing upstream page.
+**Reserved addresses.** The address prefixes that belong to upstream are listed once, in the Module manifest tab under "Reserved address prefixes". A page in `site/` at one of those is refused by the check unless it is an override of an existing upstream page.
 
 ## A theatre's own module
 

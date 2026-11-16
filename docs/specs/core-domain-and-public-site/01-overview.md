@@ -18,14 +18,14 @@ Among the seven accepted: core does not know whether a performance is on sale (B
 
 What the design comes to:
 
-- **Two modules.** Core, always on, with 26 tables. The public site, which can be switched off and owns no tables.
+- **Two modules.** Core, always on, to which this workstream adds 26 core-domain tables. The public site, which can be switched off and owns no tables.
 - **Five things with a life cycle:** season, production, performance, file, delivery.
-- **Three services every module calls:** files, notifications, and brand.
+- **Five groups of services every module calls:** programme, vocabularies, files, notifications, and brand and organisation.
 - **Vocabularies are core's**, by the integrating thread's ruling, so the form builder and every module share one way to keep an editable list of options.
-- **Fourteen points** through which other modules join in without core knowing them, including the booking button, the impact shown before a cancellation, and the components a content page may use.
+- **Thirteen points** through which other modules join in without core knowing them, including the booking button, the impact shown before a cancellation, and the components a content page may use.
 - **51 stories**, 43 for the first release, and **63 named test cases** that must never regress.
 
-It is aligned with the platform foundations draft: its names, its four ways for modules to talk, and its table, setting and ability layouts. Eight requests went back to the foundations thread and all eight have been ruled on.
+It is aligned with the platform foundations draft: its names, its four ways for modules to talk, and its table, setting and ability layouts. Every request this workstream made of the foundations thread has been ruled on, and the rulings are recorded in parts 2 and 4. A consistency review on 16 November 2026 then brought every part into line with the other specifications and the integrating thread's rulings.
 
 ## At a glance
 
@@ -49,13 +49,13 @@ flowchart LR
 | --- | --- | --- |
 | 1. Scope | Draft complete | None. Every assumption about another workstream is confirmed or ruled on. |
 | 2. Data model | Draft complete | Rewritten on 16 November 2026 into the foundations table layout: table options, data classes, erasure behaviour and id prefixes for all 26 tables. Templates are split into drafts and published versions, as the ruling requires. The final table list is at the end of the tab. |
-| 3. States and rules | Draft complete | The Sent to Bounced move depends on an unverified vendor capability |
+| 3. States and rules | Draft complete | None. Bounces and complaints arrive on Cloudflare's email events queue, as its documentation describes. |
 | 4. Interface to other modules | Draft complete | Service signatures are names and intent, not types. Workstream 2 has named its three services (addressFor, holdersOf, mergeAccounts). |
 | 5. Screens | Inventory complete; three wireframes | The other screens are described, not drawn. Final layouts are workstream 6's. |
 | 6. Settings and abilities | Draft complete | Every default is a proposal |
 | 7. Stories | Draft complete |  |
 | 8. Test plan | Draft complete |  |
 | 9. Questions for Matt | All nine decided, 16 November 2026 |  |
-| Sources | Complete for what was read | Six things not verified, listed there |
+| Sources | Complete for what was read | Four things not verified, listed there |
 
 No product code has been written. No other theatre has been consulted, so every default is one person's judgement.

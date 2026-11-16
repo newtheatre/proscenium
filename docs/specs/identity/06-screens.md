@@ -38,12 +38,12 @@ The second screen is the same whether or not the address has an account. The Goo
 
 ## My account
 
-Public shell, audience side. Other modules add their own sections here through `core.account-section`: box office adds tickets and orders.
+Public shell, audience side. Other modules add their own sections here through the Interface's point `core.account-section`: box office adds tickets and orders.
 
 | Screen | Purpose | Who sees it | Release |
 | --- | --- | --- | --- |
 | Overview | The sections available, and anything needing attention such as an unverified address | Any signed-in person | First |
-| Your details | Name, preferred name, phone, language | Any signed-in person | First |
+| Your details | Name, preferred name, pronouns, phone, language | Any signed-in person | First |
 | Email addresses | Add, verify and remove addresses; choose the address for tickets and receipts | Any signed-in person | First |
 | Signing in | Passkeys with their labels and last use; linked Google account; recovery codes | Any signed-in person | First |
 | Where you are signed in | Each session with its device and last use; end one, or all the others | Any signed-in person | First |
@@ -76,8 +76,8 @@ Console shell. Each row names the ability that shows it.
 | Facts | Each declared fact with the abilities mapped to it, edited the same way as a role | `core.role.manage` to edit | First |
 | Who holds what | Every live, pending and soon-to-lapse grant; filter by role, scope and module; grant, renew and end | `core.grant.read`; `core.grant.manage` to change | First |
 | Data requests | Exports and erasures with their state, holds and respond-by date | `core.data-request.manage` | First |
-| Sign-in settings | Methods, managed domains, session and re-assertion times, generated from the settings registry | `core.identity-settings.manage` | First |
-| Retention | What each sweep would do today; arm or disarm it | `core.identity-settings.manage` | Later |
+| Sign-in settings | Methods, managed domains, session times, generated from the settings registry | `core.identity-settings.manage` | First |
+| Retention | What each sweep would do today; arm or disarm it (the arm control alone needs core.retention.arm, held only by Owners) | `core.identity-settings.manage` | Later |
 
 ![wireframe · a person's page in the console](images/06-person-page-console.png)
 
@@ -99,13 +99,15 @@ Identity draws the left card and the first three sections. The tinted section is
 
 | Entry | Shell | Shown by |
 | --- | --- | --- |
-| My account | Public, account menu | `core.signed-in` |
+| My account | Public, account menu | `signed-in` |
 | Members' area | Public, account menu | Any standing |
 | Console | Public and members', account menu | Any ability with a console entry |
 | People: Accounts, Roles, Who holds what, Data requests | Console | The abilities above |
 | Settings: Sign-in, Retention | Console | `core.identity-settings.manage` |
 
 ## Setup steps
+
+Foundations owns the first-run sequence and the setup code that guards it. Identity contributes the steps below to that sequence through the setup-step point; creating the first Owner is the security rule and cannot be skipped or reordered.
 
 | Step | Required | Does |
 | --- | --- | --- |

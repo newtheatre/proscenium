@@ -26,8 +26,8 @@ export const records = defineRecords('box-office', {
 
 | Field | Meaning |
 | --- | --- |
-| `table` | The table whose rows are records of this type |
-| `parent` | The record type it sits under. A grant on a production covers that production's performances and their orders |
+| `table` | The table whose rows are records of this type. A record type may have no table and a fixed set of ids, for example `core.branding` with the one id `site`; its resolver then gives the label, the address and the parent |
+| `parent` | The record type it sits under, at most one. A grant on a production covers that production's performances and their orders. `parent: { type, optional: true }` allows a row with no parent, which inherits nothing |
 | `owner` | The column holding the account that owns the record, if it has one |
 
 The module also contributes a resolver to the point `core.record-resolver`, which answers a record's parent, title and link. The core declares `core.production`, `core.performance`, `core.venue`, `core.space`, `core.season` and `core.account`, to workstream 3's and workstream 2's definitions.
@@ -48,17 +48,12 @@ export const abilities = defineAbilities('box-office', {
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `on` | none | The record type the ability acts on. Without it the ability is site-wide only |
-| `risk` | `normal` | `privileged` abilities touch money, personal data or safety. They need a second factor re-asserted in the session, and the permission screen marks them |
-| `owner` | `ignored` | `grants`: the record's owner always has the ability. `refuses`: the owner never has it on their own record, whatever their role, which is how approving your own refund is refused |
+| `risk` | `normal` | `normal` or `privileged`; there is no other value. Privileged abilities touch money, personal data or safety, need a strong session, and are marked on the permission screen |
+| `assurance` | `basic`; `strong` when `risk` is `privileged` | The strength of session the ability needs. Identity defines the two levels |
+| `fresh` | `false`; `true` when `risk` is `privileged` | The person must have signed in again within `core.access.fresh-within`, the one freshness window. A privileged ability that changes anything is always fresh. One that only reads may say `fresh: false`, and must then say `audit: 'read'` |
+| `owner` | `ignored` | `grants`: the record's owner always has the ability. `refuses`: the owner never has it on their own record, whatever their role, which is how approving your own refund is refused. There is no other declarative refusal: roles, facts and ownership only allow, and any other lockout is a guard in the module's own service |
 | `implies` | none | Other abilities of the same module that come with this one |
-| `audit` | `true` | Using the ability writes an audit entry. Set `false` only for reads |
-
-Three more fields, added after draft 1 at workstream 2's request:
-
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `assurance` | `basic`; `strong` when `risk` is `privileged` | The strength of session the ability needs. Workstream 2 defines the two levels |
-| `fresh` | `false`; set when `risk` is `privileged` | A duration within which the person must have re-asserted who they are |
+| `audit` | `true` | Using the ability writes an audit entry, which records what allowed the action (`allowed_by`: the grant or the fact). `'read'` also audits reads made under it. `false` only for reads that need no trail |
 | `grantAt` | every level that applies | Restricts where a grant may be made: `site`, `module` or `record`. An ability such as erasing an account can be limited to site-wide grants |
 
 ### Scope
@@ -80,7 +75,13 @@ A fact is authority that follows from a record instead of a grant: tonight's con
 ```ts
 // layers/front-of-house/module/abilities.ts
 export const facts = defineFacts('front-of-house', {
-  'on-shift': fact({ on: 'core.performance' }),
+  'on-shift': fact({ on: 'core.performance', standing: true }),
+})
+
+// layers/front-of-house/server/facts/on-shift.ts
+export default defineFact({
+  holds: async (account, record) => { /* yes or no, and until when */ },
+  holders: async (record) => { /* the accounts that hold it now */ },
 })
 ```
 
@@ -90,7 +91,13 @@ export const facts = defineFacts('front-of-house', {
 - A fact of a switched-off module grants nothing.
 - A fact never grants a `privileged` ability unless the theatre confirms that mapping explicitly.
 
-Added after draft 1: a fact may declare `standing: true`, meaning that holding it puts a person on the members' side of their account. A fact's resolver is an asynchronous, read-only function. It is safe to await inside a route before the unit of work commits, and it is never run from a queue. Workstream 2 owns the tables that map abilities to roles and to facts.
+Three optional parts of a fact:
+
+- `standing: true` means that holding the fact puts a person on the members' side of their account.
+- `pin: true` lets a theatre map the fact to abilities for one named record, for example `training.competent` for one competency. The mapping row holds that record's id, and the fact is judged against it whatever record the ability is used on. A mapping whose pinned record no longer exists grants nothing and the permission screen shows it as broken.
+- `holders(record?)` lists the accounts that hold the fact now, for one record or for any. Identity's `holdersOf` uses it to show who an ability reaches. A fact without it cannot be enumerated, and the permission screen says so.
+
+Both functions are asynchronous and read-only. They are safe to await inside a route before the unit of work commits, and are never run from a queue. Identity owns the tables that map abilities to roles and to facts.
 
 ## Checking
 
@@ -109,7 +116,7 @@ export default defineRoute({
 const allowed = can('box-office.order.refund', ['box-office.order', order.id])
 ```
 
-- `defineRoute` is the only way to write a route. A route with no `ability` must say `ability: 'public'` or `ability: 'signed-in'` in so many words, and a route with no `rateLimit` fails the build.
+- `defineRoute` is the only way to write a route. A route names a declared ability, or says `ability: 'signed-in'` for any signed-in person, or says `public: true` for anyone; there is no `ability: 'public'`. A route that says none of these, or has no `rateLimit`, fails the build. The ability is checked before the input is validated, so a refused caller learns nothing of the input's shape.
 - A refusal carries a reason and what would allow it ("needs a current till training record"), as translation keys.
 - The check runs on every write on the server. The browser's `can` only decides what to show.
 
@@ -134,7 +141,3 @@ The rows are examples of the format; workstream 4 owns the real ones. Facts and 
 ## What this designs out
 
 Proscenium's roles are a fixed list of NNT committee posts in code (`PRIVILEGED_FLOOR` in [`shared/utils/config.ts`](https://github.com/newtheatre/proscenium/blob/main/shared/utils/config.ts) names `PRESIDENT`, `TREASURER`, `FOH_MANAGER` and others), and per-record permission arrived late. Here no role name appears in any module: modules declare abilities, and only a preset mentions a role.
-
-## Later rulings that apply to this tab
-
-Added after this tab was written; the full list is at the end of the Formats tab. For abilities: an ability may declare `audit: 'read'` so that reads under it are audited; every audit row records what allowed the action (`allowed_by`); and there is no declarative refusal beyond `owner: 'refuses'`: roles, facts and ownership only allow, and any other lockout is a guard in the module's own service.

@@ -26,7 +26,7 @@ Proscenium proved the operational core of a theatre can run as one application o
 | Some features exist only as API routes with no screen (bar discounts, choice groups) | A module is not done until its screens exist |
 | Policy numbers still leak into code as constants | Settings are declared in one registry and a check fails the build on a stray constant |
 | Personal data is classified per table, not per column | Every column declares its data class and its erasure behaviour |
-| Tests run only on CI, fail on Windows, and none exercise the real D1 driver | Tests run locally on any platform against the real runtime |
+| Tests run only on CI, fail on Windows, and none exercise the real D1 driver | Tests run locally on Linux against the real runtime |
 | 120 decision records in under three months, many about one screen, plus a 210 KB architecture file | Few, durable decisions; screen-level rules live beside the screen |
 | Per-record permissions arrived late, as a note that the first release must not preclude them | The permission model scopes to a single record from the start |
 | No rate limiting beyond reservations | Rate limiting is a platform service every route declares |

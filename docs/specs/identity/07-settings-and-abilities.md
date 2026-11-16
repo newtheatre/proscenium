@@ -1,6 +1,6 @@
 # 6. Settings and abilities
 
-Identity registers 29 settings and 16 abilities, written here in the column layouts of the foundations draft. It also owns the list of preset roles that every other workstream maps its abilities to.
+Identity registers 29 settings and 17 abilities, written here in the column layouts of the foundations draft. It also owns the list of preset roles that every other workstream maps its abilities to.
 
 ## Settings
 
@@ -27,7 +27,6 @@ Every setting is changed by `core.identity-settings.manage` unless the row says 
 | --- | --- | --- | --- | --- | --- | --- |
 | `core.sessions.lifetime` | duration | 30d | 1d to 90d | public | Yes | The longest a browser stays signed in |
 | `core.sessions.idle-limit` | duration | 14d | 1h to 90d | staff | No | How long an unused session lasts |
-| `core.sessions.reassert-window` | duration | 10m | 1m to 1h | staff | No | How long a fresh proof of identity covers further sensitive actions |
 | `core.recovery.code-count` | integer (codes) | 10 | 6 to 20 | staff | No | Recovery codes in a set |
 | `core.recovery.enrolment-link-lifetime` | duration | 24h | 1h to 7d | staff | No | How long a staff-issued passkey enrolment link works |
 
@@ -94,7 +93,7 @@ Identity's routes need one limit class beyond ordinary reads and writes. The fou
 
 ## Abilities
 
-A privileged ability needs a strong session. A privileged ability used to change something also needs a fresh re-assertion.
+A privileged ability needs a strong session. One that changes something also needs a fresh check, which is the foundations default for `risk: 'privileged'`. One that only reads declares `fresh: false` and `audit: 'read'`: strong, audited as a read, never asked again. The second table below gives the three entry fields for every ability.
 
 | Ability | Acts on | Risk | Owner | Implies | Purpose | Suggested holders |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -106,8 +105,8 @@ A privileged ability needs a strong session. A privileged ability used to change
 | `core.account.merge` | `core.account` | privileged | refuses | `account.read` | Merge two accounts and undo a merge | Administrator |
 | `core.account.recover` | `core.account` | privileged | refuses | `account.read` | Issue a passkey enrolment link to somebody locked out | Administrator |
 | `core.session.end` | `core.account` | privileged | grants |  | End a person's sessions | Administrator |
-| `core.emergency-contact.read` | `core.account` | privileged | grants |  | Read a person's emergency contacts. Every read is audited. | Fact: the duty manager's shift tonight |
-| `core.access-profile.read` | `core.account` | privileged | grants |  | Read the access needs a person agreed to share. Every read is audited. | Box-office manager; fact: the duty manager's shift tonight |
+| `core.emergency-contact.read` | `core.account` | privileged | grants |  | Read a person's emergency contacts. Every read is audited. | Welfare lead; the shift lead's fact tonight, once the theatre confirms it |
+| `core.access-profile.read` | `core.account` | privileged | grants |  | Read the access needs a person agreed to share. Every read is audited. | Welfare lead; Box-office manager, only for what the person chose to share with box office; the shift lead's fact tonight, once the theatre confirms it |
 | `core.role.read` |  | normal |  |  | See roles, facts and what each holds | Administrator, Committee member |
 | `core.role.manage` |  | privileged |  | `role.read` | Create and edit roles; map abilities to facts | Administrator |
 | `core.grant.read` |  | normal |  | `account.search` | See who holds what | Administrator, Committee member, Membership officer |
@@ -115,6 +114,28 @@ A privileged ability needs a strong session. A privileged ability used to change
 | `core.data-request.manage` | `core.data-request` | privileged | refuses | `account.read` | Start, review and cancel exports and erasures for other people | Administrator |
 | `core.identity-settings.manage` |  | privileged |  |  | Change the settings above | Administrator |
 | `core.retention.arm` |  | privileged |  |  | Arm or disarm the account sweeps | Owner only |
+
+| Ability | `assurance` | `fresh` | `grantAt` |
+| --- | --- | --- | --- |
+| `core.account.search` | any | false | site |
+| `core.account.read` | strong | false, with `audit: 'read'` | site |
+| `core.account.create` | strong | default | site |
+| `core.account.update` | strong | default | site |
+| `core.account.disable` | strong | default | site |
+| `core.account.merge` | strong | default | site |
+| `core.account.recover` | strong | default | site |
+| `core.session.end` | strong | default | site |
+| `core.emergency-contact.read` | strong | false, with `audit: 'read'` | site, and by fact |
+| `core.access-profile.read` | strong | false, with `audit: 'read'` | site, and by fact |
+| `core.role.read` | any | false | site |
+| `core.role.manage` | strong | default | site |
+| `core.grant.read` | any | false | site |
+| `core.grant.manage` | strong | default | site, module, record |
+| `core.data-request.manage` | strong | default | site |
+| `core.identity-settings.manage` | strong | default | site |
+| `core.retention.arm` | strong | default | site |
+
+"Default" is the freshness window `core.access.fresh-within`. A person using an ability over their own account through `owner: 'grants'` meets the same assurance and freshness as staff would.
 
 - **"Owner" in the Owner column means the person whose account it is.** `grants` gives everyone these abilities over their own account with no role; `refuses` stops staff disabling, merging or recovering their own.
 - **`core.grant.manage` at a record scope is delegation.** A producer who holds it on one production can add their team to that production and nowhere else. They can give only roles whose abilities they hold there.
@@ -170,3 +191,16 @@ Added after the form builder and front of house specifications both needed a hol
 | `welfare-lead` | Welfare Officer | Safeguarding lead | Safeguarding lead | Reading access needs, emergency contacts, and answers a form marks as welfare or access information; following up incidents about people | Yes | Site |
 
 From identity it holds `core.access-profile.read` and `core.emergency-contact.read`, and nothing else. It is deliberately separate from `administrator`: an administrator manages accounts without reading this information, and the welfare lead reads it without managing accounts.
+
+## Changes agreed during the phase 1 build
+
+These prevail over the tables above where they differ.
+
+| Matter | Ruling |
+| --- | --- |
+| Freshness window | How long a fresh proof of identity covers further sensitive actions is the kit's setting `core.access.fresh-within` (10 minutes by default, 1 minute to 1 hour). Identity declares no setting of its own for it. |
+| Google client id | A new setting, `core.sign-in.google-client-id` (text, unset, staff audience). `core.sign-in.google` cannot be turned on while it or the client secret is unset. |
+| Year-end expiry | The year-end rule reads `core.organisation.year-end` (a day and month), which core domain declares and which is unset until setup. While it is unset, "year end" cannot be chosen as an expiry and a grant asks for an explicit end date instead. |
+| Reads of an account | `core.account.read` needs a strong session but no fresh check (`fresh: false`). Foundations has ruled this for every privileged ability that only reads: strong, audited as a read, never asked again. The build follows it. |
+| Module-scoped grants | A grant is one row naming a role and a scope. A module scope limits the role to that module's abilities when the resolver reads it; the abilities are never copied into the grant, so a later change to the role takes effect at once. |
+| Pronouns | `core_accounts.pronouns`: optional free text of at most 40 characters, class Personal, cleared on erasure. Shown beside the name in the members' area and the console, and in the person's own account. Never on the public site, in audience emails, or in search results. |

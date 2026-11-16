@@ -28,7 +28,7 @@ The definition is data, never code. Its shape is described here; the exact schem
 
 A condition is a small tree: groups of `all`, `any` or `none`, nested to a depth a setting limits, over comparisons. Each comparison has a left side, an operator and a right side. A side is an answer, a calculation, a fact about the respondent, an attribute of the record the form is attached to, today's date, or a literal.
 
-A short illustration of the shape, not a schema:
+A short illustration of the shape, not a schema. Its ids are shortened to be read: a real question id is `ffld_` and 26 characters, made by the kit, and an option id is unique within its question.
 
 ```json
 {
@@ -78,16 +78,16 @@ One row per version. A published row is never updated; a trigger refuses it.
 | `id` | text, primary key | Internal | Kept |
 | `form_id` | text, references forms\_forms, not null | Internal | Kept |
 | `state` | text, check `draft`, `published`, `superseded` | Internal | Kept |
-| `number` | integer, null while a draft; unique with `form_id` | Internal | Kept |
+| `number` | integer, null until published; unique with `form_id` | Internal | Kept |
 | `definition` | text, JSON, not null; size capped by a setting | Internal | Kept |
 | `definition_hash` | text, not null | Internal | Kept |
 | `format` | integer, not null | Internal | Kept |
-| `edit_revision` | integer, not null; raised on every draft save | Internal | Kept |
+| `edit_revision` | integer, not null; raised on every save of the draft version | Internal | Kept |
 | `change_summary` | text, JSON; what changed from the previous version and its impact class | Internal | Kept |
-| `published_by` | text, references a person, null while a draft | Personal | Set to the anonymised person |
-| `published_at` | integer, null while a draft | Internal | Kept |
+| `published_by` | text, references a person, null while a draft version | Personal | Set to the anonymised person |
+| `published_at` | integer, null while a draft version | Internal | Kept |
 
-A partial unique index allows one draft per form. Question labels are the theatre's wording and are classed Internal; a build-time note in the builder tells authors not to put a person's details in a label.
+A partial unique index allows one draft version per form. Question labels are the theatre's wording and are classed Internal; a build-time note in the builder tells authors not to put a person's details in a label.
 
 ### forms\_fields
 
@@ -114,8 +114,8 @@ Where a form is offered: a public link, or a slot another module declares.
 | `form_id` | text, references forms\_forms, not null | Internal | Kept |
 | `slot_key` | text, not null; `forms.link` for a standalone link | Internal | Kept |
 | `subject_type`, `subject_id` | text, null; the record it is attached to. A null id means every record of that type | Internal | Kept |
-| `audience` | text, check `anyone`, `signed_in`, `members`, `group`, `invited` | Internal | Kept |
-| `audience_group_id` | text, null; required when audience is `group` | Internal | Kept |
+| `audience` | text, check `anyone`, `signed_in`, `members`, `role`, `invited` | Internal | Kept |
+| `audience_role` | text, null; a role key from identity, required when audience is `role`. The audience is then the holders of that role; identity defines no groups, so forms has none | Internal | Kept |
 | `opens_at`, `closes_at` | integer, null | Internal | Kept |
 | `response_cap` | integer, null | Internal | Kept |
 | `response_count` | integer, not null, default 0; check `response_cap` is null or `response_count <= response_cap` | Internal | Kept |
@@ -141,7 +141,7 @@ People invited to a placement whose audience is `invited`.
 
 ### forms\_responses
 
-One row per response. The id is made by the client before the first save, so a retried submission can never create a second response.
+One row per response. The id is made by the client before the first save, so a retried submission can never create a second response. The server accepts it only in the kit's form, `fres_` and 26 characters, and refuses an id that already belongs to someone else with the same answer it gives for a malformed one, so ids cannot be probed.
 
 | Column | Type and constraints | Class | On erasure |
 | --- | --- | --- | --- |
@@ -149,14 +149,15 @@ One row per response. The id is made by the client before the first save, so a r
 | `reference` | text, unique, not null; a short code a person can quote | Internal | Kept |
 | `form_id`, `version_id`, `placement_id` | text, references, not null | Internal | Kept |
 | `subject_type`, `subject_id` | text, null; the record this response is about | Internal | Kept |
+| realm | text, check audience or members; the side the response was answered on, fixed when it is created. The registry reads the row's realm from this column | Internal | Kept |
 | `person_id` | text, references core.account; null for an anonymous form or a response made while signed out | Personal | Set to null |
-| respondent\_email | text, null; the address given by a respondent who is not signed in, declared with the email subject. A check constraint allows person\_id or respondent\_email, never both | Personal | Set to null |
+| respondent\_email | text, null; the address given by a respondent who is not signed in, declared with the email subject. Forms writes it only when there is no account, and adds no check constraint: foundations withdrew the rule that a row never carries both, and where both are present the account wins | Personal | Set to null |
 | `entered_by` | text, references a person; set when staff answer on someone's behalf | Personal | Set to the anonymised person |
 | `state` | text, check `draft`, `awaiting_payment`, `submitted`, `withdrawn` | Internal | Kept |
 | `stage_key` | text, null until submitted; the workflow stage | Internal | Kept |
 | `stage_kind` | text, check `pending`, `in_review`, `returned`, `approved`, `declined`, `closed` | Internal | Kept |
 | `current_revision` | integer, not null, default 0 | Internal | Kept |
-| `unique_key` | text, null; the person id when the placement allows one response each. Unique with `placement_id` | Personal | Set to null |
+| `unique_key` | text, null; the account id, or a keyed hash of the address for a respondent who is signed out, when the placement allows one response each. Unique with `placement_id` | Personal | Set to null |
 | `is_test` | integer boolean, not null | Internal | Kept |
 | `resume_token_hash` | text, null | Internal | Set to null |
 | `submitted_at`, `decided_at`, `created_at`, `updated_at` | integer | Internal | Kept |
@@ -167,9 +168,9 @@ Indexes: (`form_id`, `stage_kind`, `submitted_at`), (`person_id`), (`subject_typ
 
 Three rules from identity (16 November 2026) apply to every table in this tab.
 
-- **A person is an account.** Every `person_id` column references `core.account`, and an account merge moves these columns in its own batch, so forms repoints nothing.
+- **A person is an account.** Every `person_id` column references `core.account`, and each is declared with a role (subject or actor) and a merge behaviour, as the registry requires. The subject column `forms_responses.person_id`, and actor columns in tables that can be updated, are `move`: the merge repoints them in its own batch. Actor columns in append-only tables (`forms_stage_history.actor_id`, `forms_messages.author_id`) are `alias`: the row is left alone and reads follow the account's `merged_into_id`. Where a move would break a unique key (two participation rows for one placement, two review assignments on one response and round), the earlier row is kept, the other is left as an alias, and the form's managers are told.
 - **A signed-out response is keyed to an address.** Claiming an account does not re-key the row: "My forms" finds it through the account's verified addresses.
-- **Access by link uses a token, never an id.** The invitation link and the link to resume a draft are the `token_hash` and `resume_token_hash` columns, stored hashed.
+- **Access by link uses a token, never an id.** The invitation link and the link to resume a draft response are the `token_hash` and `resume_token_hash` columns, stored hashed. The resume token sits on `forms_responses`, not on the table of saved draft responses. The same column carries the single-use link emailed to a signed-out respondent whose response is returned for changes: a new token replaces the old one each time, and it is cleared when used.
 
 ### forms\_response\_drafts
 
@@ -182,7 +183,7 @@ The working copy of an unsubmitted response, or of a returned one being revised.
 | `page_id` | text, null; where the person stopped | Internal | Row deleted |
 | `updated_at` | integer | Internal | Row deleted |
 
-The whole draft is encrypted because it can hold any class of answer and is never queried by content.
+The whole draft response is encrypted because it can hold any class of answer and is never queried by content.
 
 ### forms\_answers
 
@@ -201,9 +202,9 @@ One row per question per revision of a submitted response. Append-only, enforced
 | `value_cipher` | blob, null; used instead of the three above for special category | Special category | Set to null |
 | `label_snapshot` | text, null; the display text of a chosen record or option at the time | Decided per row | As `value_text` |
 
-Primary key (`response_id`, `revision`, `field_id`, `repeat_index`). Index (`field_id`, `value_text`) and (`field_id`, `value_number`) serve filters and charts. Erasure is the one permitted update, made by the erasure service through a guarded path the trigger recognises; foundations is asked how append-only triggers and erasure coexist.
+Primary key (`response_id`, `revision`, `field_id`, `repeat_index`). Index (`field_id`, `value_text`) and (`field_id`, `value_number`) serve filters and charts. Erasure is the one permitted update, made by the erasure service through a guarded path the trigger recognises: foundations ruled that the trigger allows an update only when every changed column is declared erasable and the new value is its erased value.
 
-A response to an anonymous form has no person, so erasure cannot find it. That is the point of an anonymous form, and the builder says so when the option is chosen.
+A response to an anonymous form has no person, so erasure cannot find it. That is the point of an anonymous form, and the builder says so when the option is chosen. In the registry `forms_responses` declares its account subject with `unlinked: 'staff'`, so the erasure screen lists the responses it could not link as a step for staff. A response keyed to an address is found by that address when it is a verified address of the person asking.
 
 ### forms\_option\_counts
 
@@ -308,13 +309,30 @@ Templates a theatre saves from its own forms. Templates shipped with the platfor
 | `definition` | text, JSON, not null | Internal | Kept |
 | `created_by`, `created_at` | text, integer | Personal, Internal | Person anonymised |
 
+## Table options for the registry
+
+The tables above give a class and an erasure behaviour per column. The registry also needs these options per table. "Subject" here is the registry's word for the person a row is about. Forms' own columns `subject_type` and `subject_id` mean something else, the record a response is attached to, and keep their names because slots and events use them.
+
+| Table | Realm | Subject (the person) | Append-only | Retention |
+| --- | --- | --- | --- | --- |
+| `forms_forms`, `forms_versions`, `forms_fields`, `forms_placements`, `forms_option_counts`, `forms_templates` | operational | None. Their account columns are actors | Published rows of `forms_versions` only | Kept while the form exists |
+| `forms_invitations` | operational | `person_id`, or the email subject on `email` | No | Deleted when the placement ends |
+| `forms_responses` | By row, from its `realm` column | `person_id` with `unlinked: 'staff'`, or the email subject on `respondent_email` | No | The form's `retention_days`, counted from `retention_due_at` |
+| `forms_response_drafts` | As its response | Through `forms_responses` | No | `forms.drafts.keep-for` |
+| `forms_answers` | As its response | Through `forms_responses` | Yes, with erasable value columns | With its response |
+| `forms_stage_history`, `forms_messages` | As its response | Through `forms_responses`; `actor_id` and `author_id` are actors, merged by alias | Yes, with erasable free text | With its response |
+| `forms_review_assignments`, `forms_reviews` | operational | Through `forms_responses` for the submitter; `reviewer_id` is an actor | `forms_reviews` only | With its response |
+| `forms_participation` | By row, as the response it stands for | `person_id` | No | Deleted when the placement ends |
+| `forms_action_runs` | operational | Through `forms_responses` | No | With its response |
+| `forms_response_authors` (later) | As its response | `person_id` | No | Deleted on submission |
+
 ## Limits the platform sets
 
 These come from D1 on the Workers Paid plan and bound the settings in tab 6 ([Cloudflare D1 limits](https://developers.cloudflare.com/d1/platform/limits/), read 16 November 2026).
 
 | D1 limit | Value | Consequence here |
 | --- | --- | --- |
-| Largest row, string or blob | 2 MB | A definition and a draft are each capped well below it by a setting |
+| Largest row, string or blob | 2 MB | A definition and a draft response are each capped well below it by a setting |
 | Bound parameters per query | 100 | Answers are written in chunks; no query binds one parameter per response in a result set |
 | Columns per table | 100 | Answers are rows, never a column per question |
 | Duration of a query or a whole batch | 30 seconds | A submission is one batch of at most a few hundred small statements; exports run on a queue in pages |
@@ -328,7 +346,7 @@ These come from D1 on the Workers Paid plan and bound the settings in tab 6 ([Cl
 
 ### forms\_response\_authors
 
-Arrives with the shared-draft story (FB-606), after the first release. The people a submitter has added to a draft response so a team can write a proposal together. It is a list, not a grant: the fact `forms.co-author` reads it, and the rows go when the draft is submitted.
+Arrives with the shared-draft story (FB-606), after the first release. The people a submitter has added to a draft response so a team can write a proposal together. It is a list, not a grant: the fact `forms.co-author` reads it, and the rows go when the draft response is submitted.
 
 | Column | Type and constraints | Class | On erasure |
 | --- | --- | --- | --- |
@@ -340,7 +358,7 @@ Arrives with the shared-draft story (FB-606), after the first release. The peopl
 
 ## Id prefixes
 
-Foundations amended the id format on 16 November 2026: every id is a prefix, an underscore and 26 characters, and a reference or a route accepts only its own table's prefix. Ids sort by creation time unless marked random, which only hides the moment of creation. An id is never a secret: it appears in logs, audit rows, event payloads and webhooks, so anything that grants access by being known is a separate random token on the row, stored hashed. Foundations checked these prefixes for clashes and entered them in its index.
+Foundations amended the id format on 16 November 2026: every id is a prefix, an underscore and 26 characters, and a reference or a route accepts only its own table's prefix. Ids sort by creation time unless marked random, which only hides the moment of creation. An id is never a secret: it appears in logs, audit rows, event payloads and webhooks, so anything that grants access by being known is a separate random token on the row, stored hashed. Foundations checked these prefixes for clashes and entered them in its index. Four tables are keyed by their own columns (draft responses, answers, option counts and participation), so they have no id and need no prefix. The prefixes first registered for them, `fdr`, `fans`, `fopt` and `fpar`, are given back to foundations.
 
 | Table | Prefix | Random |
 | --- | --- | --- |
@@ -350,14 +368,10 @@ Foundations amended the id format on 16 November 2026: every id is a prefix, an 
 | `forms_placements` | `fplc` | No |
 | `forms_invitations` | `finv` | Yes, to hide when it was made. The invitation link is a separate token column, stored hashed |
 | `forms_responses` | `fres` | No |
-| `forms_response_drafts` | `fdr` | Yes, to hide when it was made. The resume link is a separate token column, stored hashed |
-| `forms_answers` | `fans` | No |
-| `forms_option_counts` | `fopt` | No |
 | `forms_stage_history` | `fstg` | No |
 | `forms_review_assignments` | `fasg` | No |
 | `forms_reviews` | `frev` | No |
 | `forms_messages` | `fmsg` | No |
-| `forms_participation` | `fpar` | No |
 | `forms_action_runs` | `frun` | No |
 | `forms_templates` | `ftpl` | No |
 | forms\_response\_authors (after the first release) | fcoa | No |

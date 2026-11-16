@@ -4,12 +4,38 @@ Identity owns seventeen tables, all inside the `core` module. One row in `core_a
 
 ## Reading the tables
 
-- **Types.** `id` is the platform's opaque identifier, `time` is a UTC instant, `flag` is true or false, `enum` is text limited by a check constraint. Workstream 1 fixes how each is stored.
+- **Types.** `id` is the platform's opaque identifier and `enum` is text limited by a check constraint. Where a table below says `time` or `instant` it is the foundations type `timestamp` (a UTC instant), and `flag` is `boolean`.
 - **Prefix.** Tables are named `core_<plural>`, the foundations format, because identity is an area of the always-on `core` module.
 - **Class** is the paper's data class: Public, Internal, Personal, Personal free text, Special category.
-- **On erasure** says what the erasure batch does to the column on the erased person's own rows.
-- **On merge** is given per table: what happens to the losing account's rows.
+- **On erasure** says what the erasure batch does to the column on the erased person's own rows. In the foundations verbs, "Set to null" is `clear`, "Kept" is `keep`, and "Row deleted" is the table option `onErasure: 'delete-row'`. A column the batch overwrites with a placeholder is `anonymise`.
+- **On merge** is given per table: what happens to the merged-away account's rows. The account that is kept is the survivor.
 - **A reference to an account** in any other module's table declares the same two behaviours in its data-class entry. Identity never names another module's table.
+
+## Heading line of each table
+
+The foundations layout gives every table a heading line. Realm is `audience`, `members` or `operational`. Identity's tables describe the person and how they sign in, whichever side they use, so most are operational.
+
+| Table | Realm | Subject | Append-only | Retention |
+| --- | --- | --- | --- | --- |
+| `core_accounts` | operational | `id` | No | Anonymised by erasure or by the armed sweeps (`core.retention.unclaimed-after`, `core.retention.dormant-after`); the row is kept as a tombstone |
+| `core_account_emails` | operational | `account_id` | No | With the account; an unverified address goes after `core.sign-in.unverified-address-lifetime` |
+| `core_passkeys` | operational | `account_id` | No | With the account |
+| `core_federated_identities` | operational | `account_id` | No | With the account |
+| `core_recovery_codes` | operational | `account_id` | No | With the account |
+| `core_account_tokens` | operational | `account_id`, or the email column when no account is named | No | Deleted a day after expiry |
+| `core_passkey_challenges` | operational | `account_id` where one is named, otherwise none | No | Deleted on expiry |
+| `core_sessions` | operational | `account_id` | No | Deleted 30 days after ending or expiring |
+| `core_roles` | operational | none | No | Kept |
+| `core_role_abilities` | operational | none | No | Kept |
+| `core_fact_abilities` | operational | none | No | Kept |
+| `core_grants` | operational | `account_id`; `granted_by` and `ended_by` are actors | No | Ended rows are kept as the record of who held what |
+| `core_account_merges` | operational | `survivor_id` | No | Kept |
+| `core_account_merge_items` | operational | none (reached through the merge) | No | Deleted when the undo window closes |
+| `core_data_requests` | operational | `account_id` | No | Kept as the record that the request was met; it holds no personal content after erasure |
+| `core_emergency_contacts` | members | `account_id` | No | With the account |
+| `core_access_profiles` | audience | `account_id` | No | With the account; a special column under `CORE_ENCRYPTION_KEY` |
+
+None of identity's tables is append-only; the audit trail of its actions is foundations' `core_audit`.
 
 ### Id prefixes
 
@@ -33,7 +59,7 @@ Every id is a prefix, an underscore and 26 characters, in the foundations format
 | `core_emergency_contacts` | `emc` | No |
 | `core_access_profiles` | `apr` | No |
 
-`core_role_abilities` and `core_fact_abilities` are keyed by their two columns together and have no id of their own. The id of a session, token or challenge is never the secret itself: the secret is a separate value stored only as a hash.
+`core_role_abilities` and `core_fact_abilities` have no id of their own. The first is keyed by `role_id` and `ability` together; the second by `fact`, `ability` and `pinned_record` together. The id of a session, token or challenge is never the secret itself: the secret is a separate value stored only as a hash.
 
 ## core\_accounts
 
@@ -48,7 +74,7 @@ One row per person. Kept for ever as a tombstone after erasure, so that history 
 | locale | text | Null; a language tag the platform ships | Internal | Set to null |
 | audience\_email\_id | id | Null; refers to a core\_account\_emails row of this account | Internal | Set to null |
 | members\_email\_id | id | Null; refers to a core\_account\_emails row of this account. Null means "use the audience address" | Internal | Set to null |
-| origin | enum | setup, self, guest, invite, staff | Internal | Kept |
+| origin | enum | `setup`, `self`, `guest`, `named-by-other`, `invite`, `staff`. `invite` is an account made by an invitation or by a role granted to an address nobody holds. `staff` is a person added by staff in the console or at the desk, including a name on the door list with no address. `named-by-other` is a person whose details somebody else gave. | Internal | Kept |
 | created\_at | time | Not null | Internal | Kept |
 | first\_signed\_in\_at | time | Null until the first successful sign-in | Internal | Kept |
 | last\_signed\_in\_at | time | Null | Personal | Set to null |
@@ -61,7 +87,7 @@ One row per person. Kept for ever as a tombstone after erasure, so that history 
 - **A trigger guards the tombstone.** Once `anonymised_at` is set, any write to a Personal column of the row is refused by the database, not by application code.
 - **A second trigger refuses deletion** of any row.
 - **Derived, never stored:** *unclaimed* is `first_signed_in_at` null on a live row; *claimed* is the opposite; *alias* is `merged_into_id` set; *tombstone* is `anonymised_at` set.
-- **On merge:** the loser's row stays, gains `merged_into_id`, and loses nothing else until the undo window closes.
+- On merge: the merged-away account's row stays, gains `merged_into_id`, and loses nothing else until the undo window closes.
 
 ## core\_account\_emails
 
@@ -77,7 +103,7 @@ An address belongs to one account at a time.
 | created\_at | time | Not null | Internal | Row deleted |
 
 - The unique index on `address` is the conditional write that stops two accounts being made for one address at the same moment.
-- **On merge:** rows move to the winner.
+- On merge: rows move to the survivor.
 
 ## core\_passkeys
 
@@ -95,7 +121,7 @@ An address belongs to one account at a time.
 | created\_at | time | Not null | Internal | Row deleted |
 | last\_used\_at | time | Null | Personal | Row deleted |
 
-**On merge:** rows move to the winner, so both sets of passkeys keep working.
+On merge: rows move to the survivor, so both sets of passkeys keep working.
 
 ## core\_federated\_identities
 
@@ -112,7 +138,7 @@ A link between an account and an identity at an outside provider. Google is the 
 | linked\_at | time | Not null | Internal | Row deleted |
 | last\_used\_at | time | Null | Personal | Row deleted |
 
-**On merge:** rows move to the winner.
+On merge: rows move to the survivor.
 
 ## core\_recovery\_codes
 
@@ -124,7 +150,7 @@ A link between an account and an identity at an outside provider. Google is the 
 | created\_at | time | Not null | Internal | Row deleted |
 | used\_at | time | Null; set by a conditional write so a code works once | Internal | Row deleted |
 
-**On merge:** the loser's codes are deleted; the winner keeps its own.
+On merge: the merged-away account's codes are deleted; the survivor keeps its own.
 
 ## core\_account\_tokens
 
@@ -148,7 +174,7 @@ Every single-use secret sent to a person or handed to them by staff. Only a hash
 
 - A sweep deletes rows a day after they expire.
 - **A new address has no account until its token is used.** Signing up writes a token, not an account, so no unverified account ever exists.
-- **On merge:** the loser's unused tokens are deleted.
+- On merge: the merged-away account's unused tokens are deleted.
 
 ## core\_passkey\_challenges
 
@@ -185,7 +211,7 @@ One row per signed-in browser. The cookie holds a random token; the table holds 
 
 - No network address is stored.
 - A sweep deletes rows 30 days after they end or expire.
-- **On merge:** the loser's sessions are ended with reason merged.
+- On merge: the merged-away account's sessions are ended with reason `merged`.
 
 ## core\_roles
 
@@ -227,7 +253,7 @@ Which abilities the theatre has attached to a fact a module declares. It is the 
 | `created_by` | id | Not null; an account, as actor | Internal | Kept |
 | `created_at` | instant | Not null | Internal | Kept |
 
-- **Key:** `fact` and `ability` together.
+- Key: `fact`, `ability` and `pinned_record` together.
 - **On merge:** `created_by` is an alias.
 - A row whose fact or ability no longer exists in any enabled module is ignored by the resolver and listed on the health page.
 
@@ -263,7 +289,7 @@ A role given to an account. A grant is never edited: it is ended, and a renewal 
 - A partial unique index allows one live grant per account, role and scope.
 - *Live*, *lapsed* and *pending* are read at query time. Pending means the account is unclaimed.
 - A trigger allows only the three `ended_` columns to change after insert.
-- **On merge:** live rows move to the winner. Where both hold the same role at the same scope, the later expiry stays and the other ends as replaced.
+- On merge: live rows move to the survivor. Where both hold the same role at the same scope, the later expiry stays and the other ends as `replaced`.
 
 ## core\_account\_merges and core\_account\_merge\_items
 
@@ -272,8 +298,8 @@ The record of a merge, and the list of what it moved so that it can be undone.
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
 | id | id | Primary key | Internal | Kept |
-| winner\_id | id | Not null | Internal | Kept |
-| loser\_id | id | Not null; unique among merges not undone | Internal | Kept |
+| `survivor_id` | id | Not null | Internal | Kept |
+| `merged_account_id` | id | Not null; unique among merges not undone | Internal | Kept |
 | started\_by | enum | person, staff, claim | Internal | Kept |
 | performed\_by | id | Not null | Internal | Kept |
 | performed\_at | time | Not null | Internal | Kept |
@@ -289,7 +315,7 @@ The record of a merge, and the list of what it moved so that it can be undone.
 | row\_id | id | Not null | Internal | Rows deleted |
 | action | enum | moved, ended, deleted | Internal | Rows deleted |
 
-Items are deleted by a sweep when `undo_until` passes; after that the merge is permanent and the loser's row is anonymised.
+Items are deleted by a sweep when `undo_until` passes; after that the merge is permanent and the merged-away account's row is anonymised.
 
 ## core\_data\_requests
 
@@ -322,7 +348,7 @@ Somebody to ring for a member. It describes a third person, so it is never shown
 | phone | text | Not null | Personal | Row deleted |
 | updated\_at | time | Not null | Internal | Row deleted |
 
-**On merge:** rows move; the winner's rows are listed first.
+On merge: rows move; the survivor's rows are listed first.
 
 ## core\_access\_profiles
 
@@ -337,7 +363,7 @@ A person's access needs, given once and offered wherever they are useful. The qu
 | share\_with\_members\_side | flag | Not null; default false | Internal | Row deleted |
 | updated\_at | time | Not null | Internal | Row deleted |
 
-**On merge:** the winner's row stays; if only the loser has one, it moves.
+On merge: the survivor's row stays; if only the merged-away account has one, it moves.
 
 ## What other modules declare about an account reference
 
@@ -347,7 +373,7 @@ Every column elsewhere that holds an account id states two things in its data-cl
 
 | Declaration | Choices | Meaning |
 | --- | --- | --- |
-| On merge | move | The row is re-pointed at the winner. Used for mutable rows: a booking, a shift, a basket. |
+| On merge | move | The row is re-pointed at the survivor. Used for mutable rows: a booking, a shift, a basket. |
 |  | alias | The row is left alone and reads follow `merged_into_id`. Required for append-only tables, which cannot be updated. |
 |  | handler | The module supplies the statements, for rows with a uniqueness rule that a plain move would break. |
 | On erasure | keep | The id stays and now points at a tombstone. Used for ledger lines, attendance, safety records. |

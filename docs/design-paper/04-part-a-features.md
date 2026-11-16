@@ -27,8 +27,8 @@ These are postures, not fixed roles. A theatre defines its own role names and ma
 ### People and accounts
 
 - One account per person across every module, with clearly separate audience and members' experiences (see the Accounts sub-tab).
-- Guest checkout without an account, claimable later.
-- Shadow accounts for people recorded before they ever sign in, such as a trainee on a paper register.
+- Guest checkout, with an unclaimed account the buyer can claim later.
+- Unclaimed accounts for people recorded before they ever sign in, such as a trainee on a paper register.
 - Merging duplicate accounts, and erasure that anonymises while keeping history.
 - Emergency contacts and access needs, held as protected data.
 
@@ -77,7 +77,7 @@ Flexibility comes in four layers, from least to most effort:
 
 1. **Settings.** Numbers, deadlines, names and toggles, changed in the app.
 2. **Modules.** Switched on or off in the app, with a guided setup for each.
-3. **Custom fields and vocabularies.** Through the form builder, a theatre adds its own fields to productions, people and bookings, and its own lists such as department names, ticket concessions or incident types.
+3. **Custom fields and vocabularies.** Through the form builder, a theatre adds its own fields to productions, people and venues, and its own lists such as department names, ticket concessions or incident types.
 4. **Content and design.** Public pages written or redesigned in the fork.
 
 A theatre should never need to edit application code to match its own practice. A request that needs code is a signal that a setting or an extension point is missing.

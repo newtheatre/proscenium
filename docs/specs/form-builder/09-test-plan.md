@@ -14,7 +14,7 @@ Twenty-seven named cases must never regress. Each has a name a contributor can s
 | One each | Integration, D1 | Two concurrent submissions by one person to a one-each placement store one; a withdrawal frees the place |
 | The decision made twice | Integration, D1 | Two people deciding one response at the same moment produce one stage change; the second is refused |
 | The production created once | Integration, D1 | An outcome action retried after a failure creates one record, by its idempotency key |
-| Two editors | Integration, D1 | A draft save with a stale revision is refused and overwrites nothing |
+| Two editors | Integration, D1 | A save of the draft version with a stale revision is refused and overwrites nothing |
 | All or nothing at checkout | Integration, D1 | When a host's unit of work fails, no response, answer, count or event from `addResponse` remains |
 
 ### The engine
@@ -34,7 +34,7 @@ Twenty-seven named cases must never regress. Each has a name a contributor can s
 | --- | --- | --- |
 | The frozen version | Integration, D1 | An update or delete of a published version is refused by the database |
 | The answer that kept its question | Integration | After a question is retired, its earlier answers are still read, exported and erased under the retired question |
-| The draft that crossed a publish | End to end | A respondent mid-draft when a new version is published keeps their answers, is told what changed, and submits against the new version |
+| The draft response that crossed a publish | End to end | A respondent with a draft response when a new version is published keeps their answers, is told what changed, and submits against the new version |
 | The older deployment | Upgrade | A release reads and serves forms written in the previous two definition formats |
 
 ### Access
@@ -45,16 +45,16 @@ Twenty-seven named cases must never regress. Each has a name a contributor can s
 | Blind until released | Integration | Before release no reviewer can obtain another's scores, including through a summary that would reveal them by subtraction |
 | Not your own | Integration | A person cannot decide, review or move a response they submitted, whatever abilities they hold |
 | The restricted answer | Integration | A special-category answer is ciphertext at rest, absent from the table and export without `read-special`, and each reveal is audited |
-| The id is not a key | Integration | An invitation or a link to resume a draft works only with its token; knowing the row's id opens nothing, and the token is stored only as a hash |
+| The id is not a key | Integration | An invitation or a link to resume a draft response works only with its token; knowing the row's id opens nothing, and the token is stored only as a hash |
 | Found by address | Integration | A response made while signed out appears in My forms once its address is verified on an account, and to nobody before that |
 
 ### Privacy
 
 | Name | Tier | Proves |
 | --- | --- | --- |
-| Erased everywhere | Integration, D1 | Erasing a person treats their answers in every form by class, deletes their drafts and files, and leaves counts and history intact, in one unit of work |
+| Erased everywhere | Integration, D1 | Erasing a person treats their answers in every form by class, deletes their draft responses and files, and leaves counts and history intact, in one unit of work |
 | Gone on time | Integration | The retention sweep anonymises a response the day after its date and not the day before |
-| Quiet by default | Integration | No response, review or action event reaches a webhook unless the form opts its response events in, and no event payload ever carries an answer, a name or free text |
+| Quiet by default | Integration | No response, review or action event ever reaches a webhook. A form that has not turned sharing on announces no `forms.response.shared` event, and one that has announces it with ids only. No event payload ever carries an answer, a name or free text |
 
 ## What each tier covers
 
@@ -83,6 +83,6 @@ The engine is small and pure, so it suits tests that generate many random defini
 
 ## Fixtures
 
-- The ten shipped templates are test fixtures: each must pass the publish checks and be fillable end to end.
+- The templates shipped with a release are test fixtures (three in the first release: show proposal, access requirements and feedback survey): each must pass the publish checks and be fillable end to end.
 - The shared engine case set lives beside the engine and is the same file for both runtimes.
 - Seed data for the demo site includes one form in each state and a proposals round part-way through review, with random people generated at run time.

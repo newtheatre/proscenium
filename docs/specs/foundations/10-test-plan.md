@@ -24,8 +24,8 @@ These run from the registry over every module, upstream's and a theatre's own, w
 | Tables | A table exists that no manifest declares, or the reverse; a table name lacks its module's prefix |
 | Data classes | A column has no class; a table with personal columns has no subject; a class and its erasure behaviour do not fit; an append-only table lacks its triggers |
 | Migrations | The schema and the migrations disagree; an applied migration's checksum changed; a migration removes or renames within a major; a migration rebuilds an append-only table |
-| Routes | A route has neither an ability nor `public: true`; a route's ability is not declared; a route lies outside its module's prefix; a changing route lacks input validation |
-| Abilities | An ability is declared and never checked, or checked and never declared; a high-risk ability lacks `fresh`; an ability's record type has no table |
+| Routes | A route has neither an ability nor `public: true` (the ability may be 'signed-in'; 'public' is not an ability); a route's ability is not declared; a route lies outside its module's prefix; a changing route lacks input validation |
+| Abilities | An ability is declared and never checked, or checked and never declared; a `privileged ability that changes something is declared fresh: false, or one that only reads is declared fresh: false without audit: 'read'`; an ability's record type has no table |
 | Settings | A key is read that is not declared; a default lies outside its own limits; a sensitive setting is quotable; a content token names an unknown or non-quotable key |
 | Events and jobs | An event is announced or listened to without being declared; a listener's module neither requires nor uses the announcer; a job handler is missing |
 | External calls | A module uses `externalCall` with no reconcile handler; an outside address is fetched outside `externalCall` or a declared credential |

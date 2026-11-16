@@ -1,6 +1,6 @@
 # Module catalogue
 
-Sixteen modules sit on the core. Each can be switched off without breaking another, and a dependency is declared, never assumed.
+Sixteen modules sit on the core, listed below. One of them is built as two: Membership is `membership` and `membership-fees`, so a free member list needs no payments. The form builder is a further module, `forms`, which is always on and cannot be switched off, and the core itself is one always-on module. Each switchable module can be switched off without breaking another, and a dependency is declared, never assumed. There are no either-or dependencies.
 
 ## Priority
 
@@ -20,15 +20,15 @@ The detailed sections below keep catalogue order, not priority order.
 | Public site | What's on, production pages, archive, about and policy pages | Core |
 | Programming | Proposal windows, review, season planning | Core |
 | Production management | Team, casting, rehearsals, tasks, per-show budget | Core |
-| Box office | Tickets, seating, passes, refunds, door scanning | Core |
-| Payments | Pluggable providers for taking and returning money | Box office or Bar |
+| Box office | Tickets, seating, passes, refunds, door scanning | Payments, Finance |
+| Payments | Pluggable providers for taking and returning money | Finance |
 | Front of house | Rota, tonight screen, checklists, incidents, night report | Core |
-| Bar and kiosk | Products, till, tabs, stock, age checks | Payments |
+| Bar and kiosk | Products, till, tabs, stock, age checks | Payments, Finance |
 | Spaces | Room and resource booking with policy and approvals | Core |
 | Inventory | Props, costume, set and technical kit | Core |
 | Training | Catalogue, sessions, records, gates | Core |
-| Membership | Terms, fees, verification, benefits | Core |
-| Communications | Mailing lists, audience messages, consent | Core |
+| Membership | Schemes, fees, verification, benefits | Form builder. Its fees module also needs Payments and Finance |
+| Communications | Lists, notices, consent (mailings come later) | Core |
 | Finance | Ledger, budgets, expenses, period close, exports | Core |
 | Fundraising | Donations, sponsors, campaigns | Finance, Payments |
 | Governance | Committee record, handover, documents, elections | Core |
@@ -68,7 +68,7 @@ Lowest priority. Credits on the public page and the archive belong to the core p
 
 ## Box office
 
-The most important module. It works entirely within the audience experience and never assumes the buyer is a member. The last seven items were added after the research into other ticketing systems.
+The most important module. It works entirely within the audience experience and never assumes the buyer is a member. The last seven items were added after the research into other ticketing systems. Of those seven, gift vouchers and a donation at checkout are in roadmap phase 6. The embeddable widget, wallet tickets, agent and promoter allocations, a customer record page and abandoned-basket reminders are not yet scheduled.
 
 - Ticket types, concessions and price bands per production or per performance.
 - General admission or allocated seating from a seating plan.
@@ -91,7 +91,7 @@ The most important module. It works entirely within the audience experience and 
 
 ## Payments
 
-- A provider interface with several implementations: an in-person card reader, online card, cash, invoice, and none (free events).
+- A provider interface with several implementations. Cash and attested card (staff confirm a card payment taken on a separate machine) always exist; then online card, then an in-person card reader; and none, for free events. Invoice is not a payment method in any specification.
 - A theatre enables any combination per channel: online, desk, bar.
 - Every charge is an attempt with a recorded outcome, so an interrupted payment is never ambiguous.
 - Refunds go back by the method that took the money, with approval rules.
@@ -165,6 +165,8 @@ The most important module. It works entirely within the audience experience and 
 - Invoices in and out.
 - Period close, and exports to an accounting package or a parent body's format.
 - Tax handling as a setting: none, VAT, sales tax.
+
+The ledger, its accounts, period close and income reports are built with the box office in roadmap phase 3. Budgets, expense claims, invoices, accounting exports and reconciliation are placed in phase 6 and have no specification yet.
 
 ## Fundraising
 

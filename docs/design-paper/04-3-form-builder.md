@@ -1,6 +1,6 @@
 # Form builder
 
-A full form builder with a strong engine is part of the core, so that any module can ask a theatre's own questions without new code. It takes inspiration from Matt's [form-builder](https://github.com/MattA-Official/form-builder) project and is designed fresh, with usability as the first requirement.
+A full form builder with a strong engine is an always-on module of its own, forms, beside the core, so that any module can ask a theatre's own questions without new code. It takes inspiration from Matt's [form-builder](https://github.com/MattA-Official/form-builder) project and is designed fresh, with usability as the first requirement.
 
 ## Why it is core
 
@@ -57,3 +57,11 @@ The reference project works but is not very usable, so these are requirements, n
 ## Custom fields
 
 Custom fields on built-in records (a production, a person, a booking) are the same engine: a small form attached to the record type. There is one mechanism to learn, not two.
+
+## What arrives when
+
+This tab describes the whole intent. The [form builder specification](https://claude.ai/artifact/6E5k2VS2PnhdciVNMeap5s) is the authority on what is built first, and it is narrower:
+
+- **First release:** building a form, filling it in, review and decisions, on its own; a form attached to a slot on a host module's record, with Membership as the first host (FB-501, FB-502, record mode FB-503 and outcome actions FB-506, brought forward by decision on 16 November 2026).
+- **Later:** custom fields on a production, a person and a venue (FB-511); pickers for a person, production, performance and space (FB-504); answers that map to real fields (FB-505); a form that ends in a charge (FB-508); an approved proposal that creates a production (FB-512); and questions at checkout, attached to a ticket type.
+- **Not in any specification:** a signature question type (consent is the nearest) and a picker for an inventory item. They stay here as intent until someone specifies them.

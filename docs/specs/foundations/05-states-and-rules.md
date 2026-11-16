@@ -22,7 +22,7 @@ stateDiagram-v2
 - **M4.** Switching off **never deletes data**. Tables, settings values, files and audit rows stay. Its routes answer 404, its navigation and contributions disappear, its jobs stop being claimed (queued ones wait), its tasks stop being scheduled, its listeners stop receiving events (events announced meanwhile are not replayed), its public components render nothing.
 - **M5.** Switching on again resumes queued jobs and restores everything in M4. Nothing is re-seeded.
 - **M6.** The first time a module is switched on, its presets are offered, its secrets marked `always` are checked, and its setup steps join the setup checklist. A missing `always` secret blocks the switch; a `when-used` secret does not, and the feature that needs it refuses with `core.not-configured` until it is set.
-- **M7.** The switch is an audited action needing `core.module.switch`, risk high, with fresh sign-in.
+- **M7.** The switch is an audited action needing `core.module.switch`, risk privileged, so a strong session and a fresh sign-in.
 - **M8.** A module's migrations are applied whether it is on or off, so switching on is instant and never runs schema changes.
 
 ## 2. A migration: generated, applied once, never edited
@@ -37,7 +37,7 @@ stateDiagram-v2
   Applied --> [*]
 ```
 
-- **G1.** Migrations run inside the application: at first-run setup, and after an update when an administrator presses Apply on the Updates screen or, if `core.updates.apply-migrations` is `automatic`, on the first request after deploy. While migrations are pending, every route except health, sign-in and the Updates screen answers 503 with a plain page.
+- **G1.** Migrations run inside the application: at first-run setup, and after an update when an administrator presses Apply on the Updates screen or, if `core.updates.apply-migrations` is `automatic`, on the first request after deploy. While migrations are pending, every route except health, sign-in and the Updates screen answers 503 with a plain page. The platform takes no backup of its own, before a migration or at any other time (Matt, 16 November 2026); a theatre relies on the history Cloudflare keeps for its database.
 - **G2.** Upstream's journal is applied first and completely, then the theatre's (`site/migrations/`). A theatre migration may refer to upstream tables; never the reverse.
 - **G3.** Each migration is one D1 batch with its ledger row, so it is applied whole or not at all. A migration too large for one batch is split into several migrations by the generator.
 - **G4.** An applied migration's file never changes: the runner compares checksums and stops with the file's name if one differs.
@@ -104,7 +104,7 @@ stateDiagram-v2
 - **J3.** Back-off doubles from 30 seconds; five attempts by default; a manifest may lower or raise it per job.
 - **J4.** A dead job appears on the health screen and the Jobs screen with its error. The platform's dead-letter queue catches only messages the consumer could not even read, and those raise a health warning.
 - **J5.** A scheduled task is a job created by the scheduler. The one cron trigger fires every minute; the scheduler inserts a `core_task_runs` row for each task that is due and creates its job. A missed minute is caught up at the next; a task that is still running is not started again.
-- **J6.** Task times (`dailyAt`, `weeklyOn`) are Europe/London wall-clock times by default, taken from `core.locale.time-zone`.
+- **J6.** Task times (`dailyAt`, `weeklyOn`) are wall-clock times in the theatre's time zone, which is unset until setup; until it is set, tasks run to UTC and no domain date is computed. The zone is `core.locale.time-zone`.
 - **J7.** A job handler receives ids, opens its own unit, and must be safe to repeat.
 
 ## 6. An external call: recorded before it is made
@@ -126,10 +126,10 @@ stateDiagram-v2
 
 ## Rules that have no diagram
 
-- **R1. One permission check.** `can(actor, ability, record?)` is the only function that answers whether someone may do something. The route wrapper calls it from the route's declaration; pages call the same function to decide what to show. A route with no `ability` must say `public: true` or the build fails.
+- **R1. One permission check.** `can(actor, ability, record?)` is the only function that answers whether someone may do something. The route wrapper calls it from the route's declaration; pages call the same function to decide what to show. A route with no `ability` must say `public: true` (anyone) or name the ability 'signed-in' (any signed-in person), or the build fails. There is no ability named 'public'.
 - **R2. A refusal always has the same shape**: `{ code, reason, remedy?, fields? }`, with a stable code (`<module>.<what>`) and a sentence a person can act on.
-- **R3. Settings are read through `setting(key)`**, which validates and falls back to the default. A value outside its declared limits can never be saved; a limit tightened by an update leaves the old value in place, flagged on the health screen, until an administrator changes it.
-- **R4. A setting marked `quotable` can be quoted on a public page** with `:setting{key="…"}` and is rendered live. CI fails on a token whose key does not exist or is not quotable. Sensitive settings can never be quotable.
+- **R3. Settings are read through `useSetting(key)`**, which validates and falls back to the default. A value outside its declared limits can never be saved; a limit tightened by an update leaves the old value in place, flagged on the health screen, until an administrator changes it.
+- **R4. A setting marked `quotable` can be quoted on a public page** with `:setting{name="…"}` and is rendered live. CI fails on a token whose name does not exist or is not quotable. Sensitive settings can never be quotable.
 - **R5. Settings are site-wide.** Anything that varies by venue, production or performance is a field on that record whose default comes from a setting (question 1 for Matt).
 - **R6. Idempotent routes**: a route declared `idempotent` requires a key from the client and replays the stored response for a repeat within 48 hours.
 - **R7. Every date a rule depends on is a local date in the site's time zone**, stored with `col.localDate`, never derived from a UTC timestamp in a query.

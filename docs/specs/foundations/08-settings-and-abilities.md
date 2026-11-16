@@ -2,78 +2,94 @@
 
 ## Foundations' own settings and abilities
 
-Foundations defines the registries; it also uses them. These are the settings and abilities of the system area of `core`, written in the registry formats. Identity, the core domain and the interface add their own `core.*` entries in their documents.
+Foundations defines the registries; it also uses them. These are the settings and abilities of the system area of `core`, written in the registry layouts. Identity, the core domain and the interface add their own `core.*` entries in their documents, so no table here is the whole of `core`.
+
+Revised on 16 November 2026 after the consistency review: the freshness window is `core.access.fresh-within`, the name and locale settings are confirmed as foundations' (the core domain keeps only its additional `core.organisation.*` keys), and every table follows the registry layouts.
 
 ## Settings
 
-No operational number is fixed in code. Defaults are proposals a theatre can change within the limits shown.
+No operational number is fixed in code. Defaults are proposals a theatre can change within the limits shown. Every setting here is changed with `core.setting.change` unless the row says otherwise.
 
-| Key | Kind | Default | Limits | Audience | Notes |
-| --- | --- | --- | --- | --- | --- |
-| `core.site.name` | text | unset | 1 to 80 characters | public, quotable | Set at setup |
-| `core.locale.time-zone` | choice | `Europe/London` | Any IANA zone | internal | Change needs confirm: shows the tasks and deadlines that will move |
-| `core.locale.currency` | choice | `GBP` | ISO 4217 | public | Cannot change once a ledger row exists |
-| `core.locale.language` | choice | `en-GB` | Shipped catalogues | public |  |
-| `core.locale.day-start` | time | `04:00` | 00:00 to 08:00 | internal | The hour a show night ends, so a late finish belongs to the right day |
-| `core.updates.channel` | choice | `stable` | stable, beta | internal | Managed by deployment (`site.config.ts`), shown read-only |
-| `core.updates.apply-migrations` | choice | `button` | button, automatic | internal | Question 3 |
-| `core.audit.retention` | duration | 7 years | 1 to 25 years | internal | Change needs a reason |
-| `core.jobs.retention` | duration | 30 days | 7 to 365 days | internal | Finished jobs |
-| `core.jobs.max-attempts` | integer | 5 | 1 to 10 | internal | A job may declare its own |
-| `core.health.notify` | boolean | true |  | internal | Tell the Owner when a check fails for more than a day |
-| `core.health.notify-after` | duration | 24 hours | 1 hour to 7 days | internal |  |
-| `core.security.fresh-sign-in` | duration | 15 minutes | 5 to 60 minutes | internal | How recent a sign-in must be for abilities marked fresh. Read by identity. |
-| `core.maintenance.message` | text | a plain default | up to 280 characters | public | Shown while migrations are pending |
+| Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `core.site.name` | text | unset | 1 to 80 characters | `core.setting.change` | public | yes | The theatre's name. Set at setup |
+| `core.locale.time-zone` | choice | unset | any IANA zone | `core.setting.change`, with confirmation that shows the tasks and deadlines that will move | public | no | The theatre's time zone. Set at setup; until then scheduled tasks use UTC and no domain date is computed |
+| `core.locale.currency` | choice | `GBP` | ISO 4217 | `core.setting.change` | public | no | The one currency. Refused once any money has been recorded |
+| `core.locale.language` | choice | `en-GB` | the shipped catalogues | `core.setting.change` | public | no | The one language setting |
+| `core.locale.day-start` | time | `04:00` | 00:00 to 08:00 | `core.setting.change`, with confirmation | staff | no | The hour a show night ends, so a late finish belongs to the right day |
+| `core.updates.channel` | choice | `stable` | stable, beta | deployment (`site.config.ts`), shown read-only | staff | no | Which releases the theatre is offered |
+| `core.updates.apply-migrations` | choice | `button` | button, automatic | `core.update.apply` | staff | no | Whether an administrator presses Apply or migrations apply by themselves |
+| `core.audit.retention` | duration | 7 years | 1 to 25 years | `core.setting.change`, with a reason | staff | yes | How long audit entries are kept |
+| `core.jobs.retention` | duration | 30 days | 7 to 365 days | `core.setting.change` | staff | no | How long finished jobs and task runs are kept |
+| `core.jobs.max-attempts` | integer | 5 | 1 to 10 | `core.setting.change` | staff | no | Attempts before a job is dead; a job may declare its own |
+| `core.health.notify` | boolean | true |  | `core.setting.change` | staff | no | Tell the Owner when a check keeps failing |
+| `core.health.notify-after` | duration | 24 hours | 1 hour to 7 days | `core.setting.change` | staff | no | How long a check must fail before the Owner is told |
+| `core.access.fresh-within` | duration | 10 minutes | 1 minute to 1 hour | `core.setting.change`, with confirmation | staff | no | How recent a sign-in must be for an ability that needs a fresh one. The only freshness window; identity reads it and has withdrawn its own key |
+| `core.maintenance.message` | text | a plain default | up to 280 characters | `core.setting.change` | public | no | Shown while migrations are pending |
+| `core.rate-limits.<class>` | rate | see the table of classes below | 1 to 10,000 in a period of 1 minute to 1 day | `core.setting.change`, with confirmation | staff | no | The allowance for one rate-limit class |
+
+"With a reason" and "with confirmation" are the registry field `onChange: 'reason'` and `onChange: 'confirm'` (added to the settings registry on 16 November; the field `change` remains the ability).
+
+The core domain's calendar helpers read `core.locale.time-zone` and `core.locale.day-start`. The core domain declares only the organisation settings that are additional to these, under `core.organisation.*`.
 
 Kit limits that are not a theatre's business (statements per unit, bound parameters per statement, back-off base) are constants in the kit with a comment citing the platform limit, not settings.
 
 ## Abilities
 
-| Ability | On | Risk | Owner role | Notes |
-| --- | --- | --- | --- | --- |
-| `core.module.view` | site | low | grants | See the Modules screen |
-| `core.module.switch` | `core.module` | high | grants | Fresh sign-in; audited |
-| `core.setting.view` | site | low | grants | Sensitive values are never shown to anyone |
-| `core.setting.change` | `core.setting` | medium | grants | A setting may name a narrower ability of its own module in `change` so that module's manager can change it |
-| `core.setting.import` | site | high | grants | Fresh sign-in |
-| `core.job.view` | site | low | grants |  |
-| `core.job.manage` | `core.job` | medium | grants | Retry, cancel, run a task now |
-| `core.credential.view` | site | medium | grants | See which are set, never the value |
-| `core.credential.change` | `core.credential` | high | grants | Fresh sign-in; audited without the value |
-| `core.health.view` | site | low | grants |  |
-| `core.update.apply` | site | high | grants | Apply migrations |
-| `core.audit.view` | site | medium | grants | Every search is audited (`audit: 'read'`) |
-| `core.audit.export` | site | high | grants | Fresh sign-in |
+| Ability | Acts on | Risk | Owner | Implies | Purpose | Suggested holders |
+| --- | --- | --- | --- | --- | --- | --- |
+| `core.module.view` | site | normal |  |  | See the Modules screen | Owner, administrator |
+| `core.module.switch` | `core.module` | privileged |  | `core.module.view` | Switch a module on or off | Owner |
+| `core.setting.view` | site | normal |  |  | See settings; a sensitive value is never shown to anyone | Owner, administrator |
+| `core.setting.change` | `core.setting` | normal |  | `core.setting.view` | Change a setting. Granted for the site or for one module's settings through the parent link. A setting may name a narrower ability of its own module in `change` | Owner, administrator |
+| `core.setting.import` | site | privileged |  | `core.setting.change` | Import a settings file | Owner |
+| `core.job.view` | site | normal |  |  | See jobs and task runs | Owner, administrator |
+| `core.job.manage` | `core.job` | normal |  | `core.job.view` | Retry, cancel, run a task now | Owner, administrator |
+| `core.credential.view` | site | normal |  |  | See which credentials are set, never a value | Owner, administrator |
+| `core.credential.change` | `core.credential` | privileged |  | `core.credential.view` | Set or clear a credential; audited without the value | Owner |
+| `core.health.view` | site | normal |  |  | See the Health screen | Owner, administrator |
+| `core.update.apply` | site | privileged |  | `core.health.view` | Apply migrations | Owner |
+| `core.signing-key.retire` | site | privileged |  | `core.health.view` | Retire a signing key at once | Owner |
+| `core.audit.view` | site | privileged, `fresh: false`, `audit: 'read'` |  |  | Search the audit trail; every search is itself recorded | Owner, administrator |
+| `core.audit.export` | site | privileged |  | `core.audit.view` | Download audit entries | Owner |
 
-All default to the Owner role only. `core.audit.view` is also offered to the data-protection lead role that identity defines. None can be reached through a fact: system authority is never derived from a shift or a training record.
+Risk is `normal` or `privileged`, as the abilities registry defines. A privileged ability needs a strong session, and a fresh sign-in unless it only reads. None of these record types has an owner column, so the Owner column is empty throughout. The suggested holders are identity's preset roles; there is no data-protection role, so the administrator preset is the suggested second holder of the audit trail. None of these abilities can be reached through a fact: system authority is never derived from a shift or a training record.
 
 ## Record types
 
-| Record type | Table | Parent | Owner |
+| Record type | Table | Parent | Owner column |
 | --- | --- | --- | --- |
 | `core.module` | `core_modules` | none | none |
 | `core.setting` | `core_settings` | `core.module` (the declaring module) | none |
 | `core.job` | `core_jobs` | `core.module` | none |
 | `core.credential` | `core_credentials` | `core.module` | none |
 
-The parent link is what lets a module's manager be granted `core.setting.change` on that module's settings alone.
+The parent link is what lets a module's manager be granted `core.setting.change` on that module's settings alone. "Per settings group" in the interface's document means exactly this: per declaring module.
 
 ## Secrets
 
-| Secret | Needed | Purpose |
-| --- | --- | --- |
-| `CORE_ENCRYPTION_KEY` | always | Encrypts stored credentials and columns of class special. Generated by the theatre at setup, held as a deployment secret and in its password manager; rotating it is a documented procedure with a key version. |
-| `CORE_SETUP_CODE` | until an Owner exists | Proves the person at `/setup` is the person who deployed |
-| `CORE_TURNSTILE_SECRET_KEY` | when-used | The challenge on public forms and sign-in (declared by identity, verified by core) |
+This table is the single index of every secret in `core`, whichever area declares it. The setup check and the Health screen read the whole table. A switchable module's secrets are in its own document and manifest.
+
+| Secret | Declared by | Needed | Purpose |
+| --- | --- | --- | --- |
+| `CORE_ENCRYPTION_KEY` | foundations | always | The one key that encrypts stored credentials, signing keys, every column of class special and every column declared `encrypted: true`. Generated by the theatre at setup, held as a deployment secret and in its password manager. Every encrypted value records the key version; during a rotation the old key is held as `CORE_ENCRYPTION_KEY_PREVIOUS` until a task has re-encrypted everything. No area or module brings a key of its own |
+| `CORE_SETUP_CODE` | foundations | until an Owner exists | Proves the person at `/setup` is the person who deployed |
+| `CORE_TURNSTILE_SECRET_KEY` | identity | when-used | The challenge on public forms and sign-in (verified by core) |
+| `CORE_SESSION_KEY` | identity | always | As declared in identity's document |
+| `CORE_GOOGLE_CLIENT_SECRET` | identity | when-used | As declared in identity's document |
+| `CORE_OWNER_RECOVERY` | identity | when-used | As declared in identity's document |
 
 ## Rate-limit classes
 
-| Class | Counted per | Default allowance | Used for |
-| --- | --- | --- | --- |
-| `default` | account or network address | generous | Reads |
-| `write` | account | moderate | Any change |
-| `sign-in` | address and network address | strict | Sign-in and sign-up |
-| `public-form` | network address | strict | Forms open to people with no account |
-| `export` | account | very strict | Downloads of many records |
+A route names a class. Each allowance is the setting `core.rate-limits.<class>`; the figures are proposals.
 
-A route names a class; the numbers are settings under `core.limits.*` with the same pattern as above.
+| Class | Counted per | Proposed allowance | Used for |
+| --- | --- | --- | --- |
+| `default` | account or network address | 600 a minute | Reads |
+| `write` | account | 120 a minute | Any change |
+| `sign-in` | email address and network address | 10 in 10 minutes | Sign-in and sign-up |
+| `public-form` | network address | 20 in 10 minutes | Forms open to people with no account |
+| `export` | account | 10 an hour | Downloads of many records |
+| `presented-value` | session and network address | 10 in 10 minutes | Requirement checks that carry a typed value |
+
+`sign-in`, `public-form` and `presented-value` must count in a shared store before the first release (story F-36).

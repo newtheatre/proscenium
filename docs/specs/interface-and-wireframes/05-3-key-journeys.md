@@ -23,26 +23,26 @@ The target: from a production page to a confirmed ticket in under two minutes on
 
 ```mermaid
 flowchart LR
-    s1["Production page"] --> s2["Choose tickets"] --> s3["Your details"] --> s4["Payment page"] --> s5["Confirmation"]
-    s2n(["the hold starts"]) -.- s2
-    s3n(["no account needed"]) -.- s3
-    s4n(["the provider's own"]) -.- s4
-    s5n(["tickets by email too"]) -.- s5
+    s1["Production page"] --> s2["Choose tickets"] --> s3["Check and pay"] --> s5["Confirmation"]
+    s1n(["One Book action per date"]) -.- s1
+    s2n(["Hold tickets starts the hold"]) -.- s2
+    s3n(["Hold timer shown; no account needed"]) -.- s3
+    s5n(["Tickets by email too"]) -.- s5
     s2 --> x1["Not enough seats<br/>Says so and offers other dates"]
-    s3 --> x2["The hold runs out<br/>Back to Choose tickets, with why"]
-    s4 --> x3["Payment fails or is abandoned<br/>Back to Your details, hold kept"]
-    n1["Every exit says what happened and keeps what was typed.<br/>What happens between payment and confirmation belongs to the box office workstream."]
+    s3 --> x2["The hold runs out<br/>Back to Choose tickets"]
+    s3 --> x3["Payment fails<br/>Stays here, hold kept"]
+    n1["Every exit says what happened and keeps what was typed.<br/>Check and pay is box office's one address: basket, details and payment, in short steps on a phone."]
 ```
 
 *Buying a ticket as a guest*
 
-1. **Production page.** Dates are listed with availability in words ("Good availability", "Last few", "Sold out"). One button: Book tickets.
+1. **Production page.** Dates are listed with availability in words ("Good availability", "Last few", "Sold out"). Each date has its own Book action; a single production-level button shows only when there is one date.
 2. **Choose a performance**, if there is more than one. Skipped when the visitor came from a specific date.
 3. **Choose tickets.** General admission: a stepper per ticket type, with each price and who qualifies. Allocated seating: "Best available" is chosen for them, with "Choose my own seats" opening the plan. The running total is always visible.
-4. **Basket.** The hold timer starts and is shown in the header in words ("Held for 9 minutes"). Optional extras the theatre has enabled appear here once: a donation, a programme.
+4. **Basket.** Pressing "Hold tickets" at step 3 claims the tickets, so the hold starts there and its timer is first seen here, in the header in words ("Held for 9 minutes"). Where a theatre has extras switched on they appear here once; a donation or a programme are examples only, and box office's first release has none. Steps 4 to 6 are box office's one address, `/book/basket` ("Check and pay"): short steps on a phone, one page on a laptop.
 5. **Your details.** Name and email. "Sign in for a faster checkout" is a quiet link, never a wall. Any questions the theatre attached to the ticket type come here.
 6. **Pay.** The total is stated on the button ("Pay £24.00"). The provider's form sits inside the page.
-7. **Confirmation.** The tickets, with their codes, on the page at once. They are also emailed. "Add to wallet" and "Add to calendar" where available. An offer to keep this order in an account, which is one tap because the email is already verified by the receipt link.
+7. **Confirmation.** The tickets, with their codes, on the page at once. They are also emailed. "Add to calendar" and "Save tickets offline" where available; wallet passes are not scheduled. An offer to keep this order in an account, which is one tap because the email is already verified by the receipt link.
 
 | If | The person sees |
 | --- | --- |
@@ -71,7 +71,7 @@ The target: a walk-up sale in under 30 seconds, with a queue waiting.
 1. **Desk screen** opens on tonight's performance, with the next performances one tap away. Sold, held and remaining are shown as numbers.
 2. **Add tickets** with large steppers per type; keyboard shortcuts for the three most common types.
 3. **Customer** is optional: search by name, email or order code, or leave blank for an anonymous sale. Finding a customer shows their entitlements (member price, and a promo code if they have one; passes come in a later release).
-4. **Take payment:** card on the reader, cash or complimentary, in one payment that can also carry another module's lines such as bar items. The expected total is on screen in large figures; the reader's result comes back onto the screen.
+4. **Take payment:** card on the reader or cash, in one payment that can also carry another module's lines such as bar items. The expected total is on screen in large figures; the reader's result comes back onto the screen. A complimentary ticket is never typed in at the desk: the Complimentary row opens the approved requests waiting to be issued, the seller picks one, and "Request approval" is always offered beside it.
 5. **Done:** print, email or show a code. The screen resets for the next customer with one key.
 
 | If | The person sees |
@@ -79,7 +79,7 @@ The target: a walk-up sale in under 30 seconds, with a queue waiting.
 | The reader does not answer | The sale stays open as "Awaiting payment" with Check again, Cancel, or recording the reader's own result. "Take cash instead" appears only once the attempt is known to have failed, so nobody can pay twice |
 | The reader's amount differs from the expected total | The sale is refused and both figures are shown |
 | A customer collects a prepaid order | Search finds the order; the actions are Resend, Show or Admit (there is no collected state). A reserved order is paid at the desk first, and its code scanned at the door before then answers "Not paid. Send to the desk" |
-| The seller is not allowed to issue a complimentary ticket | The option is shown with why, and "Request approval" |
+| A complimentary ticket is wanted and no approved request exists | An empty list that says a second person must approve, and "Request approval". Nobody issues one on the spot, whatever they hold |
 | Someone else sells the last seat first | "Just sold. 0 left." The basket keeps the rest |
 
 ## 4. Scan at the door
@@ -87,9 +87,9 @@ The target: a walk-up sale in under 30 seconds, with a queue waiting.
 The target: one ticket a second, with no signal.
 
 1. **Tonight hub** shows a Door tile for whoever is on the door. Opening it loads tonight's ticket list onto the phone and says so ("312 tickets ready. Works offline").
-2. **Scan.** The camera fills the top of the screen. Each scan answers with a full-width band: green tick "Admit 1", amber "Already scanned at 19:12 by Sam", red cross "Wrong night: Friday".
+2. **Scan.** The camera fills the top of the screen. Each scan answers with a full-width band: green tick "Admit 1", amber "Already admitted at 19:12, front door", red cross "Wrong night: Friday".
 3. **The band carries what the door needs**: ticket type, seat, and a mark that an access note exists. The note's text is never on the band, because it is sensitive and the queue can see the screen; it opens on a deliberate tap.
-4. **Search by name** is one tap away, for a customer with no code.
+4. **Search by name** is one tap away while connected, for a customer with no code. Offline it works only where box office's setting `box-office.scanning.names-on-device` is on, which it is not by default; otherwise the screen says name search needs a connection and offers a typed code.
 5. **The counter** shows admitted against sold. It is live across doors when connected, and marked "this phone only" when not.
 
 | If | The person sees |
@@ -97,7 +97,7 @@ The target: one ticket a second, with no signal.
 | There is no signal | "Offline. 14 scans waiting to send." Scanning carries on from the phone's copy |
 | Two doors scan the same ticket while offline | Both admit. When they reconnect the second is flagged to the duty manager as a duplicate; nobody at the door is asked to resolve it |
 | A ticket was refunded after the list was loaded | When online, refused. When offline, admitted and flagged on reconnect; the list's age is always shown |
-| The camera is refused or broken | The screen opens on name search and a typed code |
+| The camera is refused or broken | The screen opens on a typed code, with name search where it is available |
 | The phone sleeps or the tab closes | Reopening resumes with the queue intact |
 
 ## 5. Refund or exchange
@@ -107,21 +107,21 @@ The target: one ticket a second, with no signal.
 3. **Choose what to refund** by ticket, with the amount worked out and editable only where the rules allow.
 4. **Reason**, from the theatre's list.
 5. **Confirm:** the dialog states the amount, the method it returns by, and that the seats go back on sale.
-6. **Outcome** on the record: refunded, or "Sent to the Treasurer for approval" with who and when.
+6. **Outcome** on the record: the refunded lines are marked and their tickets are void, while the order stays Confirmed (or becomes Cancelled when every line has gone); or "Sent for approval" with who and when. There is no "Refunded" order state: the states are box office's.
 
 | If | The person sees |
 | --- | --- |
 | The refund needs approval | The same form, ending in "Send for approval". The approver gets a card on their console home |
-| The seller is refunding their own order | Refused, with who can do it instead |
+| The person approving is the one who asked for the refund | Refused above the limit, which ships at zero, with who else can approve. Asking for a refund of your own order is allowed; approving your own request is not |
 | The provider refuses | The reason, and the order unchanged |
 | An exchange costs more | The difference as a new payment step; less, as a part refund |
 
 ## 6. Put a production on sale
 
 1. **New production** from the console: title, type, dates. A short form in a panel.
-2. **Production record** opens with a checklist in its Overview: add performances, set prices, add a poster, publish the page, open sales.
-3. **Performances** tab: add one or generate a run (every evening Wednesday to Saturday), each with space and capacity.
-4. **Tickets** tab: choose a price list or set prices, with a preview of what a customer will see.
+2. **Production record** opens on core's Overview tab with a checklist: add dates, set prices, add a poster, publish the page, open sales. Core's other tabs are Details, Dates, Credits, Media, and Advisories and access.
+3. **Dates** tab (core's): add one performance or generate a run (every evening Wednesday to Saturday), each with space and capacity.
+4. **Tickets** tab (box office's, added through `core.record-tab`): choose ticket types and prices, with a preview of what a customer will see.
 5. **Publish** makes the public page visible. **Open sales** is a separate, confirmed act with a time, so a page can be announced before booking opens.
 
 Each checklist line links to its tab and ticks itself. The public page preview is one click from every step.
@@ -139,21 +139,21 @@ If they sign in with a second address the system already knows, it offers to lin
 ## 8. Work tonight
 
 1. **Members' home** shows the shift as its first card from the morning of the show.
-2. From the shift's start, a bar across every page reads "You are on shift. Open Tonight".
+2. From when the shift's window opens (30 minutes before call time by default) until it closes (60 minutes after the shift ends), a bar across every page reads "You are on shift. Open Tonight".
 3. **Tonight hub** shows the tiles this shift allows: Door, Checklist, Incident. A tile the person lacks training for is shown with why.
 4. Each tile opens a live screen. Leaving returns to the hub.
 5. After the night, the shift moves to their history with its hours.
 
 ## 9. Set the site up
 
-1. **Setup screen** on a fresh deployment: apply the database, create the owner with a passkey.
-2. **Five steps:** theatre name and type, time zone and currency, brand colour and logo with a live preview of all three shells, modules to switch on, sample data or a clean start.
+1. **Setup** on a fresh deployment is foundations' screen and this journey only draws it. The sequence is stated once, in foundations' part 5, and fits the Steps page's five because checking and preparing the database share the first step: Check and prepare, then Create the Owner (identity's passkey and recovery codes).
+2. **Then** The theatre (name, time zone, currency, language), Starting point (one of the three presets, or empty; no sample data), and the Checklist built from `core.setup-step`. Brand colour and logo are not a wizard step: "Your look" is core's `core.setup-step` on the checklist, with a live preview of all three shells, and can be skipped.
 3. **Console home** opens with a setup card per module switched on, each a short steps page that can be finished later.
 4. A "Before you go live" checklist lists placeholder content not yet replaced and settings still at their defaults.
 
 ## 10. Change a policy number
 
-1. Settings search for "refund" finds "Refund cut-off before a performance".
+1. Settings search for "cancel" finds box office's setting for how late a buyer may cancel (`box-office.cancellations.until-before`). The labels and figures in this journey and in W8 are examples; the real keys are in each module's tab 7.
 2. The setting shows its value, its default, and that two public pages quote it.
 3. Saving states the change in words ("From 24 hours to 48 hours") and asks for confirmation because it is quoted publicly.
 4. The public pages show the new number at once. The audit entry is linked from the setting.

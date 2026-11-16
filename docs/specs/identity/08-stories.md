@@ -1,11 +1,11 @@
 # 7. Stories
 
-Thirty-seven stories, each with criteria a test can check. Thirty are in the first release, nine of them needed at the gate before anything else can be built; seven wait. A story is "first release" when box office cannot open safely without it.
+Thirty-seven stories, each with criteria a test can check. Thirty-one are in the first release: nine needed at the gate before anything else can be built, and twenty-two others. Six wait. A story is "first release" when box office or front of house cannot open safely without it.
 
 | Group | First release | Later |
 | --- | --- | --- |
 | Getting in | ID-01 to ID-10 |  |
-| My account | ID-11 to ID-16 | ID-17 |
+| My account | ID-11 to ID-17 | None |
 | Audience and members | ID-18 to ID-21 |  |
 | Roles and permissions | ID-22 to ID-24, ID-28, ID-29 | ID-25, ID-26, ID-27 |
 | People in the console | ID-30 to ID-32, ID-35, ID-37 | ID-33, ID-34, ID-36 |
@@ -33,7 +33,7 @@ As a returning person, I sign in with my device, so that it takes one tap.
 ### ID-03 Be offered a passkey after first signing in (first release)
 
 - The offer appears once after an email sign-in on an account with no passkey, and can be skipped.
-- Adding the first passkey shows the recovery codes and asks for one to be typed back before the page can be left.
+- Adding the first passkey offers recovery codes. Anyone may skip them except an Owner, who must type one back before the page can be left.
 - Staff holding a privileged ability are told the console needs a passkey, and what to do, before they hit a refusal.
 
 ### ID-04 Sign in with Google (first release)
@@ -99,7 +99,7 @@ As the person who runs the deployment, I can get an Owner back in when every Own
 - An added address does nothing until verified, and is removed after `core.sign-in.unverified-address-lifetime`.
 - An address verified on another account cannot be added; the message offers the merge route and reveals nothing about the other account.
 - The last verified address cannot be removed.
-- Changing the primary address sends a notice to the old one.
+- Changing the audience address or the members' address sends a notice to the old one.
 
 ### ID-13 See and end my sessions (first release)
 
@@ -126,11 +126,13 @@ As the person who runs the deployment, I can get an Owner back in when every Own
 - When it runs, every personal column on every table that references the account is cleared in one batch, sessions end, and the address can be used for a new account.
 - Running it twice changes nothing the second time.
 
-### ID-17 Emergency contacts and access needs (later)
+### ID-17 Emergency contacts and access needs (first release)
 
 - A person records contacts and access needs in their account and chooses who the access needs are shared with.
 - Both are stored encrypted, and every read by staff is audited with the reader and the reason.
 - Neither appears in a search result, a list or an export other than the person's own.
+
+In the first release these are identity's own screens, not a form builder form.
 
 ## Audience and members
 
@@ -176,7 +178,7 @@ This is the eight separation rules in part 3, as one story.
 
 ### ID-24 Roles expire (first release)
 
-- A role with the year-end rule gives every new grant the committee year end as its end date.
+- A role with the year-end rule gives every new grant the next year end as its end date, read from core.organisation.year-end; while that is unset the rule cannot be chosen.
 - The holder and the granters are told `core.grants.expiry-warning` ahead.
 - Renewal is one action over a list, and each renewal is a new grant.
 
@@ -198,7 +200,7 @@ This is the eight separation rules in part 3, as one story.
 ### ID-28 Sensitive actions ask again (first release)
 
 - A privileged ability is refused on a basic session with a message that says how to get a strong one.
-- A privileged change outside `core.sessions.reassert-window` opens the re-assertion dialogue in place and then completes.
+- A privileged change outside `core.access.fresh-within` opens the re-assertion dialogue in place and then completes.
 - A basic session cannot be upgraded by an emailed link.
 
 ### ID-29 The theatre always has an Owner (first release)
@@ -252,5 +254,5 @@ This is the eight separation rules in part 3, as one story.
 
 ### ID-37 First-run setup makes the first Owner (first release)
 
-- On an empty database the setup step creates one Owner, and requires a passkey and saved recovery codes before it finishes.
+- On an empty database, inside the first-run sequence that foundations owns and behind its setup code, identity's step creates one Owner, and requires a passkey and saved recovery codes before it finishes.
 - Once an Owner exists the step cannot run again.

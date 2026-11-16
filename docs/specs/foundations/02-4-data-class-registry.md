@@ -5,30 +5,31 @@ Every column is declared through a helper that names its data class, so a column
 ## A table
 
 ```ts
-// layers/box-office/server/db/schema.ts
+// layers/lost-property/server/db/schema.ts
 import { defineTable, col } from '#kit/db'
-import { integer, text } from 'drizzle-orm/sqlite-core'
+import { text } from 'drizzle-orm/sqlite-core'
 
-export const orders = defineTable('box_office_orders', {
-  realm: 'audience',
-  subject: 'account_id',
-  retention: 'box-office.retention.orders',
+export const claims = defineTable('lost_property_claims', {
+  id:          col.id(),
+  itemId:      col.ref('lost_property_items'),
+  accountId:   col.account('account_id', { role: 'subject', onMerge: 'move', nullable: true }),
+  email:       col.email('contact_email'),
+  phone:       col.personal(text('phone'), { erase: 'clear' }),
+  note:        col.freeText(text('note')),
+  accessNeeds: col.special('access_needs'),
+  state:       col.internal(text('state').notNull()),
+  handledBy:   col.account('handled_by', { role: 'actor', onMerge: 'move', nullable: true }),
+  createdAt:   col.createdAt(),
 }, {
-  id:            col.id(),
-  accountId:     col.ref('core_accounts', { nullable: true }),
-  performanceId: col.ref('core_performances'),
-  bookingName:   col.personal(text('booking_name').notNull()),
-  email:         col.personal(text('email').notNull()),
-  note:          col.freeText(text('note')),
-  accessNeeds:   col.special('access_needs'),
-  totalMinor:    col.minor('total_minor'),
-  currency:      col.currency('currency'),
-  state:         col.internal(text('state').notNull()),
-  createdAt:     col.createdAt(),
+  id: 'xlpc',
+  realm: 'audience',
+  subject: { account: 'account_id', email: 'contact_email', unlinked: 'staff' },
+  redact: 'lost-property.claim.redact',
+  retention: 'lost-property.claims.keep-for',
 })
 ```
 
-The column builders are Drizzle's own; `col.*` wraps one and records its class. `defineTable` refuses a column that was not wrapped, and refuses a table name that does not start with its module's prefix.
+The arguments are the name, the columns, then the options. The column builders are Drizzle's own; `col.*` wraps one and records its class. `defineTable` refuses a column that was not wrapped, and refuses a table name that does not start with its module's prefix. The example is from the invented lost-property module, so its id prefix starts with `x`, as a theatre's own module's would.
 
 ## Classes
 
@@ -36,12 +37,12 @@ The column builders are Drizzle's own; `col.*` wraps one and records its class. 
 | --- | --- | --- | --- | --- |
 | Public | `col.public()` | Production title, a credited name with consent | `keep` | `anonymise` |
 | Internal | `col.internal()` | A state, a stock level, a total | `keep` | none |
-| Personal | `col.personal()` | Email, phone, booking name | `anonymise` | `clear`, `retain` |
+| Personal | `col.personal()` | Email, phone | `anonymise` | `clear`, `retain` |
 | Personal free text | `col.freeText()` | An incident description, a note | `redact` | `clear`, `retain` |
 | Special category | `col.special()` | Access needs, health details | `clear` | none |
 | Decided per row | `col.perRow()` | A form answer whose class the theatre chose per field | per row | none |
 
-- **Special category columns are encrypted by the helper**, before the value reaches the database, with a key held as a Worker secret. They cannot be searched or indexed, and `col.special()` takes only a column name for that reason.
+- **Special category columns are always encrypted by the helper**, before the value reaches the database. `col.internal()` and `col.personal()` take `encrypted: true` for a value that is not special but must not sit in the clear, such as a webhook's secret or a push subscription's keys. All of them use the one core key, `CORE_ENCRYPTION_KEY`, and store its version beside the value so the key can be rotated; no module brings a key of its own. An encrypted column cannot be searched or indexed, and `col.special()` takes only a column name for that reason.
 - **`col.perRow(builder, { classColumn })`** names a sibling column holding one of the five fixed classes for each row. Erasure and export read it row by row. It exists for the form builder; a specification that uses it elsewhere should say why.
 - Identifiers, foreign keys, timestamps and money are internal, and their helpers say so for you.
 
@@ -63,35 +64,57 @@ Erasure of one person is a single unit of work built from the registry: every ta
 
 | Option | Required | Meaning |
 | --- | --- | --- |
-| `realm` | Yes | `audience`, `member` or `operational`. Keeps a customer's orders and a volunteer's training record apart in exports, in the privacy record and in who may see them. Proposed to workstream 2, which owns the rule |
-| `subject` | Yes | How a row reaches the person it is about: a column holding an account id, `{ via: 'order_id' }` to inherit from a parent row, a list where a row concerns several people, or `'none'` |
+| `id` | Yes, unless the table is keyed by its own columns | The table's id prefix: two to four lower-case letters, unique across the system, starting with `x` in a theatre's own module. Every id is the prefix, an underscore and 26 characters that sort by creation time. Part 4 keeps the index of prefixes |
+| `random` | No | `true` makes the 26 characters random, so an id does not reveal when the row was made. An id is still never a secret |
+| `realm` | Yes | `audience`, `members`, `operational` or `system`. Keeps a customer's orders and a volunteer's training record apart in exports, in the privacy record and in who may see them. `system` is for the platform's own tables. `{ column: 'realm' }` lets the realm differ by row |
+| `subject` | Yes | How a row reaches the person it is about. See Subjects below |
+| `redact` | With `unlinked: 'staff'` | The ability that lets staff search the table for a person and redact their rows |
 | `retention` | No | A duration setting. A scheduled sweep erases or deletes rows older than it |
 | `appendOnly` | No | Rows are never edited or deleted. The build writes the triggers that enforce it |
 | `onErasure` | No, default `keep-row` | `delete-row` removes the whole row, for tables with no value once the person is gone, such as saved preferences |
 
-- A table with `subject: 'none'` may not hold personal, free-text or special columns.
+## Subjects
+
+| Declaration | Means |
+| --- | --- |
+| A `col.account(..., { role: 'subject' })` column | The row is about that account. The subject is inferred from the column; nothing more is declared |
+| `subject: { via: 'order_id' }` | Inherited from a parent row |
+| `subject: { email: 'contact_email' }` | A person with no account, found by an address. The column is `col.email`. Erasure and download for an account also sweep these rows for every address verified on the account |
+| `subject: { account: 'account_id', email: 'contact_email' }` | Both. The account wins: a row with an account belongs to it and its email is only a contact detail. A row with no account is found by its email. A row that names another account is never matched by email |
+| `unlinked: 'staff'`, added to either form, or alone | Rows that can be linked to nobody (a nullable account that is empty and no email, or a table with neither column, such as a list of names supplied by another body). They hold personal details in classed columns, need a `retention` and a `redact` ability, and appear on the erasure and download screens as a manual step |
+| `subject: 'none'` | The table holds nothing about a person |
+
+- A nullable account subject without `unlinked` is refused by the schema check.
+- A table with `subject: 'none'` may not hold a personal or special column. It may hold a free-text column that could describe a person only if the column is `col.freeText` with an erasure behaviour and the table declares a `retention`, because the sweep is the only thing that will ever remove it.
+- A row concerning several people declares a list of subjects.
 - **Append-only and erasure together:** in an append-only table, an erasable column may be changed only to its erased value, and the trigger checks that every other column is unchanged. History survives; the person does not.
 - A migration that would rebuild an append-only table is refused by a check.
+- Nuxt Content's `_content_*` tables are outside the registry and the migration runner.
 
 ## Column helpers
 
 | Helper | SQL | Holds |
 | --- | --- | --- |
-| `col.id()` | `text primary key` | An opaque identifier the kit generates (a ULID). No table carries another system's ids |
-| `col.ref(table)` | `text references` | A foreign key. A module may reference its own tables, the core's, and those of modules in `requires` |
+| `col.id()` | `text primary key` | The table's scoped id: its declared prefix, an underscore and 26 characters. No table carries another system's ids |
+| `col.ref(table)` | `text references` | A foreign key, accepting only that table's prefix. A module may reference its own tables, the core's, and those of modules in `requires` |
+| `col.account(name, { role, onMerge })` | `text references core_accounts` | A reference to an account. Always used in place of `col.ref('core_accounts')` |
+| `col.email(name)` | `text` | An email address, personal, stored trimmed and lower-cased so it can be matched |
 | `col.createdAt()`, `col.updatedAt()`, `col.timestamp(name)` | `integer` | An instant in UTC milliseconds |
 | `col.localDate(name)` | `text` | A calendar date in the theatre's time zone, `YYYY-MM-DD`, for things that are dates and not instants |
 | `col.minor(name)`, `col.currency(name)` | `integer`, `text` | Money in minor units, and its ISO 4217 code |
+| `col.real(name)` | `real` | A measurement that is not whole, such as a latitude. Never money, a count or a percentage |
 | `col.public()`, `col.internal()`, `col.personal()`, `col.freeText()`, `col.special()`, `col.perRow()` | as wrapped | Everything else |
 
-**Columns that refer to an account**, added after draft 1 at workstream 2's request, use `col.account(name, { role, onMerge })` in place of `col.ref('core_accounts')`. The example at the top of this tab should read `accountId: col.account('account_id', { role: 'subject', onMerge: 'move', nullable: true })`.
+`col.perRow(builder, { classColumn })` takes its class from a sibling column; `classFrom: { via: 'file_id', column: 'class' }` takes it from a parent row.
+
+**Columns that refer to an account** take two options:
 
 | Option | Values | Meaning |
 | --- | --- | --- |
 | `role` | `subject`, `actor` | `subject`: the row is about this person, so erasure and export reach it. `actor`: the person did something to the row (approved it, sold it); the reference is kept and follows a merge |
 | `onMerge` | `move`, `alias`, `handler` | What merging two accounts does: rewrite the column, leave it and let reads follow the merged account, or call the module's contribution to workstream 2's merge point |
 
-A table's subject is inferred from its `role: 'subject'` columns. The `subject` table option remains for `{ via }` a parent row and for `'none'`. A check requires `alias` in an append-only table, because a merge cannot rewrite it.
+A check requires `alias` in an append-only table, because a merge cannot rewrite it. The audit table is the first example: its actor column is `alias`.
 
 Referencing another module's table by foreign key is reading, and is allowed. Writing to it is not: that goes through its service.
 
@@ -121,21 +144,19 @@ The point `core.privacy-record` lets a module add entries the schema cannot know
 
 Part 2 of each specification gives every table in this layout: a heading line, then one row per column.
 
-**`box_office_orders`**: realm audience; subject `account_id`; retention `box-office.retention.orders`; not append-only.
+**`lost_property_claims`**: id prefix `xlpc`; realm audience; subject `account_id`, or `contact_email` where there is no account, unlinked rows for staff (redact ability `lost-property.claim.redact`); retention `lost-property.claims.keep-for`; not append-only.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
-| `account_id` | ref `core_accounts` | nullable | internal | keep | Null for a guest order |
-| `booking_name` | text | not null | personal | anonymise |  |
-| `email` | text | not null | personal | anonymise |  |
+| `item_id` | ref `lost_property_items` | not null | internal | keep |  |
+| `account_id` | account, subject | nullable | internal | keep | Empty for a claim made by someone with no account. On merge: move |
+| `contact_email` | email |  | personal | anonymise |  |
+| `phone` | text |  | personal | clear |  |
 | `note` | text |  | free text | redact |  |
 | `access_needs` | text, encrypted |  | special | clear |  |
-| `total_minor` | minor units | not null, at least 0 | internal | keep |  |
 | `state` | text | one of a named list | internal | keep | See part 3 |
+| `handled_by` | account, actor | nullable | internal | keep | On merge: move |
+| `created_at` | timestamp | not null | internal | keep |  |
 
-Types to use: id, ref, text, integer, boolean, timestamp, local date, minor units, currency, JSON. The table is an example of the layout, not a decision about the box office.
-
-## Later rulings that apply to this tab
-
-Added after this tab was written; the full list is at the end of the Formats tab. For data classes: a table's realm may differ by row (`realm: { column: 'realm' }`); a per-row class may come from a parent row (`classFrom: { via, column }`); an append-only table may have erasable columns; a table's subject may be a person with no account (`subject: { email: 'contact_email' }`, declared with `col.email`), and a subject is an account or an email, never both; account erasure and download also sweep email-subject rows for the account's verified addresses; and Nuxt Content's `_content_*` tables are outside the registry.
+Types to use: id, ref, account, email, text, integer, real, boolean, timestamp, local date, minor units, currency, JSON. Write "encrypted" after the type of a column declared `encrypted: true`.

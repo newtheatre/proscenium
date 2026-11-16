@@ -4,7 +4,7 @@ Security and accessibility are platform services that every module gets by defau
 
 ## Sign-in and sessions
 
-- Passkeys first. Password, email link and identity-provider sign-in are options a theatre enables.
+- Passkeys first. An emailed link or code and Google sign-in are also in the first release. Password and Microsoft sign-in come later; a sign-in method is a declared point, so one can be added.
 - A theatre can restrict an identity provider to its own domain and forbid passwords on that domain.
 - An unverified address cannot sign in.
 - Privileged actions re-assert a second factor, scoped to the session.
@@ -15,7 +15,7 @@ Security and accessibility are platform services that every module gets by defau
 
 - Security headers (content security policy, transport security, frame and referrer policy) on every response, declared once in configuration.
 - Rate limits are declared per route and enforced by the platform. A route with no declaration fails the build.
-- Turnstile on registration, sign-in, password reset and guest checkout, off when no key is configured.
+- Turnstile on registration, sign-in and guest checkout, off when no key is configured.
 - Every input is validated against a schema shared by the form and the server.
 - A constraint violation is turned into a clear refusal by one shared helper.
 

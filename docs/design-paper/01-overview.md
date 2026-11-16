@@ -32,7 +32,7 @@ A free, open-source system that runs a whole theatre, deployed entirely on Cloud
 | --- | --- |
 | Lessons from Proscenium | What to keep from Proscenium, what it does poorly, what it does not cover |
 | Part A: Features | Who the platform serves, the always-on core, how a theatre makes it its own |
-| Module catalogue | Sixteen modules, each with its capabilities |
+| Module catalogue | Sixteen modules on the core, each with its capabilities and what it needs |
 | Beyond Proscenium | Capabilities Proscenium lacks and what they ask of the core |
 | Part B: Conventions | Cloudflare runtime, lessons from Mailflare, repository shape, module manifest |
 | Data, settings and permissions | Database rules, data classes, the settings and permission registries, providers |
@@ -47,3 +47,12 @@ Added on 16 November 2026 after Matt's decisions:
 - Accounts: audience and members sets out one account with separate audience and members' experiences.
 - Form builder describes the form builder and its engine.
 - Research holds the comparison with other systems, Cloudflare limits and costs, and payment-provider fees, with sources.
+
+Tabs added since the first draft, in the order they were written:
+
+- Lessons from Mailflare records what the Mailflare port taught about running Nuxt on Cloudflare.
+- The Research sub-tabs are Comparable systems, Cloudflare limits and costs and Payment providers.
+- Next stage: detailed design is the plan for the detailed-design stage, kept as a record now that the stage is done.
+- Design stage: questions and status holds your 67 first-round decisions and the state of the six first specifications.
+- Second round: questions and status holds your decisions on the six second-round modules.
+- Build backlog and glossary is the story count, the order of work and the shared words. Where it and an older tab differ, it is the newer.

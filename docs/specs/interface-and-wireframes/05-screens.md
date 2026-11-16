@@ -21,7 +21,7 @@ The interface layer itself owns 31 screens: the frames, the homes, and the scree
 | Booking layout | Reduced header with steps and hold timer | Anyone booking | Frame | Yes |
 | My account home | Upcoming tickets first, then links to the rest | Signed-in person | Home | Yes |
 | Account sections frame | Tickets, orders, passes, details, preferences, security: the frame that module and workstream 2 pages sit in | Signed-in person | Frame | Yes |
-| Notifications inbox | Read and unread, with a count | Signed-in person | List | Yes |
+| Notifications inbox (audience side; the member inbox is a separate screen in the members' area) | Read and unread, with a count | Signed-in person | List | Yes |
 | Not found, refused, error | Say what happened and where to go | Everyone | Page | Yes |
 | Offline page | Shown by the installed app when a page was never loaded | Everyone | Page | Yes |
 
@@ -50,7 +50,7 @@ The interface layer itself owns 31 screens: the frames, the homes, and the scree
 | Navigation settings | Reorder and rename members' sections, hide destinations | Site owner | Form | Later |
 | Appearance preview | The three shells in the theatre's branding, light and dark (branding itself is workstream 3) | Site owner | Record | Yes |
 | Saved views manager | Rename, share and delete saved views | Anyone with a saved view | List | Later |
-| Activity | The audit trail as a filterable list | Per audit ability | List | Yes |
+| Activity (foundations' Audit screen) | The audit trail as a filterable list | Per audit ability | List | Yes |
 
 ### Live mode
 

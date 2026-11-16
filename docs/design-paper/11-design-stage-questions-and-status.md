@@ -1,6 +1,6 @@
 # Design stage: questions and status
 
-As of 16 November 2026. All six specifications exist as drafts. This tab gathers every question they have for you into one place, so they can be answered in one sitting.
+As of 16 November 2026. This tab is the record of the first round: six specifications, 67 questions, all answered, and four proofs, all passed. The second round of six more modules has its own tab, "Second round: questions and status", and every question there is answered too.
 
 ## How to answer
 
@@ -121,15 +121,15 @@ Core domain also proposes these defaults, which need only a nod: the operating d
 - **B4 is the one place a draft and its recommendation differ.** Box office recommends recognising income when the performance takes place, but its part 6 drafts this as a setting. I recommend the fixed rule: one path to test, and a theatre that wants sale-date figures can read them from a report.
 - **C3 and U6 overlap.** The default mode in branding and the public site's dark mode are one control. Answering U6 settles both.
 - **I1, U7 and F3 agree.** Guest checkout is the default path, a guest purchase makes an unclaimed account, and a signed-out form response is keyed to its email address and found again once that address is verified.
-- **C1 is already agreed between Core domain and Box office.** It is listed because it departs from this paper's Part A, which will be amended once you confirm.
+- **C1 is already agreed between Core domain and Box office.** It is listed because it departs from this paper's Part A, which has since been amended to match.
 - **Each specification also lists choices it made without asking**, for you to overrule: Box office (three modules, one order line per ticket, double-entry ledger, refunds only by the method that paid), Form builder (always on, one language per form, no code step in logic) and Interface (names, console group order, pages of 25, the command palette in the first release).
 
 * **Webhooks make every event's name and ids visible outside the theatre.** Following your decision on C9, a webhook can subscribe to any event any module announces. Event payloads already carry no names or free text, and Foundations has been asked to add a flag by which a module keeps a particular event off webhooks.
 * **Venues and spaces carry access features** from a set vocabulary with icons, also decided by your comment in the Core domain document.
 
-- **One payment can cover tickets and something else.** You asked that one card-reader transaction be able to take tickets with drinks and snacks. Payments now supports it: a payment has one or more parts, each owned by a module, settled together and refunded and posted to the ledger separately, and another module adds lines at the desk through the point payments.desk-basket. The Bar specification in the second round will be the first to use it.
+- **One payment can cover tickets and something else.** You asked that one card-reader transaction be able to take tickets with drinks and snacks. Payments now supports it: a payment has one or more parts, each owned by a module, settled together and refunded and posted to the ledger separately, and another module adds lines at the desk through the point payments.desk-basket. The Bar specification, written in the second round, is the first to use it, and ten of its stories join roadmap phase 3 for that reason.
 - **"Reserve now, pay on arrival" is in the Box office specification**, which you approved: a reserved order claims seats as a sale does, takes no payment and issues no tickets until the desk is paid, and always belongs to an account. B10 and B11 above are its two open choices.
 
 ## What happens after your answers
 
-I fold the answers into the six specifications and this paper, finish the shared glossary and combined data model, and assemble the build backlog for roadmap phases 1 to 3. The second round of specifications (Front of house, Spaces, Bar, Training, Membership, Communications) follows.
+Done since: the answers are folded into the six specifications and this paper, the shared glossary and the build backlog exist, and the second round of specifications (Front of house, Spaces, Bar, Training, Membership, Communications) is written and decided. The foundation kit and phase 1 are being built.

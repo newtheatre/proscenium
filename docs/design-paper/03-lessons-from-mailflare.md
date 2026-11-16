@@ -55,7 +55,7 @@ Matt's Nuxt port keeps the original's server almost untouched and replaces every
 | Bindings declared in the Nuxt configuration, generated Wrangler file | Part B, what Mailflare taught |
 | A custom Worker entry for queue, email, cron and the Durable Object | Part B, what Mailflare taught |
 | In-app migration runner with a ledger, from first-run setup and an update card | Data, settings and permissions |
-| New features in new tables that read as empty until migrated | Data: to be added as a rule |
+| New features in new tables that read as empty until migrated | Data: now a rule there |
 | One page component and one header for every screen | Security, privacy and interface |
 | Preview deployments on preview-only resources | Engineering |
 | Workstreams that own directories, rules for every thread, a status board | The next stage of this project |

@@ -14,20 +14,20 @@ The options and reasoning are kept below as the record of why. In the table, the
 | 4 | Where do the public menu and footer links live? | In a file in the fork. |
 | 5 | Are credits public, and what happens to them on erasure? | Public by default, the person may hide theirs, printed names stay on erasure unless they ask. |
 | 6 | Is phone push in the first release? | No. Email and inbox first. |
-| 7 | What is a production's permanent address? | `Decided: /whats-on/<slug> while current, /shows/<slug> once past`. |
+| 7 | What is a production's permanent address? | `/whats-on/<slug>` while current, `/shows/<slug>` once past. |
 | 8 | One language for production text at first? | Yes. |
 | 9 | Do team alerts to Discord or a webhook belong in the first release? | Decided: webhooks are in the first release. |
 
 ## 1. Does core know whether a performance is on sale?
 
-The paper's Part A gives a performance the states draft, on sale, cancelled, as Proscenium does. This specification gives it draft, scheduled, cancelled, completed, and leaves "on sale" to Box office.
+When this was asked, the paper's Part A gave a performance the states draft, on sale, cancelled, as Proscenium does. The paper has since been amended to match the decision. This specification gives it draft, scheduled, cancelled, completed, and leaves "on sale" to Box office.
 
 | Option | What it means | For | Against |
 | --- | --- | --- | --- |
-| **A. Sale state is Box office's (recommended)** | Core says a performance exists and is public. Box office says whether, when and to whom it sells, through the booking-action point. | A theatre without the box office module has no meaningless state. On-sale dates, member presales and sold-out all live in one place. Core and Box office cannot disagree. | Departs from the paper. "Announce now, sell later" needs Box office to be on. |
+| **A. Sale state is Box office's (recommended)** | Core says a performance exists and is public. Box office says whether, when and to whom it sells, through the booking-action point. | A theatre without the box office module has no meaningless state. On-sale dates, member presales and sold-out all live in one place. Core and Box office cannot disagree. | Departed from the paper as it then stood. "Announce now, sell later" needs Box office to be on. |
 | B. Core holds on sale | As the paper and Proscenium. | Simple. Familiar. | A theatre using an outside ticketing service has an "on sale" switch that does nothing. Presales and timed releases need a second state in Box office anyway. |
 
-The integrating thread agrees with A and has put it to the box office workstream.
+The integrating thread agreed with A, and the box office specification now holds the sale state.
 
 ## 2. Can a production belong to more than one season?
 
@@ -104,12 +104,12 @@ How the decision is carried out, so that a link never breaks when a show closes:
 | Past shows can be private | New setting `public-site.archive.public` (boolean, default on, changed by `public-site.site.configure`). When off, `/shows`, `/shows/<slug>`, season pages for archived seasons and the archive search return "not found", past productions leave the open data and the sitemap, and `/whats``-``on/<slug>` for a past show returns "not found" too. |
 | The lists | `/whats``-``on` lists current productions. `/shows` is the archive, replacing `/archive`. |
 
-Two things to check, since they go slightly beyond what you wrote:
+Two things went slightly beyond what Matt wrote, and both stand:
 
-- **A cancelled production** is treated as past from the day it is cancelled, and shown as cancelled.
+- **A cancelled production** is past from the moment it is cancelled, and shown as cancelled. Part 3 states the rule.
 - **The calendar feed** follows the same spelling, `/whats-on.ics`.
 
-The rest of this document was written with one permanent address. The scope, screens and routes have been corrected where the address is central. Anywhere `/archive` still appears, read `/whats-on` and `/shows`.
+Every other part of this document now uses the two addresses.
 
 ## 8. One language for production text at first?
 
@@ -136,13 +136,13 @@ How the decision is carried out. The tables are in part 2, under "Group 6: webho
 | Rule | Detail |
 | --- | --- |
 | What a webhook is | An address outside the system that is told when something happens. A theatre adds as many as it likes, each with a name, an address and a choice of which events it hears. |
-| What it hears | Any event any module announces: a production published, a performance cancelled, and later an order placed. Subscribing is by event name, with a wildcard for a whole module. |
-| No personal data leaves | This was the reason to wait, so it is settled as a rule. A webhook carries the event's name, time and ids, plus the public title and address of the record it is about. Event payloads already carry ids and never names or free text, by the foundations rule. Anything more is fetched by the receiver through the public data, or later through an authenticated interface. |
+| What it hears | Any event a module announces that is not marked internal: a production published, a performance cancelled, and later an order placed. Subscribing is by event name, with a wildcard for a whole module. |
+| No personal data leaves | This was the reason to wait, so it is settled as a rule. A webhook carries the event's name, time and ids, plus the public title of the record it is about. Event payloads already carry ids and never names or free text, by the foundations rule. Anything more is fetched by the receiver through the public data, or later through an authenticated interface. |
 | Three formats | Signed JSON for other software. Discord and Slack formats, which send a one-line sentence built from the same public fields, so a committee channel can be told "Hamlet: Saturday matinee cancelled" with no code. |
 | Signed | Each signed JSON delivery carries a time and a signature made with a secret shown once when the webhook is created. The receiver can check it came from this theatre and is not a replay. Flytower signs its webhooks the same way. |
-| Reliable, and it gives up politely | Deliveries are recorded in the same batch as the event, retried with growing waits, and logged. A webhook that fails 20 times in a row is paused and its managers are told. |
+| Reliable, and it gives up politely | A listener records one delivery for each matching webhook as the event is delivered. A job then sends it, retries with growing waits, and logs the outcome. A webhook that fails 20 times in a row is paused and its managers are told. |
 | Safe addresses only | HTTPS only. Addresses that point at private or local networks are refused. The address is treated as a secret, since a Discord address contains one, and is shown masked after saving. |
-| Who may manage them | A new privileged ability, `core.webhook.manage`. Suggested holder: administrator. |
+| Who may manage them | A privileged ability, `core.webhook.manage`, held by the administrator and owner presets (part 6). |
 
 One thing this does not include, to check: **incoming** webhooks, where another system tells this one something. Those arrive with the modules that need them, such as a payment provider's in the box office workstream.
 

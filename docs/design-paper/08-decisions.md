@@ -25,3 +25,5 @@ This should NOT be a major concern as we do not care about data loss moving to t
 - Payment-provider terms for small charities and student groups.
 
 All three were researched on 16 November 2026. The findings are in the Research tab.
+
+**Backups (16 November 2026).** The consistency review found the paper promised nightly backups that no specification delivered. Matt chose to drop the promise: the platform takes no backups, records no restore points and schedules no backup story. A theatre relies on what Cloudflare keeps for its database.

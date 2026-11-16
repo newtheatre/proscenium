@@ -35,7 +35,16 @@ Branding in the app survives updates and travels with the database, as it does i
 
 ## Looking after it
 
-- An admin page shows the running version, pending migrations, the last backup and the health of queues and scheduled tasks.
-- Backups run nightly to the theatre's own file store and can be downloaded.
+- An admin page shows the running version, pending migrations and the health of queues and scheduled tasks.
+- The platform takes no backups and promises none (Matt, 16 November 2026). A theatre relies on what Cloudflare keeps for its database, and the platform records no restore points.
 - Updates arrive as a pull request in the fork; merging it deploys.
 - A handover checklist for a new site owner: who holds the Cloudflare account, the domain, the repository and the owner role.
+
+## What on this tab is not yet scheduled
+
+A consistency review on 16 November 2026 found promises on this tab that no specification carries yet. They stay as intent and are marked here so nobody builds against them by mistake:
+
+- **Demo mode** (sample productions for evaluation and training) has no story. Interface's practice mode for trainees is a different thing.
+- **The handover checklist** for a new site owner has no story.
+- **Under 30 minutes from fork to site** is a target, measured once at the phase 1 gate, not a test.
+- **Backups** are not a platform feature: Matt decided on 16 November 2026 to drop the promise, so no backup story is scheduled.

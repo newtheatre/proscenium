@@ -2,7 +2,7 @@
 
 ## How to read this part
 
-Named cases, filed under the tier that runs them, as Foundations asks. A **never-regress** case guards a promise the theatre makes to its audience or its treasurer; it may not be skipped, weakened or deleted without a decision record. Each names the story it proves.
+Named cases, filed under the tier that runs them, as Foundations asks. A **never-regress** case guards a promise the theatre makes to its audience or its treasurer; it may not be skipped, weakened or deleted without a decision record. Each names the story it proves. There are 92 never-regress cases in the ten tables below.
 
 | Tier | Runs on | Used here for |
 | --- | --- | --- |
@@ -38,7 +38,7 @@ Named cases, filed under the tier that runs them, as Foundations asks. A **never
 | Name | Proves | Case |
 | --- | --- | --- |
 | `paid-means-ticketed` | BO-12 | A succeeded attempt confirms the order, confirms its claims, issues tickets and seals a posting, all or none. Failing any statement in the batch leaves the attempt pending and nothing else changed |
-| `payment-after-hold-released` | BO-12 | The hold is released by hand, then the provider says paid: the intent becomes unfulfilled, nothing is oversold, a full refund is requested, the money sits in `unfulfilled_payments`, staff are alerted |
+| `payment-after-hold-released` | BO-12 | The hold is released by hand, then the provider says paid: the intent becomes unfulfilled, nothing is oversold, a full refund is requested, the money sits in `payments.unfulfilled`, staff are alerted |
 | `webhook-twice-changes-nothing` | PAY-05 | The same provider event delivered twice, and two different events for the same success: one confirmation, one posting |
 | `webhook-out-of-order` | PAY-05 | Failed then succeeded, and succeeded then failed, both end in the state the provider reports when asked |
 | `forged-webhook-ignored` | PAY-05 | A bad signature is stored with `signature_ok` false and no state changes |
@@ -54,9 +54,11 @@ Named cases, filed under the tier that runs them, as Foundations asks. A **never
 
 | Name | Proves | Case |
 | --- | --- | --- |
-| `double-refund-refused` | BO-51 | Two full refunds of one payment race: one is approved, the other fails the attempt's CHECK |
+| `double-refund-refused` | BO-51 | Two full refunds of one payment race: one is approved, the other fails the CHECK on the part's and the attempt's refunded amount |
 | `refunds-never-exceed-payment` | BO-51 | Any sequence of partial refunds stops at the amount paid; a failed refund gives its amount back to the allowance |
-| `own-refund-not-approved` | BO-51 | Requester and approver equal is refused above the limit by ability and by CHECK |
+| `declined-refund-moves-no-counter` | BO-51 | Declining a requested refund changes neither the part's nor the attempt's refunded amount. Only approval adds and only failure subtracts |
+| `own-refund-not-approved` | BO-51 | Requester and approver equal is refused by ability and by CHECK when the amount is above the limit stored on the refund; at or under it, the same person may approve |
+| `self-approve-limit-is-fixed-at-request` | BO-51 | Raising `payments.refunds.self-approve-up-to` after a refund is requested does not let its requester approve it |
 | `refund-goes-back-the-way-it-came` | BO-50 | A card payment cannot be refunded as cash |
 | `cancel-is-all-or-nothing` | BO-50 | Cancelling releases claims, voids tickets, updates the total, writes the cancellation and requests the refund in one batch; a failure leaves all as it was |
 | `bulk-cancel-survives-one-failure` | BO-52 | 50 orders, the provider refuses one refund: 49 complete, 1 is listed, rerunning touches only that 1 |
@@ -71,7 +73,7 @@ Named cases, filed under the tier that runs them, as Foundations asks. A **never
 | `nothing-posts-twice` | FIN-01 | Replaying every job, webhook and settle batch of a scenario adds no posting |
 | `closed-period-refuses-postings` | FIN-02 | A posting into a closed period is refused by trigger; the service routes a late fact to the next open period with its true date |
 | `sales-reconcile-to-the-penny` | FIN-01 | After a generated season of sales, refunds, cancellations, fees and exchanges, box office totals equal ledger movements per performance and overall, and every clearing account equals payments less refunds less payouts |
-| `deferred-income-clears` | FIN-01 | After every performance has completed, `deferred_ticket_income` is zero |
+| `deferred-income-clears` | FIN-01 | After every performance has completed, `box-office.deferred-ticket-income` is zero |
 | `reversal-is-exact-and-once` | FIN-03 | A reversal mirrors the original; a second reversal of the same posting is refused |
 
 ### The door (integration and unit)
@@ -81,7 +83,7 @@ Named cases, filed under the tier that runs them, as Foundations asks. A **never
 | `ticket-admits-once` | BO-40 | Two devices scan one ticket at once, online: one admits, one sees already in |
 | `void-ticket-refused` | BO-50 | A cancelled, exchanged or reissued ticket's old code is refused |
 | `wrong-performance-refused` | BO-40 | A valid ticket for another performance is refused, naming it |
-| `forged-code-refused` (unit) | BO-40 | A code with a bad signature, or signed with a retired key version, is refused offline |
+| `forged-code-refused` (unit) | BO-40 | A code with a bad signature, or signed by a key the kit no longer keeps, is refused offline. A code signed by a rotated key that is still kept verifies |
 | `offline-scan-syncs-once` | BO-41 | A queued scan sent three times is stored once |
 | `offline-double-admission-flagged` | BO-41 | Two offline devices admit one ticket: the earlier wins, the later is flagged on the door report |
 
@@ -90,37 +92,75 @@ Named cases, filed under the tier that runs them, as Foundations asks. A **never
 | Name | Proves | Case |
 | --- | --- | --- |
 | `erasure-keeps-the-books` |  | Erasing a buyer clears their name, email, phone, access note and free text, deletes waiting-list rows, and leaves every ledger total and sales count unchanged |
-| `guest-erased-by-email` |  | A guest with no account is erased by verified address |
+| `guest-erased-by-email` |  | A buyer who never signed in is erased by verified address |
 | `access-note-is-encrypted-and-guarded` | BO-19 | The stored value is not the plain text; reading it without the ability is refused; the door shows only that one exists |
 | `events-carry-no-personal-data` |  | Every announced payload validates against a schema of identifiers only |
+| `webhook-payload-carries-no-person` |  | Every event that part 4 marks `internal: false` is delivered to a test webhook and its body checked against the data-class registry; a personal, free-text or person-tied money field fails. Every event marked `internal: true` is confirmed never to be delivered |
 | `no-card-data-anywhere` |  | No column, log line or event contains a card number pattern after a full scenario |
+| `code-stored-only-as-hash` | BO-16 | After a full scenario no column holds a ticket code, pass code, desk code or order-link token in the clear; a scanned code is found by hashing it |
 | `production-grant-is-scoped` | FIN-04 | A grant on one production shows that production's orders and statement and refuses another's |
 | `own-comp-not-approved` | BO-62 | Requester and approver equal is refused by ability and by CHECK |
-| `audience-shell-has-no-member-words` | BO-10 | The checkout pages contain no membership wording or links when signed out |
+| `audience-shell-has-no-member-words` | BO-10 | Signed out, the checkout pages contain no membership wording or links, except the provider's own phrase inside a ticket type that carries a requirement |
+| `online-order-always-has-an-account` | BO-10 | An online or phone order cannot be confirmed or reserved with a null account (refused by CHECK); a desk order with a null account cannot carry an access note |
+| `consent-is-written-once-with-the-order` | BO-10 | A ticked consent question is recorded in the batch that first confirms or first reserves the order, and not again when a reservation is paid. If that batch fails, no consent exists |
+| `consent-never-leaves-in-an-event` |  | No order event payload carries a consent key |
+| `no-consent-at-the-desk-or-without-an-account` | BO-30 | A desk or phone sale shows no consent questions, and an order with no account is never passed to a consent contribution |
 
-One more privacy case, added after the integration ruling on anonymous desk sales: `online-order-always-has-an-account`. An online or phone order cannot be confirmed with a null account (refused by CHECK); a desk order with a null account cannot carry an access note.
+### Reserve now, pay on arrival (integration)
 
-And one for outgoing webhooks (Foundations E6 and E7): `webhook-payload-carries-no-person`. Every event that part 4 marks `internal: false` is delivered to a test webhook and its body checked against the data-class registry; a personal, free-text or person-tied money field fails. Every event marked `internal: true` is confirmed never to be delivered.
+| Name | Proves | Case |
+| --- | --- | --- |
+| `reservation-claims-like-a-sale` | R-1 | The last-seat cases pass unchanged when the winning order is reserved, not paid |
+| `reservation-posts-nothing` | R-1 | Creating, amending, cancelling and releasing a reservation leave the ledger untouched |
+| `reservation-needs-an-account` | R-1 | A reserved order with a null account is refused on every channel |
+| `reservation-limits-hold-under-concurrency` | R-7 | Parallel reservations by one account cannot exceed the per-person limit |
+| `zero-total-never-rests-reserved` | R-1 | An order with nothing to pay is confirmed at once |
+| `reserved-then-paid-confirms-cleanly` | R-5 | Paying a reserved order settles in one batch: its claims, already confirmed, stay confirmed; the batch asserts that confirmed claims equal live ticket lines; tickets are issued and one posting is sealed |
+| `desk-payment-settles-once` | R-5 | Two desks taking payment for the same reservation produce one confirmed order and one posting |
+| `failed-desk-payment-keeps-the-seats` | R-5 | A failed or cancelled attempt returns the order to reserved with its claims intact |
+| `release-skips-payment-in-flight` | R-6 | The task `box-office.release-reservations` never releases an order that is awaiting payment or marked keep |
+| `release-and-payment-race` | R-6 | Release and Take payment started together end with exactly one of expired or awaiting payment, never both |
+| `desk-code-does-not-admit` | BO-40 | The door refuses a desk code and a reserved order's reference, and writes no scan row |
 
-Never-regress cases for reserve now, pay on arrival (added 16 November):
+### One payment with several owners (integration)
 
-- `reservation-claims-like-a-sale`: the last-seat proof cases pass unchanged when the winning order is reserved, not paid.
-- `reservation-posts-nothing`: creating, amending, cancelling and expiring a reservation leave the ledger untouched.
-- `reservation-needs-an-account`: a reserved order with a null account is refused on every channel.
-- `desk-payment-settles-once`: two desks taking payment for the same reservation produce one confirmed order and one posting.
-- `failed-desk-payment-keeps-the-seats`: a failed or cancelled attempt returns the order to reserved with its claims intact.
-- `release-skips-payment-in-flight`: the release job never expires an order that is awaiting payment or marked keep.
-- `release-and-payment-race`: release and Take payment started together end with exactly one of expired or awaiting payment, never both.
-- `desk-code-does-not-admit`: the door scanner refuses a desk code and a reserved order's reference.
-- `reservation-limits-hold-under-concurrency`: parallel reservations by one account cannot exceed the per-person limit.
-- `zero-total-never-rests-reserved`: an order with nothing to pay is confirmed at once.
+Tested with a stand-in second owner, so the cases do not wait for the Bar module.
 
-Never-regress cases for one payment with several parts (added 16 November), tested with a stand-in second owner since no bar module exists yet:
+| Name | Proves | Case |
+| --- | --- | --- |
+| `parts-sum-to-the-intent` | PAY-07 | An intent whose parts do not add up to its amount is refused when it is created |
+| `one-open-intent-per-record` | PAY-07 | Two intents racing for the same owner record: one is created, the other is refused by the unique index on open parts |
+| `prepare-without-payment-is-released` | PAY-07 | A desk basket prepared and never paid has `release` called for every part when the intent is cancelled or expires, and calling it twice changes nothing |
+| `all-parts-settle-or-none` | PAY-07 | If one owner's settlement refuses, no part settles, no ticket is issued, nothing is posted, and the money is refunded as unfulfilled |
+| `part-entries-must-total-the-part` | PAY-07 | A handler returning entries that do not total its part's amount fails the batch |
+| `handler-posts-only-to-its-own-accounts` | PAY-07 | A handler returning an entry for another module's account fails the batch |
+| `posting-splits-by-part` | PAY-07 | The one sealed posting credits each owner's account with its own part and balances |
+| `refund-stays-inside-its-part` | PAY-07 | Refunding more than a part's amount is refused even when the intent as a whole has room |
 
-- `parts-sum-to-the-intent`: an intent whose parts do not add up to its amount cannot leave `created`.
-- `all-parts-settle-or-none`: if one owner's settlement refuses, no part settles, no ticket is issued and nothing is posted.
-- `refund-stays-inside-its-part`: refunding more than a part's amount is refused even when the intent as a whole has room.
-- `posting-splits-by-part`: the ledger posting credits each owner's account with its own part and balances.
+### Requirements and the check at entry (integration)
+
+Tested with a stand-in requirement source, so the cases do not wait for the Membership module.
+
+| Name | Proves | Case |
+| --- | --- | --- |
+| `presented-value-is-never-stored` | BO-20 | After buying by reference, the typed value is in no column, log line, job or event; only the evidence id is kept |
+| `unavailable-at-sale-withholds-the-type` | BO-20 | With the source switched off, a ticket type that carries its requirement is not sold to anyone and the on-sale checklist says why |
+| `holder-limit-holds-under-concurrency` | BO-20 | Parallel baskets for one holder cannot take more live tickets of the type than `max_per_holder` for a performance |
+| `one-membership-one-ticket-whichever-route` | BO-20 | A holder met by account in one basket and by typed reference in another is counted once |
+| `by-reference-ticket-always-rechecked` | BO-45 | A ticket met by evidence is checked again at the scan even when the ticket type has `recheck_at_entry` off |
+| `not-met-at-entry-does-not-admit` | BO-45 | A scan answered not met stores `requirement_not_met`, admits nobody and shows the source's words |
+| `unavailable-at-entry-admits-and-reports` | BO-45 | With the source unreachable or the device offline, the ticket is admitted and listed on the night report as unchecked |
+| `override-never-for-own-ticket` | BO-45 | "Admit anyway" needs the ability and a reason, is stored on the scan row, and is refused for a ticket on the overrider's own order or met by their own account |
+| `holder-name-is-never-stored-or-cached` | BO-45 | After the door shows the name a card should carry, the name is in no scan row, ticket, offline data, event, job or log |
+
+### Holds and changes made by the buyer (integration)
+
+| Name | Proves | Case |
+| --- | --- | --- |
+| `hold-extends-once-only` | BO-24 | An extension moves the hold's and every claim's expiry in one batch; a second request is refused; with `box-office.baskets.extend-by` at zero none is given |
+| `self-cancel-respects-the-cut-off` | BO-22 | With the setting on, a buyer cancels before the cut-off and is refunded less the stated fee; after it, and with the setting off, the request is refused |
+| `buyer-exchange-charges-the-stated-fee` | BO-55 | A buyer's exchange collects the price difference and the stated fee, or refunds the difference less the fee, and keeps the original seats if the new ones cannot be had |
+| `voided-after-download-is-flagged` | BO-41 | A ticket cancelled after a device loaded its offline data and then admitted offline is flagged on the door report when the scan syncs |
 
 ## Ordinary cases
 
@@ -142,7 +182,7 @@ Never-regress cases for one payment with several parts (added 16 November), test
 - Every scheduled task run twice in a row changes nothing the second time.
 - Module switches: with Box office off, its routes answer 404 and Payments and Finance still work; Box office refuses to switch on without Payments and Finance.
 - With Front of house off, admission needs an ordinary grant and nothing errors.
-- `core.change-guard` refuses cancelling a performance with tickets until a choice is made.
+- `core.change-guard` refuses cancelling, rescheduling or moving a performance with tickets until a decision is recorded on the Bulk cancellation screen; the core's event then runs that decision.
 - Waiting list: offer, accept, lapse, next offer, stop before curtain.
 - Complimentary tickets: request, approve within cap, refuse over cap, issue.
 - Sessions: one open per person; close blocked by a pending attempt; variance posting.
@@ -152,14 +192,18 @@ Never-regress cases for one payment with several parts (added 16 November), test
 | Journey | Checks |
 | --- | --- |
 | Guest buys two tickets on a phone | Three screens, countdown, email with two codes, order link works signed out |
+| Guest reserves, then pays at the desk | Email confirmation step, reference and desk code, found at the desk in three letters, one press takes payment and admits |
 | Sold out while choosing | Honest message, waiting-list offer |
 | Card declined, then succeeds | Seats still held between tries; one order |
 | Returning before the provider answers | Waiting screen, then confirmation |
+| Countdown nearly over | One offer of more time, then none |
 | Desk sale by reader, by cash | Session bar, change shown, tickets emailed |
 | Reader gives no answer | The honest screen and its three choices |
 | Door: admit, already in, wrong night | One word and colour each; counts move |
+| Door: requirement not met | The source's words, Send to the desk, and Admit anyway only for a holder of the ability |
 | Door offline | Banner, queue count, sync on return |
 | Cancel and refund from the order screen | Second approver, seats back on sale |
+| Buyer cancels from the email link | Offered only when the setting is on and before the cut-off; fee shown before confirming |
 | Close a period | Blockers listed, close, late posting lands in the next period |
 
 Every end-to-end journey is also run with a keyboard only and through an automated accessibility check; the countdown and the scan result are checked with a screen reader script.

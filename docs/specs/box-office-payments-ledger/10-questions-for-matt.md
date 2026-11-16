@@ -1,40 +1,26 @@
 # 9. Questions for Matt
 
-## How to answer
+## The answers
 
-Nine questions, most important first. Each has options and a recommendation; "go with the recommendations" is a complete answer. Nothing below blocks the rest of the design: every recommendation is already drafted into parts 2 to 8, and a different answer changes the places named.
+Eleven questions, all answered by Matt on 16 November. He accepted every recommendation except on question 6. Parts 2 to 8 are written to these answers; the options he chose between are kept below as the record.
 
-**All eleven questions are answered (Matt, 16 November).** He accepted every recommendation except where he had said otherwise, which is question 6.
-
-| # | Answer |
-| --- | --- |
-| 1 | A. Run the proof on deployed D1 in his personal Cloudflare account |
-| 2 | A. Cash and attested card, Stripe online, SumUp reader, built in that order |
-| 3 | A. Secrets only in the first release; in-app connection later as the friendlier option |
-| 4 | A. Income is recognised when the performance takes place, as one fixed rule. The setting `finance.income.recognise` is removed |
-| 5 | A. Two people, with a self-approval limit that ships at zero |
-| 6 | **B, against the recommendation.** Buyer self-service cancellation is built in the first release, off by default |
-| 7 | A. No booking fee by default; a theatre may set one |
-| 8 | A. Offline door scanning, on by default |
-| 9 | The cut order as listed |
-| 10 | A. Unclaimed reservations are released at a time each theatre sets; unset means by hand |
-| 11 | A. A buyer confirms their email address before a reservation holds seats, as a setting that is on by default |
-
-| # | Question | Recommendation |
+| # | Question | Answer |
 | --- | --- | --- |
-| 1 | Run the proof on a real D1 database? | Yes, in your personal account (also asked as a card in the thread) |
-| 2 | Which payment providers ship first? | Cash and attested card always; Stripe online; SumUp reader |
-| 3 | Connect providers inside the app, or by secrets only? | Secrets only in the first release |
-| 4 | When does ticket money become income? | When the performance takes place |
-| 5 | Who approves refunds? | Two people by default, with a limit a theatre can raise |
-| 6 | May buyers cancel their own tickets? | Off by default; built after the first release |
-| 7 | Booking fee by default? | None |
-| 8 | Allow door scanning offline? | Yes, on by default |
-| 9 | What to cut first if the first release must shrink? | The list at the foot |
+| 1 | Run the proof on a real D1 database? | A. Yes, in his personal Cloudflare account. Done; it passed |
+| 2 | Which payment providers ship first? | A. Cash and attested card, Stripe online, SumUp reader, built in that order |
+| 3 | Connect providers inside the app, or by secrets only? | A. Secrets only in the first release; in-app connection later as the friendlier option |
+| 4 | When does ticket money become income? | A. When the performance takes place, as one fixed rule with no setting |
+| 5 | Who approves refunds? | A. Two people, with a self-approval limit that ships at zero |
+| 6 | May buyers cancel or exchange their own tickets? | **B, against the recommendation.** Built in the first release, off by default |
+| 7 | Booking fee by default? | A. None; a theatre may set one |
+| 8 | Allow door scanning offline? | A. Yes, on by default |
+| 9 | What to cut first if the first release must shrink? | The cut order as listed |
+| 10 | Release unclaimed reservations automatically? | A. At a time each theatre sets; unset means by hand |
+| 11 | Confirm an email address before a reservation holds seats? | A. Yes, as a setting that is on by default |
 
 ## 1. Run the last-seat proof on a real D1 database?
 
-The proof passed 11 of 11 cases on local D1. The integrating thread has asked for a run on a deployed database before the proof is called done, because local and deployed D1 can differ under concurrency.
+The proof passed 11 of 11 cases on local D1. Integration asked for a run on a deployed database before the proof was called done, because local and deployed D1 can differ under concurrency. Matt chose A. The run was made on 16 November, passed all 11 cases, and both throwaway resources were deleted; the Proof tab has the results.
 
 | Option | What happens |
 | --- | --- |
@@ -77,7 +63,7 @@ Recommendation A now, B later for whichever provider theatres ask for.
 | B. When the ticket is sold | Simpler to explain | A period's income includes shows not yet performed; cancellations reverse earlier income |
 | C. A setting, default A | A theatre chooses | Both paths must be tested for ever |
 
-Part 6 drafts C (the setting `finance.income.recognise`). Decided 16 November: A, one fixed rule. The setting is removed from part 6 and its second path from the test plan.
+**Decided by Matt, 16 November: A, as one fixed rule.** There is no setting. Box office credits ticket sales to `box-office.deferred-ticket-income`, and its daily task `box-office.recognise-income` moves them to income once the core reports the performance completed. The rule is Box office's own and binds no other module (part 4).
 
 ## 5. Who approves a refund?
 
@@ -97,7 +83,7 @@ A covers B and C by setting the limit high or leaving it at zero.
 | B. In the first release, off by default | More to build before the gate |
 | C. Never | Staff only, for good |
 
-**Decided by Matt, 16 November: B.** Buyers cancelling their own paid tickets is built in the first release and is off by default. The question covered exchanging as well, so three stories move to the first release in part 7: the cancel half of BO-22, BO-55, and BO-54 (staff exchange), which BO-55 is built on. Cancelling an unpaid reservation from the email link is separate and is always available (part 3).
+**Decided by Matt, 16 November: B.** Buyers cancelling their own paid tickets is built in the first release and is off by default. The question covered exchanging as well, so three stories are in the first release in part 7: the cancel half of BO-22, BO-55, and BO-54 (staff exchange), which BO-55 is built on. Cancelling an unpaid reservation from the email link is separate and is always available (part 3).
 
 ## 7. Is there a booking fee by default?
 
@@ -123,14 +109,18 @@ In the order I would cut, least harm first. Nothing above the line touches the r
 | --- | --- | --- |
 | 1. Season passes | BO-64 | Already later; listed for completeness |
 | 2. Split payments at the desk | BO-35 | Already later |
-| 3. Automatic waiting-list offers | BO-61 | Staff offer returned seats by hand from the queue; joining the list (BO-60) stays |
-| 4. Phone orders held unpaid | BO-34, in part | Phone bookings must be paid at once |
-| 5. Promo codes | BO-17 | No discounts or early-access codes |
-| 6. Offline scanning | BO-41 | The door needs a connection; the printable door list is the fallback |
-| 7. Member pricing through the eligibility point | BO-20 | Members pay the public price until the point is built |
-| 8. The SumUp reader | part of BO-30 | The desk takes cash and attested card; a card reader is used standalone |
-| 9. Production statements and the ledger export | FIN-04, FIN-05 | The treasurer reads the ledger screen only |
-| **Not to be cut** | BO-10 to BO-16, BO-30, BO-31, BO-40, BO-50, BO-51, PAY-05, FIN-01, FIN-02 | These are the gate: a paid booking, a refund and a period close that reconcile, and a last seat sold once |
+| 3. More time on a basket | BO-24 | The countdown simply ends; the buyer starts again |
+| 4. Automatic waiting-list offers | BO-61 | Staff offer returned seats by hand from the queue; joining the list (BO-60) stays |
+| 5. Phone orders held unpaid until a time the seller sets | BO-34, in part | A phone booking is paid at once or made as an ordinary reservation. The reservation path itself is not cut |
+| 6. Promo codes | BO-17 | No discounts or early-access codes |
+| 7. One payment for several owners at the till | PAY-07 | Tickets and bar items are paid one after the other. The parts model stays in the schema |
+| 8. Offline scanning | BO-41 | The door needs a connection; the printable door list is the fallback |
+| 9. Member pricing through requirements | BO-20, BO-45 | Members pay the public price until it is built |
+| 10. The SumUp reader | part of BO-30 | The desk takes cash and attested card; a card reader is used standalone |
+| 11. Production statements and the ledger export | FIN-04, FIN-05 | The treasurer reads the ledger screen only |
+| **Not to be cut** | BO-10 to BO-16, BO-30, BO-31, BO-40, BO-50, BO-51, R-1 to R-7, PAY-05, FIN-01, FIN-02 | These are the gate: a reservation paid on arrival, a paid booking, a refund and a period close that reconcile, and a last seat sold once |
+
+Matt approved this order before cuts 3 and 7 existed. Their places in it are proposals.
 
 ## Decided without asking, for you to overrule
 
@@ -145,7 +135,7 @@ In the order I would cut, least harm first. Nothing above the line touches the r
 | No card data ever touches the platform | The provider holds it; keeps every theatre out of card-security audits | Parts 2 and 4 |
 | Complimentary tickets are ordinary zero-price tickets needing a second person | Counted, scanned and audited like any other | Part 3 |
 
-## Added 16 November: two questions on reservations
+## Two questions on reservations
 
 These follow from reserve now, pay on arrival (part 3).
 
@@ -153,11 +143,11 @@ These follow from reserve now, pay on arrival (part 3).
 
 | Option | What happens |
 | --- | --- |
-| A. Yes, at a time each theatre sets (recommended) | A setting gives the minutes before the start; unset means staff release by hand. Staff can mark a latecomer to keep |
+| A. Yes, at a time each theatre sets (recommended) | The setting `box-office.reservations.release-before` gives how long before the start; unset means staff release by hand. Staff can mark a latecomer to keep |
 | B. Never automatically | Staff always release by hand |
 | C. Always, at a fixed time | Simpler, but no theatre agrees on the time |
 
-Recommendation: A. It costs one setting and one job, and a theatre that distrusts it leaves it unset.
+Recommendation: A. It costs one setting and one scheduled task, and a theatre that distrusts it leaves it unset.
 
 ### 11. Must a buyer confirm their email address before a reservation holds seats?
 

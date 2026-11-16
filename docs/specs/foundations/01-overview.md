@@ -12,12 +12,12 @@ Workstream 1 of the detailed-design stage. It specifies the ground every other w
 | Module manifest · Settings registry · Abilities registry · Data-class registry | Each format in full |
 | Worked example | A small module (lost property) written in every format |
 | 1. Scope | What foundations is, what it is not, and the six principles |
-| 2. Data model | The twelve `core_` tables foundations owns |
+| 2. Data model | The thirteen `core_` tables foundations owns |
 | 3. States and rules | Modules, migrations, units of work, events, jobs and external calls, with diagrams and numbered rules |
 | 4. Interface to other modules | The kit, foundations' points, and the index of every `core.*` and `forms.*` name |
 | 5. Screens | Setup, Modules, Settings, Jobs, Credentials, Updates and health, Audit |
 | 6. Settings and abilities | Foundations' own, in the registry formats |
-| 7. Stories | Thirty-four stories with acceptance criteria |
+| 7. Stories | Thirty-seven stories with acceptance criteria |
 | 8. Test plan | The three tiers, the conformance checks every module gets for nothing, foundations' own cases |
 | **9. Questions for Matt** | Seven questions, each with options and a recommendation |
 | Design (and its three sub-tabs) | How it is built: repository and owned paths, upstream merges, CI and test harness |
@@ -32,9 +32,9 @@ Workstream 1 of the detailed-design stage. It specifies the ground every other w
 | Nine-part specification | Complete |
 | Design tabs | Complete |
 | Proof 1, owned paths | **Passed.** Four upstream releases merged into a theatre fork with no conflict in any owned path. |
-| Proof 2, one-step deploy | **Passed locally.** A real deploy on an account is question 5. |
+| Proof 2, one-step deploy | **Passed on a real account.** The Deploy to Cloudflare button made the database, file store, cache and queues with nothing typed. The copy it makes starts with fresh history, so story F-35 links it to upstream once. |
 | Proof 3, local tests | **Passed.** Matt decided that Linux alone is the supported system for tests, so this proof is closed. |
-| Waiting on Matt | Six of the seven questions in tab 9 (question 4 is decided). None blocks another workstream; work proceeds on the recommended answers. |
+| Waiting on Matt | Nothing in tab 9: all seven questions are decided. The platform takes no backup of its own (Matt, 16 November 2026): a theatre relies on the history Cloudflare keeps for its database. |
 
 Three things the proofs changed in the design: the theatre's `site/` folder is the Nuxt project itself and all upstream code lives in layers; the lockfile is the one shared file and is resolved mechanically; and a contended write is guarded by a statement that fails on purpose inside the batch, because a D1 batch can roll back but cannot branch.
 
@@ -59,8 +59,8 @@ flowchart TB
   X -- same format --> MF
   MF --> REG[Generated registry: modules, tables and data classes, settings, abilities, events, jobs, points]
   REG --> CHK[Conformance checks in CI and locally]
-  REG --> KIT[The kit: route, can, unit, setting, enqueue, externalCall]
-  KIT --> WK[One Worker: D1, files, cache, two queues, cron, live screens]
+  REG --> KIT[The kit: defineRoute, can, unit, useSetting, enqueue, externalCall]
+  KIT --> WK[One Worker: D1, files, cache, two job queues and one for email outcomes, cron, live screens]
   REG --> CON[Console: Modules, Settings, Jobs, Health, Audit]
   Up -- releases, merged by pull request --> Th
   CHK -- owned-path check keeps the two sides apart --> Repo
