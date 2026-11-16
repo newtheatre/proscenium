@@ -1,7 +1,7 @@
 {
-  "id": "16b74d2b-96b2-47ec-8d9e-99a73db4d20d",
+  "id": "80a2970d-132b-4eae-966f-680e3c1b93e3",
   "prevIds": [
-    "3650cc34-c804-48b6-89bc-64b982b85c5d"
+    "72915642-ab35-49e0-9a0f-931c9b6c8ac8"
   ],
   "version": "7",
   "dialect": "sqlite",
@@ -87,6 +87,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_grant_warnings",
+      "entityType": "tables"
+    },
+    {
       "name": "core_grants",
       "entityType": "tables"
     },
@@ -136,6 +140,14 @@
     },
     {
       "name": "core_passkeys",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_performance_access",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_performances",
       "entityType": "tables"
     },
     {
@@ -659,6 +671,16 @@
       "name": "undo_until",
       "type": "integer",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_account_merges",
+      "name": "completed_at",
+      "type": "integer",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -2255,6 +2277,26 @@
       "entityType": "columns"
     },
     {
+      "table": "core_grant_warnings",
+      "name": "grant_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_grant_warnings",
+      "name": "warned_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_grants",
       "name": "id",
       "type": "text",
@@ -3389,6 +3431,216 @@
       "name": "last_used_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_access",
+      "name": "performance_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_access",
+      "name": "term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performance_access",
+      "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "space_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "doors_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "operating_day",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "interval_count",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "capacity",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "label",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "external_booking_url",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "cancelled_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "cancel_reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "cancel_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "completed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_performances",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -6966,11 +7218,15 @@
     },
     {
       "table": "core_notifications",
-      "name": "core_notifications_dedupe",
+      "name": "core_notifications_dedupe_account",
       "columns": [
         {
           "value": "dedupe_key",
           "isExpression": false
+        },
+        {
+          "value": "coalesce(\"account_id\", '')",
+          "isExpression": true
         }
       ],
       "isUnique": true,
@@ -7048,6 +7304,88 @@
       "columns": [
         {
           "value": "account_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_starts",
+      "columns": [
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_day",
+      "columns": [
+        {
+          "value": "operating_day",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_production",
+      "columns": [
+        {
+          "value": "production_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_venue",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_space",
+      "columns": [
+        {
+          "value": "space_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
           "isExpression": false
         }
       ],
@@ -7954,6 +8292,21 @@
       "entityType": "fks"
     },
     {
+      "table": "core_grant_warnings",
+      "name": "fk_core_grant_warnings_grant_id_core_grants_id_fk",
+      "columns": [
+        "grant_id"
+      ],
+      "tableTo": "core_grants",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_grants",
       "name": "fk_core_grants_role_id_core_roles_id_fk",
       "columns": [
@@ -8037,6 +8390,98 @@
       "tableTo": "core_sender_identities",
       "columnsTo": [
         "key"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performance_access",
+      "name": "fk_core_performance_access_performance_id_core_performances_id_fk",
+      "columns": [
+        "performance_id"
+      ],
+      "tableTo": "core_performances",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performance_access",
+      "name": "fk_core_performance_access_term_id_core_terms_id_fk",
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performances",
+      "name": "fk_core_performances_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performances",
+      "name": "fk_core_performances_venue_id_core_venues_id_fk",
+      "columns": [
+        "venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performances",
+      "name": "fk_core_performances_cancel_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "cancel_reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_performances",
+      "name": "fk_core_performances_space_id_venue_id_core_spaces_id_venue_id_fk",
+      "columns": [
+        "space_id",
+        "venue_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id",
+        "venue_id"
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "RESTRICT",
@@ -8634,6 +9079,16 @@
       "entityType": "pks"
     },
     {
+      "table": "core_performance_access",
+      "name": "core_performance_access_pk",
+      "columns": [
+        "performance_id",
+        "term_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_production_advisories",
       "name": "core_production_advisories_pk",
       "columns": [
@@ -8781,6 +9236,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_grant_warnings",
+      "name": "core_grant_warnings_pk",
+      "columns": [
+        "grant_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_grants",
       "name": "core_grants_pk",
       "columns": [
@@ -8855,6 +9319,15 @@
     {
       "table": "core_passkeys",
       "name": "core_passkeys_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_pk",
       "columns": [
         "id"
       ],
@@ -9291,6 +9764,72 @@
       "table": "core_notifications",
       "name": "core_notifications_recipient",
       "value": "(\"account_id\" IS NULL) <> (\"address\" IS NULL) OR \"payload\" IS NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performance_access",
+      "name": "core_performance_access_detail",
+      "value": "\"detail\" IS NULL OR length(\"detail\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_state",
+      "value": "\"state\" IN ('draft', 'scheduled', 'cancelled', 'completed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_period",
+      "value": "\"ends_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_doors",
+      "value": "\"doors_at\" IS NULL OR \"doors_at\" <= \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_interval",
+      "value": "\"interval_count\" IS NULL OR \"interval_count\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_capacity",
+      "value": "\"capacity\" IS NULL OR \"capacity\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_label",
+      "value": "\"label\" IS NULL OR length(\"label\") BETWEEN 1 AND 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_booking_url",
+      "value": "\"external_booking_url\" IS NULL OR \"external_booking_url\" LIKE 'https://_%'",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_cancel",
+      "value": "(\"state\" = 'cancelled') = (\"cancelled_at\" IS NOT NULL AND \"cancel_reason_term_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_cancel_note",
+      "value": "\"cancel_note\" IS NULL OR length(\"cancel_note\") <= 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_performances",
+      "name": "core_performances_completed",
+      "value": "(\"state\" = 'completed') = (\"completed_at\" IS NOT NULL)",
       "entityType": "checks"
     },
     {
