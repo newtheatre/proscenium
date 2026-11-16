@@ -34,7 +34,7 @@ interface Credential { id: Uint8Array, keys: CryptoKeyPair, userHandle: string, 
 
 export class Authenticator {
   readonly credentials: Credential[] = []
-  constructor(readonly origin = 'http://test', readonly rpId = 'test') {}
+  constructor(readonly origin = 'https://test', readonly rpId = 'test') {}
 
   /** navigator.credentials.create(), returning what @simplewebauthn/browser would send. */
   async create(options: { challenge: string, user: { id: string } }) {
