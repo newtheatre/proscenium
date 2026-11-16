@@ -6,18 +6,20 @@ useSeoMeta({ title: 'Add a passkey' })
 const route = useRoute()
 const next = nextPath(route.query.next) ?? '/'
 const refusal = ref<Refusal | null>(null)
+const { confirmItsYou } = useConfirmItsYou()
 const busy = ref(false)
 const codes = ref<string[] | null>(null)
 const { data: me } = await useFetch<{ signedIn: boolean, consoleNeedsPasskey?: boolean }>('/api/core/me')
 if (!me.value?.signedIn) await navigateTo({ path: '/sign-in', query: { next: route.fullPath } })
 
-async function add() {
+async function add(retried = false) {
   busy.value = true
   refusal.value = null
   const answer = await addMyPasskey()
   busy.value = false
   if (!answer.ok) {
-    if (answer.refusal.code === 'core.access.not-fresh') return navigateTo({ path: '/sign-in/confirm', query: { next: route.fullPath } })
+    // Confirmed in place, then tried once more (ID-28).
+    if (answer.refusal.code === 'core.access.not-fresh' && !retried && await confirmItsYou()) return add(true)
     refusal.value = answer.refusal
     return
   }
@@ -44,7 +46,7 @@ async function add() {
         block
         icon="i-lucide-key-round"
         :loading="busy"
-        @click="add"
+        @click="add()"
       >
         Add a passkey
       </UButton>
