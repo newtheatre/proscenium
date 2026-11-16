@@ -19,11 +19,12 @@ export async function sessionOf(accountId: string): Promise<SessionRow | null> {
   return first<SessionRow>(`SELECT * FROM payments_sessions WHERE state <> 'closed' AND ${mine.sql} ORDER BY opened_at DESC LIMIT 1`, ...mine.params)
 }
 
-/** Expected cash: the float, plus cash taken in the session. Cash refunds given from it come with refunds. */
+/** Expected cash: the float, plus cash taken in the session, less cash handed back from it. */
 export async function expectedCash(session: SessionRow): Promise<number> {
-  const row = await first<{ n: number }>(`SELECT coalesce(sum(a.amount_minor), 0) AS n FROM payments_attempts a JOIN payments_intents i ON i.id = a.intent_id
-    WHERE i.session_id = ? AND a.method = 'cash' AND a.state = 'succeeded'`, session.id)
-  return session.float_minor + (row?.n ?? 0)
+  const row = await first<{ taken: number, back: number }>(`SELECT
+      (SELECT coalesce(sum(a.amount_minor), 0) FROM payments_attempts a JOIN payments_intents i ON i.id = a.intent_id WHERE i.session_id = ? AND a.method = 'cash' AND a.state = 'succeeded') AS taken,
+      (SELECT coalesce(sum(r.amount_minor), 0) FROM payments_refunds r WHERE r.session_id = ? AND r.state = 'succeeded') AS back`, session.id, session.id)
+  return session.float_minor + (row?.taken ?? 0) - (row?.back ?? 0)
 }
 
 /** Opens a session for the person. Refused while they have another not yet closed. */

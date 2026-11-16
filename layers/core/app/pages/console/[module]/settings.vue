@@ -1,6 +1,5 @@
 <!-- A settings page with no page code: one per module that declares settings (UI-14). -->
 <script setup lang="ts">
-definePageMeta({ layout: 'console' })
 const { t, te } = useT()
 const route = useRoute()
 // Core's own page answers at /console/system/settings (the System group); every other module's is at /console/<module>/settings.

@@ -27,6 +27,21 @@ export type ProviderAnswer
     | { state: 'failed', providerRef?: string, failureCode: string }
     | { state: 'cancelled', providerRef?: string }
 
+/** A refund as its provider is told about it: always against the attempt that took the money. */
+export interface ProviderRefund {
+  id: string
+  amountMinor: number
+  currency: string
+  idempotencyKey: string
+  attempt: ProviderAttempt
+}
+
+/** The provider's answer to a refund. */
+export type RefundAnswer
+  = | { state: 'pending', providerRef?: string }
+    | { state: 'succeeded', providerRef?: string }
+    | { state: 'failed', providerRef?: string, failureCode: string }
+
 /** What the screen needs next after `start`. */
 export type NextStep
   = | { kind: 'redirect', url: string }
@@ -46,6 +61,11 @@ export interface PaymentProvider {
   start?: (attempt: ProviderAttempt) => Promise<{ next: NextStep, providerRef?: string, answer?: ProviderAnswer }>
   /** Ask the provider for the truth now. Required unless attested. */
   status?: (attempt: ProviderAttempt) => Promise<ProviderAnswer | 'unknown'>
+  /**
+   * Send money back with the refund's idempotency key, so asking twice refunds once. Not given for an
+   * attested provider: a person hands the money back and confirms it.
+   */
+  refund?: (refund: ProviderRefund) => Promise<RefundAnswer>
   /** Ask the provider to stop a payment waiting on a reader; true once it confirms it stopped. */
   cancel?: (attempt: ProviderAttempt) => Promise<boolean>
   /**

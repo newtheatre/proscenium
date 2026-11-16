@@ -3,6 +3,7 @@ import { sampleSchema } from '../../../../server/sample-schema'
 
 definePageMeta({ layout: 'console' })
 
+const { $api } = useNuxtApp()
 const fields = [
   { name: 'name', label: 'Name', kind: 'text' as const },
   { name: 'email', label: 'Email address', kind: 'email' as const, help: 'We use this to send the confirmation.' },
@@ -13,9 +14,9 @@ const route = useRoute()
 const stale = computed(() => route.query.stale === '1')
 
 async function submit(values: Record<string, unknown>, version?: string | number) {
-  return await $fetch('/api/gallery/save', { method: 'POST', body: { ...values, version: stale.value && version !== 'fresh' ? 'stale' : version } })
+  return await $api('/api/gallery/save', { method: 'POST', body: { ...values, version: stale.value && version !== 'fresh' ? 'stale' : version } })
 }
-const current = async () => await $fetch<{ values: Record<string, unknown>, version: string }>('/api/gallery/current')
+const current = async () => await $api<{ values: Record<string, unknown>, version: string }>('/api/gallery/current')
 </script>
 
 <template>

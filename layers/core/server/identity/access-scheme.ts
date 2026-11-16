@@ -4,10 +4,15 @@
 // sealed in special columns, never listed or searched, and read by a module only for a purpose the
 // person has switched on, through accessNeedsFor, which audits every read and answers nothing,
 // the same way, whatever the reason.
-import { all, can, first, isEnabled, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, type Actor, type UnitView } from '#kit'
+import type { H3Event } from 'h3'
+import { all, can, first, isEnabled, newId, nowMs, openSpecial, refuse, sealSpecial, usePoint, useSetting, type Actor, type UnitView } from '#kit'
 import { notify } from '../notifications/notify'
+import { notifyAddress } from '../notifications/send'
 import { getTerm, listTerms } from '../vocabularies/service'
-import { accountById, isUsable } from './accounts'
+import { accountById, isUsable, normaliseAddress } from './accounts'
+import { digest, randomToken } from './crypto'
+import { findOrCreateAccount } from './guests'
+import { relyingParty } from './web'
 import { holdersOf } from './holders'
 import { hasStanding } from './standings'
 import { z } from 'zod'
@@ -336,11 +341,30 @@ export async function reviewQueue() {
   }))
 }
 
+/**
+ * What happened to an application, newest first, for the reviewer's page (ID-40): applied, changed,
+ * each decision and each verification, with who did it. It names no need.
+ */
+export async function historyOf(accountId: string) {
+  const rows = await all<{ at: number, actor_name: string | null, detail: string }>(
+    `SELECT at, actor_name, detail FROM core_audit
+      WHERE record_type = 'core.account' AND record_id = ? AND action IN ('create', 'update', 'state')
+        AND (detail LIKE '%"accessApplication"%' OR detail LIKE '%"accessDecision"%' OR detail LIKE '%"accessVerified"%')
+      ORDER BY at DESC LIMIT 100`, accountId) // not-policy: a page of the history
+  return rows.map((r) => {
+    const detail = JSON.parse(r.detail) as { accessApplication?: string, accessDecision?: string, accessVerified?: boolean }
+    const event = detail.accessDecision ?? (detail.accessVerified === undefined ? `applied-${detail.accessApplication}` : detail.accessVerified ? 'verified' : 'unverified')
+    return { at: r.at, by: r.actor_name, event }
+  })
+}
+
 /** One application opened by a reviewer. The route's ability writes the read to the audit trail. */
 export async function openForReview(accountId: string) {
   const row = await profileOf(accountId)
   if (!row) return null
   return {
+    flagged: row.flagged_at !== null,
+    decidedAt: row.decided_at,
     status: row.status,
     inForce: await openApp(row.payload),
     pending: await openApp(row.pending),
@@ -412,4 +436,35 @@ async function flagWaiting(unit: UnitView, at: number, replyWithin: number, sche
       dedupeKey: `${reviewer}:${at}`,
     })
   }
+}
+
+/** Where an invitation's link lands once it has signed the person in: the form, open. */
+export const APPLY_PATH = '/account/access/apply'
+
+/**
+ * "Invite to apply" (ID-42): finds or makes the account for a name and an address, and emails a
+ * single-use link that signs the person in and opens the form. The link lapses after
+ * core.sign-in.invite-lifetime; after that, signing in and pressing "Apply" does the same. The email
+ * goes once the unit has committed, so a refused invitation sends nothing.
+ */
+export async function inviteToApply(unit: UnitView, event: H3Event, actor: Actor, input: { name: string, address: string }): Promise<{ accountId: string }> {
+  if (!(await schemeEnabled())) NOT_FOUND()
+  const address = normaliseAddress(input.address)
+  const found = await findOrCreateAccount(unit, { address, name: input.name, origin: 'invite' })
+  if (found.accountId === actor.accountId) refuse('core.access.own-record', 'You cannot invite yourself.', { status: 403, remedy: 'Apply from your own account instead.' })
+  const token = randomToken()
+  const id = newId('tok', { random: true })
+  const at = nowMs()
+  const lifetime = await useSetting('core.sign-in.invite-lifetime') as number
+  unit.add({
+    sql: `INSERT INTO core_account_tokens (id, purpose, token_hash, account_id, address, issued_by, next_path, attempts, created_at, expires_at)
+          VALUES (?, 'invite', ?, ?, ?, ?, ?, 0, ?, ?)`,
+    params: [id, await digest('link', token), found.accountId, address, actor.accountId ?? null, APPLY_PATH, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
+  })
+  unit.audit({ action: 'create', ability: 'core.access-scheme.review', record: ['core.account', found.accountId], detail: { accessInvitation: true } })
+  const link = `${relyingParty(event).origin}/sign-in/link#${token}`
+  const scheme = await schemeName()
+  // Written in this unit and sent after it commits, with the pipeline's retries; the link is sealed.
+  await notifyAddress(unit, 'core.access-invitation', { address, variables: { link, scheme }, dedupeKey: id })
+  return { accountId: found.accountId }
 }

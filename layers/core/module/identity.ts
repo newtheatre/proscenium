@@ -29,6 +29,7 @@ export const identitySettings = defineSettings('core', {
 
   'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
   'grants.allow-no-expiry': setting.boolean({ default: true, change }),
+  'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change }),
 
   'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
@@ -126,9 +127,6 @@ export const identityEvents = {
 export const identityJobs = {
   // The link and code travel sealed with a key derived from CORE_SESSION_KEY, never in clear.
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
-  // Security notices to named addresses (identity/notices.ts), sealed like the sign-in link.
-  'core.send-account-notice': job({ payload: z.object({ sealed: z.string() }), lane: 'prompt' }),
-  'core.send-invitation': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
   // The erasure batch for one request (ID-16). Safe to repeat: a second run writes nothing.
   'core.run-erasure': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
 }
@@ -201,6 +199,19 @@ export const identityContributions = {
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
   'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
+  // The access scheme's screens (ID-38, ID-40). "Offered" is one while the scheme runs, so My
+  // account's entry and section hide while it is off; "waiting" sits beside the console's entry.
+  'core.count': [
+    { id: 'core.access-scheme-offered', file: 'access-scheme-offered' },
+    { id: 'core.access-scheme-waiting', file: 'access-scheme-waiting' },
+  ],
+  'core.account-section': [
+    { id: 'core.access-scheme', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreAccessScheme', order: 40, to: '/account/access', icon: 'i-lucide-accessibility', count: 'core.access-scheme-offered', hideEmpty: true },
+  ],
+  // The button a fork's own access page carries: ::access-application.
+  'core.public-component': [
+    { id: 'access-application', component: 'CoreAccessApplication', alias: 'access-application', description: 'The access scheme\'s "Apply" button, or where the visitor\'s application stands.', setting: 'core.access-scheme.enabled' },
+  ],
   // The other identity messages (spec part 4) arrive with the stories that send them.
   'core.notification-type': [{
     // The code that confirms it is you in place, for a basic session with no passkey (ID-28). The
@@ -223,11 +234,26 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const, code: 'text' as const },
+    // Both sign the person in, so both are sealed.
+    variables: { link: 'sealed' as const, code: 'sealed' as const },
     wording: {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
         body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+      },
+    },
+  }, {
+    // The single-use link to the form, by notifyAddress (ID-42). Sealed: email only, cleared once sent.
+    id: 'core.access-invitation',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'sealed' as const, scheme: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Apply to the {{ scheme }} at {{ theatre }}',
+        body: '{{ theatre }} has invited you to apply to its {{ scheme }}, so that what would help you is there every time you book.\n\n[Open the form]({{ link }})\n\nThe link signs you in and works once. If it has run out, sign in with this email address and choose Apply. If you were not expecting this, you can ignore this email.',
       },
     },
   }, {
@@ -289,14 +315,13 @@ export const identityContributions = {
       },
     },
   }, {
-    // Sent by notifyAddress from a job, like the sign-in link, so the link (a sign-in) is never
-    // stored in clear in core_notifications.
+    // The link signs the person in, so it is sealed: never stored in clear in core_notifications.
     id: 'core.invitation',
     category: 'transactional' as const,
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const, role: 'text' as const },
+    variables: { link: 'sealed' as const, role: 'text' as const },
     wording: {
       'en-GB': {
         subject: 'You have been given a role at {{ theatre }}',
@@ -309,7 +334,7 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const },
+    variables: { link: 'sealed' as const },
     wording: {
       'en-GB': {
         subject: 'Confirm your email address for {{ theatre }}',
@@ -327,6 +352,36 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Your sign-in at {{ theatre }} has changed',
         body: 'This was added to your account: {{ what }}.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+      },
+    },
+  }, {
+    // To a holder, once per sweep, naming each of their roles that ends within
+    // core.grants.expiry-warning (ID-24). Grants are the members' side.
+    id: 'core.grant-expiring',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { roles: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'A role of yours at {{ theatre }} is ending',
+        body: 'These roles of yours at {{ theatre }} are ending:\n\n{{ roles }}\n\nIf you should keep one, ask whoever gave it to you to renew it. If not, there is nothing to do.',
+      },
+    },
+  }, {
+    // To whoever could renew those grants, once per sweep that found some (ID-24): a count and the
+    // earliest end, never one message per grant, because at a year end most lapse together.
+    id: 'core.grants-expiring',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { count: 'text' as const, date: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Roles at {{ theatre }} are about to lapse',
+        body: 'Roles you can renew are about to lapse: {{ count }}, the first on {{ date }}. Renew those that should carry on; the rest end by themselves.',
       },
     },
   }, {

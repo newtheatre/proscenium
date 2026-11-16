@@ -186,6 +186,8 @@ export const refunds = defineTable('payments_refunds', {
   selfApproveLimitMinor: col.minor('self_approve_limit_minor').notNull(),
   approvedBy: col.account('approved_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   declineReasonTermId: col.ref('core_terms', { nullable: true }),
+  // A cash refund is handed back from a till session, and counts against its expected cash.
+  sessionId: col.ref('payments_sessions', { nullable: true }),
   feeReturnedMinor: col.minor('fee_returned_minor'),
   createdAt: col.createdAt(),
   updatedAt: col.updatedAt(),

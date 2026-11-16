@@ -6,15 +6,19 @@ export interface Refusal { code: string, reason: string, remedy?: string }
 export type Answer<T> = { ok: true, data: T } | { ok: false, refusal: Refusal }
 
 export async function callIdentity<T>(path: string, body?: unknown, headers: Record<string, string> = {}): Promise<Answer<T>> {
-  const response = await fetch(path, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers: { 'content-type': 'application/json', ...headers },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: 'same-origin',
-  })
-  const data = await response.json().catch(() => ({})) as Record<string, unknown>
-  if (response.ok) return { ok: true, data: data as unknown as T }
-  return { ok: false, refusal: (typeof data.code === 'string' ? data : { code: 'core.unexpected', reason: 'Something went wrong.', remedy: 'Try again in a moment.' }) as unknown as Refusal }
+  // Sent through `$api`, so a refusal of "confirm it is you" is confirmed in place and retried.
+  // The path is only known at run time, so the typed fetch is used as a plain one.
+  const send = useNuxtApp().$api as unknown as (path: string, options: object) => Promise<T>
+  try {
+    return { ok: true, data: await send(path, { method: body === undefined ? 'GET' : 'POST', body, headers }) }
+  }
+  catch (error) {
+    const data = (error as { data?: unknown }).data
+    const refusal = data && typeof data === 'object' && typeof (data as Refusal).code === 'string'
+      ? data as Refusal
+      : { code: 'core.unexpected', reason: 'Something went wrong.', remedy: 'Try again in a moment.' }
+    return { ok: false, refusal }
+  }
 }
 
 const cancelled: Refusal = { code: 'core.passkey.cancelled', reason: 'The passkey was not used.', remedy: 'Try again, or sign in another way.' }

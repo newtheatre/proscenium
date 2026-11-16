@@ -201,11 +201,13 @@ describe('counts and hideEmpty (UI-04)', () => {
 
   it('lists account sections for the person, in order, and drops an empty one', async () => {
     const actor = audience()
-    expect((await sections(actor)).map(s => s.id)).toEqual(['gallery.tickets', 'gallery.drafts'])
+    // The gallery's own sections; identity's (the access scheme) show beside them.
+    const gallery = async () => (await sections(actor)).map(s => s.id).filter(id => id.startsWith('gallery.'))
+    expect(await gallery()).toEqual(['gallery.tickets', 'gallery.drafts'])
     const admin = staff()
     await call(handle, 'PUT', '/api/core/settings', { actor: admin, body: { changes: [{ key: 'gallery.demo.open', value: false }] } })
     try {
-      expect((await sections(actor)).map(s => s.id)).toEqual(['gallery.tickets'])
+      expect(await gallery()).toEqual(['gallery.tickets'])
     }
     finally {
       await call(handle, 'PUT', '/api/core/settings', { actor: admin, body: { changes: [{ key: 'gallery.demo.open', reset: true }] } })

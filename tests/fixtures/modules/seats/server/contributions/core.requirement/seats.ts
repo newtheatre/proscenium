@@ -6,6 +6,8 @@ export const members = new Set<string>()
 export const calls: { accounts: (string | null)[], refs: string[], presented?: unknown[] }[] = []
 const NUMBER = '12345678'
 const EVIDENCE = 'ev_member'
+/** The account the membership number belongs to, as a source that knows it would say. */
+export const HOLDER = 'acc_holderholderholderholderho'
 
 export default defineRequirementSource({
   checkAbility: 'seats.members.look-up',
@@ -24,7 +26,7 @@ export default defineRequirementSource({
         }
         const offered = presented?.find(p => p.ref === ref)
         const accepted = offered && ('value' in offered ? offered.value === NUMBER : offered.evidence === EVIDENCE)
-        out.push(accepted ? { account, ref, verdict: 'met', evidence: EVIDENCE } : { account, ref, verdict: 'not-met', reason: 'We could not find that membership.', quantity: 5 })
+        out.push(accepted ? { account, ref, verdict: 'met', evidence: EVIDENCE, holderAccountId: HOLDER } : { account, ref, verdict: 'not-met', reason: 'We could not find that membership.', quantity: 5, holderAccountId: HOLDER })
       }
     }
     return out

@@ -4,7 +4,6 @@
      already answered "not found", so nothing here tests membership. -->
 <script setup lang="ts">
 import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
-import { isCurrent } from '../composables/useNavigation'
 
 const BOTTOM_SECTIONS = 4 // not-policy: the specification's four sections plus More
 
