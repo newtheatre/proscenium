@@ -2,6 +2,9 @@
 // One venue (C-16, C-17): its address and public text, its spaces with kind and capacity, and the
 // access features of the building and of each space. Archiving keeps the venue on the records that
 // use it and takes it out of pickers and the public site.
+import type { FormSubmitEvent } from '@nuxt/ui'
+import type { z } from 'zod'
+import { spaceInput, venuePatch } from '../../../../../server/places/input'
 
 interface Option { id: string, label: string, icon: string | null, retired: boolean }
 interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, archived: boolean }
@@ -40,15 +43,16 @@ async function run(fn: () => Promise<unknown>, done?: string) {
 }
 
 // Details
-const details = reactive({ name: '', managed: true, addressLines: '', locality: '', postcode: '', country: '', description: '', gettingHere: '', accessInfo: '' })
+const details = reactive({ name: '', managed: true, addressLines: '', locality: '', postcode: '', country: null as string | null, description: '', gettingHere: '', accessInfo: '' })
 watch(venue, (v) => {
   if (!v) return
   Object.assign(details, {
     name: v.name, managed: v.managed, addressLines: v.addressLines ?? '', locality: v.locality ?? '', postcode: v.postcode ?? '',
-    country: v.country ?? '', description: v.description ?? '', gettingHere: v.gettingHere ?? '', accessInfo: v.accessInfo ?? '',
+    country: v.country, description: v.description ?? '', gettingHere: v.gettingHere ?? '', accessInfo: v.accessInfo ?? '',
   })
 }, { immediate: true })
-const saveDetails = () => run(() => api('', 'PATCH', { ...details, country: details.country.trim().toUpperCase() || null }), 'Venue saved')
+// The form hands over what the schema made of the values, which is what the route expects.
+const saveDetails = (event: FormSubmitEvent<z.output<typeof venuePatch>>) => run(() => api('', 'PATCH', event.data), 'Venue saved')
 
 async function setArchived(archived: boolean) {
   if (archived && !await confirm({ verb: 'Archive', thing: venue.value!.name, consequence: 'It leaves every picker and the public site. Records that use it keep it, and you can restore it later.', button: 'Archive venue' })) return
@@ -67,8 +71,8 @@ function openSpace(s?: Space) {
   refusal.value = null
   spaceOpen.value = true
 }
-async function saveSpace() {
-  const body = { ...space, defaultCapacity: space.defaultCapacity || null }
+async function saveSpace(event: FormSubmitEvent<z.output<typeof spaceInput>>) {
+  const body = event.data
   const ok = spaceId.value
     ? await run(() => api(`/spaces/${spaceId.value}`, 'PATCH', body), `Saved ${space.name}`)
     : await run(() => api('/spaces', 'POST', body), `Added ${space.name}`)
@@ -124,30 +128,22 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
       :error="error"
       @retry="refresh()"
     >
-      <div
-        v-if="venue"
-        class="space-y-10"
-      >
+      <template v-if="venue">
         <RefusalNotice
           v-if="!spaceOpen"
           :refusal="refusal"
         />
 
-        <section
-          class="space-y-4"
-          aria-labelledby="venue-details"
-        >
-          <h2
+        <PageSection title="Details">
+          <UForm
             id="venue-details"
-            class="text-base font-semibold"
-          >
-            Details
-          </h2>
-          <form
+            :schema="venuePatch"
+            :state="details"
             class="space-y-4"
-            @submit.prevent="saveDetails"
+            @submit="saveDetails"
           >
             <UFormField
+              name="name"
               label="Name"
               required
             >
@@ -157,12 +153,14 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               />
             </UFormField>
             <UFormField
+              name="managed"
               label="The theatre runs this venue"
               help="Turn off for a venue the theatre visits or tours to."
             >
               <USwitch v-model="details.managed" />
             </UFormField>
             <UFormField
+              name="addressLines"
               label="Address"
               hint="Optional"
             >
@@ -173,29 +171,38 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               />
             </UFormField>
             <div class="grid gap-4 sm:grid-cols-3">
-              <UFormField label="Town or city">
+              <UFormField
+                name="locality"
+                label="Town or city"
+              >
                 <UInput
                   v-model="details.locality"
                   maxlength="120"
                 />
               </UFormField>
-              <UFormField label="Postcode">
+              <UFormField
+                name="postcode"
+                label="Postcode"
+              >
                 <UInput
                   v-model="details.postcode"
                   maxlength="20"
                 />
               </UFormField>
               <UFormField
+                name="country"
                 label="Country"
                 help="Two letters, such as GB."
               >
                 <UInput
-                  v-model="details.country"
+                  :model-value="details.country ?? ''"
                   maxlength="2"
+                  @update:model-value="details.country = String($event).trim().toUpperCase() || null"
                 />
               </UFormField>
             </div>
             <UFormField
+              name="description"
               label="About the venue"
               help="Shown on the venue's public page."
             >
@@ -206,6 +213,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               />
             </UFormField>
             <UFormField
+              name="gettingHere"
               label="Getting here"
               help="Public transport, parking and where the entrance is."
             >
@@ -216,6 +224,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               />
             </UFormField>
             <UFormField
+              name="accessInfo"
               label="Access"
               help="What to expect on arrival, in words. The features below are shown as well."
             >
@@ -225,43 +234,34 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 maxlength="4000"
               />
             </UFormField>
-            <div class="flex flex-wrap gap-2">
-              <UButton
-                type="submit"
-                label="Save venue"
-                :disabled="!details.name.trim()"
-              />
-              <UButton
-                v-if="venue.archived"
-                label="Restore venue"
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-archive-restore"
-                @click="setArchived(false)"
-              />
-              <UButton
-                v-else
-                label="Archive venue"
-                color="neutral"
-                variant="outline"
-                icon="i-lucide-archive"
-                @click="setArchived(true)"
-              />
-            </div>
-          </form>
-        </section>
+          </UForm>
+          <template #footer>
+            <UButton
+              v-if="venue.archived"
+              label="Restore venue"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-archive-restore"
+              @click="setArchived(false)"
+            />
+            <UButton
+              v-else
+              label="Archive venue"
+              color="neutral"
+              variant="outline"
+              icon="i-lucide-archive"
+              @click="setArchived(true)"
+            />
+            <UButton
+              type="submit"
+              form="venue-details"
+              label="Save venue"
+            />
+          </template>
+        </PageSection>
 
-        <section
-          class="space-y-4"
-          aria-labelledby="venue-spaces"
-        >
-          <div class="flex items-center justify-between gap-2">
-            <h2
-              id="venue-spaces"
-              class="text-base font-semibold"
-            >
-              Spaces
-            </h2>
+        <PageSection title="Spaces">
+          <template #actions>
             <UButton
               label="Add space"
               icon="i-lucide-plus"
@@ -270,22 +270,15 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               size="sm"
               @click="openSpace()"
             />
-          </div>
-          <ul
-            class="divide-y divide-default rounded-lg border border-default"
-            aria-label="Spaces"
-          >
-            <li
+          </template>
+          <RecordList label="Spaces">
+            <RecordListItem
               v-for="s in venue.spaces"
               :key="s.id"
-              class="flex items-center gap-3 px-3 py-2"
-              :class="{ 'text-muted': s.archived }"
+              :name="s.name"
+              :description="`${kindLabel(s.kindTermId)} · ${s.defaultCapacity ? `${s.defaultCapacity} seats` : 'No capacity set'}`"
+              :muted="s.archived"
             >
-              <span class="flex-1">
-                {{ s.name }}
-                <span class="text-sm text-muted">· {{ kindLabel(s.kindTermId) }}</span>
-              </span>
-              <span class="text-sm text-muted">{{ s.defaultCapacity ? `${s.defaultCapacity} seats` : 'No capacity set' }}</span>
               <StatusBadge
                 v-if="s.archived"
                 tone="neutral"
@@ -300,34 +293,26 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                   :aria-label="`Actions for ${s.name}`"
                 />
               </UDropdownMenu>
-            </li>
-          </ul>
-        </section>
+            </RecordListItem>
+          </RecordList>
+        </PageSection>
 
-        <section
-          class="space-y-4"
-          aria-labelledby="venue-access"
-        >
-          <h2
+        <PageSection title="Access features">
+          <UForm
             id="venue-access"
-            class="text-base font-semibold"
-          >
-            Access features
-          </h2>
-          <UFormField
-            v-if="venue.spaces.length > 1"
-            label="Features of"
-          >
-            <USelect
-              v-model="scope"
-              :items="scopes"
-              class="w-64"
-            />
-          </UFormField>
-          <form
+            :state="chosen"
             class="space-y-3"
-            @submit.prevent="saveAccess"
+            @submit="saveAccess"
           >
+            <UFormField
+              v-if="venue.spaces.length > 1"
+              label="Features of"
+            >
+              <USelect
+                v-model="scope"
+                :items="scopes"
+              />
+            </UFormField>
             <div
               v-for="f in shownFeatures"
               :key="f.id"
@@ -348,15 +333,18 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 class="flex-1"
               />
             </div>
+          </UForm>
+          <template #footer>
             <UButton
               type="submit"
+              form="venue-access"
               label="Save access features"
               color="neutral"
               variant="outline"
             />
-          </form>
-        </section>
-      </div>
+          </template>
+        </PageSection>
+      </template>
     </DataBoundary>
 
     <UModal
@@ -364,13 +352,16 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
       :title="spaceId ? 'Edit space' : 'Add space'"
     >
       <template #body>
-        <form
+        <UForm
           id="space-form"
+          :schema="spaceInput"
+          :state="space"
           class="space-y-4"
-          @submit.prevent="saveSpace"
+          @submit="saveSpace"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="name"
             label="Name"
             required
           >
@@ -380,6 +371,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             />
           </UFormField>
           <UFormField
+            name="kindTermId"
             label="Kind"
             required
           >
@@ -389,6 +381,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             />
           </UFormField>
           <UFormField
+            name="defaultCapacity"
             label="Usual capacity"
             hint="Optional"
             help="Box office and room bookings start from this; a seating plan can set its own."
@@ -396,19 +389,21 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <UInputNumber
               v-model="space.defaultCapacity"
               :min="1"
-              class="w-40"
             />
           </UFormField>
           <UCheckbox
             v-model="space.performable"
+            name="performable"
             label="Performances can happen here"
           />
           <UCheckbox
             v-model="space.exclusive"
+            name="exclusive"
             label="One thing at a time"
             description="Turn off for a space several groups can share at once, such as a foyer."
           />
           <UFormField
+            name="accessInfo"
             label="Access"
             hint="Optional"
           >
@@ -418,14 +413,13 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               maxlength="4000"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
           type="submit"
           form="space-form"
           :label="spaceId ? 'Save space' : 'Add space'"
-          :disabled="!space.name.trim() || !space.kindTermId"
         />
       </template>
     </UModal>

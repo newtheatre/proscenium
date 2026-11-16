@@ -40,20 +40,20 @@ async function run(fn: () => Promise<unknown>, done?: string) {
   }
 }
 
-const adding = ref('')
+const adding = reactive({ label: '' })
 async function add() {
-  const label = adding.value.trim()
-  if (label && await run(() => api('/terms', 'POST', { label }), `Added ${label}`)) adding.value = ''
+  const label = adding.label.trim()
+  if (label && await run(() => api('/terms', 'POST', { label }), `Added ${label}`)) adding.label = ''
 }
 
 const editing = ref<string | null>(null)
-const editLabel = ref('')
+const edit = reactive({ label: '' })
 function startEdit(term: Term) {
   editing.value = term.id
-  editLabel.value = term.label
+  edit.label = term.label
 }
 async function saveEdit(term: Term) {
-  const label = editLabel.value.trim()
+  const label = edit.label.trim()
   if (!label || label === term.label) return (editing.value = null)
   if (await run(() => api(`/terms/${term.id}`, 'PATCH', { label }), `Renamed to ${label}`)) editing.value = null
 }
@@ -76,6 +76,8 @@ async function remove(term: Term) {
   if (!await confirm({ verb: 'Delete', thing: `the term ${term.label}`, consequence: 'No record uses it, so nothing else changes. This cannot be undone.', button: 'Delete term' })) return
   await run(() => api(`/terms/${term.id}`, 'DELETE'), `Deleted ${term.label}`)
 }
+
+const uses = (term: Term) => term.uses === 1 ? '1 record' : `${term.uses} records`
 
 const actions = (term: Term) => [[
   { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startEdit(term) },
@@ -103,78 +105,75 @@ const actions = (term: Term) => [[
       :error="error"
       @retry="refresh()"
     >
-      <div class="space-y-6">
-        <RefusalNotice :refusal="refusal" />
-        <p class="text-sm text-muted">
-          Records keep the term they chose, so renaming a term renames it on every record. A term's label should never be a person's name.
-          <template v-if="locked">
-            This vocabulary is locked: you can rename and reorder its terms, but not add, retire or delete them.
-          </template>
-        </p>
+      <RefusalNotice :refusal="refusal" />
 
-        <form
+      <PageSection
+        title="Terms"
+        :description="locked
+          ? 'Renaming a term renames it on every record. This vocabulary is locked: you can rename and reorder its terms, but not add, retire or delete them.'
+          : 'Renaming a term renames it on every record. A term\'s label should never be a person\'s name.'"
+      >
+        <UForm
           v-if="!locked"
-          class="flex gap-2"
-          @submit.prevent="add"
+          :state="adding"
+          @submit="add"
         >
-          <UInput
-            v-model="adding"
-            placeholder="New term"
-            aria-label="New term"
-            maxlength="80"
-            class="flex-1"
-          />
-          <UButton
-            type="submit"
-            label="Add"
-            icon="i-lucide-plus"
-            :disabled="!adding.trim()"
-          />
-        </form>
+          <UFieldGroup class="flex">
+            <UInput
+              v-model="adding.label"
+              name="label"
+              placeholder="New term"
+              aria-label="New term"
+              maxlength="80"
+              class="flex-1"
+            />
+            <UButton
+              type="submit"
+              label="Add"
+              icon="i-lucide-plus"
+              :disabled="!adding.label.trim()"
+            />
+          </UFieldGroup>
+        </UForm>
 
-        <ul
-          class="divide-y divide-default rounded-lg border border-default"
-          aria-label="Terms"
-        >
-          <li
+        <RecordList label="Terms">
+          <RecordListItem
             v-for="(term, index) in live"
             :key="term.id"
-            class="flex items-center gap-3 px-3 py-2"
+            :icon="term.icon ?? undefined"
+            :name="term.label"
+            :description="uses(term)"
           >
-            <UIcon
-              v-if="term.icon"
-              :name="term.icon"
-              class="size-4 shrink-0 text-muted"
-            />
-            <form
+            <template
               v-if="editing === term.id"
-              class="flex flex-1 gap-2"
-              @submit.prevent="saveEdit(term)"
+              #name
             >
-              <UInput
-                v-model="editLabel"
-                aria-label="Label"
-                maxlength="80"
-                class="flex-1"
-                autofocus
-                @keydown.esc="editing = null"
-              />
-              <UButton
-                type="submit"
-                label="Save"
-                size="sm"
-              />
-            </form>
-            <span
-              v-else
-              class="flex-1"
-            >{{ term.label }}</span>
-            <span class="text-sm text-muted">{{ term.uses === 1 ? '1 record' : `${term.uses} records` }}</span>
-            <template v-if="manual">
+              <UForm
+                :state="edit"
+                @submit="saveEdit(term)"
+              >
+                <UFieldGroup class="flex">
+                  <UInput
+                    v-model="edit.label"
+                    name="label"
+                    aria-label="Label"
+                    maxlength="80"
+                    class="flex-1"
+                    autofocus
+                    @keydown.esc="editing = null"
+                  />
+                  <UButton
+                    type="submit"
+                    label="Save"
+                  />
+                </UFieldGroup>
+              </UForm>
+            </template>
+            <UFieldGroup v-if="manual">
               <UButton
                 icon="i-lucide-arrow-up"
                 color="neutral"
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 :aria-label="`Move ${term.label} up`"
                 :disabled="index === 0"
@@ -183,13 +182,13 @@ const actions = (term: Term) => [[
               <UButton
                 icon="i-lucide-arrow-down"
                 color="neutral"
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 :aria-label="`Move ${term.label} down`"
                 :disabled="index === live.length - 1"
                 @click="move(term, 1)"
               />
-            </template>
+            </UFieldGroup>
             <UDropdownMenu :items="actions(term)">
               <UButton
                 icon="i-lucide-ellipsis"
@@ -199,42 +198,34 @@ const actions = (term: Term) => [[
                 :aria-label="`Actions for ${term.label}`"
               />
             </UDropdownMenu>
-          </li>
-        </ul>
+          </RecordListItem>
+        </RecordList>
+      </PageSection>
 
-        <section
-          v-if="retired.length"
-          class="space-y-2"
-        >
-          <h2 class="text-sm font-semibold">
-            Retired
-          </h2>
-          <p class="text-sm text-muted">
-            Retired terms are left out of every picker and still show on the records that use them.
-          </p>
-          <ul class="divide-y divide-default rounded-lg border border-default">
-            <li
-              v-for="term in retired"
-              :key="term.id"
-              class="flex items-center gap-3 px-3 py-2 text-muted"
-            >
-              <span class="flex-1">
-                {{ term.label }}
-                <template v-if="term.mergedIntoId">(merged into {{ labelOf(term.mergedIntoId) }})</template>
-              </span>
-              <span class="text-sm">{{ term.uses === 1 ? '1 record' : `${term.uses} records` }}</span>
-              <UButton
-                v-if="!term.mergedIntoId && !locked"
-                label="Restore"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                @click="restore(term)"
-              />
-            </li>
-          </ul>
-        </section>
-      </div>
+      <PageSection
+        v-if="retired.length"
+        title="Retired"
+        description="Retired terms are left out of every picker and still show on the records that use them."
+      >
+        <RecordList label="Retired terms">
+          <RecordListItem
+            v-for="term in retired"
+            :key="term.id"
+            :name="term.mergedIntoId ? `${term.label} (merged into ${labelOf(term.mergedIntoId)})` : term.label"
+            :description="uses(term)"
+            muted
+          >
+            <UButton
+              v-if="!term.mergedIntoId && !locked"
+              label="Restore"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              @click="restore(term)"
+            />
+          </RecordListItem>
+        </RecordList>
+      </PageSection>
     </DataBoundary>
   </PageFrame>
 </template>

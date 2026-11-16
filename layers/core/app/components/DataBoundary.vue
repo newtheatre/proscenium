@@ -25,7 +25,10 @@ const lastGoodText = computed(() => lastGood.value?.toLocaleTimeString('en-GB', 
 </script>
 
 <template>
-  <div :aria-busy="status === 'pending'">
+  <div
+    class="space-y-4"
+    :aria-busy="status === 'pending'"
+  >
     <PageFailed
       v-if="failedFirst"
       :reason="reason"
@@ -47,7 +50,6 @@ const lastGoodText = computed(() => lastGood.value?.toLocaleTimeString('en-GB', 
     <template v-else>
       <UAlert
         v-if="failedRefresh"
-        class="mb-4"
         color="warning"
         icon="i-lucide-wifi-off"
         :title="t('core.failed.stale', { time: lastGoodText })"

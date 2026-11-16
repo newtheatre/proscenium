@@ -195,17 +195,11 @@ function actions(p: Performance) {
 </script>
 
 <template>
-  <section
-    class="space-y-4"
-    aria-labelledby="production-performances"
+  <PageSection
+    title="Performances"
+    description="Each starts as a draft and is public once scheduled."
   >
-    <div class="flex items-center justify-between gap-4">
-      <h2
-        id="production-performances"
-        class="text-base font-semibold"
-      >
-        Performances
-      </h2>
+    <template #actions>
       <UButton
         label="Add performance"
         icon="i-lucide-plus"
@@ -214,7 +208,7 @@ function actions(p: Performance) {
         :disabled="!spaces.length"
         @click="start(null)"
       />
-    </div>
+    </template>
     <p
       v-if="data && !spaces.length"
       class="text-sm text-muted"
@@ -516,5 +510,5 @@ function actions(p: Performance) {
         />
       </template>
     </UModal>
-  </section>
+  </PageSection>
 </template>
