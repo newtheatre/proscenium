@@ -1,6 +1,6 @@
 # 8. Tests
 
-69 tests in five groups. The thirteen never-regress cases are the ones that protect money and stock; each must fail the build if it ever fails, and each is written to provoke the guard, not to walk the happy path.
+70 tests in five groups. The thirteen never-regress cases are the ones that protect money and stock; each must fail the build if it ever fails, and each is written to provoke the guard, not to walk the happy path.
 
 ## How the bar is tested
 
@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | T-D, database guards (10) | Vitest with workerd and local D1, as Foundations' harness | Each trigger, CHECK and unique index refuses what it should |
 | T-U, unit (4) | Vitest | Pure functions: prices, discounts, units |
-| T-I, integration (35) | Vitest with workerd, local D1, and the test payment provider | Each service and flow through the kit, with Payments and Finance real |
+| T-I, integration (36) | Vitest with workerd, local D1, and the test payment provider | Each service and flow through the kit, with Payments and Finance real |
 | T-N, never-regress (13) | The same, tagged, and run on every pull request | The guarantees in parts 3 and 4 |
 | T-E, end-to-end (7) | Playwright against a preview | The screens, at phone and laptop width, with the accessibility checks |
 
@@ -20,7 +20,7 @@ Payments is never mocked in T-I and T-N: the settle handler is only real if Paym
 | --- | --- | --- | --- |
 | T-N1 | `bar-sale-paid-once` | The same success answer delivered three times, twice at once | One sale paid, one set of movements, one set of entries |
 | T-N2 | `tickets-and-drinks-settle-together` | A combined intent whose answer succeeds | The order confirmed, tickets issued and the bar sale paid in one batch; one attempt; the posting has one money line, ticket lines and bar lines, and seals |
-| T-N3 | `combined-payment-fails-whole` | The bar's settle is made to throw inside a combined intent, and separately the ticket part's claims are released first | Neither part settled in the first case; in the second, the intent is unfulfilled, fully refunded, the bar sale is back to open with its lines, and no stock or bar income exists |
+| T-N3 | `combined-payment-fails-whole` | Three cases inside a combined intent: the bar's settle is made to throw; the bar's settle returns entries that do not total its part, and again entries naming another module's account; and the ticket part's claims are released first | In every case neither part settles and the provider's answer is recorded. Where money was taken the intent is unfulfilled and fully refunded, the bar sale is back to open with its lines, and no stock or bar income exists. Bad entries count as the bar refusing and do not fail the batch |
 | T-N4 | `no-close-while-awaiting-payment` | Closing an opening while an attempt is pending or unknown | Refused; the sale and its intent are untouched |
 | T-N5 | `refund-cannot-exceed-line` | Two refunds of the same line requested at the same moment, together above the line | The second is refused by the line's CHECK; reversed figures equal one refund |
 | T-N6 | `ticket-refund-cannot-reach-bar-part` | On a combined payment, refunding more than the ticket part through the order | Refused by Payments' part counter; the bar's part is untouched; and the mirror case from the bar's side |
@@ -70,7 +70,7 @@ One more comes from Foundations and applies here without a new test: `webhook-pa
 | T-I6 | Building a sale | Repeated client key; inactive variant refused; variant with no price refused |
 | T-I7 | Drinks-only payment, cash and attested | Total mismatch refused with both figures; no till session refused; intent cancelled returns the sale to open |
 | T-I8 | Reader payment | Silent provider leaves awaiting payment; a late success settles; a second method is refused while unknown |
-| T-I9 | Desk panel | `summary`, `prepare`, `release`; `release` called twice changes nothing more; panel absent without the ability or the setting; removing drinks rebuilds the intent with one part |
+| T-I9 | Desk panel | `summary` and `prepare` on the panel; `release(unit, part)` on the settlement handler returns the sale to open, and called twice changes nothing more; panel absent without the ability or the setting; removing drinks rebuilds the intent with one part |
 | T-I10 | Park and recall | Recall by another seller; parked sales voided at close |
 | T-I11 | Price list at the till | Re-pricing; restricted list refused without the ability; selling from a percentage list stores the reduced price on the line and posts income net, and the discount cap does not apply |
 | T-I12 | Discount | Ability and reason required; net income posted |
@@ -78,7 +78,7 @@ One more comes from Foundations and applies here without a new test: `webhook-pa
 | T-I14 | Refund | Part of a line; goodwill amount; returned against wasted against none; decline and failure release the reservation |
 | T-I15 | Zero-total sale | No intent, no posting, stock moves |
 | T-I16 | Auto-close | Stale opening closed; one with a sale awaiting payment or an open floating tab left; run twice changes nothing more |
-| T-I17 | Ledger entries | Production and performance carried; a closed period resolves to the earliest open one through Finance |
+| T-I17 | Ledger entries | Production and performance carried; the stored entries have `for_module` of `bar`, set by Payments from the part's owner; a closed period resolves to the earliest open one through Finance |
 | T-I18 | Stock items and recipes | Base unit locked after a movement; one recipe line per variant and item |
 | T-I19 | Stock on sale and refund | No location, no recipe, stock disabled: no movements; recipe changed between sale and settle uses the current one |
 | T-I20 | Delivery | Draft edits; receipt writes movements and cost; received is final |
@@ -97,6 +97,7 @@ One more comes from Foundations and applies here without a new test: `webhook-pa
 | T-I33 | Bar tabs: close, write off, erase | Closing is refused with an open floating tab and never by a staff tab; a written-off tab posts no income and appears in the report; the sweep and an erasure request clear the name and keep the row; an unpaid tab holds the erasure; no event payload carries the name |
 | T-I34 | Staff tab | It opens itself on the first charge; one per account; restricted products are absent from self-service and refused by the API unless the setting is on; the holder's price list applies; the limit refuses the charge that would pass it; the outlet closes with the tab open; the reminder is sent once when due and then weekly; a seller charges and settles it at the till; an outlet with no opening opens itself for a self-served charge; an account whose only standing is `bar.tab-holder` reaches "My bar tab", and one without `bar.tab.hold` gets page not found |
 | T-I35 | Floating tab receipt | The receipt goes to the address given and lists items and total, once even when the settle answer is replayed; the address is cleared when the receipt is sent and the digest stays; a signed-in person sees a floating tab only when the digest matches one of their verified addresses, and an unverified address of theirs shows nothing; no response at the till differs by whether the address has an account; the matched tab is in that person's download; their erasure clears its digest and name and keeps the money lines; the sweep erases an unmatched one |
+| T-I36 | Staff tabs when accounts merge | Two accounts with a live staff tab each are merged: the absorbed tab is joined and names the survivor's, no sale row changes its tab, and the survivor's total is the sum; settling the survivor's tab pays the sales of both once and posts income equal to the joined total; the step answers not yet while either tab is settling, and run twice changes nothing more; with one tab only, the tab follows the move; the limit, the fact bar.tab-holder and the write-off rule answer for an alias as for its survivor; actor columns keep the absorbed account's id; undoing the merge with the survivor's tab open takes the joined tab's present total off it and reopens the joined tab, with it settled or written off leaves the money as it is and closes the joined tab the same way, with it settling answers not yet, and run twice changes nothing more; a sale charged after the merge stays with the survivor's tab |
 
 Two checks apply to every route and are written once: each route declares an ability and refuses without it, and each refusal carries a reason and a remedy (Foundations R1 and R2).
 

@@ -2,16 +2,16 @@
 // One venue (C-16, C-17): its address and public text, its spaces with kind and capacity, and the
 // access features of the building and of each space. Archiving keeps the venue on the records that
 // use it and takes it out of pickers and the public site.
-definePageMeta({ layout: 'console' })
 
 interface Option { id: string, label: string, icon: string | null, retired: boolean }
 interface Space { id: string, name: string, kindTermId: string, defaultCapacity: number | null, performable: boolean, exclusive: boolean, description: string | null, accessInfo: string | null, archived: boolean }
 interface Place { id: string, name: string, managed: boolean, addressLines: string | null, locality: string | null, postcode: string | null, country: string | null }
 interface Venue extends Place { description: string | null, accessInfo: string | null, gettingHere: string | null, archived: boolean, spaces: Space[], access: { spaceId: string | null, termId: string, note: string | null }[] }
 
+const { $api } = useNuxtApp()
 const route = useRoute()
 const base = computed(() => `/api/core/venues/${String(route.params.id)}`)
-const { data, status, error, refresh } = await useFetch<{ venue: Venue, kinds: Option[], features: Option[] }>(base, { key: `core:venue:${String(route.params.id)}` })
+const { data, status, error, refresh } = await useAPI<{ venue: Venue, kinds: Option[], features: Option[] }>(base, { key: `core:venue:${String(route.params.id)}` })
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -23,7 +23,7 @@ const kindLabel = (id: string) => data.value?.kinds.find(k => k.id === id)?.labe
 
 // One call to the venue's routes. The path is built at run time, so it is typed as a string.
 function api(path: string, method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', body: object = {}): Promise<unknown> {
-  return $fetch<unknown>(`${base.value}${path}` as string, { method, body })
+  return $api<unknown>(`${base.value}${path}` as string, { method, body })
 }
 async function run(fn: () => Promise<unknown>, done?: string) {
   refusal.value = null
@@ -154,7 +154,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               <UInput
                 v-model="details.name"
                 maxlength="120"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -171,7 +170,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.addressLines"
                 :rows="2"
                 maxlength="300"
-                class="w-full"
               />
             </UFormField>
             <div class="grid gap-4 sm:grid-cols-3">
@@ -179,14 +177,12 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 <UInput
                   v-model="details.locality"
                   maxlength="120"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField label="Postcode">
                 <UInput
                   v-model="details.postcode"
                   maxlength="20"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField
@@ -196,7 +192,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 <UInput
                   v-model="details.country"
                   maxlength="2"
-                  class="w-full"
                 />
               </UFormField>
             </div>
@@ -208,7 +203,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.description"
                 :rows="4"
                 maxlength="4000"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -219,7 +213,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.gettingHere"
                 :rows="3"
                 maxlength="4000"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -230,7 +223,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.accessInfo"
                 :rows="3"
                 maxlength="4000"
-                class="w-full"
               />
             </UFormField>
             <div class="flex flex-wrap gap-2">
@@ -385,7 +377,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <UInput
               v-model="space.name"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -395,7 +386,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <USelect
               v-model="space.kindTermId"
               :items="liveKinds"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -426,7 +416,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               v-model="space.accessInfo"
               :rows="2"
               maxlength="4000"
-              class="w-full"
             />
           </UFormField>
         </form>

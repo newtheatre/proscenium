@@ -3,7 +3,6 @@
      not greyed. On a phone the sidebar becomes a drawer. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
-import { isCurrent } from '../composables/useNavigation'
 
 const { t } = useT()
 const route = useRoute()
@@ -11,17 +10,20 @@ const { data: brandData } = await useBrand()
 const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.default-name') }))
 const { data: navigation } = await useNavigation('console')
 const open = ref(false)
+provide(DASHBOARD_SHELL, true)
 watch(() => route.fullPath, () => { open.value = false })
 
 function toItem(i: { id: string, label: string, to: string, icon: string, match?: string, count?: number }): NavigationMenuItem {
   return { label: t(i.label), icon: i.icon, to: i.to, active: isCurrent(i, route.path), badge: i.count, onSelect: () => { open.value = false } }
 }
 
-const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
+// One menu for the whole sidebar: each module's group is a list of its own, headed by the group's
+// name, then its everyday entries and its set-up entries.
+const groups = computed<NavigationMenuItem[][]>(() => (navigation.value?.groups ?? []).map((g) => {
   const items: NavigationMenuItem[] = [{ label: t(g.label), icon: g.icon, type: 'label' }]
-  if (g.everyday.length) items.push({ label: t('core.console.everyday'), type: 'label', class: 'text-xs' }, ...g.everyday.map(toItem))
-  if (g.setup.length) items.push({ label: t('core.console.setup'), type: 'label', class: 'text-xs' }, ...g.setup.map(toItem))
-  return { id: g.id, items }
+  if (g.everyday.length) items.push({ label: t('core.console.everyday'), type: 'label' }, ...g.everyday.map(toItem))
+  if (g.setup.length) items.push({ label: t('core.console.setup'), type: 'label' }, ...g.setup.map(toItem))
+  return items
 }))
 </script>
 
@@ -47,52 +49,35 @@ const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
         </NuxtLink>
       </template>
       <template #default="{ collapsed }">
-        <nav
+        <UNavigationMenu
+          :items="groups"
+          orientation="vertical"
+          :collapsed="collapsed"
           :aria-label="t('core.console.navigation')"
-          class="space-y-4"
-        >
-          <UNavigationMenu
-            v-for="g in groups"
-            :key="g.id"
-            :items="g.items"
-            orientation="vertical"
-            :collapsed="collapsed"
-            :aria-label="t('core.console.group', { group: String(g.items[0]?.label) })"
-          />
-        </nav>
+        />
       </template>
+      <!-- On a laptop these two sit in each page's navbar (ShellTools). -->
       <template #footer>
-        <AccountMenu />
+        <div class="flex flex-col gap-2 sm:hidden">
+          <UDashboardSearchButton
+            :label="t('core.palette.open')"
+            color="neutral"
+            variant="outline"
+          />
+          <AccountMenu />
+        </div>
       </template>
     </UDashboardSidebar>
 
     <CommandPalette />
 
-    <UDashboardPanel>
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-          </template>
-          <template #right>
-            <UDashboardSearchButton
-              :label="t('core.palette.open')"
-              color="neutral"
-              variant="outline"
-            />
-            <AccountMenu />
-          </template>
-        </UDashboardNavbar>
-      </template>
-      <template #body>
-        <main
-          id="main"
-          tabindex="-1"
-          class="outline-none"
-        >
-          <slot />
-        </main>
-      </template>
-    </UDashboardPanel>
+    <!-- Each page renders its own panel (PageFrame); tabindex lets the skip link focus the page. -->
+    <main
+      id="main"
+      tabindex="-1"
+      class="flex min-w-0 flex-1 outline-none *:min-w-0 *:flex-1"
+    >
+      <slot />
+    </main>
   </UDashboardGroup>
 </template>

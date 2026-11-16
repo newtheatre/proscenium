@@ -1,28 +1,41 @@
-<!-- Cloudflare Turnstile, the one bot check. Emits the token once the check passes. -->
+<!-- Cloudflare Turnstile, the one bot check. Emits the token once the check passes, and an empty
+     token when it runs out, so a form never sends a stale one. Nuxt's Turnstile module loads the
+     script, resets the check before it expires and removes it with the component. With no site key
+     the check is quietly off, as it is on the server with no secret. -->
 <script setup lang="ts">
 const emit = defineEmits<{ token: [value: string] }>()
-const siteKey = useRuntimeConfig().public.turnstileSiteKey as string
-const box = ref<HTMLElement>()
-
-interface TurnstileApi { render: (element: HTMLElement, options: Record<string, unknown>) => string }
-
-onMounted(async () => {
-  if (!siteKey || !box.value) return
-  const global = window as unknown as { turnstile?: TurnstileApi }
-  if (!global.turnstile) {
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script')
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
-      script.async = true
-      script.onload = () => resolve()
-      script.onerror = () => reject(new Error('Turnstile did not load'))
-      document.head.appendChild(script)
-    })
-  }
-  global.turnstile!.render(box.value, { 'sitekey': siteKey, 'callback': (token: string) => emit('token', token), 'response-field': false })
+const { t } = useT()
+const siteKey = useRuntimeConfig().public.turnstile.siteKey
+const token = ref('')
+const failed = ref(false)
+watch(token, (value) => {
+  if (value) failed.value = false
+  emit('token', value)
 })
+const options = {
+  'response-field': false,
+  'expired-callback': () => { token.value = '' },
+  'error-callback': () => {
+    token.value = ''
+    failed.value = true
+  },
+}
 </script>
 
 <template>
-  <div ref="box" />
+  <div v-if="siteKey">
+    <NuxtTurnstile
+      v-model="token"
+      :options="options"
+    />
+    <UAlert
+      v-if="failed"
+      role="alert"
+      color="error"
+      variant="subtle"
+      icon="i-lucide-circle-alert"
+      :title="t('core.challenge.unavailable')"
+      :description="t('core.challenge.unavailable-remedy')"
+    />
+  </div>
 </template>

@@ -3,7 +3,19 @@ import type { UnitView } from './unit'
 import type { Actor } from './context'
 
 export interface EventRow { id: string, name: string, recordType: string | null, recordId: string | null, payload: Record<string, unknown>, announcedAt: number }
-export interface JobInfo { id: string, name: string, attempts: number }
+export interface JobInfo {
+  id: string
+  name: string
+  attempts: number
+  /** How many times this job has answered "not yet". */
+  deferrals: number
+  /**
+   * Answers "not yet": the unit still commits, then the job is queued again after a pause that
+   * grows with each deferral (core.jobs.backoff doubled, at most twelve hours). A deferral is not a
+   * failed attempt and never makes the job dead. `reason` is a code, kept as the job's last note.
+   */
+  defer: (reason: string) => void
+}
 
 export type Listener = (event: EventRow, unit: UnitView) => Promise<void> | void
 export type JobHandler<P = any> = (payload: P, unit: UnitView, job: JobInfo) => Promise<void> | void

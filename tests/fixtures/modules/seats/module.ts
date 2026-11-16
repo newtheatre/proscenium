@@ -26,6 +26,7 @@ export default defineModule({
   },
   jobs: {
     'seats.retry-flaky': job({ payload: z.object({ failTimes: z.number() }), retries: 3 }),
+    'seats.wait-a-while': job({ payload: z.object({ deferTimes: z.number(), title: z.string() }), retries: 1 }),
   },
   tasks: {
     'seats.count-seats': task({ dailyAt: '02:00' }),
@@ -36,6 +37,7 @@ export default defineModule({
   signing: [{ purpose: 'seats.door-code', rotateEvery: '90d', keepFor: '365d' }],
   contributes: {
     'core.requirement': [{ id: 'seats' }],
+    'core.record-tab': [{ id: 'seats.sales', record: 'gallery.production', ability: 'seats.orders.sell', component: 'SeatsSalesTab', order: 20 }],
     // A file the server makes for a performance, readable only through core.file-access.
     'core.file-slot': [{ id: 'seats.door-list', owner: 'seats.performance', ability: 'seats.settings.manage', accepts: ['json'], limit: 'core.files.brand-limit', access: 'record', textClass: 'personal', clean: false, source: 'server' }],
     'core.file-access': [{ id: 'seats.performance', file: 'seats-performance' }],

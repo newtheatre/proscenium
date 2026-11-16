@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // Email sending (C-32, C-52): the sending domain, whether it is verified, a test message, and,
 // where the site has its own domain and a Cloudflare token is set, setting the domain up for you.
-definePageMeta({ layout: 'console' })
 
 interface Sender {
   domain: string | null
@@ -10,9 +9,10 @@ interface Sender {
   automatic: { proposed: string | null, unavailable: 'no-token' | 'workers-dev' | 'local' | null }
 }
 
+const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
-const { data, status, error, refresh } = useFetch<Sender>('/api/core/notifications/sender')
+const { data, status, error, refresh } = useAPI<Sender>('/api/core/notifications/sender')
 const busy = ref<'set-up' | 'verify' | null>(null)
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const notice = ref<string | null>(null)
@@ -29,7 +29,7 @@ async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}
   busy.value = kind
   try {
     const path = kind === 'set-up' ? '/api/core/notifications/set-up-domain' : '/api/core/notifications/verify-domain'
-    const answer = await $fetch<{ domain: string }>(path, { method: 'POST', body })
+    const answer = await $api<{ domain: string }>(path, { method: 'POST', body })
     notice.value = kind === 'set-up'
       ? `Cloudflare is setting up ${answer.domain}. A test message goes to the contact address in a few minutes, once Cloudflare accepts it.`
       : `A test message went to the contact address from ${answer.domain}. Email can now be sent.`
@@ -125,7 +125,6 @@ async function setUp() {
             v-if="data.automatic.unavailable"
             class="mt-3"
             color="info"
-            variant="subtle"
             icon="i-lucide-info"
             :description="UNAVAILABLE[data.automatic.unavailable]"
           />
@@ -146,7 +145,6 @@ async function setUp() {
         <UAlert
           v-if="notice"
           color="success"
-          variant="subtle"
           icon="i-lucide-circle-check"
           :description="notice"
           role="status"

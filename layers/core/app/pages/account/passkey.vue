@@ -1,25 +1,23 @@
 <!-- The passkey offer after an email sign-in (ID-03). Skippable; staff are told the console needs one. -->
 <script setup lang="ts">
-import type { Refusal } from '../../composables/useIdentity'
+import type { Refusal } from '../../utils/identity'
 
 useSeoMeta({ title: 'Add a passkey' })
 const route = useRoute()
 const next = nextPath(route.query.next) ?? '/'
 const refusal = ref<Refusal | null>(null)
-const { confirmItsYou } = useConfirmItsYou()
 const busy = ref(false)
 const codes = ref<string[] | null>(null)
-const { data: me } = await useFetch<{ signedIn: boolean, consoleNeedsPasskey?: boolean }>('/api/core/me')
-if (!me.value?.signedIn) await navigateTo({ path: '/sign-in', query: { next: route.fullPath } })
+// The account shell's guard has already sent a signed-out visitor to sign in (middleware/access.global.ts).
+const { data: me } = await useAPI<{ signedIn: boolean, consoleNeedsPasskey?: boolean }>('/api/core/me', { key: 'core:me' })
 
-async function add(retried = false) {
+async function add() {
   busy.value = true
   refusal.value = null
+  // A stale sign-in is confirmed in place and the request sent again by `$api` (ID-28).
   const answer = await addMyPasskey()
   busy.value = false
   if (!answer.ok) {
-    // Confirmed in place, then tried once more (ID-28).
-    if (answer.refusal.code === 'core.access.not-fresh' && !retried && await confirmItsYou()) return add(true)
     refusal.value = answer.refusal
     return
   }
@@ -37,7 +35,6 @@ async function add(retried = false) {
       <UAlert
         v-if="me?.consoleNeedsPasskey"
         color="info"
-        variant="subtle"
         icon="i-lucide-info"
         title="You will need a passkey to use the console."
       />

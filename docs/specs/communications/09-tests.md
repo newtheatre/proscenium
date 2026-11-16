@@ -26,7 +26,7 @@ A case or proof marked "later" belongs to the release that adds mailings, or to 
 | quiet-hours (later) | A start time inside quiet hours is deferred to the end; equal values disable; a notice is never deferred |
 | throttle-delays (later) | Tranches are spaced so no minute exceeds `per-minute` |
 | audience-algebra (later) | List, include and exclude combine as intersection and difference |
-| merge-resolution | Most recent wins; unsubscribed beats pending |
+| merge-resolution | The stricter state wins: unsubscribed beats everything, subscribed beats pending, and the result is the same whichever account survives |
 | token-shape | Tokens are random, stored hashed, and are never a row id |
 
 ## Integration
@@ -57,7 +57,7 @@ A case or proof marked "later" belongs to the release that adds mailings, or to 
 | read-is-audited | Loading subscribers or recipients writes a read audit entry naming the list |
 | scoped-grant | A grant on one list shows that list's subscribers and campaigns and no other |
 | erasure | Subscriptions gone, account cleared from records and recipients, counts unchanged |
-| merge | The handler results match the unit rules; append-only rows are aliased |
+| merge | The handler step settles every shared list by the unit rules before the move, setting the other row aside with one merge consent record per list, so the move never meets the unique rule; a merge with the step left out fails on that rule; running either stage twice changes nothing more; every other account column is left as an alias and is still found through the account scope. Undone: each set-aside row returns to its account, an unsubscribe carried across or made since stands on both, no consent record is removed, the count of what stood is returned, and a second undo changes nothing. A set-aside row is deleted once the undo window has closed |
 | download | The export contributor returns the person's subscriptions and consent history |
 | import-keeps-unsubscribes (later) | An imported address already unsubscribed stays unsubscribed |
 | checkout-consent-once (later) | The record contribution returns statements only, subscribes once for an order, and a throw fails the checkout |

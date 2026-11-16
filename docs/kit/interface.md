@@ -12,9 +12,10 @@ here is stable before 1.0.
 | Account | `/account` | any signed-in person |
 | Members' area | `/members` | people for whom the fact `core.member` is true (false until Identity declares it) |
 | Console | `/console` | people holding any entry ability of a console entry |
+| Site administration | `/admin` | people holding the ability of at least one admin entry; it has no ability of its own, and is not found for anyone else (R-33) |
 | Live mode | `/live` | front-of-house and bar screens (not part of phase 1) |
 
-`/account /members /console /live /book /sign-in /setup /api /files` are reserved. A page under a
+`/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks
 `GET /api/core/access?path=...`. The order never varies:
 
@@ -41,10 +42,19 @@ contributes: {
 
 - The console's platform groups (Tonight to System) are declared by core, in a fixed order.
   A theatre's own group says `before` or `after` one of them.
+- Site administration is grouped like the console. Its six groups are declared by core with
+  `menu: 'admin'` on `core.navigation-group`, in a fixed order: theatre, modules, access, email,
+  connections, upkeep. Every admin entry names one of them; only the shell's Overview, `/admin`
+  itself, has none.
 - `section` is `everyday` or `setup`; everyday entries come first in a group.
 - An entry shows only to someone holding one of its abilities (or any signed-in person, for an
   account entry with none). `match` widens the addresses an entry covers.
 - A module with settings gets an entry for its generated settings page without declaring one. It sits in the set-up half of the module's own group (the group of its first console entry, or one named for the module), at `/console/<module>/settings` (core's own is `/console/system/settings`, in System), so a module that is off takes its settings page with it.
+- A setting declared with `scope: 'site'` is shown with the site's own settings at `/admin/settings`
+  (the entry `core.site-settings`, in the modules group) instead of on its module's page; nothing
+  else about it changes. Every one of foundations' `core.*` settings is site-scoped.
+  `GET /api/core/settings?module=x` gives all of a module's settings, each with its `scope`;
+  `&scope=module` narrows it to the module's own page and `?scope=site` gives the site page.
 - Labels are translated: `<module>.navigation.<name>.label` for an entry,
   `<module>.navigation.groups.<id>.label` for a group, `<module>.settings-sections.<group>` for a
   heading on the settings page. `bun run check:conformance` fails for a missing key, an unused one,
@@ -62,8 +72,35 @@ contributes: {
 - **PageFrame**, **DataBoundary**, **EmptyState**, **PageFailed**, **RefusalPanel**, **StatusBadge**:
   one title per page, load and fail states, refusals shown from the standard body.
 
+Every page type sits in **PageFrame**, and a page that fits none of them uses it directly. In the
+console it is the page's own dashboard panel: the title in the top bar, with the search button and
+account menu (**ShellTools**) beside it; elsewhere it is a page header in a container. Its slots are
+the same in both: `status` beside the title, `primary` for the page's main action, `toolbar` for
+filters under the top bar, the default slot for the body and `footer` for the buttons that act on
+the whole page, which stay in view while the body scrolls. `width` is `reading`, `standard` or `full`.
+
+Inside a page, **PageSection** is a titled card (`title`, `description`, and `actions` and `footer`
+slots) and **RecordList** with **RecordListItem** (`to`, `icon`, `name`, `description`, `muted`) is a
+bordered list of records. Use these two for headings and lists; do not hand-build either.
+
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.
+
+## Calling the API, layouts and moving between pages
+
+- **Requests** go through the app's own fetch, never the global `$fetch`: `useAPI(path, options)` for
+  data a screen loads (it is `useFetch` with the same options) and `useNuxtApp().$api(path, options)`
+  for an act. A request the server refuses with "confirm it is you" opens the dialogue in place and is
+  sent again once the person confirms, so a screen writes nothing for that.
+- **Layouts** follow the address: a page under `/console` or `/members` gets that shell's layout with
+  no `definePageMeta`. A page that names a layout itself keeps it.
+- **Focus** moves to `main#main` after a navigation to another page, and stays where it is when only
+  the query changes. Every layout keeps `<main id="main" tabindex="-1">` for this and for the skip link.
+- **Titles**: a page sets its own title (PageFrame does it from `title`); the theatre's name is added
+  to every one in `app.vue`. A change that is not a navigation, such as a list's new count after a
+  filter, is announced with `useAnnouncer()`.
+- **Plain functions** live in `app/utils/` (`translate`, `toRefusal`, `callIdentity`, `isCurrent`) and
+  are auto-imported; `app/composables/` holds only `use…` composables.
 
 ## Finding things: the command palette and settings search
 
@@ -100,7 +137,24 @@ the server for actions and sources when it is first opened, not on every page.
   with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.
 - **Colour mode**: `core.appearance.default` is what a first-time visitor sees; a person's own choice
   from the menu is kept; `let-people-choose` off removes the choice; `public-dark` off keeps the public
-  pages light.
+  pages light. The mode is kept in a cookie and decided on the server before the page renders
+  (`server/middleware/appearance.ts`, `middleware/appearance.global.ts`), so no page is drawn in one
+  mode and corrected to another.
+
+## Record pages and home pages
+
+- **`PageRecord`** (UI-12): `title`, `status` (always a word, with a tone), one `primary` action, an
+  `actions` menu (destructive last), a `summary` strip of four to six facts, the record's `record-type`
+  and `record-id`, and the owner's own `tabs` with their contents in the slots `tab-<id>`. Other modules'
+  tabs come from `core.record-tab` (`{ id, record, ability, component, order, count? }`): a component in
+  the module's `app/record-tabs/` folder that receives `recordId` and nothing else, labelled by
+  `<module>.record-tabs.<name>.label`. A tab the viewer may not open, or of a module that is off, is
+  absent. The history panel reads the record's audit entries through `GET /api/core/history`, which
+  needs the ability `core.history.view`.
+- **`PageHome`** (UI-16): a queue. Cards come from `core.home-card` (`{ id, home, ability, component,
+  urgency, count? }`), components in the module's `app/home-cards/` folder that receive `count`. They
+  sort overdue, today, information; a card whose count is zero is absent. With nothing waiting the page
+  says so and offers up to three of the viewer's quick actions.
 
 ## Choice fields in forms
 

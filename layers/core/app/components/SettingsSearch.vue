@@ -11,7 +11,7 @@ const hits = computed(() => matchSettings(data.value?.settings ?? [], term.value
 </script>
 
 <template>
-  <div class="mb-6">
+  <div role="search">
     <UFormField
       :label="t('core.search.settings.label')"
       :help="t('core.search.settings.help')"
@@ -20,7 +20,6 @@ const hits = computed(() => matchSettings(data.value?.settings ?? [], term.value
         v-model="term"
         type="search"
         icon="i-lucide-search"
-        class="w-full"
         :placeholder="t('core.search.settings.placeholder')"
       />
     </UFormField>
@@ -30,23 +29,18 @@ const hits = computed(() => matchSettings(data.value?.settings ?? [], term.value
     >
       {{ term ? t('core.search.results', { count: hits.length }) : '' }}
     </p>
-    <ul
+    <RecordList
       v-if="term && hits.length"
-      class="mt-2 divide-y divide-default rounded-lg border border-default"
+      class="mt-2"
     >
-      <li
+      <RecordListItem
         v-for="hit in hits"
         :key="hit.key"
-      >
-        <NuxtLink
-          :to="hit.to"
-          class="block px-3 py-2 hover:bg-elevated"
-        >
-          <span class="block font-medium text-highlighted">{{ hit.label }}</span>
-          <span class="block text-sm text-muted">{{ hit.help }}</span>
-        </NuxtLink>
-      </li>
-    </ul>
+        :to="hit.to"
+        :name="hit.label"
+        :description="hit.help"
+      />
+    </RecordList>
     <p
       v-else-if="term"
       class="mt-2 text-sm text-muted"

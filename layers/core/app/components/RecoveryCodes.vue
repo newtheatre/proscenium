@@ -1,9 +1,9 @@
 <!-- Recovery codes, shown once. The person confirms they kept them by typing one back (ID-14). -->
 <script setup lang="ts">
-import { callIdentity } from '../composables/useIdentity'
-
 const props = defineProps<{ codes: string[], checkPath?: string }>()
 const emit = defineEmits<{ kept: [code: string] }>()
+// Made by Vue, so two of these on one page (or one in a dialogue over another) never share an id.
+const headingId = useId()
 const typed = ref('')
 const wrong = ref(false)
 
@@ -22,11 +22,11 @@ async function confirm() {
 
 <template>
   <section
-    aria-labelledby="codes-heading"
+    :aria-labelledby="headingId"
     class="flex flex-col gap-4"
   >
     <h2
-      id="codes-heading"
+      :id="headingId"
       class="font-semibold text-highlighted"
     >
       Your recovery codes

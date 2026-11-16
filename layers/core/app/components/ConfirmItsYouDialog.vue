@@ -3,14 +3,13 @@
      A basic sign-in on an account with no passkey gets a six-digit code by email instead, typed
      here. A strong sign-in is never confirmed by email. -->
 <script setup lang="ts">
-import type { Refusal } from '../composables/useIdentity'
+import type { Refusal } from '../utils/identity'
+import type { ConfirmReason } from '../composables/useConfirmItsYou'
 
+const props = defineProps<{ reason: ConfirmReason }>()
+const emit = defineEmits<{ close: [confirmed: boolean] }>()
 const { t } = useT()
-const { pending, settle } = useConfirmItsYou()
-const open = computed({
-  get: () => !!pending.value,
-  set: (value: boolean) => { if (!value) settle(false) },
-})
+const settle = (confirmed: boolean) => emit('close', confirmed)
 
 const ways = ref<('passkey' | 'code')[] | null>(null)
 const address = ref<string | null>(null)
@@ -18,7 +17,7 @@ const refusal = ref<Refusal | null>(null)
 const busy = ref(false)
 const codeSent = ref(false)
 const code = ref('')
-const strongNeeded = computed(() => pending.value?.reason === 'core.access.needs-strong-sign-in')
+const strongNeeded = computed(() => props.reason === 'core.access.needs-strong-sign-in')
 
 async function usePasskey() {
   busy.value = true
@@ -47,13 +46,8 @@ async function checkCode() {
   refusal.value = answer.refusal
 }
 
-// Each time it opens: find how this sign-in may confirm, and start the quickest way at once.
-watch(() => pending.value, async (now) => {
-  if (!now) return
-  ways.value = null
-  refusal.value = null
-  codeSent.value = false
-  code.value = ''
+// As it opens: find how this sign-in may confirm, and start the quickest way at once.
+onMounted(async () => {
   const answer = await callIdentity<{ ways: ('passkey' | 'code')[], address: string | null }>('/api/core/me/reassert')
   if (!answer.ok) {
     refusal.value = answer.refusal
@@ -69,8 +63,8 @@ watch(() => pending.value, async (now) => {
 
 <template>
   <UModal
-    v-model:open="open"
     :title="t('core.confirm-its-you.title')"
+    :close="{ onClick: () => settle(false) }"
     :description="strongNeeded ? t('core.confirm-its-you.strong') : t('core.confirm-its-you.description')"
   >
     <template #body>
@@ -103,7 +97,6 @@ watch(() => pending.value, async (now) => {
                 v-model="code"
                 inputmode="numeric"
                 autocomplete="one-time-code"
-                class="w-full"
                 autofocus
               />
             </UFormField>

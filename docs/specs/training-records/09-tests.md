@@ -59,7 +59,6 @@ The module against a real local D1 in workerd, through its routes and services. 
 | `competency-change` | Adding a course changes who holds it from the next read and is audited | C5 |
 | `events-internal` | Every event whose payload has an account id is declared internal and is never offered to a webhook | Part 4 |
 | `events-payload-classes` | No payload carries a personal, free-text or special value | Part 4 |
-| `merge-collisions` | Merging two accounts that each hold a place on one session and a live training record for one course leaves one of each, the later expiry kept | Part 2 |
 | `erasure-walk` | Erasing an account deletes evidence rows and files, redacts every note, and leaves counts on sessions unchanged | Part 2 |
 | `download-complete` | A person's download holds every Training row whose subject is them, and their evidence files | Part 2 |
 | `retention-sweep` | An ended training record and its listed sign-offs are anonymised on the due date, not a day before | Part 2 |
@@ -69,6 +68,7 @@ The module against a real local D1 in workerd, through its routes and services. 
 | `course-trainer-fact` | A person listed as a trainer of one course may run its sessions and sign off its steps there and at no other course; removing them ends it at the next read; naming a trainer needs the course's manage ability and no grant through Identity | Part 6, the facts |
 | `session-space-taken` | Publishing a session into a space that is taken, or moving a published one there, is refused with `training.session.space-taken` and names what holds the space | P10 |
 | `fan-out-set-wise` | Cancelling a session with forty places, and marking forty people attended, each stay inside `core.units.statement-limit`; cutting short a course held by more people than `core.units.set-rows-limit` is one statement and one job | T4, V6 |
+| `merge-account-scope` | Two accounts each hold a current training record for one course and are merged: no row changes its account, the competency is met for the survivor until the later expiry, the holder count is one, and the next award supersedes both. Two places on one session leave one place and free the other. Running the merge step twice changes nothing more. Undoing the merge restores the cancelled place when the session is still ahead and has a place free, and otherwise leaves it cancelled and reports it with the reason; running the undo twice changes nothing more | C7, part 2 |
 
 ## End-to-end tier
 

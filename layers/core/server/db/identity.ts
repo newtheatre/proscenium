@@ -53,7 +53,7 @@ export const accounts = defineTable('core_accounts', {
 /** An address belongs to one account at a time; the unique index is the write that stops two accounts being made for one address. */
 export const accountEmails = defineTable('core_account_emails', {
   id: col.id(),
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move' }),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'signing in by an address finds the living account through this id' }),
   address: col.email('address').notNull(),
   verifiedAt: col.timestamp('verified_at'),
   addedBy: col.internal(text('added_by', { enum: ['self', 'checkout', 'staff', 'provider', 'setup'] }).notNull()),
@@ -67,7 +67,7 @@ export const accountEmails = defineTable('core_account_emails', {
 
 export const passkeys = defineTable('core_passkeys', {
   id: col.id(),
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move' }),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'a passkey signs in the account this id names, which must be the survivor' }),
   credentialId: col.internal(text('credential_id').notNull()),
   publicKey: col.internal(text('public_key').notNull()),
   signCount: col.internal(integer('sign_count').notNull().default(0)),
@@ -87,7 +87,7 @@ export const passkeys = defineTable('core_passkeys', {
 /** A link between an account and an identity at an outside provider. Google is the first. */
 export const federatedIdentities = defineTable('core_federated_identities', {
   id: col.id(),
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move' }),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'signing in with a provider finds the living account through this id' }),
   provider: col.internal(text('provider').notNull()),
   subject: col.personal(text('subject').notNull()),
   hostedDomain: col.internal(text('hosted_domain')),
@@ -285,7 +285,7 @@ export const accountMergeItems = defineTable('core_account_merge_items', {
   tableName: col.internal(text('table_name').notNull()),
   columnName: col.internal(text('column_name').notNull()),
   rowId: col.internal(text('row_id').notNull()),
-  action: col.internal(text('action', { enum: ['moved', 'ended'] }).notNull()),
+  action: col.internal(text('action', { enum: ['moved', 'ended', 'set-aside', 'set-aside-keep'] }).notNull()),
 }, { realm: 'operational', subject: 'none', extra: t => [primaryKey({ columns: [t.mergeId, t.tableName, t.columnName, t.rowId] })] })
 
 /**
@@ -297,7 +297,7 @@ export const accountMergeItems = defineTable('core_account_merge_items', {
  */
 export const emergencyContacts = defineTable('core_emergency_contacts', {
   id: col.id(),
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move' }),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'a member holds at most three, counted by this id' }),
   name: col.personal(text('name').notNull()),
   relationship: col.personal(text('relationship')),
   phone: col.personal(text('phone').notNull()),

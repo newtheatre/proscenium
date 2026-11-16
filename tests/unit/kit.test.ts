@@ -151,9 +151,19 @@ describe('tables', () => {
     expect(() => defineTable('lost_property_items', { id: col.id() }, { id: 'LOST', realm: 'operational' })).toThrow(DeclarationError)
   })
   it('refuse a subject column that may be empty unless it says who reaches the unlinked rows', () => {
-    const columns = () => ({ id: col.id(), accountId: col.account('account_id', { role: 'subject', onMerge: 'move', nullable: true }), name: col.personal(text('name')) })
+    const columns = () => ({ id: col.id(), accountId: col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'a test', nullable: true }), name: col.personal(text('name')) })
     expect(() => defineTable('lost_property_claims', columns(), { id: 'lpc', realm: 'audience' })).toThrow(/unlinked: 'staff'/)
     expect(() => defineTable('lost_property_claims', columns(), { id: 'lpc', realm: 'audience', subject: { account: 'account_id', unlinked: 'staff' } })).not.toThrow()
+  })
+  it('treat an account column as alias unless it says otherwise, and want a one-line reason for a move', () => {
+    expect(columnMeta(col.account('account_id', { role: 'subject' }))?.account?.onMerge).toBe('alias')
+    expect(() => col.account('account_id', { role: 'subject', onMerge: 'move' })).toThrow(/one-line reason/)
+    expect(() => col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'two\nlines' })).toThrow(/one-line reason/)
+    expect(columnMeta(col.account('account_id', { role: 'subject', onMerge: 'move', reason: 'signing in finds the account by it' }))?.account?.reason).toBe('signing in finds the account by it')
+    expect(() => col.account('account_id', { role: 'subject', reason: 'not a move' })).toThrow(/only for onMerge: 'move'/)
+  })
+  it('keep an actor column as alias', () => {
+    expect(() => defineTable('lost_property_handlings', { id: col.id(), handledBy: col.account('handled_by', { role: 'actor', onMerge: 'move', reason: 'no' }) }, { id: 'lph', realm: 'operational' })).toThrow(/actor column/)
   })
   it('take the realms audience, members, operational and system', () => {
     expect(() => defineTable('lost_property_bins', { id: col.id() }, { id: 'lpb', realm: 'system' })).not.toThrow()

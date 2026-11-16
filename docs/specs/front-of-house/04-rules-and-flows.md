@@ -30,7 +30,7 @@ Rules:
 | `front-of-house.leading-shift` | `core.performance` | no | As on-shift, and the shift's duty has `is_lead` |
 | `front-of-house.rostered` | the site | yes | The account has an assignment in state requested, confirmed, release\_requested or checked\_in on any shift whose window has not closed |
 
-Each resolver answers the three things Foundations asks of a fact: whether it holds, which record it holds on (the performance, with the assignment given as the reason), and until when (`window_closes_at`). Resolvers are pure reads.
+Each resolver answers the three things Foundations asks of a fact: whether it holds, which record it holds on (the performance, with the assignment given as the reason), and until when (`window_closes_at`). Resolvers are pure reads. Every read, count and claim by account, in the resolvers and in sign-up, uses the kit's account scope (the survivor and its aliases), so a merged person is on shift once and cannot hold two places.
 
 What follows from that:
 

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Venues with their spaces nested (C-16). Adding a venue adds one space of the same name, so a
 // theatre with one room never has to think about spaces.
-definePageMeta({ layout: 'console' })
 
 interface Space { id: string, name: string, defaultCapacity: number | null, archived: boolean }
 interface Row { id: string, name: string, locality: string | null, managed: boolean, archived: boolean, spaces: Space[] }
 
+const { $api } = useNuxtApp()
 const columns = [
   { key: 'name', label: 'Venue', card: true },
   { key: 'locality', label: 'Town or city', card: true },
@@ -25,7 +25,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function create() {
   refusal.value = null
   try {
-    const { venueId } = await $fetch<{ venueId: string }>('/api/core/venues', { method: 'POST', body: { name: form.name, locality: form.locality || null } })
+    const { venueId } = await $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: { name: form.name, locality: form.locality || null } })
     creating.value = false
     await navigateTo(`/console/programme/venues/${venueId}`)
   }
@@ -39,47 +39,44 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
 </script>
 
 <template>
-  <div>
-    <PageList
-      title="Venues and spaces"
-      route="/api/core/venues"
-      :columns="columns"
-      :filters="filters"
-      :row-label="(row: Row) => row.name"
-      :row-to="(row: Row) => `/console/programme/venues/${row.id}`"
-      :empty="{ title: 'No venues yet', description: 'A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio.', icon: 'i-lucide-building' }"
-    >
-      <template #primary>
-        <UButton
-          label="New venue"
-          icon="i-lucide-plus"
-          @click="creating = true"
+  <PageList
+    title="Venues and spaces"
+    route="/api/core/venues"
+    :columns="columns"
+    :filters="filters"
+    :row-label="(row: Row) => row.name"
+    :row-to="(row: Row) => `/console/programme/venues/${row.id}`"
+    :empty="{ title: 'No venues yet', description: 'A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio.', icon: 'i-lucide-building' }"
+  >
+    <template #primary>
+      <UButton
+        label="New venue"
+        icon="i-lucide-plus"
+        @click="creating = true"
+      />
+    </template>
+    <template #cell-name="{ row }">
+      <span class="inline-flex items-center gap-2">
+        {{ row.name }}
+        <UBadge
+          v-if="!row.managed"
+          label="Visiting"
+          color="neutral"
+          size="sm"
         />
-      </template>
-      <template #cell-name="{ row }">
-        <span class="inline-flex items-center gap-2">
-          {{ row.name }}
-          <UBadge
-            v-if="!row.managed"
-            label="Visiting"
-            color="neutral"
-            variant="subtle"
-            size="sm"
-          />
-          <StatusBadge
-            v-if="row.archived"
-            tone="neutral"
-            label="Archived"
-          />
-        </span>
-      </template>
-      <template #cell-locality="{ row }">
-        {{ row.locality ?? '' }}
-      </template>
-      <template #cell-spaces="{ row }">
-        {{ spaceList(row) }}
-      </template>
-    </PageList>
+        <StatusBadge
+          v-if="row.archived"
+          tone="neutral"
+          label="Archived"
+        />
+      </span>
+    </template>
+    <template #cell-locality="{ row }">
+      {{ row.locality ?? '' }}
+    </template>
+    <template #cell-spaces="{ row }">
+      {{ spaceList(row) }}
+    </template>
 
     <UModal
       v-model:open="creating"
@@ -101,7 +98,6 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
             <UInput
               v-model="form.name"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -111,7 +107,6 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
             <UInput
               v-model="form.locality"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
         </form>
@@ -125,5 +120,5 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
         />
       </template>
     </UModal>
-  </div>
+  </PageList>
 </template>

@@ -16,12 +16,12 @@ export default defineRoute({
   if (!account) refuse('core.not-found', 'There is no such person.', { status: 404 })
   const id = account.id
   const [addresses, passkeys, sessions, grants] = await Promise.all([
-    all<{ id: string, address: string, verified_at: number | null }>('SELECT id, address, verified_at FROM core_account_emails WHERE account_id = ? ORDER BY created_at', id),
-    all<{ id: string, label: string, created_at: number, last_used_at: number | null }>('SELECT id, label, created_at, last_used_at FROM core_passkeys WHERE account_id = ? ORDER BY created_at', id),
-    all<{ n: number }>('SELECT count(*) AS n FROM core_sessions WHERE account_id = ? AND ended_at IS NULL AND expires_at > ?', id, nowMs()),
+    all<{ id: string, address: string, verified_at: number | null }>('SELECT id, address, verified_at FROM core_account_emails WHERE account_id = ? ORDER BY created_at', id), // exact-account: identity's own table, keyed by the living account
+    all<{ id: string, label: string, created_at: number, last_used_at: number | null }>('SELECT id, label, created_at, last_used_at FROM core_passkeys WHERE account_id = ? ORDER BY created_at', id), // exact-account: identity's own table, keyed by the living account
+    all<{ n: number }>('SELECT count(*) AS n FROM core_sessions WHERE account_id = ? AND ended_at IS NULL AND expires_at > ?', id, nowMs()), // exact-account: identity's own table, keyed by the living account
     liveGrantsOf(id),
   ])
-  const providers = await all<{ provider: string }>('SELECT provider FROM core_federated_identities WHERE account_id = ?', id)
+  const providers = await all<{ provider: string }>('SELECT provider FROM core_federated_identities WHERE account_id = ?', id) // exact-account: identity's own table, keyed by the living account
   unit.audit({ action: 'read', record: ['core.account', id] })
   return {
     id,
