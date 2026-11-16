@@ -49,13 +49,13 @@ flowchart LR
 | --- | --- | --- |
 | 1. Scope | Draft complete | None. Every assumption about another workstream is confirmed or ruled on. |
 | 2. Data model | Draft complete | Rewritten on 16 November 2026 into the foundations table layout: table options, data classes, erasure behaviour and id prefixes for all 26 tables. Templates are split into drafts and published versions, as the ruling requires. The final table list is at the end of the tab. |
-| 3. States and rules | Draft complete | None. Bounces and complaints arrive on Cloudflare's email events queue, as its documentation describes. |
+| 3. States and rules | Draft complete | Bounces are proved on a real sending domain. The complaint event is not yet proved. |
 | 4. Interface to other modules | Draft complete | Service signatures are names and intent, not types. Workstream 2 has named its three services (addressFor, holdersOf, mergeAccounts). |
 | 5. Screens | Inventory complete; three wireframes | The other screens are described, not drawn. Final layouts are workstream 6's. |
 | 6. Settings and abilities | Draft complete | Every default is a proposal |
 | 7. Stories | Draft complete |  |
 | 8. Test plan | Draft complete |  |
 | 9. Questions for Matt | All nine decided, 16 November 2026 |  |
-| Sources | Complete for what was read | Four things not verified, listed there |
+| Sources | Complete for what was read | Five things not verified, listed there, including the complaint event |
 
 No product code has been written. No other theatre has been consulted, so every default is one person's judgement.

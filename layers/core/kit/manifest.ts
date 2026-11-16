@@ -7,6 +7,9 @@ import { tableMeta } from './db'
 import type { SettingEntry, SettingRule } from './settings'
 import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
 
+/** The `events.listens` key for the listener that hears every event not marked internal. */
+export const DELIVERABLE = 'deliverable'
+
 export interface EventDecl<P extends z.ZodObject<any> = z.ZodObject<any>> {
   version: number
   payload: P
@@ -57,6 +60,10 @@ export interface ModuleManifest {
   facts?: Record<string, FactDecl>
   records?: Record<string, RecordDecl>
   tables?: Record<string, unknown>
+  /**
+   * `listens` maps an event name to a listener file. The key `deliverable` is the listener declared
+   * on: 'deliverable': it hears every event not marked internal. Only core may declare it.
+   */
   events?: { announces?: Record<string, EventDecl<any>>, listens?: Record<string, string> }
   jobs?: Record<string, JobDecl<any>>
   tasks?: Record<string, TaskDecl>
@@ -149,6 +156,11 @@ export function validateManifest(m: ModuleManifest): void {
     checkPayload(f, decl.payload)
   }
   for (const [name, listener] of Object.entries(events.listens ?? {})) {
+    if (name === DELIVERABLE) {
+      if (m.id !== 'core') throw new DeclarationError(`events.listens.${name}`, "only core may listen on: 'deliverable'; the webhook sender is its one user")
+      if (typeof listener !== 'string' || !kebab.test(listener)) throw new DeclarationError(`events.listens.${name}`, 'names a listener file under server/listeners/, kebab-case')
+      continue
+    }
     if (!new RegExp(`^${KEBAB}\\.${KEBAB}\\.${KEBAB}$`).test(name)) throw new DeclarationError(`events.listens.${name}`, 'is an event name')
     if (typeof listener !== 'string' || !kebab.test(listener)) throw new DeclarationError(`events.listens.${name}`, 'names a listener file under server/listeners/, kebab-case')
   }
