@@ -72,7 +72,7 @@ describe('navigation and the viewer', () => {
     expect(ids).toContain('gallery')
     expect(ids).not.toContain('system') // nothing of core's is theirs to open
     const gallery = body.groups.find(g => g.id === 'gallery')!
-    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.form', 'gallery.feedback', 'gallery.drafts'])
+    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.form', 'gallery.choices', 'gallery.feedback', 'gallery.drafts'])
     expect(gallery.setup.map(e => e.id)).toEqual(['gallery.steps', 'gallery.settings']) // its settings page sits in its own group
     expect(gallery.setup.map(e => e.id)).not.toContain('gallery.denied')
   })
