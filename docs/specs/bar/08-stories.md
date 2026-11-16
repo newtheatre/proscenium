@@ -1,6 +1,6 @@
 # 7. Stories
 
-48 stories, BAR-01 to BAR-58 with gaps between groups: 39 in the first release, of which 8 are gate stories, and 9 later. The gate is one sentence: a drinks-only sale and a drinks-with-tickets sale each take one payment, move stock once, post income once and can be refunded.
+48 stories: 39 in the first release, of which 8 are gate stories and 31 are not, and 9 later. The ids run from BAR-01 to BAR-58 because ten ids are not used: BAR-06 to BAR-09, BAR-29, BAR-39 and BAR-47 to BAR-50. No story is missing. The gate is one sentence: a drinks-only sale and a drinks-with-tickets sale each take one payment, move stock once, post income once and can be refunded.
 
 ## How to read this part
 
@@ -78,8 +78,6 @@ Each story is small enough to build and prove on its own. "Rests on" names stori
 | BAR-56 | Member and staff prices decided by a price list's `customer_requirement`, checked for an identified customer through the kit's requirement check | Rests on Membership and on identifying a customer at the till |
 | BAR-57 | Deposits on reusable cups | A liability account and a returnable line |
 | BAR-58 | A receipt by email for an ordinary bar sale | Adds a subject by email to one new table |
-
-The ids BAR-06 to BAR-09, BAR-29, BAR-39 and BAR-47 to BAR-50 are not used.
 
 ## The order inside the first release, and what to cut first
 

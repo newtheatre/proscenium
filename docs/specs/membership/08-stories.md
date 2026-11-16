@@ -99,7 +99,7 @@ The gate (MEM-01, 06, 07, 08, 11, 18, 24, 35) needs only Foundations, Identity a
 
 | Id | Story | Done when | Release |
 | --- | --- | --- | --- |
-| MEM-35 | As Box office I can ask whether a buyer meets a membership requirement without knowing what membership is | The `source on core.requirement offers its options, describes a reference, and answers met or not met for an account at an instant, with evidence and a summary for staff; a check about another account needs its checkAbility`; BO-20's acceptance passes with Membership on and reads as unavailable with it off | First, gate |
+| MEM-35 | As Box office I can ask whether a buyer meets a membership requirement without knowing what membership is | The source on `core.requirement` offers its options, describes a reference, and answers met or not met for an account at an instant, with evidence and a summary for staff; a check about another account needs its `checkAbility`; BO-20's acceptance passes with Membership on and reads as unavailable with it off | First, gate |
 | MEM-58 | As a member I get the member price by typing my student ID or member number, without signing in, and I can book for a friend who is also a member | Where the scheme accepts a reference, a list entry or a current member number answers met with evidence (V8 to V11) and creates nothing else (I10); the description is presentable with the theatre's full label (V13); one reference meets one ticket (V14); a miss gives nothing away (V15); the account route and the reference route return one evidence (V11); the evidence answers again at entry; holder(evidence) returns the name to staff only (V18) | First |
 
 ## Fees

@@ -33,6 +33,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
       { id: 'core.venues', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
+      { id: 'core.email', menu: 'console', group: 'system', section: 'setup', to: '/console/system/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
       { id: 'core.vocabularies', menu: 'console', group: 'system', section: 'setup', to: '/console/system/vocabularies', icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 40 },
     ],
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
@@ -70,6 +71,8 @@ export default defineModule({
 
   jobs: { ...identity.identityJobs, ...domain.jobs },
 
+  calls: { ...domain.calls },
+
   tasks: {
     'core.prune-history': task({ dailyAt: '04:00' }),
     'core.rotate-signing-keys': task({ dailyAt: '03:30' }),
@@ -81,5 +84,6 @@ export default defineModule({
     CORE_ENCRYPTION_KEY: secret({ needed: 'when-used' }),
     CORE_TURNSTILE_SECRET_KEY: secret({ needed: 'optional' }),
     ...identity.identitySecrets,
+    ...domain.secrets,
   },
 })
