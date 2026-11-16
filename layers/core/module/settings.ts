@@ -4,8 +4,13 @@ import { defineSettings, defineSettingRules, setting } from '#kit'
 const change = 'core.settings.manage'
 
 export const settings = defineSettings('core', {
-  'locale.time-zone': setting.text({ default: 'Europe/London', maxLength: 64, change, audience: 'public' }),
+  'site.name': setting.text({ unset: true, minLength: 1, maxLength: 80, change, audience: 'public', quotable: true }),
+
+  // Unset until setup: until then scheduled tasks run on UTC and no theatre date is computed.
+  'locale.time-zone': setting.text({ unset: true, maxLength: 64, change, audience: 'public', onChange: 'confirm' }),
   'locale.currency': setting.text({ default: 'GBP', maxLength: 3, change, audience: 'public', quotable: true }),
+  'locale.language': setting.text({ default: 'en-GB', maxLength: 35, change, audience: 'public' }),
+  'locale.day-start': setting.time({ default: '04:00', min: '00:00', max: '08:00', change, onChange: 'confirm' }),
 
   'units.statement-limit': setting.integer({ default: 50, min: 10, max: 1000, unit: 'core.units.statements', change }),
   'jobs.attempts': setting.integer({ default: 5, min: 1, max: 20, unit: 'core.units.attempts', change }),
@@ -33,6 +38,7 @@ export const settingRules = defineSettingRules('core', [
   {
     id: 'time-zone-known',
     check: (s) => {
+      if (s['locale.time-zone'] === null) return true
       try {
         new Intl.DateTimeFormat('en-GB', { timeZone: s['locale.time-zone'] })
         return true
@@ -43,4 +49,15 @@ export const settingRules = defineSettingRules('core', [
     },
   },
   { id: 'currency-code', check: s => /^[A-Z]{3}$/.test(s['locale.currency']) },
+  {
+    id: 'language-known',
+    check: (s) => {
+      try {
+        return Intl.getCanonicalLocales(s['locale.language'])[0] === s['locale.language']
+      }
+      catch {
+        return false
+      }
+    },
+  },
 ])

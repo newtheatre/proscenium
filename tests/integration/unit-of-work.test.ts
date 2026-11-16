@@ -1,7 +1,7 @@
 // F-05: a write is one unit of work, committed as one D1 batch, guarded where rows are contended.
 import { describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { createUnit, isRefusal, newId, changeSetting } from '#kit'
+import { createUnit, isRefusal, newId, changeSetting, today, useSetting } from '#kit'
 import { ERASED } from '#kit/db'
 import { env, inContext, performance, rows } from './helpers'
 
@@ -126,5 +126,28 @@ describe('a unit of work', () => {
       return unit.commit().catch(error => error)
     })
     expect(isRefusal(outcome)).toBe(true)
+  })
+})
+
+describe('locale settings', () => {
+  it('asks for confirmation before changing the time zone', async () => {
+    const change = (confirm?: boolean) => inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/Paris', { confirm })
+      await unit.commit()
+    })
+    await expect(change()).rejects.toMatchObject({ code: 'core.setting.confirm-needed' })
+    await change(true)
+    expect(await inContext(() => useSetting('core.locale.time-zone'))).toBe('Europe/Paris')
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'core.locale.time-zone', null, { reset: true, confirm: true })
+      await unit.commit()
+    })
+  })
+
+  it('computes no theatre date until the time zone is set', async () => {
+    expect(await inContext(() => useSetting('core.locale.time-zone'))).toBeNull()
+    await expect(inContext(() => today())).rejects.toMatchObject({ code: 'core.locale.time-zone-unset' })
   })
 })

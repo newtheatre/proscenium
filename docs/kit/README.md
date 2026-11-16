@@ -77,7 +77,7 @@ person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is t
 duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
 with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`. A
 switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `weeklyOn` in the
-theatre's time zone; the cron trigger runs only the latest due slot, once.
+theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
 
 ## External calls
 
@@ -94,9 +94,16 @@ defineSettings('box-office', {
 })
 ```
 
-Read with `await useSetting('box-office.holds.length')` (seconds for a duration). A value outside
-the limits cannot be saved. A quotable public setting can be quoted in content as
-`:setting{name="box-office.fees.booking"}`.
+Read with `await useSetting('box-office.holds.length')` on the server (seconds for a duration);
+components use `usePublicSettings()`, which sees only public settings. A value outside the limits
+cannot be saved. A quotable public setting can be quoted in content as
+`:setting{name="box-office.fees.booking"}`. `onChange: 'reason'` makes a change need a written
+reason and `onChange: 'confirm'` a second confirmation; the `change` ability still decides who may.
+
+The core's locale settings are `core.site.name` and `core.locale.time-zone` (both unset until
+setup), `core.locale.currency` (GBP), `core.locale.language` (en-GB) and `core.locale.day-start`
+(04:00). Until the time zone is set, scheduled tasks run on UTC and `today()` and `localDate()`
+refuse rather than give a date in the wrong zone.
 
 ## The interface
 

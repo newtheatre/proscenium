@@ -1,7 +1,7 @@
 // F-06 events, F-07 jobs and tasks, F-08 external calls.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
-import { createUnit, enqueue, externalCall, newId, setClock } from '#kit'
+import { changeSetting, createUnit, enqueue, externalCall, newId, setClock } from '#kit'
 import { runJob, runScheduler, sweepJobs } from '#kit/jobs'
 import { reconcileDue } from '#kit/external'
 import { provider } from '../fixtures/modules/seats/server/calls/take-payment'
@@ -101,6 +101,20 @@ describe('jobs (F-07)', () => {
 
 describe('tasks (F-07)', () => {
   const runsOf = (from: number, to: number) => rows("SELECT due_at FROM core_task_runs WHERE task = 'seats.count-seats' AND due_at BETWEEN ? AND ?", from, to)
+  const setZone = (zone: string | null) => inContext(async () => {
+    const unit = createUnit()
+    await changeSetting(unit.view(), 'core.locale.time-zone', zone, { confirm: true, reset: zone === null })
+    await unit.commit()
+  })
+  beforeEach(() => setZone('Europe/London'))
+  afterEach(() => setZone(null))
+
+  it('keeps to UTC until setup sets the time zone', async () => {
+    await setZone(null)
+    const at = Date.parse('2027-07-10T12:00:00Z')
+    await inContext(() => runScheduler(at))
+    expect(await runsOf(at - 24 * HOUR, at)).toEqual([{ due_at: Date.parse('2027-07-10T02:00:00Z') }])
+  })
 
   it('queues a slot once when the cron fires twice', async () => {
     const at = Date.parse('2027-01-10T12:00:00Z')
