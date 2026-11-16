@@ -27,7 +27,7 @@ async function create() {
   try {
     const { key } = await $api<{ key: string }>('/api/core/vocabularies', { method: 'POST', body: { label: form.label, description: form.description || null } })
     creating.value = false
-    await navigateTo(`/console/system/vocabularies/${encodeURIComponent(key)}`)
+    await navigateTo(`/admin/vocabularies/${encodeURIComponent(key)}`)
   }
   catch (error) {
     refusal.value = toRefusal(error)
@@ -43,7 +43,7 @@ async function create() {
     :columns="columns"
     :filters="filters"
     :row-label="(row: Row) => row.label"
-    :row-to="(row: Row) => `/console/system/vocabularies/${encodeURIComponent(row.key)}`"
+    :row-to="(row: Row) => `/admin/vocabularies/${encodeURIComponent(row.key)}`"
     :empty="{ title: 'No vocabularies', description: 'Vocabularies are lists of options, such as production categories, that records choose from.', icon: 'i-lucide-list-tree' }"
   >
     <template #primary>

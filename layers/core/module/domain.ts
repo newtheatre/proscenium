@@ -247,7 +247,7 @@ export const contributes = {
   ],
   'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
-  'core.setup-step': [{ id: 'core.sender', required: true, to: '/console/system/email', order: 20 }],
+  'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
   'core.operating-day': [{ id: 'core.performances', table: 'core_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],

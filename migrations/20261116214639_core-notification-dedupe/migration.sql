@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS `core_notifications_dedupe`;--> statement-breakpoint
+CREATE UNIQUE INDEX `core_notifications_dedupe_account` ON `core_notifications` (`dedupe_key`,coalesce("account_id", '')) WHERE "core_notifications"."dedupe_key" IS NOT NULL;

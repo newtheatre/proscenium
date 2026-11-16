@@ -1,6 +1,7 @@
 // My account and people in the console: details, sessions, passkeys and recovery codes, the
 // passkey offer, disabling and merging (ID-03, ID-11, ID-13, ID-14, ID-31, ID-32).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { accountScopeIds } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { Authenticator } from './authenticator'
 import { Browser, addPasskey, address, emailSignIn, env, goStale, grantDirectly, leaveIdentity, passkeySignIn, reset, setSetting, clearSetting, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
@@ -206,6 +207,21 @@ describe('merging two accounts (ID-32)', () => {
     // Every move column of the plan points at the survivor now.
     for (const step of (await inContext(async () => mergePlan())).filter(s => s.action === 'move'))
       expect(await rows(`SELECT 1 FROM "${step.table}" WHERE "${step.column}" = ?`, mergedAccountId), `${step.table}.${step.column}`).toEqual([])
+  })
+
+  it('a chain of merges keeps every account pointing at the final survivor, so its scope reaches them all', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.account.merge'])
+    const a = await signInByEmail(new Browser())
+    const b = await signInByEmail(new Browser())
+    const c = await signInByEmail(new Browser())
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId: b, mergedAccountId: a })).status).toBe(200)
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId: c, mergedAccountId: b })).status).toBe(200)
+    expect(await rows('SELECT id, merged_into_id FROM core_accounts WHERE id IN (?, ?) ORDER BY id', a, b)).toEqual([a, b].sort().map(id => ({ id, merged_into_id: c })))
+    expect((await inContext(() => accountScopeIds(c))).sort()).toEqual([a, b, c].sort())
+    // A's re-pointing is listed with the second merge, so undoing it can put A back on B.
+    const [second] = await rows<{ id: string }>('SELECT id FROM core_account_merges WHERE merged_account_id = ?', b)
+    expect(await rows('SELECT table_name, column_name, action FROM core_account_merge_items WHERE merge_id = ? AND table_name = \'core_accounts\'', second!.id)).toEqual([{ table_name: 'core_accounts', column_name: 'merged_into_id', action: 'moved' }])
   })
 
   it('merge refuses a tombstone and itself', async () => {
