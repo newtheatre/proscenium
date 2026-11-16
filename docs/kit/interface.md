@@ -195,3 +195,14 @@ ability. Sign-out posts `{}` to `/api/core/sign-out`; the sign-in page is read w
 (sample list, form, steps, feedback and denied screens, plus a header-based test sign-in), and runs
 Playwright with axe in light, dark and phone widths. Contrast, hydration and rate limits are
 all exercised there; the tests use one worker because they share a local database.
+
+### The console's and Site administration's sidebars
+
+One menu: each navigation group of two or more entries is a collapsible section (open when it holds
+the current page), a group of one entry is a plain link, and there are no "Everyday" and "Set up"
+headings (everyday entries come first). The sidebar is resizable as well as collapsible (Nuxt UI's
+dashboard sidebar; the width is kept in a cookie). The foot holds a Documentation link (a placeholder
+pointing at the repository's docs until screens have help pages), a Site administration link for anyone
+who holds an admin entry, and the account menu. In Site administration the theatre's mark sits where it
+does in the console and "Back to console" (or "Back to the site") sits at the foot instead of the
+Site administration link. The navbar keeps only search.

@@ -102,10 +102,12 @@ for (const scheme of ['light', 'dark'] as const) {
     test('sidebar: groups in the fixed order, everyday before set-up, a group nobody may open is absent', async ({ page }) => {
       await visit(page, '/console')
       const nav = page.getByRole('navigation', { name: 'Console' })
+      expect(await nav.innerText()).toContain('Gallery')
+      expect(await nav.innerText()).not.toContain('System') // core's own screens are not theirs to open
+      expect(await nav.innerText()).not.toContain('Everyday') // no headings that split a section
+      await nav.getByRole('button', { name: 'Gallery' }).click() // a group is a collapsible section
       const text = await nav.innerText()
-      expect(text.indexOf('Gallery')).toBeGreaterThan(-1)
-      expect(text).not.toContain('System') // core's own screens are not theirs to open
-      expect(text.indexOf('Everyday')).toBeLessThan(text.indexOf('Set up'))
+      expect(text.indexOf('Sample list')).toBeLessThan(text.indexOf('Sample steps')) // everyday before set-up
       expect(text).not.toContain('Administration') // the entry they cannot open is not greyed, it is absent
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
       await noViolations(page)
