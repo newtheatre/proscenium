@@ -15,8 +15,12 @@ const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.string
 // Waits for the page to hydrate, so a test never acts on markup that has no behaviour yet.
 async function visit(page: Page, url: string) {
   const response = await page.goto(url)
-  await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+  await hydrated(page)
   return response
+}
+
+async function hydrated(page: Page) {
+  await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
 }
 
 async function noViolations(page: Page) {
@@ -232,6 +236,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'Save Sample show settings' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
       await page.reload()
+      await hydrated(page)
       await expect(page.getByLabel('Show title', { exact: true })).toHaveValue('Macbeth')
       await expect(page.getByText('Default: Hamlet.')).toBeVisible()
       await page.getByRole('button', { name: /Reset Show title to its default/ }).click()
