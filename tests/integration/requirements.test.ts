@@ -1,10 +1,10 @@
 // core.requirement: verdicts from sources, unavailable as the host chooses, quantity on a met
 // answer, checkAbility for somebody else's account, and the presented-value rate limit.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { newId, requirements, runInContext } from '#kit'
+import { defineRoute, newId, requirements, runInContext } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { calls, members } from '../fixtures/modules/seats/server/contributions/core.requirement/seats'
-import { env, inContext, person, rows, setModule } from './helpers'
+import { calls, HOLDER, members } from '../fixtures/modules/seats/server/contributions/core.requirement/seats'
+import { call, env, inContext, person, rows, server, setModule } from './helpers'
 import type { Actor } from '#kit'
 
 const as = <T>(actor: Actor, fn: () => Promise<T>, address = '192.0.2.1') => runInContext({ env, actor, cache: {}, address }, fn)
@@ -91,6 +91,23 @@ describe('requirements', () => {
       expect(typed).toMatchObject({ account: null, verdict: 'met', evidence: 'ev_member' })
       const [again] = await as(anonymous, () => requirements.check({ accounts: [null], refs: ['seats:member'], presented: [{ ref: 'seats:member', evidence: typed!.evidence! }], whenUnavailable: 'not-met' }))
       expect(again).toMatchObject({ verdict: 'met' })
+    })
+
+    it('hands the host the account a presented value belongs to, on the server only (R-34)', async () => {
+      const presented = [{ ref: 'seats:member', value: '12345678' }]
+      const [met] = await as(anonymous, () => requirements.check({ accounts: [null], refs: ['seats:member'], presented, whenUnavailable: 'not-met' }))
+      expect(met!.holderAccountId).toBe(HOLDER)
+      expect(JSON.stringify(met)).not.toContain(HOLDER)
+      expect(Object.keys(met!)).not.toContain('holderAccountId')
+      // Never on a verdict that is not met, even when a source sends one.
+      const [refused] = await as(anonymous, () => requirements.check({ accounts: [null], refs: ['seats:member'], presented: [{ ref: 'seats:member', value: '00000000' }], whenUnavailable: 'not-met' }))
+      expect(refused!.holderAccountId).toBeUndefined()
+      // A host route that returns the answers as they are sends no account to the browser.
+      const handle = server({ 'POST /api/seats/check': defineRoute({ public: true, rateLimit: 'default' }, () => requirements.check({ accounts: [null], refs: ['seats:member'], presented, whenUnavailable: 'not-met' })) })
+      const body = await (await call(handle, 'POST', '/api/seats/check', { body: {} })).text()
+      expect(body).toContain('"verdict":"met"')
+      expect(body).not.toContain(HOLDER)
+      expect(body).not.toContain('holderAccountId')
     })
 
     it('stops guessing at the presented-value limit without calling the source', async () => {

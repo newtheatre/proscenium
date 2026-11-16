@@ -30,6 +30,12 @@ export interface SourceAnswer {
   help?: string
   /** On a met verdict: how many of the thing the host may grant on it, nought or more. */
   quantity?: number
+  /**
+   * On a met verdict: the account the source knows a presented value belongs to (R-34). The kit
+   * hands it to the host on the server only; it never reaches the browser, a summary, an event or
+   * a job.
+   */
+  holderAccountId?: string
 }
 
 /** A value the person presents with no account: what was typed, or what an earlier answer returned. */
@@ -73,6 +79,11 @@ export interface Answer {
   evidence?: string
   help?: string
   quantity?: number
+  /**
+   * On a met verdict, the account a presented value belongs to, if the source knows. Server only:
+   * it is not enumerable, so turning the answer into JSON (a route returning it) leaves it out.
+   */
+  readonly holderAccountId?: string
 }
 
 export interface CheckRequest {
@@ -194,7 +205,13 @@ async function check(request: CheckRequest): Promise<Answer[]> {
   const presented = [...(request.presented ?? [])]
   const answers = new Map<string, Answer>()
   const key = (account: string | null, ref: string) => `${account ?? ''}\u0000${ref}`
-  const set = (account: string | null, ref: string, answer: Omit<Answer, 'account' | 'ref'>) => answers.set(key(account, ref), { account, ref, ...answer })
+  const set = (account: string | null, ref: string, answer: Omit<Answer, 'account' | 'ref'>) => {
+    const { holderAccountId, ...rest } = answer as Omit<Answer, 'account' | 'ref'> & { holderAccountId?: unknown }
+    const out: Answer = { account, ref, ...rest }
+    if (rest.verdict === 'met' && !rest.unavailable && typeof holderAccountId === 'string' && holderAccountId)
+      Object.defineProperty(out, 'holderAccountId', { value: holderAccountId, enumerable: false })
+    answers.set(key(account, ref), out)
+  }
   const unavailable = (account: string | null, ref: string) => set(account, ref, { verdict: request.whenUnavailable, unavailable: true })
 
   // Guessing is limited by the kit: a check carrying a typed value counts against presented-value.
