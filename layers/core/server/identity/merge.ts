@@ -121,7 +121,7 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
   const ended = new Map<string, { accountId: string, roleId: string }>()
   for (const p of pairs) {
     if (ended.has(p.mine) || ended.has(p.theirs)) continue
-    const mineFirst = p.mine_ends !== null && (p.theirs_ends === null || p.mine_ends <= p.theirs_ends)
+    const mineFirst = (p.mine_ends ?? Infinity) <= (p.theirs_ends ?? Infinity)
     if (mineFirst) ended.set(p.mine, { accountId: p.mine_account, roleId: p.mine_role })
     else ended.set(p.theirs, { accountId: p.theirs_account, roleId: p.theirs_role })
   }
