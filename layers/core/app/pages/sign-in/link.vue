@@ -1,13 +1,14 @@
 <!-- Where an emailed link lands. The token is in the fragment, so it never reaches a server log. -->
 <script setup lang="ts">
-import type { Refusal } from '../../composables/useIdentity'
+import type { Refusal } from '../../utils/identity'
 
 useSeoMeta({ title: 'Signing you in' })
 const refusal = ref<Refusal | null>(null)
 
 onMounted(async () => {
   const token = window.location.hash.slice(1)
-  history.replaceState(null, '', window.location.pathname)
+  // Vue Router keeps its own data in the history state, so it is passed back rather than cleared.
+  history.replaceState(history.state, '', window.location.pathname + window.location.search)
   const answer = await callIdentity<{ next: string, offerPasskey: boolean }>('/api/core/sign-in/link', { token })
   if (!answer.ok) {
     refusal.value = answer.refusal

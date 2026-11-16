@@ -8,6 +8,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 
 export interface RecordTab { id: string, label: string }
 
+const { $api } = useNuxtApp()
 const props = withDefaults(defineProps<{
   title: string
   /** Always a word, never colour alone. */
@@ -31,7 +32,7 @@ const route = useRoute()
 const router = useRouter()
 
 interface Contributed { id: string, labelKey: string, component: string, count?: number }
-const { data: contributed } = await useFetch<{ tabs: Contributed[] }>('/api/core/record-tabs', { query: { record: props.recordType }, key: `core:record-tabs:${props.recordType}`, default: () => ({ tabs: [] }) })
+const { data: contributed } = await useAPI<{ tabs: Contributed[] }>('/api/core/record-tabs', { query: { record: props.recordType }, key: `core:record-tabs:${props.recordType}`, default: () => ({ tabs: [] }) })
 
 // A component no one answers to is left out rather than breaking the page.
 const others = computed(() => (contributed.value?.tabs ?? []).flatMap((c) => {
@@ -55,7 +56,7 @@ watch(historyOpen, async (open) => {
   if (!open || history.value) return
   historyFailed.value = false
   try {
-    history.value = (await $fetch<{ entries: NonNullable<typeof history.value> }>('/api/core/history', { query: { type: props.recordType, id: props.recordId } })).entries
+    history.value = (await $api<{ entries: NonNullable<typeof history.value> }>('/api/core/history', { query: { type: props.recordType, id: props.recordId } })).entries
   }
   catch {
     historyFailed.value = true
@@ -69,15 +70,11 @@ const { te } = useT()
 <template>
   <PageFrame :title="title">
     <template #status>
-      <div
+      <StatusBadge
         v-if="status"
-        class="mt-2"
-      >
-        <StatusBadge
-          :tone="status.tone"
-          :label="status.label"
-        />
-      </div>
+        :tone="status.tone"
+        :label="status.label"
+      />
     </template>
     <template #primary>
       <UButton

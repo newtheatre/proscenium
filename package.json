@@ -29,6 +29,7 @@
     "@iconify-json/lucide": "^1.2.155",
     "@nuxt/content": "3.16.2",
     "@nuxt/ui": "^4.12.2",
+    "@nuxtjs/turnstile": "^1.1.3",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.1.0",
     "@vueuse/core": "^15.0.0",

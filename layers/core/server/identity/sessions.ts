@@ -71,9 +71,8 @@ export function endSessionsOf(unit: UnitView, accountId: string, reason: 'ended_
  */
 export async function currentSession(event: H3Event): Promise<CurrentSession | null> {
   const context = useContext()
-  if ('identitySession' in context.cache) return context.cache.identitySession as CurrentSession | null
-  const found = await readSession(event)
-  context.cache.identitySession = found
+  // The promise is kept, so calls that arrive together (a page's server render makes several) share one read.
+  const found = await ((context.cache.identitySession as Promise<CurrentSession | null> | undefined) ?? (context.cache.identitySession = readSession(event)))
   ;(event.context as any).identitySession = found
   return found
 }

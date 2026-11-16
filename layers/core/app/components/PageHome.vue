@@ -12,7 +12,7 @@ const props = withDefaults(defineProps<{
 
 const { t } = useT()
 interface Card { id: string, component: string, urgency: 'overdue' | 'today' | 'info', count?: number }
-const { data } = await useFetch<{ cards: Card[], starters: { id: string, to: string, icon: string, labelKey: string }[] }>('/api/core/home', { query: { home: props.home }, key: `core:home:${props.home}`, default: () => ({ cards: [], starters: [] }) })
+const { data } = await useAPI<{ cards: Card[], starters: { id: string, to: string, icon: string, labelKey: string }[] }>('/api/core/home', { query: { home: props.home }, key: `core:home:${props.home}`, default: () => ({ cards: [], starters: [] }) })
 
 // A component no one answers to is left out rather than breaking the page.
 const cards = computed(() => (data.value?.cards ?? []).flatMap((c) => {

@@ -4,13 +4,13 @@
      is a drawer, opened from the strip. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
-import { isCurrent } from '../composables/useNavigation'
 
 const { t } = useT()
 const route = useRoute()
 const { has } = useViewer()
 const { data: navigation } = await useNavigation('admin')
 const open = ref(false)
+provide(DASHBOARD_SHELL, true)
 watch(() => route.fullPath, () => { open.value = false })
 
 // The browser title starts with where you are, and the buttons stay neutral (see main.css).
@@ -62,49 +62,41 @@ const groups = computed<NavigationMenuItem[][]>(() => [
           :aria-label="t('core.admin.navigation')"
         />
       </template>
+      <!-- On a laptop these two sit in each page's navbar (ShellTools). -->
       <template #footer>
-        <AccountMenu />
+        <div class="flex flex-col gap-2 sm:hidden">
+          <UDashboardSearchButton
+            :label="t('core.palette.open')"
+            color="neutral"
+            variant="outline"
+          />
+          <AccountMenu />
+        </div>
       </template>
     </UDashboardSidebar>
 
     <CommandPalette />
 
-    <UDashboardPanel>
-      <template #header>
-        <div class="flex items-center gap-2 border-b border-default bg-elevated px-4 py-1.5 text-sm font-medium">
-          <UDashboardSidebarToggle
-            class="lg:hidden"
-            :aria-label="t('core.admin.menu')"
-          />
-          <UIcon
-            name="i-lucide-shield-check"
-            class="size-4"
-          />
-          <span>{{ t('core.admin.strip') }}</span>
-        </div>
-        <UDashboardNavbar :toggle="false">
-          <template #leading>
-            <UDashboardSidebarCollapse class="max-lg:hidden" />
-          </template>
-          <template #right>
-            <UDashboardSearchButton
-              :label="t('core.palette.open')"
-              color="neutral"
-              variant="outline"
-            />
-            <AccountMenu />
-          </template>
-        </UDashboardNavbar>
-      </template>
-      <template #body>
-        <main
-          id="main"
-          tabindex="-1"
-          class="outline-none"
-        >
-          <slot />
-        </main>
-      </template>
-    </UDashboardPanel>
+    <!-- The strip sits above every page's own panel (PageFrame); main.css takes its height off the panel's. -->
+    <div class="flex min-w-0 flex-1 flex-col">
+      <div class="admin-strip flex h-9 shrink-0 items-center gap-2 border-b border-default bg-elevated px-4 text-sm font-medium">
+        <UDashboardSidebarToggle
+          class="lg:hidden"
+          :aria-label="t('core.admin.menu')"
+        />
+        <UIcon
+          name="i-lucide-shield-check"
+          class="size-4"
+        />
+        <span>{{ t('core.admin.strip') }}</span>
+      </div>
+      <main
+        id="main"
+        tabindex="-1"
+        class="admin-main flex min-w-0 flex-1 outline-none *:min-w-0 *:flex-1"
+      >
+        <slot />
+      </main>
+    </div>
   </UDashboardGroup>
 </template>

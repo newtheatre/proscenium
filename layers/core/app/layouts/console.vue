@@ -3,7 +3,6 @@
      not greyed. On a phone the sidebar becomes a drawer. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
-import { isCurrent } from '../composables/useNavigation'
 
 const { t } = useT()
 const route = useRoute()
@@ -11,6 +10,7 @@ const { data: brandData } = await useBrand()
 const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.default-name') }))
 const { data: navigation } = await useNavigation('console')
 const open = ref(false)
+provide(DASHBOARD_SHELL, true)
 watch(() => route.fullPath, () => { open.value = false })
 
 function toItem(i: { id: string, label: string, to: string, icon: string, match?: string, count?: number }): NavigationMenuItem {
@@ -56,38 +56,28 @@ const groups = computed<NavigationMenuItem[][]>(() => (navigation.value?.groups 
           :aria-label="t('core.console.navigation')"
         />
       </template>
+      <!-- On a laptop these two sit in each page's navbar (ShellTools). -->
       <template #footer>
-        <AccountMenu />
+        <div class="flex flex-col gap-2 sm:hidden">
+          <UDashboardSearchButton
+            :label="t('core.palette.open')"
+            color="neutral"
+            variant="outline"
+          />
+          <AccountMenu />
+        </div>
       </template>
     </UDashboardSidebar>
 
     <CommandPalette />
 
-    <UDashboardPanel>
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-          </template>
-          <template #right>
-            <UDashboardSearchButton
-              :label="t('core.palette.open')"
-              color="neutral"
-              variant="outline"
-            />
-            <AccountMenu />
-          </template>
-        </UDashboardNavbar>
-      </template>
-      <template #body>
-        <main
-          id="main"
-          tabindex="-1"
-          class="outline-none"
-        >
-          <slot />
-        </main>
-      </template>
-    </UDashboardPanel>
+    <!-- Each page renders its own panel (PageFrame); tabindex lets the skip link focus the page. -->
+    <main
+      id="main"
+      tabindex="-1"
+      class="flex min-w-0 flex-1 outline-none *:min-w-0 *:flex-1"
+    >
+      <slot />
+    </main>
   </UDashboardGroup>
 </template>

@@ -126,9 +126,6 @@ export const identityEvents = {
 export const identityJobs = {
   // The link and code travel sealed with a key derived from CORE_SESSION_KEY, never in clear.
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
-  // Security notices to named addresses (identity/notices.ts), sealed like the sign-in link.
-  'core.send-account-notice': job({ payload: z.object({ sealed: z.string() }), lane: 'prompt' }),
-  'core.send-invitation': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
   // The erasure batch for one request (ID-16). Safe to repeat: a second run writes nothing.
   'core.run-erasure': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
 }
@@ -223,7 +220,8 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const, code: 'text' as const },
+    // Both sign the person in, so both are sealed.
+    variables: { link: 'sealed' as const, code: 'sealed' as const },
     wording: {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
@@ -289,14 +287,13 @@ export const identityContributions = {
       },
     },
   }, {
-    // Sent by notifyAddress from a job, like the sign-in link, so the link (a sign-in) is never
-    // stored in clear in core_notifications.
+    // The link signs the person in, so it is sealed: never stored in clear in core_notifications.
     id: 'core.invitation',
     category: 'transactional' as const,
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const, role: 'text' as const },
+    variables: { link: 'sealed' as const, role: 'text' as const },
     wording: {
       'en-GB': {
         subject: 'You have been given a role at {{ theatre }}',
@@ -309,7 +306,7 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const },
+    variables: { link: 'sealed' as const },
     wording: {
       'en-GB': {
         subject: 'Confirm your email address for {{ theatre }}',

@@ -1,8 +1,8 @@
 // The pretend provider. Tests say what it "knows" about each reference in `world`, and sign a
 // webhook with `sign`.
-import type { PaymentProvider, ProviderAnswer } from '#modules/payments'
+import type { PaymentProvider, ProviderAnswer, RefundAnswer } from '#modules/payments'
 
-export const world = { answers: new Map<string, ProviderAnswer | 'unknown'>(), statusCalls: 0, failStatus: false }
+export const world = { answers: new Map<string, ProviderAnswer | 'unknown'>(), statusCalls: 0, failStatus: false, refundAnswer: { state: 'succeeded' } as RefundAnswer, refundKeys: [] as string[], startKeys: [] as string[], startFail: false, startAnswer: undefined as ProviderAnswer | undefined }
 const KEY = 'cardco-test-key'
 
 export function sign(eventId: string): string {
@@ -14,12 +14,18 @@ export default {
   methods: [{ method: 'card_online', channels: ['online'] }],
   secrets: [],
   async start(attempt) {
-    return { next: { kind: 'none' }, providerRef: `cc_${attempt.id}` }
+    world.startKeys.push(attempt.idempotencyKey)
+    if (world.startFail) throw new Error('cardco did not answer')
+    return { next: { kind: 'redirect', url: `https://cardco.test/pay/${attempt.id}` }, providerRef: `cc_${attempt.id}`, answer: world.startAnswer }
   },
   async status(attempt) {
     world.statusCalls++
     if (world.failStatus) throw new Error('cardco is down')
     return world.answers.get(attempt.providerRef ?? '') ?? 'unknown'
+  },
+  async refund(refund) {
+    world.refundKeys.push(refund.idempotencyKey)
+    return world.refundAnswer
   },
   async verifyWebhook({ body, headers }) {
     let event: { id?: string, type?: string, ref?: string }

@@ -1,10 +1,15 @@
 <!-- First-run setup (ID-37): the first Owner's name, address and passkey, then their recovery codes. -->
 <script setup lang="ts">
-import type { Refusal } from '../composables/useIdentity'
+import type { Refusal } from '../utils/identity'
 
 useSeoMeta({ title: 'Set up your theatre' })
-const { data: state } = await useFetch<{ needed: boolean }>('/api/core/setup')
-if (state.value && !state.value.needed) await navigateTo('/sign-in')
+// Once the theatre is set up there is nothing here: decided before the page is made.
+definePageMeta({
+  middleware: async () => {
+    const { data } = await useAPI<{ needed: boolean }>('/api/core/setup', { key: 'core:setup' })
+    if (data.value && !data.value.needed) return navigateTo('/sign-in')
+  },
+})
 const name = ref('')
 const address = ref('')
 const codes = ref<string[] | null>(null)

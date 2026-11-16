@@ -2,12 +2,12 @@
 // Closures (C-18): times when the whole theatre, a venue or one space is shut. A blocking closure
 // refuses a performance scheduled inside it. Public holidays, once imported, are listed greyed and
 // only warn. Times are shown and entered in the theatre's time zone, whatever the viewer's.
-definePageMeta({ layout: 'console' })
 
 interface Closure { id: string, venueId: string | null, spaceId: string | null, kind: 'closure' | 'public_holiday', title: string, startsAt: number, endsAt: number, allDay: boolean, blocksPerformances: boolean, source: 'manual' | 'feed' }
 interface Place { id: string, name: string, spaces: { id: string, name: string }[] }
 
-const { data, status, error, refresh } = await useFetch<{ rows: Closure[], places: Place[] }>('/api/core/closures', { key: 'core:closures' })
+const { $api } = useNuxtApp()
+const { data, status, error, refresh } = await useAPI<{ rows: Closure[], places: Place[] }>('/api/core/closures', { key: 'core:closures' })
 const { data: settings } = await usePublicSettings()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
@@ -55,7 +55,7 @@ async function add() {
   refusal.value = null
   const [venueId, spaceId] = form.scope === WHOLE ? [null, null] : [form.scope.split('/')[0]!, form.scope.split('/')[1] ?? null]
   try {
-    await $fetch('/api/core/closures', { method: 'POST', body: { venueId, spaceId, title: form.title, allDay: form.allDay, from: form.from, to: form.to || form.from, blocksPerformances: form.blocksPerformances } })
+    await $api('/api/core/closures', { method: 'POST', body: { venueId, spaceId, title: form.title, allDay: form.allDay, from: form.from, to: form.to || form.from, blocksPerformances: form.blocksPerformances } })
     adding.value = false
     await refresh()
     toast.add({ title: 'Closure recorded', color: 'success' })
@@ -68,7 +68,7 @@ async function remove(c: Closure) {
   if (!await confirm({ verb: 'Delete', thing: `the closure ${c.title}`, consequence: 'Performances can be scheduled in this time again.', button: 'Delete closure' })) return
   refusal.value = null
   try {
-    await $fetch(`/api/core/closures/${c.id}` as string, { method: 'DELETE' })
+    await $api(`/api/core/closures/${c.id}` as string, { method: 'DELETE' })
     await refresh()
     toast.add({ title: 'Closure deleted', color: 'success' })
   }

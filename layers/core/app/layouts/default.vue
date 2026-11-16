@@ -5,24 +5,13 @@
 <script setup lang="ts">
 const { t } = useT()
 const { data: brand } = await useBrand()
-const { data: publicSettings } = await usePublicSettings()
 const { data: navigation } = await useAsyncData('core:navigation', () => queryCollection('navigation').first())
 const route = useRoute()
 
-// With dark mode off for the public pages (core.appearance.public-dark), they stay light whatever
-// the person's mode, and the dark class returns when they leave for a shell that follows it.
-const colorMode = useColorMode()
-const pinLight = computed(() => (publicSettings.value['core.appearance.public-dark']?.value) === false)
-function applyPin() {
-  if (!import.meta.client) return
-  document.documentElement.classList.toggle('dark', colorMode.value === 'dark' && !pinLight.value)
-}
-onMounted(applyPin)
-watch([() => colorMode.value, pinLight], applyPin)
-onBeforeUnmount(() => { if (import.meta.client) document.documentElement.classList.toggle('dark', colorMode.value === 'dark') })
-
+// The brand's tokens go into the page's head with the page, so no stylesheet request holds up the
+// first paint and a saved brand shows on the next page load.
 useHead(() => ({
-  link: [{ rel: 'stylesheet', href: `/api/core/branding/theme.css?v=${brand.value?.revision ?? 0}` }],
+  style: brand.value?.css ? [{ key: 'core-brand', innerHTML: brand.value.css }] : [],
 }))
 
 const name = computed(() => brand.value?.name ?? t('core.public.default-name'))
