@@ -224,7 +224,8 @@ export const webhookEvents = defineTable('payments_webhook_events', {
   subject: 'none',
   retention: 'payments.retention.webhooks',
   extra: t => [
-    uniqueIndex('payments_webhook_events_event').on(t.providerAccountId, t.providerEventId),
+    // Only a verified event claims its id: a forged event naming a real id must not shut out the real one.
+    uniqueIndex('payments_webhook_events_event').on(t.providerAccountId, t.providerEventId).where(sql`signature_ok = 1`),
     index('payments_webhook_events_received').on(t.receivedAt),
   ],
 })

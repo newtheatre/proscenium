@@ -23,7 +23,7 @@ const FROM: Record<Exclude<AttemptState, 'started'>, AttemptState[]> = {
   succeeded: ['started', 'pending', 'unknown'],
   failed: ['started', 'pending', 'unknown'],
   cancelled: ['started', 'pending'],
-  unknown: ['pending'],
+  unknown: ['started', 'pending'],
 }
 
 function eventKind(answer: Answer, source: Source): string {

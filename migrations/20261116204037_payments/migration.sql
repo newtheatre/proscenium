@@ -164,7 +164,7 @@ CREATE UNIQUE INDEX `payments_refunds_idempotency_key` ON `payments_refunds` (`i
 CREATE INDEX `payments_refunds_part` ON `payments_refunds` (`part_id`);--> statement-breakpoint
 CREATE INDEX `payments_refunds_waiting` ON `payments_refunds` (`state`) WHERE state IN ('requested', 'approved', 'sent', 'failed');--> statement-breakpoint
 CREATE UNIQUE INDEX `payments_sessions_one_open` ON `payments_sessions` (`opened_by`) WHERE state <> 'closed';--> statement-breakpoint
-CREATE UNIQUE INDEX `payments_webhook_events_event` ON `payments_webhook_events` (`provider_account_id`,`provider_event_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `payments_webhook_events_event` ON `payments_webhook_events` (`provider_account_id`,`provider_event_id`) WHERE signature_ok = 1;--> statement-breakpoint
 CREATE INDEX `payments_webhook_events_received` ON `payments_webhook_events` (`received_at`);
 --> statement-breakpoint
 DROP TRIGGER IF EXISTS `payments_attempt_events_append_only_delete`;
@@ -192,11 +192,12 @@ CREATE TRIGGER `payments_intent_parts_fixed` BEFORE UPDATE ON `payments_intent_p
 --> statement-breakpoint
 CREATE TRIGGER `payments_intent_parts_no_delete` BEFORE DELETE ON `payments_intent_parts` BEGIN SELECT RAISE(ABORT, 'payments: a part is never deleted'); END;
 --> statement-breakpoint
--- An attempt starts on an open intent and moves only forward. Succeeded attempts never add up to
+-- An attempt starts on an open intent and moves only forward; one with no answer in time becomes
+-- unknown, whether or not the provider said it was pending. Succeeded attempts never add up to
 -- more than the intent.
 CREATE TRIGGER `payments_attempts_insert` BEFORE INSERT ON `payments_attempts` WHEN NEW.`state` <> 'started' OR NEW.`refunded_minor` <> 0 OR coalesce((SELECT `state` FROM `payments_intents` WHERE `id` = NEW.`intent_id`), '') <> 'open' BEGIN SELECT RAISE(ABORT, 'payments: an attempt starts, on an open intent'); END;
 --> statement-breakpoint
-CREATE TRIGGER `payments_attempts_fixed` BEFORE UPDATE ON `payments_attempts` WHEN NEW.`intent_id` <> OLD.`intent_id` OR NEW.`provider_account_id` <> OLD.`provider_account_id` OR NEW.`method` <> OLD.`method` OR NEW.`amount_minor` <> OLD.`amount_minor` OR NEW.`idempotency_key` <> OLD.`idempotency_key` OR (NEW.`state` <> OLD.`state` AND NOT ((OLD.`state` = 'started' AND NEW.`state` IN ('pending', 'succeeded', 'failed', 'cancelled')) OR (OLD.`state` = 'pending' AND NEW.`state` IN ('succeeded', 'failed', 'cancelled', 'unknown')) OR (OLD.`state` = 'unknown' AND NEW.`state` IN ('succeeded', 'failed')))) BEGIN SELECT RAISE(ABORT, 'payments: an attempt keeps its amount and moves only forward'); END;
+CREATE TRIGGER `payments_attempts_fixed` BEFORE UPDATE ON `payments_attempts` WHEN NEW.`intent_id` <> OLD.`intent_id` OR NEW.`provider_account_id` <> OLD.`provider_account_id` OR NEW.`method` <> OLD.`method` OR NEW.`amount_minor` <> OLD.`amount_minor` OR NEW.`idempotency_key` <> OLD.`idempotency_key` OR (NEW.`state` <> OLD.`state` AND NOT ((OLD.`state` = 'started' AND NEW.`state` IN ('pending', 'succeeded', 'failed', 'cancelled', 'unknown')) OR (OLD.`state` = 'pending' AND NEW.`state` IN ('succeeded', 'failed', 'cancelled', 'unknown')) OR (OLD.`state` = 'unknown' AND NEW.`state` IN ('succeeded', 'failed')))) BEGIN SELECT RAISE(ABORT, 'payments: an attempt keeps its amount and moves only forward'); END;
 --> statement-breakpoint
 CREATE TRIGGER `payments_attempts_within_intent` AFTER UPDATE OF `state` ON `payments_attempts` WHEN NEW.`state` = 'succeeded' AND (SELECT sum(`amount_minor`) FROM `payments_attempts` WHERE `intent_id` = NEW.`intent_id` AND `state` = 'succeeded') > (SELECT `amount_minor` FROM `payments_intents` WHERE `id` = NEW.`intent_id`) BEGIN SELECT RAISE(ABORT, 'payments: more was taken than the intent asks for'); END;
 --> statement-breakpoint

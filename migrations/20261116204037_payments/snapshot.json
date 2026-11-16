@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "60b929d5-f738-4152-8b85-48674f9dc49d",
+  "id": "62849310-8401-4bb2-99ff-155691efe289",
   "prevIds": [
     "7feed09f-5580-4b78-ab25-a745e285e18e"
   ],
@@ -6698,7 +6698,7 @@
         }
       ],
       "isUnique": true,
-      "where": null,
+      "where": "signature_ok = 1",
       "origin": "manual",
       "entityType": "indexes"
     },
