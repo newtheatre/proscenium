@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ac6cb971-c9f1-484d-9e60-efd437914c18",
+  "id": "bf5de3ce-afa2-4dc4-96ed-14d5b94e4551",
   "prevIds": [
     "648dc193-a89c-4021-9edc-dd1fef7676f1"
   ],
@@ -2437,6 +2437,16 @@
     {
       "table": "core_notifications",
       "name": "payload",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_notifications",
+      "name": "sealed_variables",
       "type": "text",
       "notNull": false,
       "autoincrement": false,

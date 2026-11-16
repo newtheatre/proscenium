@@ -134,7 +134,10 @@ export const notifications = defineTable('core_notifications', {
   subjectId: col.internal(text('subject_id')),
   dedupeKey: col.internal(text('dedupe_key')),
   coalesceKey: col.internal(text('coalesce_key')),
-  payload: col.personal(text('payload', { mode: 'json' })),
+  payload: col.personal(text('payload', { mode: 'json' }), { erase: 'clear' }),
+  // A type's sealed variables, such as a link that signs someone in: encrypted with the core key,
+  // never in payload, and cleared in the unit that finishes the email delivery.
+  sealedVariables: col.personal(text('sealed_variables'), { encrypted: true, erase: 'clear' }),
   actorId: col.account('actor_id', { role: 'actor', onMerge: 'alias', nullable: true }),
   createdAt: col.createdAt(),
 }, {

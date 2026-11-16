@@ -112,9 +112,11 @@ export const points = {
       link: z.string().startsWith('/').optional(),
       lane: z.enum(['prompt', 'bulk']).optional(),
       topic: z.string().optional(),
-      variables: z.record(variableName, z.enum(['url', 'text'])),
+      // 'sealed' carries a secret, such as a link that signs someone in: encrypted at rest and email only.
+      variables: z.record(variableName, z.enum(['url', 'sealed', 'text'])),
       wording: z.record(z.string(), wording).refine(w => 'en-GB' in w, 'wording needs en-GB'),
-    }).strict(),
+    }).strict()
+      .refine(t => !Object.values(t.variables).includes('sealed') || (t.channels.length === 1 && t.channels[0] === 'email'), { message: 'a type with a sealed variable is sent by email only', path: ['channels'] }),
   }),
   /** A group of optional messages a person can switch off, and the unit a sender is chosen for. */
   'core.notification-topic': point({

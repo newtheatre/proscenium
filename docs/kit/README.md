@@ -90,13 +90,18 @@ Any module may import core's services without listing core: `import { notifyAddr
   the same type and account writes nothing and returns the earlier id. A channel the person
   switched off for an optional type's topic is recorded as suppressed; no address, an address on
   the suppression list or the type's module being off as skipped. Declare `channels: ['email',
-  'inbox']` and, for the inbox, `link: '/path/{{ variable }}'`.
+  'inbox']` and, for the inbox, `link: '/path/{{ variable }}'`. The variables are cleared once no
+  delivery needs them. A variable of kind `sealed` (a link that signs someone in, say) is kept
+  encrypted in its own column, never in the payload, and cleared in the same unit that moves the
+  email to a final state, or after seven days at most. A type with a sealed variable is email only;
+  declaring one with another channel is refused at start-up. A cleared notification is not re-sent.
   Cloudflare's later reports arrive on the EMAIL_EVENTS queue and are matched by the message id
   `send()` returned: a hard bounce or a complaint marks the delivery Bounced or Complained,
   announces `core.delivery.bounced` or `.complained`, and puts the address on core's suppression
   list, which is what stops the next send (Cloudflare does not, soon enough). The task
-  `core.sweep-notifications` frees deliveries stuck in Sending, re-queues lost ones and clears a
-  notification's payload once every delivery is finished.
+  `core.sweep-notifications` frees deliveries stuck in Sending, re-queues lost ones, clears a
+  notification's payload once every delivery is finished and any sealed variables left after seven
+  days.
 - `operatingDayOf(instant)` and `dayBounds(day)`: the theatre's operating day, which rolls over at
   `core.locale.day-start`. A table that stores one contributes to `core.operating-day`, so
   it is recalculated when the time zone or the rollover changes.

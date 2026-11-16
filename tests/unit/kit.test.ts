@@ -13,6 +13,7 @@ import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
 import { buildRegistry, type ModuleEntry } from '#kit/registry'
 import { points as corePoints } from '../../layers/core/module/points'
+import { points as domainPoints } from '../../layers/core/module/domain'
 
 describe('ids', () => {
   it('are a prefix and 26 characters that sort by creation time', () => {
@@ -200,5 +201,16 @@ describe('navigation entries', () => {
   it('hide an empty entry only when it has a count', () => {
     expect(schema.safeParse({ ...base, hideEmpty: true }).success).toBe(false)
     expect(schema.safeParse({ ...base, hideEmpty: true, count: 'box-office.orders.open' }).success).toBe(true)
+  })
+})
+
+describe('notification types', () => {
+  const schema = (domainPoints['core.notification-type'] as any).schema
+  const base = { id: 'team.invite', category: 'transactional', side: 'members', channels: ['email'], variables: { link: 'sealed' }, wording: { 'en-GB': { subject: 'Join us', body: '[Accept]({{ link }})' } } }
+  it('send a type with a sealed variable by email only', () => {
+    expect(schema.safeParse(base).success).toBe(true)
+    expect(schema.safeParse({ ...base, channels: ['email', 'inbox'] }).success).toBe(false)
+    expect(schema.safeParse({ ...base, channels: ['inbox'] }).success).toBe(false)
+    expect(schema.safeParse({ ...base, channels: ['email', 'inbox'], variables: { link: 'url' } }).success).toBe(true)
   })
 })

@@ -3,7 +3,7 @@
 // and one delivery per channel, written set-wise (U7): a handful of statements for any number of
 // recipients up to core.units.set-rows-limit, which the kit enforces before anything is written.
 // Email is sent after the commit by the job core.send-notifications; the inbox item is written here.
-import { all, first, isEnabled, nowMs, refuse, useContext, useSetting } from '#kit'
+import { all, first, isEnabled, nowMs, refuse, sealSpecial, useContext, useSetting } from '#kit'
 import type { RecordRef, UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { deliveries, inboxItems, notifications } from '../db/domain'
@@ -127,7 +127,14 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
   const record = recordOf(options.subject)
   const actor = useContext().actor
   const at = nowMs()
-  const ids = unit.insertSet(notifications, fresh.map(r => ({
+  // Sealed variables go in their own encrypted column, never in payload.
+  const sealedNames = Object.keys(type.variables).filter(name => type.variables[name] === 'sealed')
+  const split = await Promise.all(fresh.map(async (r) => {
+    const open = Object.fromEntries(Object.entries(r.values).filter(([k]) => !sealedNames.includes(k)))
+    const hidden = Object.fromEntries(Object.entries(r.values).filter(([k]) => sealedNames.includes(k)))
+    return { open, sealed: sealedNames.length ? await sealSpecial(JSON.stringify(hidden)) : null }
+  }))
+  const ids = unit.insertSet(notifications, fresh.map((r, i) => ({
     typeKey,
     side: type.side,
     accountId: r.accountId,
@@ -135,7 +142,8 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     subjectType: record.type,
     subjectId: record.id,
     dedupeKey: r.hash,
-    payload: r.values,
+    payload: split[i]!.open,
+    sealedVariables: split[i]!.sealed,
     actorId: actor.accountId ?? null,
   })))
 

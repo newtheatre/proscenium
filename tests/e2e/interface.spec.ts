@@ -231,7 +231,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('1 change')).toBeVisible()
       await page.getByRole('button', { name: 'Save Sample show settings' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
-      await page.reload()
+      await visit(page, '/console/gallery/settings') // waits for hydration, as a bare reload does not
       await expect(page.getByLabel('Show title', { exact: true })).toHaveValue('Macbeth')
       await expect(page.getByText('Default: Hamlet.')).toBeVisible()
       await page.getByRole('button', { name: /Reset Show title to its default/ }).click()
