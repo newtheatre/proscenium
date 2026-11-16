@@ -29,6 +29,8 @@ const items = computed<DropdownMenuItem[][]>(() => {
   if (has('members')) where.push({ label: viewer.value.membersName ?? t('core.menu.members'), icon: 'i-lucide-users', to: '/members', ...mark(here.value === 'members') })
   if (has('console')) where.push({ label: t('core.menu.console'), icon: 'i-lucide-layout-dashboard', to: '/console', ...mark(here.value === 'console') })
 
+  if (has('admin')) where.push({ label: t('core.menu.admin'), icon: 'i-lucide-shield-check', to: '/admin', ...mark(here.value === 'admin') })
+
   const modes = (['system', 'light', 'dark'] as const).map(mode => ({
     label: t(`core.menu.appearance.${mode}`),
     type: 'checkbox' as const,

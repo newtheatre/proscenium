@@ -275,3 +275,18 @@ describe('home cards, record tabs and history (UI-12, UI-16)', () => {
     expect(entries[1].detail).toEqual({ field: 'name' })
   })
 })
+
+describe('Site administration in the viewer (R-33)', () => {
+  const sides = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/viewer', { actor })).json()).sides as string[]
+
+  it('offers the admin side to someone who holds an admin entry\'s ability, and only them', async () => {
+    expect(await sides(person(['core.settings.manage']))).toContain('admin')
+    expect(await sides(staff())).not.toContain('admin')
+    expect(await sides(audience())).not.toContain('admin')
+  })
+
+  it('answers /admin as a missing page to someone with no admin ability', async () => {
+    expect((await decide('/admin', staff())).decision).toBe('not-found')
+    expect((await decide('/admin', person(['core.settings.manage']))).decision).toBe('allow')
+  })
+})
