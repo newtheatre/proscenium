@@ -69,7 +69,10 @@ export function clearCookie(event: H3Event, name: string): void {
 
 /** The site's own origin and host, which a passkey is bound to. */
 export function relyingParty(event: H3Event): { origin: string, id: string } {
-  const url = getRequestURL(event, { xForwardedHost: false, xForwardedProto: false })
+  // The Worker's own request carries the scheme the browser used. Nitro's request stand-in does
+  // not, so h3 would take an HTTPS page for http:// and refuse every change as from another site.
+  const request = event.web?.request ?? (event.context.cloudflare as { request?: Request } | undefined)?.request
+  const url = request ? new URL(request.url) : getRequestURL(event, { xForwardedHost: false, xForwardedProto: false })
   return { origin: url.origin, id: url.hostname }
 }
 

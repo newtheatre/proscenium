@@ -66,6 +66,8 @@ export const points = {
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),
   }),
   'core.health-check': point({ kind: 'code', contract: 'health-check' }),
+  /** A source of verdicts on stored conditions, under its module's id (Formats tab, Requirements). */
+  'core.requirement': point({ kind: 'code', contract: 'requirement-source' }),
   'core.erasure-handler': point({ kind: 'code', contract: 'erasure-handler' }),
   'core.record-resolver': point({ kind: 'code', contract: 'record-resolver' }),
   'core.privacy-record': point({
