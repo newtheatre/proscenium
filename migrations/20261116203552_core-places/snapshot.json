@@ -1,13 +1,19 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "1d12a0a5-0156-4688-82b1-712709cc0998",
+  "id": "dad7e1ea-590d-45e6-a11d-1d1bd48e9d90",
   "prevIds": [
-    "a2ed7eed-124d-4b66-9651-eb277b7576ca",
-    "bf5de3ce-afa2-4dc4-96ed-14d5b94e4551",
-    "f39fb455-d19c-415f-8f32-bef757dd2f0f"
+    "3df4d1c2-528f-49ce-bcaf-6a133ffb4485"
   ],
   "ddl": [
+    {
+      "name": "core_access_profiles",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_access_shares",
+      "entityType": "tables"
+    },
     {
       "name": "core_account_emails",
       "entityType": "tables"
@@ -34,6 +40,14 @@
     },
     {
       "name": "core_credentials",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_data_request_checks",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_data_requests",
       "entityType": "tables"
     },
     {
@@ -175,6 +189,216 @@
     {
       "name": "core_vocabularies",
       "entityType": "tables"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "status",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "payload",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "pending",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "message",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "submitted_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "submitted_via",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "submitted_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "decided_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "decided_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_method",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "verified_companions",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "review_due",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "reminders",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "flagged_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "purpose",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
     },
     {
       "table": "core_account_emails",
@@ -907,6 +1131,196 @@
       "entityType": "columns"
     },
     {
+      "table": "core_data_request_checks",
+      "name": "request_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "table_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "outcome",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "ticked_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "ticked_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "requested_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "identity_check",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "respond_by",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "not_before",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "holds",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "file_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "finished_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "closed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_email_suppressions",
       "name": "address_hash",
       "type": "text",
@@ -1569,6 +1983,16 @@
     {
       "table": "core_files",
       "name": "purge_after",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "expires_at",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -4023,6 +4447,46 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_data_requests",
+      "name": "core_data_requests_account",
+      "columns": [
+        {
+          "value": "account_id",
+          "isExpression": false
+        },
+        {
+          "value": "kind",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "core_data_requests_state",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "not_before",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_emergency_contacts",
       "name": "core_emergency_contacts_account",
       "columns": [
@@ -4150,6 +4614,20 @@
         },
         {
           "value": "purge_after",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_files",
+      "name": "core_files_expiry",
+      "columns": [
+        {
+          "value": "expires_at",
           "isExpression": false
         }
       ],
@@ -4702,6 +5180,21 @@
       "entityType": "fks"
     },
     {
+      "table": "core_data_request_checks",
+      "name": "fk_core_data_request_checks_request_id_core_data_requests_id_fk",
+      "columns": [
+        "request_id"
+      ],
+      "tableTo": "core_data_requests",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_grant_ends",
       "name": "fk_core_grant_ends_grant_id_core_grants_id_fk",
       "columns": [
@@ -4929,6 +5422,25 @@
       "entityType": "fks"
     },
     {
+      "table": "core_access_profiles",
+      "name": "core_access_profiles_pk",
+      "columns": [
+        "account_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_access_shares",
+      "name": "core_access_shares_pk",
+      "columns": [
+        "account_id",
+        "purpose"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_account_merge_items",
       "name": "core_account_merge_items_pk",
       "columns": [
@@ -4946,6 +5458,16 @@
       "columns": [
         "module_id",
         "name"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_data_request_checks",
+      "name": "core_data_request_checks_pk",
+      "columns": [
+        "request_id",
+        "table_name"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -5051,6 +5573,15 @@
     {
       "table": "core_audit",
       "name": "core_audit_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_data_requests",
+      "name": "core_data_requests_pk",
       "columns": [
         "id"
       ],
@@ -5317,6 +5848,18 @@
       ],
       "nameExplicit": false,
       "entityType": "uniques"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "core_access_profiles_payload_when_accepted",
+      "value": "(status = 'accepted') = (payload IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_access_profiles",
+      "name": "core_access_profiles_verified_when_accepted",
+      "value": "verified_at IS NULL OR status = 'accepted'",
+      "entityType": "checks"
     },
     {
       "table": "core_accounts",
