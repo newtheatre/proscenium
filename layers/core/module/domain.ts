@@ -111,6 +111,7 @@ export const abilities = defineAbilities('core', {
   'production.create': ability({ implies: ['production.view'] }),
   'production.edit': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'production.publish': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.edit'] }),
+  'production.cancel': ability({ risk: 'privileged', on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   // Scheduling and cancelling act on the production, so a grant on it covers all its dates (part 6).
   'performance.schedule': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'performance.cancel': ability({ risk: 'privileged', on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
@@ -277,6 +278,7 @@ export const announces = {
   'core.production.published': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
   'core.production.updated': event({ version: 1, payload: z.object({ productionId: z.string(), fields: z.array(z.enum(PRODUCTION_PUBLIC_FIELDS)) }), internal: false }),
   'core.production.withdrawn': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
+  'core.production.cancelled': event({ version: 1, payload: z.object({ productionId: z.string(), reason: code() }), internal: false }),
   'core.performance.scheduled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), reinstated: z.boolean() }), internal: false }),
   'core.performance.rescheduled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldStartsAt: z.number().int(), oldEndsAt: z.number().int(), startsAt: z.number().int(), endsAt: z.number().int() }), internal: false }),
   'core.performance.moved': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldVenueId: z.string(), oldSpaceId: z.string(), venueId: z.string(), spaceId: z.string() }), internal: false }),

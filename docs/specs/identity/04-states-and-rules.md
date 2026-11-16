@@ -2,6 +2,8 @@
 
 Six records have a life cycle: the account, the address, the session, the grant, the merge and the data request. Every change below is one database batch with its audit entry inside it, and every guard is checked on the server where the write happens.
 
+Where a rule below says a write happens once or not at all (a sign-in link used once, an account claimed, one live grant per account, role and scope, a stage of a merge), the unit learns the outcome from the kit's guard passing, never from a count of rows changed. The database's count includes rows written by triggers and search indexes, so it may be tested for being above nought and for nothing more exact.
+
 ## The account
 
 ```mermaid

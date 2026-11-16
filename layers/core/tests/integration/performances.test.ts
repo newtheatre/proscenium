@@ -22,6 +22,11 @@ import archiveVenue from '../../server/api/core/venues/[id]/archive.post'
 import archiveSpace from '../../server/api/core/venues/[id]/spaces/[space]/archive.post'
 import deleteSpace from '../../server/api/core/venues/[id]/spaces/[space]/index.delete'
 import createClosure from '../../server/api/core/closures/index.post'
+import patchProduction from '../../server/api/core/productions/[id]/index.patch'
+import publishProduction from '../../server/api/core/productions/[id]/publish.post'
+import cancelProduction from '../../server/api/core/productions/[id]/cancel.post'
+import restoreProduction from '../../server/api/core/productions/[id]/restore.post'
+import productionImpact from '../../server/api/core/productions/[id]/impact.get'
 import { completeEnded } from '../../server/programme/performances'
 import { changeSetting, createUnit } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
@@ -47,8 +52,13 @@ const handle = server({
   'POST /api/core/venues/:id/spaces/:space/archive': archiveSpace,
   'DELETE /api/core/venues/:id/spaces/:space': deleteSpace,
   'POST /api/core/closures': createClosure,
+  'PATCH /api/core/productions/:id': patchProduction,
+  'POST /api/core/productions/:id/publish': publishProduction,
+  'POST /api/core/productions/:id/cancel': cancelProduction,
+  'POST /api/core/productions/:id/restore': restoreProduction,
+  'GET /api/core/productions/:id/impact': productionImpact,
 })
-const admin = person(['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'core.closure.manage'])
+const admin = person(['core.production.create', 'core.production.edit', 'core.production.publish', 'core.production.cancel', 'core.performance.schedule', 'core.performance.cancel', 'core.venue.manage', 'core.closure.manage'])
 const scheduler = person(['core.performance.schedule'])
 const viewer = person(['core.production.view'])
 
@@ -249,5 +259,47 @@ describe('performances', () => {
     expect(await state(id)).toBe('completed')
     expect(await events('core.performance.completed', id)).toHaveLength(1)
     expect((await req('PATCH', `/api/core/performances/${id}`, { capacity: 10 })).body.code).toBe('core.performance.completed')
+  })
+
+  it('go with their production when it is cancelled: scheduled ones still to come only, with the same reason', async () => {
+    const s = await stage()
+    await req('PATCH', `/api/core/productions/${s.productionId}`, { summary: 'A run to cancel.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true })
+    expect((await req('POST', `/api/core/productions/${s.productionId}/cancel`, { reasonTermId: await term('core.cancel-reason', 'other') })).body.code).toBe('core.production.not-cancellable')
+    await req('POST', `/api/core/productions/${s.productionId}/publish`, {})
+
+    const future: string[] = []
+    for (let day = 1; day <= 12; day++) {
+      const id = await add(s, `2027-11-${String(day).padStart(2, '0')}T19:30:00Z`)
+      await req('POST', `/api/core/performances/${id}/schedule`, {})
+      future.push(id)
+    }
+    const drafts = [await add(s, '2027-12-01T19:30:00Z'), await add(s, '2027-12-02T19:30:00Z')]
+    const done: string[] = []
+    for (let day = 3; day <= 5; day++) {
+      const id = await add(s, `2027-12-0${day}T19:30:00Z`)
+      await req('POST', `/api/core/performances/${id}/schedule`, {})
+      done.push(id)
+    }
+    await env.DB.prepare(`UPDATE core_performances SET state = 'completed', completed_at = ? WHERE id IN (${done.map(() => '?').join(', ')})`).bind(Date.now(), ...done).run()
+
+    expect((await req('GET', `/api/core/productions/${s.productionId}/impact?kind=cancel`, undefined, viewer)).body)
+      .toEqual({ lines: ['12 scheduled performances still to come will be cancelled with the same reason.'], refusal: null })
+    expect((await req('POST', `/api/core/productions/${s.productionId}/cancel`, { reasonTermId: await term('core.cancel-reason', 'illness') }, person(['core.performance.cancel']))).status).toBe(403)
+    const { status, body } = await req('POST', `/api/core/productions/${s.productionId}/cancel`, { reasonTermId: await term('core.cancel-reason', 'weather'), note: 'Snow.' })
+    expect(status, JSON.stringify(body)).toBe(200)
+    expect(body.performances).toBe(12)
+
+    const states = await rows<{ id: string, state: string, cancel_note: string | null }>('SELECT id, state, cancel_note FROM core_performances WHERE production_id = ?', s.productionId)
+    expect(states.filter(r => future.includes(r.id)).every(r => r.state === 'cancelled' && r.cancel_note === 'Snow.')).toBe(true)
+    expect(states.filter(r => drafts.includes(r.id)).map(r => r.state)).toEqual(['draft', 'draft'])
+    expect(states.filter(r => done.includes(r.id)).map(r => r.state)).toEqual(['completed', 'completed', 'completed'])
+    expect(await rows("SELECT id FROM core_events WHERE name = 'core.performance.cancelled' AND payload LIKE ?", `%${s.productionId}%`)).toHaveLength(12)
+    expect((await rows<{ payload: string }>("SELECT payload FROM core_events WHERE name = 'core.production.cancelled' AND record_id = ?", s.productionId)).map(e => JSON.parse(e.payload))).toEqual([{ productionId: s.productionId, reason: 'weather' }])
+    expect((await rows('SELECT state FROM core_productions WHERE id = ?', s.productionId))[0]).toEqual({ state: 'cancelled' })
+
+    // Brought back, it is withdrawn and its performances stay cancelled, to be reinstated one by one.
+    expect((await req('POST', `/api/core/productions/${s.productionId}/restore`, {})).status).toBe(200)
+    expect((await rows('SELECT state, cancel_reason_term_id FROM core_productions WHERE id = ?', s.productionId))[0]).toEqual({ state: 'withdrawn', cancel_reason_term_id: null })
+    expect(await rows("SELECT id FROM core_performances WHERE production_id = ? AND state = 'cancelled'", s.productionId)).toHaveLength(12)
   })
 })
