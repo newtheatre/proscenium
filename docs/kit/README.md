@@ -87,6 +87,16 @@ Any module may import core's services without listing core: `import { notifyAddr
   where your records hold files as contributions to `core.file-slot`; uploads go to
   `POST /api/core/files?slot=<id>&owner=<record id>` and are checked and cleaned by a job.
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
+- Vocabularies, the shared lists of options such as production categories and advisories. Declare
+  yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is
+  `<module>.<name>`); it is made the first time the module is on and from then on its terms are the
+  theatre's. A record stores the term's id in a `col.ref('core_terms')` column, never the label.
+  `listTerms(key, { includeRetired? })` gives a picker's options in order; `getTerm(id)` gives a
+  label for any term, retired or merged ones too; `assertTerm(id, key)` is the predicate to put on
+  your own insert or update, then `.expect(1)`, so a retired term or one from another vocabulary
+  is refused. Staff edit terms at `/console/system/vocabularies`; a term in use can be retired but
+  never deleted, and the restrict reference makes the database refuse it too. Merging terms
+  (C-22) comes later; `core.term.merged` is declared for it.
 
 ## The unit of work
 
@@ -228,6 +238,12 @@ in the specification's "As built" list; this guide is the reference from here on
 - In phase 1 `notifyAddress` sends at once, inside the caller's job, so the job's lane is the lane;
   a notification type's `lane` takes effect with the full pipeline in phase 2.
 - An upload is one request carrying the bytes, rather than a begun upload and a second request.
+- Vocabulary terms keep `slug`, `label`, `description` and `icon` as public columns rather than per-row
+  columns classed by the vocabulary's `term_class`: a per-row column needs a subject, which
+  `core_terms` does not have. No vocabulary core ships is internal; one that is waits on the kit
+  supporting a class taken one hop away.
+- A vocabulary is made when its module is switched on (the `core.module.enabled` listener) and,
+  for modules that are always on, the first time any vocabulary is read.
 - A file with `record` access is not served until a module answers `core.file-access`.
 - The theatre's own files (its logos) have the owner `site`, so there is no `core.branding` record.
 - A set given to `announce` is a list of `{ payload, record? }`, since each event may name its own

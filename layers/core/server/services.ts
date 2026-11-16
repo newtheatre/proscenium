@@ -5,3 +5,5 @@ export type { NotifyAddressOptions, NotificationType } from './notifications/sen
 export { getBrand } from './brand/theme'
 export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from './calendar'
 export { attachFile, detachFile, fileUrl } from './files/service'
+export { listTerms, getTerm, assertTerm } from './vocabularies/service'
+export type { Term } from './vocabularies/service'
