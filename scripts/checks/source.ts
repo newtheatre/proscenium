@@ -266,7 +266,7 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
   if (!accountIn.size) return []
   const alt = (names: Iterable<string>) => [...names].sort((a, b) => b.length - a.length).join('|')
   const column = `(?<![\\w])(?:\\w+\\.)?"?(${alt(accountIn.keys())})"?`
-  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope|inAccountScope)\\())'
+  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope(?:Sql)?|inAccountScope)\\())'
   const raw = [
     new RegExp(`${column}\\s*(?:==?|!=|<>)\\s*${value}`, 'gi'),
     new RegExp(`${column}\\s+IS\\s+(?:NOT\\s+)?${value}`, 'gi'),
@@ -306,6 +306,43 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
         if (drizzle?.test(line) || compared.some(name => isAccount(name, near)))
           problems.push(`${at}:${i + 1}: compares an account column to an id; use inAccountScope(column, account) so rows of merged accounts are found, or exactAccount with // exact-account: why`)
       })
+    }
+  }
+  return problems
+}
+
+// A statement's count of changed rows includes rows its triggers and a search index wrote, so an
+// INSERT into a searched table can count 3 (Foundations part 3, "Counting changed rows"). A count
+// may be tested against nought; a unit that needs an exact count uses the kit's guard.
+const COMPARE = '(===|!==|==|!=|<=|>=|<|>)'
+const CHANGES_AFTER = new RegExp(`\\bchanges\\b(?!\\s*\\()[\\s)?]*(?:\\?\\?\\s*\\d+[\\s)]*)?${COMPARE}\\s*(-?\\d+(?:\\.\\d+)?)`, 'g')
+const CHANGES_BEFORE = new RegExp(`(-?\\d+(?:\\.\\d+)?)\\s*${COMPARE}\\s*\\(?\\s*[\\w.?[\\]]*\\.changes\\b(?!\\s*\\()`, 'g')
+
+/** Lines (1-based) that compare a statement's changed-row count with a number other than nought. */
+export function exactChangeCounts(source: string): number[] {
+  const found: number[] = []
+  source.split('\n').forEach((line, i) => {
+    const numbers = [...line.matchAll(CHANGES_AFTER)].map(m => m[2]!).concat([...line.matchAll(CHANGES_BEFORE)].map(m => m[1]!))
+    if (numbers.some(n => Number(n) !== 0)) found.push(i + 1)
+  })
+  return found
+}
+
+/** Lines (1-based) whose SQL reads SQLite's changes(). */
+export function changesInSql(source: string): number[] {
+  return source.split('\n').flatMap((line, i) => /\bchanges\s*\(\s*\)/.test(line) && !/^\s*(\/\/|\*)/.test(line) ? [i + 1] : [])
+}
+
+export function checkChangeCounts(modules: Loaded[]): string[] {
+  const problems: string[] = []
+  for (const m of modules) {
+    for (const file of moduleFiles(m).filter(f => f.endsWith('.ts'))) {
+      const source = readFileSync(file, 'utf8')
+      for (const line of exactChangeCounts(source)) problems.push(`${rel(file)}:${line}: compares a count of changed rows with a number other than 0; triggers and search indexes add to the count, so test it against 0 or use the unit of work's guard`)
+      // A search index flushes what it holds when the next write opens, so changes() read by a later
+      // statement can be stale (Foundations part 3, "the claim stamp"). Only the kit's guard reads it.
+      if (rel(file).startsWith('layers/core/kit/')) continue
+      for (const line of changesInSql(source)) problems.push(`${rel(file)}:${line}: reads changes() in SQL, which a search index can leave stale; stamp the row in the conditional write and read the stamp back`)
     }
   }
   return problems

@@ -12,8 +12,6 @@ import { declaredType } from './notify'
 
 const PREFIX = 'cf.email.sending.message.'
 /** How long a set-aside row is kept: fixed, not a setting (core part 2). */
-const SET_ASIDE_KEPT = 30 * 86_400_000 // not-policy: the table's fixed retention, 30 days
-
 interface Match { id: string, state: string, notification_id: string, account_id: string | null, type_key: string }
 
 async function suppress(unit: UnitView, recipient: unknown, reason: 'hard_bounce' | 'complaint'): Promise<void> {
@@ -70,6 +68,5 @@ export async function recordSetAside(info: SetAside): Promise<void> {
   const at = nowMs()
   const unit = createUnit()
   unit.add({ sql: 'INSERT INTO core_email_events_set_aside (queue_message_id, event_type, reason, set_aside_at) VALUES (?, ?, ?, ?) ON CONFLICT (queue_message_id) DO NOTHING', params: [info.queueMessageId, info.type, info.reason, at] })
-  unit.add({ sql: 'DELETE FROM core_email_events_set_aside WHERE set_aside_at < ?', params: [at - SET_ASIDE_KEPT] })
   await unit.commit()
 }

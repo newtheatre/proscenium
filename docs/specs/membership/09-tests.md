@@ -37,7 +37,7 @@ Real units of work against local D1. Each case states what must be in the databa
 | `join-free-unchecked-one-request` | One request leaves an active membership, a member row with a number, an audit entry and a `started` event, and nothing pending |  |
 | `join-writes-all-or-nothing` | With the form response made to refuse (a one-each placement already used), no membership, charge, verification or event row exists |  |
 | `activation-needs-every-requirement` | For every combination of the three requirements, the membership is active exactly when all needed timestamps are set; the check constraint refuses a forced update (I1) | Yes |
-| `activation-twice` | `markPaid` and `markVerified` raced as two batches activate once; the second expects zero rows and refuses cleanly |  |
+| `activation-twice` | `markPaid` and `markVerified` raced as two batches activate once; the second finds that the guard did not pass and refuses cleanly |  |
 | `one-open-application` | A second application for the same scheme returns the first (J3) |  |
 | `join-refused-when-current` | Outside the renewal window the refusal carries the date renewal opens |  |
 | `payment-not-offered-before-checks` | A charge cannot be paid while verification or approval is unmet (A2) |  |

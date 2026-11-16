@@ -68,7 +68,7 @@ export async function changeSetting(unit: UnitView, key: string, raw: unknown, o
   if (!found) throw new Refusal('core.setting.unknown', `There is no setting called ${key}.`, { status: 404 })
   const { entry, module } = found
   if (entry.onChange === 'reason' && !options.reason?.trim()) throw new Refusal('core.setting.reason-needed', 'Say why you are changing this setting.', { status: 422, fields: { reason: 'required' } })
-  if (entry.onChange === 'confirm' && options.confirm !== true) throw new Refusal('core.setting.confirm-needed', 'This change affects dates and scheduled work. Confirm it to save.', { status: 422, fields: { confirm: 'required' } })
+  if (entry.onChange === 'confirm' && options.confirm !== true) throw new Refusal('core.setting.confirm-needed', 'This setting asks for the change to be confirmed before it is saved.', { status: 422, fields: { confirm: 'required' } })
   const reset = options.reset === true
   let value: unknown = null
   if (!reset) {

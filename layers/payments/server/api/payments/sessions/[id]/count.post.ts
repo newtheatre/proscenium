@@ -3,8 +3,8 @@
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { can, defineRoute, first, Refusal } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { getSession, startCount, summarise } from '../../../../sessions'
-import { inAccountScope } from '../../../../account-scope'
 
 export default defineRoute({
   // Your own session needs payments.session.open; anyone else's needs payments.session.close-any.
@@ -15,8 +15,7 @@ export default defineRoute({
   const id = getRouterParam(event, 'id') ?? ''
   const session = await getSession(id)
   if (!session) throw new Refusal('core.not-found', 'There is no such session.', { status: 404 })
-  const scope = inAccountScope('opened_by', actor.accountId!)
-  const own = await first('SELECT 1 FROM payments_sessions WHERE id = ? AND ' + scope.sql, session.id, ...scope.params)
+  const own = await first(`SELECT 1 FROM payments_sessions WHERE id = ?1 AND opened_by IN (${accountScopeSql('?2')})`, session.id, actor.accountId!)
   const allowed = own ? await can(actor, 'payments.session.open') : await can(actor, 'payments.session.close-any', { type: 'payments.session', id: session.id })
   if (!allowed.allowed)
     throw new Refusal('core.access.denied', 'Only the person who opened this session, or someone allowed to close any, may cash it up.', { status: 403 })

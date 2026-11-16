@@ -23,6 +23,8 @@ export const ledger = defineTable('seats_ledger', {
   buyer: col.account('buyer_id', { role: 'subject', onMerge: 'alias' }),
   buyerName: col.personal(text('buyer_name')),
   note: col.freeText(text('note')),
+  // Not personal data, but it must go when the row is anonymised: a hash of a link token.
+  linkHash: col.internal(text('link_hash'), { erase: 'clear' }),
   at: col.createdAt(),
 }, { id: 'sl', realm: 'audience', appendOnly: true })
 
@@ -33,4 +35,10 @@ export const charges = defineTable('seats_charges', {
   providerReference: col.internal(text('provider_reference')),
 }, { id: 'sc', realm: 'operational' })
 
-export const tables = { performances, ledger, charges }
+// A table about nobody keeps its rows for a fixed time rather than a setting's.
+export const ticks = defineTable('seats_ticks', {
+  id: col.id(),
+  at: col.createdAt(),
+}, { id: 'stk', realm: 'system', subject: 'none', retention: { fixed: '30d' } })
+
+export const tables = { performances, ledger, charges, ticks }

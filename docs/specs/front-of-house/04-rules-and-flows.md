@@ -1,6 +1,6 @@
 # 3. Rules and flows
 
-Every write below is one unit of work: the change, its audit entry and its event go in one batch or none do. Every refusal uses the Foundations body `{ code, reason, remedy? }`; codes are listed at the end of this part. A write that reaches many rows at once (cancelling a performance's shifts, telling everyone on a rota) is written set-wise, as Foundations' rules U7 to U9 require, never one statement per person.
+Every write below is one unit of work: the change, its audit entry and its event go in one batch or none do. Every refusal uses the Foundations body `{ code, reason, remedy? }`; codes are listed at the end of this part. A write that reaches many rows at once (cancelling a performance's shifts, telling everyone on a rota) is written set-wise, as Foundations' rules U7 to U9 require, never one statement per person. No rule here depends on how many rows a statement changed, because D1's count includes rows written by triggers and indexes. A change that is only valid from a given state (taking cover, check-in, completing a checklist run, closing an incident, signing off a report) succeeds when the kit's guard passed in the same unit, and is refused when it did not.
 
 ## The shift window
 

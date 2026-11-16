@@ -364,7 +364,7 @@ describe('what Cloudflare reports afterwards', () => {
     expect(await suppressed('cross@example.org')).toMatchObject({ reason: 'complaint' })
   })
 
-  it('keeps a row for each event set aside, once, and says so on the health screen', async () => {
+  it('keeps a row for each event set aside, once, for 30 days, and says so on the health screen', async () => {
     const health = async () => inContext(async () => {
       const [found] = (await usePoint<{ check: () => Promise<{ state: string, sentence: string }> }>('core.health-check')).filter(c => c.id === 'core.email-events')
       return found!.value.check()
@@ -375,6 +375,12 @@ describe('what Cloudflare reports afterwards', () => {
       expect(await health()).toMatchObject({ state: 'ok' })
       for (const info of [{ queueMessageId: 'q1', type: 'complained' as const, reason: 'unmatched' as const }, { queueMessageId: 'q1', type: 'complained' as const, reason: 'unmatched' as const }, { queueMessageId: 'q2', type: null, reason: 'unreadable' as const }])
         await inContext(() => emailEventsSetAside(info), { kind: 'job' })
+      // The delivery sweep removes a row once the table's fixed 30 days have passed.
+      await inContext(async () => {
+        const unit = createUnit()
+        await sweep(unit.view(), { dueAt: Date.now() })
+        await unit.commit()
+      }, { kind: 'job' })
       expect(await rows('SELECT queue_message_id, event_type, reason FROM core_email_events_set_aside ORDER BY queue_message_id')).toEqual([
         { queue_message_id: 'q1', event_type: 'complained', reason: 'unmatched' },
         { queue_message_id: 'q2', event_type: null, reason: 'unreadable' },
