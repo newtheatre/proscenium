@@ -100,7 +100,7 @@ describe('reviewing (ID-40)', () => {
     const outsider = await staff()
     expect((await outsider.browser.get('/api/core/access-scheme')).status).toBe(403)
     const desk = await reviewer()
-    const queue = (await desk.browser.get('/api/core/access-scheme')).body.applications
+    const queue = (await desk.browser.get('/api/core/access-scheme')).body.rows
     const line = queue.find((a: any) => a.accountId === accountId)
     expect(line).toMatchObject({ name: 'Ada Applicant', change: false, overdue: false })
     expect(JSON.stringify(queue)).not.toContain('Short walks')
@@ -138,7 +138,7 @@ describe('reviewing (ID-40)', () => {
     await sweep()
     expect(to(desks!).map(e => e.subject)).toEqual(['Applications to the Access scheme are waiting'])
     expect(to(desks!)[0]!.text).not.toContain('Ada')
-    expect((await desk.browser.get('/api/core/access-scheme')).body.applications.find((a: any) => a.accountId === accountId)).toMatchObject({ overdue: true })
+    expect((await desk.browser.get('/api/core/access-scheme')).body.rows.find((a: any) => a.accountId === accountId)).toMatchObject({ overdue: true })
     const [row] = await rows<{ flagged_at: number | null }>('SELECT flagged_at FROM core_access_profiles WHERE account_id = ?', accountId)
     expect(row!.flagged_at).not.toBeNull()
   })
@@ -292,7 +292,7 @@ describe('changing, confirming and leaving (ID-42, ID-44)', () => {
     await sweep()
     expect(to(mine).map(e => e.subject)).toEqual(['Are your details for the Access scheme still right?', 'Are your details for the Access scheme still right?'])
     await sweep()
-    expect((await desk.browser.get('/api/core/access-scheme')).body.applications.find((a: any) => a.accountId === accountId)).toMatchObject({ change: true })
+    expect((await desk.browser.get('/api/core/access-scheme')).body.rows.find((a: any) => a.accountId === accountId)).toMatchObject({ change: true })
     expect((await companionsAnswer(accountId))[0]).toMatchObject({ verdict: 'met', quantity: 1 })
     // Confirming resets the date.
     await env.DB.prepare('UPDATE core_access_profiles SET pending = NULL WHERE account_id = ?').bind(accountId).run()

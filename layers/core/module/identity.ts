@@ -184,6 +184,19 @@ export const identityContributions = {
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
   'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
+  // The access scheme's screens (ID-38, ID-40). "Offered" is one while the scheme runs, so My
+  // account's entry and section hide while it is off; "waiting" sits beside the console's entry.
+  'core.count': [
+    { id: 'core.access-scheme-offered', file: 'access-scheme-offered' },
+    { id: 'core.access-scheme-waiting', file: 'access-scheme-waiting' },
+  ],
+  'core.account-section': [
+    { id: 'core.access-scheme', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreAccessScheme', order: 40, to: '/account/access', icon: 'i-lucide-accessibility', count: 'core.access-scheme-offered', hideEmpty: true },
+  ],
+  // The button a fork's own access page carries: ::access-application.
+  'core.public-component': [
+    { id: 'access-application', component: 'CoreAccessApplication', alias: 'access-application', description: 'The access scheme\'s "Apply" button, or where the visitor\'s application stands.', setting: 'core.access-scheme.enabled' },
+  ],
   // The other identity messages (spec part 4) arrive with the stories that send them.
   'core.notification-type': [{
     id: 'core.sign-in-link',

@@ -336,11 +336,30 @@ export async function reviewQueue() {
   }))
 }
 
+/**
+ * What happened to an application, newest first, for the reviewer's page (ID-40): applied, changed,
+ * each decision and each verification, with who did it. It names no need.
+ */
+export async function historyOf(accountId: string) {
+  const rows = await all<{ at: number, actor_name: string | null, detail: string }>(
+    `SELECT at, actor_name, detail FROM core_audit
+      WHERE record_type = 'core.account' AND record_id = ? AND action IN ('create', 'update', 'state')
+        AND (detail LIKE '%"accessApplication"%' OR detail LIKE '%"accessDecision"%' OR detail LIKE '%"accessVerified"%')
+      ORDER BY at DESC LIMIT 100`, accountId) // not-policy: a page of the history
+  return rows.map((r) => {
+    const detail = JSON.parse(r.detail) as { accessApplication?: string, accessDecision?: string, accessVerified?: boolean }
+    const event = detail.accessDecision ?? (detail.accessVerified === undefined ? `applied-${detail.accessApplication}` : detail.accessVerified ? 'verified' : 'unverified')
+    return { at: r.at, by: r.actor_name, event }
+  })
+}
+
 /** One application opened by a reviewer. The route's ability writes the read to the audit trail. */
 export async function openForReview(accountId: string) {
   const row = await profileOf(accountId)
   if (!row) return null
   return {
+    flagged: row.flagged_at !== null,
+    decidedAt: row.decided_at,
     status: row.status,
     inForce: await openApp(row.payload),
     pending: await openApp(row.pending),
