@@ -1,6 +1,7 @@
 // Contract for payments.desk-basket: a module's panel in the till, through which it adds its own
 // lines to the payment being taken (Box office specification, part 4). Box office is one contributor
-// among others, so a bar works without a box office.
+// among others, so a bar works without a box office. What `prepare` makes is undone by the owner's
+// payments.settlement release.
 import type { UnitView } from '#kit'
 
 export interface DeskContext {
@@ -10,9 +11,15 @@ export interface DeskContext {
 }
 
 export interface DeskBasket {
+  /** The panel's name, as a translation key. */
+  label: string
+  /** The ability a seller needs to see and use the panel. */
+  ability: string
+  /** Its place among the panels; Box office's comes first. */
+  order?: number
   /**
-   * Adds to the unit whatever makes the sale real but unpaid, and says whose it is and how much.
-   * Called in the batch that creates the intent. Undone by the owner's payments.settlement release.
+   * Adds to the unit whatever makes the sale real but unpaid, and says whose it is and how much
+   * (above zero). Called in the batch that creates the intent.
    */
   prepare: (unit: UnitView, context: DeskContext) => Promise<{ owner: { module: string, record: string }, amountMinor: number }>
   /** Lines and an amount for display. Reads only. */
