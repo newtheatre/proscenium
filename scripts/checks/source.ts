@@ -25,7 +25,8 @@ function moduleFiles(m: Loaded): string[] {
 export function checkImports(modules: Loaded[]): string[] {
   const problems: string[] = []
   for (const m of modules) {
-    const allowed = new Set([...(m.manifest.requires ?? [])])
+    // Core is always on, so any module may use its services without listing it.
+    const allowed = new Set(['core', ...(m.manifest.requires ?? [])])
     const isCore = m.manifest.id === 'core'
     for (const file of moduleFiles(m)) {
       lines(file).forEach((line, i) => {
@@ -96,7 +97,11 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
       problems.push(`${m.found.root}: has no i18n/en-GB.json`)
       continue
     }
-    const all = new Set(Object.keys(JSON.parse(readFileSync(file, 'utf8'))))
+    // A module's catalogue is i18n/en-GB.json plus any parts in i18n/en-GB/, so areas of one module
+    // (core's foundations, identity and domain) can keep their strings apart.
+    const partsDir = join(ROOT, m.found.root, 'i18n/en-GB')
+    const parts = existsSync(partsDir) ? readdirSync(partsDir).filter(f => f.endsWith('.json')).map(f => join(partsDir, f)) : []
+    const all = new Set([file, ...parts].flatMap(f => Object.keys(JSON.parse(readFileSync(f, 'utf8')))))
     const keys = new Set(all)
     const need = (key: string, what: string) => {
       if (!all.has(key)) problems.push(`${rel(file)}: needs "${key}" (${what})`)

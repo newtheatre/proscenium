@@ -43,6 +43,8 @@ export default defineNuxtConfig({
         d1_databases: [{ binding: 'DB' }],
         r2_buckets: [{ binding: 'FILES' }],
         kv_namespaces: [{ binding: 'CACHE' }],
+        // Cloudflare Email Sending. Sends only from a domain onboarded in the dashboard.
+        send_email: [{ name: 'EMAIL' }],
         triggers: { crons: ['* * * * *'] },
         queues: {
           producers: [
@@ -82,6 +84,7 @@ export default defineNuxtConfig({
         d1_databases: [{ binding: 'DB', database_name: `${name}-db`, database_id: 'local' }],
         r2_buckets: [{ binding: 'FILES', bucket_name: `${name}-files` }],
         kv_namespaces: [{ binding: 'CACHE', id: 'local' }],
+        send_email: [{ name: 'EMAIL' }],
         queues: { producers: [{ binding: 'JOBS_PROMPT', queue: queue.prompt }, { binding: 'JOBS_BULK', queue: queue.bulk }] },
       }, null, 2))
       config.cloudflare = { ...config.cloudflare, dev: { ...config.cloudflare?.dev, configPath: path, persistDir: r('./.wrangler/state') } }

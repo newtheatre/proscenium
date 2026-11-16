@@ -8,6 +8,8 @@ export interface KitEnv {
   CACHE?: KVNamespace
   JOBS_PROMPT?: Queue
   JOBS_BULK?: Queue
+  /** Cloudflare Email Sending. Only core's mailer touches it. */
+  EMAIL?: SendEmail
   CORE_ENCRYPTION_KEY?: string
   CORE_TURNSTILE_SECRET_KEY?: string
   /** "1" applies pending migrations on the first request. Set by dev, preview and tests only. */

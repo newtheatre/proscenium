@@ -31,4 +31,7 @@ export default defineModule({
   calls: {
     'seats.take-payment': call({ reconcileAfter: '1m' }),
   },
+  contributes: {
+    'core.operating-day': [{ id: 'seats.performances', table: 'seats_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
+  },
 })
