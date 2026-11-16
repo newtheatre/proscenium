@@ -143,13 +143,6 @@ export const points = {
     }).strict(),
   }),
   /**
-<<<<<<< HEAD
-   * A component a fork's Markdown page may use, such as ::whats-on. `component` is its own name,
-   * starting with its module's id (PublicSiteWhatsOn); `alias` is the short, kebab-case name a
-   * content file writes, unique across the system. An entry without them names a component that is
-   * already global under its id (core's `setting`). `setting` switches it off.
-   */
-=======
    * A reusable list of options a module ships (group 3). Made, with its starting terms, the first
    * time it is needed; afterwards the theatre owns its terms and a release never rewrites them.
    */
@@ -170,8 +163,12 @@ export const points = {
       }).strict()),
     }).strict(),
   }),
-  /** A component a fork's Markdown page may use, such as ::whats-on. `setting` switches it off. */
->>>>>>> origin/next
+  /**
+   * A component a fork's Markdown page may use, such as ::whats-on. `component` is its own name,
+   * starting with its module's id (PublicSiteWhatsOn); `alias` is the short, kebab-case name a
+   * content file writes, unique across the system. An entry without them names a component that is
+   * already global under its id (core's `setting`). `setting` switches it off.
+   */
   'core.public-component': point({
     kind: 'data',
     schema: z.object({
