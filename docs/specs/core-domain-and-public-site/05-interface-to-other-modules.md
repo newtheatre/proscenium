@@ -108,7 +108,7 @@ An event's payload carries ids and times, never names or free text. "Internal" i
 | `core.performance.completed` | The task marks it complete | The operating day | No |
 | `core.venue.archived`, `core.space.archived` | The move happens |  | No |
 | `core.closure.created`, `core.closure.removed` | A closure is saved or deleted | Scope and times | No |
-| `core.term.retired`, `core.term.merged` | The move happens | The vocabulary key, and the term merged into | No |
+| `core.term.retired`, `core.term.merged` | The move happens | `termId` and `vocabulary` for both, and `intoId` for a merge. `core.term.merged` is declared from the first release so listeners can be written against it, and is first announced when merging terms ships (C-22, later). | No |
 | `core.file.ready`, `core.file.deleted` | The move happens | The owner and slot | Yes |
 | `core.branding.changed` | The brand is saved | The new revision | No |
 | `core.delivery.failed` | A transactional delivery reaches Failed | The type key and channel | Yes |
@@ -353,7 +353,7 @@ This closes the point left open in the first draft: Cloudflare does report what 
 What Cloudflare provides:
 
 - **Six events on a queue.** `message.delivered`, `message.deferred`, `message.bounced`, `message.failed`, `message.rejected` and `message.complained`, through a Queues event subscription scoped to one sending domain. Each carries the message id, the recipient, whether it is final, and the SMTP status. A bounce says whether it is hard or soft.
-- **Its own suppression list.** Cloudflare suppresses hard bounces and complaints itself, for the sending domain. A send to a suppressed address fails: the Workers binding throws `E_RECIPIENT_SUPPRESSED`, and a `message.rejected` event follows with the reason `suppressed`. An API lists the entries and accepts ours.
+- **Its own suppression list, which core does not rely on.** Cloudflare's documentation says it suppresses hard bounces and complaints for the sending domain, and that a send to a suppressed address fails: the Workers binding throws `E_RECIPIENT_SUPPRESSED`, and a `message.rejected` event follows with the reason `suppressed`. An API lists the entries and accepts ours. The proof below found that this does not happen promptly, so core treats it as a backstop that may or may not be there.
 
 What core does with it:
 
@@ -362,18 +362,31 @@ What core does with it:
 | `message.delivered` | Stays `sent`. Nothing else is recorded. |
 | `message.deferred` | Nothing. Cloudflare is still trying. |
 | `message.bounced`, hard | State `bounced`. The address is added to `core_email_suppressions` with reason `hard_bounce`. `core.delivery.bounced` is announced. |
-| `message.bounced`, soft | State `bounced`. No suppression, since Cloudflare's own lasts a day. |
+| `message.bounced`, soft | State `bounced`. No suppression in core, because a soft bounce may clear. |
 | `message.complained` | State `complained`. Suppression with reason `complaint`. `core.delivery.complained` is announced. |
 | `message.failed` | State `failed`, shown on the health screen. |
 | `message.rejected`, or the binding refusing a suppressed address | State `suppressed`, reason `suppressed_address`. The address is added to core's list if it is missing, so the two agree. |
 
 Rules that follow:
 
-- **Core's list mirrors Cloudflare's and does not replace it.** Core checks its own list first, so it never spends a send on an address it knows is suppressed, and Cloudflare's list remains the last line. A manual suppression in core is pushed to Cloudflare. Lifting one in core lifts it there, where Cloudflare allows it.
+- **Core's own list is what stops a repeat send.** Core checks `core_email_suppressions` before every send, of every type, and skips an address on it. The entry is written when `core.delivery.bounced` (hard) or `core.delivery.complained` is recorded, in the same unit. Cloudflare's list is not relied on: if the binding does throw `E_RECIPIENT_SUPPRESSED`, the delivery becomes `suppressed` and the address joins core's list, but nothing waits for it. A manual suppression in core is pushed to Cloudflare, and lifting one in core lifts it there, where Cloudflare allows it.
 - **The consumer is safe to repeat.** Each event has its own id. A delivery already in a final state is not changed by a repeat or a late event.
 - **Nothing personal is logged.** The event holds the recipient's address and the subject line. The consumer reads the message id and the outcome, hashes the address where it needs to suppress, and writes neither the address nor the subject to any log.
 - **One more resource to deploy.** Each theatre needs a queue for these events and a subscription from its sending domain to it. By the foundations thread's ruling, the queue is a binding named EMAIL\_EVENTS, created on first deploy like the others. The subscription cannot be: the domain must be verified first and the application holds no account token. So it is a core setup step, shown once the sending domain is verified, that gives the dashboard clicks and the four events to choose (bounced, complained, failed, rejected). A core health check warns while the step is not done, warns when mail has gone out for a day with no outcome received, and reminds the administrator to leave "Drop suppressed recipients" off. A message in a shape the consumer does not recognise is acknowledged and logged, not retried, because the shape is Cloudflare's to change. The task `core.email-events` is the queue's consumer.
 - **Limits.** One email takes at most 50 recipients. Core sends one email for each recipient, so it never meets this. Cloudflare describes the product as transactional; whether mailings fit is the Communications module's question, which that thread is checking.
+
+### What a run on a real sending domain showed
+
+The build ran the bounce half on a real sending domain on 16 November 2026 (report at `/mnt/project-files/core-domain-proofs/report.md`, proof 2). Four findings are now rules:
+
+| Finding | Rule |
+| --- | --- |
+| The bounced event's `payload.messageId` is the identical string `send()` returns, angle brackets included. | `provider_ref` stores the value exactly as returned, with no trimming, and is matched exactly. |
+| The event reached the queue about 0.6 seconds after `send()` returned: a hard bounce, classed `permanent_failure`, with the SMTP reply. Its payload also carries the recipient and the subject. | The consumer reads the message id, the outcome and its class. It logs neither the recipient nor the subject, and never the whole payload. An outcome can arrive before the send job has finished recording Sent, so the consumer retries a message whose `provider_ref` it cannot yet find, a few times, before setting it aside. |
+| After a hard bounce, `send()` to the same address did not throw. Two resends succeeded and bounced again, and Cloudflare's suppression list was still empty four and a half minutes later. | Core's own suppression is what stops repeats, checked before every send. `E_RECIPIENT_SUPPRESSED` is handled if it comes and never relied on. |
+| For about two minutes after the sending domain was onboarded, `send()` threw `E_EMAIL_SENDING_NOT_READY`, even with the DNS status ready, and once more after the first success. | The sender setup step and its verify treat that code as "try again shortly" and keep checking, not as a failed domain. A send job that meets it retries on the usual back-off and does not count it towards a Failed delivery's limit during the first hour after onboarding. |
+
+The complaint half is not yet proved. Cloudflare offers no way to simulate a complaint, so it needs a real mailbox at a provider that reports them. Until it is run, that a complained event carries the same message id is taken from the documentation and from the bounce result.
 
 ## Access needs and access features are two lists
 
@@ -388,7 +401,7 @@ The identity specification defines an access scheme a person applies to. Its pub
 | Thing | What is specified |
 | --- | --- |
 | The page | `/access`, from `site/content/access.md` in the starter content. It is a seeded page: it ships with plain wording that reads correctly unedited (what the scheme is for, how to apply, how long a reply takes), and carries `placeholder: true` so the site-readiness screen lists it until the theatre has made it its own. |
-| The component | `CoreAccessApplication`, short alias `AccessApplication`, contributed by identity through `core.public-component`. It shows the way into the application for the person viewing it. Identity owns everything it shows and does. |
+| The component | `CoreAccessApplication`, alias `access-application`, so the page writes `::access-application`. Identity contributes it through `core.public-component`. It shows the way into the application for the person viewing it. Identity owns everything it shows and does. |
 | The reply time | The page quotes it live with `:setting{name="core.access-scheme.reply-within"}`, so the wording cannot drift from the setting. |
 | If the theatre has not edited it | The seeded wording and the component show. Nothing is hidden and nothing is broken; the page is only listed as unfinished. |
 | If the theatre deletes it | `/access` answers "not found". The content check warns, because other modules link to this address. |
