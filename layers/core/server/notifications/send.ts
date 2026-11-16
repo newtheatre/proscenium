@@ -13,7 +13,9 @@ export interface NotificationType {
   id: string
   category: 'transactional' | 'optional'
   side: 'audience' | 'members'
-  channels: 'email'[]
+  channels: ('email' | 'inbox')[]
+  /** The inbox item's link: a path inside the application that may use the type's variables. */
+  link?: string
   lane?: 'prompt' | 'bulk'
   topic?: string
   variables: Record<string, VariableKind>
