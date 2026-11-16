@@ -108,6 +108,35 @@ Two further console screens run the access scheme, both needing `core.access-sch
 
 On a person's page in the console, "Emergency contacts" (members' side) is closed until asked for: it appears only to a holder of `core.emergency-contact.read` and only for a person with a standing, and opening it asks for a reason and records the read. The page shows nothing about the access scheme unless the viewer holds `core.access-scheme.read`, or holds `core.access-profile.read` and the person switched on the welfare purpose; otherwise the section is absent, not empty. Box office and front of house see access needs on their own booking and house screens, from the copy on the booking, not here.
 
+## Addresses
+
+Interface fixes the prefixes: a person's own sections sit under `/account/` on the audience side and `/members/account/` on the members' side, so the two mirror each other; identity's console screens sit under `/console/people`; site administration under `/admin`. The words after the prefix are identity's.
+
+| Screen | Address |
+| --- | --- |
+| My account: Overview | `/account` |
+| Your details | `/account/details` |
+| Email addresses | `/account/email` |
+| Signing in | `/account/sign-in` |
+| Where you are signed in | `/account/sessions` |
+| Access scheme | `/account/access` |
+| Your data | `/account/data` |
+| Member details | `/members/account/details` |
+| Emergency contacts (part of Member details, and linkable) | `/members/account/emergency-contacts` |
+| What you can do | `/members/account/abilities` |
+| Link another account (later) | `/members/account/link` |
+| Accounts | `/console/people` |
+| Account | `/console/people/<account>` |
+| Add someone | `/console/people/new` |
+| Merge accounts | `/console/people/merge` |
+| Merges | `/console/people/merges` |
+| Who holds what | `/console/people/grants`; grants about to lapse with `?lapsing=1` |
+| Data requests | `/console/people/data-requests` |
+| Access scheme (queue) | `/console/people/access-scheme` |
+| Application | `/console/people/access-scheme/<account>`, since an application is keyed by its account |
+
+A form that belongs to a screen sits beneath it: the person's application form is `/account/access/apply`, and applying on somebody's behalf is `/console/people/access-scheme/<account>/apply`. The getting-in screens keep the addresses the sign-in flow already uses and are not menu entries. Site administration's addresses are given above.
+
 ## Navigation entries
 
 | Entry | Shell | Shown by |

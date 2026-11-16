@@ -138,7 +138,7 @@ inAccountScope(column: AccountColumn, account: string | SQL): SQL
 
 // The subquery itself, for joins and for conditions the helper above does not fit.
 accountScope(account: string | SQL): SQL
-//   => SELECT id FROM core_accounts WHERE id = :s OR merged_into_id = :s
+//   => SELECT :s AS id UNION SELECT id FROM core_accounts WHERE merged_into_id = :s
 //      where :s is the survivor of accountId, resolved inside the same statement
 
 // Outside a statement: the ids, for display, logs and tests. Never bound into an IN list.
@@ -155,6 +155,16 @@ exactAccount(column: AccountColumn, accountId: string): SQL
 `accountScope` accepts either a survivor's id or a merged-away id and gives the same set, because it resolves the survivor inside the statement; a unit therefore needs no read first (rule U4). The conformance check refuses `eq`, `inArray` or raw SQL that compares a `col.account` column to a value in any module, and accepts only `inAccountScope`, a join on `accountScope`, or `exactAccount`; each use of `exactAccount` outside identity needs a one-line reason.
 
 **In a set-wise statement the account is an expression, not a value.** `account` may be an id or an SQL expression, such as the account column of a row read with `json_each`, and the scope is then worked out for each row inside the one statement. That is how a fan-out asks "has anyone in this person's scope already got this?" for many people at once, without a read per person. For the same reason a key that must match across a merge (a notification's dedupe key is the first) is not computed from the account id: the key leaves the account out, and the statement's condition is "the same key, for an account in this row's scope". The kit has no set-wise form of `accountScopeIds`; a module that thinks it needs one should put the comparison in the statement.
+
+**As built (kit pull request 54, 16 November 2026).** The names and signatures above are the kit's. Five points of detail:
+
+- The scope subquery is the survivor itself united with the accounts merged into it, as written above. It gives the same set as before when the account row exists, and an id with no row stands for itself, so a statement never finds an empty scope.
+- A job answers "not yet" with `job.defer(code)`. A deferral is counted in `core_jobs.deferrals`, not in attempts, and never makes the job dead.
+- A handler's undo answers `{ notRestored, reason }`: the count of what could not be put back and its reason code.
+- A set-aside row is listed with `onClose: 'delete'` (the default) or `'keep'`, and its merge item is recorded with kind `set-aside` or `set-aside-keep`.
+- A column with role actor is enforced as `alias`: the schema check refuses `move` or `handler` on it.
+
+Of the three registry readers only erasure needed the scope: retention works by age, and export is not built yet and must use `inAccountScope` when it is.
 
 Referencing another module's table by foreign key is reading, and is allowed. Writing to it is not: that goes through its service.
 

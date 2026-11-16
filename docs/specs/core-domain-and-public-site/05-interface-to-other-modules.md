@@ -443,7 +443,7 @@ The identity specification defines an access scheme a person applies to. Its pub
 
 Identity has confirmed the component's name and behaviour. It shows "Apply" to a person who is signed out or has not applied, and the state of their own application to one who has. While `core.access-scheme.enabled` is off it shows nothing, so the seeded wording is written to read sensibly without it, and the site-readiness screen says the page has nothing to offer. The page names the scheme with `:setting{name="core.access-scheme.name"}`, so it uses the theatre's own name for it. The form itself lives under `/account`.
 
-Identity's eighteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks.
+Identity's nineteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks. The nineteenth, `core.grants-expiring`, was added on 16 November 2026: members' side, transactional, sent once per sweep to those who can renew. Its key clashes with none of core's own types, and a transactional type on the members' side is one the format already allows.
 
 ## Fan-out: many rows in one unit of work
 

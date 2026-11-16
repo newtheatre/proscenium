@@ -6,6 +6,7 @@
 import { all, nowMs, usePoint, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { ERASED, type TableMeta } from '#kit/db'
+import { accountScopeSql } from '#kit/accounts'
 import type { ErasureHandler } from '../points/erasure-handler'
 import type { ErasureHold } from '../points/erasure-hold'
 import { accountById, verifiedAddressesOf } from './accounts'
@@ -28,13 +29,20 @@ function bound(sql: string, params: unknown[]): { sql: string, params: unknown[]
   return { sql, params: params.slice(0, highest) }
 }
 
+/**
+ * The person's rows by an account column: the account scope, so rows written under an account
+ * merged into this one are reached too (the column may be alias, or a move the merge job has not
+ * reached yet).
+ */
+const SCOPE = `IN (${accountScopeSql('?1')})`
+
 /** The conditions that pick a table's rows about the person, or null if none can be picked. */
 function matchOf(meta: TableMeta, tables: Map<string, TableMeta>, depth = 0): string | null {
   const subject = meta.options.subject
   if (subject === 'none') return null
   const terms: string[] = []
-  if (typeof subject === 'string') terms.push(`${q(subject)} = ?1`)
-  else if (Array.isArray(subject)) terms.push(...subject.map(c => `${q(c)} = ?1`))
+  if (typeof subject === 'string') terms.push(`${q(subject)} ${SCOPE}`)
+  else if (Array.isArray(subject)) terms.push(...subject.map(c => `${q(c)} ${SCOPE}`))
   else if (subject && 'email' in subject) terms.push(`${q(subject.email)} IN (SELECT value FROM json_each(?2))`)
   else if (subject && 'via' in subject) {
     const via = Object.values(meta.columns).find(c => c.sql === subject.via)
@@ -42,11 +50,11 @@ function matchOf(meta: TableMeta, tables: Map<string, TableMeta>, depth = 0): st
     const parentMatch = parent && depth < 4 ? matchOf(parent, tables, depth + 1) : null // not-policy: a guard against a cycle
     if (parentMatch) terms.push(`${q(subject.via)} IN (SELECT id FROM ${q(parent!.name)} WHERE ${parentMatch})`)
   }
-  terms.push(...meta.subjects.filter(c => !terms.some(t => t.startsWith(`${q(c)} `))).map(c => `${q(c)} = ?1`))
+  terms.push(...meta.subjects.filter(c => !terms.some(t => t.startsWith(`${q(c)} `))).map(c => `${q(c)} ${SCOPE}`))
   // A table about no one in particular still holds what the person did there, under their own
   // name: the audit trail's actor name, the reason they gave for a setting.
   if (!subject && !meta.subjects.length) {
-    for (const c of Object.values(meta.columns)) if (c.meta.account?.role === 'actor') terms.push(`${q(c.sql)} = ?1`)
+    for (const c of Object.values(meta.columns)) if (c.meta.account?.role === 'actor') terms.push(`${q(c.sql)} ${SCOPE}`)
   }
   return terms.length ? terms.map(t => `(${t})`).join(' OR ') : null
 }

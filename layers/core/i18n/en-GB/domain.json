@@ -102,5 +102,7 @@
   "core.navigation.productions.label": "Productions",
   "core.navigation.seasons.label": "Seasons",
   "core.abilities.venue.manage.label": "Manage venues and spaces",
-  "core.navigation.venues.label": "Venues and spaces"
+  "core.navigation.venues.label": "Venues and spaces",
+  "core.abilities.closure.manage.label": "Record closures",
+  "core.navigation.closures.label": "Closures"
 }
