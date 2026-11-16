@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Every vocabulary, the platform's and the theatre's own (C-20), with "New vocabulary" for a list
 // of the theatre's own.
-import { vocabularyInput } from '../../../../../server/vocabularies/input'
+import { vocabularyInput } from '../../../../server/vocabularies/input'
 
 interface Row { key: string, owner: string, label: string, description: string | null, locked: boolean, live: number, retired: number }
 
@@ -24,7 +24,7 @@ const fields = [
   { name: 'description', label: 'Description', kind: 'textarea' as const, optional: true },
 ]
 const create = (values: Record<string, unknown>) => $api<{ key: string }>('/api/core/vocabularies', { method: 'POST', body: { ...values, description: values.description || null } })
-const created = (result: unknown) => navigateTo(`/console/system/vocabularies/${encodeURIComponent((result as { key: string }).key)}`)
+const created = (result: unknown) => navigateTo(`/admin/vocabularies/${encodeURIComponent((result as { key: string }).key)}`)
 </script>
 
 <template>
@@ -35,7 +35,7 @@ const created = (result: unknown) => navigateTo(`/console/system/vocabularies/${
     :columns="columns"
     :filters="filters"
     :row-label="(row: Row) => row.label"
-    :row-to="(row: Row) => `/console/system/vocabularies/${encodeURIComponent(row.key)}`"
+    :row-to="(row: Row) => `/admin/vocabularies/${encodeURIComponent(row.key)}`"
     :empty="{ title: 'No vocabularies', description: 'Vocabularies are lists of options, such as production categories, that records choose from.', icon: 'i-lucide-list-tree' }"
   >
     <template #primary>
