@@ -1,9 +1,8 @@
 // One file's details, for the person who uploaded it or anyone who may edit its owner.
 import { getRouterParam } from 'h3'
 import { sql } from 'drizzle-orm'
-import { defineRoute, can, refuse, useDb } from '#kit'
+import { defineRoute, can, inAccountScope, refuse, useDb } from '#kit'
 import { fileRow, fileSlot, fileUrl } from '../../../files/service'
-import { inAccountScope } from '../../../account-scope'
 
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (event, { actor }) => {
   const row = await fileRow(getRouterParam(event, 'id') ?? '')
