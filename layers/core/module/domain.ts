@@ -144,13 +144,19 @@ export const points = {
       owner: z.string(),
       ability: z.string(),
       many: z.boolean().optional(),
-      accepts: z.array(z.enum(['png', 'jpeg', 'webp', 'svg', 'pdf'])).min(1),
+      // json, zip and csv only for a slot whose files the server makes.
+      accepts: z.array(z.enum(['png', 'jpeg', 'webp', 'svg', 'pdf', 'json', 'zip', 'csv'])).min(1),
       limit: z.string(),
       access: z.enum(['public', 'signed_in', 'record']),
       textClass: z.enum(['public', 'internal', 'personal']),
       clean: z.boolean(),
-    }).strict(),
+      /** 'server': the files are made by the module with storeFile, never uploaded. */
+      source: z.enum(['upload', 'server']).optional(),
+    }).strict()
+      .refine(s => s.source === 'server' || s.accepts.every(kind => !['json', 'zip', 'csv'].includes(kind)), { message: 'only a server slot takes json, zip or csv', path: ['accepts'] }),
   }),
+  /** Whether an account may read the files of a record with `record` access, keyed by the record type. */
+  'core.file-access': point({ kind: 'code', contract: 'file-access' }),
   /**
    * A table whose rows carry an operating day worked out from an instant. Recalculated when the
    * time zone or the rollover changes (C-37). Rows whose `done` column is set are left alone.
@@ -210,6 +216,7 @@ export const contributes = {
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
+  'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/console/system/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
@@ -237,6 +244,7 @@ export const announces = {
   'core.closure.removed': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.file.rejected': event({ version: 1, payload: z.object({ fileId: z.string(), reason: code() }), internal: true }),
+  'core.file.deleted': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.term.retired': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code() }), internal: true }),
   'core.delivery.failed': event({ version: 1, payload: z.object({ notificationId: z.string(), typeKey: code(), channel: z.enum(['email', 'inbox']) }), internal: true }),
   'core.delivery.bounced': event({ version: 1, payload: z.object({ notificationId: z.string(), accountId: z.string().nullable() }), internal: true }),

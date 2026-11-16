@@ -2,7 +2,7 @@
 // Mail is sent only once this succeeds. The address is a role address from the settings, never the
 // administrator's own, so nothing personal is involved. The verify route calls it, and so does the
 // job that follows setting the domain up automatically (C-52).
-import { changeSetting, createUnit, refuse, useSetting } from '#kit'
+import { changeSetting, createUnit, first, nowMs, refuse, useSetting } from '#kit'
 import type { UnitView } from '#kit'
 import { MailError, useMailer } from './mailer'
 import { senderFor, theatreName } from './send'
@@ -42,3 +42,29 @@ export async function verifySendingDomain(unit: UnitView): Promise<VerifyResult>
   await changeSetting(unit, 'core.notifications.verified-domain', domain)
   return { verified: true, domain }
 }
+
+const VERIFY_JOB = 'core.verify-sending-domain'
+
+/**
+ * Before a test message sent by hand: cancels any verify job still waiting, so the two cannot both
+ * send (C-52 queues one after setting the domain up). Cancelling is a conditional write, as is a
+ * job's own start, so exactly one of them wins. Answers 'running' when a job has already started:
+ * its message is on the way and the caller sends nothing.
+ */
+export async function takeOverVerification(): Promise<{ state: 'clear' | 'running', cancelled: string | null }> {
+  const waiting = await first<{ payload: string }>("SELECT payload FROM core_jobs WHERE name = ? AND state = 'queued' ORDER BY created_at DESC LIMIT 1", VERIFY_JOB)
+  const unit = createUnit()
+  unit.add({ sql: "UPDATE core_jobs SET state = 'cancelled', finished_at = ? WHERE name = ? AND state = 'queued'", params: [nowMs(), VERIFY_JOB] })
+  await unit.commit()
+  const running = await first("SELECT 1 FROM core_jobs WHERE name = ? AND state = 'running'", VERIFY_JOB)
+  return { state: running ? 'running' : 'clear', cancelled: waiting ? (JSON.parse(waiting.payload) as { domain: string }).domain : null }
+}
+
+/** Puts back the automatic retries a hand-sent test cancelled, when Cloudflare is not ready yet. */
+export async function resumeVerification(domain: string): Promise<void> {
+  const unit = createUnit()
+  unit.enqueue(VERIFY_JOB, { domain, tries: 1 }, { delay: RESUME_WAIT })
+  await unit.commit()
+}
+
+const RESUME_WAIT = 60 // not-policy: seconds, as the automatic set-up first waits
