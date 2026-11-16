@@ -92,5 +92,7 @@
   "core.settings.rules.stuck-after": "Treat as stuck after must be longer than the wait before the first retry.",
   "core.abilities.notification.configure.label": "Change how messages are sent",
   "core.abilities.venue.manage.label": "Manage venues and spaces",
-  "core.navigation.venues.label": "Venues and spaces"
+  "core.navigation.venues.label": "Venues and spaces",
+  "core.abilities.closure.manage.label": "Record closures",
+  "core.navigation.closures.label": "Closures"
 }

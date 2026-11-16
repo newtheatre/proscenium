@@ -85,6 +85,7 @@ export const records = defineRecords('core', {
   vocabulary: record({ table: 'core_vocabularies' }),
   venue: record({ table: 'core_venues' }),
   space: record({ table: 'core_spaces', parent: 'core.venue' }),
+  closure: record({ table: 'core_closures' }),
 })
 
 export const abilities = defineAbilities('core', {
@@ -98,6 +99,8 @@ export const abilities = defineAbilities('core', {
   'vocabulary.manage': ability({ on: 'core.vocabulary', grantAt: ['site', 'record'] }),
   // A venue and its spaces. Creating a venue needs it site-wide; a grant on one venue covers its spaces.
   'venue.manage': ability({ on: 'core.venue', grantAt: ['site', 'record'] }),
+  // Closures for the theatre, a venue or a space. Site-wide only: a closure cannot scope a grant.
+  'closure.manage': ability(),
 })
 
 const variableName = z.string().regex(/^[a-z][a-zA-Z0-9]*$/)
@@ -230,6 +233,8 @@ export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
   'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
   'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
+  'core.closure.created': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
+  'core.closure.removed': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.file.rejected': event({ version: 1, payload: z.object({ fileId: z.string(), reason: code() }), internal: true }),
   'core.term.retired': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code() }), internal: true }),
