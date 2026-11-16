@@ -169,6 +169,14 @@ session and by address; past it, those pairs answer not met and the source is no
 `requirements.holder(ref, evidence)` gives staff with the source's `holderAbility` a display name,
 and audits the read.
 
+## Public components
+
+A module offers a component to the fork's Markdown pages through `core.public-component`:
+`{ id, component: 'CoreAccessApplication', alias: 'access-application' }`. The component's own name
+starts with its module's name; the alias is what a content file writes (`::access-application`),
+kebab-case, unique across modules and never an HTML element's name. The build refuses a clash, and
+the core layer registers the component a second time, globally, under its alias.
+
 ## External calls
 
 `externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency
