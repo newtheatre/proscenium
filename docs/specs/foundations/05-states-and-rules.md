@@ -66,6 +66,10 @@ stateDiagram-v2
 - **U5.** Work that must not be undone by a failure after it (sending a message, calling a provider) is not done in a unit. It is a job announced by the unit, or an external call (section 6).
 - **U6.** A unit has a limit on statements (a setting of the kit, not of the theatre). Work over the limit must be a job that proceeds in chunks, each its own unit, each safe to repeat.
 
+* **U7.** A fan-out is written set-wise, never one statement per row. Every row of the set travels in one JSON parameter, and each table is written by one `INSERT ... SELECT` that reads it with `json_each`, so the cost in statements does not grow with the number of rows and no statement nears D1's limit on bound parameters. The kit provides the helper, unit.insertSet(table, rows), which returns the ids in order, so a module does not write `json_each` by hand. Ids are made by the kit before the unit is built and travel in the JSON, because the unit does not read (U4). Proved locally by core domain on 16 November 2026: fifty notifications in five statements.
+* **U8.** `unit.announce()` and `unit.audit()` each take one row or a set. A set of any size is one statement, written as U7 describes, and each event in it is dispatched and delivered as its own event. The caller passes the set it read before building the unit; the guards on the change (U2) make that set true or roll everything back, so the writer never selects from the rows just changed.
+* **U9.** One set carries at most `core.units.set-rows-limit` rows, 500 as shipped and provisional until measured on a real D1 database. It is a setting of the kit beside `core.units.statement-limit` (50), stated once here and cited by modules. A larger set is refused with `core.unit.too-large`, and the work becomes a job in chunks as U6 says.
+
 ## 4. An announced event: stored with the change, delivered at least once
 
 ```mermaid
