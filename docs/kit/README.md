@@ -104,6 +104,17 @@ A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the 
 handler (`readRawBody(event, false)`) and validates the query against `input` instead. Such a route
 cannot be idempotent.
 
+### The site's address
+
+Build an absolute address with `await siteUrl('/tickets/abc')` (or `siteOrigin()`), never from a request
+header. It answers from the Worker variable `CORE_SITE_ORIGIN` when set, else the setting
+`core.site.origin`, which first-run setup records from the address it ran on. Until either is set, a
+route answers from its own request; outside a request it refuses with `core.site.origin-unset`, and a
+job that meets that refusal is put back unrun, without spending an attempt. Once an origin is
+recorded, a read on any other host is redirected to it (307) and a change there is refused, except the
+health probe, a provider's webhook (`/api/<module>/webhooks/...`) and first-run setup. The Health
+screen shows whether the address is recorded and when the variable is in force.
+
 ## Core's services
 
 Any module may import core's services without listing core: `import { notifyAddress } from
