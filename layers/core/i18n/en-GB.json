@@ -252,6 +252,7 @@
   "core.settings-sections.brand": "Look and feel",
   "core.settings-sections.files": "Uploaded files",
   "core.settings-sections.notifications": "Email and notices",
+  "core.settings-sections.programme": "Programme",
   "core.settings-sections.sign-in": "Ways to sign in",
   "core.settings-sections.sessions": "Staying signed in",
   "core.settings-sections.recovery": "Recovery codes",

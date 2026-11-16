@@ -247,4 +247,101 @@ export const emailSuppressions = defineTable('core_email_suppressions', {
   extra: t => [check('core_email_suppressions_reason', sql`${t.reason} IN ('hard_bounce', 'complaint', 'manual')`)],
 })
 
-export const tables = { files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+/** A dated label that groups productions (part 2, group 1). A season may be one day long. */
+export const seasons = defineTable('core_seasons', {
+  id: col.id(),
+  slug: col.public(text('slug').notNull()),
+  name: col.public(text('name').notNull()),
+  startsOn: col.public(text('starts_on').notNull()),
+  endsOn: col.public(text('ends_on').notNull()),
+  summary: col.public(text('summary')),
+  state: col.internal(text('state').notNull().default('draft')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+  createdAt: col.createdAt(),
+}, {
+  id: 'sea',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_seasons_slug').on(t.slug),
+    uniqueIndex('core_seasons_name').on(sql`lower(${t.name})`),
+    check('core_seasons_state', sql`${t.state} IN ('draft', 'published', 'archived')`),
+    check('core_seasons_dates', sql`${t.endsOn} >= ${t.startsOn}`),
+  ],
+})
+
+/**
+ * Anything the theatre puts in front of people: its own show, a visiting company's, a hire, or an
+ * event. first_starts_at and last_ends_at are copies kept in step by every performance write.
+ */
+export const productions = defineTable('core_productions', {
+  id: col.id(),
+  slug: col.public(text('slug').notNull()),
+  title: col.public(text('title').notNull()),
+  subtitle: col.public(text('subtitle')),
+  summary: col.public(text('summary')),
+  description: col.public(text('description')),
+  kind: col.internal(text('kind').notNull()),
+  // col.ref, so the vocabulary screen counts the use and refuses to delete a term in use.
+  categoryTermId: col.ref('core_terms', { nullable: true }),
+  seasonId: col.public(text('season_id').references(() => seasons.id, { onDelete: 'set null' })),
+  companyName: col.public(text('company_name')),
+  ageGuidance: col.public(text('age_guidance')),
+  advisoriesConfirmedNone: col.public(integer('advisories_confirmed_none', { mode: 'boolean' }).notNull().default(false)),
+  contentNote: col.public(text('content_note')),
+  runningMinutes: col.public(integer('running_minutes')),
+  intervalCount: col.public(integer('interval_count').notNull().default(0)),
+  externalBookingUrl: col.public(text('external_booking_url')),
+  creditsPublic: col.internal(integer('credits_public', { mode: 'boolean' }).notNull()),
+  state: col.internal(text('state').notNull().default('draft')),
+  cancelReasonTermId: col.ref('core_terms', { nullable: true }),
+  listed: col.internal(integer('listed', { mode: 'boolean' }).notNull().default(true)),
+  publishedAt: col.timestamp('published_at'),
+  firstStartsAt: col.public(integer('first_starts_at')),
+  lastEndsAt: col.public(integer('last_ends_at')),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'prd',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_productions_slug').on(t.slug),
+    index('core_productions_listing').on(t.state, t.lastEndsAt),
+    index('core_productions_season').on(t.seasonId),
+    index('core_productions_category').on(t.categoryTermId),
+    check('core_productions_state', sql`${t.state} IN ('draft', 'published', 'withdrawn', 'cancelled')`),
+    check('core_productions_kind', sql`${t.kind} IN ('own', 'visiting', 'hire', 'event')`),
+    check('core_productions_title', sql`length(${t.title}) BETWEEN 1 AND 200`),
+    check('core_productions_summary', sql`${t.summary} IS NULL OR length(${t.summary}) <= 300`),
+    check('core_productions_age', sql`${t.ageGuidance} IS NULL OR length(${t.ageGuidance}) <= 40`),
+    check('core_productions_running', sql`${t.runningMinutes} IS NULL OR ${t.runningMinutes} > 0`),
+    check('core_productions_intervals', sql`${t.intervalCount} >= 0`),
+    check('core_productions_booking_url', sql`${t.externalBookingUrl} IS NULL OR ${t.externalBookingUrl} LIKE 'https://_%'`),
+    check('core_productions_cancel_reason', sql`(${t.state} = 'cancelled') = (${t.cancelReasonTermId} IS NOT NULL)`),
+  ],
+})
+
+/** Every slug a published production has had, so an old link redirects for ever. */
+export const productionSlugs = defineTable('core_production_slugs', {
+  slug: col.public(text('slug').primaryKey()),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  retiredAt: col.internal(integer('retired_at').notNull()),
+}, { realm: 'operational', subject: 'none', appendOnly: true })
+
+/** The advisories a production carries, from the core.advisory vocabulary, each with a short detail. */
+export const productionAdvisories = defineTable('core_production_advisories', {
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  termId: col.ref('core_terms'),
+  detail: col.public(text('detail')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.productionId, t.termId] }),
+    check('core_production_advisories_detail', sql`${t.detail} IS NULL OR length(${t.detail}) <= 300`),
+  ],
+})
+
+export const tables = { seasons, productions, productionSlugs, productionAdvisories, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }

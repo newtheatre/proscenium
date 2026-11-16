@@ -13,6 +13,8 @@ export type { FindOrCreateInput, FoundAccount, UnclaimedOrigin } from './identit
 export { canonicalAccount, accountLabel } from './identity/accounts'
 export { listTerms, getTerm, assertTerm } from './vocabularies/service'
 export type { Term } from './vocabularies/service'
+export { getProduction, productionBySlug } from './programme/service'
+export type { Production, ProductionState, Season } from './programme/service'
 export { addressFor, addressesFor } from './identity/addresses'
 export type { Side } from './identity/addresses'
 export { describeViewer } from './interface/viewer'
