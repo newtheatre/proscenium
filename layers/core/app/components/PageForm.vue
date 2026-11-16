@@ -13,11 +13,14 @@ import { phrase, toRefusal, type RefusalView } from '../composables/useRefusal'
 export interface FormField {
   name: string
   label: string
-  kind: 'text' | 'email' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox'
+  kind: 'text' | 'email' | 'textarea' | 'number' | 'date' | 'select' | 'checkbox' | 'radio' | 'ticks'
   help?: string
   optional?: boolean
   placeholder?: string
-  options?: { value: string, label: string }[]
+  /** Choices for select, radio and ticks. A radio's values may be numbers (0, 1 or 2 companions). */
+  options?: { value: string | number, label: string }[]
+  /** ticks only: each ticked option opens a short note of at most `max` characters; leave out for no notes. */
+  notes?: { max: number, label: string }
   /** Sits beside the next field: only when the two are one thought (start and end). */
   pairWithNext?: boolean
 }
@@ -60,6 +63,19 @@ const USlideover = resolveComponent('USlideover')
 const PageFrame = resolveComponent('PageFrame')
 const bodySlot = computed(() => panel.value ? 'body' : 'default')
 const panel = computed(() => props.open !== undefined && props.fields.length <= PANEL_FIELD_LIMIT)
+// A tick list holds { value, note? } for each ticked option, in the order of the options.
+function tickOf(name: string, value: string | number) {
+  return (state[name] as { value: string | number, note?: string }[] | undefined)?.find(x => x.value === value)
+}
+function setTick(g: FormField, value: string | number, on: boolean | 'indeterminate') {
+  const kept = ((state[g.name] as { value: string | number, note?: string }[] | undefined) ?? []).filter(x => x.value !== value)
+  const next = on === true ? [...kept, tickOf(g.name, value) ?? { value }] : kept
+  state[g.name] = (g.options ?? []).flatMap(o => next.filter(x => x.value === o.value))
+}
+function setNote(g: FormField, value: string | number, note: string) {
+  state[g.name] = ((state[g.name] as { value: string | number, note?: string }[] | undefined) ?? []).map(x => x.value === value ? (note ? { value, note } : { value }) : x)
+}
+
 const state = reactive<Record<string, any>>({ ...props.initial })
 const base = ref<Record<string, unknown>>({ ...props.initial })
 const version = ref(props.version)
@@ -308,6 +324,47 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-model="state[g.name]"
                 class="w-full"
               />
+              <URadioGroup
+                v-else-if="g.kind === 'radio'"
+                v-model="state[g.name]"
+                :items="(g.options ?? []).map(o => ({ value: o.value, label: o.label }))"
+                value-key="value"
+                :legend="g.label"
+                orientation="horizontal"
+              />
+              <fieldset
+                v-else-if="g.kind === 'ticks'"
+                class="space-y-3"
+              >
+                <legend class="sr-only">
+                  {{ g.label }}
+                </legend>
+                <div
+                  v-for="o in g.options ?? []"
+                  :key="String(o.value)"
+                  class="space-y-2"
+                >
+                  <UCheckbox
+                    :id="`${g.name}-${o.value}`"
+                    :model-value="!!tickOf(g.name, o.value)"
+                    :label="o.label"
+                    @update:model-value="setTick(g, o.value, $event)"
+                  />
+                  <UFormField
+                    v-if="g.notes && tickOf(g.name, o.value)"
+                    :label="g.notes.label"
+                    :hint="`${(tickOf(g.name, o.value)?.note ?? '').length}/${g.notes.max}`"
+                    class="ms-7"
+                  >
+                    <UInput
+                      :model-value="tickOf(g.name, o.value)?.note ?? ''"
+                      :maxlength="g.notes.max"
+                      class="w-full"
+                      @update:model-value="setNote(g, o.value, String($event))"
+                    />
+                  </UFormField>
+                </div>
+              </fieldset>
               <USelect
                 v-else-if="g.kind === 'select'"
                 v-model="state[g.name]"

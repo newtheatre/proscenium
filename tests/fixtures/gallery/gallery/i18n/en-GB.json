@@ -23,5 +23,6 @@
   "gallery.records.production": "Production",
   "gallery.quick-actions.new-booking.label": "New sample booking",
   "gallery.quick-actions.new-booking.keywords": "book sell tickets",
-  "gallery.navigation.drafts.label": "Sample drafts"
+  "gallery.navigation.drafts.label": "Sample drafts",
+  "gallery.navigation.choices.label": "Sample choices"
 }
