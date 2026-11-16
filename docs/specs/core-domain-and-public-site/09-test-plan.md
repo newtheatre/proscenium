@@ -28,7 +28,7 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 | The draft leak | End to end | A draft production with a draft performance, and a published production with one draft performance. | No public page, feed, open-data route, sitemap or search result mentions any draft. Each returns "not found", not "forbidden". |
 | The silent warning | Integration | A production with no advisories and no confirmation. | It cannot be published. |
 | The closed week | Integration | A blocking closure, then a performance inside it. Then a closure created over an existing performance. | The first is refused. The second saves, lists the performance as a warning, and changes nothing. |
-| The long run | Integration | A run that would create 200 performances. | Created by a job in chunks that respect the 90-parameter limit, each chunk its own unit of work. Running a chunk twice creates nothing twice. A job stopped part way reports how many were created, and can be finished or undone. |
+| The long run | Integration | A run that would create 200 performances, one of them clashing in a second run. Then a run over the kit's limit on rows in one unit. | The 200 are saved whole in one unit of a handful of statements, under the kit's statement limit. With the clash, none is saved. The larger run is created by a job in chunks, each its own unit. Running a chunk twice creates nothing twice. A job stopped part way reports how many were created, and can be finished or undone. |
 
 ## Vocabularies
 
@@ -54,7 +54,7 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 
 | Name | Tier | Set up | Must hold |
 | --- | --- | --- | --- |
-| The double send | Integration | The send job runs twice for one delivery, at once. | One message goes to the provider. |
+| The double send | Integration | The send job runs twice for one delivery, at once. Separately, notify() is called twice for the same fifty recipients with the same dedupe keys, and once for one more than the kit's limit on rows in one unit. | One message goes to the provider. The fifty cost about five statements, the repeat writes no row, and the oversized call is refused before anything is written. |
 | The lost queue message | Integration | A delivery is recorded and its queue message dropped. | The sweep sends it within the stuck window. |
 | The rolled-back receipt | Integration | A caller's batch fails after `notify()` added its statements. | No notification, no delivery, no inbox item. |
 | The muted receipt | Integration | A person with every switch off receives a transactional type. | It is sent. The preferences screen offers no switch for it. |
