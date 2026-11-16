@@ -5,3 +5,6 @@ export type { NotifyAddressOptions, NotificationType } from './notifications/sen
 export { getBrand } from './brand/theme'
 export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from './calendar'
 export { attachFile, detachFile, fileUrl } from './files/service'
+export { findOrCreateAccount } from './identity/guests'
+export type { FindOrCreateInput, FoundAccount, UnclaimedOrigin } from './identity/guests'
+export { canonicalAccount, accountLabel } from './identity/accounts'
