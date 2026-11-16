@@ -41,6 +41,7 @@ export default defineModule({
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
     'order.release': ability({ on: 'box-office.order' }),
+    'ticket.admit': ability({ on: 'core.performance' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
