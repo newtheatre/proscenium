@@ -11,6 +11,7 @@ export const identitySettings = defineSettings('core', {
   'sign-in.link-lifetime': setting.duration({ default: '15m', min: '5m', max: '1h', change, audience: 'public', quotable: true }),
   'sign-in.code-attempts': setting.integer({ default: 5, min: 3, max: 10, unit: 'core.units.attempts', change }),
   'sign-in.open-sign-up': setting.boolean({ default: true, change, audience: 'public' }),
+  'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
   'sign-in.google': setting.boolean({ default: false, change, audience: 'public' }),
   // Not in the specification's list: Google needs a client id as well as the secret, and an id is
   // not a secret, so it is a setting the theatre types in beside the switch.
@@ -22,6 +23,7 @@ export const identitySettings = defineSettings('core', {
   'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   'sessions.idle-limit': setting.duration({ default: '14d', min: '1h', max: '90d', change }),
 
+  'recovery.enrolment-link-lifetime': setting.duration({ default: '24h', min: '1h', max: '7d', change }),
   'recovery.code-count': setting.integer({ default: 10, min: 6, max: 20, unit: 'core.units.codes', change }),
 
   'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
@@ -55,6 +57,7 @@ export const identityAbilities = defineAbilities('core', {
   'account.search': ability({ risk: 'normal', grantAt: ['site'] }),
   'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'], grantAt: ['site'] }),
   'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
+  'account.recover': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'account.merge': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'session.end': ability({ on: 'core.account', risk: 'privileged', owner: 'grants', grantAt: ['site'] }),
   'role.read': ability({ risk: 'normal', audit: false, grantAt: ['site'] }),
@@ -81,6 +84,8 @@ export const identityEvents = {
 export const identityJobs = {
   // The link and code travel sealed with a key derived from CORE_SESSION_KEY, never in clear.
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
+  // Security notices to named addresses (identity/notices.ts), sealed like the sign-in link.
+  'core.send-account-notice': job({ payload: z.object({ sealed: z.string() }), lane: 'prompt' }),
 }
 
 export const identityTasks = {
@@ -106,6 +111,58 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
         body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+      },
+    },
+  }, {
+    id: 'core.address-verify',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'url' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Confirm your email address for {{ theatre }}',
+        body: 'Use this link to confirm this address for your account. It works once.\n\n[Confirm this address]({{ link }})\n\nIf you did not add this address, you can ignore this email and nothing will change.',
+      },
+    },
+  }, {
+    id: 'core.credential-added',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { what: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your sign-in at {{ theatre }} has changed',
+        body: 'This was added to your account: {{ what }}.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+      },
+    },
+  }, {
+    id: 'core.address-changed',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: {},
+    wording: {
+      'en-GB': {
+        subject: 'Your email address at {{ theatre }} has changed',
+        body: 'This address is no longer the one {{ theatre }} uses to write to you about tickets and your account.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+      },
+    },
+  }, {
+    id: 'core.members-address-changed',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: {},
+    wording: {
+      'en-GB': {
+        subject: 'Your members\' email address at {{ theatre }} has changed',
+        body: 'This address is no longer the one {{ theatre }} uses for members\' messages.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
       },
     },
   }],
