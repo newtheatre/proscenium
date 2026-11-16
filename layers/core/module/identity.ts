@@ -126,9 +126,6 @@ export const identityEvents = {
 export const identityJobs = {
   // The link and code travel sealed with a key derived from CORE_SESSION_KEY, never in clear.
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
-  // Security notices to named addresses (identity/notices.ts), sealed like the sign-in link.
-  'core.send-account-notice': job({ payload: z.object({ sealed: z.string() }), lane: 'prompt' }),
-  'core.send-invitation': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
   // The erasure batch for one request (ID-16). Safe to repeat: a second run writes nothing.
   'core.run-erasure': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
 }
@@ -290,8 +287,7 @@ export const identityContributions = {
       },
     },
   }, {
-    // Sent by notifyAddress from a job, like the sign-in link. The link signs the person in, so it
-    // is sealed. It stays on the job until notify() can reach an account made in the same unit.
+    // The link signs the person in, so it is sealed: never stored in clear in core_notifications.
     id: 'core.invitation',
     category: 'transactional' as const,
     side: 'audience' as const,

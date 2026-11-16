@@ -1,23 +1,18 @@
 // Security notices about an account (part 4, "Notification types"): a credential added, a recovery
 // used, an address changed or removed, and the link that verifies an address. Each goes to named
-// addresses (every verified one, the old one, the new one) rather than to a side, so it is sent
-// by notifyAddress from a job after the change commits: notify() reaches an account's one address
-// on a side, not named ones. The addresses, and any link, travel sealed in the job's payload, and
-// the verifying link is a sealed variable.
+// addresses (every verified one, the old one, the new one) rather than to a side, so each address
+// gets its own notifyAddress, written in the change's unit and sent once it commits. The verifying
+// link is a sealed variable: kept encrypted, sent by email only and cleared once sent.
 import { newId, type UnitView } from '#kit'
-import { sealValue } from './crypto'
+import { notifyAddress } from '../notifications/send'
 import { verifiedAddressesOf } from './accounts'
 
 export type NoticeType = 'core.credential-added' | 'core.address-changed' | 'core.members-address-changed' | 'core.address-verify'
 
-export interface Notice { type: NoticeType, addresses: string[], variables: Record<string, string>, key: string }
-
-/** Queues one notice to each of these addresses. `key` makes a retried job send nothing twice. */
+/** One notice to each of these addresses, in the caller's unit. */
 export async function queueNotice(unit: UnitView, type: NoticeType, addresses: string[], variables: Record<string, string> = {}): Promise<void> {
-  const list = [...new Set(addresses)]
-  if (!list.length) return
-  const notice: Notice = { type, addresses: list, variables, key: newId('ntc', { random: true }) }
-  unit.enqueue('core.send-account-notice', { sealed: await sealValue('account-notice', notice) })
+  const key = newId('ntc', { random: true })
+  for (const address of new Set(addresses)) await notifyAddress(unit, type, { address, variables, dedupeKey: `${key}:${address}` })
 }
 
 /** What was added, in the words of the core.credential-added message. */
