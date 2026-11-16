@@ -104,5 +104,11 @@
   "core.abilities.venue.manage.label": "Manage venues and spaces",
   "core.navigation.venues.label": "Venues and spaces",
   "core.abilities.closure.manage.label": "Record closures",
-  "core.navigation.closures.label": "Closures"
+  "core.navigation.closures.label": "Closures",
+  "core.settings.programme.doors-before.label": "Doors open before the start",
+  "core.settings.programme.doors-before.help": "How long before a performance starts the doors open, unless a performance sets its own time.",
+  "core.settings.programme.default-running-time.label": "Running time if not given",
+  "core.settings.programme.default-running-time.help": "How long a new performance lasts when its production has no running time and no end is given.",
+  "core.abilities.performance.schedule.label": "Add, schedule and change performances",
+  "core.abilities.performance.cancel.label": "Cancel and reinstate performances"
 }

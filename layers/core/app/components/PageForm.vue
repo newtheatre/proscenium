@@ -5,6 +5,7 @@
      overwriting. Up to about six fields it opens as a panel over the list; longer forms get a page. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
+import { parseDate } from '@internationalized/date'
 import type { z } from 'zod'
 import type { FormErrorEvent } from '@nuxt/ui'
 import { isConflict, mergeConflict, PANEL_FIELD_LIMIT } from '../../shared/form'
@@ -78,6 +79,12 @@ function setTick(g: FormField, value: string | number, on: boolean | 'indetermin
 }
 function setNote(g: FormField, value: string | number, note: string) {
   state[g.name] = ((state[g.name] as { value: string | number, note?: string }[] | undefined) ?? []).map(x => x.value === value ? (note ? { value, note } : { value }) : x)
+}
+
+// A date is kept as the server takes it (2027-09-01); the control works in calendar dates.
+function dateOf(value: unknown) {
+  try { return typeof value === 'string' && value ? parseDate(value) : undefined }
+  catch { return undefined }
 }
 
 const state = reactive<Record<string, any>>({ ...props.initial })
@@ -277,22 +284,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           :description="t('core.form.conflict.description')"
           role="alert"
         />
-        <fieldset
+        <URadioGroup
           v-for="c in conflicts"
           :key="c.field"
-          class="rounded-lg border border-default p-3"
-        >
-          <legend class="px-1 text-sm font-medium">
-            {{ labelOf(c.field) }}
-          </legend>
-          <URadioGroup
-            v-model="c.take"
-            :items="[
-              { value: 'mine', label: t('core.form.conflict.mine', { value: show(c.mine) }) },
-              { value: 'theirs', label: t('core.form.conflict.theirs', { value: show(c.theirs) }) },
-            ]"
-          />
-        </fieldset>
+          v-model="c.take"
+          :legend="labelOf(c.field)"
+          variant="table"
+          :items="[
+            { value: 'mine', label: t('core.form.conflict.mine', { value: show(c.mine) }) },
+            { value: 'theirs', label: t('core.form.conflict.theirs', { value: show(c.theirs) }) },
+          ]"
+        />
         <UButton
           v-if="conflicts.length"
           :label="t('core.form.conflict.apply')"
@@ -320,7 +322,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               v-for="g in row"
               :key="g.name"
               :name="g.name"
-              :label="g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
+              :label="g.kind === 'checkbox' ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
               :help="g.help"
             >
               <UTextarea
@@ -381,6 +383,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <UInputNumber
                 v-else-if="g.kind === 'number'"
                 v-model="state[g.name]"
+              />
+              <UInputDate
+                v-else-if="g.kind === 'date'"
+                :model-value="dateOf(state[g.name])"
+                @update:model-value="state[g.name] = $event ? $event.toString() : ''"
               />
               <UInput
                 v-else

@@ -470,4 +470,67 @@ export const closures = defineTable('core_closures', {
   ],
 })
 
-export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+/**
+ * One occasion on which a production happens (part 2, group 1). Everything record-like in every
+ * other module keys to a row here, never to a date or a room.
+ */
+export const performances = defineTable('core_performances', {
+  id: col.id(),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'restrict' })),
+  venueId: col.public(text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' })),
+  spaceId: col.public(text('space_id').notNull()),
+  startsAt: col.public(integer('starts_at').notNull()),
+  doorsAt: col.public(integer('doors_at')),
+  endsAt: col.public(integer('ends_at').notNull()),
+  operatingDay: col.internal(text('operating_day').notNull()),
+  intervalCount: col.public(integer('interval_count')),
+  capacity: col.internal(integer('capacity')),
+  label: col.public(text('label')),
+  externalBookingUrl: col.public(text('external_booking_url')),
+  state: col.public(text('state').notNull().default('draft')),
+  cancelledAt: col.public(integer('cancelled_at')),
+  cancelReasonTermId: col.ref('core_terms', { nullable: true }),
+  cancelNote: col.public(text('cancel_note')),
+  // Set with state completed, so the operating-day recalculation leaves finished nights alone.
+  completedAt: col.internal(integer('completed_at')),
+  createdAt: col.createdAt(),
+}, {
+  id: 'perf',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    // The venue can never disagree with the space: the pair references core_spaces (id, venue_id).
+    foreignKey({ columns: [t.spaceId, t.venueId], foreignColumns: [spaces.id, spaces.venueId] }).onDelete('restrict'),
+    index('core_performances_starts').on(t.startsAt),
+    index('core_performances_day').on(t.operatingDay),
+    index('core_performances_production').on(t.productionId, t.startsAt),
+    index('core_performances_venue').on(t.venueId, t.startsAt),
+    index('core_performances_space').on(t.spaceId, t.startsAt),
+    check('core_performances_state', sql`${t.state} IN ('draft', 'scheduled', 'cancelled', 'completed')`),
+    check('core_performances_period', sql`${t.endsAt} > ${t.startsAt}`),
+    check('core_performances_doors', sql`${t.doorsAt} IS NULL OR ${t.doorsAt} <= ${t.startsAt}`),
+    check('core_performances_interval', sql`${t.intervalCount} IS NULL OR ${t.intervalCount} >= 0`),
+    check('core_performances_capacity', sql`${t.capacity} IS NULL OR ${t.capacity} >= 0`),
+    check('core_performances_label', sql`${t.label} IS NULL OR length(${t.label}) BETWEEN 1 AND 40`),
+    check('core_performances_booking_url', sql`${t.externalBookingUrl} IS NULL OR ${t.externalBookingUrl} LIKE 'https://_%'`),
+    check('core_performances_cancel', sql`(${t.state} = 'cancelled') = (${t.cancelledAt} IS NOT NULL AND ${t.cancelReasonTermId} IS NOT NULL)`),
+    check('core_performances_cancel_note', sql`${t.cancelNote} IS NULL OR length(${t.cancelNote}) <= 200`),
+    check('core_performances_completed', sql`(${t.state} = 'completed') = (${t.completedAt} IS NOT NULL)`),
+  ],
+})
+
+/** What one performance offers (captioned, signed, relaxed and so on), from core.access-feature. */
+export const performanceAccess = defineTable('core_performance_access', {
+  performanceId: col.internal(text('performance_id').notNull().references(() => performances.id, { onDelete: 'cascade' })),
+  termId: col.ref('core_terms'),
+  detail: col.public(text('detail')),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.performanceId, t.termId] }),
+    check('core_performance_access_detail', sql`${t.detail} IS NULL OR length(${t.detail}) <= 200`),
+  ],
+})
+
+export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }

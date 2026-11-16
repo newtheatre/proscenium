@@ -1,7 +1,7 @@
 // Seasons and productions (part 2, group 1; part 3; C-01, C-02, C-03, C-09, C-10). Moves are
 // guarded in the statement that makes them, so two people pressing at once cannot both succeed; a
-// read beforehand only chooses the words of the refusal. Performances, credits, cancelling a whole
-// production and the change guard arrive in the next slices.
+// read beforehand only chooses the words of the refusal. Performances are in performances.ts;
+// credits and cancelling a whole production arrive in later slices.
 import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse, useSetting } from '#kit'
 import type { UnitView } from '#kit'
@@ -218,6 +218,8 @@ export interface ProductionQuery { q?: string, state?: ProductionState, seasonId
 export async function listProductions(query: ProductionQuery): Promise<{ rows: Production[], total: number }> {
   const where: string[] = []
   const params: unknown[] = []
+  // To be replaced: search moves behind the kit's readList (Foundations part 4), and no module keeps
+  // a LIKE of its own. Add no more.
   if (query.q?.trim()) {
     where.push("(lower(title) LIKE ? ESCAPE '\\' OR lower(coalesce(company_name, '')) LIKE ? ESCAPE '\\')")
     const like = `%${query.q.trim().toLowerCase().replace(/[\\%_]/g, c => `\\${c}`)}%`
@@ -353,7 +355,11 @@ export async function withdrawProduction(unit: UnitView, id: string): Promise<vo
 /** Deletes a draft that was never published. Once performances exist, none may have left draft. */
 export async function deleteProduction(unit: UnitView, id: string): Promise<void> {
   await productionRow(id)
-  unit.add(sql`DELETE FROM core_productions WHERE id = ${id} AND state = 'draft' AND published_at IS NULL`)
-    .expect(1, { code: 'core.production.not-deletable', reason: 'Only a draft that was never published can be deleted.', remedy: 'Withdraw it instead.' })
+  // Its draft performances go with it; one that ever left draft keeps the production.
+  const deletable = sql`EXISTS (SELECT 1 FROM core_productions WHERE id = ${id} AND state = 'draft' AND published_at IS NULL)
+    AND NOT EXISTS (SELECT 1 FROM core_performances WHERE production_id = ${id} AND state <> 'draft')`
+  unit.add(sql`DELETE FROM core_performances WHERE production_id = ${id} AND ${deletable}`)
+  unit.add(sql`DELETE FROM core_productions WHERE id = ${id} AND ${deletable}`)
+    .expect(1, { code: 'core.production.not-deletable', reason: 'Only a draft that was never published, with no performance scheduled, can be deleted.', remedy: 'Withdraw it instead.' })
   unit.audit({ action: 'delete', record: ['core.production', id] })
 }

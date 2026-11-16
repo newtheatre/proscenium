@@ -123,6 +123,18 @@ export default defineModule({
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
+    // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
+    'core.navigation': [
+      { id: 'payments.session', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/session', icon: 'i-lucide-calculator', ability: 'payments.session.open', order: 10 },
+      { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },
+      { id: 'payments.refunds', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/refunds', icon: 'i-lucide-undo-2', ability: 'payments.refund.approve', order: 30, count: 'payments.refunds-waiting' },
+      { id: 'payments.sessions', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/sessions', icon: 'i-lucide-receipt', ability: 'payments.session.view', order: 40 },
+      { id: 'payments.providers', menu: 'console', group: 'money', section: 'setup', to: '/console/payments/providers', icon: 'i-lucide-credit-card', ability: 'payments.provider.manage', order: 10 },
+    ],
+    'core.count': [
+      { id: 'payments.attention', file: 'attention' },
+      { id: 'payments.refunds-waiting', file: 'refunds-waiting' },
+    ],
     'core.vocabulary': [{
       id: 'payments.refund-decline-reason',
       label: 'Reasons for declining a refund',

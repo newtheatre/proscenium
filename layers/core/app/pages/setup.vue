@@ -29,7 +29,7 @@ async function start() {
 
 async function finish(code: string) {
   const answer = await callIdentity<{ next: string }>('/api/core/setup/finish', { code })
-  if (answer.ok) return navigateTo(answer.data.next)
+  if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
 }
 </script>
