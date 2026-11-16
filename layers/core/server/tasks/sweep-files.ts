@@ -15,10 +15,12 @@ export default defineTask(async (unit) => {
   }
   const purged = await all<{ id: string, object_key: string }>("SELECT id, object_key FROM core_files WHERE state = 'deleted' AND purge_after < ? LIMIT ?", at, batch)
   for (const row of purged) unit.add({ sql: "DELETE FROM core_files WHERE id = ? AND state = 'deleted'", params: [row.id] })
-  const expired = await all<{ id: string, object_key: string }>("SELECT id, object_key FROM core_files WHERE expires_at < ? AND state != 'pending' LIMIT ?", at, batch)
+  // An expired file skips core.files.deleted-retention: it was made to last only so long.
+  const expired = await all<{ id: string, object_key: string, slot: string, state: string }>("SELECT id, object_key, slot, state FROM core_files WHERE expires_at < ? AND state != 'pending' LIMIT ?", at, batch)
   for (const row of expired) {
     unit.add({ sql: 'DELETE FROM core_files WHERE id = ? AND expires_at < ?', params: [row.id, at] })
     unit.audit({ action: 'delete', record: ['core.file', row.id], detail: { expired: true } })
+    if (row.state === 'ready') unit.announce('core.file.deleted', { fileId: row.id, slot: row.slot }, { record: ['core.file', row.id] })
   }
   unit.afterCommit(async () => {
     for (const row of [...stale, ...purged, ...expired]) await store.delete(row.object_key)

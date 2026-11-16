@@ -1,7 +1,7 @@
 // The file service (C-23, C-36): an upload is stored, checked and cleaned in a job, then attached
 // to its owner. Nothing is served until it is ready, and the bytes are only reachable through the
 // row, at /files/<id>.
-import { createUnit, first, newId, nowMs, refuse, usePoint, useSetting, files as store } from '#kit'
+import { all, createUnit, first, newId, nowMs, refuse, usePoint, useSetting, files as store } from '#kit'
 import type { Actor, UnitView } from '#kit'
 import type { FileAccess } from '../points/file-access'
 import { clean, MEDIA_TYPES, Rejected, sniff, type FileKind } from './inspect'
@@ -123,6 +123,8 @@ export async function attachFile(unit: UnitView, fileId: string, target: { slot:
 
 async function setAsideOthers(unit: UnitView, row: FileRow, at: number) {
   const keep = await useSetting('core.files.deleted-retention') as number
+  const others = await all<{ id: string }>("SELECT id FROM core_files WHERE owner_type = ? AND owner_id = ? AND slot = ? AND id != ? AND state = 'ready' AND attached_at IS NOT NULL", row.owner_type, row.owner_id, row.slot, row.id)
+  for (const other of others) unit.announce('core.file.deleted', { fileId: other.id, slot: row.slot }, { record: ['core.file', other.id] })
   unit.add({
     sql: "UPDATE core_files SET state = 'deleted', deleted_at = ?, purge_after = ? WHERE owner_type = ? AND owner_id = ? AND slot = ? AND id != ? AND state = 'ready' AND attached_at IS NOT NULL",
     params: [at, at + keep * 1000, row.owner_type, row.owner_id, row.slot, row.id], // not-policy: seconds to milliseconds
@@ -133,8 +135,10 @@ async function setAsideOthers(unit: UnitView, row: FileRow, at: number) {
 export async function detachFile(unit: UnitView, fileId: string): Promise<void> {
   const keep = await useSetting('core.files.deleted-retention') as number
   const at = nowMs()
+  const row = await first<{ slot: string }>("SELECT slot FROM core_files WHERE id = ? AND state IN ('ready', 'pending')", fileId)
   unit.add({ sql: "UPDATE core_files SET state = 'deleted', deleted_at = ?, purge_after = ? WHERE id = ? AND state IN ('ready', 'pending')", params: [at, at + keep * 1000, fileId] }) // not-policy: seconds to milliseconds
   unit.audit({ action: 'delete', record: ['core.file', fileId] })
+  if (row) unit.announce('core.file.deleted', { fileId, slot: row.slot }, { record: ['core.file', fileId] })
 }
 
 /**
@@ -168,6 +172,7 @@ export async function storeFile(unit: UnitView, input: { slot: string, ownerType
   if (!slot.many) await setAsideOthers(unit, row, at)
   unit.add({ sql: "UPDATE core_files SET state = 'ready', ready_at = ?, attached_at = ? WHERE id = ? AND state = 'pending'", params: [at, at, id] }).expect(1)
   unit.audit({ action: 'create', record: ['core.file', id], detail: { slot: slot.id } })
+  unit.announce('core.file.ready', { fileId: id, slot: slot.id }, { record: ['core.file', id] })
   return id
 }
 

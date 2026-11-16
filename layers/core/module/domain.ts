@@ -192,6 +192,7 @@ export const contributes = {
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
+  'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }],
   'core.public-component': [{ id: 'setting' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
@@ -214,6 +215,7 @@ export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.file.rejected': event({ version: 1, payload: z.object({ fileId: z.string(), reason: code() }), internal: true }),
+  'core.file.deleted': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.term.retired': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code() }), internal: true }),
   'core.term.merged': event({ version: 1, payload: z.object({ termId: z.string(), vocabulary: code(), intoId: z.string() }), internal: true }),
 }

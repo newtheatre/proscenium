@@ -15,6 +15,7 @@ import { resetRateLimits } from '#kit/ratelimit'
 import { createUnit, setClock } from '#kit'
 import { storeFile } from '../../server/files/service'
 import sweepFiles from '../../server/tasks/sweep-files'
+import eraseFiles from '../../server/contributions/core.erasure-handler/files'
 import { readers } from '../../../../tests/fixtures/modules/seats/server/contributions/core.file-access/seats-performance'
 import { env, inContext, person, rows, sent, server } from '../../../../tests/integration/helpers'
 
@@ -236,6 +237,25 @@ describe('a file the server makes (storeFile)', () => {
     }, { kind: 'job' })
     expect(await rows('SELECT id FROM core_files WHERE id = ?', id)).toEqual([])
     expect(await env.FILES!.get(row!.object_key)).toBeNull()
+    expect(await rows("SELECT payload FROM core_events WHERE name = 'core.file.deleted' AND payload LIKE ?", `%${id}%`)).toHaveLength(1)
+  })
+
+  it('goes with the account that owns it when the account is erased', async () => {
+    const accountId = 'acc_2222222222bbbbbbbbbbbbbbbb'
+    await env.DB.prepare("INSERT INTO core_files (id, object_key, owner_type, owner_id, slot, text_class, media_type, byte_size, sha256, access, state, created_at) VALUES ('fil_2222222222cccccccccccccccc', 'files/erase-me', 'core.account', ?, 'core.data-download', 'personal', 'application/zip', 3, 'x', 'record', 'ready', ?)").bind(accountId, Date.now()).run()
+    await inContext(async () => {
+      const unit = createUnit()
+      await eraseFiles.erase(unit.view(), { accountId, emails: [] })
+      await unit.commit()
+    })
+    expect(await rows("SELECT state FROM core_files WHERE id = 'fil_2222222222cccccccccccccccc'")).toEqual([{ state: 'deleted' }])
+    expect(await rows("SELECT name FROM core_events WHERE name = 'core.file.deleted' AND payload LIKE '%fil_2222222222cccccccccccccccc%'")).toHaveLength(1)
+    await inContext(async () => {
+      const unit = createUnit()
+      await sweepFiles(unit.view(), { dueAt: Date.now() + 1000 })
+      await unit.commit()
+    }, { kind: 'job' })
+    expect(await rows("SELECT id FROM core_files WHERE id = 'fil_2222222222cccccccccccccccc'")).toEqual([])
   })
 
   it('leaves nothing usable when the caller\'s unit fails, and the sweep clears it up', async () => {
