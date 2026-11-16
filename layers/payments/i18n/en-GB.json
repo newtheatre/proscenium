@@ -31,5 +31,9 @@
 
   "payments.abilities.provider.manage.label": "Add payment providers, pair card readers and switch test mode",
   "payments.abilities.settings.manage.label": "Change payments settings",
+  "payments.abilities.attempt.attest.label": "Record a cash or card machine payment at the desk",
+  "payments.abilities.session.open.label": "Open and cash up your own till session",
+  "payments.abilities.session.view.label": "See till sessions and their counts",
+  "payments.abilities.session.close-any.label": "Close someone else's till session, or countersign a cash difference",
   "payments.abilities.attempt.reconcile.label": "Answer a payment with no answer from the provider's own records"
 }

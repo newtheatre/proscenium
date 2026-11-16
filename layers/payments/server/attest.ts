@@ -1,6 +1,6 @@
 // A cash or standalone-card payment, recorded by the person who took it. The attempt is written when
 // they confirm it, then answered in their name; if that answer completes the intent, it settles.
-import { all, createUnit, Refusal, useSetting } from '#kit'
+import { all, createUnit, first, Refusal, useSetting } from '#kit'
 import { addAttempt, recordAnswer } from './answers'
 import { getIntent } from './intents'
 import { providerAccount, providers } from './providers'
@@ -23,6 +23,8 @@ export async function attest(input: AttestInput): Promise<{ attemptId: string, s
   if (!intent) throw new Refusal('core.not-found', 'There is no such payment.', { status: 404 })
   if (intent.state !== 'open') throw new Refusal('payments.intent.not-open', 'This payment is no longer open.', { status: 409 })
   if (intent.channel !== 'desk') throw new Refusal('payments.attempt.desk-only', 'Cash and card machine payments are taken at the desk.', { status: 409 })
+  if (intent.session_id && (await first<{ state: string }>('SELECT state FROM payments_sessions WHERE id = ?', intent.session_id))?.state !== 'open')
+    throw new Refusal('payments.session.not-open', 'The till session for this payment is being cashed up or is closed.', { status: 409 })
   const account = await providerAccount(input.providerAccountId)
   const provider = account && (await providers()).get(account.provider)
   if (!account?.active || !provider || !provider.capabilities.includes('attested') || !provider.methods.some(m => m.method === input.method && m.channels.includes('desk')))

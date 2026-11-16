@@ -34,11 +34,15 @@ export default defineModule({
     'intent': { table: 'payments_intents' },
     'attempt': { table: 'payments_attempts' },
     'refund': { table: 'payments_refunds' },
-    'session': { table: 'payments_sessions' },
+    'session': { table: 'payments_sessions', owner: 'opened_by' },
   }),
   abilities: defineAbilities('payments', {
     'provider.manage': ability({ risk: 'privileged' }),
     'attempt.reconcile': ability({ on: 'payments.attempt', risk: 'privileged' }),
+    'attempt.attest': ability(),
+    'session.open': ability(),
+    'session.view': ability({ on: 'payments.session', owner: 'grants' }),
+    'session.close-any': ability({ on: 'payments.session', risk: 'privileged', owner: 'refuses', implies: ['session.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -57,6 +61,8 @@ export default defineModule({
       'payments.intent.expired': event({ version: 1, payload: z.object({ intentId: z.string(), owners }), internal: true }),
       // An operational alarm for staff.
       'payments.attempt.unknown': event({ version: 1, payload: z.object({ attemptId: z.string() }), internal: true }),
+      // A till cashed up. No subject: only the session's id.
+      'payments.session.closed': event({ version: 1, payload: z.object({ sessionId: z.string() }), internal: false }),
     },
   },
 
