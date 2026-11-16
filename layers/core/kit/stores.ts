@@ -15,7 +15,7 @@ function kv(): KVNamespace {
 }
 
 export const files = {
-  put: (key: string, body: ReadableStream | ArrayBuffer | string | Blob, options?: R2PutOptions) => bucket().put(key, body as any, options),
+  put: (key: string, body: ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob, options?: R2PutOptions) => bucket().put(key, body as any, options),
   get: (key: string) => bucket().get(key),
   head: (key: string) => bucket().head(key),
   delete: (key: string) => bucket().delete(key),

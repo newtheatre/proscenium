@@ -4,6 +4,7 @@ import { loadRegistry, LoadError } from './lib/load.ts'
 import { checkPageAddresses, checkRoutes } from './checks/routes.ts'
 import { checkMigrations } from './checks/migrations.ts'
 import { checkAbilities, checkContentTokens, checkEventsAndJobs, checkImports, checkPolicyNumbers, checkTranslations } from './checks/source.ts'
+import { checkSite } from './checks/site.ts'
 
 let failed = 0
 function report(name: string, problems: string[]) {
@@ -28,6 +29,7 @@ report('Routes', checkRoutes(registry, modules))
 report('Reserved addresses', checkPageAddresses())
 report('Abilities', checkAbilities(modules, registry))
 report('Settings quoted in content', checkContentTokens(registry))
+report('The site\'s menu and page components', checkSite(registry, source => Bun.YAML.parse(source)))
 report('Events and jobs', checkEventsAndJobs(modules, registry))
 report('Imports, bindings and outside calls', checkImports(modules))
 report('Numbers that should be settings', checkPolicyNumbers(modules))

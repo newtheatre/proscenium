@@ -29,8 +29,13 @@ export interface RouteDeclaration<I extends z.ZodType | undefined = undefined> {
   protect?: 'turnstile'
   /** Require an Idempotency-Key header and replay the stored response for a repeated key. */
   idempotent?: boolean
-  /** The request body (or, for GET, the query) schema. */
+  /** The request body (or, for GET, the query) schema. With `body: 'binary'`, the query's. */
   input?: I
+  /**
+   * 'binary': the body is bytes the handler reads itself (readRawBody(event, false)), such as an
+   * upload; the kit leaves it unread and validates the query instead. Cannot be idempotent.
+   */
+  body?: 'json' | 'binary'
 }
 
 export interface RouteContext<I> {
@@ -50,6 +55,8 @@ export function checkRouteDeclaration(decl: RouteDeclaration<any>): void {
   if (decl.ability && decl.public) throw new DeclarationError('public', 'a route is either public or requires an ability, not both')
   if (!RATE_CLASSES.includes(decl.rateLimit)) throw new DeclarationError('rateLimit', `is one of ${RATE_CLASSES.join(', ')}`)
   if (decl.protect !== undefined && decl.protect !== 'turnstile') throw new DeclarationError('protect', "is 'turnstile'")
+  if (decl.body !== undefined && decl.body !== 'json' && decl.body !== 'binary') throw new DeclarationError('body', "is 'json' or 'binary'")
+  if (decl.body === 'binary' && decl.idempotent) throw new DeclarationError('idempotent', 'a binary body is not kept, so it cannot be replayed')
 }
 
 function refusalResponse(event: H3Event, refusal: Refusal): RefusalBody {
@@ -116,7 +123,8 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
 
     const method = event.method.toUpperCase()
     const reads = method === 'GET' || method === 'HEAD'
-    const rawBody = reads ? '' : (await readRawBody(event, 'utf8')) ?? ''
+    const binary = decl.body === 'binary'
+    const rawBody = reads || binary ? '' : (await readRawBody(event, 'utf8')) ?? ''
 
     if (decl.protect === 'turnstile') {
       const token = getHeader(event, 'cf-turnstile-response')
@@ -136,8 +144,8 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
 
     let input: unknown
     if (decl.input) {
-      let raw: unknown = reads ? getQuery(event) : undefined
-      if (!reads) {
+      let raw: unknown = reads || binary ? getQuery(event) : undefined
+      if (!reads && !binary) {
         try { raw = rawBody ? JSON.parse(rawBody) : {} }
         catch { throw new Refusal('core.input.invalid', 'The request could not be read.', { status: 400 }) }
       }
