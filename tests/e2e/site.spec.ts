@@ -24,3 +24,22 @@ test('the health endpoint answers', async ({ request }) => {
   expect(response.ok()).toBe(true)
   expect(await response.json()).toMatchObject({ status: 'ok' })
 })
+
+test.describe('in dark mode on a phone', () => {
+  test.use({ colorScheme: 'dark', viewport: { width: 390, height: 844 } })
+
+  test('the home page has no accessibility violations', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.locator('html')).toHaveClass(/dark/)
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
+    expect(results.violations).toEqual([])
+  })
+})
+
+test('the skip link moves to the page content', async ({ page }) => {
+  await page.goto('/')
+  await page.keyboard.press('Tab')
+  const skip = page.getByRole('link', { name: 'Skip to content' })
+  await expect(skip).toBeFocused()
+  await expect(skip).toBeInViewport()
+})

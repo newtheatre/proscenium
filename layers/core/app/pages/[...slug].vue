@@ -7,8 +7,14 @@ useSeoMeta({ title: page.value.title, description: page.value.description })
 </script>
 
 <template>
-  <ContentRenderer
-    v-if="page"
-    :value="page"
-  />
+  <UContainer>
+    <UPage>
+      <UPageBody>
+        <ContentRenderer
+          v-if="page"
+          :value="page"
+        />
+      </UPageBody>
+    </UPage>
+  </UContainer>
 </template>

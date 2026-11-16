@@ -98,6 +98,15 @@ Read with `await useSetting('box-office.holds.length')` (seconds for a duration)
 the limits cannot be saved. A quotable public setting can be quoted in content as
 `:setting{name="box-office.fees.booking"}`.
 
+## The interface
+
+Screens use Nuxt UI v4 components first, on Tailwind CSS v4, as in Mailflare; reach for custom
+markup only where Nuxt UI has nothing suitable. The core layer registers the module, its stylesheet
+(`layers/core/app/assets/css/main.css`) and the shared component defaults (`app.config.ts`).
+Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs. The
+public shell in `layers/core/app/layouts/default.vue` is a plain placeholder until the interface
+workstream's shells land; a theatre's colours will come from its branding settings.
+
 ## Testing
 
 Unit tests run in Node; integration tests run in workerd with a local D1, using the fixture

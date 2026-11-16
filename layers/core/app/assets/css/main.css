@@ -1,0 +1,7 @@
+/* Nuxt UI v4 on Tailwind CSS v4. A theatre's colours come from its branding settings later; until
+   then Nuxt UI's defaults apply. Tailwind scans this layer and the theatre's site/. */
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@source "../../..";
+@source "../../../../../site";

@@ -1,22 +1,28 @@
-<!-- A plain shell until workstream 6's interface lands: a skip link, a header and the page. -->
+<!-- The public shell, plain until the interface workstream's design lands: a skip link, a header
+     with the colour-mode switch, the page and a footer. -->
 <template>
   <div>
     <a
       href="#main"
-      class="skip"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-default focus:px-3 focus:py-2"
     >Skip to content</a>
-    <header>
-      <NuxtLink to="/">
-        Home
-      </NuxtLink>
-    </header>
-    <main id="main">
+    <UHeader
+      title="Home"
+      :toggle="false"
+    >
+      <template #right>
+        <UColorModeButton />
+      </template>
+    </UHeader>
+    <UMain id="main">
       <slot />
-    </main>
+    </UMain>
+    <UFooter>
+      <template #left>
+        <p class="text-sm text-muted">
+          Runs on Proscenium
+        </p>
+      </template>
+    </UFooter>
   </div>
 </template>
-
-<style scoped>
-.skip { position: absolute; left: -999px; }
-.skip:focus { left: 1rem; top: 1rem; }
-</style>

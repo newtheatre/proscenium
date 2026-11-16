@@ -21,7 +21,8 @@ const COMPATIBILITY_DATE = '2026-11-01'
 
 export default defineNuxtConfig({
   extends: theatreLayers,
-  modules: ['@nuxt/content', '@nuxt/eslint'],
+  // Nuxt UI before Nuxt Content, so content pages use Nuxt UI's prose components.
+  modules: ['@nuxt/ui', '@nuxt/content', '@nuxt/eslint'],
 
   $production: { nitro: { entry: r('./layers/core/server/entry.ts') } },
   devtools: { enabled: false },
