@@ -8,7 +8,7 @@ import { watchDebounced } from '@vueuse/core'
 import type { z } from 'zod'
 import type { FormErrorEvent } from '@nuxt/ui'
 import { isConflict, mergeConflict, PANEL_FIELD_LIMIT } from '../../shared/form'
-import { phrase, toRefusal, type RefusalView } from '../composables/useRefusal'
+import type { RefusalView } from '../utils/refusal'
 
 export interface FormField {
   name: string

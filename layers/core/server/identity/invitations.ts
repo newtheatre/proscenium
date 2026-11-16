@@ -4,12 +4,17 @@
 // address does the same, because the grant waits on the account, not on the link.
 import type { H3Event } from 'h3'
 import { newId, nowMs, useSetting, type Actor, type UnitView } from '#kit'
-import { digest, randomToken, sealValue } from './crypto'
+import { digest, randomToken } from './crypto'
 import { relyingParty } from './web'
+import { notify } from '../notifications/notify'
 
 export interface Invitation { tokenId: string, link: string }
 
-/** Writes the invitation's token and queues the email that carries its link, sealed. */
+/**
+ * Writes the invitation's token and the email that carries its link, in the same unit. The link is a
+ * sealed variable: kept encrypted, sent by email only and cleared once sent. The account is unclaimed,
+ * so the email goes to the address it was created with, looked up when it is sent.
+ */
 export async function createInvitation(unit: UnitView, event: H3Event, actor: Actor, to: { accountId: string, address: string, role: string }): Promise<Invitation> {
   const token = randomToken()
   const tokenId = newId('tok', { random: true })
@@ -21,6 +26,6 @@ export async function createInvitation(unit: UnitView, event: H3Event, actor: Ac
     params: [tokenId, await digest('link', token), to.accountId, to.address, actor.accountId ?? null, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
   const link = `${relyingParty(event).origin}/sign-in/link#${token}`
-  unit.enqueue('core.send-invitation', { tokenId, sealed: await sealValue('invitation-mail', { address: to.address, link, role: to.role }) })
+  await notify(unit, 'core.invitation', { to: to.accountId, variables: { link, role: to.role }, dedupeKey: tokenId })
   return { tokenId, link }
 }

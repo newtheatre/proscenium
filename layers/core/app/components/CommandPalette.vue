@@ -13,6 +13,7 @@ interface Palette {
 }
 interface Found { type: string, id: string, title: string, to?: string }
 
+const { $api } = useNuxtApp()
 const MOST_RESULTS = 8 // not-policy: a short list per group
 const { t, te } = useT()
 const open = ref(false)
@@ -20,7 +21,7 @@ const term = ref('')
 const { data: navigation } = await useNavigation('console')
 // Fetched when the palette is first opened, so a page that never opens it makes no extra requests.
 const { data: settingsIndex, execute: loadSettings } = useSettingsIndex({ immediate: false })
-const { data: palette, execute: loadPalette } = useFetch<Palette>('/api/core/palette', { key: 'core:palette', lazy: true, server: false, immediate: false, default: () => ({ sources: [], actions: [] }) })
+const { data: palette, execute: loadPalette } = useAPI<Palette>('/api/core/palette', { key: 'core:palette', lazy: true, server: false, immediate: false, default: () => ({ sources: [], actions: [] }) })
 let loaded = false
 watch(open, (now) => {
   if (!now || loaded) return
@@ -39,9 +40,9 @@ watchDebounced(term, async (q) => {
   try {
     const out: Found[] = []
     for (const source of sources) {
-      const { ids } = await $fetch<{ ids: string[] }>(source.route, { query: { q } }).catch(() => ({ ids: [] as string[] }))
+      const { ids } = await $api<{ ids: string[] }>(source.route, { query: { q } }).catch(() => ({ ids: [] as string[] }))
       if (!ids.length) continue
-      const { records: found } = await $fetch<{ records: Found[] }>('/api/core/records', { query: { type: source.record, ids: ids.join(',') } }).catch(() => ({ records: [] as Found[] }))
+      const { records: found } = await $api<{ records: Found[] }>('/api/core/records', { query: { type: source.record, ids: ids.join(',') } }).catch(() => ({ records: [] as Found[] }))
       out.push(...found)
     }
     // Only the latest question's answer is shown.

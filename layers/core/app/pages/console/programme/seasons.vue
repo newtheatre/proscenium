@@ -1,12 +1,12 @@
 <script setup lang="ts">
 // Seasons: dated labels that group productions. Edit, publish, archive; a draft with no
 // productions can be deleted. Archived seasons leave what's on and stay in the archive.
-definePageMeta({ layout: 'console' })
 
 type State = 'draft' | 'published' | 'archived'
 interface Season { id: string, name: string, startsOn: string, endsOn: string, summary: string | null, state: State, productions: number }
 
-const { data, status, error, refresh } = await useFetch<{ rows: Season[] }>('/api/core/seasons', { key: 'core:seasons', query: { size: 100 } })
+const { $api } = useNuxtApp()
+const { data, status, error, refresh } = await useAPI<{ rows: Season[] }>('/api/core/seasons', { key: 'core:seasons', query: { size: 100 } })
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -41,14 +41,14 @@ function open(s?: Season) {
 async function save() {
   const body = { ...form, endsOn: form.endsOn || form.startsOn }
   const ok = editId.value
-    ? await run(() => $fetch<unknown>(`/api/core/seasons/${editId.value}` as string, { method: 'PATCH', body }), 'Season saved')
-    : await run(() => $fetch<unknown>('/api/core/seasons' as string, { method: 'POST', body }), 'Season added')
+    ? await run(() => $api<unknown>(`/api/core/seasons/${editId.value}` as string, { method: 'PATCH', body }), 'Season saved')
+    : await run(() => $api<unknown>('/api/core/seasons' as string, { method: 'POST', body }), 'Season added')
   if (ok) editing.value = false
 }
-const move = (s: Season, to: State, done: string) => run(() => $fetch<unknown>(`/api/core/seasons/${s.id}/state` as string, { method: 'POST', body: { to } }), done)
+const move = (s: Season, to: State, done: string) => run(() => $api<unknown>(`/api/core/seasons/${s.id}/state` as string, { method: 'POST', body: { to } }), done)
 async function remove(s: Season) {
   if (!await confirm({ verb: 'Delete', thing: s.name, consequence: 'The season is removed for good.', button: 'Delete season' })) return
-  await run(() => $fetch<unknown>(`/api/core/seasons/${s.id}` as string, { method: 'DELETE' }), 'Season deleted')
+  await run(() => $api<unknown>(`/api/core/seasons/${s.id}` as string, { method: 'DELETE' }), 'Season deleted')
 }
 const actions = (s: Season) => [[
   { label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => open(s) },

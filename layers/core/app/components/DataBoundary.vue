@@ -2,8 +2,6 @@
      A failed first load shows only the reason and Retry. A failed refresh keeps the data on screen
      and marks it with when it was last good (UI-18). -->
 <script setup lang="ts" generic="T">
-import { toRefusal } from '../composables/useRefusal'
-
 const props = defineProps<{
   data: T | null | undefined
   status: 'idle' | 'pending' | 'success' | 'error'

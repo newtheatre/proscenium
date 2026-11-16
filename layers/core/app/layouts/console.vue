@@ -3,7 +3,6 @@
      not greyed. On a phone the sidebar becomes a drawer. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
-import { isCurrent } from '../composables/useNavigation'
 
 const { t } = useT()
 const route = useRoute()

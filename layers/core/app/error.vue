@@ -2,7 +2,7 @@
      answers), a refusal that says why and what would let the person through, and a failure. -->
 <script setup lang="ts">
 import type { NuxtError } from '#app'
-import type { RefusalView } from './composables/useRefusal'
+import type { RefusalView } from './utils/refusal'
 
 const props = defineProps<{ error: NuxtError<Partial<RefusalView> | undefined> }>()
 const { t } = useT()

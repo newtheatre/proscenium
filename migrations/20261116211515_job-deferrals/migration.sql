@@ -1,0 +1,1 @@
+ALTER TABLE `core_jobs` ADD `deferrals` integer DEFAULT 0 NOT NULL;

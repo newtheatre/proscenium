@@ -14,7 +14,7 @@ Workstream 2 of the detailed-design stage. One person has one account; the audie
 | What lets staff do things? | Abilities, reached three ways: a role somebody granted, a fact that is true now (tonight's shift), or owning the record. Roles are data the theatre edits; only Owner is fixed. |
 | What protects sensitive work? | A session is basic or strong. Privileged abilities need a strong session (a passkey). One that changes something also needs a fresh check, asked in place; one that only reads is audited instead. |
 | What stops access piling up? | Grants carry an end date and are never edited; facts end by themselves; nobody grants themselves or gives what they lack; the theatre always keeps an Owner. |
-| What about duplicates? | Staff merge two accounts in one batch. Every module's rows follow from a declaration on the column, and a test built from the registry proves none was missed. |
+| What about duplicates? | Staff merge two accounts. The person is one account at once; their rows follow in the background, module by module, from a declaration on each column, and a test built from the registry proves none was missed. A merge can be undone for 30 days. |
 | What about leaving? | A person downloads their data or asks for erasure. Erasure waits a cooling-off, respects holds a module declares, then clears every personal value in one batch. |
 
 Three choices carry most of the weight. **States are read, not stored**, so an account cannot be "pending" in one table and "active" in another. **An account exists only after a proof or a real record**, so there are no half-made sign-ups to clean. **Completeness is tested from registries**, so merge, erasure and the members' area boundary stay whole as modules are added.
@@ -24,10 +24,10 @@ Three choices carry most of the weight. **States are read, not stored**, so an a
 | Part | State | Contents |
 | --- | --- | --- |
 | 1. Scope | Draft complete | In and out of scope, what is assumed of other workstreams, glossary |
-| 2. Data model | Draft complete | 18 tables with column rules, data class, and merge and erasure behaviour |
+| 2. Data model | Draft complete | 20 tables with column rules, data class, and merge and erasure behaviour |
 | 3. States and rules | Draft complete | Four life cycles as diagrams, the resolver, the eight separation rules, merge and erasure, emergency contacts (members only) and the access scheme (apply, decide, verify, share by purpose) |
-| 4. Interface to other modules | Draft complete | Services, events, points, jobs, secrets, and what each workstream must do to fit |
-| 5. Screens | Draft complete | 33 screens, three wireframes |
+| 4. Interface to other modules | Draft complete | Services, events, points, jobs, secrets, 19 notification types, and what each workstream must do to fit |
+| 5. Screens | Draft complete | 33 screens with their addresses (9 in the console, 5 in site administration), three wireframes |
 | 6. Settings and abilities | Draft complete | 37 settings, 19 abilities, 15 preset roles |
 | 7. Stories | Draft complete | 45 stories, 38 in the first release (9 at the gate, 29 others), 7 later |
 | 8. Test plan | Draft complete | Named never-regress cases by tier |

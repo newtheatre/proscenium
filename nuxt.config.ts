@@ -86,7 +86,7 @@ export default defineNuxtConfig({
     },
     // `nuxt dev` emulates the bindings with wrangler's platform proxy, which needs a config file.
     // Local state lives in .wrangler/state, shared with `bun run preview`. Migrations apply on the
-    // first request; jobs and the scheduler run in-process (layers/core/server/plugins/kit.ts).
+    // first request; jobs and the scheduler run in-process (layers/core/server/plugins/01.kit.ts).
     'nitro:config'(config) {
       if (!config.dev) return
       const path = r('./.nuxt/wrangler.dev.json')

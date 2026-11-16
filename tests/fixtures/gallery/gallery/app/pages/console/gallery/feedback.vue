@@ -4,8 +4,8 @@ definePageMeta({ layout: 'console' })
 const { confirm } = useConfirm()
 const undo = useUndo()
 const answer = ref('')
-const ok = useFetch('/api/gallery/items', { query: { size: 1 }, key: 'gallery:ok' })
-const broken = useFetch('/api/gallery/nothing-here', { key: 'gallery:broken', retry: false })
+const ok = useAPI('/api/gallery/items', { query: { size: 1 }, key: 'gallery:ok' })
+const broken = useAPI('/api/gallery/nothing-here', { key: 'gallery:broken', retry: false })
 
 async function cancel() {
   answer.value = await confirm({ verb: 'Cancel', thing: 'the 19:30 performance of Hamlet', consequence: '84 ticket holders will be emailed.', button: 'Cancel performance' }) ? 'cancelled' : 'kept'

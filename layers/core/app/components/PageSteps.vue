@@ -5,8 +5,6 @@
      of what will happen, with the action named on its button. -->
 <script setup lang="ts">
 import type { z } from 'zod'
-import { readProgress, writeProgress } from '../composables/useStepsProgress'
-import { toRefusal } from '../composables/useRefusal'
 
 export interface StepDecl {
   id: string
