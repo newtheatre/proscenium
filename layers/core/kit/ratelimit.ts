@@ -12,10 +12,11 @@ import { useEnv } from './context'
 import { nowMs } from './clock'
 import type { Rate } from './settings'
 
-export const RATE_CLASSES = ['default', 'write', 'sign-in', 'public-form', 'export'] as const
+// presented-value counts checks that carry a value a person typed (a membership number, a code).
+export const RATE_CLASSES = ['default', 'write', 'sign-in', 'public-form', 'export', 'presented-value'] as const
 export type RateClass = typeof RATE_CLASSES[number]
 
-/** Classes counted in the shared store. `presented-value` joins with requirements.check. */
+/** Classes counted in the shared store, shared by every instance. */
 export const SHARED_RATE_CLASSES: ReadonlySet<string> = new Set(['sign-in', 'public-form', 'presented-value'])
 
 export interface RateDecision {
@@ -79,7 +80,7 @@ async function allowance(rateClass: string): Promise<Rate> {
  * (Called takeRate before F-36, when it answered a bare boolean; renamed so no old caller can
  * mistake the decision for one.)
  */
-export async function countAgainstRate(rateClass: RateClass | 'presented-value', who: string): Promise<RateDecision> {
+export async function countAgainstRate(rateClass: RateClass, who: string): Promise<RateDecision> {
   const limit = await allowance(rateClass)
   const namespace = useEnv().RATE_LIMITS as CounterNamespace | undefined
   // Without the binding (nuxt dev) the shared classes count in memory too.

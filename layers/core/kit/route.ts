@@ -123,7 +123,8 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     const actor = await provider.actor(event)
     context.actor = actor
 
-    const who = actor.accountId ?? getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? 'unknown'
+    context.address = getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? undefined
+    const who = actor.accountId ?? context.address ?? 'unknown'
     const rate = await countAgainstRate(decl.rateLimit, who)
     if (!rate.allowed) {
       setResponseHeader(event, 'Retry-After', rate.retryAfter)

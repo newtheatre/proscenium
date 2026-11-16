@@ -59,6 +59,8 @@ export interface KitContext {
   ability?: string
   allowedBy?: string
   module?: string
+  /** The caller's network address, set by a route; keys the presented-value rate limit. */
+  address?: string
 }
 
 export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, fn: () => T): T {
