@@ -347,6 +347,33 @@ export const productionAdvisories = defineTable('core_production_advisories', {
 })
 
 /**
+ * Who made the show (C-09): a printed name and a role in a section, linked to an account or not. A
+ * credit with no account is a historical or outside credit, found for a data request by staff
+ * searching the printed name. The linked person may change the visibility of their own.
+ */
+export const productionCredits = defineTable('core_production_credits', {
+  id: col.id(),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias', nullable: true }),
+  creditedName: col.public(text('credited_name').notNull()),
+  role: col.public(text('role').notNull()),
+  sectionTermId: col.ref('core_terms'),
+  visibility: col.internal(text('visibility').notNull().default('public')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+}, {
+  id: 'crd',
+  realm: 'members',
+  subject: { account: 'account_id', unlinked: 'staff' },
+  extra: t => [
+    index('core_production_credits_order').on(t.productionId, t.sectionTermId, t.sort),
+    index('core_production_credits_account').on(t.accountId),
+    check('core_production_credits_visibility', sql`${t.visibility} IN ('public', 'members', 'hidden')`),
+    check('core_production_credits_name', sql`length(${t.creditedName}) BETWEEN 1 AND 120`),
+    check('core_production_credits_role', sql`length(${t.role}) BETWEEN 1 AND 120`),
+  ],
+})
+
+/**
  * A building or site (part 2, group 2). A venue the theatre uses but does not run (a hired hall) is
  * the same record with managed false. A venue is never a flagged room.
  */
@@ -569,4 +596,4 @@ export const performanceAccess = defineTable('core_performance_access', {
   ],
 })
 
-export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
