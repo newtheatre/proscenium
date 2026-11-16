@@ -8,6 +8,7 @@ import { sql } from 'drizzle-orm'
 import { all, first, newId, nowMs, refuse } from '#kit'
 import type { UnitView } from '#kit'
 import { assertTerm, ensureVocabularies } from '../vocabularies/service'
+import { neverPerformedIn, noFuturePerformancesIn } from '../programme/performances'
 
 export interface VenueInput {
   name: string
@@ -82,6 +83,8 @@ const toSpace = (r: SpaceRow): Space => ({
 const VENUE_NAME_TAKEN = { code: 'core.venue.name-taken', reason: 'Another venue has that name.', remedy: 'Choose a different name.' }
 const SPACE_NAME_TAKEN = { code: 'core.space.name-taken', reason: 'Another space in this venue has that name.', remedy: 'Choose a different name.' }
 const KIND_REFUSED = { code: 'core.space.kind-unknown', reason: 'Choose a kind of space from the list.' }
+const FUTURE_PERFORMANCES = { code: 'core.place.in-use', reason: 'A scheduled performance still to come uses it.', remedy: 'Move or cancel those performances first.' }
+const PERFORMED = { code: 'core.space.performed', reason: 'This space has had performances, so it is kept for their history.', remedy: 'Archive it instead.' }
 
 function slugFrom(name: string): string {
   return name.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'place' // not-policy: a slug's pattern and length
@@ -182,7 +185,9 @@ export async function updateVenue(unit: UnitView, id: string, input: Partial<Ven
 export async function setVenueArchived(unit: UnitView, id: string, archived: boolean): Promise<void> {
   const row = await venueRow(id)
   if ((row.state === 'archived') === archived) return
-  unit.add(sql`UPDATE core_venues SET state = ${archived ? 'archived' : 'active'} WHERE id = ${id}`).expect(1)
+  // A venue with a scheduled performance still to come stays in use (part 3).
+  unit.add(sql`UPDATE core_venues SET state = ${archived ? 'archived' : 'active'} WHERE id = ${id}${archived ? sql` AND ${noFuturePerformancesIn('venue_id', id)}` : sql``}`)
+    .expect(1, FUTURE_PERFORMANCES)
   unit.audit({ action: 'state', record: ['core.venue', id], detail: { archived } })
   if (archived) unit.announce('core.venue.archived', { venueId: id }, { record: ['core.venue', id] })
 }
@@ -218,7 +223,8 @@ export async function updateSpace(unit: UnitView, venueId: string, id: string, i
 export async function setSpaceArchived(unit: UnitView, venueId: string, id: string, archived: boolean): Promise<void> {
   const row = await spaceRow(venueId, id)
   if ((row.state === 'archived') === archived) return
-  unit.add(sql`UPDATE core_spaces SET state = ${archived ? 'archived' : 'active'} WHERE id = ${id}`).expect(1)
+  unit.add(sql`UPDATE core_spaces SET state = ${archived ? 'archived' : 'active'} WHERE id = ${id}${archived ? sql` AND ${noFuturePerformancesIn('space_id', id)}` : sql``}`)
+    .expect(1, FUTURE_PERFORMANCES)
   unit.audit({ action: 'state', record: ['core.space', id], detail: { archived, venueId } })
   if (archived) unit.announce('core.space.archived', { spaceId: id, venueId }, { record: ['core.space', id] })
 }
@@ -226,7 +232,9 @@ export async function setSpaceArchived(unit: UnitView, venueId: string, id: stri
 /** Deletes a space, never the venue's last one (C-17). */
 export async function deleteSpace(unit: UnitView, venueId: string, id: string): Promise<void> {
   await spaceRow(venueId, id)
-  unit.add(sql`DELETE FROM core_spaces WHERE id = ${id} AND venue_id = ${venueId} AND (SELECT count(*) FROM core_spaces WHERE venue_id = ${venueId}) > 1`)
+  // A space that has ever had a performance is kept for its history (part 3).
+  if (await first('SELECT 1 FROM core_performances WHERE space_id = ? LIMIT 1', id)) refuse(PERFORMED.code, PERFORMED.reason, { remedy: PERFORMED.remedy })
+  unit.add(sql`DELETE FROM core_spaces WHERE id = ${id} AND venue_id = ${venueId} AND (SELECT count(*) FROM core_spaces WHERE venue_id = ${venueId}) > 1 AND ${neverPerformedIn('space_id', id)}`)
     .expect(1, { code: 'core.space.last', reason: 'A venue needs at least one space, so its last space cannot be deleted.', remedy: 'Rename it, or archive the venue.' })
   unit.audit({ action: 'delete', record: ['core.space', id], detail: { venueId } })
 }
