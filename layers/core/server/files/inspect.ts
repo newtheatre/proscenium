@@ -2,9 +2,11 @@
 // how to clean it (C-36): raster images lose their metadata, an SVG keeps only drawing. Pure
 // functions over bytes, with no dependencies, so they run in the Worker and in tests alike.
 
-export type FileKind = 'png' | 'jpeg' | 'webp' | 'svg' | 'pdf'
+export type FileKind = 'png' | 'jpeg' | 'webp' | 'svg' | 'pdf' | 'json' | 'zip' | 'csv'
 export const MEDIA_TYPES: Record<FileKind, string> = {
   png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml', pdf: 'application/pdf',
+  // Only for files the server makes itself (storeFile): an upload is never judged to be one of these.
+  json: 'application/json', zip: 'application/zip', csv: 'text/csv',
 }
 
 export class Rejected extends Error {
@@ -43,6 +45,7 @@ export function clean(kind: FileKind, bytes: Uint8Array, options: { clean: boole
     // An SVG is always cleaned: it is a document that can run code, whatever the slot says.
     case 'svg': return cleanSvg(bytes)
     case 'pdf': return { bytes, width: null, height: null }
+    case 'json': case 'zip': case 'csv': throw new Rejected('type-not-accepted')
   }
 }
 
