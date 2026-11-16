@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "9190c0d7-d9e0-4551-933e-fc3a2c6db50c",
+  "id": "3650cc34-c804-48b6-89bc-64b982b85c5d",
   "prevIds": [
-    "72320e20-2ba2-4f03-a73c-1613bbf4aa43"
+    "b21c6662-5570-4730-93df-605943a051b1"
   ],
   "ddl": [
     {
@@ -36,6 +36,10 @@
     },
     {
       "name": "core_audit",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_closures",
       "entityType": "tables"
     },
     {
@@ -139,6 +143,18 @@
       "entityType": "tables"
     },
     {
+      "name": "core_production_advisories",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_production_slugs",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_productions",
+      "entityType": "tables"
+    },
+    {
       "name": "core_recovery_codes",
       "entityType": "tables"
     },
@@ -148,6 +164,10 @@
     },
     {
       "name": "core_roles",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_seasons",
       "entityType": "tables"
     },
     {
@@ -1099,6 +1119,136 @@
       "name": "unit_id",
       "type": "text",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "all_day",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "blocks_performances",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "feed_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -2506,6 +2656,16 @@
     },
     {
       "table": "core_jobs",
+      "name": "deferrals",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_jobs",
       "name": "max_attempts",
       "type": "integer",
       "notNull": true,
@@ -3295,6 +3455,326 @@
       "entityType": "columns"
     },
     {
+      "table": "core_production_advisories",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "slug",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "retired_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "subtitle",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "category_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "company_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "age_guidance",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "advisories_confirmed_none",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "content_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "running_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "interval_count",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "external_booking_url",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "credits_public",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "cancel_reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "listed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "published_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "first_starts_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "last_ends_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "id",
       "type": "text",
@@ -3479,6 +3959,96 @@
       "name": "archived_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "starts_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "ends_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -6001,6 +6571,56 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_closures",
+      "name": "core_closures_time",
+      "columns": [
+        {
+          "value": "starts_at",
+          "isExpression": false
+        },
+        {
+          "value": "ends_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_venue",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_feed_ref",
+      "columns": [
+        {
+          "value": "feed_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"core_closures\".\"feed_ref\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_data_requests",
       "name": "core_data_requests_account",
       "columns": [
@@ -6459,6 +7079,66 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_productions",
+      "name": "core_productions_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_listing",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "last_ends_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_category",
+      "columns": [
+        {
+          "value": "category_term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "core_recovery_codes_hash",
       "columns": [
@@ -6493,6 +7173,34 @@
         {
           "value": "key",
           "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
         }
       ],
       "isUnique": true,
@@ -7184,6 +7892,38 @@
       "entityType": "fks"
     },
     {
+      "table": "core_closures",
+      "name": "fk_core_closures_venue_id_core_venues_id_fk",
+      "columns": [
+        "venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_closures",
+      "name": "fk_core_closures_space_id_venue_id_core_spaces_id_venue_id_fk",
+      "columns": [
+        "space_id",
+        "venue_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id",
+        "venue_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_data_request_checks",
       "name": "fk_core_data_request_checks_request_id_core_data_requests_id_fk",
       "columns": [
@@ -7347,6 +8087,96 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "fk_core_production_advisories_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "fk_core_production_advisories_term_id_core_terms_id_fk",
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "fk_core_production_slugs_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
+      "name": "fk_core_productions_category_term_id_core_terms_id_fk",
+      "columns": [
+        "category_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
+      "name": "fk_core_productions_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
+      "name": "fk_core_productions_cancel_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "cancel_reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -7804,6 +8634,16 @@
       "entityType": "pks"
     },
     {
+      "table": "core_production_advisories",
+      "name": "core_production_advisories_pk",
+      "columns": [
+        "production_id",
+        "term_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_role_abilities",
       "name": "core_role_abilities_pk",
       "columns": [
@@ -7862,6 +8702,15 @@
     {
       "table": "core_audit",
       "name": "core_audit_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_pk",
       "columns": [
         "id"
       ],
@@ -8022,6 +8871,24 @@
       "entityType": "pks"
     },
     {
+      "table": "core_production_slugs",
+      "name": "core_production_slugs_pk",
+      "columns": [
+        "slug"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "core_recovery_codes_pk",
       "columns": [
@@ -8033,6 +8900,15 @@
     {
       "table": "core_roles",
       "name": "core_roles_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_pk",
       "columns": [
         "id"
       ],
@@ -8310,6 +9186,36 @@
       "entityType": "checks"
     },
     {
+      "table": "core_closures",
+      "name": "core_closures_kind",
+      "value": "\"kind\" IN ('closure', 'public_holiday')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_source",
+      "value": "\"source\" IN ('manual', 'feed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_scope",
+      "value": "\"space_id\" IS NULL OR \"venue_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_period",
+      "value": "\"ends_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_title",
+      "value": "length(\"title\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
       "table": "core_email_suppressions",
       "name": "core_email_suppressions_reason",
       "value": "\"reason\" IN ('hard_bounce', 'complaint', 'manual')",
@@ -8394,9 +9300,81 @@
       "entityType": "checks"
     },
     {
+      "table": "core_production_advisories",
+      "name": "core_production_advisories_detail",
+      "value": "\"detail\" IS NULL OR length(\"detail\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_state",
+      "value": "\"state\" IN ('draft', 'published', 'withdrawn', 'cancelled')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_kind",
+      "value": "\"kind\" IN ('own', 'visiting', 'hire', 'event')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_title",
+      "value": "length(\"title\") BETWEEN 1 AND 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_summary",
+      "value": "\"summary\" IS NULL OR length(\"summary\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_age",
+      "value": "\"age_guidance\" IS NULL OR length(\"age_guidance\") <= 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_running",
+      "value": "\"running_minutes\" IS NULL OR \"running_minutes\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_intervals",
+      "value": "\"interval_count\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_booking_url",
+      "value": "\"external_booking_url\" IS NULL OR \"external_booking_url\" LIKE 'https://_%'",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_cancel_reason",
+      "value": "(\"state\" = 'cancelled') = (\"cancel_reason_term_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
       "table": "core_roles",
       "name": "core_roles_expiry_days",
       "value": "(expiry_rule = 'days') = (expiry_days IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_state",
+      "value": "\"state\" IN ('draft', 'published', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_dates",
+      "value": "\"ends_on\" >= \"starts_on\"",
       "entityType": "checks"
     },
     {
