@@ -474,6 +474,39 @@ export const closures = defineTable('core_closures', {
  * One occasion on which a production happens (part 2, group 1). Everything record-like in every
  * other module keys to a row here, never to a date or a room.
  */
+/**
+ * A run of performances too long for one unit (C-04), created by the core.create-run job in chunks.
+ * `items` holds the performances still to make, as the person accepted them from the preview;
+ * `done` counts how many of them the chunks have dealt with, so a repeated chunk does nothing.
+ */
+export const performanceRuns = defineTable('core_performance_runs', {
+  id: col.id(),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  venueId: col.internal(text('venue_id').notNull()),
+  spaceId: col.internal(text('space_id').notNull()),
+  scheduled: col.internal(integer('scheduled', { mode: 'boolean' }).notNull()),
+  capacity: col.internal(integer('capacity')),
+  intervalCount: col.internal(integer('interval_count')),
+  label: col.internal(text('label')),
+  items: col.internal(text('items').notNull()),
+  total: col.internal(integer('total').notNull()),
+  done: col.internal(integer('done').notNull().default(0)),
+  state: col.internal(text('state').notNull().default('running')),
+  stopReason: col.internal(text('stop_reason')),
+  createdAt: col.createdAt(),
+  updatedAt: col.internal(integer('updated_at').notNull()),
+}, {
+  id: 'run',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('core_performance_runs_production').on(t.productionId, t.createdAt),
+    check('core_performance_runs_state', sql`${t.state} IN ('running', 'stopped', 'done', 'removing', 'removed')`),
+    check('core_performance_runs_done', sql`${t.done} BETWEEN 0 AND ${t.total}`),
+    check('core_performance_runs_stop', sql`${t.stopReason} IS NULL OR length(${t.stopReason}) <= 300`),
+  ],
+})
+
 export const performances = defineTable('core_performances', {
   id: col.id(),
   productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'restrict' })),
@@ -493,6 +526,8 @@ export const performances = defineTable('core_performances', {
   cancelNote: col.public(text('cancel_note')),
   // Set with state completed, so the operating-day recalculation leaves finished nights alone.
   completedAt: col.internal(integer('completed_at')),
+  // The long run that made it, so a chunk repeated makes nothing twice and an unfinished run can be removed.
+  runId: col.internal(text('run_id').references(() => performanceRuns.id, { onDelete: 'set null' })),
   createdAt: col.createdAt(),
 }, {
   id: 'perf',
@@ -506,6 +541,7 @@ export const performances = defineTable('core_performances', {
     index('core_performances_production').on(t.productionId, t.startsAt),
     index('core_performances_venue').on(t.venueId, t.startsAt),
     index('core_performances_space').on(t.spaceId, t.startsAt),
+    uniqueIndex('core_performances_run').on(t.runId, t.startsAt).where(sql`${t.runId} IS NOT NULL`),
     check('core_performances_state', sql`${t.state} IN ('draft', 'scheduled', 'cancelled', 'completed')`),
     check('core_performances_period', sql`${t.endsAt} > ${t.startsAt}`),
     check('core_performances_doors', sql`${t.doorsAt} IS NULL OR ${t.doorsAt} <= ${t.startsAt}`),
@@ -533,4 +569,4 @@ export const performanceAccess = defineTable('core_performance_access', {
   ],
 })
 
-export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }

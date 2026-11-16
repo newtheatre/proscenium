@@ -104,3 +104,16 @@ export async function cancelAttempt(attemptId: string): Promise<{ state: string 
   }
   return { state: (await first<{ state: string }>('SELECT state FROM payments_attempts WHERE id = ?', attempt.id))!.state }
 }
+
+/**
+ * Asks each provider to stop a payment a seller has given up on, as a best effort that waits for no
+ * answer: whatever the provider says later is recorded as usual, and money it took goes back.
+ */
+export async function stopWaiting(attemptIds: string[]): Promise<void> {
+  for (const id of attemptIds) {
+    const attempt = await first<AttemptRow>('SELECT * FROM payments_attempts WHERE id = ?', id)
+    if (!attempt || !['started', 'pending'].includes(attempt.state)) continue
+    const { provider, attempt: asked } = await forProvider(attempt)
+    await provider?.cancel?.(asked).catch(() => false)
+  }
+}

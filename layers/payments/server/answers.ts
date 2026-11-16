@@ -147,10 +147,35 @@ export async function applyAnswer(unit: UnitView, attempt: AttemptRow, answer: A
   if (answer.state !== 'succeeded') return { changed: true, settled: false }
   const intent = (await getIntent(attempt.intent_id))!
   await postFee(unit, attempt, answer, intent.currency)
+  if (intent.state === 'cancelled' || intent.state === 'expired') {
+    // A seller gave up on this payment and the provider took it after all.
+    await holdAndRefund(unit, intent, await partsOf(intent.id), [{ ...attempt, state: 'succeeded' }])
+    return { changed: true, settled: false }
+  }
   const paid = (await moneyLines(intent.id)).reduce((sum, l) => sum + l.amountMinor, 0) + attempt.amount_minor
   if (intent.state !== 'open' || paid !== intent.amount_minor) return { changed: true, settled: false }
   await settle(unit, intent, await partsOf(intent.id), attempt)
   return { changed: true, settled: true }
+}
+
+/**
+ * Money taken for an intent that will never settle (cancelled or expired, so its parts are already
+ * released): each attempt's money is held in payments.unfulfilled and refunded in full, asked for by
+ * the system and so approved at once (Box office specification, part 4, abandoning a reader payment).
+ */
+export async function holdAndRefund(unit: UnitView, intent: IntentRow, parts: PartRow[], attempts: AttemptRow[]): Promise<void> {
+  for (const attempt of attempts) {
+    if (await isTestMoney(intent.id, attempt)) continue
+    await postEntries(unit, {
+      key: `payments:attempt:${attempt.id}:held`,
+      source: { module: 'payments', type: 'payments.attempt', id: attempt.id },
+      kind: 'unfulfilled',
+      currency: intent.currency,
+      postedBy: null,
+      entries: [{ account: clearingFor(attempt.method, attempt.provider_account_id), amountMinor: attempt.amount_minor }, { account: { key: 'payments.unfulfilled' }, amountMinor: -attempt.amount_minor }],
+    })
+  }
+  for (const refundId of await refundInFull(unit, intent, parts, attempts)) unit.enqueue('payments.send-refund', { refundId })
 }
 
 /** Records an answer on its own: attempt succeeded, intent unfulfilled, the money held to go back. */

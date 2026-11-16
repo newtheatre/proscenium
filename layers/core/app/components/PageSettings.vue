@@ -5,7 +5,7 @@
      is shown read-only with who can change it. -->
 <script setup lang="ts">
 import { parseTime } from '@internationalized/date'
-import { fromControl, sameValue, toControl } from '../../shared/controls'
+import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
 
 interface SettingView {
   key: string
@@ -23,6 +23,8 @@ interface SettingView {
   sensitive: boolean
   managed: boolean
   quotable: boolean
+  /** 'confirm': the page shows what will change and asks again before saving. */
+  onChange: 'reason' | 'confirm' | null
   changeLabelKey: string
   canChange: boolean
   min?: number | string
@@ -39,12 +41,16 @@ const props = defineProps<{
   /** 'site' draws every setting declared with scope 'site', whichever module declares it (Site administration). */
   scope?: 'module' | 'site'
   title: string
+  trail?: { label: string, to: string }[]
   /** A setting to scroll into view and highlight, from settings search. */
   highlight?: string
+  /** Only settings whose key starts with one of these, for a page of one subject (Sign-in). */
+  only?: string[]
 }>()
 
 const { t } = useT()
 const toast = useToast()
+const { confirm } = useConfirm()
 const site = props.scope === 'site'
 const { data, status, error, refresh } = await useAPI<{ module: string | null, settings: SettingView[] }>('/api/core/settings', { query: site ? { scope: 'site' } : { module: props.module, scope: 'module' }, key: site ? 'core:settings:site' : `core:settings:${props.module}` })
 
@@ -64,8 +70,11 @@ const resets = reactive<Record<string, boolean>>({})
 const problems = reactive<Record<string, string>>({})
 const saving = ref<string | null>(null)
 
+// The settings this page draws: all of them, or those of its subject.
+const shown = computed(() => (data.value?.settings ?? []).filter(s => !props.only || props.only.some(prefix => s.key.startsWith(prefix))))
+
 function load() {
-  for (const s of data.value?.settings ?? []) {
+  for (const s of shown.value) {
     draft[s.key] = s.sensitive ? '' : toControl(s)
     resets[s.key] = false
   }
@@ -75,7 +84,7 @@ watch(data, load, { immediate: true })
 const sections = computed(() => {
   // Sections are a module's own groups; on the site page the same group of two modules stays apart.
   const groups = new Map<string, SettingView[]>()
-  for (const s of data.value?.settings ?? []) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
+  for (const s of shown.value) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
   return [...groups].map(([id, settings]) => ({ id, module: settings[0]!.module, group: settings[0]!.group, settings }))
 })
 
@@ -95,12 +104,24 @@ function onEdit(s: SettingView, value: unknown) {
 async function save(sectionId: string, settings: SettingView[]) {
   const changes = changesIn(settings).map(s => resets[s.key]
     ? { key: s.key, reset: true }
-    : { key: s.key, value: fromControl(s.kind, draft[s.key], s.unset) })
+    : { key: s.key, value: fromControl(s.kind, draft[s.key], s.unset, s.default ?? s.value) })
   if (!changes.length || saving.value) return
+  // A setting declared onChange: 'confirm' shows what will change and asks again.
+  const asking = changesIn(settings).filter(s => s.onChange === 'confirm')
+  if (asking.length) {
+    const shown = (s: SettingView) => resets[s.key] ? defaultText(s) : controlText(s.kind, draft[s.key], words())
+    const confirmed = await confirm({
+      verb: t('core.settings-page.confirm-verb'),
+      thing: asking.map(s => t(s.labelKey)).join(', '),
+      consequence: asking.map(s => t('core.settings-page.confirm-change', { setting: t(s.labelKey), from: controlText(s.kind, toControl(s), words()), to: shown(s) })).join(' '),
+      button: t('core.settings-page.confirm-button'),
+    })
+    if (!confirmed) return
+  }
   saving.value = sectionId
   for (const s of settings) Reflect.deleteProperty(problems, s.key)
   try {
-    await $api('/api/core/settings', { method: 'PUT', body: { changes } })
+    await $api('/api/core/settings', { method: 'PUT', body: { changes, confirm: asking.length > 0 || undefined } })
     toast.add({ title: t('core.settings-page.saved', { count: changes.length }), color: 'success', icon: 'i-lucide-circle-check' })
     await refresh()
   }
@@ -136,9 +157,15 @@ const sectionTitle = (section: { module: string, group: string }) => {
 }
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
 const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
-const defaultText = (s: SettingView) => {
-  const v = toControl(s, s.default)
-  return s.kind === 'boolean' ? (v ? t('core.settings-page.on') : t('core.settings-page.off')) : String(Array.isArray(v) ? v.join(', ') : v)
+const words = () => ({
+  on: t('core.settings-page.on'),
+  off: t('core.settings-page.off'),
+  rate: (count: number, per: string) => t('core.settings-page.rate', { count, period: per }),
+})
+const defaultText = (s: SettingView) => controlText(s.kind, toControl(s, s.default), words())
+const rate = (s: SettingView) => draft[s.key] as RateControl
+function onRate(s: SettingView, part: Partial<RateControl>) {
+  onEdit(s, { ...rate(s), ...part })
 }
 
 onMounted(() => {
@@ -149,6 +176,7 @@ onMounted(() => {
 <template>
   <PageFrame
     :title="title"
+    :trail="trail"
     width="reading"
   >
     <SettingsSearch />
@@ -216,6 +244,29 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   @update:model-value="onEdit(s, $event)"
                 />
+                <div
+                  v-else-if="s.kind === 'rate'"
+                  class="flex flex-wrap items-center gap-2"
+                >
+                  <UInputNumber
+                    :model-value="rate(s).count"
+                    :disabled="!s.canChange"
+                    :min="limit(s, 'min')"
+                    :max="limit(s, 'max')"
+                    :aria-label="t('core.settings-page.rate-count', { setting: t(s.labelKey) })"
+                    class="w-40"
+                    @update:model-value="onRate(s, { count: $event ?? undefined })"
+                  />
+                  <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
+                  <UInput
+                    :model-value="rate(s).per"
+                    :disabled="!s.canChange"
+                    :aria-label="t('core.settings-page.rate-period', { setting: t(s.labelKey) })"
+                    placeholder="10m"
+                    class="w-28"
+                    @update:model-value="onRate(s, { per: String($event) })"
+                  />
+                </div>
                 <UInputTime
                   v-else-if="s.kind === 'time'"
                   :model-value="timeOf(draft[s.key])"
@@ -234,10 +285,10 @@ onMounted(() => {
                   @update:model-value="onEdit(s, $event)"
                 />
                 <template
-                  v-if="unitText(s)"
+                  v-if="unitText(s) || s.kind === 'rate'"
                   #hint
                 >
-                  {{ unitText(s) }}
+                  {{ s.kind === 'rate' ? t('core.settings-page.rate-hint') : unitText(s) }}
                 </template>
               </UFormField>
 

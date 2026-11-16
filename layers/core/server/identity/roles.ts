@@ -4,7 +4,7 @@
 import { all, first, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { nextYearEnd, yearEndIsSet } from './year-end'
-import { LIVE, OWNER, guardLastOwner, isOwner, kitGrantsOf, roleAbilities, withImplied } from './grants'
+import { HELD_BY, LIVE, OWNER, guardLastOwner, isOwner, kitGrantsOf, roleAbilities, withImplied } from './grants'
 import { accountById } from './accounts'
 
 export interface RoleRow {
@@ -41,7 +41,7 @@ export async function notHeld(actor: Actor, wanted: string[], scope: Scope = { k
   }))
 }
 
-function abilityError(missing: string[]): never {
+export function abilityError(missing: string[]): never {
   refuse('core.role.not-held', 'You can only give abilities you hold yourself.', { status: 403, remedy: `Ask someone who holds ${missing.join(', ')} to do this.` })
 }
 
@@ -187,7 +187,7 @@ export async function createGrant(unit: UnitView, actor: Actor, input: GrantInpu
   unit.add({
     sql: `INSERT INTO core_grants (id, account_id, role_id, scope, scope_module, scope_type, scope_id, starts_at, expires_at, granted_by, granted_at)
           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-           WHERE NOT EXISTS (SELECT 1 FROM core_grants g WHERE g.account_id = ? AND g.role_id = ? AND g.scope = ? AND g.scope_module IS ? AND g.scope_type IS ? AND g.scope_id IS ? AND ${LIVE})`,
+           WHERE NOT EXISTS (SELECT 1 FROM core_grants g WHERE ${HELD_BY} AND g.role_id = ? AND g.scope = ? AND g.scope_module IS ? AND g.scope_type IS ? AND g.scope_id IS ? AND ${LIVE})`,
     params: [id, input.accountId, role.id, scope.kind, module, type, recordId, at, expiresAt, actor.accountId ?? null, at, input.accountId, role.id, scope.kind, module, type, recordId, at, at],
   }).expect(1, { code: 'core.grant.already-held', reason: 'This person already holds this role there.', remedy: 'Change the existing grant instead.' })
   unit.announce('core.grant.created', { grantId: id, accountId: input.accountId, roleId: role.id }, { record: ['core.grant', id] })

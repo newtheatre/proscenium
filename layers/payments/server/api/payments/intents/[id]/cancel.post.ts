@@ -1,8 +1,10 @@
-// Cancels a desk payment nobody has paid anything towards, and releases what was prepared for it.
+// Cancels a desk payment, releasing what was prepared for it. A payment still waiting on the reader
+// may be given up on: the reader is asked to stop, and money it takes after all is refunded.
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { cancelIntent } from '../../../../intents'
+import { stopWaiting } from '../../../../start'
 
 export default defineRoute({
   ability: 'payments.attempt.attest',
@@ -10,6 +12,7 @@ export default defineRoute({
   input: z.object({}).strict(),
 }, async (event, { unit }) => {
   const id = getRouterParam(event, 'id') ?? ''
-  await cancelIntent(unit.view(), id)
-  return { cancelled: true }
+  const { waiting } = await cancelIntent(unit.view(), id)
+  if (waiting.length) unit.afterCommit(() => stopWaiting(waiting))
+  return { cancelled: true, waiting }
 })

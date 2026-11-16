@@ -1,6 +1,6 @@
-<!-- What every console page's navbar ends with: the search button, which opens the command
-     palette the layout holds, and the account menu, the one way between shells (UI-02). On a phone
-     the navbar has room only for the title and the page's own action, so both move to the drawer. -->
+<!-- What every console page's navbar ends with: the search button, which opens the command palette the
+     layout holds. The account menu is at the foot of the sidebar. On a phone the navbar has room only
+     for the title and the page's own action, so search moves to the drawer. -->
 <script setup lang="ts">
 const { t } = useT()
 </script>
@@ -12,6 +12,5 @@ const { t } = useT()
       color="neutral"
       variant="outline"
     />
-    <AccountMenu />
   </div>
 </template>

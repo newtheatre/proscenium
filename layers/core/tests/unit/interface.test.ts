@@ -3,9 +3,9 @@
 // control values and back.
 import { describe, expect, it } from 'vitest'
 import { entryLabelKey, groupLabelKey, orderGroups, resolveEntry, shellOf } from '../../shared/navigation'
-import { activeFilterCount, parseList, serialiseList, toCsv } from '../../shared/list'
+import { activeFilterCount, decodeList, defineList, directionWords, filterChipText, filterCount, parseList, serialiseList, toCsv } from '../../shared/list'
 import { isConflict, mergeConflict } from '../../shared/form'
-import { durationText, fromControl, toControl } from '../../shared/controls'
+import { controlText, durationText, fromControl, toControl } from '../../shared/controls'
 
 describe('shells and entries (UI-08)', () => {
   it('knows which shell an address belongs to', () => {
@@ -43,18 +43,59 @@ describe('shells and entries (UI-08)', () => {
 })
 
 describe('list state in the address (UI-11)', () => {
+  const list = defineList('test.items', {
+    filters: { status: { kind: 'choices', label: 'Status', options: [{ value: 'draft', label: 'Draft' }, { value: 'live', label: 'Live' }] }, when: { kind: 'dates', label: 'When', presets: [{ value: '7d', label: 'Last 7 days' }] }, listed: { kind: 'yes-no', label: 'Listed' } },
+    sorts: { title: { label: 'Title', type: 'text' }, seats: { label: 'Seats', type: 'number' }, changed: { label: 'Last changed', type: 'date', natural: 'desc' } },
+    columns: { title: { label: 'Title', sort: 'title', always: true }, seats: { label: 'Seats', sort: 'seats' } },
+    views: { drafts: { label: 'Drafts', filters: { status: 'draft' }, sort: 'changed' }, all: { label: 'All' } },
+    defaultView: 'all',
+    defaultSort: { key: 'title', order: 'asc' },
+  })
+
   it('reads and writes the same query, leaving out defaults', () => {
-    const defaults = { sort: 'title', order: 'asc' as const }
-    const state = parseList({ q: 'ham', status: 'draft', sort: 'seats', order: 'desc', page: '2' }, ['status'], defaults)
-    expect(state).toMatchObject({ search: 'ham', filters: { status: 'draft' }, sort: 'seats', order: 'desc', page: 2, pageSize: 25 })
-    expect(serialiseList(state, defaults)).toEqual({ q: 'ham', status: 'draft', sort: 'seats', order: 'desc', page: '2' })
-    expect(serialiseList(parseList({}, ['status'], defaults), defaults)).toEqual({})
+    const state = parseList({ q: 'ham', status: 'draft,live', sort: 'seats', order: 'desc', page: '2' }, list)
+    expect(state).toMatchObject({ search: 'ham', filters: { status: 'draft,live' }, sort: 'seats', order: 'desc', page: 2, pageSize: 25, view: 'all' })
+    expect(serialiseList(state, list)).toEqual({ q: 'ham', status: 'draft,live', sort: 'seats', order: 'desc', page: '2' })
+    expect(serialiseList(parseList({}, list), list)).toEqual({})
+    expect(serialiseList(parseList({ view: 'drafts' }, list), list)).toEqual({ view: 'drafts' })
   })
 
   it('ignores nonsense and filters that are not declared', () => {
-    const state = parseList({ page: '-3', size: 'abc', other: 'x', order: 'sideways' }, ['status'])
-    expect(state).toMatchObject({ page: 1, pageSize: 25, order: 'asc', filters: {} })
-    expect(activeFilterCount(parseList({ q: 'a', status: 'x' }, ['status']))).toBe(2)
+    const state = parseList({ page: '-3', size: '7', other: 'x', order: 'sideways', sort: 'nope', view: 'nope' }, list)
+    expect(state).toMatchObject({ page: 1, pageSize: 25, order: 'asc', filters: {}, sort: 'title', view: 'all' })
+    expect(activeFilterCount(parseList({ q: 'a', status: 'x' }, list))).toBe(2)
+    expect(filterCount(parseList({ q: 'a' }, list))).toBe(0)
+  })
+
+  it('refuses a declaration that uses a reserved key or an undeclared sort', () => {
+    expect(() => defineList('t.bad', { filters: { page: { kind: 'choice', label: 'Page' } }, sorts: {}, columns: {} })).toThrow(/reserved/)
+    expect(() => defineList('t.bad', { filters: {}, sorts: {}, columns: { a: { label: 'A', sort: 'x' } } })).toThrow(/undeclared sort/)
+  })
+
+  it('decodes strictly: a view sets filters and sort, the address overrides, an unknown key is named', () => {
+    const can = (a: string) => a !== 'x'
+    const ok = decodeList({ view: 'drafts', listed: 'yes' }, list, { can, today: '2026-11-16' })
+    expect(ok).toMatchObject({ ok: true, value: { view: 'drafts', sort: { key: 'changed', order: 'desc' }, filters: { status: ['draft'], listed: true } } })
+    expect(decodeList({ status: 'live', view: 'drafts' }, list, { today: '2026-11-16' })).toMatchObject({ ok: true, value: { filters: { status: ['live'] } } })
+    expect(decodeList({ when: '7d' }, list, { today: '2026-11-16' })).toMatchObject({ ok: true, value: { filters: { when: { from: '2026-11-09', to: '2026-11-16' } } } })
+    expect(decodeList({ colour: 'red' }, list, { today: '2026-11-16' })).toEqual({ ok: false, key: 'colour', reason: expect.any(String) })
+    expect(decodeList({ status: 'gone' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'status' })
+    expect(decodeList({ sort: 'x' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'sort' })
+    expect(decodeList({ size: '30' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'size' })
+  })
+
+  it('drops a filter the viewer may not use, and words directions by type', () => {
+    const guarded = defineList('t.g', { filters: { secret: { kind: 'choice', label: 'S', ability: 'x' } }, sorts: { a: { label: 'A', type: 'date' } }, columns: {} })
+    expect(decodeList({ secret: 'v' }, guarded, { can: () => false, today: '2026-11-16' })).toMatchObject({ ok: true, value: { dropped: ['secret'], filters: {} } })
+    expect(directionWords('date', 'asc').short).toBe('Soonest first')
+    expect(directionWords('number', 'desc').short).toBe('Highest first')
+  })
+
+  it('writes a chip for each kind of filter', () => {
+    expect(filterChipText(list.filters.status, 'draft,live')).toBe('Status: Draft, Live')
+    expect(filterChipText(list.filters.when, '7d')).toBe('When: Last 7 days')
+    expect(filterChipText(list.filters.when, '2026-11-01..2026-11-16')).toBe('When: 2026-11-01 to 2026-11-16')
+    expect(filterChipText(list.filters.listed, 'no')).toBe('Listed: No')
   })
 
   it('exports CSV with quoting and no formulas', () => {
@@ -96,5 +137,16 @@ describe('setting controls (UI-14)', () => {
     expect(fromControl('money', 12.5)).toBe(1250)
     expect(fromControl('custom', '{"a":1}')).toEqual({ a: 1 })
     expect(fromControl('text', '', true)).toBeNull()
+  })
+  it('edits a rate as a count and a period, and a text custom value as text', () => {
+    expect(toControl({ kind: 'rate', value: { count: 600, per: 60 } })).toEqual({ count: 600, per: '1m' })
+    expect(toControl({ kind: 'rate', value: null })).toEqual({ count: undefined, per: '' })
+    expect(fromControl('rate', { count: 20, per: ' 10m ' })).toEqual({ count: 20, per: '10m' })
+    expect(fromControl('rate', { count: undefined, per: '' })).toEqual({ count: null, per: '' })
+    const words = { on: 'on', off: 'off', rate: (count: number, per: string) => `${count} in ${per}` }
+    expect(controlText('rate', { count: 10, per: '10m' }, words)).toBe('10 in 10m')
+    expect(toControl({ kind: 'custom', value: '08-01' })).toBe('08-01')
+    expect(fromControl('custom', '08-01', false, '08-01')).toBe('08-01')
+    expect(fromControl('custom', '{"a":1}', false, { a: 0 })).toEqual({ a: 1 })
   })
 })
