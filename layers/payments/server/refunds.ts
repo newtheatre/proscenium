@@ -108,6 +108,9 @@ async function succeed(unit: UnitView, refund: RefundRow, providerRef?: string) 
   const at = nowMs()
   unit.add({ sql: "UPDATE payments_refunds SET state = 'succeeded', provider_ref = coalesce(provider_ref, ?), updated_at = ? WHERE id = ? AND state IN ('approved', 'sent')", params: [providerRef ?? null, at, refund.id] })
     .expect(1, { code: 'payments.refund.already-answered', reason: 'This refund already has its answer.' })
+  unit.announce('payments.refund.succeeded', { refundId: refund.id, partId: part.id, owner: ownerOf(part) }, { record: ['payments.refund', refund.id] })
+  // Test money posts nothing, going out as coming in.
+  if ((await providerAccount(attempt.provider_account_id))?.mode === 'test') return
   let back: EntryInput[]
   if (part.settled_at === null) {
     // An unfulfilled payment: the money was held in payments.unfulfilled, never the owner's.
@@ -129,7 +132,6 @@ async function succeed(unit: UnitView, refund: RefundRow, providerRef?: string) 
     postedBy: null,
     entries: [{ account: clearingFor(attempt.method, attempt.provider_account_id), amountMinor: -refund.amount_minor }, ...back],
   })
-  unit.announce('payments.refund.succeeded', { refundId: refund.id, partId: part.id, owner: ownerOf(part) }, { record: ['payments.refund', refund.id] })
 }
 
 /** Records a provider's answer to a refund, in its own unit. */

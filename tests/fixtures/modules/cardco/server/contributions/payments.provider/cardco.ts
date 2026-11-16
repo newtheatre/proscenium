@@ -2,7 +2,7 @@
 // webhook with `sign`.
 import type { PaymentProvider, ProviderAnswer, RefundAnswer } from '#modules/payments'
 
-export const world = { answers: new Map<string, ProviderAnswer | 'unknown'>(), statusCalls: 0, failStatus: false, refundAnswer: { state: 'succeeded' } as RefundAnswer, refundKeys: [] as string[] }
+export const world = { answers: new Map<string, ProviderAnswer | 'unknown'>(), statusCalls: 0, failStatus: false, refundAnswer: { state: 'succeeded' } as RefundAnswer, refundKeys: [] as string[], startKeys: [] as string[], startFail: false, startAnswer: undefined as ProviderAnswer | undefined }
 const KEY = 'cardco-test-key'
 
 export function sign(eventId: string): string {
@@ -14,7 +14,9 @@ export default {
   methods: [{ method: 'card_online', channels: ['online'] }],
   secrets: [],
   async start(attempt) {
-    return { next: { kind: 'none' }, providerRef: `cc_${attempt.id}` }
+    world.startKeys.push(attempt.idempotencyKey)
+    if (world.startFail) throw new Error('cardco did not answer')
+    return { next: { kind: 'redirect', url: `https://cardco.test/pay/${attempt.id}` }, providerRef: `cc_${attempt.id}`, answer: world.startAnswer }
   },
   async status(attempt) {
     world.statusCalls++
