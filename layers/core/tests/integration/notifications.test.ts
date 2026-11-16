@@ -1,5 +1,6 @@
-// C-27, C-28, C-32: a module sends one email from its own job; a failure retries; nothing is sent
-// until the sending domain is set and verified; each topic can use a named sender.
+// C-27, C-28, C-32: a module records an email to an address from its own job (notifyAddress), and
+// core.send-notifications sends it after the commit; a failure retries; nothing is sent until the
+// sending domain is set and verified; each topic can use a named sender.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, enqueue, usePoint } from '#kit'
 import { MailError, setMailer, type OutgoingEmail } from '../../server/notifications/mailer'
@@ -28,12 +29,21 @@ async function setSettings(values: Record<string, unknown>) {
   sent.length = 0
 }
 
-/** Runs the jobs queued so far, once each: a retry's own message waits for the next call. */
+/**
+ * Runs the jobs queued so far, once each, then the sends they queued: a module's job, then
+ * core.send-notifications. A retry's own message waits for the next call.
+ */
 async function deliver(): Promise<string[]> {
-  const batch = sent.splice(0)
   const outcomes: string[] = []
-  for (const message of batch) outcomes.push(await inContext(() => runJob(message.jobId), { kind: 'job' }))
+  for (let round = 0; round < 2; round++) { // not-policy: the module's job, then the send
+    const batch = sent.splice(0)
+    for (const message of batch) outcomes.push(await inContext(() => runJob(message.jobId), { kind: 'job' }))
+  }
   return outcomes
+}
+
+async function emailDeliveries() {
+  return rows<{ state: string, reason: string | null, last_error: string | null }>("SELECT state, reason, last_error FROM core_notification_deliveries WHERE channel = 'email'")
 }
 
 async function sendTicket(address = 'guest@example.org', key?: string) {
@@ -65,24 +75,29 @@ afterEach(async () => {
     env.DB.prepare('DELETE FROM core_notification_routing'),
     env.DB.prepare('DELETE FROM core_sender_identities'),
     env.DB.prepare('DELETE FROM core_jobs'),
+    env.DB.prepare('DELETE FROM core_notification_deliveries'),
+    env.DB.prepare('DELETE FROM core_notifications'),
+    env.DB.prepare('DELETE FROM core_email_suppressions'),
   ])
   await env.CACHE!.list().then(list => Promise.all(list.keys.map(k => env.CACHE!.delete(k.name))))
 })
 
 describe('sending an email from a job (C-27)', () => {
-  it('sends nothing until the sending domain is set and verified, and the job waits to retry', async () => {
+  it('sends nothing until the sending domain is set and verified, and the send waits to retry', async () => {
     await sendTicket()
-    expect(await deliver()).toEqual(['retrying'])
+    expect(await deliver()).toEqual(['done', 'retrying'])
     expect(mails).toHaveLength(0)
-    const [job] = await rows<{ last_error: string, payload: string }>("SELECT last_error, payload FROM core_jobs WHERE name = 'notify.send-ticket'")
+    expect(await emailDeliveries()).toEqual([expect.objectContaining({ state: 'queued' })])
+    const [job] = await rows<{ last_error: string, payload: string }>("SELECT last_error, payload FROM core_jobs WHERE name = 'core.send-notifications'")
     expect(job!.last_error).toMatch(/^core\.notifications\.domain-unverified/)
     expect(job!.last_error).not.toContain('guest@example.org')
+    expect(job!.payload).not.toContain('guest@example.org')
   })
 
   it('renders the type\'s wording with the brand and the theatre\'s name, and sends it', async () => {
     await verify()
     await sendTicket()
-    expect(await deliver()).toEqual(['done'])
+    expect(await deliver()).toEqual(['done', 'done'])
     expect(mails).toHaveLength(1)
     const mail = mails[0]!
     expect(mail.to).toBe('guest@example.org')
@@ -93,6 +108,13 @@ describe('sending an email from a job (C-27)', () => {
     expect(mail.text).toContain('Open your ticket: https://tickets.example.org/t/abc')
     expect(mail.html).toContain('<strong>B12</strong>')
     expect(mail.html).toContain('href="https://tickets.example.org/t/abc"')
+  })
+
+  it('keeps no address or variables once the email to a bare address is finished', async () => {
+    await verify()
+    await sendTicket()
+    await deliver()
+    expect(await rows('SELECT account_id, address, payload, sealed_variables FROM core_notifications')).toEqual([{ account_id: null, address: null, payload: null, sealed_variables: null }])
   })
 
   it('writes nothing about the message to the database', async () => {
@@ -111,8 +133,9 @@ describe('sending an email from a job (C-27)', () => {
     await sendTicket('guest@example.org', 'order-1')
     await sendTicket('guest@example.org', 'order-1')
     await sendTicket('guest@example.org', 'order-2')
-    expect(await deliver()).toEqual(['done', 'done', 'done'])
+    await deliver()
     expect(mails).toHaveLength(2)
+    expect(await emailDeliveries()).toHaveLength(2)
   })
 
   it('refuses variables the type does not declare, a missing one, and an unsafe address', async () => {
@@ -131,7 +154,12 @@ describe('sending an email from a job (C-27)', () => {
   it('escapes what the caller gives, so a variable cannot add markup', async () => {
     await verify()
     const { notifyAddress } = await import('../../server/notifications/send')
-    await inContext(() => notifyAddress(createUnit(), 'notify.ticket-ready', { address: 'a@example.org', variables: { link: 'https://x.example.org/?a=1&b="2"', seat: '<img src=x onerror=alert(1)>' } }))
+    await inContext(async () => {
+      const unit = createUnit()
+      await notifyAddress(unit, 'notify.ticket-ready', { address: 'a@example.org', variables: { link: 'https://x.example.org/?a=1&b="2"', seat: '<img src=x onerror=alert(1)>' } })
+      await unit.commit()
+    })
+    await deliver()
     expect(mails[0]!.html).not.toContain('<img')
     expect(mails[0]!.html).toContain('&lt;img src=x onerror=alert(1)&gt;')
     expect(mails[0]!.html).toContain('href="https://x.example.org/?a=1&amp;b=&quot;2&quot;"')
@@ -139,28 +167,32 @@ describe('sending an email from a job (C-27)', () => {
 })
 
 describe('when sending fails (C-28)', () => {
-  it('retries with growing waits, then marks the job dead and announces it, keeping only the provider\'s code', async () => {
+  it('retries the send, keeping only the provider\'s code, and leaves the module\'s job done', async () => {
     await verify()
     failWith = 'E_INTERNAL_SERVER_ERROR'
     await sendTicket()
-    const outcomes: string[] = []
-    for (let i = 0; i < 3; i++) {
-      outcomes.push(...await deliver())
-      await env.DB.prepare("UPDATE core_jobs SET run_after = 0 WHERE state = 'queued'").run()
-    }
-    expect(outcomes).toEqual(['retrying', 'retrying', 'dead'])
-    const [job] = await rows<{ state: string, last_error: string }>("SELECT state, last_error FROM core_jobs WHERE name = 'notify.send-ticket'")
-    expect(job).toEqual({ state: 'dead', last_error: 'core.notifications.send-failed: E_INTERNAL_SERVER_ERROR' })
-    expect(await rows("SELECT id FROM core_events WHERE name = 'core.job.died'")).not.toHaveLength(0)
+    expect(await deliver()).toEqual(['done', 'done'])
+    expect(mails).toHaveLength(0)
+    expect(await emailDeliveries()).toEqual([{ state: 'retrying', reason: null, last_error: 'E_INTERNAL_SERVER_ERROR' }])
+    const [job] = await rows<{ payload: string }>("SELECT payload FROM core_jobs WHERE name = 'core.send-notifications' AND state = 'queued'")
+    expect(job!.payload).not.toContain('guest@example.org')
   })
 
-  it('treats a domain the provider will not send from as unverified', async () => {
+  it('retries a domain the provider will not send from', async () => {
     await verify()
     failWith = 'E_SENDER_NOT_VERIFIED'
     await sendTicket()
     await deliver()
-    const [job] = await rows<{ last_error: string }>("SELECT last_error FROM core_jobs WHERE name = 'notify.send-ticket'")
-    expect(job!.last_error).toMatch(/^core\.notifications\.domain-unverified/)
+    expect(await emailDeliveries()).toEqual([expect.objectContaining({ state: 'retrying', last_error: 'E_SENDER_NOT_VERIFIED' })])
+  })
+
+  it('does not send to a suppressed address', async () => {
+    await verify()
+    const { addressHash } = await import('../../server/notifications/suppression')
+    await env.DB.prepare('INSERT INTO core_email_suppressions (address_hash, reason, created_at) VALUES (?, \'hard_bounce\', ?)').bind(await inContext(() => addressHash('guest@example.org')), Date.now()).run()
+    await sendTicket()
+    expect(await deliver()).toEqual(['done'])
+    expect(await emailDeliveries()).toEqual([{ state: 'skipped', reason: 'suppressed_address', last_error: null }])
   })
 })
 
@@ -188,7 +220,7 @@ describe('the sending domain and senders (C-32)', () => {
     await verify()
     await setSettings({ 'core.notifications.sending-domain': 'other.example.org' })
     await sendTicket()
-    expect(await deliver()).toEqual(['retrying'])
+    expect(await deliver()).toEqual(['done', 'retrying'])
     expect(mails).toHaveLength(0)
   })
 
