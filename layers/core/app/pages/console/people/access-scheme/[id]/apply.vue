@@ -14,12 +14,13 @@ interface Opened {
 }
 
 const { t } = useT()
+const { $api } = useNuxtApp()
 const toast = useToast()
 const route = useRoute()
 const id = String(route.params.id)
 const base = `/api/core/access-scheme/${encodeURIComponent(id)}`
 const back = `/console/people/access-scheme/${encodeURIComponent(id)}`
-const { data } = await useFetch<Opened>(base, { key: `core:access-application:${id}` })
+const { data } = await useAPI<Opened>(base, { key: `core:access-application:${id}` })
 if (!data.value) throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 
 const { schema, fields, toForm, toBody } = useAccessApplicationForm(
@@ -31,7 +32,7 @@ const initial = toForm(app?.status === 'rejected' ? null : (app?.pending ?? app?
 useSeoMeta({ title: () => t('core.access.review.behalf') })
 
 async function submit(values: Record<string, unknown>) {
-  await $fetch<unknown>(`${base}/application` as string, { method: 'POST', body: toBody(values) })
+  await $api<unknown>(`${base}/application` as string, { method: 'POST', body: toBody(values) })
   toast.add({ title: t('core.access.review.applied'), color: 'success' })
   await refreshNuxtData(`core:access-application:${id}`)
 }

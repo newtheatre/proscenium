@@ -9,7 +9,7 @@ const { data: settings } = await usePublicSettings()
 const enabled = computed(() => settings.value?.['core.access-scheme.enabled']?.value !== false)
 const name = computed(() => String(settings.value?.['core.access-scheme.name']?.value ?? ''))
 // Only a signed-in visitor's own application is asked about; nothing is fetched for anybody else.
-const { data: mine } = await useFetch<{ enabled: boolean, application?: { status: string } | null }>('/api/core/me/access', {
+const { data: mine } = await useAPI<{ enabled: boolean, application?: { status: string } | null }>('/api/core/me/access', {
   key: 'core:my-access-summary',
   immediate: viewer.value.signedIn,
   default: () => ({ enabled: true, application: null }),

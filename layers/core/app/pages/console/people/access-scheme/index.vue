@@ -7,6 +7,7 @@ definePageMeta({ layout: 'console' })
 interface Row { accountId: string, name: string | null, change: boolean, submittedVia: 'self' | 'staff', waitingFor: number, overdue: boolean }
 
 const { t } = useT()
+const { $api } = useNuxtApp()
 const DAY = 86_400_000 // not-policy: milliseconds in a day
 
 const columns = [
@@ -25,7 +26,7 @@ async function sendInvitation() {
   busy.value = true
   refusal.value = null
   try {
-    await $fetch('/api/core/access-scheme/invitations', { method: 'POST', body: { name: invite.name, address: invite.address } })
+    await $api('/api/core/access-scheme/invitations', { method: 'POST', body: { name: invite.name, address: invite.address } })
     toast.add({ title: t('core.access.invite.sent', { address: invite.address }), color: 'success' })
     inviting.value = false
     invite.name = ''

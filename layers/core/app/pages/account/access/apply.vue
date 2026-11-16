@@ -17,8 +17,9 @@ interface Mine {
 }
 
 const { t } = useT()
+const { $api } = useNuxtApp()
 const toast = useToast()
-const { data } = await useFetch<Mine>('/api/core/me/access', { key: 'core:my-access' })
+const { data } = await useAPI<Mine>('/api/core/me/access', { key: 'core:my-access' })
 if (!data.value?.enabled) throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 
 const application = computed(() => data.value?.application ?? null)
@@ -27,7 +28,7 @@ const initial = toForm(application.value?.status === 'rejected' ? null : (applic
 useSeoMeta({ title: () => data.value?.name ?? '' })
 
 async function submit(values: Record<string, unknown>) {
-  await $fetch('/api/core/me/access', { method: 'POST', body: toBody(values) })
+  await $api('/api/core/me/access', { method: 'POST', body: toBody(values) })
   toast.add({ title: t('core.access.sent'), color: 'success' })
   await refreshNuxtData('core:my-access')
 }

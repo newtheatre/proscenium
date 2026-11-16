@@ -3,7 +3,7 @@
      ask for more, verify, and a way to apply on their behalf (the form is [id]/apply). Opening it is recorded; nobody opens their own. -->
 <script setup lang="ts">
 import type { AccessApplicationValue } from '../../../../../composables/useAccessApplicationForm'
-import type { RefusalView } from '../../../../../composables/useRefusal'
+import type { RefusalView } from '../../../../../utils/refusal'
 
 definePageMeta({ layout: 'console' })
 
@@ -28,12 +28,13 @@ interface Opened {
 }
 
 const { t } = useT()
+const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const base = computed(() => `/api/core/access-scheme/${encodeURIComponent(id.value)}`)
-const { data, status, error, refresh } = await useFetch<Opened>(base, { key: `core:access-application:${id.value}` })
+const { data, status, error, refresh } = await useAPI<Opened>(base, { key: `core:access-application:${id.value}` })
 
 const refusal = ref<RefusalView | null>(null)
 const busy = ref(false)
@@ -53,7 +54,7 @@ async function act(path: string, method: 'POST' | 'PUT', body: object, done: str
   busy.value = true
   refusal.value = null
   try {
-    await $fetch<unknown>(`${base.value}${path}` as string, { method, body })
+    await $api<unknown>(`${base.value}${path}` as string, { method, body })
     toast.add({ title: done, color: 'success' })
     await refresh()
     return true

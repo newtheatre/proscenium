@@ -3,7 +3,7 @@
 <script setup lang="ts">
 const props = defineProps<{ headingId: string }>()
 const { t } = useT()
-const { data } = await useFetch<{ enabled: boolean, name?: string, application?: { status: 'submitted' | 'more-info' | 'accepted' | 'rejected' } | null }>('/api/core/me/access', { key: 'core:my-access-summary' })
+const { data } = await useAPI<{ enabled: boolean, name?: string, application?: { status: 'submitted' | 'more-info' | 'accepted' | 'rejected' } | null }>('/api/core/me/access', { key: 'core:my-access-summary' })
 
 const TONE = { 'submitted': 'info', 'more-info': 'warning', 'accepted': 'success', 'rejected': 'danger' } as const
 const status = computed(() => data.value?.application?.status ?? null)

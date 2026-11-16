@@ -4,7 +4,7 @@
      switches for other uses, and every read by staff. With the scheme off it is a missing page. -->
 <script setup lang="ts">
 import type { AccessApplicationValue } from '../../../composables/useAccessApplicationForm'
-import type { RefusalView } from '../../../composables/useRefusal'
+import type { RefusalView } from '../../../utils/refusal'
 
 interface Mine {
   enabled: boolean
@@ -28,11 +28,12 @@ interface Mine {
 }
 
 const { t } = useT()
+const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 
-const { data, refresh } = await useFetch<Mine>('/api/core/me/access', { key: 'core:my-access' })
+const { data, refresh } = await useAPI<Mine>('/api/core/me/access', { key: 'core:my-access' })
 if (!data.value?.enabled) throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 
 const name = computed(() => data.value?.name ?? '')
@@ -52,7 +53,7 @@ async function leave() {
   })
   if (!ok) return
   try {
-    await $fetch('/api/core/me/access', { method: 'DELETE', body: {} })
+    await $api('/api/core/me/access', { method: 'DELETE', body: {} })
     toast.add({ title: t('core.access.left', { scheme: name.value }), color: 'success' })
     await refresh()
   }
@@ -63,7 +64,7 @@ async function leave() {
 
 async function confirmStillRight() {
   try {
-    await $fetch('/api/core/me/access/confirm', { method: 'POST', body: {} })
+    await $api('/api/core/me/access/confirm', { method: 'POST', body: {} })
     toast.add({ title: t('core.access.confirmed'), color: 'success' })
     await refresh()
   }
@@ -74,7 +75,7 @@ async function confirmStillRight() {
 
 async function share(purpose: string, on: boolean) {
   try {
-    await $fetch('/api/core/me/access/sharing', { method: 'PUT', body: { purpose, on } })
+    await $api('/api/core/me/access/sharing', { method: 'PUT', body: { purpose, on } })
   }
   catch (error) {
     refusal.value = toRefusal(error)
