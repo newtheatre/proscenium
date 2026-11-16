@@ -61,6 +61,29 @@ Before the handler runs the kit checks, in order: the module is on (else 404), t
 or 403). Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
 of work after the handler returns, with an audit entry when the ability is audited.
 
+A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the body unread for the
+handler (`readRawBody(event, false)`) and validates the query against `input` instead. Such a route
+cannot be idempotent.
+
+## Core's services
+
+Any module may import core's services without listing core: `import { notifyAddress } from
+'#modules/core'`. In roadmap phase 1 they are:
+
+- `notifyAddress(unit, typeKey, { address, variables, locale?, dedupeKey? })` sends one
+  transactional email from inside your job. Declare the type as a contribution to
+  `core.notification-type` (wording inline, variables `url` or `text`, `{{ theatre }}` filled by
+  core). It throws on failure, so your job retries; nothing is sent until the sending domain is set
+  and verified. In tests, `setMailer(fn)` from `layers/core/server/notifications/mailer.ts`
+  records messages instead of sending them.
+- `operatingDayOf(instant)` and `dayBounds(day)`: the theatre's operating day, which rolls over at
+  `core.organisation.day-rollover`. A table that stores one contributes to `core.operating-day`, so
+  it is recalculated when the time zone or the rollover changes.
+- `attachFile(unit, fileId, { slot, ownerType, ownerId })` and `detachFile(unit, fileId)`. Declare
+  where your records hold files as contributions to `core.file-slot`; uploads go to
+  `POST /api/core/files?slot=<id>&owner=<record id>` and are checked and cleaned by a job.
+- `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
+
 ## The unit of work
 
 A change, its audit entry, its events and the jobs it queues commit together as one D1 batch, or
@@ -127,5 +150,13 @@ in the specification's "As built" list; this guide is the reference from here on
 - Pending migrations are applied automatically only where `PROSCENIUM_AUTO_MIGRATE=1` (dev,
   preview and tests). It is not a production option and is removed when F-28's maintenance page
   and Apply button land.
+- The theatre's time zone and currency stay `core.locale.time-zone` and `core.locale.currency`,
+  which the scheduler already reads, rather than the core domain's `core.organisation.*` names.
+  The organisation's language setting waits for a second language.
+- In phase 1 `notifyAddress` sends at once, inside the caller's job, so the job's lane is the lane;
+  a notification type's `lane` takes effect with the full pipeline in phase 2.
+- An upload is one request carrying the bytes, rather than a begun upload and a second request.
+- A file with `record` access is not served until a module answers `core.file-access`.
+- The theatre's own files (its logos) have the owner `site`, so there is no `core.branding` record.
 - Not yet checked by `bun run check`: the erasure scan, soft-dependency switching and navigation
   coverage, which need the modules they check.
