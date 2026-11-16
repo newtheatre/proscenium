@@ -50,16 +50,16 @@ async function cancel() {
     :description="`Cancel ${title}? It shows as cancelled at its address.`"
   >
     <template #body>
-      <form
+      <UForm
         id="cancel-production"
         class="space-y-4"
-        @submit.prevent="cancel"
+        :state="form"
+        @submit="cancel"
       >
         <RefusalNotice :refusal="refusal" />
         <UAlert
           v-if="reach?.refusal"
           color="error"
-          variant="subtle"
           icon="i-lucide-circle-x"
           :title="reach.refusal.reason"
         >
@@ -91,7 +91,6 @@ async function cancel() {
             v-model="form.reasonTermId"
             :items="items"
             placeholder="Choose a reason"
-            class="w-full"
           />
         </UFormField>
         <UFormField
@@ -102,10 +101,9 @@ async function cancel() {
             v-model="form.note"
             :rows="2"
             maxlength="200"
-            class="w-full"
           />
         </UFormField>
-      </form>
+      </UForm>
     </template>
     <template #footer>
       <UButton

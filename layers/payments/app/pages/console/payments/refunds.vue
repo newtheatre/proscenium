@@ -97,25 +97,16 @@ async function decline() {
             :description="t('payments.screens.refunds.empty-help')"
             icon="i-lucide-undo-2"
           />
-          <ul
+          <RecordList
             v-else
-            class="divide-y divide-default rounded-lg border border-default"
+            :label="t('payments.navigation.refunds.label')"
           >
-            <li
+            <RecordListItem
               v-for="r in loaded.refunds"
               :key="r.id"
-              class="flex flex-wrap items-center gap-3 px-3 py-3"
+              :name="`${money(r.amountMinor, r.currency)} · ${methodLabel(r.method)} · ${ownerLabel(r)}`"
+              :description="[t('payments.screens.refunds.asked', { person: r.requestedByName ?? t('payments.screens.refunds.the-system'), when: when(r.createdAt) }), ...(r.approvedByName ? [t('payments.screens.refunds.approved-by', { person: r.approvedByName })] : [])].join(' · ')"
             >
-              <div class="min-w-0 flex-1">
-                <p class="font-medium">
-                  {{ money(r.amountMinor, r.currency) }} · {{ methodLabel(r.method) }} · {{ ownerLabel(r) }}
-                </p>
-                <p class="text-sm text-muted">
-                  {{ t('payments.screens.refunds.asked', { person: r.requestedByName ?? t('payments.screens.refunds.the-system'), when: when(r.createdAt) }) }}<template v-if="r.approvedByName">
-                    · {{ t('payments.screens.refunds.approved-by', { person: r.approvedByName }) }}
-                  </template>
-                </p>
-              </div>
               <template v-if="r.state === 'requested'">
                 <UButton
                   :label="t('payments.screens.refunds.approve-button')"
@@ -136,8 +127,8 @@ async function decline() {
                 size="sm"
                 @click="act(r, 'confirm')"
               />
-            </li>
-          </ul>
+            </RecordListItem>
+          </RecordList>
         </div>
       </template>
     </DataBoundary>
@@ -148,10 +139,11 @@ async function decline() {
       @update:open="(open: boolean) => { if (!open) declining = null }"
     >
       <template #body>
-        <form
+        <UForm
           id="decline-refund"
           class="space-y-4"
-          @submit.prevent="decline"
+          :state="{ reason }"
+          @submit="decline"
         >
           <RefusalNotice :refusal="declineRefusal" />
           <UFormField
@@ -161,10 +153,9 @@ async function decline() {
             <USelect
               v-model="reason"
               :items="reasons?.reasons.map(r => ({ value: r.id, label: r.label })) ?? []"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

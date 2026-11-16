@@ -45,6 +45,8 @@ const TONES = { draft: 'neutral', scheduled: 'success', cancelled: 'danger', com
 const performances = computed(() => data.value?.performances ?? [])
 const spaces = computed(() => (data.value?.options.venues ?? []).flatMap(v => v.spaces.map(s => ({ value: s.id, label: `${s.name}, ${v.name}`, venueId: v.id, capacity: s.defaultCapacity }))))
 const place = (p: Performance) => spaces.value.find(s => s.value === p.spaceId)?.label ?? 'A space no longer listed'
+/** Where, doors, end and seats, on one line. */
+const summaryOf = (p: Performance) => [place(p), ...(p.doorsAt ? [`doors ${dates.time(p.doorsAt)}`] : []), `ends ${dates.time(p.endsAt)}`, ...(p.capacity !== null ? [`${p.capacity} seats`] : [])].join(' · ')
 const accessLabel = (id: string) => data.value?.options.access.find(a => a.id === id)?.label ?? 'Access'
 const thing = (p: Performance) => `the ${dates.time(p.startsAt)} performance of ${props.title} on ${dates.dayNamed(p.startsAt)}`
 
@@ -234,43 +236,29 @@ function actions(p: Performance) {
         description="Add each performance as a draft, then schedule it when its time and space are settled."
         icon="i-lucide-calendar"
       />
-      <ul
+      <RecordList
         v-else
-        class="divide-y divide-default rounded-md border border-default"
+        label="Performances"
       >
-        <li
+        <RecordListItem
           v-for="p in performances"
           :key="p.id"
-          class="flex flex-wrap items-center gap-3 px-4 py-3"
+          :description="summaryOf(p)"
         >
-          <div class="min-w-0 flex-1">
-            <p class="font-medium">
-              {{ dates.dateTime(p.startsAt) }}<span
-                v-if="p.label"
-                class="text-muted"
-              > · {{ p.label }}</span>
-            </p>
-            <p class="text-sm text-muted">
-              {{ place(p) }}<template v-if="p.doorsAt">
-                · doors {{ dates.time(p.doorsAt) }}
-              </template> · ends {{ dates.time(p.endsAt) }}<template v-if="p.capacity !== null">
-                · {{ p.capacity }} seats
-              </template>
-            </p>
-            <div
-              v-if="p.access.length"
-              class="mt-1 flex flex-wrap gap-1"
-            >
-              <UBadge
-                v-for="a in p.access"
-                :key="a.termId"
-                :label="accessLabel(a.termId)"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              />
-            </div>
-          </div>
+          <template #name>
+            {{ dates.dateTime(p.startsAt) }}<span
+              v-if="p.label"
+              class="font-normal text-muted"
+            > · {{ p.label }}</span>
+            <UBadge
+              v-for="a in p.access"
+              :key="a.termId"
+              :label="accessLabel(a.termId)"
+              color="neutral"
+              size="sm"
+              class="ms-1"
+            />
+          </template>
           <StatusBadge
             :tone="TONES[p.state]"
             :label="p.state.charAt(0).toUpperCase() + p.state.slice(1)"
@@ -286,8 +274,8 @@ function actions(p: Performance) {
               :aria-label="`Actions for ${dates.dateTime(p.startsAt)}`"
             />
           </UDropdownMenu>
-        </li>
-      </ul>
+        </RecordListItem>
+      </RecordList>
     </DataBoundary>
 
     <UModal
@@ -296,10 +284,11 @@ function actions(p: Performance) {
       :description="editing?.state === 'scheduled' ? 'It is scheduled, so a new time or space must be free.' : 'It starts as a draft. Nothing is public until it is scheduled.'"
     >
       <template #body>
-        <form
+        <UForm
           id="performance-form"
           class="space-y-4"
-          @submit.prevent="save"
+          :state="form"
+          @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -309,7 +298,6 @@ function actions(p: Performance) {
             <USelect
               v-model="form.spaceId"
               :items="spaces"
-              class="w-full"
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -347,7 +335,6 @@ function actions(p: Performance) {
               <UInputNumber
                 v-model="form.capacity"
                 :min="0"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -358,7 +345,6 @@ function actions(p: Performance) {
                 v-model="form.intervalCount"
                 :min="0"
                 :max="10"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -368,7 +354,6 @@ function actions(p: Performance) {
               <UInput
                 v-model="form.label"
                 maxlength="40"
-                class="w-full"
               />
             </UFormField>
           </div>
@@ -379,10 +364,9 @@ function actions(p: Performance) {
             <UInput
               v-model="form.externalBookingUrl"
               type="url"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
@@ -400,16 +384,16 @@ function actions(p: Performance) {
       :description="cancelling ? `Cancel ${thing(cancelling)}?` : undefined"
     >
       <template #body>
-        <form
+        <UForm
           id="cancel-performance"
           class="space-y-4"
-          @submit.prevent="cancel"
+          :state="cancelForm"
+          @submit="cancel"
         >
           <RefusalNotice :refusal="refusal" />
           <UAlert
             v-if="cancelReach?.refusal"
             color="error"
-            variant="subtle"
             icon="i-lucide-circle-x"
             :title="cancelReach.refusal.reason"
           >
@@ -441,7 +425,6 @@ function actions(p: Performance) {
               v-model="cancelForm.reasonTermId"
               :items="reasons"
               placeholder="Choose a reason"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -452,10 +435,9 @@ function actions(p: Performance) {
               v-model="cancelForm.note"
               :rows="2"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton
@@ -474,10 +456,11 @@ function actions(p: Performance) {
       description="What this performance offers, such as captioning, with any detail."
     >
       <template #body>
-        <form
+        <UForm
           id="performance-access"
           class="space-y-3"
-          @submit.prevent="saveAccess"
+          :state="accessChosen"
+          @submit="saveAccess"
         >
           <RefusalNotice :refusal="refusal" />
           <div
@@ -500,7 +483,7 @@ function actions(p: Performance) {
               class="flex-1"
             />
           </div>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

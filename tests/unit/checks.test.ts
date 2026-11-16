@@ -103,3 +103,26 @@ describe('counts of changed rows', () => {
     ].join('\n'))).toEqual([1, 4, 5, 8])
   })
 })
+
+describe('the interface check', () => {
+  it('flags what the kit replaces, and leaves the kit\'s own components alone', async () => {
+    const { interfaceProblems } = await import('../../scripts/checks/interface')
+    const source = [
+      '<form @submit.prevent="save">',
+      '  <UInput',
+      '    v-model="name"',
+      '    class="w-full"',
+      '  />',
+      '  <UInput type="date" />',
+      '  <ul class="divide-y divide-default rounded-lg border border-default">',
+      '  <UButton class="w-full" />',
+      '  <UInput class="w-48" />',
+      '</form>',
+      'const d = new Intl.DateTimeFormat(\'en-GB\')',
+    ].join('\n')
+    expect(interfaceProblems('page.vue', source).map(p => p.line)).toEqual([1, 4, 6, 7, 11])
+    expect(interfaceProblems('PageSettings.vue', '<form>')).toEqual([])
+    expect(interfaceProblems('RecordList.vue', '<ul class="divide-y rounded-lg border">')).toEqual([])
+    expect(interfaceProblems('useDates.ts', 'new Intl.DateTimeFormat(language)')).toEqual([])
+  })
+})

@@ -2,8 +2,6 @@
      first, with how long each has waited. Names and states only; needs show once one is opened, and
      opening one is recorded. -->
 <script setup lang="ts">
-definePageMeta({ layout: 'console' })
-
 interface Row { accountId: string, name: string | null, change: boolean, submittedVia: 'self' | 'staff', waitingFor: number, overdue: boolean }
 
 const { t } = useT()
@@ -94,10 +92,11 @@ const filters = [{
       :description="t('core.access.invite.description')"
     >
       <template #body>
-        <form
+        <UForm
           id="invite-to-apply"
           class="space-y-4"
-          @submit.prevent="sendInvitation"
+          :state="invite"
+          @submit="sendInvitation"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -107,7 +106,6 @@ const filters = [{
             <UInput
               v-model="invite.name"
               maxlength="200"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -119,10 +117,9 @@ const filters = [{
               v-model="invite.address"
               type="email"
               maxlength="254"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

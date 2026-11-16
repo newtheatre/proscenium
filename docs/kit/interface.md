@@ -81,7 +81,13 @@ the whole page, which stay in view while the body scrolls. `width` is `reading`,
 
 Inside a page, **PageSection** is a titled card (`title`, `description`, and `actions` and `footer`
 slots) and **RecordList** with **RecordListItem** (`to`, `icon`, `name`, `description`, `muted`) is a
-bordered list of records. Use these two for headings and lists; do not hand-build either.
+bordered list of records. Use these two for headings and lists; do not hand-build either. A row's `below` slot
+holds what belongs under it (a short form, a detail). **FactStrip** (`facts: { label, value }[]`) is the
+row of figures on a record's summary and on a screen's totals.
+
+`bun run check:conformance` holds screens to this ("Screens are built from the kit"): no raw `<form>`
+(use `UForm` or `PageForm`), no `w-full` on a form control (controls already fill their field), no
+hand-built bordered list, no native date or time input, and no date formatted by hand.
 
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.

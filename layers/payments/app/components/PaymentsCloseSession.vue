@@ -36,9 +36,10 @@ async function close() {
 </script>
 
 <template>
-  <form
+  <UForm
     class="space-y-4"
-    @submit.prevent="close"
+    :state="{ countedMinor, note }"
+    @submit="close"
   >
     <RefusalNotice :refusal="refusal" />
     <p>{{ t('payments.screens.close.expected', { amount: money(session.expectedCashMinor, session.currency) }) }}</p>
@@ -72,7 +73,6 @@ async function close() {
         v-model="note"
         maxlength="200"
         :rows="2"
-        class="w-full"
       />
     </UFormField>
     <UButton
@@ -81,5 +81,5 @@ async function close() {
       :disabled="countedMinor === null || (!!difference && !note.trim())"
       :label="t('payments.screens.close.button')"
     />
-  </form>
+  </UForm>
 </template>

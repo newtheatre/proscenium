@@ -105,7 +105,6 @@ const label = computed(() => props.count ? t('core.list.filters-on', { count: pr
             :model-value="values[name] || ANY"
             :items="withAny(filters[name]!.options)"
             value-key="value"
-            class="w-full"
             @update:model-value="setValue(name, String($event))"
           />
 
@@ -122,7 +121,6 @@ const label = computed(() => props.count ? t('core.list.filters-on', { count: pr
             :model-value="values[name] || ANY"
             :items="groupedItems(filters[name]!)"
             value-key="value"
-            class="w-full"
             @update:model-value="setValue(name, String($event))"
           />
 
@@ -134,7 +132,6 @@ const label = computed(() => props.count ? t('core.list.filters-on', { count: pr
             :loading="lookupBusy[name]"
             value-key="value"
             ignore-filter
-            class="w-full"
             :placeholder="t('core.list.any')"
             @update:search-term="searchLookup(name, $event)"
             @update:model-value="setValue(name, $event ? String($event) : '')"
