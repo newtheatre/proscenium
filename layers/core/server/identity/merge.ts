@@ -67,7 +67,7 @@ export async function mergePreview(survivorId: string, mergedAccountId: string) 
  * Merges `mergedAccountId` into `survivorId`. Refuses a merge with itself, with a tombstone or with an account
  * already merged away, and (ID-29) one that would leave no Owner who can sign in.
  */
-export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survivorId: string, mergedAccountId: string }): Promise<string> {
+export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survivorId: string, mergedAccountId: string, startedBy?: 'person' | 'staff' | 'claim' }): Promise<string> {
   const { survivorId, mergedAccountId } = input
   if (survivorId === mergedAccountId) refuse('core.merge.same', 'An account cannot be merged with itself.', { status: 422 })
   const survivor = await accountById(survivorId)
@@ -82,8 +82,8 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
   const undo = await useSetting('core.merge.undo-window') as number
   const mergeId = newId('mrg')
   unit.add({
-    sql: 'INSERT INTO core_account_merges (id, survivor_id, merged_account_id, started_by, performed_by, performed_at, undo_until) VALUES (?, ?, ?, \'staff\', ?, ?, ?)',
-    params: [mergeId, survivorId, mergedAccountId, actor.accountId ?? null, at, at + undo * 1000], // not-policy: seconds to milliseconds
+    sql: 'INSERT INTO core_account_merges (id, survivor_id, merged_account_id, started_by, performed_by, performed_at, undo_until) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    params: [mergeId, survivorId, mergedAccountId, input.startedBy ?? 'staff', actor.accountId ?? null, at, at + undo * 1000], // not-policy: seconds to milliseconds
   })
   for (const step of plan) {
     const t = `"${step.table}"`
@@ -127,6 +127,6 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
     .expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })
   if ((await isOwner(mergedAccountId)) || (await isOwner(survivorId))) guardLastOwner(unit)
   unit.announce('core.account.merged', { survivorId, mergedAccountId, mergeId }, { record: ['core.account', survivorId] })
-  unit.audit({ action: 'state', ability: 'core.account.merge', record: ['core.account', survivorId], detail: { mergedAccountId, mergeId, grantsMoved: grants.length } })
+  unit.audit({ action: 'state', ...(input.startedBy === 'claim' ? {} : { ability: 'core.account.merge' }), record: ['core.account', survivorId], detail: { mergedAccountId, mergeId, grantsMoved: grants.length, startedBy: input.startedBy ?? 'staff' } })
   return mergeId
 }
