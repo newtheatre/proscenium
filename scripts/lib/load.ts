@@ -7,11 +7,14 @@ import { ROOT, KIT, abs, rel } from './paths.ts'
 import { kitAliases } from '../../layers/core/aliases.ts'
 
 export type Owner = 'upstream' | 'site' | 'fixtures'
+export const FIXTURES = { dir: 'tests/fixtures/modules', owner: 'fixtures' as const }
+/** The gallery: a module of fixture screens the browser tests open. Only a build made for those tests includes it. */
+export const GALLERY = { dir: 'tests/fixtures/gallery', owner: 'fixtures' as const }
 export const ROOTS: { dir: string, owner: Owner }[] = [
   { dir: 'layers', owner: 'upstream' },
   { dir: 'site/layers', owner: 'site' },
+  ...(process.env.PROSCENIUM_GALLERY === '1' ? [GALLERY] : []),
 ]
-export const FIXTURES = { dir: 'tests/fixtures/modules', owner: 'fixtures' as const }
 
 export interface HandlerFile { kind: 'listeners' | 'jobs' | 'tasks' | 'facts' | 'calls' | 'contributions', name: string, point?: string, file: string }
 export interface FoundModule { root: string, owner: Owner, manifestFile: string, handlerFiles: HandlerFile[] }

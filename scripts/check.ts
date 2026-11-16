@@ -3,7 +3,7 @@
 import { loadRegistry, LoadError } from './lib/load.ts'
 import { checkPageAddresses, checkRoutes } from './checks/routes.ts'
 import { checkMigrations } from './checks/migrations.ts'
-import { checkAbilities, checkContentTokens, checkEventsAndJobs, checkImports, checkPolicyNumbers, checkTranslations } from './checks/source.ts'
+import { checkAbilities, checkContentTokens, checkEventsAndJobs, checkImports, checkNavigation, checkPolicyNumbers, checkTranslations } from './checks/source.ts'
 import { checkSite } from './checks/site.ts'
 
 let failed = 0
@@ -34,8 +34,9 @@ report('Events and jobs', checkEventsAndJobs(modules, registry))
 report('Imports, bindings and outside calls', checkImports(modules))
 report('Numbers that should be settings', checkPolicyNumbers(modules))
 report('Translations', checkTranslations(modules, registry))
+report('Navigation coverage', checkNavigation(modules, registry))
 report('Migrations', await checkMigrations(modules, registry))
 
-console.log('\nNot yet checked (they need modules that do not exist yet): the erasure scan, soft-dependency switching, navigation coverage, and owned paths (fork CI only: bun run check:paths).')
+console.log('\nNot yet checked (they need modules that do not exist yet): the erasure scan, soft-dependency switching, and owned paths (fork CI only: bun run check:paths).')
 console.log(failed ? `\n${failed} problem${failed === 1 ? '' : 's'} found.` : '\nEverything conforms.')
 process.exit(failed ? 1 : 0)
