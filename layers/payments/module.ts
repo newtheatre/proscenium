@@ -3,7 +3,7 @@
 // through the point payments.settlement, so it never imports Box office, a bar or anything else that
 // sells. Cash and attested card ship with it, so a desk works on day one with no account anywhere.
 import { z } from 'zod'
-import { ability, call, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, secret, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'payments.settings.manage'
@@ -93,6 +93,13 @@ export default defineModule({
     'payments.send-refund': job({ payload: z.object({ refundId: z.string() }), retries: 8 }),
   },
 
+  // Provider keys are Worker secrets in the first release (Matt's question 3). Stripe's are needed
+  // only once a Stripe account is added.
+  secrets: {
+    PAYMENTS_STRIPE_SECRET_KEY: secret({ needed: 'when-used' }),
+    PAYMENTS_STRIPE_WEBHOOK_SECRET: secret({ needed: 'when-used' }),
+  },
+
   contributes: {
     'finance.system-account': [
       { id: 'cash', name: 'Cash in tills', kind: 'asset' },
@@ -102,7 +109,7 @@ export default defineModule({
       { id: 'cash-variance', name: 'Cash over and short', kind: 'expense' },
       { id: 'unfulfilled', name: 'Payments to return', kind: 'liability' },
     ],
-    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }],
+    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'stripe' }],
     // Payments' own part: guided setup's test payment.
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
