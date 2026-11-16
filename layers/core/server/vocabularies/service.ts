@@ -198,7 +198,7 @@ async function termOrRefuse(vocabularyKey: string, id: string): Promise<TermRow>
 }
 
 const LABEL_TAKEN = { code: 'core.term.label-taken', reason: 'Another live term in this vocabulary has that label.', remedy: 'Choose a different label, or restore the retired term that has it.' }
-const LOCKED = () => refuse('core.vocabulary.locked', 'This vocabulary is locked: its terms can be renamed and reordered, but not added, retired, merged or deleted.', { status: 409 })
+const LOCKED = () => refuse('core.vocabulary.locked', 'This vocabulary is locked: its terms can be renamed and reordered, but not added, retired or deleted.', { status: 409 })
 
 /** The case-insensitive clash check, as a guard: the unique index is the real enforcement. */
 function labelFree(vocabularyKey: string, label: string, exceptId?: string): SQL {
@@ -270,25 +270,6 @@ export async function restoreTerm(unit: UnitView, vocabularyKey: string, id: str
   if (row.merged_into_id) refuse('core.term.merged', 'This term was merged into another, so it cannot be restored.', { status: 409 })
   unit.add(sql`UPDATE core_terms SET retired_at = NULL WHERE id = ${id} AND retired_at IS NOT NULL AND ${labelFree(vocabularyKey, row.label, id)}`).expect(1, LABEL_TAKEN)
   unit.audit({ action: 'state', ability: 'core.vocabulary.manage', record: ['core.vocabulary', vocabularyKey], detail: { termId: id, to: 'live' } })
-}
-
-/**
- * Retires one term into another of the same vocabulary. Records keep the old id; reads follow
- * merged_into_id, so reports group the two together and nothing is rewritten.
- */
-export async function mergeTerm(unit: UnitView, vocabularyKey: string, id: string, intoId: string): Promise<void> {
-  const vocabulary = await vocabularyOrRefuse(vocabularyKey)
-  if (vocabulary.locked) LOCKED()
-  if (id === intoId) refuse('core.term.merge-self', 'A term cannot be merged into itself.', { status: 422, fields: { into: 'invalid' } })
-  await termOrRefuse(vocabularyKey, id)
-  await termOrRefuse(vocabularyKey, intoId)
-  unit.add(sql`UPDATE core_terms SET merged_into_id = ${intoId}, retired_at = coalesce(retired_at, ${nowMs()})
-    WHERE id = ${id} AND merged_into_id IS NULL AND ${assertTerm(intoId, vocabularyKey)}`)
-    .expect(1, { code: 'core.term.merge-stale', reason: 'One of the two terms changed meanwhile: it was merged already, or the one to keep was retired.', remedy: 'Reload the list and try again.' })
-  // Terms already merged into this one follow it, so a read is never more than one hop.
-  unit.add(sql`UPDATE core_terms SET merged_into_id = ${intoId} WHERE merged_into_id = ${id}`)
-  unit.audit({ action: 'state', ability: 'core.vocabulary.manage', record: ['core.vocabulary', vocabularyKey], detail: { termId: id, to: 'merged', into: intoId } })
-  unit.announce('core.term.merged', { termId: id, vocabulary: vocabularyKey, intoId }, { record: ['core.vocabulary', vocabularyKey] })
 }
 
 const IN_USE = { code: 'core.term.in-use', reason: 'Records use this term, so it cannot be deleted.', remedy: 'Retire it instead: it leaves every picker and stays on the records that use it.' }

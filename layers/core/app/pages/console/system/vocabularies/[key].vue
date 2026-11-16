@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// One vocabulary (C-20, C-21): its terms in order, to add, rename, reorder, retire, restore, merge
-// and delete, each with the count of records that use it. A record stores the term's id, so a
+// One vocabulary (C-20, C-21): its terms in order, to add, rename, reorder, retire, restore and
+// delete, each with the count of records that use it. A record stores the term's id, so a
 // rename reaches every record and none is rewritten.
 definePageMeta({ layout: 'console' })
 
@@ -77,21 +77,8 @@ async function remove(term: Term) {
   await run(() => api(`/terms/${term.id}`, 'DELETE'), `Deleted ${term.label}`)
 }
 
-const merging = ref<Term | null>(null)
-const mergeInto = ref<string | undefined>()
-const mergeOptions = computed(() => live.value.filter(t => t.id !== merging.value?.id).map(t => ({ value: t.id, label: t.label })))
-async function merge() {
-  const term = merging.value
-  if (!term || !mergeInto.value) return
-  if (await run(() => api(`/terms/${term.id}/merge`, 'POST', { into: mergeInto.value }), `Merged ${term.label} into ${labelOf(mergeInto.value!)}`)) {
-    merging.value = null
-    mergeInto.value = undefined
-  }
-}
-
 const actions = (term: Term) => [[
   { label: 'Rename', icon: 'i-lucide-pencil', onSelect: () => startEdit(term) },
-  ...(locked.value ? [] : [{ label: 'Merge into…', icon: 'i-lucide-merge', onSelect: () => { merging.value = term } }]),
   ...(locked.value ? [] : [{ label: 'Retire', icon: 'i-lucide-archive', onSelect: () => retire(term) }]),
   ...(locked.value || term.uses > 0 || (term.seeded && data.value?.vocabulary.owner !== 'theatre') ? [] : [{ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => remove(term) }]),
 ]]
@@ -249,29 +236,5 @@ const actions = (term: Term) => [[
         </section>
       </div>
     </DataBoundary>
-
-    <UModal
-      :open="!!merging"
-      :title="`Merge ${merging?.label ?? ''}`"
-      description="The term is retired and every record that uses it shows the term you choose instead. No record is rewritten."
-      @update:open="open => { if (!open) merging = null }"
-    >
-      <template #body>
-        <UFormField label="Merge into">
-          <USelect
-            v-model="mergeInto"
-            :items="mergeOptions"
-            class="w-full"
-          />
-        </UFormField>
-      </template>
-      <template #footer>
-        <UButton
-          label="Merge"
-          :disabled="!mergeInto"
-          @click="merge"
-        />
-      </template>
-    </UModal>
   </PageFrame>
 </template>

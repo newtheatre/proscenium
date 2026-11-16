@@ -92,7 +92,7 @@ export const vocabularies = defineTable('core_vocabularies', {
 export const terms = defineTable('core_terms', {
   id: col.id(),
   vocabularyKey: col.internal(text('vocabulary_key').notNull().references(() => vocabularies.key, { onDelete: 'restrict' })),
-  slug: col.internal(text('slug').notNull()),
+  slug: col.public(text('slug').notNull()),
   label: col.public(text('label').notNull()),
   description: col.public(text('description')),
   icon: col.public(text('icon')),

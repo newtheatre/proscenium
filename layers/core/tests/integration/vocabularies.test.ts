@@ -1,5 +1,5 @@
 // C-20 and C-21, and the test plan's vocabulary cases: the retired term, the renamed term and the
-// duplicate label; plus locked vocabularies, reordering, merging, deleting and the year end.
+// duplicate label; plus locked vocabularies, reordering, deleting and the year end.
 import { sql } from 'drizzle-orm'
 import { beforeEach, describe, expect, it } from 'vitest'
 import listVocabularies from '../../server/api/core/vocabularies/index.get'
@@ -11,7 +11,6 @@ import patchTerm from '../../server/api/core/vocabularies/[key]/terms/[id]/index
 import deleteTerm from '../../server/api/core/vocabularies/[key]/terms/[id]/index.delete'
 import retireTerm from '../../server/api/core/vocabularies/[key]/terms/[id]/retire.post'
 import restoreTerm from '../../server/api/core/vocabularies/[key]/terms/[id]/restore.post'
-import mergeTerm from '../../server/api/core/vocabularies/[key]/terms/[id]/merge.post'
 import reorder from '../../server/api/core/vocabularies/[key]/order.put'
 import { assertTerm, getTerm } from '../../server/services'
 import { changeSetting, createUnit, isRefusal } from '#kit'
@@ -28,7 +27,6 @@ const handle = server({
   'DELETE /api/core/vocabularies/:key/terms/:id': deleteTerm,
   'POST /api/core/vocabularies/:key/terms/:id/retire': retireTerm,
   'POST /api/core/vocabularies/:key/terms/:id/restore': restoreTerm,
-  'POST /api/core/vocabularies/:key/terms/:id/merge': mergeTerm,
   'PUT /api/core/vocabularies/:key/order': reorder,
 })
 const admin = person(['core.vocabulary.manage'])
@@ -176,7 +174,7 @@ describe('the renamed term', () => {
   })
 })
 
-describe('order and merging', () => {
+describe('order', () => {
   it('reorders with every term listed, and refuses a list that has gone stale', async () => {
     const list = await terms('core.credit-section')
     const reversed = list.map(t => t.id).reverse()
@@ -184,21 +182,6 @@ describe('order and merging', () => {
     expect((await terms('core.credit-section')).map(t => t.id)).toEqual(reversed)
     const stale = await json(call(handle, 'PUT', '/api/core/vocabularies/core.credit-section/order', { actor: admin, body: { ids: reversed.slice(1) } }))
     expect(stale.body.code).toBe('core.term.order-stale')
-  })
-
-  it('merges one term into another: reads follow it and nothing is rewritten', async () => {
-    const key = 'core.cancel-reason'
-    const weather = await termNamed('Weather', key)
-    const other = await termNamed('Other', key)
-    const production = await usedBy(weather.id)
-    expect((await call(handle, 'POST', `/api/core/vocabularies/${key}/terms/${weather.id}/merge`, { actor: admin, body: { into: other.id } })).status).toBe(200)
-    expect(await inContext(() => getTerm(weather.id))).toMatchObject({ id: other.id, label: 'Other' })
-    expect((await rows<{ category_id: string }>('SELECT category_id FROM seats_performances WHERE id = ?', production))[0]!.category_id).toBe(weather.id)
-    expect(await picker(key)).not.toContain('Weather')
-    const back = await json(call(handle, 'POST', `/api/core/vocabularies/${key}/terms/${weather.id}/restore`, { actor: admin, body: {} }))
-    expect(back.body.code).toBe('core.term.merged')
-    const [event] = await rows<{ payload: string }>("SELECT payload FROM core_events WHERE name = 'core.term.merged' ORDER BY id DESC LIMIT 1")
-    expect(JSON.parse(event!.payload)).toEqual({ termId: weather.id, vocabulary: key, intoId: other.id })
   })
 })
 
