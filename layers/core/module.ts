@@ -20,6 +20,25 @@ export default defineModule({
   records,
   tables,
   points,
+  contributes: {
+    // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
+    // Site settings holds every module's generated settings page.
+    'core.navigation-group': [
+      { id: 'tonight', icon: 'i-lucide-moon-star' },
+      { id: 'box-office', icon: 'i-lucide-ticket' },
+      { id: 'front-of-house', icon: 'i-lucide-door-open' },
+      { id: 'bar', icon: 'i-lucide-wine' },
+      { id: 'spaces', icon: 'i-lucide-building-2' },
+      { id: 'training', icon: 'i-lucide-graduation-cap' },
+      { id: 'membership', icon: 'i-lucide-id-card' },
+      { id: 'people', icon: 'i-lucide-users' },
+      { id: 'money', icon: 'i-lucide-pound-sterling' },
+      { id: 'communications', icon: 'i-lucide-mail' },
+      { id: 'forms', icon: 'i-lucide-file-text' },
+      { id: 'reports', icon: 'i-lucide-chart-column' },
+      { id: 'site-settings', icon: 'i-lucide-settings' },
+    ],
+  },
 
   events: {
     announces: {

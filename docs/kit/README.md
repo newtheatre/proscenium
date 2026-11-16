@@ -110,9 +110,8 @@ refuse rather than give a date in the wrong zone.
 Screens use Nuxt UI v4 components first, on Tailwind CSS v4, as in Mailflare; reach for custom
 markup only where Nuxt UI has nothing suitable. The core layer registers the module, its stylesheet
 (`layers/core/app/assets/css/main.css`) and the shared component defaults (`app.config.ts`).
-Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs. The
-public shell in `layers/core/app/layouts/default.vue` is a plain placeholder until the interface
-workstream's shells land; a theatre's colours will come from its branding settings.
+Icons are bundled at build time, so nothing is fetched from Iconify while the Worker runs.
+Shells, page types and the navigation declaration are in [interface.md](interface.md).
 
 ## Testing
 

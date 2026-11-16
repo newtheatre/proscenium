@@ -62,8 +62,16 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// A page's server render calls the API through Nitro's local fetch, which carries no Cloudflare
+// context of its own. The bindings are the same for every request in an isolate, so the plugin
+// remembers them from the request that arrived from outside.
+let remembered: KitEnv | undefined
+export function rememberEnv(env: KitEnv | undefined): void {
+  if (env?.DB) remembered = env
+}
+
 function envOf(event: H3Event): KitEnv {
-  const env = (event.context as any).cloudflare?.env
+  const env = (event.context as any).cloudflare?.env ?? remembered
   if (!env?.DB) throw new Error('No DB binding on this request. Run under wrangler, nuxt dev with the Cloudflare preset, or a test worker')
   return env
 }

@@ -1,0 +1,23 @@
+{
+  "gallery.module.name": "Gallery",
+  "gallery.module.description": "Fixture screens for the browser tests. Not part of any release.",
+  "gallery.abilities.sample.view.label": "View the gallery",
+  "gallery.abilities.sample.manage.label": "Change the gallery's settings",
+  "gallery.abilities.sample.admin.label": "Administer the gallery",
+  "gallery.settings.demo.title.label": "Show title",
+  "gallery.settings.demo.title.help": "The name of the show used in the gallery's sample pages.",
+  "gallery.settings.demo.limit.label": "Most seats in one order",
+  "gallery.settings.demo.limit.help": "How many seats one person may take at a time.",
+  "gallery.settings.demo.open.label": "Booking is open",
+  "gallery.settings.demo.open.help": "Turn this off to stop sales.",
+  "gallery.settings.demo.hold.label": "How long seats are held",
+  "gallery.settings.demo.hold.help": "How long a basket keeps its seats before they are let go.",
+  "gallery.settings-sections.demo": "Sample show",
+  "gallery.navigation.groups.gallery.label": "Gallery",
+  "gallery.navigation.list.label": "Sample list",
+  "gallery.navigation.form.label": "Sample form",
+  "gallery.navigation.steps.label": "Sample steps",
+  "gallery.navigation.feedback.label": "Sample feedback",
+  "gallery.navigation.denied.label": "Administration",
+  "gallery.navigation.account.label": "Sample tickets"
+}

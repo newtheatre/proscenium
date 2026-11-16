@@ -1,0 +1,8 @@
+# The links in the public header and footer. Yours to change; updates never touch this file.
+name: Your theatre
+header:
+  - label: About
+    to: /about
+footer:
+  - label: About
+    to: /about

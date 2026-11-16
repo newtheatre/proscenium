@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { ROOT, rel } from '../lib/paths.ts'
 import type { Loaded } from '../lib/load.ts'
 import { allRoutes } from './routes.ts'
+import { abilityList, entryLabelKey, groupLabelKey, resolveEntry, SHELL_PREFIXES, shellOf } from '../../layers/core/shared/navigation.ts'
 
 export function walk(dir: string, extensions = ['.ts', '.vue']): string[] {
   if (!existsSync(dir)) return []
@@ -114,7 +115,13 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
     }
     for (const rule of registry.settingRules.get(id) ?? []) need(`${id}.settings.rules.${rule.id}`, 'what a setting rule says when it fails')
     for (const [key, { module }] of registry.abilities as Map<string, any>) if (module === id) need(`${id}.abilities.${key.slice(id.length + 1)}.label`, 'the ability\'s label')
-    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`]
+    const contributed = (point: string) => ((m.manifest.contributes ?? {}) as Record<string, any[]>)[point] ?? []
+    for (const entry of contributed('core.navigation')) if (!entry.label) need(entryLabelKey(entry.id), 'the navigation entry\'s label')
+    for (const group of contributed('core.navigation-group')) need(groupLabelKey(id, group.id), 'the navigation group\'s label')
+    const sections = new Set<string>()
+    for (const [key, { module }] of registry.settings as Map<string, any>) if (module === id) sections.add(key.slice(id.length + 1).split('.')[0]!)
+    for (const section of sections) need(`${id}.settings-sections.${section}`, 'the heading of a group of settings on the generated settings page')
+    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`]
     for (const key of keys) if (derived.some(p => key.startsWith(p))) problems.push(`${rel(file)}: "${key}" is not used by any declaration`)
   }
   return problems
@@ -126,6 +133,10 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
   for (const route of allRoutes(modules)) if (route.ability) required.add(route.ability)
   for (const { entry } of registry.settings.values()) if (entry.change) required.add(entry.change)
   for (const [key, { module, decl }] of registry.abilities as Map<string, any>) for (const short of decl.implies ?? []) if (required.has(key)) required.add(`${module}.${short}`)
+  // A navigation entry shows only to people who hold its ability, so that is a requirement too.
+  for (const m of modules) {
+    for (const entry of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.navigation'] ?? []) for (const name of abilityList(entry.ability)) required.add(name)
+  }
   for (const m of modules) {
     for (const file of moduleFiles(m)) {
       for (const [, name] of readFileSync(file, 'utf8').matchAll(/(?:can|requireAbility)\([^,]+,\s*['"]([^'"]+)['"]/g)) required.add(name!)
@@ -143,6 +154,7 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
 export function checkPolicyNumbers(modules: Loaded[]): string[] {
   const problems: string[] = []
   for (const m of modules) {
+    if (m.found.root.startsWith('tests/')) continue // test fixtures hold sample data, not policy
     for (const file of walk(join(ROOT, m.found.root, 'server'), ['.ts'])) {
       if (file.includes('/server/db/')) continue
       lines(file).forEach((line, i) => {
@@ -153,6 +165,46 @@ export function checkPolicyNumbers(modules: Loaded[]): string[] {
           if (!['0', '1', '2'].includes(number)) problems.push(`${rel(file)}:${i + 1}: the number ${number} looks like policy; make it a setting, or mark the line // not-policy: why`)
         }
       })
+    }
+  }
+  return problems
+}
+
+/** The route a page file answers, with dynamic parts kept as `[name]`. */
+function pageRoute(pagesDir: string, file: string): string {
+  const parts = file.slice(pagesDir.length).replace(/\.vue$/, '').split('/').filter(Boolean)
+  if (parts.at(-1) === 'index') parts.pop()
+  return `/${parts.join('/')}`
+}
+
+/**
+ * Navigation coverage (UI-08): every page a module puts inside the account, members', console or
+ * live shell is reachable from a navigation entry, so nothing is built that nobody can find. A page
+ * under an entry's address (or its `match` prefix) is covered; a shell's home page is not an entry.
+ * A module's settings page is generated, and the entry for it is too.
+ */
+export function checkNavigation(modules: Loaded[], registry: any): string[] {
+  const problems: string[] = []
+  const entries: { to: string, match?: string }[] = []
+  for (const m of modules) {
+    for (const entry of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.navigation'] ?? []) entries.push(entry)
+  }
+  const withSettings = new Set<string>()
+  for (const { module } of registry.settings.values() as Iterable<{ module: string }>) withSettings.add(module)
+  for (const module of withSettings) entries.push({ to: `/console/${module}/settings` })
+  const homes = new Set(Object.values(SHELL_PREFIXES))
+  for (const m of modules) {
+    const pagesDir = join(ROOT, m.found.root, 'app/pages')
+    for (const file of walk(pagesDir, ['.vue'])) {
+      const route = pageRoute(pagesDir, file)
+      const shell = shellOf(route)
+      if (!shell || homes.has(route)) continue
+      const fixed = route.split('/').filter(Boolean)
+      const dynamic = fixed.findIndex(part => part.startsWith('['))
+      const prefix = `/${(dynamic === -1 ? fixed : fixed.slice(0, dynamic)).join('/')}`
+      // The core settings page answers /console/<module>/settings for every module with settings.
+      if (route === '/console/[module]/settings') continue
+      if (!resolveEntry(entries, prefix)) problems.push(`${rel(file)}: the page ${route} has no navigation entry; contribute one to core.navigation whose \`to\` or \`match\` covers it`)
     }
   }
   return problems

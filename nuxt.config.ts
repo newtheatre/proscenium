@@ -17,16 +17,21 @@ const queue = { prompt: `${name}-prompt`, bulk: `${name}-bulk` }
 const theatreLayers = existsSync(r('./site/layers'))
   ? readdirSync(r('./site/layers'), { withFileTypes: true }).filter(d => d.isDirectory()).map(d => `./site/layers/${d.name}`)
   : []
+// The browser tests' build adds a module of fixture screens (tests/fixtures/gallery). No other build does.
+const gallery = process.env.PROSCENIUM_GALLERY === '1' ? ['./tests/fixtures/gallery/gallery'] : []
 const COMPATIBILITY_DATE = '2026-11-01'
 
 export default defineNuxtConfig({
-  extends: theatreLayers,
+  // The gallery fixture module is added only to the browser tests' build.
+  extends: [...theatreLayers, ...gallery],
   // Nuxt UI before Nuxt Content, so content pages use Nuxt UI's prose components.
   modules: ['@nuxt/ui', '@nuxt/content', '@nuxt/eslint'],
 
   $production: { nitro: { entry: r('./layers/core/server/entry.ts') } },
   devtools: { enabled: false },
   content: { database: { type: 'd1', bindingName: 'DB' }, experimental: { sqliteConnector: 'native' } },
+  // Fonts and icons are bundled: nothing loads from a third party (UI-24, Part B).
+  ui: { fonts: false },
   dir: { public: 'site/public' },
   srcDir: 'site/app',
   serverDir: 'site/server',
@@ -89,4 +94,5 @@ export default defineNuxtConfig({
     },
   },
   eslint: { config: { stylistic: true } },
+  icon: { fallbackToApi: false, serverBundle: 'local', clientBundle: { scan: true } },
 })

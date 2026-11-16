@@ -1,0 +1,90 @@
+<!-- The console shell (UI-04): a collapsible sidebar with one group per module in a fixed order,
+     each split into everyday work and set-up; a group with nothing the viewer may open is absent,
+     not greyed. On a phone the sidebar becomes a drawer. -->
+<script setup lang="ts">
+import type { NavigationMenuItem } from '@nuxt/ui'
+import { isCurrent } from '../composables/useNavigation'
+
+const { t } = useT()
+const route = useRoute()
+const brand = await useBrand()
+const { data: navigation } = await useNavigation('console')
+const open = ref(false)
+watch(() => route.fullPath, () => { open.value = false })
+
+function toItem(i: { id: string, label: string, to: string, icon: string, match?: string, count?: string }): NavigationMenuItem {
+  return { label: t(i.label), icon: i.icon, to: i.to, active: isCurrent(i, route.path), onSelect: () => { open.value = false } }
+}
+
+const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
+  const items: NavigationMenuItem[] = [{ label: t(g.label), icon: g.icon, type: 'label' }]
+  if (g.everyday.length) items.push({ label: t('core.console.everyday'), type: 'label', class: 'text-xs' }, ...g.everyday.map(toItem))
+  if (g.setup.length) items.push({ label: t('core.console.setup'), type: 'label', class: 'text-xs' }, ...g.setup.map(toItem))
+  return { id: g.id, items }
+}))
+</script>
+
+<template>
+  <UDashboardGroup>
+    <SkipLink />
+    <UDashboardSidebar
+      id="console"
+      v-model:open="open"
+      collapsible
+    >
+      <template #header="{ collapsed }">
+        <NuxtLink
+          to="/console"
+          class="truncate font-semibold"
+        >
+          <span v-if="!collapsed">{{ brand.name }}</span>
+          <UIcon
+            v-else
+            name="i-lucide-drama"
+            class="size-5"
+          />
+        </NuxtLink>
+      </template>
+      <template #default="{ collapsed }">
+        <nav
+          :aria-label="t('core.console.navigation')"
+          class="space-y-4"
+        >
+          <UNavigationMenu
+            v-for="g in groups"
+            :key="g.id"
+            :items="g.items"
+            orientation="vertical"
+            :collapsed="collapsed"
+            :aria-label="t('core.console.group', { group: String(g.items[0]?.label) })"
+          />
+        </nav>
+      </template>
+      <template #footer>
+        <AccountMenu />
+      </template>
+    </UDashboardSidebar>
+
+    <UDashboardPanel>
+      <template #header>
+        <UDashboardNavbar>
+          <template #leading>
+            <UDashboardSidebarCollapse />
+          </template>
+          <template #right>
+            <AccountMenu />
+          </template>
+        </UDashboardNavbar>
+      </template>
+      <template #body>
+        <main
+          id="main"
+          tabindex="-1"
+          class="outline-none"
+        >
+          <slot />
+        </main>
+      </template>
+    </UDashboardPanel>
+  </UDashboardGroup>
+</template>
