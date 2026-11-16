@@ -7,7 +7,8 @@ import { isCurrent } from '../composables/useNavigation'
 
 const { t } = useT()
 const route = useRoute()
-const brand = await useBrand()
+const { data: brandData } = await useBrand()
+const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.default-name') }))
 const { data: navigation } = await useNavigation('console')
 const open = ref(false)
 watch(() => route.fullPath, () => { open.value = false })

@@ -1,11 +1,14 @@
 // The core: always on. Identity, the core domain and the interface are areas inside it, named by
-// the second segment of their names. This manifest holds foundations' part.
+// the second segment of their names. Foundations' part is written here; the core domain's is spread in
+// from module/domain.ts and server/db/domain.ts.
 import { z } from 'zod'
-import { code, defineModule, event, secret, task } from '#kit'
+import { code, defineModule, defineSettingRules, event, secret, task } from '#kit'
 import { settings, settingRules } from './module/settings'
 import { abilities, records } from './module/abilities'
 import { points } from './module/points'
 import { tables } from './server/db/schema'
+import * as domain from './module/domain'
+import { tables as domainTables } from './server/db/domain'
 
 export default defineModule({
   id: 'core',
@@ -14,13 +17,14 @@ export default defineModule({
   stability: 'experimental',
   switchable: false,
 
-  settings,
-  settingRules,
-  abilities,
-  records,
-  tables,
-  points,
+  settings: { ...settings, ...domain.settings },
+  settingRules: defineSettingRules('core', [...settingRules.rules, ...domain.settingRules]),
+  abilities: { ...abilities, ...domain.abilities },
+  records: { ...records, ...domain.records },
+  tables: { ...tables, ...domainTables },
+  points: { ...points, ...domain.points },
   contributes: {
+    ...domain.contributes,
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
     // System holds core's own screens; each module's settings page sits in the module's own group.
     'core.navigation-group': [
@@ -48,11 +52,16 @@ export default defineModule({
       'core.setting.changed': event({ version: 1, payload: z.object({ key: code() }), internal: true }),
       'core.release.applied': event({ version: 1, payload: z.object({ version: code() }), internal: true }),
       'core.job.died': event({ version: 1, payload: z.object({ jobId: z.string(), name: code() }), internal: true }),
+      ...domain.announces,
     },
+    listens: { ...domain.listens },
   },
+
+  jobs: { ...domain.jobs },
 
   tasks: {
     'core.prune-history': task({ dailyAt: '04:00' }),
+    ...domain.tasks,
   },
 
   secrets: {

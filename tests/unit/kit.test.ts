@@ -5,12 +5,14 @@ import { text } from 'drizzle-orm/sqlite-core'
 import { newId, isId, idTime, idSchema } from '#kit/ids'
 import { parseDuration, formatDuration } from '#kit/duration'
 import { setting, defineSettings, validateSettingValue, formatSetting } from '#kit/settings'
-import { ability, defineAbilities } from '#kit/abilities'
+import { ability, defineAbilities, record, defineRecords } from '#kit/abilities'
 import { code, defineModule, event, job, task } from '#kit/manifest'
-import { col, defineTable } from '#kit/db'
+import { col, columnMeta, defineTable } from '#kit/db'
 import { latestSlot } from '#kit/jobs'
 import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
+import { buildRegistry, type ModuleEntry } from '#kit/registry'
+import { points as corePoints } from '../../layers/core/module/points'
 
 describe('ids', () => {
   it('are a prefix and 26 characters that sort by creation time', () => {
@@ -79,6 +81,13 @@ describe('settings', () => {
     expect(validateSettingValue(name, '')).toMatchObject({ ok: false, limit: 'minLength' })
     expect(validateSettingValue(name, null)).toEqual({ ok: true, value: null })
   })
+  it('read a rate as a count in a period', () => {
+    const { 'x.limits.sign-in': rate } = defineSettings('x', { 'limits.sign-in': setting.rate({ default: { count: 10, per: '10m' }, change: 'x.settings.manage' }) })
+    expect(validateSettingValue(rate, { count: 10, per: '10m' })).toEqual({ ok: true, value: { count: 10, per: 600 } })
+    expect(validateSettingValue(rate, { count: 10, per: '2d' })).toMatchObject({ ok: false, limit: 'per' })
+    expect(validateSettingValue(rate, { count: 0, per: '1m' })).toMatchObject({ ok: false, limit: 'count' })
+    expect(formatSetting(rate, { count: 10, per: 600 })).toBe('10 in 10 minutes')
+  })
   it('refuse an unknown onChange', () => {
     expect(() => defineSettings('x', { 'a.b': setting.integer({ default: 1, change: 'x.settings.manage', onChange: 'shout' as 'reason' }) })).toThrow(DeclarationError)
   })
@@ -133,6 +142,19 @@ describe('tables', () => {
   it('refuse a bad prefix', () => {
     expect(() => defineTable('lost_property_items', { id: col.id() }, { id: 'LOST', realm: 'operational' })).toThrow(DeclarationError)
   })
+  it('refuse a subject column that may be empty unless it says who reaches the unlinked rows', () => {
+    const columns = () => ({ id: col.id(), accountId: col.account('account_id', { role: 'subject', onMerge: 'move', nullable: true }), name: col.personal(text('name')) })
+    expect(() => defineTable('lost_property_claims', columns(), { id: 'lpc', realm: 'audience' })).toThrow(/unlinked: 'staff'/)
+    expect(() => defineTable('lost_property_claims', columns(), { id: 'lpc', realm: 'audience', subject: { account: 'account_id', unlinked: 'staff' } })).not.toThrow()
+  })
+  it('take the realms audience, members, operational and system', () => {
+    expect(() => defineTable('lost_property_bins', { id: col.id() }, { id: 'lpb', realm: 'system' })).not.toThrow()
+    expect(() => defineTable('lost_property_bins', { id: col.id() }, { id: 'lpb', realm: 'member' as 'members' })).toThrow(/realm/)
+  })
+  it('mark a column to be sealed with the core key', () => {
+    expect(columnMeta(col.internal(text('secret'), { encrypted: true }))?.encrypted).toBe(true)
+    expect(columnMeta(col.special('needs'))?.encrypted).toBe(true)
+  })
 })
 
 describe('task slots', () => {
@@ -151,5 +173,32 @@ describe('task slots', () => {
   })
   it('take the earlier of a repeated autumn time', () => {
     expect(instantOfLocal('2026-10-25', '01:30', zone)).toBe(Date.parse('2026-10-25T00:30:00Z'))
+  })
+})
+
+describe('the registry', () => {
+  const entry = (manifest: object): ModuleEntry => ({ manifest: defineModule({ manifest: 1, since: '0.1.0', ...manifest } as any), root: `layers/${(manifest as any).id}`, owner: 'upstream', handlers: {} } as unknown as ModuleEntry)
+
+  it('lets uses name a reserved module that is not written yet, and nothing else', () => {
+    expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['bar'] })])).not.toThrow()
+    expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['raffle'] })])).toThrow(/reserved/)
+  })
+  it('takes a record type with fixed ids and no table', () => {
+    expect(() => buildRegistry([entry({ id: 'lost-property', records: defineRecords('lost-property', { branding: record({ ids: ['site'] }) }) })])).not.toThrow()
+    expect(() => buildRegistry([entry({ id: 'lost-property', records: defineRecords('lost-property', { branding: record({ ids: [] }) }) })])).toThrow(/ids/)
+  })
+})
+
+describe('navigation entries', () => {
+  const schema = (corePoints['core.navigation'] as any).schema
+  const base = { id: 'orders', menu: 'account', to: '/account/orders', icon: 'i-lucide-ticket', ability: 'signed-in' }
+  it('name a menu, and only an account entry may be for every signed-in person', () => {
+    expect(schema.safeParse(base).success).toBe(true)
+    expect(schema.safeParse({ ...base, menu: 'console' }).success).toBe(false)
+    expect(schema.safeParse({ ...base, shell: 'account' }).success).toBe(false)
+  })
+  it('hide an empty entry only when it has a count', () => {
+    expect(schema.safeParse({ ...base, hideEmpty: true }).success).toBe(false)
+    expect(schema.safeParse({ ...base, hideEmpty: true, count: 'box-office.orders.open' }).success).toBe(true)
   })
 })

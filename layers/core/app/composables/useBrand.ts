@@ -1,17 +1,11 @@
-// The theatre's name and logo. Core's getBrand() supplies the real values once it exists; until then
-// the name comes from the theatre's own navigation file, so a fork can already set it.
-export async function useBrand() {
-  const { data } = await useAsyncData('core:brand', () => queryCollection('navigation').first())
-  return computed(() => ({ name: data.value?.name ?? 'Your theatre', logo: undefined as string | undefined }))
-}
+// The theatre's brand (C-35), fetched once per page load and shared: name, logos and revision.
+export interface BrandLogo { url: string, width: number | null, height: number | null, alt: string }
+export interface Brand { revision: number, name: string | null, logo: BrandLogo | null, logoDark: BrandLogo | null, creditLine: boolean }
 
-/** The public header and footer links, from site/content/navigation.yml. */
-export async function useSiteNavigation() {
-  const { data } = await useAsyncData('core:site-navigation', () => queryCollection('navigation').first())
-  return computed(() => ({
-    header: data.value?.header ?? [],
-    footer: data.value?.footer ?? [],
-    contact: data.value?.contact,
-    credit: data.value?.credit,
-  }))
+export function useBrand() {
+  return useFetch<Brand>('/api/core/branding', {
+    key: 'core:brand',
+    default: () => ({ revision: 0, name: null, logo: null, logoDark: null, creditLine: true }),
+    pick: ['revision', 'name', 'logo', 'logoDark', 'creditLine'],
+  })
 }

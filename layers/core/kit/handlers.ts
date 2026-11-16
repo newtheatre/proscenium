@@ -8,7 +8,13 @@ export interface JobInfo { id: string, name: string, attempts: number }
 export type Listener = (event: EventRow, unit: UnitView) => Promise<void> | void
 export type JobHandler<P = any> = (payload: P, unit: UnitView, job: JobInfo) => Promise<void> | void
 export type TaskHandler = (unit: UnitView, run: { dueAt: number }) => Promise<void> | void
-export type FactResolver = (actor: Actor, record?: { type: string, id: string }) => Promise<boolean | { holds: boolean, until?: number }> | boolean
+export type FactResolver = ((actor: Actor, record?: { type: string, id: string }) => Promise<boolean | { holds: boolean, until?: number }> | boolean) & {
+  /**
+   * The accounts that hold the fact now, for one record or for any. Async and pure, never queued.
+   * A fact without it cannot be enumerated, and identity's holdersOf says so.
+   */
+  holders?: (record?: { type: string, id: string }) => Promise<string[]>
+}
 
 export interface CallOutcome { result: 'succeeded' | 'failed', providerReference?: string, data?: Record<string, unknown> }
 export interface CallAttempt { id: string, name: string, reference: string, idempotencyKey: string, at: number }
@@ -22,7 +28,8 @@ export interface CallHandler {
 export const defineListener = (fn: Listener): Listener => fn
 export const defineJob = <P = any>(fn: JobHandler<P>): JobHandler<P> => fn
 export const defineTask = (fn: TaskHandler): TaskHandler => fn
-export const defineFact = (fn: FactResolver): FactResolver => fn
+export const defineFact = (fn: FactResolver, options: { holders?: FactResolver['holders'] } = {}): FactResolver =>
+  options.holders ? Object.assign(fn, { holders: options.holders }) : fn
 export const defineCall = (handler: CallHandler): CallHandler => handler
 
 export interface ModuleHandlers {

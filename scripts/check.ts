@@ -1,9 +1,10 @@
 // bun run check:conformance — the conformance checks of the Foundations test plan (F-10). Each
 // prints what it found, naming the file and what to do; any problem fails the run.
 import { loadRegistry, LoadError } from './lib/load.ts'
-import { checkRoutes } from './checks/routes.ts'
+import { checkPageAddresses, checkRoutes } from './checks/routes.ts'
 import { checkMigrations } from './checks/migrations.ts'
 import { checkAbilities, checkContentTokens, checkEventsAndJobs, checkImports, checkNavigation, checkPolicyNumbers, checkTranslations } from './checks/source.ts'
+import { checkSite } from './checks/site.ts'
 
 let failed = 0
 function report(name: string, problems: string[]) {
@@ -25,8 +26,10 @@ catch (error) {
 const { modules, registry } = loaded
 
 report('Routes', checkRoutes(registry, modules))
+report('Reserved addresses', checkPageAddresses())
 report('Abilities', checkAbilities(modules, registry))
 report('Settings quoted in content', checkContentTokens(registry))
+report('The site\'s menu and page components', checkSite(registry, source => Bun.YAML.parse(source)))
 report('Events and jobs', checkEventsAndJobs(modules, registry))
 report('Imports, bindings and outside calls', checkImports(modules))
 report('Numbers that should be settings', checkPolicyNumbers(modules))

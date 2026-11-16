@@ -1,6 +1,8 @@
 <!-- A centred single-task layout for sign-in and setup: one thing to do, nothing to wander off to. -->
 <script setup lang="ts">
-const brand = await useBrand()
+const { t } = useT()
+const { data: brandData } = await useBrand()
+const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.default-name') }))
 </script>
 
 <template>

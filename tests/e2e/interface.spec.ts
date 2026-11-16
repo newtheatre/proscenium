@@ -35,7 +35,7 @@ test.describe('a visitor who is not signed in', () => {
     await expect(page.getByRole('banner')).toContainText('Your theatre')
     await expect(page.getByRole('link', { name: "What's on" }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
-    await expect(page.getByRole('contentinfo').getByRole('link', { name: 'About' })).toBeVisible()
+    await expect(page.getByRole('contentinfo')).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
   })
 })

@@ -172,5 +172,12 @@
   "core.navigation.groups.forms.label": "Forms",
   "core.navigation.groups.reports.label": "Reports",
   "core.settings-sections.site": "The theatre",
-  "core.settings-sections.locale": "Place and money"
+  "core.settings-sections.locale": "Place and money",
+  "core.abilities.job.manage.label": "Cancel background work that has not started",
+  "core.public.default-name": "Your theatre",
+  "core.public.credit": "Runs on Proscenium",
+  "core.settings-sections.organisation": "The organisation",
+  "core.settings-sections.brand": "Look and feel",
+  "core.settings-sections.files": "Uploaded files",
+  "core.settings-sections.notifications": "Email and notices"
 }
