@@ -23,7 +23,7 @@ export default defineModule({
   abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities },
   records: { ...records, ...identity.identityRecords, ...domain.records },
   tables: { ...tables, ...domainTables },
-  points: { ...points, ...domain.points },
+  points: { ...points, ...identity.identityPoints, ...domain.points },
   contributes: {
     ...domain.contributes,
     ...identity.identityContributions,

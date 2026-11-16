@@ -282,7 +282,49 @@ export const accountMergeItems = defineTable('core_account_merge_items', {
   action: col.internal(text('action', { enum: ['moved', 'ended'] }).notNull()),
 }, { realm: 'operational', subject: 'none', extra: t => [primaryKey({ columns: [t.mergeId, t.tableName, t.columnName, t.rowId] })] })
 
+export const DATA_REQUEST_KINDS = ['export', 'erasure'] as const
+export const DATA_REQUEST_STATES = ['requested', 'confirmed', 'held', 'running', 'done', 'cancelled', 'failed'] as const
+/** How staff checked who somebody was when they started a request for them (ID-35). */
+export const IDENTITY_CHECKS = ['signed-in', 'email-reply', 'in-person', 'document', 'known'] as const
+
+/**
+ * A request to download or erase a person's data, by them or by staff for them (ID-15, ID-16,
+ * ID-35). Kept as the record that the request was met; it holds no personal content.
+ */
+export const dataRequests = defineTable('core_data_requests', {
+  id: col.id(),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias' }),
+  kind: col.internal(text('kind', { enum: DATA_REQUEST_KINDS }).notNull()),
+  state: col.internal(text('state', { enum: DATA_REQUEST_STATES }).notNull()),
+  requestedBy: col.account('requested_by', { role: 'actor', onMerge: 'alias' }),
+  requestedAt: col.timestamp('requested_at').notNull(),
+  // Null when the person asked for themselves, signed in.
+  identityCheck: col.internal(text('identity_check', { enum: IDENTITY_CHECKS })),
+  respondBy: col.timestamp('respond_by').notNull(),
+  notBefore: col.timestamp('not_before'),
+  // A JSON list of the hold codes modules raised, never free text.
+  holds: col.internal(text('holds')),
+  fileId: col.internal(text('file_id')),
+  finishedAt: col.timestamp('finished_at'),
+  // Staff close a request once every unlinked table has been searched by hand.
+  closedAt: col.timestamp('closed_at'),
+  closedBy: col.account('closed_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+}, {
+  id: 'dreq',
+  realm: 'operational',
+  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore)],
+})
+
+/** One line of a request's hand-search checklist: a table that may hold rows linked to no account. */
+export const dataRequestChecks = defineTable('core_data_request_checks', {
+  requestId: col.ref('core_data_requests'),
+  tableName: col.internal(text('table_name').notNull()),
+  outcome: col.internal(text('outcome', { enum: ['nothing-found', 'handled'] }).notNull()),
+  tickedBy: col.account('ticked_by', { role: 'actor', onMerge: 'alias' }),
+  tickedAt: col.timestamp('ticked_at').notNull(),
+}, { realm: 'operational', subject: 'none', extra: t => [primaryKey({ columns: [t.requestId, t.tableName] })] })
+
 export const identityTables = {
   accounts, accountEmails, passkeys, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
-  roles, roleAbilities, factAbilities, grants, grantEnds, accountMerges, accountMergeItems,
+  roles, roleAbilities, factAbilities, grants, grantEnds, accountMerges, accountMergeItems, dataRequests, dataRequestChecks,
 }
