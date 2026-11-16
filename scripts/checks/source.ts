@@ -194,7 +194,7 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
   }
   const withSettings = new Set<string>()
   for (const { module } of registry.settings.values() as Iterable<{ module: string }>) withSettings.add(module)
-  for (const module of withSettings) entries.push({ to: `/console/${module}/settings` })
+  for (const module of withSettings) entries.push({ to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings` })
   const homes = new Set(Object.values(SHELL_PREFIXES))
   for (const m of modules) {
     const pagesDir = join(ROOT, m.found.root, 'app/pages')

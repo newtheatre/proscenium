@@ -3,7 +3,8 @@
 definePageMeta({ layout: 'console' })
 const { t, te } = useT()
 const route = useRoute()
-const module = computed(() => String(route.params.module))
+// Core's own page answers at /console/system/settings (the System group); every other module's is at /console/<module>/settings.
+const module = computed(() => route.params.module === 'system' ? 'core' : String(route.params.module))
 const title = computed(() => te(`${module.value}.module.name`) ? t('core.settings-page.title', { module: t(`${module.value}.module.name`) }) : t('core.settings-page.title', { module: module.value }))
 </script>
 

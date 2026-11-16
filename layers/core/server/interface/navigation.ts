@@ -36,7 +36,7 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
       module,
       label: `${module}.module.name`,
       menu: 'console',
-      to: `/console/${module}/settings`,
+      to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings`,
       icon: 'i-lucide-settings-2',
       ability: [...abilities],
       group: module === 'core' ? SYSTEM_GROUP : own ?? module,

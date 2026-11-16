@@ -122,3 +122,11 @@ describe('the generated settings page (UI-14)', () => {
     expect(response.status).toBe(403)
   })
 })
+
+describe("core's own settings page", () => {
+  it('is served at /console/system/settings, not /console/core/settings', async () => {
+    const admin = person(['core.settings.manage'])
+    expect((await decide('/console/system/settings', admin)).decision).toBe('allow')
+    expect((await decide('/console/core/settings', admin)).decision).toBe('not-found')
+  })
+})
