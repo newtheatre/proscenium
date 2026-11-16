@@ -27,7 +27,7 @@ export const files = defineTable('core_files', {
   access: col.internal(text('access').notNull()),
   state: col.internal(text('state').notNull().default('pending')),
   rejectedReason: col.internal(text('rejected_reason')),
-  uploadedBy: col.account('uploaded_by', { role: 'subject', onMerge: 'move', nullable: true }),
+  uploadedBy: col.account('uploaded_by', { role: 'subject', onMerge: 'alias', nullable: true }),
   createdAt: col.createdAt(),
   readyAt: col.timestamp('ready_at'),
   attachedAt: col.timestamp('attached_at'),
@@ -129,7 +129,7 @@ export const notifications = defineTable('core_notifications', {
   id: col.id(),
   typeKey: col.internal(text('type_key').notNull()),
   side: col.internal(text('side').notNull()),
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move', nullable: true }),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias', nullable: true }),
   // Only for a send to an address with no account yet (notifyAddress, once it joins the pipeline).
   address: col.email('address'),
   locale: col.internal(text('locale').notNull()),
@@ -190,7 +190,7 @@ export const deliveries = defineTable('core_notification_deliveries', {
 /** A message in a person's inbox on one side. The unread count reads the account index. */
 export const inboxItems = defineTable('core_inbox_items', {
   id: col.id(),
-  accountId: col.account('account_id', { role: 'subject', onMerge: 'move' }),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias' }),
   deliveryId: col.internal(text('delivery_id').references(() => deliveries.id, { onDelete: 'set null' })),
   side: col.internal(text('side').notNull()),
   title: col.personal(text('title').notNull()),

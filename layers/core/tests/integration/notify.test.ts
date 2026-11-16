@@ -152,6 +152,20 @@ describe('notify', () => {
     expect(await counted()).toBe(50)
   })
 
+  it('does not send again to a person whose other account already had it, once the accounts are merged (R-34)', async () => {
+    const survivor = await account()
+    const merged = await account()
+    const first = await send('notify.receipt', { to: merged, variables: { order: 'M1' }, dedupeKey: 'order-m1' })
+    await env.DB.prepare('UPDATE core_accounts SET merged_into_id = ? WHERE id = ?').bind(survivor, merged).run()
+    sent.length = 0
+    const again = await send('notify.receipt', { to: survivor, variables: { order: 'M1' }, dedupeKey: 'order-m1' })
+    expect(again.ids).toEqual(first.ids)
+    expect(again.statements).toBe(0)
+    expect(sent).toHaveLength(0)
+    // A different key still sends.
+    expect((await send('notify.receipt', { to: survivor, variables: { order: 'M2' }, dedupeKey: 'order-m2' })).statements).toBeGreaterThan(0)
+  })
+
   it('leaves nothing behind when the caller\'s unit fails', async () => {
     const to = await account()
     const outcome = await inContext(async () => {
