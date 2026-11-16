@@ -1,9 +1,9 @@
 // List search (Foundations part 4, "Lists", S1 to S5; proof P-LIST-1): the generated index finds every
 // word in any searched field, ignoring case and accents, and an erasure leaves it in the same statement.
 import { describe, expect, it } from 'vitest'
-import { newId, searchQuery, searchWords } from '#kit'
+import { createUnit, newId, searchQuery, searchWords } from '#kit'
 import { ERASED } from '#kit/db'
-import { env, performance, rows } from './helpers'
+import { env, inContext, performance, rows } from './helpers'
 
 async function sale(performanceId: string, buyerName: string, note: string | null = null): Promise<string> {
   const id = newId('sl')
@@ -42,5 +42,19 @@ describe('a generated search index', () => {
     await env.DB.prepare('UPDATE seats_ledger SET buyer_name = ? WHERE id = ?').bind(ERASED.anonymise, id).run()
     expect(await find('okafor')).toEqual([])
     expect(await find('former member')).toContain(id)
+  })
+
+  it('leaves a unit\'s expectations true after a write to a searched table', async () => {
+    // FTS5 writes out what it holds in memory when the next write opens a savepoint, which would
+    // change changes() under a guard that is itself a write. The guard is a read, so it does not.
+    const show = await performance()
+    const attempt = inContext(async () => {
+      const unit = createUnit()
+      unit.add({ sql: 'INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, created_at) VALUES (?, ?, 1, ?, ?, ?)', params: [newId('sl'), show, newId('acc'), 'Ola Okafor', Date.now()] })
+      unit.add({ sql: "UPDATE seats_performances SET sold = 1 WHERE id = 'sp_missing'", params: [] }).expect(1, { code: 'seats.missing', reason: 'No such performance.' })
+      return unit.commit()
+    })
+    await expect(attempt).rejects.toMatchObject({ code: 'seats.missing' })
+    expect(await find('ola okafor')).toEqual([])
   })
 })
