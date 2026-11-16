@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { entryLabelKey, groupLabelKey, orderGroups, resolveEntry, shellOf } from '../../shared/navigation'
 import { activeFilterCount, parseList, serialiseList, toCsv } from '../../shared/list'
 import { isConflict, mergeConflict } from '../../shared/form'
-import { durationText, fromControl, toControl } from '../../shared/controls'
+import { controlText, durationText, fromControl, toControl } from '../../shared/controls'
 
 describe('shells and entries (UI-08)', () => {
   it('knows which shell an address belongs to', () => {
@@ -96,5 +96,16 @@ describe('setting controls (UI-14)', () => {
     expect(fromControl('money', 12.5)).toBe(1250)
     expect(fromControl('custom', '{"a":1}')).toEqual({ a: 1 })
     expect(fromControl('text', '', true)).toBeNull()
+  })
+  it('edits a rate as a count and a period, and a text custom value as text', () => {
+    expect(toControl({ kind: 'rate', value: { count: 600, per: 60 } })).toEqual({ count: 600, per: '1m' })
+    expect(toControl({ kind: 'rate', value: null })).toEqual({ count: undefined, per: '' })
+    expect(fromControl('rate', { count: 20, per: ' 10m ' })).toEqual({ count: 20, per: '10m' })
+    expect(fromControl('rate', { count: undefined, per: '' })).toEqual({ count: null, per: '' })
+    const words = { on: 'on', off: 'off', rate: (count: number, per: string) => `${count} in ${per}` }
+    expect(controlText('rate', { count: 10, per: '10m' }, words)).toBe('10 in 10m')
+    expect(toControl({ kind: 'custom', value: '08-01' })).toBe('08-01')
+    expect(fromControl('custom', '08-01', false, '08-01')).toBe('08-01')
+    expect(fromControl('custom', '{"a":1}', false, { a: 0 })).toEqual({ a: 1 })
   })
 })
