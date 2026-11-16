@@ -1,13 +1,13 @@
-// notifyAddress: the phase 1 form of C-27. One call sends one transactional email to one address,
-// from inside the caller's job. Nothing about the message (address, variables, wording) is written
-// to the database or the log; a failure throws, so the caller's job retries with the kit's back-off
-// and, after its last attempt, is shown as failed and announces core.job.died (C-28).
+// notifyAddress: one transactional email to one address that has no account, such as an invitation
+// or a security notice to an old address. It joins notify()'s pipeline: the notification and its
+// email delivery are written in the caller's unit, and core.send-notifications sends it after the
+// commit, with the same retries, sealed variables and delivery log.
 import { z } from 'zod'
-import { cache, first, refuse, usePoint, useSetting } from '#kit'
+import { first, isEnabled, refuse, sealSpecial, useContext, usePoint, useSetting } from '#kit'
 import type { RecordRef, UnitView } from '#kit'
-import { DOMAIN_CODES, MailError, useMailer } from './mailer'
-import { checkVariables, render, type VariableKind } from './render'
-import { brandTokens } from '../brand/theme'
+import { checkVariables, type VariableKind } from './render'
+import { suppressedAddresses } from './suppression'
+import { deliveries, notifications } from '../db/domain'
 
 export interface NotificationType {
   id: string
@@ -26,9 +26,9 @@ export interface NotifyAddressOptions {
   address: string
   variables: Record<string, string>
   locale?: string
-  /** The same key on a second call sends nothing more, for as long as core.idempotency.keep-for. */
+  /** The same key on a second call, for the same type, sends nothing more. */
   dedupeKey?: string
-  /** What the message is about. Unused until the full pipeline keeps a log. */
+  /** What the message is about, kept on the notification for the delivery log. */
   record?: RecordRef
 }
 
@@ -75,46 +75,56 @@ export async function theatreName(fallback: string): Promise<string> {
 async function dedupeKeyFor(typeKey: string, key: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${typeKey}\u0000${key}`))
   const hex = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('') // not-policy: hexadecimal
-  return `core:notify:${hex}`
+  return `adr:${hex}`
 }
 
 /**
- * Renders the type's wording with the caller's variables and sends it at once through the mail
- * binding. Call it inside your own job. `unit` is the caller's unit: unused in phase 1, it is where
- * the full pipeline (phase 2) will add the notification and its deliveries, with no change here.
+ * Records one email to `address` in the caller's unit; it is sent after the commit. A second call
+ * with the same type and dedupe key writes nothing and returns the earlier notification. A caller
+ * that sends to several addresses calls this once for each, in the same unit.
  */
-export async function notifyAddress(unit: UnitView, typeKey: string, options: NotifyAddressOptions): Promise<{ sent: boolean }> {
-  void unit
-  const type = await notificationType(typeKey)
-  if (type.category !== 'transactional') refuse('core.notifications.not-transactional', `${typeKey} is not transactional, so it needs the full notification pipeline.`, { status: 500 })
+export async function notifyAddress(unit: UnitView, typeKey: string, options: NotifyAddressOptions): Promise<{ sent: boolean, notificationId: string }> {
+  const declared = (await usePoint<NotificationType>('core.notification-type')).find(c => c.value.id === typeKey)
+  if (!declared) refuse('core.notifications.unknown-type', `No module declares a message called ${typeKey}.`, { status: 500 })
+  const type = declared.value
+  if (type.category !== 'transactional') refuse('core.notifications.not-transactional', `${typeKey} is not transactional, so it needs an account and notify().`, { status: 500 })
   if (!type.channels.includes('email')) refuse('core.notifications.no-channel', `${typeKey} is not sent by email.`, { status: 500 })
-  if (!z.email().safeParse(options.address).success) refuse('core.notifications.bad-address', 'This is not an email address.', { status: 422, fields: { address: 'invalid' } })
+  const address = options.address.trim()
+  if (!z.email().safeParse(address).success) refuse('core.notifications.bad-address', 'This is not an email address.', { status: 422, fields: { address: 'invalid' } })
   const values = checkVariables(type.variables, options.variables ?? {})
 
-  const domain = await sendingDomain()
-  const dedupe = options.dedupeKey ? await dedupeKeyFor(typeKey, options.dedupeKey) : undefined
-  if (dedupe && await cache.get(dedupe)) return { sent: false }
-
-  const locale = options.locale && type.wording[options.locale] ? options.locale : 'en-GB'
-  const sender = await senderFor(type.topic ?? 'transactional', domain)
-  const brand = await brandTokens()
-  const message = render(type.wording[locale]!, {
-    values,
-    kinds: type.variables,
-    accent: brand.light.link,
-    theatre: await theatreName(domain),
-    footer: await useSetting('core.notifications.email-footer') as string | null,
-  })
-
-  try {
-    await useMailer()({ from: { name: sender.name, email: sender.email }, to: options.address.trim(), replyTo: sender.replyTo, ...message })
+  const dedupe = options.dedupeKey ? await dedupeKeyFor(typeKey, options.dedupeKey) : null
+  if (dedupe) {
+    const earlier = await first<{ id: string }>('SELECT id FROM core_notifications WHERE dedupe_key = ?', dedupe)
+    if (earlier) return { sent: false, notificationId: earlier.id }
   }
-  catch (error) {
-    if (error instanceof MailError && DOMAIN_CODES.has(error.code)) {
-      refuse('core.notifications.domain-unverified', 'The mail service refused the sending domain.', { status: 503, remedy: 'Check the domain is onboarded for sending in Cloudflare, then verify it again in Settings.' })
-    }
-    throw error
-  }
-  if (dedupe) await cache.put(dedupe, 1, { ttl: await useSetting('core.idempotency.keep-for') as number })
-  return { sent: true }
+
+  const fallbackLocale = (await useSetting('core.locale.language') as string | null) ?? 'en-GB'
+  const locale = [options.locale, fallbackLocale].find(l => !!l && !!type.wording[l]) ?? 'en-GB'
+  const sealedNames = Object.keys(type.variables).filter(name => type.variables[name] === 'sealed')
+  const open = Object.fromEntries(Object.entries(values).filter(([k]) => !sealedNames.includes(k)))
+  const hidden = Object.fromEntries(Object.entries(values).filter(([k]) => sealedNames.includes(k)))
+  const record = options.record ? (Array.isArray(options.record) ? { type: options.record[0], id: options.record[1] ?? null } : { type: (options.record as any).type, id: (options.record as any).id ?? null }) : { type: null, id: null }
+  const [notificationId] = unit.insertSet(notifications, [{
+    typeKey,
+    side: type.side,
+    accountId: null,
+    address,
+    locale,
+    subjectType: record.type,
+    subjectId: record.id,
+    dedupeKey: dedupe,
+    payload: open,
+    sealedVariables: sealedNames.length ? await sealSpecial(JSON.stringify(hidden)) : null,
+    actorId: useContext().actor.accountId ?? null,
+  }])
+
+  const state = !(await isEnabled(declared.module))
+    ? { state: 'skipped' as const, reason: 'module_off' }
+    : (await suppressedAddresses([address])).has(address.toLowerCase())
+        ? { state: 'skipped' as const, reason: 'suppressed_address' }
+        : { state: 'queued' as const, reason: null }
+  const [deliveryId] = unit.insertSet(deliveries, [{ notificationId: notificationId!, side: type.side, channel: 'email', ...state, senderKey: null }])
+  if (state.state === 'queued') unit.enqueue('core.send-notifications', { deliveryIds: [deliveryId!] }, { lane: type.lane ?? 'prompt' })
+  return { sent: true, notificationId: notificationId! }
 }

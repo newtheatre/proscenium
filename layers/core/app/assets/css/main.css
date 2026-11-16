@@ -34,9 +34,9 @@
 }
 
 /* The three named content widths: a page names one, it never sets its own. */
-.width-reading { max-width: 42rem; }
-.width-standard { max-width: 72rem; }
-.width-full { max-width: none; }
+@utility width-reading { max-width: 42rem; }
+@utility width-standard { max-width: 72rem; }
+@utility width-full { max-width: none; }
 
 /* A focus ring that is always visible and never only a colour change. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {

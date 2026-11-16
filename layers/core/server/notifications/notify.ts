@@ -166,7 +166,9 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     if (muted.has(`${accountId}\u0000${channel}`)) return { state: 'suppressed', reason: 'preference' }
     if (channel === 'inbox') return { state: 'sent', reason: null }
     const address = addresses.get(accountId)
-    if (!address) return { state: 'skipped', reason: 'no_address' }
+    // No committed address yet, perhaps because the account is made in this same unit (an
+    // invitation): queue it, and the send job, which reads the address again, decides.
+    if (!address) return { state: 'queued', reason: null }
     if (suppressed.has(address.toLowerCase())) return { state: 'skipped', reason: 'suppressed_address' }
     return { state: 'queued', reason: null }
   }

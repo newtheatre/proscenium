@@ -12,6 +12,7 @@ export default defineModule({
   tables,
   contributes: {
     'payments.settlement': [{ id: 'snacks' }],
+    'payments.desk-basket': [{ id: 'snacks' }],
     'finance.system-account': [
       { id: 'income', name: 'Snack income', kind: 'income' },
     ],

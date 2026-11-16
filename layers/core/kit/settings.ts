@@ -17,6 +17,11 @@ interface Common {
   since?: string
   /** What the screen asks before saving: a written reason, or a second confirmation. */
   onChange?: 'reason' | 'confirm'
+  /**
+   * Where the setting is shown (R-33): on its module's settings page in the console (`module`, the
+   * default) or with the site's own settings under /admin/settings (`site`). Nothing else changes.
+   */
+  scope?: 'module' | 'site'
 }
 
 type WithDefault<V> = { default: V, unset?: false } | { default?: undefined, unset: true }
@@ -120,6 +125,7 @@ function checkEntry(key: string, entry: SettingEntry) {
   if ((entry.kind === 'choice' || (entry.kind === 'list' && entry.of === 'choice')) && !(Array.isArray(entry.options) && entry.options.length && entry.options.every(o => KEBAB.test(o))))
     throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case')
   if (entry.onChange !== undefined && !['reason', 'confirm'].includes(entry.onChange)) throw new DeclarationError(f('onChange'), "is 'reason' or 'confirm'")
+  if (entry.scope !== undefined && !['module', 'site'].includes(entry.scope)) throw new DeclarationError(f('scope'), "is 'module' or 'site'")
   if (entry.kind === 'text' && entry.minLength !== undefined && !(Number.isInteger(entry.minLength) && entry.minLength >= 0 && entry.minLength <= entry.maxLength!)) throw new DeclarationError(f('minLength'), 'a whole number no larger than maxLength')
   if (entry.kind === 'time') {
     for (const limit of ['min', 'max'] as const) if (entry[limit] !== undefined && !(typeof entry[limit] === 'string' && TIME.test(entry[limit]))) throw new DeclarationError(f(limit), 'a time limit is written like 08:00')

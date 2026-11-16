@@ -58,7 +58,7 @@ This is the answer to the complaint that audiences and members share one muddled
 
 *W8 · generated settings page, laptop width*
 
-No module draws its own settings screen. It declares each setting with a label, a sentence of help, a type and a default, and this page is built from those declarations, grouped by module. Changes are collected and saved together from the bar at the bottom, and a changed row says what it was before. The three settings shown are examples; the real list belongs to the box office workstream.
+No module draws its own settings screen. It declares each setting with a label, a sentence of help, a type and a default, and its page at `/console/<module>/settings` is built from those declarations, in sections. Changes are collected and saved together from the bar at the bottom, and a changed row says what it was before. A setting the module declares as site-wide is not on this page: it is in site administration at `/admin/settings`, and the page says so with a link. The sections and the three settings shown are examples; the real list belongs to the box office workstream.
 
 ## W9. Site administration
 

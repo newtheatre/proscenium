@@ -20,7 +20,6 @@ const hits = computed(() => matchSettings(data.value?.settings ?? [], term.value
         v-model="term"
         type="search"
         icon="i-lucide-search"
-        class="w-full"
         :placeholder="t('core.search.settings.placeholder')"
       />
     </UFormField>

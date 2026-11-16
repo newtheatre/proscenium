@@ -37,7 +37,6 @@ async function add(retried = false) {
       <UAlert
         v-if="me?.consoleNeedsPasskey"
         color="info"
-        variant="subtle"
         icon="i-lucide-info"
         title="You will need a passkey to use the console."
       />

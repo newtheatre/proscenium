@@ -326,7 +326,8 @@ test.describe('the starting colour mode', () => {
 
 test.describe('confirming it is you', () => {
   test('a save refused for a stale sign-in opens the dialogue in place rather than leaving the page', async ({ browser }) => {
-    const stale = { ...person('Stella Stale', [grant('core.settings.manage')]), assurance: 'strong' }
+    // core.settings.manage alone opens only Site administration (R-33); the organisation's settings keep her in the console.
+    const stale = { ...person('Stella Stale', [grant('core.settings.manage'), grant('core.organisation.edit')]), assurance: 'strong' }
     const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(stale) })
     const page = await context.newPage()
     await visit(page, '/console')
