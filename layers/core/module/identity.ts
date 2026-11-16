@@ -29,6 +29,7 @@ export const identitySettings = defineSettings('core', {
 
   'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
   'grants.allow-no-expiry': setting.boolean({ default: true, change }),
+  'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change }),
 
   'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
@@ -327,6 +328,36 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Your sign-in at {{ theatre }} has changed',
         body: 'This was added to your account: {{ what }}.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
+      },
+    },
+  }, {
+    // To a holder, once per sweep, naming each of their roles that ends within
+    // core.grants.expiry-warning (ID-24). Grants are the members' side.
+    id: 'core.grant-expiring',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { roles: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'A role of yours at {{ theatre }} is ending',
+        body: 'These roles of yours at {{ theatre }} are ending:\n\n{{ roles }}\n\nIf you should keep one, ask whoever gave it to you to renew it. If not, there is nothing to do.',
+      },
+    },
+  }, {
+    // To whoever could renew those grants, once per sweep that found some (ID-24): a count and the
+    // earliest end, never one message per grant, because at a year end most lapse together.
+    id: 'core.grants-expiring',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { count: 'text' as const, date: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Roles at {{ theatre }} are about to lapse',
+        body: 'Roles you can renew are about to lapse: {{ count }}, the first on {{ date }}. Renew those that should carry on; the rest end by themselves.',
       },
     },
   }, {
