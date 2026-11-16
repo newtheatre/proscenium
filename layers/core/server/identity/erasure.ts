@@ -68,7 +68,7 @@ export function erasurePlan(): ErasureStep[] {
     const match = matchOf(meta, tables)
     if (!match) continue
     const set = Object.values(meta.columns)
-      .filter(c => c.meta.class !== 'internal' && (c.meta.erase === 'clear' || c.meta.erase === 'anonymise' || c.meta.erase === 'redact'))
+      .filter(c => c.meta.class === 'internal' ? c.meta.erase === 'clear' : (c.meta.erase === 'clear' || c.meta.erase === 'anonymise' || c.meta.erase === 'redact'))
       .map(c => ({ column: c.sql, to: c.meta.erase as 'clear' | 'anonymise' | 'redact' }))
     if (meta.options.onErasure === 'delete-row') steps.push({ table: meta.name, match, action: 'delete', set: [] })
     else if (set.length || meta.name === 'core_accounts') steps.push({ table: meta.name, match, action: 'update', set })

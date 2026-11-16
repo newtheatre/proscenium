@@ -12,7 +12,8 @@ import { setPersonalFields } from './log'
  * Module ids the design has reserved (Formats tab). `uses` may name one before it is written; a
  * `uses` on an absent module contributes nothing.
  */
-export const RESERVED_MODULE_IDS: readonly string[] = ['public-site', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']
+/** Every settled module id, built or not (Foundations part 4, under the module table). A `uses` naming one with no module present is satisfied as absent; a `requires` is not. */
+export const RESERVED_MODULE_IDS: readonly string[] = ['core', 'box-office', 'payments', 'finance', 'forms', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications', 'public-site']
 
 export type Owner = 'upstream' | 'site' | 'fixtures'
 
@@ -186,7 +187,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         }
         if (c.erase === 'retain' && !r.settings.has(c.until!)) fail(entry, `tables.${key}.${col}`, `retain until "${c.until}", which is not a setting`)
       }
-      if (meta.options.retention && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+      if (typeof meta.options.retention === 'string' && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
     }
   }
 
