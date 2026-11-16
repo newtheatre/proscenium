@@ -132,6 +132,7 @@ CREATE TRIGGER `finance_period_closes_append_only_delete` BEFORE DELETE ON `fina
 DROP TRIGGER IF EXISTS `finance_period_closes_append_only_update`;
 --> statement-breakpoint
 CREATE TRIGGER `finance_period_closes_append_only_update` BEFORE UPDATE ON `finance_period_closes` WHEN NOT (NEW.`id` IS OLD.`id` AND NEW.`period_id` IS OLD.`period_id` AND NEW.`action` IS OLD.`action` AND NEW.`by` IS OLD.`by` AND NEW.`at` IS OLD.`at` AND NEW.`debits_minor` IS OLD.`debits_minor` AND NEW.`credits_minor` IS OLD.`credits_minor` AND NEW.`reason_term_id` IS OLD.`reason_term_id`) BEGIN SELECT RAISE(ABORT, 'append-only: finance_period_closes'); END;
+
 --> statement-breakpoint
 -- Written by hand: the ledger's own rules (Box office specification, part 2, Finance). A posting is
 -- real only once sealed, and the seal is refused unless its entries balance in one currency.
