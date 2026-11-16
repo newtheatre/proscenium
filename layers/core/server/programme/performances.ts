@@ -191,7 +191,7 @@ async function warningsFor(spaceId: string, from: number, to: number): Promise<s
 }
 
 /** Keeps the production's first start and last end in step, in the same unit as the change. */
-function syncProductionDates(unit: UnitView, productionId: string): void {
+export function syncProductionDates(unit: UnitView, productionId: string): void {
   unit.add(sql`UPDATE core_productions SET
       first_starts_at = (SELECT min(starts_at) FROM core_performances WHERE production_id = ${productionId} AND state <> 'draft'),
       last_ends_at = (SELECT max(ends_at) FROM core_performances WHERE production_id = ${productionId} AND state NOT IN ('draft', 'cancelled'))

@@ -1,6 +1,6 @@
 # 3. Rules and flows
 
-Two records have a life cycle: a subscription and a campaign. Each move is guarded in the statement that makes it, writes an audit entry and announces its event in the same batch, as core domain's part 3 defines a guard.
+Two records have a life cycle: a subscription and a campaign. Each move is made in a unit of work that runs the kit's guard, writes an audit entry and announces its event in the same batch, as core domain's part 3 defines a guard. A move happened when the guard passed. Nothing here tests how many rows a statement changed, because D1's count includes rows written by triggers and search indexes.
 
 **What is built when.** Every rule below about a subscription, consent, unsubscribing by the manage link and a notice is in the first release. A rule that applies only to a mailing (the bulk lane, the throttle, quiet hours, approval, pause and cancel, narrowing, the mail client's unsubscribe button) is in a later release and says "later". In the first release a campaign is always a notice.
 
@@ -76,10 +76,10 @@ Rules:
 
 - **The manage link is the way out in every release.** It is in the confirmation message and in each row of the export, and My account offers the same switches. Later, every mailing carries two routes out: the manage link in its footer, and the List-Unsubscribe and List-Unsubscribe-Post headers that give mail clients a one-click button (RFC 8058). Core adds the headers (request N3).
 - **The one-click request, later, needs nothing but the token.** It is a POST to a public route, takes no cookie, and answers success whether or not the token is known.
-- **The manage link opens a page, not an action.** A GET never unsubscribes, because mail scanners follow links. The page shows the list and one button.
+- **The manage link opens a page, not an action.** A GET never unsubscribes, because mail scanners follow links. The page names the one list and offers two buttons, "Leave this list" and "Stop all mailings". Both are harmless to repeat, which is why a signed token is enough for them.
 - **It takes effect before the next tranche.** A tranche job re-checks subscription state in the statement that hands recipients over.
-- **The page offers the alternatives without getting in the way**: the person's other lists on that side, and "stop all mailings", which switches the topic off.
-- **A token is per subscription and never expires** while the row exists, so a link in a two-year-old email still works.
+- **Anything more needs a preferences link or a sign-in.** Seeing one's other lists, joining one, or rejoining after leaving by mistake reveals or changes more than a signed token may. The page offers "Email me a link to my lists": a preferences link goes to the subscription's own address, works once and for 24 hours, and opens the lists for that subject and side. A signed-in person is sent to My account instead.
+- **The tokens follow Foundations' rules T1 to T4.** The manage link is a signed token (`signing.sign`, purpose `communications.leave`) holding the subscription id and an expiry two years on, and is treated as readable. The export makes fresh ones each time. The confirm and preferences links are random 32-byte tokens stored as a hash with an expiry on the subscription row. Every route declares its token parameter so that it stays out of logs; every landing page sends no-referrer and no-store and gives one answer for a wrong, used or expired link; every link is built with the kit's `siteUrl(path)`.
 
 ## Campaign
 
@@ -114,7 +114,7 @@ The table gives who may make each move and its guard. A draft that was never sch
 | in-review | draft | `communications.campaign.edit` or `.approve` | None. The approver may send it back with a comment |
 | draft or in-review | scheduled | `communications.campaign.send`; from in-review, `communications.campaign.approve` by someone other than the author | The content checks pass. The time is now or later. The sending domain is verified |
 | scheduled | draft | `communications.campaign.send` | Sending has not started |
-| scheduled | preparing | The five-minute task, at `scheduled_for` | Claimed by a conditional write, so two task runs cannot both start it. Not inside quiet hours unless it is a notice |
+| scheduled | preparing | The five-minute task, at `scheduled_for` | The campaign is still scheduled and due: the guard passes for one task run only, so two runs cannot both start it. Not inside quiet hours unless it is a notice |
 | preparing | sending | The prepare job | The snapshot is complete |
 | sending | paused | `communications.campaign.send` | None |
 | paused | sending | `communications.campaign.send` | None |

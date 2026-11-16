@@ -29,7 +29,7 @@ A booking has eight states, and only a Confirmed booking occupies time. Every ru
 | Confirmed | Bumped | The system | Rules B2, L1, L2 |
 | Confirmed | Completed | The sweep task | `ends_at` has passed |
 
-No other move exists. A final state is never left: a declined request that should have been allowed is asked for again. Each move is one conditional update that names the state it expects, with an expectation that one row changes, so two people acting at once cannot both succeed. Each move writes a `spaces_booking_events` row and announces its event in the same unit of work.
+No other move exists. A final state is never left: a declined request that should have been allowed is asked for again. Each move is one conditional update that names the state it expects, and the unit goes on only if the update changed something, tested as above nought and never as an exact number (D1's count includes rows written by triggers and indexes), so two people acting at once cannot both succeed. Each move writes a `spaces_booking_events` row and announces its event in the same unit of work.
 
 ## Asking for a booking
 
@@ -68,7 +68,7 @@ A public holiday is not a blocker. It is shown on the calendar and on the reques
 
 **C1a, other modules' uses of a space.** A fourth blocker for a space: any time another module reports through core's point `core.space-busy`, such as a training session. Spaces reads it through core's `isSpaceFree`, leaving out its own contribution, so anything that occupies a room blocks a booking and is drawn on the calendar, labelled by the module that reported it. These uses are code contributions and cannot be part of the one statement in rule C2: they are read immediately before the write. A module that takes a space is expected to ask `isSpaceFree` itself first, which then sees the bookings here.
 
-**C2, the write that cannot double-book.** Confirming is one statement: an insert (or, for a request, an update from Requested) that carries the condition "no Confirmed booking of this bookable overlaps this window", with an expectation that one row changes. D1 runs the statements of a unit one after another with no other writer between them, so of two people confirming overlapping times exactly one succeeds, and the other receives the refusal `spaces.clash` with the blocker named. For a space, the same statement carries core's predicate `assertSpaceFree(spaceId, from, to)`, which is false when a scheduled performance or a blocking closure overlaps, so blockers 2 and 3 are refused on the write itself and not by a read before it.
+**C2, the write that cannot double-book.** Confirming is one statement: an insert (or, for a request, an update from Requested) that carries the condition "no Confirmed booking of this bookable overlaps this window", and the unit goes on only if the statement changed something, tested as above nought and never as an exact number. D1 runs the statements of a unit one after another with no other writer between them, so of two people confirming overlapping times exactly one succeeds, and the other receives the refusal `spaces.clash` with the blocker named. For a space, the same statement carries core's predicate `assertSpaceFree(spaceId, from, to)`, which is false when a scheduled performance or a blocking closure overlaps, so blockers 2 and 3 are refused on the write itself and not by a read before it.
 
 **C3, what the refusal says.** The refusal names each blocker by kind and time, and by title only if the reader may see titles (rule K2). It offers the nearest free time of the same length that day, where there is one.
 
@@ -122,7 +122,7 @@ A public holiday is not a blocker. It is shown on the calendar and on the reques
 
 ## Series
 
-**R1, a series is expanded when it is made.** Each occurrence is a row in `spaces_bookings`, created in the same unit as the series. Nothing is generated later, so what the booker saw is what exists. The occurrences are written as one set, as Foundations' rule U7 requires: one insert reads them all from one parameter, each row carrying the clash condition of rule C2, with an expectation of the number of occurrences.
+**R1, a series is expanded when it is made.** Each occurrence is a row in `spaces_bookings`, created in the same unit as the series. Nothing is generated later, so what the booker saw is what exists. The occurrences are written as one set, as Foundations' rule U7 requires: one insert reads them all from one parameter, each row carrying the clash condition of rule C2. The kit's guard follows it: a read statement that passes only when every occurrence asked for now exists in the series, and the unit rolls back if it does not. No count of changed rows is relied on.
 
 **R2, limits.** At most `spaces.series.max-occurrences` occurrences, and the last no further ahead than the purpose's limit (P6). The purpose must allow repeats.
 
@@ -170,7 +170,7 @@ A public holiday is not a blocker. It is shown on the calendar and on the reques
 | L8 | The record a booking was made for is removed (its origin) | The owning module calls the service that cancels by origin, in its own unit |
 | L9 | The module is switched off | Tables are kept. Nothing is cancelled. Core's check of whether a space is free no longer counts bookings |
 
-**Many bookings at once.** L1, L2 and L4 may change hundreds of bookings. Each listener writes set-wise, as Foundations' rules U7 to U9 require. It reads the bookings in the way; then one guarded update moves them, with an expectation of the count read; one insert writes their history rows; and one set each goes to `unit.announce` and to the notification service. The number of statements does not grow with the number of bookings. If a booking changed between the read and the write, the unit rolls back and the listener's retry reads again. When more bookings are in the way than `core.units.set-rows-limit` allows in one set, the listener changes the soonest and queues the job `spaces.clear-window` for the same blocker, which repeats in chunks until none is left. Each chunk is safe to repeat, because it acts only on bookings still Confirmed or Requested.
+**Many bookings at once.** L1, L2 and L4 may change hundreds of bookings. Each listener writes set-wise, as Foundations' rules U7 to U9 require. It reads the bookings in the way; then one conditional update moves them, and the kit's guard, a read statement, passes only when none of the bookings read is still in the state it was read in; one insert writes their history rows; and one set each goes to `unit.announce` and to the notification service. The number of statements does not grow with the number of bookings. If a booking changed between the read and the write, the guard does not pass, the unit rolls back and the listener's retry reads again. When more bookings are in the way than `core.units.set-rows-limit` allows in one set, the listener changes the soonest and queues the job `spaces.clear-window` for the same blocker, which repeats in chunks until none is left. Each chunk is safe to repeat, because it acts only on bookings still Confirmed or Requested.
 
 ## Sweeps and reminders
 

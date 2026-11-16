@@ -170,7 +170,7 @@ On erasure the row is kept with its dates and scheme, so counts by year stay tru
 | `first_joined_on` | local date | not null | internal | keep | "Member since" |
 | `created_at` | timestamp | not null | internal | keep |  |
 
-The number is taken from a one-row counter in the same batch as the first activation, with the same guarded update Box office uses for booking references. The next number is one more than the table's highest, read and written in one statement, and rows are never deleted, so no separate counter table is needed and the unique index settles a race. A supporters' scheme gives a number too; the prefix shown beside it is a setting.
+The number is given in the same batch as the first activation. The next number is one more than the table's highest, read and written in one statement, and rows are never deleted, so no separate counter table is needed and the unique index settles a race. A supporters' scheme gives a number too; the prefix shown beside it is a setting.
 
 ## membership\_verifications
 

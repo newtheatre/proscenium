@@ -23,7 +23,9 @@ const filter = (name: 'accountId' | 'periodId') => computed({
 })
 const accountId = filter('accountId')
 const periodId = filter('periodId')
-const query = computed(() => ({ accountId: accountId.value === ANY ? undefined : accountId.value, periodId: periodId.value === ANY ? undefined : periodId.value }))
+// A production's statement links here with its id, to show the postings behind it.
+const productionId = computed(() => (typeof route.query.productionId === 'string' ? route.query.productionId : undefined))
+const query = computed(() => ({ accountId: accountId.value === ANY ? undefined : accountId.value, periodId: periodId.value === ANY ? undefined : periodId.value, productionId: productionId.value }))
 
 const { data, status, error, refresh } = await useAPI<Page>('/api/finance/postings', { query, key: 'finance:ledger' })
 const { data: accounts } = await useAPI<{ accounts: { id: string, code: string, name: string }[] }>('/api/finance/accounts', { key: 'finance:accounts' })
@@ -93,6 +95,14 @@ async function reverse(p: Posting) {
           :items="periodItems"
           :aria-label="t('finance.screens.ledger.period')"
           class="w-48"
+        />
+        <UButton
+          v-if="productionId"
+          :label="t('finance.screens.ledger.one-production')"
+          trailing-icon="i-lucide-x"
+          color="neutral"
+          variant="soft"
+          :to="{ query: { ...route.query, productionId: undefined } }"
         />
       </div>
     </template>
