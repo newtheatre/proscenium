@@ -31,6 +31,7 @@ export default defineModule({
   calls: {
     'seats.take-payment': call({ reconcileAfter: '1m' }),
   },
+  signing: [{ purpose: 'seats.door-code', rotateEvery: '90d', keepFor: '365d' }],
   contributes: {
     'core.operating-day': [{ id: 'seats.performances', table: 'seats_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   },

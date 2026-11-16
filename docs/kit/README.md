@@ -146,6 +146,42 @@ key, then records the outcome and applies it through the module's `outcome` hand
 throws or times out leaves the attempt with no outcome; the `reconcile` handler asks the provider
 later. Nothing is shown as done before its outcome commits.
 
+## Signing
+
+A module that issues codes a device must check with no connection (door codes, membership cards)
+declares a purpose and signs under it; the kit owns the keys (F-37):
+
+```ts
+signing: [{ purpose: 'box-office.door-code', rotateEvery: '90d', keepFor: '1460d' }],
+```
+
+```ts
+import { signing } from '#kit/signing'
+// What is signed may name the key: pass a function of the key id, and the key named is the one that signs.
+const { keyId, signature } = await signing.sign('box-office.door-code', keyId => `tkt.${keyId}.${code}`)
+const genuine = await signing.verify('box-office.door-code', keyId, `tkt.${keyId}.${code}`, signature)
+const keys = await signing.publicKeys('box-office.door-code') // for the device's offline data
+```
+
+- Keys are ECDSA on P-256 with SHA-256 (`ES256`). A signature is 64 bytes (r and s), base64url; a
+  public key is the 65-byte uncompressed point, base64url, which a browser imports with
+  `crypto.subtle.importKey('raw', bytes, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify'])`.
+- The first signature under a purpose makes its key. The daily task `core.rotate-signing-keys`
+  makes a new current key every `rotateEvery`; the old key then only checks, for `keepFor` counted
+  from when it stopped signing, so anything signed can be checked for at least `keepFor`. After
+  that it is retired and checks nothing.
+- The private part is sealed with `CORE_ENCRYPTION_KEY` in `core_signing_keys` and never leaves it.
+  It is erased as soon as the key stops signing. Public parts are kept for ever.
+- An Owner can retire a key at once (`POST /api/core/signing-keys/:id/retire`, ability
+  `core.signing-key.retire`). Without `{ confirm: true }` it refuses with
+  `core.signing-key.confirm-needed`, whose reason says what retiring would invalidate. Retiring the
+  current key makes a new one straight away. `GET /api/core/signing-keys` (`core.health.view`)
+  lists the keys in use with their dates and the same sentence, for the Health screen.
+- A route signs only under its own module's purposes. A module that adds a kind of code to another
+  module's point signs through that point, so the host makes the call.
+- A signature proves the theatre issued a code. It does not prove what the code stands for is still
+  valid, and a signed code is not a secret.
+
 ## Settings
 
 ```ts
