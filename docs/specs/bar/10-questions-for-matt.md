@@ -12,11 +12,11 @@ Nine questions were put to Matt on 16 November 2026, each with a recommendation.
 | 4. Bar tabs | In the first release, as staff tabs and floating tabs. Self-service leaves out alcohol; a staff tab is paid whole at the till; money owed stays out of the ledger until paid |
 | 5. Selling offline | Later. Offline, the till says payments need a connection |
 | 6. Ledger | Income only now; stock value later |
-| 7. Age check and refusals | As specified, with the refusals log: product, reason and a manager's signature. The description of the person stays off |
+| 7. Age check and refusals | As specified, with the refusals log: product, reason and a manager's signature. A description of the person is a setting, off by default, which NNT expects to switch on |
 | 8. Drinks at the desk | The `student-society` preset gives the box-office role `bar.sale.sell` on the desk outlet |
 | 9. Prices and training | Committee price list at 25% off everything, chosen by hand; a training requirement per outlet in the first release; automatic member prices later |
 
-One thing only Matt can check, which does not hold up the build: whether the conditions on NNT's premises licence ask for a description of the person on each refusal. If they do, it is one setting.
+Nothing is open. Matt confirmed on 16 November that the refusals log should be able to hold a short description of the person. It stays a setting, off by default for the platform, and NNT expects to switch it on.
 
 ## 1. When is the bar built?
 
@@ -104,7 +104,7 @@ Interface's rule is that live mode keeps working offline. For the till that woul
 - Each refusal records the product refused and a reason from a list the theatre can edit, which starts with No ID, ID not accepted, Under age, Buying for someone under age, Already drunk and Other.
 - Because "already drunk" has nothing to do with age, a refusal can be recorded from any sale or with no sale, and the register is called the refusals register on screen.
 - A manager signs the register as checked for a period, and the licensing export shows those signatures.
-- A short description of the person refused ("male, about 16, red jacket") is common on paper logs. It is an optional field, off by default, because it is the one thing in the register about a customer. It stays off unless NNT's licence conditions or licensing officer ask for it.
+- A short description of the person refused ("male, about 16, red jacket") is common on paper logs. It is an optional field, off by default, because it is the one thing in the register about a customer. Matt confirmed the log should be able to hold it, so NNT expects to switch it on. It is limited to 120 characters, guided away from names and from race, religion, disability and health, kept only as long as the register row, and erasable row by row (parts 2 and 3).
 
 The question as asked:
 
