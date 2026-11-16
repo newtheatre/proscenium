@@ -10,7 +10,7 @@ const valid = computed(() => HEX.test(model.value ?? ''))
 
 <template>
   <UFieldGroup>
-    <UPopover>
+    <UPopover :content="{ align: 'start' }">
       <UButton
         color="neutral"
         variant="outline"
@@ -31,11 +31,12 @@ const valid = computed(() => HEX.test(model.value ?? ''))
       </template>
     </UPopover>
     <UInput
-      v-model="model"
+      :model-value="model ?? ''"
       :disabled="disabled"
       maxlength="7"
       placeholder="#1d4ed8"
       class="w-32 font-mono"
+      @update:model-value="model = String($event)"
     />
   </UFieldGroup>
 </template>

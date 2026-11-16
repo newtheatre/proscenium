@@ -167,7 +167,10 @@ const words = () => ({
 /** "30m" as "30 minutes", for the default and the confirmation. */
 function durationWords(text: string): string {
   const match = /^(\d+)([smhdw])$/.exec(text)
-  return match ? `${match[1]} ${t(`core.duration.units.${match[2]}`)}` : text
+  if (!match) return text
+  // The browser's own wording, so one hour is not "1 hours" in any language.
+  const unit = { s: 'second', m: 'minute', h: 'hour', d: 'day', w: 'week' }[match[2] as 's' | 'm' | 'h' | 'd' | 'w']
+  return new Intl.NumberFormat(language.value, { style: 'unit', unit, unitDisplay: 'long' }).format(Number(match[1]))
 }
 // A custom setting's own control: a component in its module's app/setting-editors folder, named for
 // the key (finance.year.starts is SettingFinanceYearStarts). Without one it is typed as text.

@@ -1,4 +1,6 @@
 {
+  "finance.screens.year-start.day": "Day of the month",
+  "finance.screens.year-start.month": "Month",
   "finance.navigation.ledger.label": "Ledger",
   "finance.navigation.periods.label": "Periods",
   "finance.navigation.accounts.label": "Ledger accounts",

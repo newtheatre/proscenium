@@ -285,6 +285,25 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
     })
 
+    test('a length of time is a number and a unit, and a whole number has steppers', async ({ page }) => {
+      await visit(page, '/console/gallery/settings')
+      const amount = page.getByRole('spinbutton', { name: 'How long seats are held: How many' })
+      await expect(amount).toHaveValue('15')
+      await expect(page.getByRole('combobox', { name: 'How long seats are held: Unit of time' })).toContainText('minutes')
+      await amount.fill('20')
+      await amount.blur()
+      await expect(page.getByText('1 change')).toBeVisible()
+      await page.getByRole('button', { name: 'Save Sample show settings' }).click()
+      await expect(page.getByText('Saved 1 change').first()).toBeVisible()
+      await visit(page, '/console/gallery/settings')
+      await expect(page.getByRole('spinbutton', { name: 'How long seats are held: How many' })).toHaveValue('20')
+      await expect(page.getByText('Default: 15 minutes.')).toBeVisible()
+      await noViolations(page)
+      await page.getByRole('button', { name: /Reset How long seats are held to its default/ }).click()
+      await page.getByRole('button', { name: 'Save Sample show settings' }).click()
+      await expect(page.getByText('Saved 1 change').first()).toBeVisible()
+    })
+
     test('the account menu marks the current shell and offers the console', async ({ page }) => {
       await visit(page, '/console/gallery/list')
       await page.getByRole('button', { name: /Open the menu for Sam Staff/ }).first().click()

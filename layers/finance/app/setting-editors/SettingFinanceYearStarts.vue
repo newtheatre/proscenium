@@ -20,7 +20,7 @@ const set = (m: number, d: number) => { model.value = `${pad(m)}-${pad(Math.min(
       :min="1"
       :max="28"
       :disabled="disabled"
-      :aria-label="t('finance.settings.year.starts.day')"
+      :aria-label="t('finance.screens.year-start.day')"
       class="w-28"
       @update:model-value="set(month, $event ?? 1)"
     />
@@ -28,7 +28,7 @@ const set = (m: number, d: number) => { model.value = `${pad(m)}-${pad(Math.min(
       :model-value="month"
       :items="months"
       :disabled="disabled"
-      :aria-label="t('finance.settings.year.starts.month')"
+      :aria-label="t('finance.screens.year-start.month')"
       class="w-40"
       @update:model-value="set($event as number, day)"
     />

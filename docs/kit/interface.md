@@ -177,6 +177,23 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   `type="date"` or `type="datetime-local"`: a native picker ignores the locale and works in the
   viewer's zone.
 - `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
+
+### Controls for the setting kinds
+
+The generated settings page gives each kind of setting its own control, and the same fields are there
+for any other screen:
+
+- `integer`: a number box with steppers, kept inside the setting's `min` and `max`.
+- `money`: `FieldMoney`.
+- `duration`, and the period of a `rate`: `FieldDuration`, a number and a unit. It takes and gives the
+  text the server keeps (`30m`, `2h`, `14d`), so nobody types that by hand.
+- `colour`: `FieldColour`, a swatch that opens a picker beside the hex value.
+- `reference`: `FieldRecord`, which searches the record type's `core.search-source` and keeps the
+  record's id. A record type nothing searches falls back to the id as text.
+- `custom`: a component in the module's `app/setting-editors` folder named for the key, so
+  `finance.year.starts` is `SettingFinanceYearStarts.vue`. It takes `modelValue` and `disabled` and
+  emits `update:modelValue` with a value the setting's schema accepts. Without one the value is typed
+  as text.
 - A date control is typed part by part, so a browser test focuses its first part and types the digits
   (`tests/e2e/date-fields.spec.ts` covers the kit fields; a module need not test them again).
 

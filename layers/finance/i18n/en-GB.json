@@ -10,8 +10,6 @@
   "finance.settings.periods.length.options.month": "A month",
   "finance.settings.periods.length.options.quarter": "A quarter",
   "finance.settings.year.starts.label": "First day of the financial year",
-  "finance.settings.year.starts.day": "Day of the month",
-  "finance.settings.year.starts.month": "Month",
   "finance.settings.year.starts.help": "A day and a month, such as 1 August. Periods start on this day of the month. This is Finance's own date and is not the committee year end.",
   "finance.settings.tax.registered.label": "Charges tax on sales",
   "finance.settings.tax.registered.help": "Whether the theatre is registered to charge tax, such as VAT. Not supported yet: it must stay off in this release.",
