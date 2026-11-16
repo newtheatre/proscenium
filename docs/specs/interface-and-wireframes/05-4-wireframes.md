@@ -10,7 +10,7 @@ W1, the four frames side by side, is in the Shells and navigation sub-tab. Label
 
 *W2 · console list page, laptop width*
 
-Every list in the console has this frame. The sidebar shows only groups this person may open, with everyday work above set-up. The header carries the title, search, help and the page's one primary action. Filters are chips that live in the address, so this exact view can be sent to a colleague. Below laptop width the sidebar becomes a drawer and each row becomes a card showing order, customer and status. The drawing shows the frame, not box office's real words: the statuses, sidebar labels and columns in W2 and W6 are examples. An order's states are box office's (Basket, Awaiting payment, Confirmed, Reserved, Expired, Cancelled; a ticket is valid, void or admitted; there is no "Paid" or "Refunded" state), and its menu entries are Sell, Orders, and Ticket types and prices.
+Every list in the console has this frame. The sidebar shows only groups this person may open, with everyday work above set-up. The header carries the title, search, help and the page's one primary action. Filters are chips that live in the address, so this exact view can be sent to a colleague. Below laptop width the sidebar becomes a drawer and each row becomes a card showing order, customer and status. W2 uses box office's own words: an order's states are Basket, Awaiting payment, Confirmed, Reserved, Expired and Cancelled (a ticket is valid, void or admitted; there is no "Paid" or "Refunded" state), and its menu entries are Sell, Orders, Door list, Ticket types and prices, and Settings. W6 still shows example statuses and labels; it draws the frame of a record, not box office's real words.
 
 ## W3. Buying a ticket on a phone
 
@@ -59,6 +59,14 @@ This is the answer to the complaint that audiences and members share one muddled
 *W8 · generated settings page, laptop width*
 
 No module draws its own settings screen. It declares each setting with a label, a sentence of help, a type and a default, and this page is built from those declarations, grouped by module. Changes are collected and saved together from the bar at the bottom, and a changed row says what it was before. The three settings shown are examples; the real list belongs to the box office workstream.
+
+## W9. Site administration
+
+![W9 · site administration, laptop width](images/05-4-w9-site-administration.png)
+
+*W9 · site administration, laptop width*
+
+Site administration is the console's frame with three things changed so that nobody mistakes one for the other: a strip that names it at every width, "Back to console" where the theatre's mark would be, and its own sidebar of install-level screens. Its home is not a work queue but a short list of what needs attention and the state of the installation. The groups and addresses are listed in Shells and navigation. The cards and figures drawn are examples.
 
 ## What the wireframes do not show
 

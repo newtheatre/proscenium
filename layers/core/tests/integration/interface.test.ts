@@ -4,16 +4,24 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import access from '../../server/api/core/access.get'
 import navigation from '../../server/api/core/navigation.get'
 import accountSections from '../../server/api/core/account-sections.get'
+import home from '../../server/api/core/home.get'
+import recordTabs from '../../server/api/core/record-tabs.get'
+import history from '../../server/api/core/history.get'
+import putModule from '../../server/api/core/modules/[id].put'
 import viewer from '../../server/api/core/viewer.get'
 import settingsGet from '../../server/api/core/settings/index.get'
 import settingsPut from '../../server/api/core/settings/index.put'
 import { resetRateLimits } from '#kit/ratelimit'
-import { call, person, server, setModule } from '../../../../tests/integration/helpers'
+import { call, env, person, server, setModule } from '../../../../tests/integration/helpers'
 
 const handle = server({
   'GET /api/core/access': access,
   'GET /api/core/navigation': navigation,
   'GET /api/core/viewer': viewer,
+  'PUT /api/core/modules/:id': putModule,
+  'GET /api/core/home': home,
+  'GET /api/core/record-tabs': recordTabs,
+  'GET /api/core/history': history,
   'GET /api/core/account-sections': accountSections,
   'GET /api/core/settings': settingsGet,
   'PUT /api/core/settings': settingsPut,
@@ -72,7 +80,7 @@ describe('navigation and the viewer', () => {
     expect(ids).toContain('gallery')
     expect(ids).not.toContain('system') // nothing of core's is theirs to open
     const gallery = body.groups.find(g => g.id === 'gallery')!
-    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.form', 'gallery.choices', 'gallery.feedback', 'gallery.drafts'])
+    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.form', 'gallery.choices', 'gallery.record', 'gallery.feedback', 'gallery.drafts'])
     expect(gallery.setup.map(e => e.id)).toEqual(['gallery.steps', 'gallery.settings']) // its settings page sits in its own group
     expect(gallery.setup.map(e => e.id)).not.toContain('gallery.denied')
   })
@@ -180,5 +188,53 @@ describe("the members' area (UI-03)", () => {
     expect((await call(handle, 'GET', '/api/core/navigation?shell=members', { actor: audience() })).status).toBe(404)
     const sections = await (await call(handle, 'GET', '/api/core/account-sections?side=members', { actor: audience() })).json() as { sections: unknown[] }
     expect(sections.sections).toEqual([])
+  })
+})
+
+describe('home cards, record tabs and history (UI-12, UI-16)', () => {
+  const get = async (path: string, actor?: ReturnType<typeof person>) => (await (await call(handle, 'GET', path, { actor })).json())
+
+  it('shows cards most urgent first and leaves out a card whose count is zero', async () => {
+    const { cards } = await get('/api/core/home?home=console', reader())
+    expect(cards.map((c: { id: string }) => c.id)).toEqual(['gallery.drafts-waiting', 'gallery.tip'])
+    expect(cards[0].count).toBe(3)
+  })
+
+  it('shows nothing of a card the person may not open, and starting points only when nothing waits', async () => {
+    const body = await get('/api/core/home?home=console', audience())
+    expect(body.cards).toEqual([])
+    expect(body.starters).toEqual([])
+    const some = await get('/api/core/home?home=console', reader())
+    expect(some.starters).toEqual([])
+  })
+
+  it('hides the members\' home from someone who is not a member', async () => {
+    expect(await get('/api/core/home?home=members', audience())).toEqual({ cards: [], starters: [] })
+  })
+
+  it('lists the tabs other modules add, and none once that module is off', async () => {
+    const { tabs } = await get('/api/core/record-tabs?record=gallery.production', reader())
+    expect(tabs).toEqual([{ id: 'gallery.tickets', labelKey: 'gallery.record-tabs.tickets.label', component: 'GalleryTicketsTab', count: 3 }])
+    expect((await get('/api/core/record-tabs?record=gallery.production', audience())).tabs).toEqual([])
+    // Another module's tab, which goes when that module is switched off.
+    const both = person(['gallery.sample.view', 'seats.orders.sell'])
+    expect((await get('/api/core/record-tabs?record=gallery.production', both)).tabs.map((t: { id: string }) => t.id)).toEqual(['gallery.tickets', 'seats.sales'])
+    const owner = person(['core.modules.manage'])
+    await call(handle, 'PUT', '/api/core/modules/seats', { actor: owner, body: { on: false } })
+    expect((await get('/api/core/record-tabs?record=gallery.production', both)).tabs.map((t: { id: string }) => t.id)).toEqual(['gallery.tickets'])
+    await call(handle, 'PUT', '/api/core/modules/seats', { actor: owner, body: { on: true } })
+  })
+
+  it('gives a record\'s history only to someone who may see it, newest first', async () => {
+    await env.DB.prepare('INSERT INTO core_audit (id, at, actor_name, actor_kind, action, record_type, record_id, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind('aud_h1', 1000, 'Sam Staff', 'person', 'create', 'gallery.production', 'prod-1', '{"field":"name"}').run()
+    await env.DB.prepare('INSERT INTO core_audit (id, at, actor_name, actor_kind, action, record_type, record_id, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind('aud_h2', 2000, 'Sam Staff', 'person', 'update', 'gallery.production', 'prod-1', null).run()
+    const path = '/api/core/history?type=gallery.production&id=prod-1'
+    expect((await call(handle, 'GET', path)).status).toBe(401)
+    expect((await call(handle, 'GET', path, { actor: reader() })).status).toBe(403)
+    const { entries } = await get(path, person(['core.history.view']))
+    expect(entries.map((e: { action: string }) => e.action)).toEqual(['update', 'create'])
+    expect(entries[1].detail).toEqual({ field: 'name' })
   })
 })

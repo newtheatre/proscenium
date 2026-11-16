@@ -1,0 +1,35 @@
+{
+  "payments.module.name": "Payments",
+  "payments.module.description": "Taking money: payment providers and card readers, one payment for several things at the desk, till sessions, and refunds.",
+  "payments.navigation.groups.payments.label": "Payments",
+
+  "payments.settings-sections.attempts": "Waiting for an answer",
+  "payments.settings-sections.refunds": "Refunds",
+  "payments.settings-sections.sessions": "Till sessions",
+  "payments.settings-sections.cash": "Cash",
+  "payments.settings-sections.desk": "At the desk",
+  "payments.settings-sections.retention": "Keeping records",
+
+  "payments.settings.attempts.answer-within.label": "Wait for a provider's answer",
+  "payments.settings.attempts.answer-within.help": "How long to wait for a provider to answer before a payment is marked unknown. Seats are kept while it is unknown, and the provider keeps being asked.",
+  "payments.settings.attempts.alert-unknown-after.label": "Alert about an unknown payment after",
+  "payments.settings.attempts.alert-unknown-after.help": "When a payment still without an answer appears on the health screen and staff are told.",
+  "payments.settings.refunds.self-approve-up-to.label": "Largest refund one person may approve alone",
+  "payments.settings.refunds.self-approve-up-to.help": "A refund at or under this amount may be requested and approved by the same person. Nothing means every refund needs two people. A change does not affect refunds already requested.",
+  "payments.settings.refunds.window.label": "Refunds may be asked for up to",
+  "payments.settings.refunds.window.help": "How long after a payment a refund may be requested.",
+  "payments.settings.sessions.variance-needs-second-person.label": "Cash difference that needs a second person",
+  "payments.settings.sessions.variance-needs-second-person.help": "When the cash counted at the end of a session differs from what was expected by more than this, a second person must close the session.",
+  "payments.settings.sessions.default-float.label": "Suggested float",
+  "payments.settings.sessions.default-float.help": "The float suggested when someone opens a till session.",
+  "payments.settings.cash.enabled.label": "Take cash at the desk",
+  "payments.settings.cash.enabled.help": "Whether cash is offered as a way to pay at the desk.",
+  "payments.settings.desk.attested-card.label": "Record card payments taken on a standalone machine",
+  "payments.settings.desk.attested-card.help": "Whether a seller may record a card payment taken on a card machine that is not connected to this system.",
+  "payments.settings.retention.webhooks.label": "Keep provider notifications for",
+  "payments.settings.retention.webhooks.help": "How long a record of each notification from a payment provider is kept. Only its id and type are kept, never its contents.",
+
+  "payments.abilities.provider.manage.label": "Add payment providers, pair card readers and switch test mode",
+  "payments.abilities.settings.manage.label": "Change payments settings",
+  "payments.abilities.attempt.reconcile.label": "Answer a payment with no answer from the provider's own records"
+}

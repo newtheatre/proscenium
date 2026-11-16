@@ -108,7 +108,7 @@ The merge event is identity's `core.account.merged`. Payment is not here: Paymen
 
 | Event | Owner | Forms does |
 | --- | --- | --- |
-| Two people were merged | Identity (workstream 2) | Nothing to repoint: the merge moves or aliases forms' account columns as tab 2 declares. Where the merged person now has two responses to a one-each placement, forms keeps both and flags them |
+| Two people were merged | Identity (workstream 2) | Nothing to repoint: the merge aliases forms' account columns and moves three, as tab 2 declares. Where the merged person now has two responses to a one-each placement, forms keeps the earlier as the live one, marks the other set aside by the merge, and restores it if the merge is undone within identity's 30 days |
 | A record was deleted or archived | Its owner | Nothing by itself. The owner calls `withdrawResponses` if it wants responses withdrawn |
 
 Erasure is not an event for forms. The data-class registry handles the columns, using the per-row class on `forms_answers`, and forms contributes a handler for what the registry cannot express.

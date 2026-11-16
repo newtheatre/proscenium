@@ -2,13 +2,13 @@
 
 Nov 16, 2026 · @Matthew Adcock
 
-This is workstream 6 of the detailed-design stage for Proscenium, the open-source theatre platform. It specifies how the platform looks and behaves for the people using it: three shells, one way of building navigation, a small set of page types, and the journeys that matter most, drawn as wireframes. It contains no product code.
+This is workstream 6 of the detailed-design stage for Proscenium, the open-source theatre platform. It specifies how the platform looks and behaves for the people using it: four shells, one way of building navigation, a small set of page types, and the journeys that matter most, drawn as wireframes. It contains no product code.
 
 ## Scope
 
 **In scope**
 
-- The three shells (public, members' area, console): their layout, who lands in each, and how a person moves between them.
+- The four shells (public, members' area, console, site administration): their layout, who lands in each, and how a person moves between them.
 - Navigation: how it is assembled from what modules declare, filtered by what a person may do.
 - Page conventions: the page types every module builds from, and the rules for headers, actions, forms, lists, feedback, empty and error states.
 - Operational screens: phone-first screens that survive a dropped connection (door, till, tonight).
