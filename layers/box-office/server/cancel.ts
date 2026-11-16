@@ -7,13 +7,14 @@
 import { sql } from 'drizzle-orm'
 import { all, first, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { assertTerm, getPerformance, getTerm, notify } from '#modules/core'
-import { postEntries } from '#modules/finance'
+import { balances, postEntries } from '#modules/finance'
 import { intentStatus, requestRefund } from '#modules/payments'
 import type { OwnerEntry } from '#modules/payments'
 import { cancellations } from './db/schema'
 import { liveLines, ORDER, wordsFor, type OrderRow } from './orders'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
+const INCOME = { key: 'box-office.ticket-income' }
 const FEES = { key: 'box-office.booking-fee-income' }
 const REASONS = 'box-office.cancellation-reason'
 
@@ -64,6 +65,23 @@ export async function tagged(account: { key: string }, totals: Map<string, numbe
   })))
 }
 
+/**
+ * Debits for ticket money that is no longer the audience's, performance by performance: off deferred
+ * income while the performance still has that much deferred, and off ticket income for whatever the
+ * daily task has already recognised, so deferred income never goes below nothing for a performance.
+ */
+export async function takenBack(totals: Map<string, number>): Promise<OwnerEntry[]> {
+  const deferred = new Map<string, number>()
+  const recognised = new Map<string, number>()
+  for (const [performanceId, amount] of totals) {
+    // A liability's balance is a credit, so what is still deferred shows as a negative number.
+    const owed = Math.max(0, -(await balances({ systemKeys: [DEFERRED.key], performanceId })).reduce((sum, b) => sum + b.balanceMinor, 0))
+    deferred.set(performanceId, Math.min(amount, owed))
+    recognised.set(performanceId, amount - Math.min(amount, owed))
+  }
+  return [...await tagged(DEFERRED, deferred, 1), ...await tagged(INCOME, recognised, 1)]
+}
+
 /** What a refund of an order's part takes back off deferred income, by performance. */
 export async function refundEntries(orderId: string, refund: { id: string, amountMinor: number }): Promise<OwnerEntry[]> {
   const cancellation = await first<{ line_ids: string }>('SELECT line_ids FROM box_office_cancellations WHERE refund_id = ?', refund.id)
@@ -74,7 +92,7 @@ export async function refundEntries(orderId: string, refund: { id: string, amoun
   const ids = cancellation ? new Set(JSON.parse(cancellation.line_ids) as string[]) : null
   const totals = spread(ids ? lines.filter(l => ids.has(l.id)) : lines, refund.amountMinor)
   if (!totals.size) return [{ account: DEFERRED, amountMinor: refund.amountMinor, performanceId: null }]
-  return tagged(DEFERRED, totals, 1)
+  return takenBack(totals)
 }
 
 /** Cancels lines of a reserved or confirmed order for a member of staff, with any refund. */
@@ -147,7 +165,7 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
       kind: 'transfer',
       currency: order.currency,
       postedBy: input.by,
-      entries: [...await tagged(DEFERRED, keptBack, 1), ...await tagged(FEES, keptBack, -1)],
+      entries: [...await takenBack(keptBack), ...await tagged(FEES, keptBack, -1)],
     })
   }
 

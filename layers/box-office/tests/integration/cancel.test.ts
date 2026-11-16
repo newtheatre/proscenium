@@ -4,13 +4,14 @@
 // refunding needs its own ability; the fee kept and the refund together empty what the tickets had
 // deferred; a refund above the limit waits for a second person; and a seat let go is sold once.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, newId, openSpecial, setClock } from '#kit'
+import { advanceClock, changeSetting, createUnit, newId, openSpecial, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { listTerms } from '#modules/core'
 import { addAttempt } from '../../../payments/server/answers'
 import { approveRefund, recordAnswer } from '../../../payments/server/services'
 import { world } from '../../../../tests/fixtures/modules/cardco/server/contributions/payments.provider/cardco'
 import { deliver, env, inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
+import recogniseIncome from '../../server/tasks/recognise-income'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const boxOfficeManager = person(['box-office.order.cancel', 'box-office.order.refund'])
@@ -182,5 +183,25 @@ describe('a seat let go', () => {
     expect(done.body).toMatchObject({ state: 'cancelled', refund: null, feeMinor: 0 })
     expect(await claimed(h)).toBe(0)
     expect(await count('SELECT count(*) AS n FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = ?', made.basket.orderId)).toBe(0)
+  })
+})
+
+describe('a refund after the performance has taken place', () => {
+  it('comes off ticket income once the income has been recognised, and leaves deferred income at nothing', async () => {
+    const DAY = 86_400_000
+    const h = await house(4, { startsAt: NOV_16 + DAY })
+    const o = await paid(h, 2)
+    advanceClock(2 * DAY)
+    await env.DB.prepare("UPDATE core_performances SET state = 'completed', completed_at = ends_at WHERE id = ?").bind(h.performanceId).run()
+    await inContext(() => (recogniseIncome as unknown as () => Promise<void>)(), { kind: 'job' })
+    expect(await balance('box-office.deferred-ticket-income', h.performanceId)).toBe(0)
+    expect(await balance('box-office.ticket-income', h.performanceId)).toBe(-2400)
+
+    // Two days on, the manager has confirmed their sign-in again.
+    const later = person(['box-office.order.cancel', 'box-office.order.refund'], { reassertedAt: NOV_16 + 2 * DAY } as any)
+    expect((await cancel(o.orderId, { lineIds: [o.lines[0]], refund: 'full' }, later)).body).toMatchObject({ refund: { state: 'approved', amountMinor: 1200 } })
+    await deliver()
+    expect(await balance('box-office.deferred-ticket-income', h.performanceId)).toBe(0)
+    expect(await balance('box-office.ticket-income', h.performanceId)).toBe(-1200)
   })
 })
