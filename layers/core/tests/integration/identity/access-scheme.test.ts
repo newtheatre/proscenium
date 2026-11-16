@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { fact, requirements } from '#kit'
 import { createUnit } from '#kit/unit'
-import { deliver, env, grantDirectly, leaveIdentity, reset, setSetting, clearSetting, staff, useIdentity } from './helpers'
+import { Browser, deliver, env, grantDirectly, leaveIdentity, reset, setSetting, clearSetting, staff, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
 import { accessNeedsFor, sweepAccessScheme } from '../../../server/identity/access-scheme'
@@ -100,7 +100,7 @@ describe('reviewing (ID-40)', () => {
     const outsider = await staff()
     expect((await outsider.browser.get('/api/core/access-scheme')).status).toBe(403)
     const desk = await reviewer()
-    const queue = (await desk.browser.get('/api/core/access-scheme')).body.applications
+    const queue = (await desk.browser.get('/api/core/access-scheme')).body.rows
     const line = queue.find((a: any) => a.accountId === accountId)
     expect(line).toMatchObject({ name: 'Ada Applicant', change: false, overdue: false })
     expect(JSON.stringify(queue)).not.toContain('Short walks')
@@ -138,9 +138,23 @@ describe('reviewing (ID-40)', () => {
     await sweep()
     expect(to(desks!).map(e => e.subject)).toEqual(['Applications to the Access scheme are waiting'])
     expect(to(desks!)[0]!.text).not.toContain('Ada')
-    expect((await desk.browser.get('/api/core/access-scheme')).body.applications.find((a: any) => a.accountId === accountId)).toMatchObject({ overdue: true })
+    expect((await desk.browser.get('/api/core/access-scheme')).body.rows.find((a: any) => a.accountId === accountId)).toMatchObject({ overdue: true })
     const [row] = await rows<{ flagged_at: number | null }>('SELECT flagged_at FROM core_access_profiles WHERE account_id = ?', accountId)
     expect(row!.flagged_at).not.toBeNull()
+  })
+
+  it('the application page names the person, shows the history, and serves a person who has not applied', async () => {
+    const { browser, accountId, need } = await applicant()
+    const desk = await reviewer()
+    const before = (await desk.browser.get(`/api/core/access-scheme/${accountId}`)).body
+    expect(before).toMatchObject({ name: 'Ada Applicant', application: null, history: [] })
+    expect(before.needs.length).toBeGreaterThan(0)
+    await browser.post('/api/core/me/access', { needs: [{ term: need.distance }], companions: 0 })
+    await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })
+    const after = (await desk.browser.get(`/api/core/access-scheme/${accountId}`)).body
+    expect(after.application.status).toBe('accepted')
+    expect(after.history.map((h: any) => h.event)).toEqual(['accept', 'applied-self'])
+    expect(JSON.stringify(after.history)).not.toContain('distance')
   })
 
   it('asking for more needs a question, and the answer returns it to the queue', async () => {
@@ -262,6 +276,25 @@ describe('changing, confirming and leaving (ID-42, ID-44)', () => {
     expect((await second.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })).status).toBe(200)
   })
 
+  it('invite to apply emails a single-use link that signs the person in and opens the form', async () => {
+    const desk = await reviewer()
+    const invited = `invitee-${Date.now()}@example.org`
+    const answer = await desk.browser.post('/api/core/access-scheme/invitations', { name: 'Ivy Invitee', address: invited })
+    expect(answer.status).toBe(200)
+    await deliver()
+    const email = to(invited).at(-1)!
+    expect(email.subject).toBe('Apply to the Access scheme at The Test Theatre')
+    const token = /\/sign-in\/link#([\w-]+)/.exec(email.text)![1]!
+    const browser = new Browser()
+    const used = await browser.post('/api/core/sign-in/link', { token })
+    expect(used.status).toBe(200)
+    expect(used.body.next).toBe('/account/access/apply')
+    expect((await browser.get('/api/core/me')).body.account.id).toBe(answer.body.accountId)
+    // Once only, and never stored in clear.
+    expect((await new Browser().post('/api/core/sign-in/link', { token })).body.code).toBe('core.sign-in.link-used')
+    expect(await rows('SELECT count(*) AS n FROM core_notifications WHERE payload LIKE ?', `%${token}%`)).toEqual([{ n: 0 }])
+  })
+
   it('leaving deletes the application and the sharing choices', async () => {
     const { browser, accountId, need } = await applicant()
     await grantDirectly(accountId, ['core.account.search'])
@@ -292,7 +325,7 @@ describe('changing, confirming and leaving (ID-42, ID-44)', () => {
     await sweep()
     expect(to(mine).map(e => e.subject)).toEqual(['Are your details for the Access scheme still right?', 'Are your details for the Access scheme still right?'])
     await sweep()
-    expect((await desk.browser.get('/api/core/access-scheme')).body.applications.find((a: any) => a.accountId === accountId)).toMatchObject({ change: true })
+    expect((await desk.browser.get('/api/core/access-scheme')).body.rows.find((a: any) => a.accountId === accountId)).toMatchObject({ change: true })
     expect((await companionsAnswer(accountId))[0]).toMatchObject({ verdict: 'met', quantity: 1 })
     // Confirming resets the date.
     await env.DB.prepare('UPDATE core_access_profiles SET pending = NULL WHERE account_id = ?').bind(accountId).run()

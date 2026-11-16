@@ -198,6 +198,19 @@ export const identityContributions = {
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
   'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
+  // The access scheme's screens (ID-38, ID-40). "Offered" is one while the scheme runs, so My
+  // account's entry and section hide while it is off; "waiting" sits beside the console's entry.
+  'core.count': [
+    { id: 'core.access-scheme-offered', file: 'access-scheme-offered' },
+    { id: 'core.access-scheme-waiting', file: 'access-scheme-waiting' },
+  ],
+  'core.account-section': [
+    { id: 'core.access-scheme', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreAccessScheme', order: 40, to: '/account/access', icon: 'i-lucide-accessibility', count: 'core.access-scheme-offered', hideEmpty: true },
+  ],
+  // The button a fork's own access page carries: ::access-application.
+  'core.public-component': [
+    { id: 'access-application', component: 'CoreAccessApplication', alias: 'access-application', description: 'The access scheme\'s "Apply" button, or where the visitor\'s application stands.', setting: 'core.access-scheme.enabled' },
+  ],
   // The other identity messages (spec part 4) arrive with the stories that send them.
   'core.notification-type': [{
     // The code that confirms it is you in place, for a basic session with no passkey (ID-28). The
@@ -226,6 +239,20 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
         body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+      },
+    },
+  }, {
+    // The single-use link to the form, by notifyAddress (ID-42). Sealed: email only, cleared once sent.
+    id: 'core.access-invitation',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'sealed' as const, scheme: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Apply to the {{ scheme }} at {{ theatre }}',
+        body: '{{ theatre }} has invited you to apply to its {{ scheme }}, so that what would help you is there every time you book.\n\n[Open the form]({{ link }})\n\nThe link signs you in and works once. If it has run out, sign in with this email address and choose Apply. If you were not expecting this, you can ignore this email.',
       },
     },
   }, {
