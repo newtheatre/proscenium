@@ -1,10 +1,14 @@
 // The core domain's services, for other modules: import notifyAddress from the core's services alias.
 // Foundations' services are the kit (#kit); identity adds its own here beside these.
 export { notifyAddress } from './notifications/send'
+export { notify } from './notifications/notify'
+export type { NotifyOptions, NotifyRecipient } from './notifications/notify'
 export type { NotifyAddressOptions, NotificationType } from './notifications/send'
 export { getBrand } from './brand/theme'
 export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from './calendar'
 export { attachFile, detachFile, fileUrl } from './files/service'
+export { listTerms, getTerm, assertTerm } from './vocabularies/service'
+export type { Term } from './vocabularies/service'
 export { addressFor, addressesFor } from './identity/addresses'
 export type { Side } from './identity/addresses'
 export { findOrCreateAccount } from './identity/guests'
