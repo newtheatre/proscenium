@@ -116,9 +116,9 @@ This is Matt's requirement: the Nottingham New Theatre has one card reader, and 
 3. When staff press Take payment, the desk asks each contribution to `prepare(unit, context)`. The bar's moves its sale to awaiting payment and returns `{ owner: { module: 'bar', record: saleId }, amountMinor }`, always above zero: a zero-total bar sale never reaches `prepare`. Box office adds its own part. Payments writes the intent and its parts in the same batch and checks that the parts sum to the amount.
 4. One attempt, one payment on the reader.
 5. On success Payments calls `settle` once per part in one batch: Box office confirms the order and issues tickets; the bar marks its sale paid, moves stock and returns its ledger entries. The posting has one line for the money and each owner's own income lines, so ticket income and bar income never mix.
-6. If the attempt fails, both parts stay unsettled: the order stays reserved and the bar sale stays awaiting payment, still attached. Staff retry, change method, or remove the drinks. Removing them calls the bar's `release(unit, owner)`, which returns the sale to open, and the intent is rebuilt without the bar part.
+6. If the attempt fails, both parts stay unsettled: the order stays reserved and the bar sale stays awaiting payment, still attached. Staff retry, change method, or remove the drinks. Removing them makes Payments call the bar's `release(unit, part)`, which returns the sale to open, and the intent is rebuilt without the bar part.
 
-`release` is safe to call twice. Payments calls it on cancel, on final failure and when the intent expires.
+`release(unit, part)` is an optional member of the bar's `payments.settlement` handler, not of its desk panel contribution. It is safe to call twice. Payments calls it on cancel, on final failure, when the desk removes the bar's part and when the intent expires. For a bar sale it returns the sale to open; for a bar tab it returns the tab from settling to open.
 
 ### When a part cannot settle
 
@@ -126,7 +126,7 @@ There is no partial settlement: any refusal settles nothing.
 
 | Case | What happens |
 | --- | --- |
-| The bar part cannot settle | By construction it always can: stock never blocks a sale, and a sale awaiting payment cannot be voided or edited. If it still fails (a bug), nothing settles; if money was taken, Payments marks the intent unfulfilled and refunds it whole, and the reservation stays reserved |
+| The bar part cannot settle | By construction it always can: stock never blocks a sale, and a sale awaiting payment cannot be voided or edited. If the handler still refuses or throws (a bug), nothing settles. The same holds if the entries it returns do not total its part, or name an account that is not the bar's: Payments treats that as the bar refusing, not as a failed batch. In each case the provider's answer is recorded; if money was taken, Payments marks the intent unfulfilled and refunds it whole, and the reservation stays reserved |
 | The ticket part cannot settle (seats gone after a late answer) | Payments marks the whole intent unfulfilled and refunds it in full, drinks included. The bar's `cannotSettle(part)` returns the sale to open with its lines kept, and the till shows "Payment refunded, take payment again". No stock moved, no bar income posted |
 
 Refunding the drinks along with the tickets in that rare case is the cost of one batch for one payment.
@@ -177,15 +177,18 @@ flowchart LR
   O["open<br/>charges up to its limit"] -->|"Settle"| G["settling<br/>payment is in hand"]
   G -->|"failed or cancelled"| O
   G -->|"paid"| S["settled<br/>sales paid, income posted"]
-  O -->|"written off with a reason, by someone other than its opener and holder"| W["written_off<br/>no income; stock has gone"]
+  O -->|"written off"| W["written_off<br/>no income; stock has gone"]
+  O -->|"its holder's account is merged into another with a tab"| J["joined<br/>paid with the tab it joined"]
   N1["A staff tab runs across nights. A floating tab is settled or written off before its outlet closes."]
-  N2["A settling tab takes no charges. Settled and written_off are final."]
+  N2["A settling tab takes no charges. Settled and written_off are final. A joined tab takes no charges either."]
+  N3["A tab is written off with a reason, by someone other than its opener and its holder."]
   style S stroke-width: 2px
   style N1 stroke-dasharray: 4 3
   style N2 stroke-dasharray: 4 3
+  style N3 stroke-dasharray: 4 3
 ```
 
-*bar tab states · open, settling, settled, written_off*
+*bar tab states · open, settling, settled, written_off, joined*
 
 | Step | Rule |
 | --- | --- |
@@ -200,6 +203,7 @@ flowchart LR
 - **No part payment.** A tab is paid whole. Splitting a bill is done by opening two tabs.
 - **One settle handler.** The same `payments.settlement` contribution handles a bar sale and a bar tab; the part's owner record says which.
 - **Not at the desk.** A bar tab is charged and settled at the till only, never on the box office desk panel.
+- Merged accounts. When two accounts that each hold a live staff tab are merged, the absorbed account's tab becomes `joined` and its total is carried onto the survivor's tab (part 4). A joined tab takes no charges. Its sales are paid when the tab it was joined to settles, in the same statement, and stay `on_tab` if that tab is written off.
 
 ### Self-service on a staff tab
 
@@ -296,7 +300,7 @@ Received is final. A mistake is corrected by a second delivery, by wastage, or a
 
 ## What is posted to the ledger, and when
 
-Positive is a debit, negative a credit. `clearing` is cash for cash and the provider's card clearing account otherwise, and is Payments' line, not the bar's. The bar never calls `postEntries` for a sale: its handlers return entries and Payments writes one sealed posting per intent. A part's entries total exactly the part.
+Positive is a debit, negative a credit. `clearing` is cash for cash and the provider's card clearing account otherwise, and is Payments' line, not the bar's. The bar never calls `postEntries` for a sale: its handlers return entries and Payments writes one sealed posting per intent, setting `for_module` on each stored entry from the part's owner. The bar does not set it. A part's entries total exactly the part and name only the bar's accounts; entries that do not are treated as the bar refusing to settle (see "When a part cannot settle").
 
 | Fact | Posted when | The bar's entries |
 | --- | --- | --- |

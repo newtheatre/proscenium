@@ -124,7 +124,7 @@ An ability granted on a production or a performance therefore reaches its shifts
 | `core.notification-type` | See below |
 | `core.notification-topic` | "Shifts open for sign-up", "Cover needed", "Night reports" |
 | `core.vocabulary` | `front-of-house.incident-category` (slip or fall, illness, behaviour, fire alarm, building, lost child, other), `front-of-house.exception-reason` (broken, missing, not safe, no time, other). Theatres edit both |
-| `core.erasure-hold`, `core.erasure-handler`, `core.export-contributor`, `core.merge-handler` | As in part 3. The merge handler keeps one assignment when two accounts on the same shift become one |
+| `core.erasure-hold`, `core.erasure-handler`, `core.export-contributor`, `core.merge-handler` | As in part 3. The merge handler keeps one assignment when two accounts on the same shift become one: the other is released and marked freed by that merge. On undo, after Identity has moved the columns back, the freed assignment is restored to the account it came from only if the shift is still to come and a rota place is still free; nothing is taken back from anyone else, and otherwise it stays released and the undo reports it in its count with the reason. Merge and undo are each one unit and safe to repeat |
 | `core.privacy-record` | Rota and volunteer hours (legitimate interests); incident records (legal obligation and vital interests), with the retention periods |
 | `forms.slot` | `front-of-house.incident-details`, later: a theatre's own extra questions on an incident |
 

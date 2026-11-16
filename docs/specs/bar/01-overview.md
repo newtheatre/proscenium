@@ -15,7 +15,7 @@ The second-round specification for the `bar` module: products and prices, a till
 | 5. Screens | Eighteen screens: the till, the desk panel, fifteen console screens and "My bar tab" in the members' area, with wireframes of the till, the desk panel and My bar tab |
 | 6. Settings and abilities | 20 settings, 25 abilities, 7 record types, 1 fact, 5 notification types |
 | 7. Stories | 48 stories: 39 in the first release, 8 of them gates, and 9 later |
-| 8. Tests | 69 tests, 13 of which must never regress |
+| 8. Tests | 70 tests, 13 of which must never regress |
 | 9. Questions for Matt | The nine questions put to Matt, and his decisions |
 
 ## The main choices

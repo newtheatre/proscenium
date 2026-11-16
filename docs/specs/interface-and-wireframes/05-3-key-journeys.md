@@ -147,7 +147,7 @@ If they sign in with a second address the system already knows, it offers to lin
 ## 9. Set the site up
 
 1. **Setup** on a fresh deployment is foundations' screen and this journey only draws it. The sequence is stated once, in foundations' part 5, and fits the Steps page's five because checking and preparing the database share the first step: Check and prepare, then Create the Owner (identity's passkey and recovery codes).
-2. **Then** The theatre (name, time zone, currency, language), Starting point (one of the three presets, or empty; no sample data), and the Checklist built from `core.setup-step`. Brand colour and logo are not a wizard step: "Your look" is core's `core.setup-step` on the checklist, with a live preview of all three shells, and can be skipped.
+2. **Then** The theatre (name, time zone, currency, language), Starting point (one of the three presets, or empty; no sample data), and the Checklist built from `core.setup-step`. Brand colour and logo are not a wizard step: "Your look" is core's `core.setup-step` on the checklist, with a live preview of the public site, the members' area and the console, and can be skipped.
 3. **Console home** opens with a setup card per module switched on, each a short steps page that can be finished later.
 4. A "Before you go live" checklist lists placeholder content not yet replaced and settings still at their defaults.
 

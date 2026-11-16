@@ -1,0 +1,53 @@
+// The till (Box office specification, part 4, "One payment with several owners"): Payments' desk
+// component. Each module with something to sell at the desk contributes a panel to
+// payments.desk-basket; the till asks each panel the seller filled in to prepare its part, in the one
+// batch that creates the intent, and then takes one payment for the total.
+import { can, nowMs, Refusal, usePoint, type Actor, type UnitView } from '#kit'
+import { createIntent } from './intents'
+import type { DeskBasket } from './points/desk-basket'
+
+/** How long a desk sale may wait unpaid before the expiry task releases it. */
+const DESK_INTENT_LIFETIME = 30 * 60_000 // not-policy: a backstop for a till left mid-sale; the seller cancels or takes payment long before
+
+export interface PanelInput { basket: string, input: unknown }
+
+/** The panels the seller may use, in order. */
+export async function panelsFor(actor: Actor): Promise<{ id: string, module: string, value: DeskBasket }[]> {
+  const out = []
+  for (const c of await usePoint<DeskBasket>('payments.desk-basket')) {
+    if ((await can(actor, c.value.ability as any)).allowed) out.push(c)
+  }
+  return out
+}
+
+async function chosen(actor: Actor, panels: PanelInput[]) {
+  const mine = new Map((await panelsFor(actor)).map(p => [p.id, p]))
+  const seen = new Set<string>()
+  return panels.map((p) => {
+    const panel = mine.get(p.basket)
+    if (!panel) throw new Refusal('payments.till.no-panel', 'That is not something you can sell here.', { status: 403 })
+    if (seen.has(p.basket)) throw new Refusal('payments.till.panel-twice', 'Each panel is sent once.', { status: 422 })
+    seen.add(p.basket)
+    return { panel, input: p.input }
+  })
+}
+
+/** What the filled panels add up to, for display. Reads only. */
+export async function tillSummary(actor: Actor, sessionId: string, panels: PanelInput[]) {
+  const out = []
+  for (const { panel, input } of await chosen(actor, panels)) out.push({ basket: panel.id, ...await panel.value.summary({ sessionId, input }) })
+  return { panels: out, amountMinor: out.reduce((s, p) => s + p.amountMinor, 0) }
+}
+
+/** Prepares every filled panel and opens one intent for them in the session, in the caller's unit. */
+export async function prepareSale(unit: UnitView, actor: Actor, sessionId: string, panels: PanelInput[]): Promise<{ intentId: string, amountMinor: number }> {
+  if (!panels.length) throw new Refusal('payments.till.empty', 'There is nothing to take payment for.', { status: 422 })
+  const parts = []
+  for (const { panel, input } of await chosen(actor, panels)) {
+    const prepared = await panel.value.prepare(unit, { sessionId, input })
+    if (prepared.owner.module !== panel.module) throw new Error(`${panel.module}'s panel prepared a part for ${prepared.owner.module}`)
+    parts.push(prepared)
+  }
+  const { intentId } = await createIntent(unit, { parts, channel: 'desk', sessionId, expiresAt: nowMs() + DESK_INTENT_LIFETIME })
+  return { intentId, amountMinor: parts.reduce((s, p) => s + p.amountMinor, 0) }
+}

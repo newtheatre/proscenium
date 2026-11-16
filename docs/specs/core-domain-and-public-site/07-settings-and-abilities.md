@@ -84,6 +84,8 @@ The brand limit is Flytower's figure for a raw logo. The others are judgement.
 | `core.notifications.inbox-retention` | duration | 180d | 30d to 730d | `core.notification.configure` | signed-in | No | How long an inbox message stays |
 | `core.notifications.email-footer` | text | unset | up to 500 characters | `core.template.edit` | staff | No | Text under every email, such as a registered address |
 
+One more notification setting belongs to story C-52: `core.notifications.sending-label` (text, changed by `core.sender.manage`), the label of the sending subdomain that automatic setup creates under the site's hostname. It holds one DNS label, and its default is `mail`, Matt's choice of 16 November 2026. The optional secret `CORE_CLOUDFLARE_TOKEN` that automatic setup needs is listed in the foundations specification's secrets table, not here. Part 4 gives the whole design.
+
 400 days keeps one full year of sends plus a month, so "did last year's renewal reminder go out?" can be answered.
 
 ## Settings: webhooks
