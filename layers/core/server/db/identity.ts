@@ -135,6 +135,7 @@ export const accountTokens = defineTable('core_account_tokens', {
   id: 'tok',
   random: true,
   realm: 'operational',
+  subject: { account: 'account_id', unlinked: 'staff' },
   onErasure: 'delete-row',
   extra: t => [uniqueIndex('core_account_tokens_hash').on(t.tokenHash), index('core_account_tokens_address').on(t.purpose, t.address, t.createdAt), index('core_account_tokens_expiry').on(t.expiresAt)],
 })
@@ -152,6 +153,7 @@ export const passkeyChallenges = defineTable('core_passkey_challenges', {
   id: 'pch',
   random: true,
   realm: 'operational',
+  subject: { account: 'account_id', unlinked: 'staff' },
   onErasure: 'delete-row',
   extra: t => [index('core_passkey_challenges_expiry').on(t.expiresAt)],
 })

@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { createJiti } from 'jiti'
 import { ROOT, KIT, abs, rel } from './paths.ts'
+import { kitAliases } from '../../layers/core/aliases.ts'
 
 export type Owner = 'upstream' | 'site' | 'fixtures'
 export const ROOTS: { dir: string, owner: Owner }[] = [
@@ -16,7 +17,8 @@ export interface HandlerFile { kind: 'listeners' | 'jobs' | 'tasks' | 'facts' | 
 export interface FoundModule { root: string, owner: Owner, manifestFile: string, handlerFiles: HandlerFile[] }
 
 export const jiti = createJiti(import.meta.url, {
-  alias: { '#kit': KIT },
+  // The same aliases as the app, so a handler may import another module's services (#modules/<id>).
+  alias: { ...kitAliases(ROOT), '#kit': KIT },
   moduleCache: true,
   fsCache: false,
   interopDefault: true,

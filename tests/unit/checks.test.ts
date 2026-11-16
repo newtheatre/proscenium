@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { parseRoute } from '../../scripts/checks/routes'
+import { parseRoute, RESERVED_PREFIXES } from '../../scripts/checks/routes'
 
 function route(path: string, source: string) {
   const root = mkdtempSync(join(tmpdir(), 'route-'))
@@ -25,5 +25,11 @@ describe('the route check', () => {
   })
   it('notices a route not written with defineRoute', () => {
     expect(route('lost-property/items.get.ts', 'export default defineEventHandler(() => 1)').usesDefineRoute).toBe(false)
+  })
+})
+
+describe('the reserved address list', () => {
+  it('holds the platform\'s prefixes', () => {
+    expect(RESERVED_PREFIXES).toEqual(expect.arrayContaining(['account', 'console', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing']))
   })
 })

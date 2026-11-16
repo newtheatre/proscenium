@@ -96,3 +96,39 @@ export function checkRoutes(registry: any, modules: Loaded[], options: { fatalOn
   }
   return problems
 }
+
+/**
+ * Address prefixes the platform owns (Module manifest tab, "Reserved address prefixes": the one
+ * list). A theatre's own page may not sit under one, nor under anything starting with an underscore.
+ */
+export const RESERVED_PREFIXES = ['account', 'members', 'console', 'live', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing'] as const
+
+function pageFiles(dir: string, extensions: string[]): string[] {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name)
+    return statSync(full).isDirectory() ? pageFiles(full, extensions) : extensions.some(e => name.endsWith(e)) ? [full] : []
+  })
+}
+
+/** The first segment of a page's address, from its file under a pages folder. */
+function firstSegment(relative: string): string {
+  const first = relative.split('/')[0]!.replace(/\.(vue|md)$/, '').replace(/^\d+\./, '')
+  return first
+}
+
+export function checkPageAddresses(): string[] {
+  const problems: string[] = []
+  const roots = [join(ROOT, 'site/app/pages'), join(ROOT, 'site/content/pages')]
+  const layers = join(ROOT, 'site/layers')
+  if (existsSync(layers)) for (const name of readdirSync(layers)) roots.push(join(layers, name, 'app/pages'))
+  for (const root of roots) {
+    for (const file of pageFiles(root, ['.vue', '.md'])) {
+      const segment = firstSegment(file.slice(root.length + 1))
+      const at = file.slice(ROOT.length + 1)
+      if (segment.startsWith('_')) problems.push(`${at}: addresses starting with an underscore belong to the framework`)
+      else if ((RESERVED_PREFIXES as readonly string[]).includes(segment)) problems.push(`${at}: /${segment} is reserved for the platform; choose another address`)
+    }
+  }
+  return problems
+}

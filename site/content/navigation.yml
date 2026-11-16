@@ -1,0 +1,6 @@
+# The public menu. Each link is a label and where it goes: a page on this site, such as /about
+# (site/content/pages/about.md), or an https address. `bun run check` fails a link to a missing page.
+header:
+  - label: Home
+    to: /
+footer: []

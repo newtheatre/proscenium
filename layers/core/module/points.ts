@@ -7,9 +7,11 @@ const ability = z.union([z.string(), z.array(z.string()).min(1)])
 export const points = {
   'core.navigation': point({
     kind: 'data',
+    // A menu, not a shell: the account menu sits in the public shell. 'signed-in' as the ability
+    // is for account entries every signed-in person sees.
     schema: z.object({
       id: z.string(),
-      shell: z.enum(['account', 'members', 'console', 'live']),
+      menu: z.enum(['account', 'members', 'console', 'live']),
       to: z.string().startsWith('/'),
       icon: z.string(),
       ability,
@@ -17,8 +19,11 @@ export const points = {
       group: z.string().optional(),
       section: z.enum(['everyday', 'setup']).optional(),
       count: z.string().optional(),
+      hideEmpty: z.boolean().optional(),
       match: z.string().optional(),
-    }).strict(),
+    }).strict()
+      .refine(e => e.ability !== 'signed-in' || e.menu === 'account', { message: "only an account entry may give ability 'signed-in'", path: ['ability'] })
+      .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] }),
   }),
   'core.setup-step': point({
     kind: 'data',

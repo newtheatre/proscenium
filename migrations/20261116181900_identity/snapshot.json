@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "cb035d43-572f-43a5-a3be-92343b95d0a6",
+  "id": "52849583-0382-4463-8ab3-fb002c267030",
   "prevIds": [
-    "9c41ea35-d023-4f79-81a7-87bdc0c1c903"
+    "de23e7dd-c45a-4627-81d7-bf72d585d0d1"
   ],
   "ddl": [
     {
@@ -51,6 +51,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_files",
+      "entityType": "tables"
+    },
+    {
       "name": "core_grant_ends",
       "entityType": "tables"
     },
@@ -79,6 +83,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_notification_routing",
+      "entityType": "tables"
+    },
+    {
       "name": "core_passkey_challenges",
       "entityType": "tables"
     },
@@ -96,6 +104,10 @@
     },
     {
       "name": "core_roles",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_sender_identities",
       "entityType": "tables"
     },
     {
@@ -1155,6 +1167,246 @@
       "entityType": "columns"
     },
     {
+      "table": "core_files",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "object_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "owner_type",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "owner_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "slot",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "original_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "text_class",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "title",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "alt_text",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "media_type",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "byte_size",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "sha256",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "width",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "height",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "access",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "rejected_reason",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "uploaded_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "ready_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "attached_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "deleted_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "purge_after",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_grant_ends",
       "name": "grant_id",
       "type": "text",
@@ -1665,6 +1917,26 @@
       "entityType": "columns"
     },
     {
+      "table": "core_notification_routing",
+      "name": "topic_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_notification_routing",
+      "name": "sender_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_passkey_challenges",
       "name": "id",
       "type": "text",
@@ -2031,6 +2303,56 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_sender_identities",
+      "name": "key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_sender_identities",
+      "name": "display_name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_sender_identities",
+      "name": "local_part",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_sender_identities",
+      "name": "reply_to",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_sender_identities",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
       "generated": null,
       "entityType": "columns"
     },
@@ -2549,6 +2871,50 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_files",
+      "name": "core_files_owner",
+      "columns": [
+        {
+          "value": "owner_type",
+          "isExpression": false
+        },
+        {
+          "value": "owner_id",
+          "isExpression": false
+        },
+        {
+          "value": "slot",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_files",
+      "name": "core_files_purge",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "purge_after",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_grant_ends",
       "name": "core_grant_ends_grant",
       "columns": [
@@ -2711,6 +3077,20 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_sender_identities",
+      "name": "core_sender_identities_local_part",
+      "columns": [
+        {
+          "value": "local_part",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_sessions",
       "name": "core_sessions_token",
       "columns": [
@@ -2802,6 +3182,21 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_notification_routing",
+      "name": "fk_core_notification_routing_sender_key_core_sender_identities_key_fk",
+      "columns": [
+        "sender_key"
+      ],
+      "tableTo": "core_sender_identities",
+      "columnsTo": [
+        "key"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -2966,6 +3361,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_files",
+      "name": "core_files_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_grants",
       "name": "core_grants_pk",
       "columns": [
@@ -2988,6 +3392,15 @@
       "name": "core_modules_pk",
       "columns": [
         "module_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_notification_routing",
+      "name": "core_notification_routing_pk",
+      "columns": [
+        "topic_key"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -3029,6 +3442,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_sender_identities",
+      "name": "core_sender_identities_pk",
+      "columns": [
+        "key"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_sessions",
       "name": "core_sessions_pk",
       "columns": [
@@ -3056,6 +3478,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_files",
+      "name": "core_files_object_key_unique",
+      "columns": [
+        "object_key"
+      ],
+      "nameExplicit": false,
+      "entityType": "uniques"
+    },
+    {
       "table": "core_accounts",
       "name": "core_accounts_not_merged_into_itself",
       "value": "merged_into_id IS NULL OR merged_into_id <> id",
@@ -3077,6 +3508,12 @@
       "table": "core_accounts",
       "name": "core_accounts_pronouns_length",
       "value": "pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_files",
+      "name": "core_files_byte_size",
+      "value": "\"byte_size\" > 0",
       "entityType": "checks"
     },
     {

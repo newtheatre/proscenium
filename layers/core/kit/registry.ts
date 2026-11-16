@@ -8,6 +8,12 @@ import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
 import type { ModuleHandlers } from './handlers'
 import { setPersonalFields } from './log'
 
+/**
+ * Module ids the design has reserved (Formats tab). `uses` may name one before it is written; a
+ * `uses` on an absent module contributes nothing.
+ */
+export const RESERVED_MODULE_IDS: readonly string[] = ['public-site', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']
+
 export type Owner = 'upstream' | 'site' | 'fixtures'
 
 export interface ModuleEntry {
@@ -90,13 +96,17 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
   for (const entry of entries) {
     const m = entry.manifest
     const linked = new Set(['core', m.id, ...(m.requires ?? []), ...(m.uses ?? [])])
-    for (const field of ['requires', 'uses'] as const) {
-      for (const other of m[field] ?? []) if (!r.modules.has(other)) fail(entry, field, `"${other}" is not a module in this repository`)
-    }
+    for (const other of m.requires ?? []) if (!r.modules.has(other)) fail(entry, 'requires', `"${other}" is not a module in this repository`)
+    for (const other of m.uses ?? []) if (!r.modules.has(other) && !RESERVED_MODULE_IDS.includes(other)) fail(entry, 'uses', `"${other}" is neither a module in this repository nor an id the design has reserved`)
     for (const other of m.requires ?? []) {
       if (entry.owner === 'upstream' && r.modules.get(other)!.owner === 'site') fail(entry, 'requires', `upstream never depends on a theatre's module (${other})`)
     }
+    const absent = (name: string) => {
+      const owner = name.split('.')[0]!
+      return !!m.uses?.includes(owner) && !r.modules.has(owner)
+    }
     for (const [event, listener] of Object.entries(m.events?.listens ?? {})) {
+      if (absent(event)) continue
       const announced = r.events.get(event)
       if (!announced) fail(entry, `events.listens.${event}`, 'no module announces this event')
       if (!linked.has(announced!.module)) fail(entry, `events.listens.${event}`, `${announced!.module} announces it, so list ${announced!.module} in requires or uses`)
@@ -113,6 +123,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       if (!handler || typeof handler.reconcile !== 'function' || typeof handler.outcome !== 'function') fail(entry, `calls.${name}`, `${entry.root}/server/calls/${short(name)}.ts must export defineCall({ outcome, reconcile })`)
     }
     for (const [name, list] of Object.entries(m.contributes ?? {})) {
+      if (absent(name)) continue
       const declared = r.points.get(name)
       if (!declared) fail(entry, `contributes.${name}`, 'no module declares this point')
       if (!linked.has(declared!.module)) fail(entry, `contributes.${name}`, `${declared!.module} owns this point, so list it in requires or uses`)
@@ -138,9 +149,14 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       }
     }
     for (const [key, { decl }] of [...r.records].filter(([, a]) => a.module === m.id)) {
+      if (decl.parent && !r.records.has(decl.parent)) fail(entry, `records.${key}.parent`, `"${decl.parent}" is not a record type`)
+      if (decl.table === undefined) {
+        if (!Array.isArray(decl.ids) || !decl.ids.length || !decl.ids.every(i => /^[a-z][a-z0-9-]*$/.test(i))) fail(entry, `records.${key}.ids`, 'a record type without a table lists its fixed ids, kebab-case')
+        if (decl.owner) fail(entry, `records.${key}.owner`, 'a record type without a table has no owner column')
+        continue
+      }
       const table = r.tables.get(decl.table)
       if (!table) fail(entry, `records.${key}.table`, `"${decl.table}" is not a declared table`)
-      if (decl.parent && !r.records.has(decl.parent)) fail(entry, `records.${key}.parent`, `"${decl.parent}" is not a record type`)
       if (decl.owner && !Object.values(table!.meta.columns).some(c => c.sql === decl.owner)) fail(entry, `records.${key}.owner`, `"${decl.owner}" is not a column of ${decl.table}`)
     }
     for (const [key, { decl }] of [...r.facts].filter(([, a]) => a.module === m.id)) {

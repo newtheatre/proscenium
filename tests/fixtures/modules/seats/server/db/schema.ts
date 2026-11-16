@@ -8,6 +8,10 @@ export const performances = defineTable('seats_performances', {
   capacity: col.internal(integer('capacity').notNull()),
   sold: col.internal(integer('sold').notNull().default(0)),
   claimedBy: col.internal(text('claimed_by')),
+  // For core.operating-day: the instant a performance starts and the operating day it falls on.
+  startsAt: col.timestamp('starts_at'),
+  operatingDay: col.localDate('operating_day'),
+  completedAt: col.timestamp('completed_at'),
 }, { id: 'sp', realm: 'operational', extra: t => [check('seats_performances_capacity', sql`${t.sold} <= ${t.capacity}`)] })
 
 export const ledger = defineTable('seats_ledger', {

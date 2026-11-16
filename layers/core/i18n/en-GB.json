@@ -51,6 +51,7 @@
   "core.settings.rules.language-known": "That is not a language code we recognise. Use one such as en-GB.",
   "core.abilities.settings.manage.label": "Change the platform's settings",
   "core.abilities.modules.manage.label": "Switch modules on and off",
+  "core.abilities.job.manage.label": "Cancel background work that has not started",
   "core.units.codes": "codes",
   "core.settings.sign-in.email-link.label": "Sign in by emailed link and code",
   "core.settings.sign-in.email-link.help": "Whether people can be sent a link and a code to sign in. Passkeys are always available.",
