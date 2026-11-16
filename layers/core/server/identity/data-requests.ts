@@ -14,6 +14,7 @@ import { accountById } from './accounts'
 import { digest, randomToken } from './crypto'
 import { eraseAccount, erasureHolds } from './erasure'
 import { relyingParty } from './web'
+import { fileUrl } from '../files/service'
 import type { IDENTITY_CHECKS } from '../db/identity'
 
 export type IdentityCheck = typeof IDENTITY_CHECKS[number]
@@ -30,6 +31,7 @@ export interface DataRequestRow {
   respond_by: number
   not_before: number | null
   holds: string | null
+  file_id: string | null
   finished_at: number | null
   closed_at: number | null
   closed_by: string | null
@@ -168,8 +170,23 @@ export async function runErasure(unit: UnitView, requestId: string): Promise<voi
 
 /** What the person sees of their own requests: state, dates and the hold codes, never staff notes. */
 export async function requestsOf(accountId: string) {
-  const rows = await all<DataRequestRow>('SELECT * FROM core_data_requests WHERE account_id = ? ORDER BY requested_at DESC', accountId)
-  return rows.map(r => ({ id: r.id, kind: r.kind, state: r.state, requestedAt: r.requested_at, notBefore: r.not_before, holds: r.holds ? JSON.parse(r.holds) as string[] : [], finishedAt: r.finished_at }))
+  // A finished download carries its link while the file is still kept.
+  const rows = await all<DataRequestRow & { file_ready: number | null, file_expires_at: number | null }>(
+    `SELECT r.*, (f.state = 'ready' AND (f.expires_at IS NULL OR f.expires_at > ?)) AS file_ready, f.expires_at AS file_expires_at
+       FROM core_data_requests r LEFT JOIN core_files f ON f.id = r.file_id
+      WHERE r.account_id = ? ORDER BY r.requested_at DESC`,
+    nowMs(), accountId,
+  )
+  return rows.map(r => ({
+    id: r.id,
+    kind: r.kind,
+    state: r.state,
+    requestedAt: r.requested_at,
+    notBefore: r.not_before,
+    holds: r.holds ? JSON.parse(r.holds) as string[] : [],
+    finishedAt: r.finished_at,
+    ...(r.kind === 'export' && r.file_id && r.file_ready ? { download: { url: fileUrl(r.file_id), until: r.file_expires_at } } : {}),
+  }))
 }
 
 /** Tables that may hold rows about a person with no account linked: the hand-search checklist. */

@@ -24,7 +24,7 @@ export interface ErasureStep {
 const q = (name: string) => `"${name}"`
 
 /** D1 wants exactly as many values as the statement numbers, so each gets the first n it uses. */
-function bound(sql: string, params: unknown[]): { sql: string, params: unknown[] } {
+export function bound(sql: string, params: unknown[]): { sql: string, params: unknown[] } {
   const highest = Math.max(0, ...[...sql.matchAll(/\?(\d)/g)].map(m => Number(m[1])))
   return { sql, params: params.slice(0, highest) }
 }
@@ -37,7 +37,7 @@ function bound(sql: string, params: unknown[]): { sql: string, params: unknown[]
 const SCOPE = `IN (${accountScopeSql('?1')})`
 
 /** The conditions that pick a table's rows about the person, or null if none can be picked. */
-function matchOf(meta: TableMeta, tables: Map<string, TableMeta>, depth = 0): string | null {
+export function matchOf(meta: TableMeta, tables: Map<string, TableMeta>, depth = 0): string | null {
   const subject = meta.options.subject
   if (subject === 'none') return null
   const terms: string[] = []

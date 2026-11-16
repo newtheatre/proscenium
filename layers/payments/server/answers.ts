@@ -11,7 +11,7 @@ import { refundInFull } from './refunds'
 import type { Method, ProviderAnswer } from './points/provider'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
-export interface AttemptRow { id: string, intent_id: string, provider_account_id: string, method: Method, amount_minor: number, state: AttemptState, idempotency_key: string, provider_ref: string | null, reader_id: string | null }
+export interface AttemptRow { id: string, intent_id: string, provider_account_id: string, method: Method, amount_minor: number, state: AttemptState, idempotency_key: string, provider_ref: string | null, reader_id: string | null, started_at: number, refunded_minor: number }
 
 /** Where an answer came from. A person's answer records who; a webhook's, which delivery. */
 export type Source = { kind: 'webhook', webhookEventId: string } | { kind: 'poll' } | { kind: 'person', reconciled?: boolean } | { kind: 'system' }
@@ -217,8 +217,8 @@ export async function recordAnswer(attemptId: string, answer: Answer, source: So
 /** Writes a new attempt in `started`. A retry is a new attempt with a new key. */
 export function addAttempt(unit: UnitView, input: { intentId: string, providerAccountId: string, method: Method, amountMinor: number, readerId?: string | null, tenderedMinor?: number | null, idempotencyKey?: string }): AttemptRow {
   const id = newId('att')
-  const row: AttemptRow = { id, intent_id: input.intentId, provider_account_id: input.providerAccountId, method: input.method, amount_minor: input.amountMinor, state: 'started', idempotency_key: input.idempotencyKey ?? `payments:attempt:${id}`, provider_ref: null, reader_id: input.readerId ?? null }
   const at = nowMs()
+  const row: AttemptRow = { id, intent_id: input.intentId, provider_account_id: input.providerAccountId, method: input.method, amount_minor: input.amountMinor, state: 'started', idempotency_key: input.idempotencyKey ?? `payments:attempt:${id}`, provider_ref: null, reader_id: input.readerId ?? null, started_at: at, refunded_minor: 0 }
   unit.add({
     sql: "INSERT INTO payments_attempts (id, intent_id, provider_account_id, method, amount_minor, state, idempotency_key, reader_id, tendered_minor, started_at, updated_at) VALUES (?, ?, ?, ?, ?, 'started', ?, ?, ?, ?, ?)",
     params: [id, input.intentId, input.providerAccountId, input.method, input.amountMinor, row.idempotency_key, row.reader_id, input.tenderedMinor ?? null, at, at],

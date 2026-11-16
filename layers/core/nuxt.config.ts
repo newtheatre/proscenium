@@ -22,6 +22,12 @@ export default defineNuxtConfig({
   colorMode: { storage: 'cookie', storageKey: MODE_KEY, cookieAttrs: { path: '/', maxAge: MODE_COOKIE_AGE, sameSite: 'lax' } },
   runtimeConfig: { public: { turnstile: { siteKey: '' } } },
   alias: kitAliases(root),
+  // Screens that moved to Site administration (R-33): old bookmarks still arrive.
+  routeRules: {
+    '/console/system/email': { redirect: { to: '/admin/email', statusCode: 301 } },
+    '/console/system/vocabularies': { redirect: { to: '/admin/vocabularies', statusCode: 301 } },
+    '/console/system/vocabularies/**': { redirect: { to: '/admin/vocabularies/**', statusCode: 301 } },
+  },
   experimental: {
     // A link's page is fetched when a person points at or focuses it, not when the link scrolls
     // into view: a menu is a column of links, and most are never followed.
