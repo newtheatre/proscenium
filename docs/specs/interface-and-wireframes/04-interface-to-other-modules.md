@@ -57,7 +57,7 @@ contributes: {
 
 - The public shell's own header and footer links are the theatre's, declared in its site folder, not contributed by modules. The public shell takes exactly two things from modules: account sections and public components.
 - The route guard resolves an address to the longest matching entry and checks its ability. A page under a shell prefix that no entry covers fails the build, so no screen is reachable only by typing its address.
-- A console group is declared once by the module that owns it (`core.navigation-group`: id, `menu` (`console`, the default, or `admin`), order, icon). The platform's own groups use the fixed orders in the Shells sub-tab; a theatre's module places itself with `before` or `after`. Site administration's groups are `theatre`, `modules`, `access`, `email`, `connections` and `upkeep`, all declared by core; an entry with `menu: 'admin'` names one of them, and Overview alone has no group.
+- A sidebar group is declared once by the module that owns it (`core.navigation-group`: id, `menu` (`console`, the default, or `admin`), order, icon). The platform's own groups use the fixed orders in the Shells sub-tab; a theatre's module places itself with `before` or `after`. Site administration's groups are `theatre`, `modules`, `access`, `email`, `connections` and `upkeep`, all declared by core; an entry with `menu: 'admin'` names one of them, and Overview alone has no group.
 
 ### `core.home-card`
 

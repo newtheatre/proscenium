@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Productions (C-01): every production, with its state and season. "New production" starts a draft
 // and opens it. Dates, and so the next performance, arrive with performances.
-definePageMeta({ layout: 'console' })
 
 interface Row { id: string, title: string, kind: string, state: 'draft' | 'published' | 'withdrawn' | 'cancelled', seasonId: string | null, companyName: string | null }
 
-const { data: seasons } = await useFetch<{ rows: { id: string, name: string }[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
+const { $api } = useNuxtApp()
+const { data: seasons } = await useAPI<{ rows: { id: string, name: string }[] }>('/api/core/seasons', { key: 'core:seasons:picker', query: { size: 100 } })
 const columns = [
   { key: 'title', label: 'Production', sortable: true, card: true },
   { key: 'season', label: 'Season', card: true },
@@ -26,7 +26,7 @@ const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 async function create() {
   refusal.value = null
   try {
-    const { id } = await $fetch<{ id: string }>('/api/core/productions', { method: 'POST', body: { title: form.title, kind: form.kind } })
+    const { id } = await $api<{ id: string }>('/api/core/productions', { method: 'POST', body: { title: form.title, kind: form.kind } })
     creating.value = false
     await navigateTo(`/console/programme/productions/${id}`)
   }
@@ -37,40 +37,38 @@ async function create() {
 </script>
 
 <template>
-  <div>
-    <PageList
-      title="Productions"
-      route="/api/core/productions"
-      :columns="columns"
-      :filters="filters"
-      :row-label="(row: Row) => row.title"
-      :row-to="(row: Row) => `/console/programme/productions/${row.id}`"
-      :empty="{ title: 'No productions yet', description: 'A production is anything the theatre puts in front of people: its own show, a visiting company, a hire or an event.', icon: 'i-lucide-drama' }"
-    >
-      <template #primary>
-        <UButton
-          label="New production"
-          icon="i-lucide-plus"
-          @click="creating = true"
-        />
-      </template>
-      <template #cell-title="{ row }">
-        <span>{{ row.title }}</span>
-        <span
-          v-if="row.companyName"
-          class="text-sm text-muted"
-        > · {{ row.companyName }}</span>
-      </template>
-      <template #cell-season="{ row }">
-        {{ seasonName(row.seasonId) }}
-      </template>
-      <template #cell-state="{ row }">
-        <StatusBadge
-          :tone="TONES[row.state as Row['state']]"
-          :label="row.state.charAt(0).toUpperCase() + row.state.slice(1)"
-        />
-      </template>
-    </PageList>
+  <PageList
+    title="Productions"
+    route="/api/core/productions"
+    :columns="columns"
+    :filters="filters"
+    :row-label="(row: Row) => row.title"
+    :row-to="(row: Row) => `/console/programme/productions/${row.id}`"
+    :empty="{ title: 'No productions yet', description: 'A production is anything the theatre puts in front of people: its own show, a visiting company, a hire or an event.', icon: 'i-lucide-drama' }"
+  >
+    <template #primary>
+      <UButton
+        label="New production"
+        icon="i-lucide-plus"
+        @click="creating = true"
+      />
+    </template>
+    <template #cell-title="{ row }">
+      <span>{{ row.title }}</span>
+      <span
+        v-if="row.companyName"
+        class="text-sm text-muted"
+      > · {{ row.companyName }}</span>
+    </template>
+    <template #cell-season="{ row }">
+      {{ seasonName(row.seasonId) }}
+    </template>
+    <template #cell-state="{ row }">
+      <StatusBadge
+        :tone="TONES[row.state as Row['state']]"
+        :label="row.state.charAt(0).toUpperCase() + row.state.slice(1)"
+      />
+    </template>
 
     <UModal
       v-model:open="creating"
@@ -111,5 +109,5 @@ async function create() {
         />
       </template>
     </UModal>
-  </div>
+  </PageList>
 </template>

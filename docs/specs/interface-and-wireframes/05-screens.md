@@ -1,10 +1,10 @@
 # 5. Screens
 
-The interface layer itself owns 31 screens: the frames, the homes, and the screens no single module can own. Every other screen belongs to a module and is listed in that module's specification, built from the page types defined here.
+The interface layer itself owns 33 screens: the frames, the homes, and the screens no single module can own. Every other screen belongs to a module and is listed in that module's specification, built from the page types defined here.
 
 | Sub-tab | Holds |
 | --- | --- |
-| Shells and navigation | The three shells, live mode, the account menu, addresses, how navigation is assembled |
+| Shells and navigation | The four shells (public, members' area, console, site administration), live mode, the account menu, addresses, how navigation is assembled |
 | Page conventions | The seven page types and the rules every screen follows |
 | Key journeys | Ten journeys step by step, with what the person sees when each goes wrong |
 | Wireframes | Drawn layouts of the shells and the important screens |
@@ -41,16 +41,23 @@ The interface layer itself owns 31 screens: the frames, the homes, and the scree
 | --- | --- | --- | --- | --- |
 | Console layout | Sidebar, page header, command palette, help panel | Anyone with a console ability | Frame | Yes |
 | Console home | Work awaiting this person, then today | Anyone with a console ability | Home | Yes |
-| Command palette | Go to, find, do | Anyone with a console ability | Overlay | Yes |
-| Help panel | This screen's documentation beside the screen | Anyone with a console ability | Overlay | Yes |
-| Settings search | Find any setting | Anyone who may read settings | List | Yes |
-| Module settings page | Generated from the registry | Per setting's ability | Settings | Yes |
-| Modules | Switch on and off, with dependencies and setup state | Site owner | List | Yes |
+| Command palette | Go to, find, do; shared with site administration | Anyone with a console or site administration ability | Overlay | Yes |
+| Help panel | This screen's documentation beside the screen | Anyone with a console or site administration ability | Overlay | Yes |
+| Module settings page | Generated from the registry, at `/console/<module>/settings` | Per setting's ability | Settings | Yes |
 | Module setup | A module's guided setup | Site owner or the module's manager | Steps | Yes |
-| Navigation settings | Reorder and rename members' sections, hide destinations | Site owner | Form | Later |
-| Appearance preview | The three shells in the theatre's branding, light and dark (branding itself is workstream 3) | Site owner | Record | Yes |
 | Saved views manager | Rename, share and delete saved views | Anyone with a saved view | List | Later |
-| Activity (foundations' Audit screen) | The audit trail as a filterable list | Per audit ability | List | Yes |
+
+### Site administration
+
+| Screen | Purpose | Who sees it | Type | First |
+| --- | --- | --- | --- | --- |
+| Site administration layout | The console's frame with the named strip, "Back to console" and its own sidebar | Anyone holding the ability of a site administration entry | Frame | Yes |
+| Overview | What needs attention, then the state of the installation, at `/admin` | Anyone holding the ability of a site administration entry | Home | Yes |
+| Settings (foundations' screen, drawn here) | Site-wide settings by module, and search across every setting, at `/admin/settings` | Anyone who may read settings | List and Settings | Yes |
+| Modules (foundations' screen, drawn here) | Switch on and off, with dependencies and setup state, at `/admin/modules` | Site owner | List | Yes |
+| Navigation | Reorder and rename members' sections, hide destinations, at `/admin/navigation` | Holder of `core.navigation.arrange` | Form | Later |
+| Appearance preview | The public site, members' area and console in the theatre's branding, light and dark, on core's Branding screen | Site owner | Record | Yes |
+| Activity (foundations' Audit log) | The audit trail as a filterable list, at `/admin/audit` | Per audit ability | List | Yes |
 
 ### Live mode
 

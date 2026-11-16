@@ -13,7 +13,7 @@ export interface Viewer {
 const ANONYMOUS: Viewer = { signedIn: false, sides: ['audience'], navigation: [] }
 
 export function useViewer() {
-  const fetched = useFetch<Viewer>('/api/core/viewer', { key: 'core:viewer', default: () => ANONYMOUS })
+  const fetched = useAPI<Viewer>('/api/core/viewer', { key: 'core:viewer', default: () => ANONYMOUS })
   const viewer = computed(() => fetched.data.value ?? ANONYMOUS)
   return {
     viewer,

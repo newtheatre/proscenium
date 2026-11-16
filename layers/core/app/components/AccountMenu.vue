@@ -5,7 +5,7 @@
      page. A signed-out visitor sees Sign in. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { CHOSEN_KEY } from '../../shared/appearance'
+import { CHOSEN_KEY, MODE_COOKIE_AGE } from '../../shared/appearance'
 import { shellOf } from '../../shared/navigation'
 
 const { t } = useT()
@@ -13,6 +13,8 @@ const route = useRoute()
 const { viewer, has } = useViewer()
 const { signOut } = useSignOut()
 const colorMode = useColorMode()
+// Marks the mode as the person's own choice, where the server can read it (server/middleware/appearance.ts).
+const chosen = useCookie<string | null>(CHOSEN_KEY, { path: '/', maxAge: MODE_COOKIE_AGE, sameSite: 'lax' })
 const { data: publicSettings } = await usePublicSettings()
 const mayChoose = computed(() => publicSettings.value['core.appearance.let-people-choose']?.value !== false)
 
@@ -35,8 +37,7 @@ const items = computed<DropdownMenuItem[][]>(() => {
     checked: colorMode.preference === mode,
     onUpdateChecked: () => {
       colorMode.preference = mode
-      try { localStorage.setItem(CHOSEN_KEY, '1') }
-      catch { /* no storage: the choice lasts until the page is left */ }
+      chosen.value = '1'
     },
   }))
   return [

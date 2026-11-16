@@ -69,7 +69,7 @@ Time zone, currency, language and the operating day's rollover hour are foundati
 | `core.saved-view.share` | Share a saved view with everyone who may open the list, and edit or remove shared views | Site or module | Each module's manager role, as the theatre maps it |
 | `core.practice.use` | Open live screens in practice mode | Site | Every member |
 
-Two abilities the interface uses are foundations' and are not declared here. `core.setting.change` guards the Settings page. `core.audit.view` guards the Activity list and a record's full history: the Activity list is foundations' Audit screen drawn with the List page, one screen and not two.
+Two abilities the interface uses are foundations' and are not declared here. `core.setting.change` guards the settings pages, a module's in the console and the site-wide ones in site administration. `core.audit.view` guards the Activity list and a record's full history: the Activity list is foundations' Audit screen drawn with the List page, one screen and not two.
 
 Export is not one ability. Each module declares `<module>.<record>.export`, and the list page shows Export only to a holder, so a training officer cannot export orders by holding a general export right.
 
