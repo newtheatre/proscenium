@@ -129,13 +129,14 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
       need(`${id}.quick-actions.${name}.label`, 'the quick action\'s label')
       if (action.keywords) need(action.keywords, 'the quick action\'s search words')
     }
+    for (const tab of contributed('core.record-tab')) need(`${id}.record-tabs.${String(tab.id).slice(id.length + 1)}.label`, 'the record tab\'s label')
     for (const source of contributed('core.search-source')) need(`${id}.records.${String(source.record).slice(id.length + 1)}`, 'the name of the kind of record the search finds')
     const hasSettings = [...(registry.settings as Map<string, any>).values()].some(s => s.module === id)
     if (hasSettings && id !== 'core' && !contributed('core.navigation-group').length && !contributed('core.navigation').some((e: any) => e.group)) need(groupLabelKey(id, id), 'the label of the console group its settings page sits in')
     const sections = new Set<string>()
     for (const [key, { module }] of registry.settings as Map<string, any>) if (module === id) sections.add(key.slice(id.length + 1).split('.')[0]!)
     for (const section of sections) need(`${id}.settings-sections.${section}`, 'the heading of a group of settings on the generated settings page')
-    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.quick-actions.`, `${id}.records.`]
+    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.quick-actions.`, `${id}.records.`, `${id}.record-tabs.`]
     for (const key of keys) if (derived.some(p => key.startsWith(p))) problems.push(`${rel(file)}: "${key}" is not used by any declaration`)
   }
   return problems
@@ -213,8 +214,13 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
     }
   }
   const withSettings = new Set<string>()
-  for (const { module } of registry.settings.values() as Iterable<{ module: string }>) withSettings.add(module)
+  let siteSettings = false
+  for (const { module, entry } of registry.settings.values() as Iterable<{ module: string, entry: { scope?: string } }>) {
+    if (entry.scope === 'site') siteSettings = true
+    else withSettings.add(module)
+  }
   for (const module of withSettings) entries.push({ to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings` })
+  if (siteSettings) entries.push({ to: '/admin/settings' })
   const homes = new Set(Object.values(SHELL_PREFIXES))
   for (const m of modules) {
     const pagesDir = join(ROOT, m.found.root, 'app/pages')
@@ -228,6 +234,78 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
       // The core settings page answers /console/<module>/settings for every module with settings.
       if (route === '/console/[module]/settings') continue
       if (!resolveEntry(entries, prefix)) problems.push(`${rel(file)}: the page ${route} has no navigation entry; contribute one to core.navigation whose \`to\` or \`match\` covers it`)
+    }
+  }
+  return problems
+}
+
+/** Identity's own code may compare an account column to an id: its tables are keyed by the account itself. */
+const EXACT_ACCOUNT_HOME = 'layers/core/server/identity/'
+
+/**
+ * A read by account goes through the account scope (Foundations, Data-class registry, "The account
+ * scope"): a merge leaves most account columns holding the id they were written with, so comparing
+ * one to an id misses the person's other rows. Refuses eq, ne, inArray and raw SQL that compare a
+ * col.account column to a value, and exactAccount without a reason, outside identity's own code.
+ */
+export function checkAccountComparisons(modules: Loaded[], registry: any): string[] {
+  // Which tables hold each column name as an account column, and which hold it as something else
+  // (finance_entries.account_id is a ledger account), so a name is judged by the tables on its line.
+  const accountIn = new Map<string, Set<string>>()
+  const otherIn = new Map<string, Set<string>>()
+  const keyIs = new Map<string, { account: boolean, other: boolean }>()
+  const add = (map: Map<string, Set<string>>, name: string, table: string) => map.set(name, (map.get(name) ?? new Set()).add(table))
+  for (const [table, { meta }] of registry.tables as Map<string, any>) {
+    for (const [key, c] of Object.entries(meta.columns as Record<string, any>)) {
+      add(c.meta.account ? accountIn : otherIn, c.sql, table)
+      const k = keyIs.get(key) ?? { account: false, other: false }
+      k[c.meta.account ? 'account' : 'other'] = true
+      keyIs.set(key, k)
+    }
+  }
+  if (!accountIn.size) return []
+  const alt = (names: Iterable<string>) => [...names].sort((a, b) => b.length - a.length).join('|')
+  const column = `(?<![\\w])(?:\\w+\\.)?"?(${alt(accountIn.keys())})"?`
+  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope|inAccountScope)\\())'
+  const raw = [
+    new RegExp(`${column}\\s*(?:==?|!=|<>)\\s*${value}`, 'gi'),
+    new RegExp(`${column}\\s+IS\\s+(?:NOT\\s+)?${value}`, 'gi'),
+    new RegExp(`${column}\\s+(?:NOT\\s+)?IN\\s*(?:\\(\\s*)?(?:${value}|SELECT\\s+value\\s+FROM\\s+json_each)`, 'gi'),
+  ]
+  const accountKeys = [...keyIs].filter(([, k]) => k.account && !k.other).map(([key]) => key)
+  const drizzle = accountKeys.length ? new RegExp(`\\b(?:eq|ne|inArray|notInArray)\\(\\s*[\\w.]+\\.(?:${alt(accountKeys)})\\b`) : undefined
+  const tableNames = new RegExp(`\\b(${alt((registry.tables as Map<string, any>).keys())})\\b`, 'g')
+  // A name compared on a line is an account column if a table named near it (the statement's
+  // lines) holds it as one, or, with no table in sight, if no table holds that name as anything else.
+  const isAccount = (name: string, near: string) => {
+    const named = [...near.matchAll(tableNames)].map(m => m[1]!)
+    if (named.length) return named.some(t => accountIn.get(name)?.has(t))
+    return !otherIn.has(name)
+  }
+  const problems: string[] = []
+  for (const m of modules) {
+    if (m.found.root.startsWith('tests/')) continue // fixtures show the kit, not a module's reads
+    for (const file of walk(join(ROOT, m.found.root, 'server'), ['.ts'])) {
+      const at = rel(file)
+      if (at.includes('/server/db/') || at.startsWith(EXACT_ACCOUNT_HOME)) continue
+      const all = lines(file)
+      all.forEach((line, i) => {
+        if (/^\s*(\/\/|\/?\*)/.test(line)) return
+        if (line.includes('exact-account:')) return
+        const near = all.slice(Math.max(0, i - 6), i + 3).join('\n') // not-policy: the lines a statement usually spans
+        if (/(?<!function\s+)\bexactAccount\(/.test(line)) {
+          problems.push(`${at}:${i + 1}: exactAccount outside identity needs a reason; end the line with // exact-account: why`)
+          return
+        }
+        // A name after SET and before WHERE is being assigned, not compared.
+        const assigned = (index: number) => {
+          const before = line.slice(0, index).toUpperCase()
+          return before.search(/\bSET\b(?![\s\S]*\bSET\b)/) > before.search(/\bWHERE\b(?![\s\S]*\bWHERE\b)/)
+        }
+        const compared = raw.flatMap(r => [...line.matchAll(r)].filter(match => !assigned(match.index!)).map(match => match[1]!.toLowerCase()))
+        if (drizzle?.test(line) || compared.some(name => isAccount(name, near)))
+          problems.push(`${at}:${i + 1}: compares an account column to an id; use inAccountScope(column, account) so rows of merged accounts are found, or exactAccount with // exact-account: why`)
+      })
     }
   }
   return problems

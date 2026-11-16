@@ -152,6 +152,20 @@ describe('notify', () => {
     expect(await counted()).toBe(50)
   })
 
+  it('does not send again to a person whose other account already had it, once the accounts are merged (R-34)', async () => {
+    const survivor = await account()
+    const merged = await account()
+    const first = await send('notify.receipt', { to: merged, variables: { order: 'M1' }, dedupeKey: 'order-m1' })
+    await env.DB.prepare('UPDATE core_accounts SET merged_into_id = ? WHERE id = ?').bind(survivor, merged).run()
+    sent.length = 0
+    const again = await send('notify.receipt', { to: survivor, variables: { order: 'M1' }, dedupeKey: 'order-m1' })
+    expect(again.ids).toEqual(first.ids)
+    expect(again.statements).toBe(0)
+    expect(sent).toHaveLength(0)
+    // A different key still sends.
+    expect((await send('notify.receipt', { to: survivor, variables: { order: 'M2' }, dedupeKey: 'order-m2' })).statements).toBeGreaterThan(0)
+  })
+
   it('leaves nothing behind when the caller\'s unit fails', async () => {
     const to = await account()
     const outcome = await inContext(async () => {
@@ -183,10 +197,30 @@ describe('notify', () => {
     const bounced = await account('bounced@example.org')
     await env.DB.prepare('INSERT INTO core_email_suppressions (address_hash, reason, created_at) VALUES (?, \'hard_bounce\', ?)').bind(await inContext(() => addressHash('Bounced@Example.org')), Date.now()).run()
     const { ids } = await send('notify.receipt', { to: [nobody, bounced], variables: { order: 'D1' } })
-    const states = await deliveriesOf(ids)
-    expect(states.filter(d => d.channel === 'email').map(d => [d.notification_id, d.state, d.reason])).toEqual(expect.arrayContaining([[ids[0], 'skipped', 'no_address'], [ids[1], 'skipped', 'suppressed_address']]))
+    let states = await deliveriesOf(ids)
+    // No address is decided at send time, which reads it again; a suppressed one is skipped at once.
+    expect(states.filter(d => d.channel === 'email').map(d => [d.notification_id, d.state, d.reason])).toEqual(expect.arrayContaining([[ids[0], 'queued', null], [ids[1], 'skipped', 'suppressed_address']]))
     expect(states.filter(d => d.channel === 'inbox').every(d => d.state === 'sent')).toBe(true)
-    expect(sent).toHaveLength(0)
+    await deliver()
+    states = await deliveriesOf(ids)
+    expect(states.find(d => d.notification_id === ids[0] && d.channel === 'email')).toMatchObject({ state: 'skipped', reason: 'no_address' })
+    expect(mails).toHaveLength(0)
+  })
+
+  it('emails an account made in the same unit, whose address is not committed when notify runs', async () => {
+    const id = newId('acc')
+    const emailId = newId('aem')
+    const { ids } = await inContext(async () => {
+      const unit = createUnit()
+      unit.add({ sql: 'INSERT INTO core_accounts (id, name, origin, created_at, audience_email_id) VALUES (?, \'Pat\', \'guest\', ?, ?)', params: [id, Date.now(), emailId] })
+      unit.add({ sql: 'INSERT INTO core_account_emails (id, account_id, address, verified_at, added_by, created_at) VALUES (?, ?, \'new@example.org\', NULL, \'checkout\', ?)', params: [emailId, id, Date.now()] })
+      const made = await notify(unit.view(), 'notify.receipt', { to: id, variables: { order: 'N1' } })
+      await unit.commit()
+      return { ids: made }
+    })
+    await deliver()
+    expect((await deliveriesOf(ids)).find(d => d.channel === 'email')).toMatchObject({ state: 'sent' })
+    expect(mails.map(m => m.to)).toEqual(['new@example.org'])
   })
 
   it('honours a person\'s choice for an optional topic, on each channel', async () => {

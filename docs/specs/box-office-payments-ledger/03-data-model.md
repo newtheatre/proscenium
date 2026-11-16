@@ -26,7 +26,15 @@ Three modules, 38 tables: 22 for Box office, 9 for Payments and 7 for Finance. N
 
 ## Each table in the Foundations format
 
-**Words.** Where a column table below says "blank", read `clear` for a personal column and `redact` for personal free text. Where it says "keep reference", the column is `col.account(name, { role: 'actor', onMerge: 'alias' })` in an append-only table and `onMerge: 'move'` elsewhere; the subject columns named in the table below use `role: 'subject'`. Money columns are `col.minor` and `col.currency`. Encrypted columns are `col.special`.
+**Words.** Where a column table below says "blank", read `clear` for a personal column and `redact` for personal free text. Where it says "keep reference", the column is `col.account(name, { role: 'actor' })`; the subject columns named in the table below use `role: 'subject'`. Money columns are `col.minor` and `col.currency`. Encrypted columns are `col.special`.
+
+**Account merge** (integration ruling R-34). Every account column in these three modules is `onMerge: 'alias'`, the default: the row keeps the id it was written with, which resolves to the surviving account. That covers every actor column and the subject columns `box_office_orders.account_id`, `box_office_passes.account_id`, `box_office_comp_requests.for_account_id` and `box_office_tickets.requirement_account_id`. One column is `move`: `payments_sessions.opened_by`, because the unique index that allows one open till session per person compares stored ids and would otherwise let a merged person hold two.
+
+Since a person may now be several stored ids, everything that reads, counts or limits by account uses the kit's account scope (the survivor and its aliases), as Foundations names it (Data-class registry, "The account scope"). A statement uses `inAccountScope(column, accountId)` as its condition, or `accountScope(accountId)` as a subquery, so the scope is resolved inside the statement and never bound as a list. `accountScopeIds` is for display and tests only. No statement in these modules compares an account column to an id directly; the conformance check refuses it, and `exactAccount` is used once, with its reason, for the open-session index above. The scope is used for:
+
+- "My tickets", `ticketsFor(accountId)`, the audience sources and the erasure hold.
+- `max_per_holder` on its account key, the reservation limit per person, and any promo code limit per person, each as the condition on its claim statement.
+- The rules that nobody approves their own refund or complimentary request, and nobody overrides for their own ticket. The service compares resolved accounts; the CHECKs compare stored ids and stay as backstops.
 
 | Table | Realm | Subject | Append-only | Retention and row erasure |
 | --- | --- | --- | --- | --- |
@@ -131,7 +139,7 @@ Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so repo
 | `kind` | text | `standard`, `concession`, `companion`, `complimentary`; fixed, because each changes behaviour | Public | keep |
 | `requirement_refs` | text | null, or a list of plain-text requirement references such as `membership:<scheme id>` or `fact:<name>`, checked through the kit's `requirements.check` (part 4). Box office never reads inside one and holds no foreign key | Internal | keep |
 | `recheck_at_entry` | integer | boolean, default true; only meaningful with `requirement_refs` | Internal | keep |
-| `max_per_holder` | integer | default 1; live tickets of this type per performance for one holder, counted by evidence id when the answer carries one and by account otherwise; only meaningful with `requirement_refs` | Internal | keep |
+| `max_per_holder` | integer | default 1; live tickets of this type per performance for one holder, counted on both keys: by account, on the kit's account scope, whenever the ticket keeps one, and by evidence id whenever it keeps one, so a claim is refused when either matches; only meaningful with `requirement_refs` | Internal | keep |
 | `proof_note` | text | shown to the buyer and the door, such as "Bring student ID" | Public | keep |
 | `needs_paid_ticket` | integer | boolean; a companion ticket needs a paid ticket in the same order | Internal | keep |
 | `active` | integer | boolean | Internal | keep |
@@ -558,6 +566,8 @@ Everything that was heard about an attempt, in the order it was heard.
 
 ### `payments_refunds` (guarded)
 
+**Staff actors and account merge.** `requested_by` and `approved_by` here, `answered_by` on attempts and `closed_by` on sessions record who did something, so on an account merge they are declared `alias`: the row keeps the id it was written with, which resolves to the surviving account. `payments_sessions.opened_by` is the session's subject and is declared `move`. Because two different stored ids can now be one person, the rule that nobody approves their own refund is applied by the service on resolved accounts: it resolves `requested_by` to its surviving account before comparing it with the approver. The CHECK compares stored ids and stays as the backstop.
+
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
 | `attempt_id` | text | the payment being refunded; a refund always goes back the way the money came | Internal | keep |
@@ -612,7 +622,7 @@ Finance ships no accounts of its own. Each module declares the accounts it posts
 | Box office | `box-office.ticket-income`, `box-office.deferred-ticket-income`, `box-office.booking-fee-income`, `box-office.donation-income`, `box-office.pass-liability` |
 | Payments | `payments.cash` (cash in tills), `payments.card-clearing` (one per provider account, by `scope`), `payments.bank`, `payments.provider-fees`, `payments.cash-variance`, `payments.unfulfilled` |
 
-A trigger refuses an entry whose posting's `source_module` is not the account's `module`, except that Payments may write the entries an owner returned for its own part (part 4).
+A trigger refuses an entry whose posting's `source_module` is not the account's `module`, except that Payments may write the entries an owner returned for its own part (part 4). To let the trigger judge that, finance\_entries has one more column than the table of columns shows: for\_module (text, null, Internal, keep), which Payments sets to the part's owner. The trigger requires the account's module to equal for\_module when it is set and the posting's source\_module otherwise, and for\_module may differ from source\_module only when source\_module is payments. A declared account's code starts as its system key, such as box-office.ticket-income, until the treasurer recodes it.
 
 ### `finance_postings` (append-only)
 

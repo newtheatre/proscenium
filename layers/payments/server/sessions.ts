@@ -37,7 +37,7 @@ export async function openSession(unit: UnitView, input: { accountId: string, po
   const currency = await useSetting('core.locale.currency') as string
   // The partial unique index on opened_by refuses a race the read did not see. It compares stored ids,
   // which is why opened_by moves on a merge.
-  const own = exactAccount('opened_by', input.accountId)
+  const own = exactAccount('opened_by', input.accountId) // exact-account: the one-open-session index compares stored ids
   unit.add({
     sql: `INSERT INTO payments_sessions (id, point_label, opened_by, opened_at, state, float_minor, currency, created_at, updated_at)
       SELECT ?, ?, ?, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM payments_sessions WHERE state <> 'closed' AND ${own.sql})`,

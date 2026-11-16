@@ -45,10 +45,13 @@ async function settle(id: string, change: { state: 'sent' | 'retrying' | 'failed
   })
   if (change.state !== 'retrying') {
     // The email is finished: its sealed variables go in the same unit (part 4, "A variable that
-    // carries a secret"), and the payload once no other delivery of the notification needs it.
+    // carries a secret"), and the payload once no other delivery of the notification needs it. A
+    // send to a bare address (notifyAddress) loses the address then too, so an erased person's old
+    // address, or one only used to sign in, is not kept in the log.
     unit.add({
       sql: `UPDATE core_notifications SET sealed_variables = NULL,
-        payload = CASE WHEN EXISTS (SELECT 1 FROM core_notification_deliveries WHERE notification_id = core_notifications.id AND state IN ('queued', 'held', 'sending', 'retrying')) THEN payload ELSE NULL END
+        payload = CASE WHEN EXISTS (SELECT 1 FROM core_notification_deliveries WHERE notification_id = core_notifications.id AND state IN ('queued', 'held', 'sending', 'retrying')) THEN payload ELSE NULL END,
+        address = CASE WHEN account_id IS NULL AND NOT EXISTS (SELECT 1 FROM core_notification_deliveries WHERE notification_id = core_notifications.id AND state IN ('queued', 'held', 'sending', 'retrying')) THEN NULL ELSE address END
         WHERE id = (SELECT notification_id FROM core_notification_deliveries WHERE id = ?)`,
       params: [id],
     })

@@ -6,6 +6,41 @@ The inventory lists every screen this workstream adds, the shell it sits in, and
 
 "Who sees it" names an ability. A person without it does not see the screen or its link.
 
+## Which shell each screen sits in
+
+On 16 November 2026 Matt added a fourth shell, Site administration at `/admin`, for screens about the installation itself, and the console's System group went (integration ruling R-33). The console keeps the theatre's day-to-day work. The tables further down group screens by subject; this table says which shell each is in. The interface specification owns the shell, its menu and the exact addresses, and it confirmed this split and these addresses the same day.
+
+| Screen | Shell | Address |
+| --- | --- | --- |
+| Productions, Production, Add dates, Calendar, Seasons, Change confirmation | Console | unchanged |
+| Venues, Venue, Closures | Console | unchanged |
+| Files | Console | unchanged |
+| Message types, Template editor | Console | unchanged |
+| Delivery log | Console | unchanged |
+| Branding | Site administration | `/admin/branding` |
+| Organisation | Site administration | `/admin/organisation` |
+| Vocabularies | Site administration | `/admin/vocabularies` |
+| Senders, with the sending-domain setup and the email outcomes step | Site administration | `/admin/email` |
+| Delivery health, with the suppression list | Site administration | `/admin/email/health` |
+| Webhooks, Webhook editor, Webhook delivery log | Site administration | `/admin/webhooks` |
+| Site readiness | Site administration | `/admin/site-readiness` |
+
+Each Site administration entry declares `menu: 'admin'` and one of the interface specification's groups:
+
+| Group | Core's entries, in order |
+| --- | --- |
+| `theatre` (Theatre) | Organisation, Branding, Vocabularies, then the interface's Navigation, then Site readiness |
+| `email` (Email) | Senders, Delivery health |
+| `connections` (Connections) | After the foundations' Credentials: Webhooks |
+
+Core declares all six groups of the shell (`theatre`, `email`, `connections`, `modules`, `access`, `upkeep`), because `core.navigation-group` now carries a `menu` field, `console` by default or `admin`. Core also declares the console's Communications group, so that Message types, Template editor and Delivery log have a home while the Communications module is off.
+
+Core contributes cards to the Site administration Overview through `core.home-card` with `menu: 'admin'`, one for each thing on its screens that needs someone: the sending domain is not verified, the email outcomes step is not done, a webhook is paused, Site readiness has items outstanding. Each shows only to a holder of the screen's ability and links to the screen. They repeat what the health checks already report and add no new check.
+
+Why the line falls there. A screen is in Site administration when it changes how the installation is set up and is touched rarely: who the theatre is, how it looks, where its mail comes from, what its lists contain, where its events are sent. A screen stays in the console when someone uses it in the course of running shows. That is why the wording of messages and the delivery log stay in the console, beside the people who answer "did my email arrive", while the sender and its health move.
+
+Moving a screen changes no ability. A person sees Site administration when they hold at least one ability with a screen in it, and sees only those screens. The setup steps "Your look", "Your year", "Your sender" and "Email outcomes" link to their screens at the new addresses.
+
 ## Public shell
 
 | Screen | Address | Who sees it | Shows |
@@ -53,7 +88,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Venue | `core.venue.manage` | Address, public text, access text, photos, and its spaces with capacity and kind |
 | Closures | `core.closure.manage` | A list and a small calendar. Add a closure for the theatre, a venue or a space. Public holidays shown, greyed, from the feed. |
 
-## Console: site and brand
+## Site and brand (Site administration, except Files)
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
@@ -63,7 +98,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Vocabularies | `core.vocabulary.manage` | Every vocabulary, grouped by module, with "New vocabulary" for a list of the theatre's own. Inside one: terms in order, drag to reorder, rename, retire, merge, with a count of records using each. |
 | Files | `core.file.manage` | Every file: preview, owner, slot, size, state. Filter by owner type and state. Restore a deleted file before its purge date. Storage used. |
 
-## Console: messages
+## Messages (console, except Senders and Delivery health)
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |
@@ -73,7 +108,7 @@ Proscenium's inbox has no unread count and never marks a message read, by its ow
 | Delivery log | `core.delivery.read` | Deliveries, newest first: type, channel, state, time. The recipient shows only to someone who may see that person. Filter by state, type and date. Retry a failed one. |
 | Delivery health | `core.delivery.read` | Counts for the last day and week: sent, retrying, failed, bounced. Anything stuck. The suppression list, with "lift" for an address suppressed by mistake. |
 
-## Console: webhooks
+## Site administration: webhooks
 
 | Screen | Who sees it | Shows |
 | --- | --- | --- |

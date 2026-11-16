@@ -6,30 +6,26 @@ export type ConfirmReason = 'core.access.not-fresh' | 'core.access.needs-strong-
 
 export const CONFIRM_REASONS: readonly string[] = ['core.access.not-fresh', 'core.access.needs-strong-sign-in']
 
-interface Pending { reason: ConfirmReason, resolve: (confirmed: boolean) => void }
-
 export function useConfirmItsYou() {
-  const pending = useState<Pending | null>('core:confirm-its-you', () => null)
+  const overlay = useOverlay()
   // Two requests refused at once share one dialogue and one answer.
   const waiting = useState<Promise<boolean> | null>('core:confirm-its-you-waiting', () => null)
 
   function confirmItsYou(reason: ConfirmReason = 'core.access.not-fresh'): Promise<boolean> {
     if (waiting.value) return waiting.value
-    const answer = new Promise<boolean>((resolve) => {
-      pending.value = { reason, resolve: (confirmed) => {
-        pending.value = null
+    const answer = (async () => {
+      try {
+        const { default: component } = await import('../components/ConfirmItsYouDialog.vue')
+        const dialogue = overlay.create(component, { destroyOnClose: true })
+        return (await dialogue.open({ reason }).result) === true
+      }
+      finally {
         waiting.value = null
-        resolve(confirmed)
-      } }
-    })
+      }
+    })()
     waiting.value = answer
     return answer
   }
 
-  /** Closes the dialogue with an answer. */
-  function settle(confirmed: boolean) {
-    pending.value?.resolve(confirmed)
-  }
-
-  return { confirmItsYou, pending, settle }
+  return { confirmItsYou }
 }

@@ -42,7 +42,7 @@ export const readers = defineTable('payments_readers', {
 export const sessions = defineTable('payments_sessions', {
   id: col.id(),
   pointLabel: col.internal(text('point_label').notNull()),
-  openedBy: col.account('opened_by', { role: 'subject', onMerge: 'move' }),
+  openedBy: col.account('opened_by', { role: 'subject', onMerge: 'move', reason: 'a person has one open till session, a unique rule on this id' }),
   closedBy: col.account('closed_by', { role: 'actor', onMerge: 'alias', nullable: true }),
   openedAt: col.timestamp('opened_at').notNull(),
   closedAt: col.timestamp('closed_at'),

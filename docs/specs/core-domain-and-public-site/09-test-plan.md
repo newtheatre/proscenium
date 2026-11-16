@@ -119,4 +119,10 @@ Three tiers, as the paper sets them: **unit** (one function, no database), **int
 | The replayed delivery | Integration | The send job runs twice for one webhook delivery. | The receiver gets the same delivery id both times, and the signature's time lets it reject an old copy. |
 | The bare icon | End to end | A venue page with access features. | Every icon has a visible label and an accessible name. A venue with none shows no access row and no "not accessible" wording. |
 
-That makes 63 named cases.
+One more, added on 16 November 2026 with the sealed variable kind:
+
+| Name | Tier | Situation | Expected |
+| --- | --- | --- | --- |
+| The link in the row | integration | An invitation with a sealed sign-in link is sent to an account, delivered, and then read back every way core offers: the notification row, the inbox, the console's delivery log, the preview, the audit trail, the event and the logs. | The email carries the link. Before delivery the row holds it only encrypted, in `sealed_variables`. After delivery the column is null. No other place ever holds or shows the value. There is no inbox item. Registering the same type with the inbox channel is refused. |
+
+That makes 64 named cases.
