@@ -8,7 +8,7 @@ import { isEnabled } from './modules-store'
 import { can, requireAbility, fact as holdsFactFor } from './access'
 import { useContext } from './context'
 import { createUnit } from './unit'
-import { takeRate } from './ratelimit'
+import { countAgainstRate } from './ratelimit'
 import { nowMs } from './clock'
 import { log } from './log'
 import type { RecordRef } from './unit'
@@ -201,7 +201,7 @@ async function check(request: CheckRequest): Promise<Answer[]> {
   const typed = new Set(presented.filter(p => 'value' in p).map(p => p.ref))
   if (typed.size) {
     let within = true
-    for (const k of presentedKeys()) if (!(await takeRate('presented-value', k))) within = false
+    for (const k of presentedKeys()) if (!(await countAgainstRate('presented-value', k)).allowed) within = false
     if (!within) {
       for (const ref of typed) for (const account of accounts) set(account, ref, { verdict: 'not-met', unavailable: false, reason: SLOW_DOWN })
     }

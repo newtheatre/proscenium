@@ -7,6 +7,8 @@
   "d1_databases": [{ "binding": "DB", "database_name": "tests", "database_id": "00000000-0000-0000-0000-000000000000" }],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "tests" }],
   "kv_namespaces": [{ "binding": "CACHE", "id": "tests" }],
+  "durable_objects": { "bindings": [{ "name": "RATE_LIMITS", "class_name": "RateLimitCounter" }] },
+  "migrations": [{ "tag": "core-rate-limits", "new_sqlite_classes": ["RateLimitCounter"] }],
   // Test values only. A real deployment sets its own as Worker secrets.
   "vars": { "CORE_SESSION_KEY": "test-session-key-not-secret", "CORE_TURNSTILE_SECRET_KEY": "test-turnstile-secret", "CORE_ENCRYPTION_KEY": "test-encryption-key-not-secret" }
 }

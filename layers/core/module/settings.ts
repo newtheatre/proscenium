@@ -32,12 +32,13 @@ export const settings = defineSettings('core', {
   'access.fresh-within': setting.duration({ default: '10m', min: '1m', max: '1d', change }),
   'idempotency.keep-for': setting.duration({ default: '48h', min: '1h', max: '7d', change }),
 
-  'rate-limits.default': setting.integer({ default: 120, min: 1, max: 10000, unit: 'core.units.per-minute', change }),
-  'rate-limits.write': setting.integer({ default: 30, min: 1, max: 10000, unit: 'core.units.per-minute', change }),
-  'rate-limits.sign-in': setting.integer({ default: 10, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
-  'rate-limits.public-form': setting.integer({ default: 10, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
-  'rate-limits.export': setting.integer({ default: 5, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
-  'rate-limits.presented-value': setting.integer({ default: 10, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
+  // Allowances for each rate-limit class (F-36). The figures are the specification's proposals.
+  'rate-limits.default': setting.rate({ default: { count: 600, per: '1m' }, change, onChange: 'confirm' }),
+  'rate-limits.write': setting.rate({ default: { count: 120, per: '1m' }, change, onChange: 'confirm' }),
+  'rate-limits.sign-in': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
+  'rate-limits.public-form': setting.rate({ default: { count: 20, per: '10m' }, change, onChange: 'confirm' }),
+  'rate-limits.export': setting.rate({ default: { count: 10, per: '1h' }, change, onChange: 'confirm' }),
+  'rate-limits.presented-value': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
 
   'retention.audit': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
   'retention.setting-changes': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
