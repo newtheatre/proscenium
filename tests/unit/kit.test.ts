@@ -13,6 +13,7 @@ import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
 import { buildRegistry, type ModuleEntry } from '#kit/registry'
 import { points as corePoints } from '../../layers/core/module/points'
+import { points as domainPoints } from '../../layers/core/module/domain'
 
 describe('ids', () => {
   it('are a prefix and 26 characters that sort by creation time', () => {
@@ -130,6 +131,13 @@ describe('manifests', () => {
     expect(() => defineModule({ ...base, jobs: { 'lost-property.Sweep': job({ payload: z.object({}) }) } })).toThrow(DeclarationError)
     expect(() => defineModule({ ...base, tasks: { 'lost-property.clear-items': task({ dailyAt: '25:00' }) } })).toThrow(/dailyAt/)
   })
+  it('take signing purposes under the module\'s own id, each once, with periods of at least a day (F-37)', () => {
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '90d', keepFor: '365d' }] })).not.toThrow()
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'box-office.door-code', rotateEvery: '90d', keepFor: '365d' }] })).toThrow(/signing\[0\]\.purpose/)
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '90d', keepFor: '365d' }, { purpose: 'lost-property.claim-code', rotateEvery: '30d', keepFor: '60d' }] })).toThrow(/listed twice/)
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '1h', keepFor: '365d' }] })).toThrow(/rotateEvery/)
+    expect(() => defineModule({ ...base, signing: [{ purpose: 'lost-property.claim-code', rotateEvery: '90d', keepFor: 'for ever' }] })).toThrow(/keepFor/)
+  })
 })
 
 describe('tables', () => {
@@ -179,6 +187,19 @@ describe('task slots', () => {
 describe('the registry', () => {
   const entry = (manifest: object): ModuleEntry => ({ manifest: defineModule({ manifest: 1, since: '0.1.0', ...manifest } as any), root: `layers/${(manifest as any).id}`, owner: 'upstream', handlers: {} } as unknown as ModuleEntry)
 
+  it('gives core\'s deliverable listener every event not marked internal', () => {
+    const core = { ...entry({ id: 'core', switchable: false, events: { listens: { deliverable: 'deliver-webhooks' } } }), root: 'layers/core', handlers: { listeners: { 'deliver-webhooks': () => {} } } } as ModuleEntry
+    const lost = entry({ id: 'lost-property', events: { announces: {
+      'lost-property.item.found': event({ version: 1, payload: z.object({ itemId: z.string() }) }),
+      'lost-property.item.tidied': event({ version: 1, payload: z.object({ itemId: z.string() }), internal: true }),
+    } } })
+    const registry = buildRegistry([core, lost])
+    expect(registry.listeners.get('lost-property.item.found')).toEqual([{ module: 'core', listener: 'deliver-webhooks' }])
+    expect(registry.listeners.get('lost-property.item.tidied')).toBeUndefined()
+  })
+  it('lets only core listen on deliverable', () => {
+    expect(() => defineModule({ id: 'lost-property', manifest: 1, since: '0.1.0', events: { listens: { deliverable: 'send-everything' } } })).toThrow(/only core/)
+  })
   it('lets uses name a reserved module that is not written yet, and nothing else', () => {
     expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['bar'] })])).not.toThrow()
     expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['raffle'] })])).toThrow(/reserved/)
@@ -200,5 +221,16 @@ describe('navigation entries', () => {
   it('hide an empty entry only when it has a count', () => {
     expect(schema.safeParse({ ...base, hideEmpty: true }).success).toBe(false)
     expect(schema.safeParse({ ...base, hideEmpty: true, count: 'box-office.orders.open' }).success).toBe(true)
+  })
+})
+
+describe('notification types', () => {
+  const schema = (domainPoints['core.notification-type'] as any).schema
+  const base = { id: 'team.invite', category: 'transactional', side: 'members', channels: ['email'], variables: { link: 'sealed' }, wording: { 'en-GB': { subject: 'Join us', body: '[Accept]({{ link }})' } } }
+  it('send a type with a sealed variable by email only', () => {
+    expect(schema.safeParse(base).success).toBe(true)
+    expect(schema.safeParse({ ...base, channels: ['email', 'inbox'] }).success).toBe(false)
+    expect(schema.safeParse({ ...base, channels: ['inbox'] }).success).toBe(false)
+    expect(schema.safeParse({ ...base, channels: ['email', 'inbox'], variables: { link: 'url' } }).success).toBe(true)
   })
 })

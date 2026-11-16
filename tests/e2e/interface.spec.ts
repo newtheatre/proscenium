@@ -12,6 +12,15 @@ const reader = person('Robin Reader', [grant('gallery.sample.view')])
 const audience = person('Alex Audience', [])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 
+// The tests share one local database and make many requests as a handful of people; the platform's
+// own limit (core.rate-limits.default) is exercised by the kit's tests, not these.
+test.beforeAll(async ({ playwright }) => {
+  const siteOwner = { ...person('Rate Owner', [grant('core.settings.manage')]), assurance: 'strong', reassertedAt: Date.now() }
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(siteOwner) })
+  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
+  await api.dispose()
+})
+
 // Waits for the page to hydrate, so a test never acts on markup that has no behaviour yet.
 async function visit(page: Page, url: string) {
   const response = await page.goto(url)
@@ -220,6 +229,18 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('button', { name: 'Set up my theatre' })).toHaveCount(0)
     })
 
+    test('core\'s own settings page shows wording for every setting, never a catalogue key', async ({ browser }) => {
+      const owner = { ...person('Olive Owner', ['core.settings.manage', 'core.identity-settings.manage', 'core.organisation.edit', 'core.branding.edit', 'core.sender.manage', 'core.template.edit'].map(grant)), assurance: 'strong', reassertedAt: Date.now() }
+      const context = await browser.newContext(as(owner))
+      const page = await context.newPage()
+      await visit(page, '/console/system/settings')
+      await expect(page.getByRole('heading', { level: 1, name: 'Core settings' })).toBeVisible()
+      await expect(page.getByText('Short name', { exact: true }).first()).toBeVisible()
+      // A part of the catalogue that is not loaded shows as its key, such as core.settings.x.label.
+      expect((await page.locator('main').innerText()).match(/\b[a-z][a-z0-9-]*\.[a-z0-9.-]+\.(label|help)\b/g) ?? []).toEqual([])
+      await context.close()
+    })
+
     test('the generated settings page: each setting shows its default, who may change it and a quoted tag', async ({ page }) => {
       await visit(page, '/console/gallery/settings')
       await expect(page.getByRole('heading', { level: 1, name: 'Gallery settings' })).toBeVisible()
@@ -231,7 +252,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('1 change')).toBeVisible()
       await page.getByRole('button', { name: 'Save Sample show settings' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
-      await page.reload()
+      await visit(page, '/console/gallery/settings') // waits for hydration, as a bare reload does not
       await expect(page.getByLabel('Show title', { exact: true })).toHaveValue('Macbeth')
       await expect(page.getByText('Default: Hamlet.')).toBeVisible()
       await page.getByRole('button', { name: /Reset Show title to its default/ }).click()
@@ -258,5 +279,47 @@ test.describe('on a phone', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
     expect(overflow).toBe(false)
     await noViolations(page)
+  })
+})
+
+test.describe('My account and counts', () => {
+  test.use(as({ ...audience, accountId: 'acc_alexaudience_account' }))
+
+  test('lists the sections modules add, with the account entries as links, and has no violations', async ({ page }) => {
+    await visit(page, '/account')
+    await expect(page.getByRole('heading', { level: 1, name: 'My account' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Sample tickets' }).first()).toBeVisible()
+    await expect(page.getByText('Sample tickets section').first()).toBeVisible()
+    await noViolations(page)
+  })
+})
+
+test.describe('counts in the console menu', () => {
+  test.use(as({ ...staff, accountId: 'acc_samstaff_counts' }))
+
+  test('shows a count beside an entry while there is something to count', async ({ page }) => {
+    await visit(page, '/console/gallery/list')
+    const entry = page.getByRole('navigation', { name: 'Console' }).getByRole('link', { name: /Sample drafts/ })
+    await expect(entry).toContainText('3')
+  })
+})
+
+test.describe('the starting colour mode', () => {
+  test('a first-time visitor sees the site owner\'s choice', async ({ browser }) => {
+    const siteOwner = { ...person('Olive Owner', [grant('core.settings.manage')]), assurance: 'strong', reassertedAt: Date.now() }
+    const owner = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(siteOwner) })
+    const change = (change: object) => owner.request.put('/api/core/settings', { data: { changes: [change] } })
+    expect((await change({ key: 'core.appearance.default', value: 'dark' })).ok()).toBe(true)
+    try {
+      const visitor = await browser.newContext({ baseURL: 'http://localhost:8788', colorScheme: 'light' })
+      const page = await visitor.newPage()
+      await visit(page, '/')
+      await expect(page.locator('html')).toHaveClass(/dark/)
+      await visitor.close()
+    }
+    finally {
+      await change({ key: 'core.appearance.default', reset: true })
+      await owner.close()
+    }
   })
 })

@@ -5,6 +5,7 @@ import type { NavItem, ShellName } from '../../shared/navigation'
 export interface Viewer {
   signedIn: boolean
   name?: string
+  membersName?: string
   sides: ('audience' | 'members' | 'console')[]
   navigation: (NavItem & { shell: ShellName })[]
 }

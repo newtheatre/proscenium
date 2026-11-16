@@ -12,6 +12,8 @@ export const performances = defineTable('seats_performances', {
   startsAt: col.timestamp('starts_at'),
   operatingDay: col.localDate('operating_day'),
   completedAt: col.timestamp('completed_at'),
+  // For core's vocabularies: a record that points at a term, as a production's category will.
+  categoryId: col.ref('core_terms', { nullable: true }),
 }, { id: 'sp', realm: 'operational', extra: t => [check('seats_performances_capacity', sql`${t.sold} <= ${t.capacity}`)] })
 
 export const ledger = defineTable('seats_ledger', {
