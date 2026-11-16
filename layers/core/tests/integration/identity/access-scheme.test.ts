@@ -5,7 +5,7 @@ import { createUnit } from '#kit/unit'
 import { deliver, env, grantDirectly, leaveIdentity, reset, setSetting, clearSetting, staff, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
-import { sweepAccessScheme } from '../../../server/identity/access-scheme'
+import { accessNeedsFor, sweepAccessScheme } from '../../../server/identity/access-scheme'
 
 const sent: OutgoingEmail[] = []
 
@@ -234,6 +234,14 @@ describe('reading for a purpose (ID-39)', () => {
     // The person sees the read, with the purpose.
     const reads = (await browser.get('/api/core/me/access')).body.reads
     expect(reads.some((r: any) => r.purpose === 'core.welfare')).toBe(true)
+    // A module calling the service for somebody without the purpose's ability gets nothing either.
+    const outsider = await staff()
+    expect(await inContext(async () => {
+      const unit = createUnit()
+      const found = await accessNeedsFor(unit, { kind: 'person', accountId: outsider.accountId, assurance: 'strong', reassertedAt: Date.now() }, accountId, 'core.welfare')
+      await unit.commit()
+      return found
+    })).toBeNull()
     // Switching off stops reads at once.
     await browser.put('/api/core/me/access/sharing', { purpose: 'core.welfare', on: false })
     expect((await read()).body).toEqual({ shared: false })

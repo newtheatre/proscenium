@@ -285,7 +285,7 @@ export async function accessNeedsFor(unit: UnitView, actor: Actor, accountId: st
   if (!found || !(await isEnabled(found.module))) return null
   const purpose = found.value
   const ability = purpose.ability ?? 'core.access-profile.read'
-  if (!(await can(actor, ability as Parameters<typeof can>[1], ['core.account', accountId]))) return null
+  if (!(await can(actor, ability as Parameters<typeof can>[1], ['core.account', accountId])).allowed) return null
   const share = await first<{ purpose: string }>('SELECT purpose FROM core_access_shares WHERE account_id = ? AND purpose = ?', accountId, purposeId)
   const row = await profileOf(accountId)
   if (!share || row?.status !== 'accepted') return null
