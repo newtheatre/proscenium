@@ -10,6 +10,9 @@ import { setEmailEventsConsumer } from '#kit/email-events'
 import { emailEventsConsumer } from './email-events'
 import type { KitEnv } from '#kit/context'
 
+// The Durable Object behind the shared rate-limit counts (binding RATE_LIMITS).
+export { RateLimitCounter } from './rate-counter'
+
 installRegistry(registry)
 installMigrations(migrations, release)
 setEmailEventsConsumer(emailEventsConsumer)

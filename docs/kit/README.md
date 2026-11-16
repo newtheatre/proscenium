@@ -285,10 +285,13 @@ in the specification's "As built" list; this guide is the reference from here on
 - External calls are declared in the manifest's `calls` section, each with a handler file.
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning
   old history is the daily task `core.prune-history`.
-- Rate limits are counted per Worker instance in memory, with the limits as core settings. This
-  is accepted for the kit gate only: one instance does not see another's counts, so it does not
-  protect sign-in or public forms. Before the first release the `sign-in` and `public-form`
-  classes must count in a shared store, starting from Cloudflare's rate limiting binding (F-36).
+- Rate limits (F-36): each class's allowance is the `rate` setting `core.rate-limits.<class>`, a
+  count in a period. `sign-in`, `public-form` and `presented-value` count in the RateLimitCounter
+  Durable Object (binding `RATE_LIMITS`), one object per class and caller, shared by every
+  instance; the others count in memory in each instance. Cloudflare's rate limiting binding was
+  evaluated and not used: its period is fixed at deploy to 10 or 60 seconds and its counts are
+  approximate and kept per location. Call `countAgainstRate(class, who)`; it answers
+  `{ allowed, retryAfter }`.
 - Pending migrations are applied automatically only where `PROSCENIUM_AUTO_MIGRATE=1` (dev,
   preview and tests). It is not a production option and is removed when F-28's maintenance page
   and Apply button land.
