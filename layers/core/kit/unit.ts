@@ -1,9 +1,13 @@
-// The unit of work: the one way to write (U1 to U6). Statements are collected from the handler and
+// The unit of work: the one way to write (U1 to U9). Statements are collected from the handler and
 // the services it calls, then committed as one D1 batch with the audit rows, the events and the
 // jobs they cause. A guard after a statement aborts the whole batch unless that statement changed
-// the expected number of rows.
+// the expected number of rows. A fan-out is written set-wise (U7, U8): every row of a set travels
+// in one JSON parameter and each table is written by one INSERT ... SELECT over json_each, so the
+// statement count does not grow with the rows.
+import { getTableColumns } from 'drizzle-orm'
 import { useContext } from './context'
-import { toStatement, prepare, type Statement, type Writable } from './database'
+import { toStatement, prepare, bindable, type Statement, type Writable } from './database'
+import { tableMeta } from './db'
 import { Refusal } from './refusal'
 import { newId } from './ids'
 import { nowMs } from './clock'
@@ -30,15 +34,31 @@ export interface Expectation { code: string, reason: string, remedy?: string }
 
 export interface EnqueueOptions { dedupeKey?: string, delay?: number, lane?: Lane }
 
+/** One event of a set given to announce(). */
+export interface Announcement { payload: Record<string, unknown>, record?: RecordRef }
+
 /** What a service is given: everything but commit. A service never commits (U3). */
 export interface UnitView {
   readonly id: string
   add: (query: Writable) => UnitView
   /** The statement just added must change exactly `rows` rows, or nothing in the unit is written. */
   expect: (rows: number, refusal?: Partial<Expectation>) => UnitView
-  audit: (entry: AuditEntry) => UnitView
-  /** Announces an event in this unit. Returns the event's id. */
-  announce: (name: string, payload: Record<string, unknown>, options?: { record?: RecordRef }) => string
+  /** One audit row, or a set of them written as one statement (U8). */
+  audit: (entry: AuditEntry | readonly AuditEntry[]) => UnitView
+  /**
+   * Announces an event in this unit and returns its id. Given a set, announces each as its own
+   * event in one statement (plus one per listener) and returns their ids in order (U8).
+   */
+  announce: {
+    (name: string, payload: Record<string, unknown>, options?: { record?: RecordRef }): string
+    (name: string, set: readonly Announcement[]): string[]
+  }
+  /**
+   * Inserts every row in one statement (U7) and returns the rows' ids in order (empty for a table
+   * with no id column). Ids and other defaults are made here, before the unit is built. Every row
+   * gives the same columns. A guard may follow it, as after add().
+   */
+  insertSet: (table: unknown, rows: readonly Record<string, unknown>[]) => string[]
   /** Queues a job, only if the unit commits. Returns the job's id. */
   enqueue: (job: string, payload: unknown, options?: EnqueueOptions) => string
   /** Runs after a successful commit. Its failure is logged and never undoes the commit. */
@@ -54,10 +74,10 @@ export interface CommitResult {
 }
 
 type Item
-  = | { kind: 'statement', statement: Statement }
+  = | { kind: 'statement', statement: Statement, rows?: number }
     | { kind: 'guard', rows: number, refusal: Expectation }
-    | { kind: 'audit', entry: AuditEntry }
-    | { kind: 'event', id: string, name: string, payload: Record<string, unknown>, record?: RecordRef }
+    | { kind: 'audit', entries: AuditEntry[], set: boolean }
+    | { kind: 'event', name: string, events: { id: string, payload: Record<string, unknown>, record?: RecordRef }[], set: boolean }
     | { kind: 'job', id: string, name: string, payload: unknown, options: EnqueueOptions, jobKind?: 'job' | 'listener' | 'task', module?: string }
 
 const DEFAULT_CONFLICT: Expectation = { code: 'core.unit.conflict', reason: 'Someone else changed this at the same moment, so nothing was saved.', remedy: 'Reload and try again.' }
@@ -77,6 +97,43 @@ function checkDetail(detail: Record<string, unknown>) {
       throw new Error(`Audit detail "${key}" must be ids, codes, numbers or booleans: never a person's name, address or words`)
     }
   }
+}
+
+/** Reads element `i` of each json_each row. */
+const at_ = (i: number) => `json_extract(value, '$[${i}]')`
+
+/** A JSON array of rows for json_each, each value already as D1 would bind it. */
+function setParam(rows: unknown[][]): string {
+  return JSON.stringify(rows.map(row => bindable(row)))
+}
+
+/** The INSERT ... SELECT that writes a set: one bound JSON parameter whatever the row count. */
+export function insertSetStatement(table: unknown, rows: readonly Record<string, unknown>[]): { statement: Statement, ids: string[] } {
+  const meta = tableMeta(table)
+  if (!meta) throw new Error('insertSet() takes a table declared with defineTable')
+  const columns = getTableColumns(table as any) as Record<string, any>
+  const given = new Set<string>()
+  for (const row of rows) for (const key of Object.keys(row)) given.add(key)
+  for (const key of given) if (!columns[key]) throw new Error(`${meta.name} has no column "${key}"`)
+  const keys = Object.keys(columns).filter(key => given.has(key) || columns[key].defaultFn)
+  const idKey = Object.entries(meta.columns).find(([, c]) => c.meta.helper === 'id')?.[0]
+  const ids: string[] = []
+  const values = rows.map((row, n) => keys.map((key) => {
+    const column = columns[key]
+    let value = row[key]
+    if (value === undefined) {
+      if (!column.defaultFn) throw new Error(`Every row in a set gives the same columns: row ${n} of ${meta.name} has no "${key}"`)
+      value = column.defaultFn()
+    }
+    if (key === idKey) ids.push(value as string)
+    if (value === null) return null
+    const driver = column.mapToDriverValue(value)
+    if (driver instanceof ArrayBuffer || ArrayBuffer.isView(driver)) throw new Error(`insertSet() cannot carry binary values (${meta.name}.${key})`)
+    return driver
+  }))
+  const names = keys.map(key => `"${columns[key].name}"`).join(', ')
+  const select = keys.map((_, i) => at_(i)).join(', ')
+  return { statement: { sql: `INSERT INTO "${meta.name}" (${names}) SELECT ${select} FROM json_each(?)`, params: [setParam(values)] }, ids }
 }
 
 export class UnitOfWork implements UnitView {
@@ -109,22 +166,38 @@ export class UnitOfWork implements UnitView {
     return this
   }
 
-  audit(entry: AuditEntry): this {
+  audit(entry: AuditEntry | readonly AuditEntry[]): this {
     this.open()
-    if (entry.detail) checkDetail(entry.detail)
-    this.items.push({ kind: 'audit', entry })
+    const set = Array.isArray(entry)
+    const entries = (set ? [...entry] : [entry]) as AuditEntry[]
+    for (const e of entries) if (e.detail) checkDetail(e.detail)
+    if (entries.length) this.items.push({ kind: 'audit', entries, set })
     return this
   }
 
-  announce(name: string, payload: Record<string, unknown>, options: { record?: RecordRef } = {}): string {
+  announce(name: string, payload: Record<string, unknown>, options?: { record?: RecordRef }): string
+  announce(name: string, set: readonly Announcement[]): string[]
+  announce(name: string, payloadOrSet: Record<string, unknown> | readonly Announcement[], options: { record?: RecordRef } = {}): string | string[] {
     this.open()
     const declared = useRegistry().events.get(name)
     if (!declared) throw new Error(`"${name}" is not a declared event`)
-    const parsed = declared.decl.payload.safeParse(payload)
-    if (!parsed.success) throw new Error(`The payload of ${name} does not match its declaration: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`)
-    const id = newId('evt')
-    this.items.push({ kind: 'event', id, name, payload: parsed.data as Record<string, unknown>, record: options.record })
-    return id
+    const set = Array.isArray(payloadOrSet)
+    const given = set ? payloadOrSet as readonly Announcement[] : [{ payload: payloadOrSet as Record<string, unknown>, record: options.record }]
+    const events = given.map(({ payload, record }) => {
+      const parsed = declared.decl.payload.safeParse(payload)
+      if (!parsed.success) throw new Error(`The payload of ${name} does not match its declaration: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`)
+      return { id: newId('evt'), payload: parsed.data as Record<string, unknown>, record }
+    })
+    if (events.length) this.items.push({ kind: 'event', name, events, set })
+    return set ? events.map(e => e.id) : events[0]!.id
+  }
+
+  insertSet(table: unknown, rows: readonly Record<string, unknown>[]): string[] {
+    this.open()
+    if (!rows.length) return []
+    const { statement, ids } = insertSetStatement(table, rows)
+    this.items.push({ kind: 'statement', statement, rows: rows.length })
+    return ids
   }
 
   enqueue(job: string, payload: unknown, options: EnqueueOptions = {}): string {
@@ -162,7 +235,8 @@ export class UnitOfWork implements UnitView {
       add: q => (self.add(q), view),
       expect: (rows, refusal) => (self.expect(rows, refusal), view),
       audit: entry => (self.audit(entry), view),
-      announce: (name, payload, options) => self.announce(name, payload, options),
+      announce: ((name: string, payload: any, options?: { record?: RecordRef }) => self.announce(name, payload, options)) as UnitView['announce'],
+      insertSet: (table, rows) => self.insertSet(table, rows),
       enqueue: (job, payload, options) => self.enqueue(job, payload, options),
       afterCommit: fn => (self.afterCommit(fn), view),
     }
@@ -188,6 +262,8 @@ export class UnitOfWork implements UnitView {
     const added: number[] = []
     const jobs: { index: number, id: string, lane: Lane, delay?: number }[] = []
     const eventIds: string[] = []
+    const sets: number[] = []
+    const jobSets: { id: string, lane: Lane }[] = []
     const needsModules = this.items.some(i => i.kind === 'event')
     const enabled = needsModules ? await enabledModules() : undefined
     const maxAttempts = await useSetting('core.jobs.attempts')
@@ -207,6 +283,7 @@ export class UnitOfWork implements UnitView {
     for (const item of this.items) {
       switch (item.kind) {
         case 'statement':
+          if (item.rows) sets.push(item.rows)
           statements.push(item.statement)
           added.push(statements.length - 1)
           break
@@ -217,29 +294,70 @@ export class UnitOfWork implements UnitView {
           break
         }
         case 'audit': {
-          const { entry } = item
-          const isKind = (AUDIT_ACTIONS as readonly string[]).includes(entry.action)
-          const ability = entry.ability ?? (isKind ? context.ability : entry.action)
-          const record = ref(entry.record)
-          const module = ability?.split('.')[0] ?? record.type?.split('.')[0] ?? context.module ?? null
-          statements.push({
-            sql: 'INSERT INTO core_audit (id, at, actor_account_id, actor_name, actor_kind, action, ability, allowed_by, module_id, record_type, record_id, detail, request_id, unit_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            params: [newId('aud'), at, context.actor.accountId ?? null, context.actor.name ?? null, context.actor.kind === 'anonymous' ? 'person' : context.actor.kind, isKind ? entry.action : 'state', ability ?? null, context.allowedBy ?? null, module, record.type, record.id, entry.detail ? JSON.stringify(entry.detail) : null, context.requestId, this.id],
+          const rows = item.entries.map((entry) => {
+            const isKind = (AUDIT_ACTIONS as readonly string[]).includes(entry.action)
+            const ability = entry.ability ?? (isKind ? context.ability : entry.action)
+            const record = ref(entry.record)
+            const module = ability?.split('.')[0] ?? record.type?.split('.')[0] ?? context.module ?? null
+            return [newId('aud'), isKind ? entry.action : 'state', ability ?? null, module, record.type, record.id, entry.detail ? JSON.stringify(entry.detail) : null]
           })
+          const actor = [context.actor.accountId ?? null, context.actor.name ?? null, context.actor.kind === 'anonymous' ? 'person' : context.actor.kind]
+          if (!item.set) {
+            const [id, action, ability, module, type, recordId, detail] = rows[0]!
+            statements.push({
+              sql: 'INSERT INTO core_audit (id, at, actor_account_id, actor_name, actor_kind, action, ability, allowed_by, module_id, record_type, record_id, detail, request_id, unit_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              params: [id, at, ...actor, action, ability, context.allowedBy ?? null, module, type, recordId, detail, context.requestId, this.id],
+            })
+          }
+          else {
+            sets.push(rows.length)
+            statements.push({
+              sql: `INSERT INTO core_audit (id, at, actor_account_id, actor_name, actor_kind, action, ability, allowed_by, module_id, record_type, record_id, detail, request_id, unit_id) SELECT ${at_(0)}, ?, ?, ?, ?, ${at_(1)}, ${at_(2)}, ?, ${at_(3)}, ${at_(4)}, ${at_(5)}, ${at_(6)}, ?, ? FROM json_each(?)`,
+              params: [at, ...actor, context.allowedBy ?? null, context.requestId, this.id, setParam(rows)],
+            })
+          }
           break
         }
         case 'event': {
-          const record = ref(item.record)
-          statements.push({
-            sql: 'INSERT INTO core_events (id, name, record_type, record_id, payload, announced_at, unit_id, dispatched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            params: [item.id, item.name, record.type, record.id, JSON.stringify(item.payload), at, this.id, at],
+          const rows = item.events.map((event) => {
+            const record = ref(event.record)
+            return [event.id, record.type, record.id, JSON.stringify(event.payload)]
           })
-          eventIds.push(item.id)
-          // Listeners become prompt-lane jobs in the same batch (E1, E3). A listener of a module
-          // that is off now is not called, and is never caught up later (E5).
+          if (!item.set) {
+            const [id, type, recordId, payload] = rows[0]!
+            statements.push({
+              sql: 'INSERT INTO core_events (id, name, record_type, record_id, payload, announced_at, unit_id, dispatched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              params: [id, item.name, type, recordId, payload, at, this.id, at],
+            })
+          }
+          else {
+            sets.push(rows.length)
+            statements.push({
+              sql: `INSERT INTO core_events (id, name, record_type, record_id, payload, announced_at, unit_id, dispatched_at) SELECT ${at_(0)}, ?, ${at_(1)}, ${at_(2)}, ${at_(3)}, ?, ?, ? FROM json_each(?)`,
+              params: [item.name, at, this.id, at, setParam(rows)],
+            })
+          }
+          eventIds.push(...item.events.map(e => e.id))
+          // Listeners become prompt-lane jobs in the same batch (E1, E3), one statement per listener
+          // for a set. A listener of a module that is off now is not called, and is never caught up
+          // later (E5).
           for (const listener of registry.listeners.get(item.name) ?? []) {
             if (!enabled!.has(listener.module)) continue
-            pushJob({ kind: 'job', id: newId('job'), name: `${listener.module}.${listener.listener}`, payload: { eventId: item.id }, options: { lane: 'prompt', dedupeKey: `${item.id}` }, jobKind: 'listener', module: listener.module })
+            const name = `${listener.module}.${listener.listener}`
+            if (!item.set) {
+              const event = item.events[0]!
+              pushJob({ kind: 'job', id: newId('job'), name, payload: { eventId: event.id }, options: { lane: 'prompt', dedupeKey: `${event.id}` }, jobKind: 'listener', module: listener.module })
+              continue
+            }
+            const jobRows = item.events.map(event => [newId('job'), JSON.stringify({ eventId: event.id }), event.id])
+            sets.push(jobRows.length)
+            statements.push({
+              sql: `INSERT OR IGNORE INTO core_jobs (id, kind, name, module_id, lane, payload, dedupe_key, state, attempts, max_attempts, run_after, created_at) SELECT ${at_(0)}, 'listener', ?, ?, 'prompt', ${at_(1)}, ${at_(2)}, 'queued', 0, ?, ?, ? FROM json_each(?)`,
+              params: [name, listener.module, maxAttempts, at, at, setParam(jobRows)],
+            })
+            // Event ids are new, so no listener job here can meet an unfinished duplicate. Every
+            // job gets its message; a message for a row that is not queued is ignored (J1).
+            for (const [id] of jobRows) jobSets.push({ id: id as string, lane: 'prompt' })
           }
           break
         }
@@ -253,6 +371,14 @@ export class UnitOfWork implements UnitView {
     if (statements.length > limit) {
       this.state = 'open'
       throw new Refusal('core.unit.too-large', `This change needs ${statements.length} database statements, more than the limit of ${limit}, so nothing was saved.`, { status: 500 })
+    }
+    if (sets.length) {
+      const rowsLimit = await useSetting('core.units.set-rows-limit') as number
+      const largest = Math.max(...sets)
+      if (largest > rowsLimit) {
+        this.state = 'open'
+        throw new Refusal('core.unit.too-large', `This change writes ${largest} rows in one set, more than the limit of ${rowsLimit}, so nothing was saved.`, { status: 500 })
+      }
     }
     if (!statements.length) {
       this.state = 'committed'
@@ -277,13 +403,13 @@ export class UnitOfWork implements UnitView {
 
     // A job ignored as a duplicate (same dedupe key while unfinished) gets no message.
     const queued = jobs.filter(j => (results[j.index]?.meta?.changes ?? 0) > 0)
-    const messages: JobMessage[] = queued.map(j => ({ jobId: j.id, lane: j.lane, delaySeconds: j.delay || undefined }))
+    const messages: JobMessage[] = [...queued.map(j => ({ jobId: j.id, lane: j.lane, delaySeconds: j.delay || undefined })), ...jobSets.map(j => ({ jobId: j.id, lane: j.lane }))]
     await dispatch(messages)
     for (const hook of this.hooks) {
       try { await hook() }
       catch (error) { log.error('core.unit.after-commit-failed', { unitId: this.id, error: String((error as Error)?.message ?? error) }) }
     }
-    return { unitId: this.id, results: added.map(i => results[i]!), eventIds, jobIds: queued.map(j => j.id) }
+    return { unitId: this.id, results: added.map(i => results[i]!), eventIds, jobIds: [...queued.map(j => j.id), ...jobSets.map(j => j.id)] }
   }
 }
 
