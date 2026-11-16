@@ -10,7 +10,7 @@ A case or proof marked "later" belongs to the release that adds mailings, or to 
 | --- | --- | --- | --- |
 | P-COM-1 A tranche as one set | Can one unit of work pass a tranche of recipients to core as one set, with the recipient updates and the audit entry, inside D1's batch limits and `core.units.set-rows-limit`? | The default tranche of 50 commits in one batch on local and deployed D1; the largest size that does is recorded as the ceiling for `tranche-size` | To run with core, before the build |
 | P-COM-2 Ten thousand | Does a 10,000-recipient mailing prepare and hand over within the bulk lane's limits without starving the prompt lane? | A ticket email queued mid-campaign is sent within its usual time | Later, with mailings |
-| P-COM-3 Provider feedback | What does Cloudflare's email sending report back for a bounce and a complaint? | The event is received, and its message id matches the one `send()` returned | Bounce half passed on 16 November 2026, run by the core domain build: the ids match exactly and the event arrives in under a second. Cloudflare did not suppress the address itself within four and a half minutes, so core's own suppression is what stops a repeat. Complaint half open: it needs a real mailbox at a provider that reports complaints |
+| P-COM-3 Provider feedback | What does Cloudflare's email sending report back for a bounce and a complaint? | The event is received, and its message id matches the one `send()` returned | Bounce half passed on 16 November 2026, run by the core domain build: the ids match exactly and the event arrives in under a second. Cloudflare did not suppress the address itself within four and a half minutes, so core's own suppression is what stops a repeat. The complaint half will not be run (Matt, 16 November 2026): the complaint path is built to Cloudflare's documentation and stays unproved |
 
 ## Unit
 
@@ -27,7 +27,7 @@ A case or proof marked "later" belongs to the release that adds mailings, or to 
 | throttle-delays (later) | Tranches are spaced so no minute exceeds `per-minute` |
 | audience-algebra (later) | List, include and exclude combine as intersection and difference |
 | merge-resolution | The stricter state wins: unsubscribed beats everything, subscribed beats pending, and the result is the same whichever account survives |
-| token-shape | Tokens are random, stored hashed, and are never a row id |
+| token-shape | Confirm and preferences tokens are random, stored hashed with an expiry, and work once. A manage token is signed for its one purpose, holds ids and an expiry only, and is refused for any other purpose or after its expiry. No address carries a bare row id, and a wrong, used or expired link of any kind gets the same answer |
 
 ## Integration
 
@@ -35,7 +35,7 @@ A case or proof marked "later" belongs to the release that adds mailings, or to 
 | --- | --- |
 | signup-is-silent | The sign-up route returns the same body and timing class for a new, a subscribed and an unsubscribed address |
 | signup-one-unit | Pending subscription, consent record and notification commit together or not at all, and no account is created |
-| confirm-once | A confirm token works once; a second use changes nothing |
+| confirm-once | A confirm token passes the guard once; on a second use the guard fails and nothing is written |
 | confirm-expiry | The daily task deletes an expired pending row and writes an expired record |
 | consent-append-only | Update and delete on consent records fail by trigger; the erasure update alone succeeds |
 | every-move-records | Each subscription move leaves exactly one consent record |
@@ -45,7 +45,7 @@ A case or proof marked "later" belongs to the release that adds mailings, or to 
 | topic-off-excludes (later) | A person with the topic off is excluded at snapshot; core would also suppress the delivery |
 | snapshot-fixed | Someone who joins after the snapshot does not receive the campaign |
 | tranche-idempotent | Running the same tranche job twice creates each notification once |
-| start-claimed-once | Two runs of the start task cannot both start a campaign |
+| start-claimed-once | Two runs of the start task cannot both start a campaign: the guard passes for the first and fails for the second |
 | dead-tranche-requeued | A tranche whose job died is re-queued by the sweep and finishes |
 | pause-and-cancel (later) | Pause stops new tranches; cancel excludes all pending; a tranche in flight completes |
 | results-outlive-log | Final counts are on the campaign after core's deliveries are purged |

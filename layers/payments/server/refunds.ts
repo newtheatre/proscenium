@@ -5,11 +5,11 @@
 // when it is requested, so a later change to the setting cannot loosen it.
 import { sql } from 'drizzle-orm'
 import { all, createUnit, first, newId, nowMs, Refusal, useSetting, type UnitView } from '#kit'
+import { accountScopeSql } from '#kit/accounts'
 import { assertTerm } from '#modules/core'
 import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor, forProvider, providerAccount, providers } from './providers'
-import { inAccountScope } from './account-scope'
 import { labelsOf } from './people'
 import type { AttemptRow } from './answers'
 import type { RefundAnswer } from './points/provider'
@@ -84,8 +84,7 @@ export async function approveRefund(unit: UnitView, refundId: string, approver: 
   if (!refund) throw new Refusal('core.not-found', 'There is no such refund.', { status: 404 })
   if (refund.state !== 'requested') throw new Refusal('payments.refund.not-requested', 'This refund is not waiting for approval.', { status: 409 })
   if (refund.requested_by && refund.amount_minor > refund.self_approve_limit_minor) {
-    const scope = inAccountScope('requested_by', approver)
-    if (await first(`SELECT 1 FROM payments_refunds WHERE id = ? AND ${scope.sql}`, refund.id, ...scope.params))
+    if (await first(`SELECT 1 FROM payments_refunds WHERE id = ?1 AND requested_by IN (${accountScopeSql('?2')})`, refund.id, approver))
       throw new Refusal('payments.refund.own', 'You cannot approve a refund you asked for.', { status: 403, remedy: 'Ask someone else who may approve refunds.' })
   }
   unit.add({ sql: "UPDATE payments_refunds SET state = 'approved', approved_by = ?, updated_at = ? WHERE id = ? AND state = 'requested'", params: [approver, nowMs(), refund.id] })
@@ -182,8 +181,7 @@ export async function confirmRefund(unit: UnitView, refundId: string, by: string
   const attempt = (await first<AttemptRow>('SELECT * FROM payments_attempts WHERE id = ?', refund.attempt_id))!
   if (await integrated(attempt)) throw new Refusal('payments.refund.goes-back-by-provider', 'This payment is refunded through its provider, the way it was paid.', { status: 409 })
   if (attempt.method === 'cash') {
-    const scope = inAccountScope('opened_by', by)
-    const session = await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE state = 'open' AND ${scope.sql}`, ...scope.params)
+    const session = await first<{ id: string }>(`SELECT id FROM payments_sessions WHERE state = 'open' AND opened_by IN (${accountScopeSql('?1')})`, by)
     if (!session) throw new Refusal('payments.session.none', 'Open a till session to hand back cash.', { status: 409 })
     unit.add({ sql: 'UPDATE payments_refunds SET session_id = ? WHERE id = ?', params: [session.id, refund.id] })
   }

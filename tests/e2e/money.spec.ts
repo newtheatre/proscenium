@@ -13,7 +13,7 @@ const treasurer = {
   grants: [
     'payments.session.open', 'payments.session.view', 'payments.session.close-any', 'payments.attempt.reconcile',
     'payments.attempt.attest', 'payments.refund.approve', 'payments.provider.manage',
-    'finance.ledger.view', 'finance.account.manage', 'finance.period.close', 'finance.period.reopen', 'finance.posting.correct',
+    'finance.ledger.view', 'finance.ledger.export', 'finance.account.manage', 'finance.period.close', 'finance.period.reopen', 'finance.posting.correct',
   ].map(grant),
 }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
@@ -47,6 +47,9 @@ const SCREENS = [
   ['/console/finance/ledger', 'Ledger'],
   ['/console/finance/accounts', 'Ledger accounts'],
   ['/console/finance/periods', 'Periods'],
+  ['/console/finance/productions', 'Production statements'],
+  ['/console/finance/reconcile', 'Reconciliation'],
+  ['/console/finance/export', 'Export'],
 ] as const
 
 for (const [path, title] of SCREENS) {

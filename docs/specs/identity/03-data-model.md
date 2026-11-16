@@ -286,7 +286,7 @@ A role given to an account. Append-only: a grant row is written once and never c
 | `granted_at` | time | Not null | Internal | Kept |
 
 - A grant is *live* when `starts_at` has passed, `expires_at` is null or still to come, and it has no row in `core_grant_ends`. *Lapsed* and *pending* are read at query time too. Pending means the account is unclaimed.
-- One live grant per account, role and scope. An index cannot see the ends table, so the rule is a condition on the statement that writes the grant: it writes nothing if a live grant for the same account, role and scope exists, counting through the account scope.
+- One live grant per account, role and scope. An index cannot see the ends table, so the rule is a condition on the statement that writes the grant: it writes nothing if a live grant for the same account, role and scope exists, counting through the account scope. The unit knows the grant was written because the kit's guard passed, not from a count of rows changed.
 - On merge: `account_id` is `alias`, as it must be in an append-only table, so both accounts' grants are read as the survivor's from stage one. Where both hold the same role at the same scope, a handler ends the one with the earlier expiry as replaced. On undo that grant cannot be un-ended, so the handler's undo writes a new grant to the returned account with the same role, scope and expiry, if it would still be live.
 
 ## core\_grant\_ends
