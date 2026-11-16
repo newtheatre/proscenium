@@ -1,34 +1,31 @@
-<!-- The one confirmation dialog, mounted once in app.vue and opened by useConfirm(). -->
+<!-- The one confirmation dialog, opened by useConfirm() through Nuxt UI's overlays. It closes with
+     true only from the button that repeats the verb; Escape, the cross and "Keep" all answer false. -->
 <script setup lang="ts">
-const { pending, answer } = useConfirm()
+import type { ConfirmRequest } from '../composables/useConfirm'
+
+defineProps<ConfirmRequest>()
+const emit = defineEmits<{ close: [confirmed: boolean] }>()
 const { t } = useT()
-const open = computed({
-  get: () => pending.value !== null,
-  set: (value: boolean) => { if (!value) answer(false) },
-})
 </script>
 
 <template>
   <UModal
-    v-model:open="open"
-    :title="pending ? t('core.confirm.title', { verb: pending.verb, thing: pending.thing }) : ''"
-    :description="pending?.consequence"
-    :dismissible="true"
+    :title="t('core.confirm.title', { verb, thing })"
+    :description="consequence"
+    :close="{ onClick: () => emit('close', false) }"
   >
     <template #footer>
-      <div class="flex w-full justify-end gap-2">
-        <UButton
-          color="neutral"
-          variant="outline"
-          :label="t('core.confirm.keep')"
-          @click="answer(false)"
-        />
-        <UButton
-          color="error"
-          :label="pending?.button ?? pending?.verb"
-          @click="answer(true)"
-        />
-      </div>
+      <UButton
+        color="neutral"
+        variant="outline"
+        :label="t('core.confirm.keep')"
+        @click="emit('close', false)"
+      />
+      <UButton
+        color="error"
+        :label="button ?? verb"
+        @click="emit('close', true)"
+      />
     </template>
   </UModal>
 </template>

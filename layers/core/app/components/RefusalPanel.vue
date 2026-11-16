@@ -14,7 +14,6 @@ const signedOut = computed(() => props.refusal.code === 'core.access.signed-out'
 <template>
   <UAlert
     color="warning"
-    variant="subtle"
     icon="i-lucide-lock"
     :title="refusal.reason"
     :description="refusal.remedy"

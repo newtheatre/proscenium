@@ -1,6 +1,7 @@
 // The confirmation dialog, for acts that cannot be undone. It names the thing and the consequence
 // and its button repeats the verb: "Cancel the 19:30 performance of Hamlet?" ... "Cancel performance".
-// There are no browser prompts anywhere in the codebase (the lint rule forbids them).
+// There are no browser prompts anywhere in the codebase (the lint rule forbids them). The dialog is
+// opened through Nuxt UI's overlays, so nothing is mounted until it is first asked for.
 export interface ConfirmRequest {
   /** The verb: "Cancel", "Delete", "Refund". */
   verb: string
@@ -12,20 +13,13 @@ export interface ConfirmRequest {
   button?: string
 }
 
-interface Pending extends ConfirmRequest { resolve: (answer: boolean) => void }
-
 export function useConfirm() {
-  const pending = useState<Pending | null>('core:confirm', () => null)
-  function confirm(request: ConfirmRequest): Promise<boolean> {
-    return new Promise((resolve) => {
-      pending.value?.resolve(false)
-      pending.value = { ...request, resolve }
-    })
+  const overlay = useOverlay()
+  /** Resolves true only when the person presses the button that repeats the verb. */
+  async function confirm(request: ConfirmRequest): Promise<boolean> {
+    const { default: component } = await import('../components/ConfirmDialog.vue')
+    const dialog = overlay.create(component, { destroyOnClose: true })
+    return (await dialog.open(request).result) === true
   }
-  function answer(value: boolean) {
-    const current = pending.value
-    pending.value = null
-    current?.resolve(value)
-  }
-  return { confirm, pending, answer }
+  return { confirm }
 }
