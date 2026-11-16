@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "ab81bcd8-9818-4e1a-a623-7ef8d27ed913",
+  "id": "3d0ea085-8f47-412d-8fe7-07ed4680ccc9",
   "prevIds": [
-    "81e54d94-ca07-4be9-8c78-949805857556"
+    "2b12cfea-2f20-47f4-8a23-59c0a5df4cbe"
   ],
   "ddl": [
     {
@@ -84,6 +84,10 @@
     },
     {
       "name": "core_grant_ends",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_grant_warnings",
       "entityType": "tables"
     },
     {
@@ -2255,6 +2259,26 @@
       "entityType": "columns"
     },
     {
+      "table": "core_grant_warnings",
+      "name": "grant_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_grant_warnings",
+      "name": "warned_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_grants",
       "name": "id",
       "type": "text",
@@ -2647,6 +2671,16 @@
     {
       "table": "core_jobs",
       "name": "attempts",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_jobs",
+      "name": "deferrals",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
@@ -6156,6 +6190,16 @@
     },
     {
       "table": "payments_refunds",
+      "name": "session_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
       "name": "fee_returned_minor",
       "type": "integer",
       "notNull": false,
@@ -7938,6 +7982,21 @@
       "entityType": "fks"
     },
     {
+      "table": "core_grant_warnings",
+      "name": "fk_core_grant_warnings_grant_id_core_grants_id_fk",
+      "columns": [
+        "grant_id"
+      ],
+      "tableTo": "core_grants",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_grants",
       "name": "fk_core_grants_role_id_core_roles_id_fk",
       "columns": [
@@ -8480,6 +8539,21 @@
       "entityType": "fks"
     },
     {
+      "table": "payments_refunds",
+      "name": "fk_payments_refunds_session_id_payments_sessions_id_fk",
+      "columns": [
+        "session_id"
+      ],
+      "tableTo": "payments_sessions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "payments_webhook_events",
       "name": "fk_payments_webhook_events_provider_account_id_payments_provider_accounts_id_fk",
       "columns": [
@@ -8745,6 +8819,15 @@
       "name": "core_files_pk",
       "columns": [
         "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_grant_warnings",
+      "name": "core_grant_warnings_pk",
+      "columns": [
+        "grant_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
