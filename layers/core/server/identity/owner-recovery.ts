@@ -5,7 +5,7 @@
 import { credential, first, nowMs, refuse } from '#kit'
 import { sameText } from './crypto'
 import { normaliseAddress } from './accounts'
-import { LIVE, OWNER } from './grants'
+import { HOLDER, LIVE, OWNER } from './grants'
 
 export async function requireRecoverySecret(given: string): Promise<void> {
   const secret = await credential('CORE_OWNER_RECOVERY')
@@ -18,7 +18,7 @@ export async function ownerByAddress(address: string): Promise<string> {
   const row = await first<{ id: string }>(
     `SELECT a.id FROM core_account_emails e
        JOIN core_accounts a ON a.id = e.account_id
-       JOIN core_grants g ON g.account_id = a.id
+       JOIN core_grants g ON ${HOLDER} = a.id
        JOIN core_roles r ON r.id = g.role_id AND r.key = '${OWNER}'
       WHERE e.address = ? AND e.verified_at IS NOT NULL AND a.disabled_at IS NULL AND a.merged_into_id IS NULL AND a.anonymised_at IS NULL AND ${LIVE}
       LIMIT 1`,
