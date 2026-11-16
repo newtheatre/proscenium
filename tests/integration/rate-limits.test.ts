@@ -3,7 +3,7 @@
 // period read from core.rate-limits.<class>.
 import { afterEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit } from '#kit'
-import { memoryRateStore, resetRateLimits, sharedRateStore, takeRate } from '#kit/ratelimit'
+import { memoryRateStore, resetRateLimits, sharedRateStore, countAgainstRate } from '#kit/ratelimit'
 import { setClock, advanceClock } from '#kit/clock'
 import { env, inContext } from './helpers'
 
@@ -15,7 +15,7 @@ async function setRate(key: string, value: { count: number, per: string } | null
   })
 }
 
-const take = (rateClass: Parameters<typeof takeRate>[0], who: string) => inContext(() => takeRate(rateClass, who))
+const take = (rateClass: Parameters<typeof countAgainstRate>[0], who: string) => inContext(() => countAgainstRate(rateClass, who))
 const namespace = () => env.RATE_LIMITS as unknown as Parameters<typeof sharedRateStore>[0]
 
 afterEach(async () => {

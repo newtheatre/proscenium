@@ -9,7 +9,7 @@ import { Refusal, isRefusal, DeclarationError, type RefusalBody } from './refusa
 import { useAccessProvider, can } from './access'
 import { isEnabled } from './modules-store'
 import { createUnit, type UnitOfWork } from './unit'
-import { takeRate, RATE_CLASSES, type RateClass } from './ratelimit'
+import { countAgainstRate, RATE_CLASSES, type RateClass } from './ratelimit'
 import { useRegistry } from './registry'
 import { verifyTurnstile } from './turnstile'
 import { nowMs } from './clock'
@@ -124,7 +124,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     context.actor = actor
 
     const who = actor.accountId ?? getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? 'unknown'
-    const rate = await takeRate(decl.rateLimit, who)
+    const rate = await countAgainstRate(decl.rateLimit, who)
     if (!rate.allowed) {
       setResponseHeader(event, 'Retry-After', rate.retryAfter)
       throw new Refusal('core.rate-limit.reached', 'Too many requests. Please slow down.', { status: 429, remedy: 'Wait a while, then try again.' })

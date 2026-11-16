@@ -74,8 +74,12 @@ async function allowance(rateClass: string): Promise<Rate> {
   return typeof value === 'number' ? { count: value, per: 60 } : value // not-policy: the old settings were per minute
 }
 
-/** Counts this request against the class's allowance for `who`, and says whether it is within it. */
-export async function takeRate(rateClass: RateClass | 'presented-value', who: string): Promise<RateDecision> {
+/**
+ * Counts this request against the class's allowance for `who`, and says whether it is within it.
+ * (Called takeRate before F-36, when it answered a bare boolean; renamed so no old caller can
+ * mistake the decision for one.)
+ */
+export async function countAgainstRate(rateClass: RateClass | 'presented-value', who: string): Promise<RateDecision> {
   const limit = await allowance(rateClass)
   const namespace = useEnv().RATE_LIMITS as CounterNamespace | undefined
   // Without the binding (nuxt dev) the shared classes count in memory too.
