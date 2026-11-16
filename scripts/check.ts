@@ -3,7 +3,7 @@
 import { loadRegistry, LoadError } from './lib/load.ts'
 import { checkPageAddresses, checkRoutes } from './checks/routes.ts'
 import { checkMigrations } from './checks/migrations.ts'
-import { checkAbilities, checkAccountComparisons, checkContentTokens, checkEventsAndJobs, checkImports, checkNavigation, checkPolicyNumbers, checkTranslations } from './checks/source.ts'
+import { checkAbilities, checkAccountComparisons, checkContentTokens, checkEventsAndJobs, checkImports, checkNavigation, checkPolicyNumbers, checkSealSpecial, checkTranslations } from './checks/source.ts'
 import { checkSite } from './checks/site.ts'
 
 let failed = 0
@@ -34,6 +34,7 @@ report('Events and jobs', checkEventsAndJobs(modules, registry))
 report('Imports, bindings and outside calls', checkImports(modules))
 report('Numbers that should be settings', checkPolicyNumbers(modules))
 report('Reads by account go through the account scope', checkAccountComparisons(modules, registry))
+report('sealSpecial writes special columns, never a token', checkSealSpecial(modules, registry))
 report('Translations', checkTranslations(modules, registry))
 report('Navigation coverage', checkNavigation(modules, registry))
 report('Migrations', await checkMigrations(modules, registry))

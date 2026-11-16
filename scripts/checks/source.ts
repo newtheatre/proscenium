@@ -310,3 +310,26 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
   }
   return problems
 }
+
+/**
+ * sealSpecial writes a special or encrypted column and nothing else (Foundations part 4, T5): a
+ * link token is never sealed, it is hashed with linkTokens. Refuses sealSpecial in a module that has
+ * no such column, and a call whose argument names a token or a link.
+ */
+export function checkSealSpecial(modules: Loaded[], registry: any): string[] {
+  const problems: string[] = []
+  for (const m of modules) {
+    const sealsColumns = [...(registry.tables as Map<string, any>).values()].some(t => t.module === m.manifest.id && Object.values(t.meta.columns as Record<string, any>).some(c => c.meta.encrypted))
+    for (const file of moduleFiles(m).filter(f => f.endsWith('.ts') && !rel(f).startsWith('layers/core/kit/'))) {
+      lines(file).forEach((line, i) => {
+        if (!/\bsealSpecial\(/.test(line)) return
+        const at = `${rel(file)}:${i + 1}`
+        if (!sealsColumns) problems.push(`${at}: sealSpecial writes a special or encrypted column, and this module has none`)
+        for (const [, argument] of line.matchAll(/\bsealSpecial\(([^)]*)\)/g)) {
+          if (/token|link/i.test(argument!)) problems.push(`${at}: seals a link token; a token is never sealed or stored, keep linkTokens.hash(token) instead`)
+        }
+      })
+    }
+  }
+  return problems
+}
