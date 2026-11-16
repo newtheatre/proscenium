@@ -224,3 +224,18 @@ gets the same declaration made for it: each filter is a `choice`, each `sortable
 - **Server:** `decodeList(query, list, { can, today })` (alias `parse`) validates strictly and answers a typed
   `ListQuery` (folded search words, validated filters, dropped filters, view, sort, page, size) or a
   `ListRefusal` naming the key. Routes call the kit's `readList`, not this.
+
+### Adding to another module's list or record page (R-35)
+
+A module adds to another module's list or record page only through four points:
+`core.record-tab`, `core.record-fact`, `core.record-check` and `core.list-column`. There are no slots
+and no overrides. All are read-only, gated by `ability`, and absent when the module is off.
+
+| Point | A contribution adds | Built as |
+| --- | --- | --- |
+| `core.record-fact` | One fact in the summary strip, after the owner's | `{ id, record, ability, component, order }`; the component (in `app/record-facts/`) renders a `<div><dt/><dd/></div>` and gets `recordId` |
+| `core.record-check` | One line of the record's checklist | Code point. The file under `server/contributions/core.record-check/` exports `{ record, ability, order, check(recordId) }` answering `{ done, sentence, link }`. It reports only |
+| `core.list-column` | A column after the owner's | `{ id, list, ability, component, order }`; the component (in `app/list-columns/`) gets `listId`, `query` and `rowId` and fetches once for the page (one fetch key for the query). Label `<module>.list-columns.<name>.label`. Not yet sortable |
+
+`PageRecord` shows the checklist and an `aside` slot beside the tabs on a laptop; on a phone the
+checklist folds to one line above the tabs ("Checklist: 3 of 5").

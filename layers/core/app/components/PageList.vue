@@ -146,11 +146,22 @@ const sortIcon = (sortKey: string) => state.value.sort === sortKey ? (state.valu
 // The columns on show: the declared ones less what this device has hidden. A column's heading
 // sorts by the declared sort it names.
 const shown = computed(() => Object.entries(decl.value.columns).filter(([key]) => !hidden.value.includes(key)).map(([key, c]) => ({ key, ...c })))
+// Columns other modules add through core.list-column come after the owner's: read-only, gated by
+// ability, absent when their module is off. Each cell gets the list's id, the page's query and the
+// row's id, and fetches once for the page (the same key shares one request).
+const { data: contributed } = props.list
+  ? await useAPI<{ columns: { id: string, labelKey: string, component: string }[] }>('/api/core/list-columns', { query: { list: props.list.id }, key: `core:list-columns:${props.list.id}`, default: () => ({ columns: [] }) })
+  : { data: ref({ columns: [] as { id: string, labelKey: string, component: string }[] }) }
+const extra = computed(() => contributed.value.columns.flatMap((c) => {
+  const component = resolveComponent(c.component)
+  return typeof component === 'string' ? [] : [{ key: c.id, label: t(c.labelKey), component }]
+}))
 const rowId = (row: Row) => String(row[props.rowKey])
 const tableColumns = computed<TableColumn<Row>[]>(() => [
   ...(expandable.value ? [{ id: 'expand', enableSorting: false }] : []),
   ...(props.bulkActions ? [{ id: 'select', enableSorting: false }] : []),
   ...shown.value.map(c => ({ id: c.key, accessorFn: (row: Row) => row[c.key], header: c.label, enableSorting: !!c.sort })),
+  ...extra.value.map(c => ({ id: c.key, header: c.label, enableSorting: false })),
   ...(props.rowActions ? [{ id: 'actions', enableSorting: false }] : []),
 ])
 
@@ -485,6 +496,19 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                   {{ t('core.list.all-children', { count: childTotal(row.original), what: subRowsNoun ?? '' }) }}
                 </ULink>
               </template>
+            </template>
+            <template
+              v-for="c in extra"
+              :key="c.key"
+              #[`${c.key}-cell`]="{ row }"
+            >
+              <component
+                :is="c.component"
+                v-if="row.depth === 0"
+                :list-id="decl.id"
+                :query="query"
+                :row-id="rowId(row.original)"
+              />
             </template>
             <template #actions-header>
               <span class="sr-only">{{ t('core.list.actions') }}</span>

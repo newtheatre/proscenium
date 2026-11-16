@@ -23,6 +23,9 @@ export default defineModule({
   }),
   contributes: {
     'core.count': [{ id: 'gallery.drafts', file: 'drafts' }, { id: 'gallery.none', file: 'none' }],
+    'core.record-fact': [{ id: 'gallery.seats-held', record: 'gallery.production', ability: 'gallery.sample.view', component: 'GalleryFactSeats', order: 10 }],
+    'core.record-check': [{ id: 'gallery.poster', file: 'has-poster' }],
+    'core.list-column': [{ id: 'gallery.sales', list: 'gallery.shows', ability: 'gallery.sample.view', component: 'GalleryShowSales', order: 10 }],
     'core.record-tab': [{ id: 'gallery.tickets', record: 'gallery.production', ability: 'gallery.sample.view', component: 'GalleryTicketsTab', order: 10, count: 'gallery.drafts' }],
     'core.home-card': [
       { id: 'gallery.drafts-waiting', home: 'console', ability: 'gallery.sample.view', component: 'GalleryDraftsCard', urgency: 'overdue', count: 'gallery.drafts' },

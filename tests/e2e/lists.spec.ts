@@ -65,6 +65,16 @@ test.describe('a list with views and rows that open', () => {
     await expect(page.getByText('2026-11-20 19:30 (1)')).toBeVisible()
   })
 
+  test('a column another module adds comes after the owner\'s, with one request for the page', async ({ page }) => {
+    const asked: string[] = []
+    page.on('request', (r) => { if (r.url().includes('/api/gallery/shows-sales')) asked.push(r.url()) })
+    await visit(page, '/console/gallery/shows?view=all')
+    await expect(page.getByRole('columnheader', { name: 'Sales' })).toBeVisible()
+    await expect(page.getByTestId('show-sales').first()).toHaveText('84 sold')
+    expect(await page.getByTestId('show-sales').count()).toBe(5)
+    expect(asked.length).toBeLessThanOrEqual(1) // server render fetched it already; the browser asks at most once more
+  })
+
   test('the server names a key it does not know', async ({ page }) => {
     const response = await page.request.get('/api/gallery/shows?colour=red', { headers: { 'x-test-actor': JSON.stringify(staff) } })
     expect(response.status()).toBe(422)

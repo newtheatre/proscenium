@@ -33,6 +33,8 @@ test.describe('someone who may view the gallery', () => {
     await expect(page.getByRole('link', { name: 'Open the form' })).toBeVisible()
     await expect(page.getByText('Seats sold')).toBeVisible()
     await expect(page.getByText('Overview of prod-1.')).toBeVisible()
+    await expect(page.getByText('Seats held')).toBeVisible() // another module's fact, in the strip
+    await expect(page.getByRole('complementary', { name: 'About this record' }).getByText('A poster is set')).toBeVisible()
     await page.getByRole('tab', { name: 'Details' }).click()
     await expect(page.getByText('Details of prod-1.')).toBeVisible()
     await expect(page.getByText('Seats sold')).toBeVisible() // the summary stays as tabs change
