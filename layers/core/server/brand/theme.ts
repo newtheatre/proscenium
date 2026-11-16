@@ -103,16 +103,17 @@ export async function getBrand() {
   }
 }
 
-function block(t: ModeTokens, grey: readonly string[]): string {
+function block(t: ModeTokens, grey: readonly string[], inverted: string): string {
   return [
     `--brand-background:${t.background}`, `--brand-surface:${t.surface}`, `--brand-border:${t.border}`,
     `--brand-text:${t.text}`, `--brand-muted:${t.muted}`, `--brand-link:${t.link}`,
     `--brand-solid:${t.solid}`, `--brand-on-solid:${t.onSolid}`,
     `--brand-success:${t.success}`, `--brand-warning:${t.warning}`, `--brand-danger:${t.danger}`, `--brand-info:${t.info}`,
     // Nuxt UI uses its primary both as text on the page and as a fill under its inverted text
-    // (white in light mode, near-black in dark), so the link colour, readable on the background,
-    // serves for both. Its greys are the brand's.
-    `--ui-primary:${t.link}`,
+    // (white in light mode, the grey at 900 in dark). A shade that reaches 4.5 to 1 against the
+    // inverted text also reaches it against the page, which is no lighter in dark mode and the
+    // same white in light, so that shade serves for both. Its greys are the brand's.
+    `--ui-primary:${nearestShade(t.link, inverted)}`,
     ...SCALE.map((step, i) => `--ui-color-neutral-${step}:${grey[i]}`),
   ].join(';')
 }
@@ -126,5 +127,5 @@ const SCALE = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '90
 export function themeCss(tokens: BrandTokens): string {
   const shared = `--brand-radius:${tokens.radius};--ui-radius:${tokens.radius};--brand-display-font:${tokens.displayFont}`
   // html:root and html.dark outrank the bundled stylesheet's :root and .dark, whatever the order.
-  return `html:root{${shared};${block(tokens.light, tokens.neutral)}}\nhtml.dark{${block(tokens.dark, tokens.neutral)}}\n`
+  return `html:root{${shared};${block(tokens.light, tokens.neutral, '#ffffff')}}\nhtml.dark{${block(tokens.dark, tokens.neutral, tokens.neutral[n900]!)}}\n`
 }

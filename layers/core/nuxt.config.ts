@@ -9,6 +9,8 @@ const generatedTypes = fileURLToPath(new URL('../../.generated/types/registry.d.
 export default defineNuxtConfig({
   app: { head: { htmlAttrs: { lang: 'en-GB' } } },
   css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
+  // Turnstile's site key is public; set NUXT_PUBLIC_TURNSTILE_SITE_KEY beside CORE_TURNSTILE_SECRET_KEY.
+  runtimeConfig: { public: { turnstileSiteKey: '' } },
   alias: kitAliases(root),
   nitro: {
     typescript: { tsConfig: { include: [generatedTypes], compilerOptions: { types: ['@cloudflare/workers-types'] } } },
