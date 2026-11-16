@@ -4,12 +4,11 @@
 // recipients up to core.units.set-rows-limit, which the kit enforces before anything is written.
 // Email is sent after the commit by the job core.send-notifications; the inbox item is written here.
 import { sql } from 'drizzle-orm'
-import { all, first, isEnabled, nowMs, refuse, sealSpecial, useContext, useDb, useSetting } from '#kit'
+import { all, first, inAccountScope, isEnabled, nowMs, refuse, sealSpecial, useContext, useDb, useSetting } from '#kit'
 import type { RecordRef, UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { deliveries, inboxItems, notifications } from '../db/domain'
 import { addressesFor } from '../identity/addresses'
-import { inAccountScope } from '../account-scope'
 import { brandTokens } from '../brand/theme'
 import { checkVariables, render } from './render'
 import { suppressedAddresses } from './suppression'
@@ -96,7 +95,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     const found = await useDb().all<{ i: number, id: string }>(sql`SELECT json_extract(r.value, '$.i') AS i, n.id
       FROM json_each(${JSON.stringify(keyed)}) r
       JOIN core_notifications n ON n.dedupe_key = json_extract(r.value, '$.h')
-        AND ${inAccountScope(sql`n.account_id`, sql`json_extract(r.value, '$.a')`)}`)
+        AND ${inAccountScope('n.account_id', sql`json_extract(r.value, '$.a')`)}`)
     for (const row of found) earlier.set(Number(row.i), row.id)
   }
   const fresh: { index: number, accountId: string, values: Record<string, string>, hash: string | null }[] = []
