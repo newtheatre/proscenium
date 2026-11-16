@@ -36,9 +36,9 @@ export const settings = defineSettings('core', {
   'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], change: branding, audience: 'public' }),
   'brand.credit-line': setting.boolean({ default: true, change: branding, audience: 'public' }),
   // Programme (part 6). The other programme settings arrive with the screens they shape.
-  'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public' }),
-  'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', change: programmeConfigure, audience: 'public' }),
-  'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', change: programmeConfigure }),
+  'programme.credits-public': setting.boolean({ default: true, scope: 'site', change: programmeConfigure, audience: 'public' }),
+  'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', scope: 'site', change: programmeConfigure, audience: 'public' }),
+  'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', scope: 'site', change: programmeConfigure }),
   'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.logo-dark': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.revision': setting.integer({ default: 0, min: 0, max: 1_000_000_000, change: branding, audience: 'public', managed: true }), // not-policy: a counter's ceiling

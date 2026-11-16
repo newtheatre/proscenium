@@ -167,6 +167,9 @@ describe('Site administration (R-33)', () => {
     expect(site.settings.length).toBeGreaterThan(0)
     expect(site.settings.every(s => s.scope === 'site')).toBe(true)
     expect(site.settings.map(s => s.key)).toContain('core.units.set-rows-limit')
+    // Programme settings that are the site's own (R-33), shown to whoever may change them.
+    const programme = await (await settings('scope=site', person(['core.settings.manage', 'core.programme.configure']))).json() as Settings
+    expect(programme.settings.map(s => s.key)).toEqual(expect.arrayContaining(['core.programme.doors-before', 'core.programme.default-running-time', 'core.programme.credits-public']))
     // Compatible: a module's settings without a scope are all of them, each saying where it belongs.
     const all = await (await settings('module=core', person(['core.settings.manage', 'core.organisation.edit']))).json() as Settings
     expect(new Set(all.settings.map(s => s.scope))).toEqual(new Set(['module', 'site']))
