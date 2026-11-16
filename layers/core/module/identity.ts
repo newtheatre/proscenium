@@ -94,6 +94,21 @@ export const identitySecrets = {
 }
 
 export const identityContributions = {
+  // The other twelve identity messages (spec part 4) arrive with the stories that send them.
+  'core.notification-type': [{
+    id: 'core.sign-in-link',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'url' as const, code: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Sign in to {{ theatre }}',
+        body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+      },
+    },
+  }],
   'core.health-check': [
     { id: 'core.session-key', file: 'session-key' },
     { id: 'core.sign-in-challenge', file: 'sign-in-challenge' },
