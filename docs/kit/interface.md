@@ -225,6 +225,40 @@ gets the same declaration made for it: each filter is a `choice`, each `sortable
   `ListQuery` (folded search words, validated filters, dropped filters, view, sort, page, size) or a
   `ListRefusal` naming the key. Routes call the kit's `readList`, not this.
 
+### The server part: defineListSource and readList
+
+The route's side of a list is a source in the module's `server/lists/<name>.ts`, the default export of
+`defineListSource(list, { table, filters, sorts, search })`. It binds every key of the declaration, and a
+missing or extra binding does not compile:
+
+- **filters:** `{ column: 'key' }` compares the filter's value with a column (a `choices` value with
+  `IN`, a `dates` value as a range in the theatre's days, a timestamp column by the instants that
+  bound them), or `{ where: value => sql`...` }` writes the condition, a subquery for a child filter.
+  A `grouped` filter always writes its own.
+- **sorts:** `{ columns: [...], index: 'name' }` names an index on the table that begins with those
+  columns, or `{ columns, bounded: n }` says the list's own filters hold the scan to n rows.
+- **search:** every column of the list and every extra in the declaration's `search`, bound to a
+  text column, to `{ column, ability }` when only some viewers may see it, or to `false` for a field
+  that is not text. An encrypted, special or erase-`clear` column is refused. The searched columns
+  make the table's search index: `bun run db:generate` writes it into the next migration and the
+  check compares.
+
+A data route reads its address with `readList(event, source)` (or `readListQuery(query, source)` in
+an export job). It refuses an unknown key with `core.list.unknown` and a page past 10,000 rows with
+`core.list.too-deep`, and answers the validated filters, `dropped`, the search `words`,
+`ignoredWords` and `searchTooShort` (words under three letters are not searched), the sort, view,
+page, `limit` and `offset`, and:
+
+```ts
+const read = await readList(event, source)
+const rows = await useDb().select(...).from(table).where(read.where()).orderBy(...read.orderBy()).limit(read.limit).offset(read.offset)
+const [{ n }] = await useDb().select({ n: count() }).from(table).where(read.where())
+return read.answer(rows, n)
+```
+
+`orderBy()` ends with the id. `read.matched(rows)` names, for each row, the hidden field that matched a
+word the shown fields did not ("Matches note: …"), from rows that carry values under the list's keys.
+
 ### Adding to another module's list or record page (R-35)
 
 A module adds to another module's list or record page only through four points:

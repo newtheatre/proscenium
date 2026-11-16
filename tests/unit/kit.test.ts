@@ -266,17 +266,35 @@ describe('list sources (S1, S2)', () => {
     const { text } = await import('drizzle-orm/sqlite-core')
     const { col, defineTable } = await import('../../layers/core/kit/db')
     const { defineListSource } = await import('../../layers/core/kit/lists')
+    const { defineList } = await import('../../layers/core/shared/list')
+    const { index } = await import('drizzle-orm/sqlite-core')
     const table = defineTable('lost_property_items', {
       id: col.id(),
       owner: col.account('owner_id', { role: 'subject' }),
       label: col.public(text('label')),
       health: col.special('health'),
       token: col.internal(text('token'), { encrypted: true }),
-    }, { id: 'lpi', realm: 'operational' })
-    expect(defineListSource({ id: 'lost-property.items' }, { table, search: ['label'] }).searchIndex).toBe('lost_property_items_search')
-    expect(() => defineListSource({ id: 'lost-property.items' }, { table, search: ['health'] })).toThrow(/special data/)
-    expect(() => defineListSource({ id: 'lost-property.items' }, { table, search: ['token'] })).toThrow(/encrypted/)
-    expect(() => defineListSource({ id: 'lost-property.items' }, { table, search: ['nothing' as any] })).toThrow(/not a column/)
+    }, { id: 'lpi', realm: 'operational', extra: t => [index('lost_property_items_label').on(t.label, t.id)] })
+    const list = defineList('lost-property.items', {
+      filters: { owner: { kind: 'lookup', label: 'Owner' } },
+      sorts: { label: { label: 'Label', type: 'text' } },
+      columns: { label: { label: 'Label', sort: 'label' } },
+      search: ['notes'],
+    })
+    const bind = (over: Record<string, any> = {}) => defineListSource(list, { table, filters: { owner: { column: 'owner' } }, sorts: { label: { columns: ['label'], index: 'lost_property_items_label' } }, search: { label: 'label', notes: false }, ...over } as any)
+    expect(bind().searchIndex).toBe('lost_property_items_search')
+    expect(bind().search).toEqual([{ field: 'label', key: 'label', sql: 'label' }])
+    expect(() => bind({ search: { label: 'health', notes: false } })).toThrow(/special data/)
+    expect(() => bind({ search: { label: 'token', notes: false } })).toThrow(/encrypted/)
+    expect(() => bind({ search: { label: 'nothing', notes: false } })).toThrow(/not a column/)
+    expect(() => bind({ search: { label: 'label' } })).toThrow(/search.notes: has no binding/)
+    expect(() => bind({ filters: { owner: { column: 'owner' }, colour: { column: 'label' } } })).toThrow(/not a filter of the list/)
+    expect(() => bind({ filters: { owner: { column: 'token' } } })).toThrow(/encrypted/)
+    // A sort names an index that begins with its columns, or the most rows its scan reads.
+    expect(() => bind({ sorts: { label: { columns: ['label'], index: 'nowhere' } } })).toThrow(/no index named nowhere/)
+    expect(() => bind({ sorts: { label: { columns: ['owner'], index: 'lost_property_items_label' } } })).toThrow(/does not begin with/)
+    expect(() => bind({ sorts: { label: { columns: ['owner'], bounded: 0 } } })).toThrow(/whole number/)
+    expect(bind({ sorts: { label: { columns: ['owner'], bounded: 500 } } }).list.id).toBe('lost-property.items')
   })
 
   it('tell the generator which index to make, remake or drop', async () => {

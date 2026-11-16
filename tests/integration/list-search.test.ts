@@ -1,9 +1,9 @@
 // List search (Foundations part 4, "Lists", S1 to S5; proof P-LIST-1): the generated index finds every
 // word in any searched field, ignoring case and accents, and an erasure leaves it in the same statement.
 import { describe, expect, it } from 'vitest'
-import { createUnit, newId, searchQuery, searchWords } from '#kit'
+import { changeSetting, createUnit, newId, searchQuery, searchWords } from '#kit'
 import { ERASED } from '#kit/db'
-import { env, inContext, performance, rows } from './helpers'
+import { env, inContext, performance, person, rows } from './helpers'
 
 async function sale(performanceId: string, buyerName: string, note: string | null = null): Promise<string> {
   const id = newId('sl')
@@ -56,5 +56,94 @@ describe('a generated search index', () => {
     })
     await expect(attempt).rejects.toMatchObject({ code: 'seats.missing' })
     expect(await find('ola okafor')).toEqual([])
+  })
+})
+
+describe('readList', async () => {
+  const { readListQuery, useDb } = await import('#kit')
+  const { count } = await import('drizzle-orm')
+  const { ledger, performances } = await import('../fixtures/modules/seats/server/db/schema')
+  const sales = (await import('../fixtures/modules/seats/server/lists/sales')).default
+  const shows = (await import('../fixtures/modules/seats/server/lists/performances')).default
+  const lookUp = () => person(['seats.members.look-up'])
+  const nobody = () => person([])
+
+  const page = (query: Record<string, string>, actor = lookUp(), show?: string) => inContext(async () => {
+    const read = await readListQuery(show ? { ...query, performance: show } : query, sales)
+    const found = await useDb().select({ id: ledger.id, buyerName: ledger.buyerName, note: ledger.note, quantity: ledger.quantity }).from(ledger).where(read.where()).orderBy(...read.orderBy()).limit(read.limit).offset(read.offset)
+    const [{ n }] = await useDb().select({ n: count() }).from(ledger).where(read.where()) as [{ n: number }]
+    return { read, found, total: n, matched: read.matched(found) }
+  }, actor)
+
+  it('searches every field the viewer may see, and names a hidden field that matched', async () => {
+    const show = await performance()
+    const ada = await sale(show, 'Ada Pemberton', 'Booked by Quilliam')
+    const quilliam = await sale(show, 'Rex Quilliam', null)
+    const both = await page({ q: 'quilliam' }, lookUp(), show)
+    expect(both.found.map(r => r.id).sort()).toEqual([ada, quilliam].sort())
+    expect(both.total).toBe(2)
+    expect(Object.fromEntries(both.found.map((r, i) => [r.id, both.matched[i]]))).toEqual({ [ada]: 'note', [quilliam]: null })
+    // Without the ability that shows buyers' names, only the note is searched.
+    const notes = await page({ q: 'quilliam' }, nobody(), show)
+    expect(notes.found.map(r => r.id)).toEqual([ada])
+  })
+
+  it('ignores words under three letters, and says when nothing was searched', async () => {
+    const show = await performance()
+    await sale(show, 'Ida Pemberton')
+    await sale(show, 'Bo Pemberton')
+    const short = await page({ q: 'Bo' }, lookUp(), show)
+    expect(short.read).toMatchObject({ words: [], ignoredWords: ['Bo'], searchTooShort: true })
+    expect(short.total).toBe(2)
+    const mixed = await page({ q: 'bo pemb' }, lookUp(), show)
+    expect(mixed.read).toMatchObject({ words: ['pemb'], ignoredWords: ['bo'], searchTooShort: false })
+    expect(mixed.read.answer([], 0)).toEqual({ rows: [], total: 0, dropped: [], ignoredWords: ['bo'], searchTooShort: false })
+  })
+
+  it('applies filters, drops one the viewer may not use, and ends every sort with the id', async () => {
+    const show = await performance()
+    const one = await sale(show, 'Single Buyer')
+    const group = newId('sl')
+    await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, created_at) VALUES (?, ?, 4, ?, ?, ?)').bind(group, show, newId('acc'), 'Group Buyer', Date.now()).run()
+    expect((await page({ sizes: 'group' }, lookUp(), show)).found.map(r => r.id)).toEqual([group])
+    expect((await page({ sizes: 'single,group' }, lookUp(), show)).total).toBe(2)
+    const dropped = await page({ buyer: newId('acc') }, nobody(), show)
+    expect(dropped.read.dropped).toEqual(['buyer'])
+    expect(dropped.total).toBe(2)
+    expect((await page({ buyer: newId('acc') }, lookUp(), show)).total).toBe(0)
+    const sorted = await page({ order: 'asc' }, lookUp(), show)
+    expect(sorted.read.sort).toEqual({ key: 'at', order: 'asc' })
+    expect(sorted.found.map(r => r.id)).toEqual([one, group])
+  })
+
+  it('refuses a key the list does not take, and a page too deep', async () => {
+    await expect(page({ colour: 'red' })).rejects.toMatchObject({ code: 'core.list.unknown', fields: { colour: 'core.list.unknown' } })
+    await expect(page({ sizes: 'huge' })).rejects.toMatchObject({ code: 'core.list.unknown', fields: { sizes: 'core.list.unknown' } })
+    await expect(page({ page: '401', size: '25' })).rejects.toMatchObject({ code: 'core.list.too-deep' })
+    await expect(page({ page: '100', size: '100' })).resolves.toBeTruthy()
+  })
+
+  it('filters by a day on a date column and by a condition the source writes', async () => {
+    const id = newId('sp')
+    await env.DB.prepare('INSERT INTO seats_performances (id, title, capacity, sold, operating_day) VALUES (?, ?, 2, 2, ?)').bind(id, 'Pericles Matinée', '2026-03-04').run()
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'core.locale.time-zone', 'Europe/London', { confirm: true })
+      await unit.commit()
+    })
+    const read = (query: Record<string, string>) => inContext(async () => {
+      const r = await readListQuery(query, shows)
+      return (await useDb().select({ id: performances.id }).from(performances).where(r.where()).orderBy(...r.orderBy())).map(x => x.id)
+    })
+    expect(await read({ q: 'pericles matinee' })).toEqual([id])
+    expect(await read({ q: 'pericles', day: '2026-03-04' })).toEqual([id])
+    expect(await read({ q: 'pericles', day: '2026-03-05..2026-03-09' })).toEqual([])
+    expect(await read({ q: 'pericles', full: 'yes' })).toEqual([id])
+    expect(await read({ q: 'pericles', full: 'no' })).toEqual([])
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'core.locale.time-zone', null, { reset: true, confirm: true })
+      await unit.commit()
+    })
   })
 })
