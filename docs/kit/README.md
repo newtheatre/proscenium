@@ -139,6 +139,25 @@ names a `menu` (account, members, console or live) and may set `hideEmpty` besid
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
 
+## Requirements
+
+A module that can judge a condition contributes a source to `core.requirement` under its own id,
+in `server/contributions/core.requirement/<id>.ts`:
+`export default defineRequirementSource({ options, describe, check, holder?, holderAbility?, checkAbility? })`.
+A host stores references as text, `<source>:<id>`, or `fact:<name>` for a fact, which core
+answers. It asks with
+`requirements.check({ accounts, refs, at?, record?, presented?, whenUnavailable })`, and every pair
+of account and reference gets `{ verdict: 'met' | 'not-met', unavailable, until?, reason?, summary?,
+evidence?, help?, quantity? }`. `whenUnavailable` is required: `'met'` where the requirement
+restricts who may do something, `'not-met'` where it grants a benefit. A source that is off, absent
+or fails answers unavailable. `quantity` (a whole number, nought or more) is kept only on a met
+verdict. With `checkAbility`, a check about any account but the actor's own reaches the source only
+if the actor holds that ability, and the read is audited against the account; a job or task never
+holds it. A check carrying a typed value counts against the `presented-value` rate-limit class, by
+session and by address; past it, those pairs answer not met and the source is not called.
+`requirements.holder(ref, evidence)` gives staff with the source's `holderAbility` a display name,
+and audits the read.
+
 ## External calls
 
 `externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency

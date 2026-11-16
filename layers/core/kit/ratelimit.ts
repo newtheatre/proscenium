@@ -3,7 +3,8 @@
 import { useSetting } from './settings-store'
 import { nowMs } from './clock'
 
-export const RATE_CLASSES = ['default', 'write', 'sign-in', 'public-form', 'export'] as const
+// presented-value counts checks that carry a value a person typed (a membership number, a code).
+export const RATE_CLASSES = ['default', 'write', 'sign-in', 'public-form', 'export', 'presented-value'] as const
 export type RateClass = typeof RATE_CLASSES[number]
 
 const windows = new Map<string, { count: number, resets: number }>()
