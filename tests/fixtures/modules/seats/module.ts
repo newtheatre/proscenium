@@ -1,6 +1,6 @@
 // A test fixture, not a product module: just enough of a box office to prove the kit's guarantees.
 import { z } from 'zod'
-import { ability, call, defineAbilities, defineModule, defineRecords, defineSettings, event, job, record, setting, task } from '#kit'
+import { ability, call, defineAbilities, defineFacts, defineModule, factDecl, defineRecords, defineSettings, event, job, record, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 export default defineModule({
@@ -15,7 +15,9 @@ export default defineModule({
   abilities: defineAbilities('seats', {
     'orders.sell': ability({ on: 'seats.performance' }),
     'settings.manage': ability({ risk: 'privileged', implies: ['orders.sell'] }),
+    'members.look-up': ability({ audit: 'read' }),
   }),
+  facts: defineFacts('seats', { regular: factDecl() }),
   tables,
   events: {
     announces: {
@@ -32,6 +34,7 @@ export default defineModule({
     'seats.take-payment': call({ reconcileAfter: '1m' }),
   },
   contributes: {
+    'core.requirement': [{ id: 'seats' }],
     'core.operating-day': [{ id: 'seats.performances', table: 'seats_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   },
 })

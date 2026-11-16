@@ -70,3 +70,5 @@ On the last row: five named sizes mean each image costs at most five unique tran
 | No other theatre has been consulted | As the design paper already records | Every default in part 6 |
 
 Two claims that stood in this table are now settled. Cloudflare Email Sending reports bounces, complaints, failures and rejections as events on a queue, through an event subscription for each sending domain: read in Cloudflare's documentation on 16 November 2026 and set out in part 4. A theatre-owned `site/content.config.ts` survives an upstream merge: shown by the foundations owned-paths proof.
+
+The bounce half of Email Sending's events was then run on a real sending domain on 16 November 2026 (`/mnt/project-files/core-domain-proofs/report.md`, proof 2), and part 4 records what it found. One thing joins the list above as not verified: that a complaint event carries the send's message id. Cloudflare offers no way to simulate a complaint, so it waits on a real mailbox at a provider that reports them. Also found, against the documentation: Cloudflare had not suppressed a hard-bounced address four and a half minutes later, so core relies on its own list.

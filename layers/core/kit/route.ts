@@ -123,7 +123,8 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     const actor = await provider.actor(event)
     context.actor = actor
 
-    const who = actor.accountId ?? getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? 'unknown'
+    context.address = getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? undefined
+    const who = actor.accountId ?? context.address ?? 'unknown'
     if (!(await takeRate(decl.rateLimit, who))) {
       setResponseHeader(event, 'Retry-After', 60)
       throw new Refusal('core.rate-limit.reached', 'Too many requests. Please slow down.', { status: 429, remedy: 'Wait a minute, then try again.' })
