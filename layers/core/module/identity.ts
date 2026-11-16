@@ -83,6 +83,7 @@ export const identityEvents = {
 export const identityJobs = {
   // The link and code travel sealed with a key derived from CORE_SESSION_KEY, never in clear.
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
+  'core.send-invitation': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
 }
 
 export const identityTasks = {
@@ -96,7 +97,7 @@ export const identitySecrets = {
 }
 
 export const identityContributions = {
-  // The other twelve identity messages (spec part 4) arrive with the stories that send them.
+  // The other identity messages (spec part 4) arrive with the stories that send them.
   'core.notification-type': [{
     id: 'core.sign-in-link',
     category: 'transactional' as const,
@@ -108,6 +109,21 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
         body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+      },
+    },
+  }, {
+    // Sent by notifyAddress from a job, like the sign-in link, so the link (a sign-in) is never
+    // stored in clear in core_notifications.
+    id: 'core.invitation',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'url' as const, role: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'You have been given a role at {{ theatre }}',
+        body: 'You have been given the role {{ role }} at {{ theatre }}. Use this link to sign in and start: it works once.\n\n[Sign in]({{ link }})\n\nIf the link has run out, sign in with this email address and the role will be waiting. If you were not expecting this, you can ignore this email.',
       },
     },
   }],

@@ -4,13 +4,13 @@
 // address does the same, because the grant waits on the account, not on the link.
 import type { H3Event } from 'h3'
 import { newId, nowMs, useSetting, type Actor, type UnitView } from '#kit'
-import { digest, randomToken } from './crypto'
+import { digest, randomToken, sealValue } from './crypto'
 import { relyingParty } from './web'
 
 export interface Invitation { tokenId: string, link: string }
 
-/** Writes the invitation's token and returns the link to send. */
-export async function createInvitation(unit: UnitView, event: H3Event, actor: Actor, to: { accountId: string, address: string }): Promise<Invitation> {
+/** Writes the invitation's token and queues the email that carries its link, sealed. */
+export async function createInvitation(unit: UnitView, event: H3Event, actor: Actor, to: { accountId: string, address: string, role: string }): Promise<Invitation> {
   const token = randomToken()
   const tokenId = newId('tok', { random: true })
   const at = nowMs()
@@ -20,5 +20,7 @@ export async function createInvitation(unit: UnitView, event: H3Event, actor: Ac
           VALUES (?, 'invite', ?, ?, ?, ?, 0, ?, ?)`,
     params: [tokenId, await digest('link', token), to.accountId, to.address, actor.accountId ?? null, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
-  return { tokenId, link: `${relyingParty(event).origin}/sign-in/link#${token}` }
+  const link = `${relyingParty(event).origin}/sign-in/link#${token}`
+  unit.enqueue('core.send-invitation', { tokenId, sealed: await sealValue('invitation-mail', { address: to.address, link, role: to.role }) })
+  return { tokenId, link }
 }

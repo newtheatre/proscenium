@@ -2,7 +2,7 @@
 // address nobody holds makes an unclaimed account, which needs the ability to add people too. The
 // grant waits for the person's first sign-in, and the invitation's link is that sign-in.
 import { z } from 'zod'
-import { defineRoute, refuse, requireAbility } from '#kit'
+import { defineRoute, first, refuse, requireAbility } from '#kit'
 import { normaliseAddress } from '../../identity/accounts'
 import { findOrCreateAccount } from '../../identity/guests'
 import { createInvitation } from '../../identity/invitations'
@@ -32,6 +32,7 @@ export default defineRoute({
   if (found.accountId === actor.accountId) refuse('core.grant.self', 'You cannot give yourself a role.', { status: 403, remedy: 'Ask someone else who can give roles.' })
   const id = await createGrant(unit, actor, { ...grant, accountId: found.accountId }, { newAccount: found.created })
   if (found.claimed) return { id, accountId: found.accountId, invited: false }
-  await createInvitation(unit, event, actor, { accountId: found.accountId, address: normaliseAddress(person.address) })
+  const role = await first<{ name: string }>('SELECT name FROM core_roles WHERE id = ?', grant.roleId)
+  await createInvitation(unit, event, actor, { accountId: found.accountId, address: normaliseAddress(person.address), role: role!.name })
   return { id, accountId: found.accountId, invited: true }
 })
