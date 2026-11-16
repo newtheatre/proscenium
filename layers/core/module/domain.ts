@@ -2,7 +2,7 @@
 // settings and the operating day, files, the brand, sending email, and the public site's points.
 // module.ts spreads each field into the core manifest, beside foundations' and identity's parts.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, secret, setting, task } from '#kit'
 import type { SettingRule } from '#kit'
 import { parseDuration } from '#kit/duration'
 
@@ -55,6 +55,8 @@ export const settings = defineSettings('core', {
   'notifications.stuck-after': setting.duration({ default: '10m', min: '5m', max: '2h', change: notificationConfigure }),
   'notifications.log-retention': setting.duration({ default: '400d', min: '30d', max: '2555d', change: notificationConfigure }),
   'notifications.inbox-retention': setting.duration({ default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in' }),
+  // C-52: the label put before the site's host when the sending domain is set up automatically.
+  'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender }),
 })
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] // not-policy: the calendar; 29 February is not every year's end
@@ -74,6 +76,7 @@ export const settingRules: SettingRule[] = [
   { id: 'year-end', check: s => s['organisation.year-end'] === null || isDayOfYear(s['organisation.year-end']) },
   { id: 'sending-domain', check: s => s['notifications.sending-domain'] === null || /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(s['notifications.sending-domain']) },
   { id: 'stuck-after', check: s => parseDuration(s['notifications.stuck-after']) > parseDuration(s['notifications.first-retry']) },
+  { id: 'sending-label', check: s => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(s['notifications.sending-label']) }, // not-policy: a DNS label
 ]
 
 export const records = defineRecords('core', {
@@ -200,7 +203,8 @@ export const contributes = {
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
-  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }],
+  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
+  'core.setup-step': [{ id: 'core.sender', required: true, to: '/console/system/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
@@ -239,6 +243,16 @@ export const jobs = {
   'core.check-file': job({ payload: z.object({ fileId: z.string() }) }),
   'core.recompute-days': job({ payload: z.object({}), lane: 'bulk' }),
   'core.send-notifications': job({ payload: z.object({ deliveryIds: z.array(z.string()).min(1) }) }),
+  'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
+}
+
+// C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard.
+export const secrets = {
+  CORE_CLOUDFLARE_TOKEN: secret({ needed: 'optional' }),
+}
+
+export const calls = {
+  'core.create-sending-domain': call({ reconcileAfter: '5m' }),
 }
 
 export const tasks = {

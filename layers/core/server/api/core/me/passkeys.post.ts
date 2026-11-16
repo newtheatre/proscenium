@@ -6,6 +6,7 @@ import { requireFresh, sessionOf } from '../../../identity/guards'
 import { addPasskey, newRecoveryCodes, passkeyCount, verifyRegistration } from '../../../identity/passkeys'
 import { deviceLabel } from '../../../identity/web'
 import { reassert } from '../../../identity/sessions'
+import { credentialNotice } from '../../../identity/notices'
 
 export default defineRoute({
   ability: 'signed-in',
@@ -22,5 +23,6 @@ export default defineRoute({
   // Proving a new passkey is a strong proof, so this session is strong from now on.
   reassert(unit, session.id, 'passkey', true)
   unit.audit({ action: 'create', record: ['core.account', session.accountId], detail: { passkeyId: id } })
+  await credentialNotice(unit, session.accountId, 'passkey')
   return { passkeyId: id, recoveryCodes }
 })

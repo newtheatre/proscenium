@@ -28,7 +28,8 @@ export class MailError extends Error {
 // Codes that will not change by trying again with the same message.
 const PERMANENT = new Set(['E_VALIDATION_ERROR', 'E_FIELD_MISSING', 'E_TOO_MANY_RECIPIENTS', 'E_RECIPIENT_SUPPRESSED', 'E_RECIPIENT_NOT_ALLOWED', 'E_CONTENT_TOO_LARGE', 'E_HEADER_NOT_ALLOWED', 'E_HEADER_USE_API_FIELD', 'E_HEADER_VALUE_INVALID', 'E_HEADER_NAME_INVALID'])
 // Codes that mean the sending domain is not ready: retried, because an administrator can fix it.
-export const DOMAIN_CODES = new Set(['E_SENDER_NOT_VERIFIED', 'E_SENDER_DOMAIN_NOT_AVAILABLE'])
+// E_EMAIL_SENDING_NOT_READY lasts about two minutes after a domain is onboarded (proof P-COM-3).
+export const DOMAIN_CODES = new Set(['E_SENDER_NOT_VERIFIED', 'E_SENDER_DOMAIN_NOT_AVAILABLE', 'E_EMAIL_SENDING_NOT_READY'])
 
 const binding: Mailer = async (message) => {
   const email = useContext().env.EMAIL

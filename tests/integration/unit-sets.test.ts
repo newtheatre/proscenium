@@ -1,5 +1,6 @@
 // U7 to U9: a fan-out is written set-wise, one statement per table whatever the row count, and a
-// set larger than core.units.set-rows-limit is refused before anything is written.
+// set larger than core.units.set-rows-limit (at most 2,000) or over 1 MB is refused before anything
+// is written.
 import { afterEach, describe, expect, it } from 'vitest'
 import { changeSetting, createUnit, isId } from '#kit'
 import { setDispatcher, type JobMessage } from '#kit/dispatch'
@@ -89,6 +90,23 @@ describe('a set written in a unit of work', () => {
     })
     await expect(result).rejects.toMatchObject({ code: 'core.unit.too-large' })
     expect(await rows("SELECT id FROM seats_performances WHERE title LIKE 'Too many %'")).toHaveLength(0)
+  })
+
+  it('refuses a set whose JSON parameter is over 1 MB, however few its rows', async () => {
+    // Ten rows of 120,000 characters: within any row limit, over the kit's byte limit (U9).
+    const wide = 'x'.repeat(120_000) // not-policy: a title wide enough to pass 1 MB in ten rows
+    const result = inContext(async () => {
+      const unit = createUnit()
+      unit.insertSet(performances, Array.from({ length: 10 }, (_, i) => ({ title: `Too wide ${i} ${wide}`, capacity: 1 })))
+      return unit.commit()
+    })
+    await expect(result).rejects.toMatchObject({ code: 'core.unit.too-large', reason: expect.stringMatching(/more than the limit of 1,000 KB/) })
+    expect(await rows("SELECT id FROM seats_performances WHERE title LIKE 'Too wide %'")).toHaveLength(0)
+  })
+
+  it('refuses a set-rows limit above 2,000', async () => {
+    await expect(setLimit('core.units.set-rows-limit', 2001)).rejects.toThrow(/must be at most 2,?000/)
+    await setLimit('core.units.set-rows-limit', 2000)
   })
 
   it('announces and audits a set in one statement each, plus one per listener, with each event delivered as its own', async () => {

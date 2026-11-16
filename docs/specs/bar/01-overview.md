@@ -9,7 +9,7 @@ The second-round specification for the `bar` module: products and prices, a till
 | Tab | Holds |
 | --- | --- |
 | 1. Scope and glossary | What is in and out, the two releases, and the words |
-| 2. Data model | 21 tables with their id prefixes, guards and data classes, and one keyed table of stock levels |
+| 2. Data model | 22 tables: 21 with their id prefixes, guards and data classes, and one keyed table of stock levels |
 | 3. Rules and flows | Openings, bar sales, who may sell, payment, refunds, the age check and refusals, bar tabs, stock, the ledger |
 | 4. Interface to other modules | What the bar needs from Payments, Finance and the rest, and what it offers |
 | 5. Screens | Eighteen screens: the till, the desk panel, fifteen console screens and "My bar tab" in the members' area, with wireframes of the till, the desk panel and My bar tab |
