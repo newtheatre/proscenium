@@ -110,6 +110,13 @@ describe('sending an email from a job (C-27)', () => {
     expect(mail.html).toContain('href="https://tickets.example.org/t/abc"')
   })
 
+  it('keeps no address or variables once the email to a bare address is finished', async () => {
+    await verify()
+    await sendTicket()
+    await deliver()
+    expect(await rows('SELECT account_id, address, payload, sealed_variables FROM core_notifications')).toEqual([{ account_id: null, address: null, payload: null, sealed_variables: null }])
+  })
+
   it('writes nothing about the message to the database', async () => {
     await verify()
     await sendTicket()
