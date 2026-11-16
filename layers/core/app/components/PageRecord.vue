@@ -69,15 +69,11 @@ const { te } = useT()
 <template>
   <PageFrame :title="title">
     <template #status>
-      <div
+      <StatusBadge
         v-if="status"
-        class="mt-2"
-      >
-        <StatusBadge
-          :tone="status.tone"
-          :label="status.label"
-        />
-      </div>
+        :tone="status.tone"
+        :label="status.label"
+      />
     </template>
     <template #primary>
       <UButton

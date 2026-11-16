@@ -37,40 +37,38 @@ async function create() {
 </script>
 
 <template>
-  <div>
-    <PageList
-      title="Productions"
-      route="/api/core/productions"
-      :columns="columns"
-      :filters="filters"
-      :row-label="(row: Row) => row.title"
-      :row-to="(row: Row) => `/console/programme/productions/${row.id}`"
-      :empty="{ title: 'No productions yet', description: 'A production is anything the theatre puts in front of people: its own show, a visiting company, a hire or an event.', icon: 'i-lucide-drama' }"
-    >
-      <template #primary>
-        <UButton
-          label="New production"
-          icon="i-lucide-plus"
-          @click="creating = true"
-        />
-      </template>
-      <template #cell-title="{ row }">
-        <span>{{ row.title }}</span>
-        <span
-          v-if="row.companyName"
-          class="text-sm text-muted"
-        > · {{ row.companyName }}</span>
-      </template>
-      <template #cell-season="{ row }">
-        {{ seasonName(row.seasonId) }}
-      </template>
-      <template #cell-state="{ row }">
-        <StatusBadge
-          :tone="TONES[row.state as Row['state']]"
-          :label="row.state.charAt(0).toUpperCase() + row.state.slice(1)"
-        />
-      </template>
-    </PageList>
+  <PageList
+    title="Productions"
+    route="/api/core/productions"
+    :columns="columns"
+    :filters="filters"
+    :row-label="(row: Row) => row.title"
+    :row-to="(row: Row) => `/console/programme/productions/${row.id}`"
+    :empty="{ title: 'No productions yet', description: 'A production is anything the theatre puts in front of people: its own show, a visiting company, a hire or an event.', icon: 'i-lucide-drama' }"
+  >
+    <template #primary>
+      <UButton
+        label="New production"
+        icon="i-lucide-plus"
+        @click="creating = true"
+      />
+    </template>
+    <template #cell-title="{ row }">
+      <span>{{ row.title }}</span>
+      <span
+        v-if="row.companyName"
+        class="text-sm text-muted"
+      > · {{ row.companyName }}</span>
+    </template>
+    <template #cell-season="{ row }">
+      {{ seasonName(row.seasonId) }}
+    </template>
+    <template #cell-state="{ row }">
+      <StatusBadge
+        :tone="TONES[row.state as Row['state']]"
+        :label="row.state.charAt(0).toUpperCase() + row.state.slice(1)"
+      />
+    </template>
 
     <UModal
       v-model:open="creating"
@@ -111,5 +109,5 @@ async function create() {
         />
       </template>
     </UModal>
-  </div>
+  </PageList>
 </template>
