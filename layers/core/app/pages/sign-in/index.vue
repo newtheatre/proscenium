@@ -30,17 +30,12 @@ const providerErrors: Record<string, string> = {
 const providerError = errorCode ? (providerErrors[errorCode] ?? 'Google did not confirm who you are. Try again.') : null
 const googleHref = `/api/core/sign-in/google${next ? `?next=${encodeURIComponent(next)}` : ''}`
 
-function arrive(target: { next: string, offerPasskey?: boolean }) {
-  if (target.offerPasskey) return navigateTo({ path: '/account/passkey', query: { next: target.next } })
-  return navigateTo(target.next)
-}
-
 async function withPasskey() {
   busy.value = true
   refusal.value = null
   const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', next ? { next } : {})
   busy.value = false
-  if (answer.ok) return arrive(answer.data)
+  if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
 }
 
@@ -62,7 +57,7 @@ async function useCode() {
   refusal.value = null
   const answer = await callIdentity<{ next: string, offerPasskey: boolean }>('/api/core/sign-in/code', { address: address.value, code: code.value })
   busy.value = false
-  if (answer.ok) return arrive(answer.data)
+  if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
 }
 </script>
