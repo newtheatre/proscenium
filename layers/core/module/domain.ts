@@ -83,6 +83,8 @@ export const records = defineRecords('core', {
   file: record({ table: 'core_files' }),
   sender: record({ table: 'core_sender_identities' }),
   vocabulary: record({ table: 'core_vocabularies' }),
+  venue: record({ table: 'core_venues' }),
+  space: record({ table: 'core_spaces', parent: 'core.venue' }),
 })
 
 export const abilities = defineAbilities('core', {
@@ -94,6 +96,8 @@ export const abilities = defineAbilities('core', {
   'notification.configure': ability(),
   // Granted on one vocabulary, it lets a module's manager look after that list only.
   'vocabulary.manage': ability({ on: 'core.vocabulary', grantAt: ['site', 'record'] }),
+  // A venue and its spaces. Creating a venue needs it site-wide; a grant on one venue covers its spaces.
+  'venue.manage': ability({ on: 'core.venue', grantAt: ['site', 'record'] }),
 })
 
 const variableName = z.string().regex(/^[a-z][a-zA-Z0-9]*$/)
@@ -231,6 +235,8 @@ function terms(...list: [slug: string, label: string, icon?: string][]) {
 
 export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
+  'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
+  'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
   'core.file.rejected': event({ version: 1, payload: z.object({ fileId: z.string(), reason: code() }), internal: true }),
   'core.file.deleted': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
