@@ -10,16 +10,16 @@ const generatedTypes = fileURLToPath(new URL('../../.generated/types/registry.d.
 
 export default defineNuxtConfig({
   app: { head: { htmlAttrs: { lang: 'en-GB' } } },
+  css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
+  // Turnstile's site key is public; set NUXT_PUBLIC_TURNSTILE_SITE_KEY beside CORE_TURNSTILE_SECRET_KEY.
+  runtimeConfig: { public: { turnstileSiteKey: '' } },
+  alias: kitAliases(root),
   // Screens that moved to Site administration (R-33): old bookmarks still arrive.
   routeRules: {
     '/console/system/email': { redirect: { to: '/admin/email', statusCode: 301 } },
     '/console/system/vocabularies': { redirect: { to: '/admin/vocabularies', statusCode: 301 } },
     '/console/system/vocabularies/**': { redirect: { to: '/admin/vocabularies/**', statusCode: 301 } },
   },
-  css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
-  // Turnstile's site key is public; set NUXT_PUBLIC_TURNSTILE_SITE_KEY beside CORE_TURNSTILE_SECRET_KEY.
-  runtimeConfig: { public: { turnstileSiteKey: '' } },
-  alias: kitAliases(root),
   nitro: {
     // Nitro drops imports of packages it thinks have no side effects; this polyfill is nothing else.
     moduleSideEffects: ['reflect-metadata'],
