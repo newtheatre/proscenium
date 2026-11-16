@@ -182,6 +182,14 @@ after 5 seconds; a throw waits 30. After five tries the message is set aside in
 `<worker>-email-events-dead`. The body names the recipient and the subject, so only the queue
 message's id and the event's type are ever logged.
 
+## Public components
+
+A module offers a component to the fork's Markdown pages through `core.public-component`:
+`{ id, component: 'CoreAccessApplication', alias: 'access-application' }`. The component's own name
+starts with its module's name; the alias is what a content file writes (`::access-application`),
+kebab-case, unique across modules and never an HTML element's name. The build refuses a clash, and
+the core layer registers the component a second time, globally, under its alias.
+
 ## External calls
 
 `externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency
