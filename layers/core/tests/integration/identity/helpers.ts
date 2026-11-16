@@ -153,12 +153,36 @@ export async function grantDirectly(accountId: string, abilities: string[], opti
   const at = Date.now()
   if (!options.roleId) {
     await env.DB.prepare('INSERT INTO core_roles (id, key, name, fixed, opens_members_area, needs_managed_identity, expiry_rule, created_at) VALUES (?, ?, ?, ?, 1, 0, \'none\', ?)')
-      .bind(roleId, options.roleKey ?? `role-${roleId.slice(4, 12)}`, options.roleKey ?? 'Test role', options.roleKey === 'owner' ? 1 : 0, at).run()
+      .bind(roleId, options.roleKey ?? `role-${roleId.slice(-10)}`, options.roleKey ?? 'Test role', options.roleKey === 'owner' ? 1 : 0, at).run()
     for (const ability of abilities) await env.DB.prepare('INSERT INTO core_role_abilities (role_id, ability) VALUES (?, ?)').bind(roleId, ability).run()
   }
   const grantId = newId('gra')
-  await env.DB.prepare('INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES (?, ?, ?, \'site\', ?, NULL, ?)').bind(grantId, accountId, roleId, at - 1000, at - 1000).run() // not-policy: a moment ago
+  await env.DB.prepare('INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, granted_by, granted_at) VALUES (?, ?, ?, \'site\', ?, \'acc_testgranter\', ?)').bind(grantId, accountId, roleId, at - 1000, at - 1000).run() // not-policy: a moment ago
   return { roleId, grantId }
 }
 
 export { env, deliver }
+
+export async function setSetting(key: string, value: unknown): Promise<void> {
+  await env.DB.prepare('INSERT INTO core_settings (key, value, updated_at) VALUES (?, ?, 0) ON CONFLICT (key) DO UPDATE SET value = excluded.value').bind(key, JSON.stringify(value)).run()
+}
+
+export async function clearSetting(key: string): Promise<void> {
+  await env.DB.prepare('DELETE FROM core_settings WHERE key = ?').bind(key).run()
+}
+
+/** Makes the browser's session look as if it was last re-asserted long ago. */
+export async function goStale(accountId: string): Promise<void> {
+  await env.DB.prepare('UPDATE core_sessions SET reasserted_at = 1 WHERE account_id = ?').bind(accountId).run()
+}
+
+/** An account that was made (say by a guest checkout) but has never signed in. */
+export async function unclaimedAccount(to = address()): Promise<string> {
+  const id = newId('acc')
+  const emailId = newId('aem')
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO core_accounts (id, name, origin, created_at, audience_email_id) VALUES (?, \'Gail Guest\', \'guest\', ?, ?)').bind(id, Date.now(), emailId),
+    env.DB.prepare('INSERT INTO core_account_emails (id, account_id, address, verified_at, added_by, created_at) VALUES (?, ?, ?, NULL, \'checkout\', ?)').bind(emailId, id, to, Date.now()),
+  ])
+  return id
+}
