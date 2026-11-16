@@ -1,6 +1,6 @@
 <!-- A refusal says why, and what would let the person through. -->
 <script setup lang="ts">
-import type { RefusalView } from '../composables/useRefusal'
+import type { RefusalView } from '../utils/refusal'
 
 const props = defineProps<{
   refusal: Pick<RefusalView, 'reason' | 'remedy'> & Partial<RefusalView>

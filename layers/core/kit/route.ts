@@ -4,7 +4,7 @@
 // of work, commits it after the handler returns, and shapes every refusal the same way.
 import { defineEventHandler, getHeader, getQuery, getRequestIP, readRawBody, setResponseHeader, setResponseStatus, type H3Event } from 'h3'
 import type { z } from 'zod'
-import { runInContext, useContext, type Actor, type KitEnv } from './context'
+import { runInContext, useContext, type Actor, type KitContext, type KitEnv } from './context'
 import { Refusal, isRefusal, DeclarationError, type RefusalBody } from './refusal'
 import { useAccessProvider, can } from './access'
 import { isEnabled } from './modules-store'
@@ -69,9 +69,11 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-// A page's server render calls the API through Nitro's local fetch, which carries no Cloudflare
-// context of its own. The bindings are the same for every request in an isolate, so the plugin
-// remembers them from the request that arrived from outside.
+// A page's server render calls the API through Nitro's local fetch, and those calls carry the
+// Cloudflare context of the request they belong to. One kind does not: when a page fails, Nitro
+// renders the error page with a local fetch of its own that carries no context, and the error page
+// draws the same shell (the brand, the viewer). The bindings are the same for every request in an
+// isolate, so the kit plugin remembers them from a request that arrived from outside, for that case.
 let remembered: KitEnv | undefined
 export function rememberEnv(env: KitEnv | undefined): void {
   if (env?.DB) remembered = env
@@ -81,6 +83,22 @@ function envOf(event: H3Event): KitEnv {
   const env = (event.context as any).cloudflare?.env ?? remembered
   if (!env?.DB) throw new Error('No DB binding on this request. Run under wrangler, nuxt dev with the Cloudflare preset, or a test worker')
   return env
+}
+
+// A page's server render calls several routes through Nitro's local fetch (the viewer, the brand,
+// the menu, the page's own data). Each is a request of its own here, but they all belong to the one
+// request that arrived from outside, and Nitro hands every one of them the same platform object. So
+// what a request reads once (settings, module states, the session) is kept against that object and
+// read once for the whole render, not once for each call.
+const renderCaches = new WeakMap<object, KitContext['cache']>()
+
+/** The per-request cache, shared by every internal call made while serving the same outside request. */
+export function requestCache(event: H3Event): KitContext['cache'] {
+  const platform = (event.context as any)._platform
+  if (!platform || typeof platform !== 'object') return {}
+  let cache = renderCaches.get(platform)
+  if (!cache) renderCaches.set(platform, cache = {})
+  return cache
 }
 
 function moduleOfPath(path: string): string | undefined {
@@ -99,7 +117,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
   const routeHandler = defineEventHandler(async (event) => {
     const env = envOf(event)
     const waitUntil = (event.context as any).cloudflare?.context?.waitUntil?.bind((event.context as any).cloudflare.context)
-    return runInContext({ env, waitUntil, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID() }, async () => {
+    return runInContext({ env, waitUntil, requestId: getHeader(event, 'cf-ray') ?? crypto.randomUUID(), cache: requestCache(event) }, async () => {
       try {
         return await handle(event)
       }
