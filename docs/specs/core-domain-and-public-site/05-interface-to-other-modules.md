@@ -374,3 +374,27 @@ Rules that follow:
 - **Nothing personal is logged.** The event holds the recipient's address and the subject line. The consumer reads the message id and the outcome, hashes the address where it needs to suppress, and writes neither the address nor the subject to any log.
 - **One more resource to deploy.** Each theatre needs a queue for these events and a subscription from its sending domain to it. By the foundations thread's ruling, the queue is a binding named EMAIL\_EVENTS, created on first deploy like the others. The subscription cannot be: the domain must be verified first and the application holds no account token. So it is a core setup step, shown once the sending domain is verified, that gives the dashboard clicks and the four events to choose (bounced, complained, failed, rejected). A core health check warns while the step is not done, warns when mail has gone out for a day with no outcome received, and reminds the administrator to leave "Drop suppressed recipients" off. A message in a shape the consumer does not recognise is acknowledged and logged, not retried, because the shape is Cloudflare's to change. The task `core.email-events` is the queue's consumer.
 - **Limits.** One email takes at most 50 recipients. Core sends one email for each recipient, so it never meets this. Cloudflare describes the product as transactional; whether mailings fit is the Communications module's question, which that thread is checking.
+
+## Access needs and access features are two lists
+
+The identity specification declares a vocabulary, `core.access-need`, for what a person needs (standing, level access, an essential companion and so on). It uses the vocabulary format in this part unchanged: terms with ids, translatable labels, and a record that stores the id. It is separate from the access features of a venue, a space or a performance (captioned, signed, relaxed and so on), which describe what the theatre offers and stay this workstream's. Neither list refers to the other. Matching a person's needs to what a performance offers is for the module that sells or staffs it.
+
+Core domain declares no purpose through `core.access-purpose`. Production teams do not read access needs in the first release, by Matt's choice, and the welfare lead is the route.
+
+## The access scheme's public page
+
+The identity specification defines an access scheme a person applies to. Its public page is theatre content with one component in it, like every other page on the public site.
+
+| Thing | What is specified |
+| --- | --- |
+| The page | `/access`, from `site/content/access.md` in the starter content. It is a seeded page: it ships with plain wording that reads correctly unedited (what the scheme is for, how to apply, how long a reply takes), and carries `placeholder: true` so the site-readiness screen lists it until the theatre has made it its own. |
+| The component | `CoreAccessApplication`, short alias `AccessApplication`, contributed by identity through `core.public-component`. It shows the way into the application for the person viewing it. Identity owns everything it shows and does. |
+| The reply time | The page quotes it live with `:setting{name="core.access-scheme.reply-within"}`, so the wording cannot drift from the setting. |
+| If the theatre has not edited it | The seeded wording and the component show. Nothing is hidden and nothing is broken; the page is only listed as unfinished. |
+| If the theatre deletes it | `/access` answers "not found". The content check warns, because other modules link to this address. |
+| If the public site is off | `/access` answers "not found" with the rest of the public site. Applying from My account is identity's and does not depend on this page. |
+| The address | `/access` is a content address, not a reserved prefix, so a theatre may also redirect it to a page of another name through `redirects.yml`. |
+
+Identity has confirmed the component's name and behaviour. It shows "Apply" to a person who is signed out or has not applied, and the state of their own application to one who has. While `core.access-scheme.enabled` is off it shows nothing, so the seeded wording is written to read sensibly without it, and the site-readiness screen says the page has nothing to offer. The page names the scheme with `:setting{name="core.access-scheme.name"}`, so it uses the theatre's own name for it. The form itself lives under `/account`.
+
+Identity's eighteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks.

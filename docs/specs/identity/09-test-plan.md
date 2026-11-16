@@ -89,6 +89,35 @@ Identity is tested mostly at the integration tier, against a real local D1, beca
 | `sweep reports only until armed` | Integration |  |
 | `sweep respects its cap and its exclusions` | Integration |  |
 
+### Emergency contacts and access needs
+
+| Name | Tier | Asserts |
+| --- | --- | --- |
+| `emergency contacts need a standing` | Integration | Without a standing the screen answers as a missing page, the write is refused and the read service answers nothing |
+| `emergency contacts go after the standing` | Integration | Reads stop on the request after the last standing ends; the sweep deletes the rows once the setting has passed and not before |
+| `emergency contact read needs its ability and a reason` | Integration | An Owner and an Administrator without the ability are refused; a read with no reason code is refused |
+| `access needs are shared only by purpose` | Integration | Walks every declared purpose: with it off for the person, every actor including an Owner reads nothing |
+| `a purpose receives only what it uses` | Integration | Entries and notes outside the purpose's declaration never leave the service |
+| `refusals of access needs look alike` | Integration | No needs, not shared and no ability give the same answer and timing class |
+| `only the person writes access needs` | Integration | Walks the route table; no route lets another account write an application or a sharing choice, except a reviewer applying on a person's behalf, which is marked and tells the person |
+| `members' purpose needs a standing` | Integration | A members' purpose is not offered to, and cannot be switched on by, a person without a standing |
+| `access needs are never listed` | Unit | No query, search index or export other than the person's own selects the special column |
+| `the person sees every read` | Integration | Each staff read of contacts or needs appears on the person's own screen |
+
+The access scheme's states add these.
+
+| Name | Tier | Asserts |
+| --- | --- | --- |
+| `only an accepted application is read` | Integration | For submitted, more-info and rejected, every purpose read, the fact and the companions value answer as for a person who never applied |
+| `nobody reviews their own application` | Integration | Open, decide and verify are all refused on the reviewer's own account |
+| `a change keeps what was accepted` | Integration | While a change waits, reads and the companions value return the accepted version |
+| `companions wait for verification when set` | Integration | With the setting on, the companions value is nought until verified; with it off, it is the accepted number |
+| `decision email names no need` | Integration | Every access-scheme template rendered for every state contains no vocabulary label and no note |
+| `the queue shows no needs` | Integration | The queue's query selects status and dates only; the special columns are read only when one application is opened |
+| `leaving deletes at once` | Integration | Withdrawal removes the row and the sharing choices in one batch; orders keep their own copy |
+| `apply returns to the form` | End to end | A signed-out person pressing Apply on the public page signs up and lands on the form |
+| `no card number is stored` | Unit | No column or audit detail type can hold a card number or an image |
+
 ## How the walking tests stay complete
 
 Five of the cases above are generated from a registry (routes, abilities, account references, data classes, email templates) and not written by hand. A module added later is covered the day it is enabled, and a column or route that declares nothing fails the build. This is the answer to the lesson that a hand-kept list of tables to merge or erase always falls behind.

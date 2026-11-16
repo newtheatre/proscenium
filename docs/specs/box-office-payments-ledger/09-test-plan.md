@@ -2,7 +2,7 @@
 
 ## How to read this part
 
-Named cases, filed under the tier that runs them, as Foundations asks. A **never-regress** case guards a promise the theatre makes to its audience or its treasurer; it may not be skipped, weakened or deleted without a decision record. Each names the story it proves. There are 92 never-regress cases in the ten tables below.
+Named cases, filed under the tier that runs them, as Foundations asks. A **never-regress** case guards a promise the theatre makes to its audience or its treasurer; it may not be skipped, weakened or deleted without a decision record. Each names the story it proves. There are 97 never-regress cases in the eleven tables below.
 
 | Tier | Runs on | Used here for |
 | --- | --- | --- |
@@ -93,7 +93,7 @@ Named cases, filed under the tier that runs them, as Foundations asks. A **never
 | --- | --- | --- |
 | `erasure-keeps-the-books` |  | Erasing a buyer clears their name, email, phone, access note and free text, deletes waiting-list rows, and leaves every ledger total and sales count unchanged |
 | `guest-erased-by-email` |  | A buyer who never signed in is erased by verified address |
-| `access-note-is-encrypted-and-guarded` | BO-19 | The stored value is not the plain text; reading it without the ability is refused; the door shows only that one exists |
+| `access-note-is-encrypted-and-guarded` | BO-19 | The stored value is not the plain text; reading it without the ability is refused; the door shows only that one exists; a seller reads a person's needs only when that person is accepted on the access scheme; changing the record afterwards leaves the order's copy as it was |
 | `events-carry-no-personal-data` |  | Every announced payload validates against a schema of identifiers only |
 | `webhook-payload-carries-no-person` |  | Every event that part 4 marks `internal: false` is delivered to a test webhook and its body checked against the data-class registry; a personal, free-text or person-tied money field fails. Every event marked `internal: true` is confirmed never to be delivered |
 | `no-card-data-anywhere` |  | No column, log line or event contains a card number pattern after a full scenario |
@@ -161,6 +161,16 @@ Tested with a stand-in requirement source, so the cases do not wait for the Memb
 | `self-cancel-respects-the-cut-off` | BO-22 | With the setting on, a buyer cancels before the cut-off and is refunded less the stated fee; after it, and with the setting off, the request is refused |
 | `buyer-exchange-charges-the-stated-fee` | BO-55 | A buyer's exchange collects the price difference and the stated fee, or refunds the difference less the fee, and keeps the original seats if the new ones cannot be had |
 | `voided-after-download-is-flagged` | BO-41 | A ticket cancelled after a device loaded its offline data and then admitted offline is flagged on the door report when the scan syncs |
+
+### Wheelchair spaces and companions (integration)
+
+| Name | Proves | Case |
+| --- | --- | --- |
+| `wheelchair-space-takes-its-seats-or-nothing` | BO-18 | A space that removes 2 seats, with 1 seat left in the seating pool: no claim is made in either pool. With 2 left: one wheelchair claim and two displaced claims, and the seating pool is full |
+| `last-seats-space-or-seat-not-both` | BO-18 | 20 buyers for the last 2 seats race 20 buyers for a space that needs them: either the space is sold or the seats are, never both, and both counters equal their live claims |
+| `displaced-seats-return-with-the-space` | BO-18 | Cancelling, expiring or exchanging a wheelchair space releases its displaced claims in the same batch, and the seats resell |
+| `permanent-space-touches-no-seat` | BO-18 | A space in a band with no displaced band claims one unit of its own pool and leaves every seating counter unchanged |
+| `companion-allowance-holds-under-concurrency` | BO-18 | A holder allowed 1 companion opens two baskets at once for one performance: one companion ticket is issued. An allowance of 0 issues none, and a companion ticket never outlives the ticket it accompanies |
 
 ## Ordinary cases
 

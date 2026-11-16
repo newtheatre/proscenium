@@ -1,11 +1,11 @@
 # 7. Stories
 
-Thirty-seven stories, each with criteria a test can check. Thirty-one are in the first release: nine needed at the gate before anything else can be built, and twenty-two others. Six wait. A story is "first release" when box office or front of house cannot open safely without it.
+Forty-five stories, each with criteria a test can check. Thirty-eight are in the first release: nine needed at the gate before anything else can be built, and twenty-nine others. Seven wait. A story is "first release" when box office or front of house cannot open safely without it.
 
 | Group | First release | Later |
 | --- | --- | --- |
 | Getting in | ID-01 to ID-10 |  |
-| My account | ID-11 to ID-17 | None |
+| My account | ID-11 to ID-17; the access scheme, ID-38 to ID-44 | ID-45 |
 | Audience and members | ID-18 to ID-21 |  |
 | Roles and permissions | ID-22 to ID-24, ID-28, ID-29 | ID-25, ID-26, ID-27 |
 | People in the console | ID-30 to ID-32, ID-35, ID-37 | ID-33, ID-34, ID-36 |
@@ -126,13 +126,93 @@ As the person who runs the deployment, I can get an Owner back in when every Own
 - When it runs, every personal column on every table that references the account is cleared in one batch, sessions end, and the address can be used for a new account.
 - Running it twice changes nothing the second time.
 
-### ID-17 Emergency contacts and access needs (first release)
+### ID-17 Emergency contacts, for members (first release)
 
-- A person records contacts and access needs in their account and chooses who the access needs are shared with.
-- Both are stored encrypted, and every read by staff is audited with the reader and the reason.
-- Neither appears in a search result, a list or an export other than the person's own.
+As a member, I record who to ring for me, so that the theatre can reach them if something happens.
 
-In the first release these are identity's own screens, not a form builder form.
+- A person with a standing can record up to three contacts in "Member details"; a person without one finds no such screen and the server refuses the write.
+- Only somebody holding `core.emergency-contact.read` over the account can read them, one person at a time, after choosing a reason; an Owner without that ability cannot.
+- Every read is audited and is listed to the person with when, in what capacity and why.
+- Contacts appear in no search result, list or export other than the person's own download.
+- When the last standing ends, reads stop at once and the rows are deleted after `core.emergency-contacts.keep-after-standing`.
+
+### ID-38 Apply to the access scheme (first release)
+
+As somebody who faces barriers at the theatre, I apply once and say what I need, so that I am not asked every time I book.
+
+- The "Apply" button on the public page `/access` and the one in My account both open the application form. A signed-out person signs in or signs up first and lands on the form, not on the home page.
+- The form offers the access-needs list as ticks, each with an optional note, asks how many essential companions are needed (none, one or two), and asks for no diagnosis and no upload.
+- Before sending, the form says who will read the application and that the box office will use it for the person's bookings.
+- Sending makes the application Submitted, emails the person a confirmation, and puts it in the reviewers' queue. A second application cannot be started while one is open.
+- My account shows the application's state in plain words at every stage.
+- With `core.access-scheme.enabled` off, neither button appears and the form answers as a missing page.
+
+### ID-39 A module reads access needs for its purpose (first release)
+
+As a module that seats, hosts or teaches people, I declare why I need access needs and read them through one service.
+
+- A purpose is declared through `core.access-purpose` with its side, explanation, ability and the entries it uses; an undeclared purpose reads nothing.
+- `accessNeedsFor` answers only when the person's application is accepted, the purpose is on for them and the actor holds the purpose's ability, and returns only the entries the purpose uses.
+- A refusal looks the same whether the person never applied, is waiting, was rejected, has not shared, or the actor lacks the ability.
+- Every read by staff writes an audit entry with the purpose and the record.
+- With the purpose's module switched off, its reads answer nothing and the person's choice is kept.
+
+### ID-40 Review an application (first release)
+
+As the person who runs the access scheme, I read each application and accept it, reject it or ask for more, so that people get an answer.
+
+- The queue lists open applications oldest first, with the person's name and how long each has waited, to a holder of `core.access-scheme.re`ad and nobody else; deciding needs core.access-scheme.review. It shows no needs until an application is opened.
+- Accepting may grant fewer companions than were asked for, with a message saying why.
+- Rejecting needs a message to the person. Asking for more needs a question; the person's answer returns the application to the queue.
+- Each decision emails the person and shows in My account. The email names no need and says only that there is news about their application.
+- A reviewer cannot open or decide their own application.
+- An application waiting longer than `core.access-scheme.reply-within` is flagged in the queue and to the reviewers.
+- Opening an application and each decision are audited.
+
+### ID-41 Verify an accepted application in person (first release)
+
+As a reviewer, I mark an application verified when I have seen evidence, so that the theatre can rely on it for free companion tickets.
+
+- Only an accepted application can be verified. The reviewer chooses what they saw: an Access Card, another document, or that the person is known to the theatre.
+- Seeing an Access Card, the reviewer compares the name and the symbols on the card with the application by eye. No card number, photograph or copy is stored.
+- Verifying, and removing the mark, are audited and the person is told.
+- With `core.access-scheme.companions-need-verified` on, companion tickets are offered only once verified; with it off, accepted is enough. Either way an accepted person can book with their other arrangements.
+- A change the person makes to the number of companions clears the mark for the new number until it is seen again.
+
+### ID-42 Invite somebody to apply, or apply for them (first release)
+
+As a reviewer answering an email or a phone call, I get the person to the form or fill it in with them.
+
+- "Invite to apply" takes a name and an address, finds or makes the account, and emails a single-use link that signs the person in and opens the form. The link lapses after `core.sign-in.invite-lifetime`; after that, signing in and pressing "Apply" does the same.
+- "Apply on their behalf" lets a reviewer complete the form for a named account. The application is marked as made by staff with the reviewer's name, and the person is emailed that it was made and how to correct it.
+- An application made by staff is still decided by a reviewer, and not by the one who entered it when another reviewer exists.
+
+### ID-43 Book as somebody on the scheme (first release)
+
+As a person on the scheme, I book and my arrangements are simply there.
+
+- Identity declares the fact `core.access-scheme`, true while the person's application is accepted, and the value `core.access-scheme.companions`, the number of companions accepted (nought while verification is required and missing). Box office names them in a ticket type's requirements through `core.requirement`.
+- At checkout the person's own session reads their own entitlement, so companion tickets are offered up to their number with no staff read and no audit entry.
+- At the desk, staff see the entitlement only through the box office purpose and its ability, audited.
+- A person not on the scheme is not offered a ticket type that requires it, and is shown how to apply.
+- Losing the scheme (rejected on review, withdrawn) does not cancel tickets already bought.
+
+### ID-44 Change, confirm or leave (first release)
+
+As a person on the scheme, I keep my details right and can leave.
+
+- A change goes to the reviewers; what was accepted stays in force until it is decided.
+- After `core.access-scheme.review-after` the person is asked to confirm their details are still right. Confirming resets the date; no answer after two reminders puts the application in the reviewers' queue, and it stays in force meanwhile.
+- Leaving deletes the application and the sharing choices at once, after a confirmation that says bookings already made keep what they were given.
+- The person can see every read of their application by staff, with when, in what capacity and for which purpose.
+
+### ID-45 Check an Access Card with Nimbus online (later)
+
+As a person with a Nimbus Access Card, I give my card number and name when I apply, so that the theatre need not see the card in person.
+
+- The check goes to Nimbus's service by card number and name. It needs an agreement and a key from Nimbus and works in the United Kingdom only, so it is off until a theatre sets it up.
+- A successful check marks the application verified with the method `access-card`, and can fill the ticks from the card's symbols for the person to confirm. The card number is a presented value and is not stored.
+- It never replaces a reviewer's decision to accept, and people without a card apply exactly as before.
 
 ## Audience and members
 

@@ -24,12 +24,12 @@ Three choices carry most of the weight. **States are read, not stored**, so an a
 | Part | State | Contents |
 | --- | --- | --- |
 | 1. Scope | Draft complete | In and out of scope, what is assumed of other workstreams, glossary |
-| 2. Data model | Draft complete | 17 tables with column rules, data class, and merge and erasure behaviour |
-| 3. States and rules | Draft complete | Four life cycles as diagrams, the resolver, the eight separation rules, merge and erasure |
+| 2. Data model | Draft complete | 18 tables with column rules, data class, and merge and erasure behaviour |
+| 3. States and rules | Draft complete | Four life cycles as diagrams, the resolver, the eight separation rules, merge and erasure, emergency contacts (members only) and the access scheme (apply, decide, verify, share by purpose) |
 | 4. Interface to other modules | Draft complete | Services, events, points, jobs, secrets, and what each workstream must do to fit |
-| 5. Screens | Draft complete | 31 screens, three wireframes |
-| 6. Settings and abilities | Draft complete | 29 settings, 17 abilities, 15 preset roles |
-| 7. Stories | Draft complete | 37 stories, 31 in the first release (9 at the gate, 22 others), 6 later |
+| 5. Screens | Draft complete | 33 screens, three wireframes |
+| 6. Settings and abilities | Draft complete | 37 settings, 19 abilities, 15 preset roles |
+| 7. Stories | Draft complete | 45 stories, 38 in the first release (9 at the gate, 29 others), 7 later |
 | 8. Test plan | Draft complete | Named never-regress cases by tier |
 | 9. Questions for Matt | **Decided 16 Nov 2026** | 12 questions, every recommendation accepted by Matt |
 

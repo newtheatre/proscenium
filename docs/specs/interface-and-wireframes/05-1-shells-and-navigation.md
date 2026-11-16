@@ -25,7 +25,7 @@ Each frame is recognisable at a glance, which matters most for a person who uses
 
 - **Header:** logo and name, What's on, the theatre's own content links, basket (only when it holds something), account menu or "Sign in".
 - **Footer:** the theatre's links, contact, policies, an optional credit line. One shape for everybody; a link that needs sign-in sends the visitor through sign-in and on to where they meant to go.
-- **My account** lives here, not in its own shell: tickets, orders, passes, vouchers, saved details, preferences. It is the audience experience, so it carries no member vocabulary at all.
+- **My account** lives here, not in its own shell: tickets, orders, passes, vouchers, saved details, preferences, and identity's access scheme (apply, see the state of an application, and what it unlocks, such as a companion ticket). Nobody ticks access needs while buying. Emergency contacts are not here: they are a section of the members' area only. It is the audience experience, so it carries no member vocabulary at all.
 - **Booking** (choose, basket, checkout, confirmation) uses the public header in a reduced form: logo, a step indicator and the basket timer. Nothing in it leads away from paying.
 - The layout and any page can be replaced by a file of the same path in the theatre's site folder. The booking flow and My account are platform pages a theatre styles through branding, not by override.
 

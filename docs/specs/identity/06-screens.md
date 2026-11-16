@@ -1,6 +1,6 @@
 # 5. Screens
 
-Identity has 31 screens: 9 for getting in, 7 in "My account", 3 in the members' area and 12 in the console. Three are drawn here because they carry the audience and members' separation; workstream 6 owns how every screen finally looks.
+Identity has 33 screens: 9 for getting in, 7 in "My account", 3 in the members' area and 14 in the console. Three are drawn here because they carry the audience and members' separation; workstream 6 owns how every screen finally looks.
 
 ## The header is where the two sides meet
 
@@ -47,7 +47,7 @@ Public shell, audience side. Other modules add their own sections here through t
 | Email addresses | Add, verify and remove addresses; choose the address for tickets and receipts | Any signed-in person | First |
 | Signing in | Passkeys with their labels and last use; linked Google account; recovery codes | Any signed-in person | First |
 | Where you are signed in | Each session with its device and last use; end one, or all the others | Any signed-in person | First |
-| Access needs | The access questions, and who the answers may be shared with | Any signed-in person | First |
+| Access scheme | Before applying: what the scheme is and an "Apply" button. The form: ticks with optional notes, companions, who will read it. Afterwards: the application's state in plain words, the reviewer's message, change or leave, switches for other purposes, and every read by staff. The public page `/access` is the theatre's own content and carries the same button. | Any signed-in person | First |
 | Your data | Download your data; ask for your account to be erased; see a request's progress; cancel it | Any signed-in person | First |
 
 ## Members' area
@@ -56,7 +56,7 @@ Members' shell. Shown only to a person with a standing.
 
 | Screen | Purpose | Who sees it | Release |
 | --- | --- | --- | --- |
-| Member details | The address for member notices; emergency contacts; any member fields the theatre added | A person with a standing | First |
+| Member details | The address for member notices; up to three emergency contacts and the list of who has read them; any member fields the theatre added | A person with a standing | First |
 | What you can do | Every ability the person holds and why: which role until when, which fact, on which record. Also grants that have lapsed. | A person with a standing | First |
 | Link another account | Start a merge with an account they also own | Any signed-in person; linked from Email addresses too | Later |
 
@@ -94,6 +94,10 @@ Identity draws the left card and the first three sections. The tinted section is
 5. **Anything staff do to an account tells the person**, at every verified address, unless it is the erasure they asked for.
 6. **The role editor ticks and locks abilities that come with one already ticked**, marks abilities that amount to full control, and switches off any the editor does not hold. This pattern is Flytower's (see Sources).
 7. **"What you can do" and the console's "Who holds what" read from the same resolver** as the server's checks, so they cannot disagree with it.
+
+Two further console screens run the access scheme, both needing `core.access-scheme.read`. "Access scheme" is the queue: open applications oldest first with how long each has waited, those due a review, and "Invite to apply"; it shows names and states only. "Application" is one person's application: what they asked for, the history of decisions, and the actions accept, reject, ask for more, verify and apply on their behalf, each needing `core.access-scheme.review`. They sit under People in the console's navigation.
+
+On a person's page in the console, "Emergency contacts" (members' side) is closed until asked for: it appears only to a holder of `core.emergency-contact.read` and only for a person with a standing, and opening it asks for a reason and records the read. The page shows nothing about the access scheme unless the viewer holds `core.access-scheme.read`, or holds `core.access-profile.read` and the person switched on the welfare purpose; otherwise the section is absent, not empty. Box office and front of house see access needs on their own booking and house screens, from the copy on the booking, not here.
 
 ## Navigation entries
 

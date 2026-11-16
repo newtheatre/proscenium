@@ -24,10 +24,10 @@ The target: from a production page to a confirmed ticket in under two minutes on
 ```mermaid
 flowchart LR
     s1["Production page"] --> s2["Choose tickets"] --> s3["Check and pay"] --> s5["Confirmation"]
-    s1n(["One Book action per date"]) -.- s1
+    s1n(["one Book action per date"]) -.- s1
     s2n(["Hold tickets starts the hold"]) -.- s2
-    s3n(["Hold timer shown; no account needed"]) -.- s3
-    s5n(["Tickets by email too"]) -.- s5
+    s3n(["hold timer shown; no account needed"]) -.- s3
+    s5n(["tickets by email too"]) -.- s5
     s2 --> x1["Not enough seats<br/>Says so and offers other dates"]
     s3 --> x2["The hold runs out<br/>Back to Choose tickets"]
     s3 --> x3["Payment fails<br/>Stays here, hold kept"]
@@ -38,9 +38,9 @@ flowchart LR
 
 1. **Production page.** Dates are listed with availability in words ("Good availability", "Last few", "Sold out"). Each date has its own Book action; a single production-level button shows only when there is one date.
 2. **Choose a performance**, if there is more than one. Skipped when the visitor came from a specific date.
-3. **Choose tickets.** General admission: a stepper per ticket type, with each price and who qualifies. Allocated seating: "Best available" is chosen for them, with "Choose my own seats" opening the plan. The running total is always visible.
+3. **Choose tickets.** General admission: a stepper per ticket type, with each price and who qualifies. Allocated seating: "Best available" is chosen for them, with "Choose my own seats" opening the plan. A wheelchair space, a transfer seat and a companion ticket are listed as ordinary ticket types where box office offers them; a space that can no longer get its seats says it is no longer available, and companions stop at the person's allowance. The running total is always visible.
 4. **Basket.** Pressing "Hold tickets" at step 3 claims the tickets, so the hold starts there and its timer is first seen here, in the header in words ("Held for 9 minutes"). Where a theatre has extras switched on they appear here once; a donation or a programme are examples only, and box office's first release has none. Steps 4 to 6 are box office's one address, `/book/basket` ("Check and pay"): short steps on a phone, one page on a laptop.
-5. **Your details.** Name and email. "Sign in for a faster checkout" is a quiet link, never a wall. Any questions the theatre attached to the ticket type come here.
+5. **Your details.** Name and email. "Sign in for a faster checkout" is a quiet link, never a wall. Any questions the theatre attached to the ticket type come here. There is no access-needs field: a signed-in buyer on identity's access scheme sees one line saying their needs are carried onto the booking, and anyone else books normally and is pointed to the application.
 6. **Pay.** The total is stated on the button ("Pay £24.00"). The provider's form sits inside the page.
 7. **Confirmation.** The tickets, with their codes, on the page at once. They are also emailed. "Add to calendar" and "Save tickets offline" where available; wallet passes are not scheduled. An offer to keep this order in an account, which is one tap because the email is already verified by the receipt link.
 
@@ -68,7 +68,7 @@ Nothing in the journey mentions shifts, training or the members' area. The only 
 
 The target: a walk-up sale in under 30 seconds, with a queue waiting.
 
-1. **Desk screen** opens on tonight's performance, with the next performances one tap away. Sold, held and remaining are shown as numbers.
+1. **Desk screen** opens on tonight's performance, with the next performances one tap away. Sold, held and remaining are shown as numbers, with people sold and seating units used shown separately where a wheelchair space removes seats.
 2. **Add tickets** with large steppers per type; keyboard shortcuts for the three most common types.
 3. **Customer** is optional: search by name, email or order code, or leave blank for an anonymous sale. Finding a customer shows their entitlements (member price, and a promo code if they have one; passes come in a later release).
 4. **Take payment:** card on the reader or cash, in one payment that can also carry another module's lines such as bar items. The expected total is on screen in large figures; the reader's result comes back onto the screen. A complimentary ticket is never typed in at the desk: the Complimentary row opens the approved requests waiting to be issued, the seller picks one, and "Request approval" is always offered beside it.
@@ -88,7 +88,7 @@ The target: one ticket a second, with no signal.
 
 1. **Tonight hub** shows a Door tile for whoever is on the door. Opening it loads tonight's ticket list onto the phone and says so ("312 tickets ready. Works offline").
 2. **Scan.** The camera fills the top of the screen. Each scan answers with a full-width band: green tick "Admit 1", amber "Already admitted at 19:12, front door", red cross "Wrong night: Friday".
-3. **The band carries what the door needs**: ticket type, seat, and a mark that an access note exists. The note's text is never on the band, because it is sensitive and the queue can see the screen; it opens on a deliberate tap.
+3. **The band carries what the door needs**: ticket type, seat, and a mark that an access note exists. The note's text is never on the band, because it is sensitive and the queue can see the screen; every scanner sees the mark, which carries no detail. A scanner holding `box-office.order.view-access-note` opens the order's needs on a deliberate tap, and each opening is an audited read; anyone else sees "Ask the front-of-house manager" and the tap does nothing. Offline the mark still shows and the tap says it needs a connection, because the detail is never in the offline data. The same ability opens the access list, a phone-first Live page at `/live/door/<performance>/access`, reached from the door screen and from front of house's access figures on Tonight.
 4. **Search by name** is one tap away while connected, for a customer with no code. Offline it works only where box office's setting `box-office.scanning.names-on-device` is on, which it is not by default; otherwise the screen says name search needs a connection and offers a typed code.
 5. **The counter** shows admitted against sold. It is live across doors when connected, and marked "this phone only" when not.
 

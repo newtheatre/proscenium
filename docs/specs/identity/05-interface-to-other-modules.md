@@ -24,8 +24,8 @@ Each is a named export other modules import. A service that writes adds its stat
 | `grantRole` | Account or address, role, scope, expiry | The grant id | Yes |
 | `endGrant` | Grant id, reason | Nothing | Yes |
 | `holdersOf` | Ability, optional record | The accounts that currently hold it by any route, for notifications such as "tell whoever can approve this" | No |
-| `emergencyContactsOf` | Actor, account id | The contacts, after checking the ability and writing an audit entry for the read | Audit only |
-| `accessProfileOf` | Actor, account id, purpose | The decrypted answers the person agreed to share for that purpose, after the same check and audit | Audit only |
+| `emergencyContactsOf` | Actor, account id, reason code | The contacts, only while the account has a standing, after checking the ability and writing an audit entry for the read | Audit only |
+| `accessNeedsFor` | Actor, account id, purpose, optional record | The needs that purpose uses, only if the person switched the purpose on and the actor holds the purpose's ability; otherwise nothing. Audited as a read. | Audit only |
 
 - `can` and `authorise` are the only way any module checks permission. The route declaration names an ability; the guard calls `authorise` with it.
 - `findOrCreateAccount` is what guest checkout, the desk, a sign-off by address and an invitation all use. Its caller decides what to send the person.
@@ -40,6 +40,32 @@ Each is a named export other modules import. A service that writes adds its stat
 | Merge without per-module code | `mergeAccounts(survivorId, otherId)` | Moves or aliases every other module's rows from the column declarations alone. A module writes merge code only where it declared `handler`. |
 
 `notSelf` remains for a check inside a service; on a route the ability's `owner: 'refuses'` does the same job by declaration.
+
+## Access needs: the purpose point
+
+A module that wants to read access needs declares a purpose through the point `core.access-purpose`. The core knows no module's purpose in advance, so a new module joins without a change to the core.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | `<module>.<name>`, for example `box-office.booking` |
+| `side` | `audience` or `members`. A members' purpose is offered only to a person with a standing. |
+| `label` and `explanation` | Translated. The explanation is the sentence the person reads beside the switch: who will see the needs, when, and why. |
+| `ability` | The ability the reader must hold. It must be privileged and declare `fresh: false` and `audit: 'read'`. Defaults to `core.access-profile.read`. |
+| `uses` | The `core.access-need` entries this purpose receives, or all of them. |
+| `note` | Whether it also receives the note beside each entry it uses. Default false. |
+| `on` | Optional record type the read is about (a performance, a production, a course), passed as `record` and checked against the ability's scope. |
+
+Purposes in the first release, each declared by its own module and agreed with it: `box-office.booking` (audience: the box office and the house team for a performance the person has booked; applying to the scheme agrees to it), and `core.welfare` (members: the theatre's welfare lead; off until the person switches it on), which identity declares. Production teams do not read access needs in the first release (Matt, 16 November 2026). `front-of-house.shift` is reserved for a later volunteer-shift purpose.
+
+A read answers only for an accepted application. Two things are offered for booking without a staff read. The fact `core.access-scheme` is true while a person's application is accepted, and the value `core.access-scheme.companions` is the number of companions accepted (nought while `core.access-scheme.companions-need-verified` is on and the application is not verified). Box office names them in a ticket type's requirements through `core.requirement`; at checkout they are evaluated for the person's own session, so nobody else learns the answer. The fact is not a standing, opens nothing on the members' side, and has no `holders` enumerator, so nobody can list who is on the scheme through it.
+
+The references a module stores are `fact:core.access-scheme` for the fact and `core.access-scheme.companions` for the value, which identity registers as a requirement source through `core.requirement`. Following Foundations' format, the source answers met with a `quantity` of 1 or 2, and not met when the number is nought, so box office can cap companion tickets at that number inside its own claim. The quantity may be copied onto what was sold and used in a condition on a statement; it never goes in a summary, an event or a job. When staff book for somebody else, the check is asked for the customer's account explicitly. The source names `box-office.order.view-access-note` as its `checkAbility` (the ability of the purpose `box-office.booking`, declared with `audit: 'read'`): a check about another account reaches the source only if the actor holds it, and the read is recorded against the account asked about. Without it the answer is not met with a reason, and the seller uses box office's override with a reason. A job, having no actor, never gets an answer about anybody.
+
+The public page `/access` is a seeded content page that core domain lists (`site/content/access.md` in the starter, flagged as a placeholder until the theatre edits it). Identity contributes one component to it through `core.public-component`: `CoreAccessApplication`, short alias `AccessApplication`. It shows the viewer their way into the application: "Apply" when signed out or not yet applied, the state of their application when they have one, and nothing when `core.access-scheme.enabled` is off. The page may quote `core.access-scheme.reply-within` and `core.access-scheme.name` live. Applying from My account does not depend on the page: with the page deleted or the public site switched off, the button in My account and the form still work.
+
+One more service, `accessPurposesFor(accountId)`, lists the purposes a person can be offered now, for the My account screen. There is deliberately no service that says whether a person has recorded needs: that is itself sensitive, so a module learns it only by a successful read.
+
+Identity declares the vocabulary `core.access-need` through core domain's point `core.vocabulary`, not locked, so a theatre can add, rename, reorder and retire entries on core's Vocabularies screen; a retired entry still shows on a profile that ticked it. The notes are identity's own data inside the special column. Access needs say what a person requires; the access features of a venue, a space or a performance say what the theatre offers and are core domain's. Neither list refers to the other, and matching them is for box office and front of house. Core domain declares no purpose in the first release, so a production team does not read access needs; the welfare lead is the route.
 
 ### People without a sign-in
 
@@ -229,6 +255,8 @@ Identity contributes these types to `core.notification-type`. All are service me
 
 Each is declared in core domain's type format. Kind is `transactional` for all of them, so none has a topic. Lane is `prompt`. Side is `audience` for every type except `core.grant-expiring`, which is `members`; a change to the members' address is announced by a second type, `core.members-address-changed`, on the `members` side, because a type has exactly one side. Channel is email for all; `core.grant-expiring`, `core.export-ready` and `core.merge-notice` also go to the inbox. `core.sign-in-link` and `core.address-verify` go to an address that may have no account yet, so they call `notifyAddress`; the rest call `notify`. Each ships a template whose variables are the theatre's name, the person's name where there is one, and the link, code or date the message is about.
 
+The access scheme adds four, all transactional, prompt and audience side, by email and in the inbox: `core.access-application-received` (to the person on applying, or when staff apply for them), `core.access-application-decided` (accepted, rejected, more asked, verified or the mark removed; the email names no need and links to My account), `core.access-review-due` (asking the person to confirm their details), and `core.access-invitation` (the single-use link to the form, by `notifyAddress`). A fifth, `core.access-application-waiting`, goes to the reviewers on the members' side when an application passes `core.access-scheme.reply-within`.
+
 ## Secrets
 
 | Secret | Needed | For |
@@ -244,7 +272,7 @@ Access profiles are a special column and use the platform's one key, `CORE_ENCRY
 | Workstream | Must |
 | --- | --- |
 | 3. Core domain | Declare the fact for a place on a production's team; mark production and venue as grantable record types; take a side when sending a notification |
-| 4. Box office | Call `findOrCreateAccount` at checkout and at the desk; declare its account references as move or alias; contribute an erasure hold for unsettled money and unused tickets; contribute its "Tickets and orders" section to My account on the audience side |
+| 4. Box office | Call `findOrCreateAccount` at checkout and at the desk; declare its account references as move or alias; contribute an erasure hold for unsettled money and unused tickets; contribute its "Tickets and orders" section to My account on the audience side; declare the access purpose box-office.booking, copy what it receives onto the order as its own special-category column, name core.access-scheme in the requirements of the ticket types that need it, and point buyers who are not on the scheme to the application |
 | 5. Form builder | Later, with its story FB-505: bind form fields to identity's `forms.bindable` contributions (phone, preferred name, emergency contact). Custom fields on a person are later still (FB-511). In the first release the access-needs and emergency-contact questions are identity's own screens, written straight to `core_access_profiles` and `core_emergency_contacts`, not a form builder form. |
 | 6. Interface | Draw the header from `describeViewer` and nothing else; never test for a role in a page |
 | Later modules | Membership, Front of house and Training each declare their fact and say whether it is a standing |

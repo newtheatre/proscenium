@@ -14,7 +14,7 @@ Workstream 4 of the detailed-design stage. It specifies ticketing, the payment p
 - **One payment can have several owners.** An intent is split into parts, so one tap on the one card reader can pay for tickets and bar items, and each part settles and refunds on its own.
 - **The ledger is double entry and append-only.** A posting balances or does not exist. Periods are closed by adding a row; late facts post into the next open period.
 - **Buying needs no sign-in.** An order is still keyed to an account, which Identity creates unclaimed for the buyer's address. The audience screens say nothing of membership, except the provider's own phrase inside a ticket type that depends on one.
-- **Size:** 38 tables, 69 stories (63 in the first release), 92 named never-regress tests, 11 questions for Matt, all answered.
+- **Size:** 38 tables, 69 stories (63 in the first release), 97 named never-regress tests, 11 questions for Matt, all answered.
 
 The parts can be read in any order. **9. Questions for Matt** records the eleven answers the rest is written to.
 
@@ -74,7 +74,7 @@ Draft 2, 16 November 2026. All nine parts and the proof are written, Matt's elev
 | 5. Screens | Written, three wireframes; the door is a Live page |
 | 6. Settings and abilities | Written; abilities are mapped to Identity's preset role keys |
 | 7. Stories | 69 stories |
-| 8. Test plan | 92 never-regress cases |
+| 8. Test plan | 97 never-regress cases |
 | 9. Questions for Matt | Eleven questions, all answered |
 | Proof: last seat on D1 | Passed locally and on deployed D1 |
 

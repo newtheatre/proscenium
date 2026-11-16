@@ -156,6 +156,32 @@ flowchart LR
 | Staff | A person holds seats, with a label | A date they set, or never; released by hand or sold from |
 | Waiting-list offer | An offer is made | `box-office.waiting-list.offer-for` later, or acceptance |
 
+## Wheelchair spaces, transfer seats and companions
+
+Venues differ, so the theatre chooses per production how a wheelchair space takes capacity. Everything below uses the same claims as any other sale, so the last-seat guarantee covers it.
+
+| The venue | Set up as | What booking one space does |
+| --- | --- | --- |
+| Permanent wheelchair spaces, counted apart from the seats | A band of kind `wheelchair` with its own capacity and no `displaces_band_id` | One claim in the wheelchair pool. Seating is untouched, and an unsold space never becomes a seat |
+| Seats are taken out to make each space | A band of kind `wheelchair` whose capacity is the most spaces the venue can make, with `displaces_band_id` naming the seating band and `displaces_units` the seats removed for each (2 by default; any number from 1) | One claim in the wheelchair pool and `displaces_units` claims in the seating pool, in one batch. If the seating pool cannot give them all, nothing is taken and the buyer is told the space is no longer available |
+| A wheelchair user who transfers to an ordinary seat | An ordinary ticket in a seating band. The theatre may make a small band, such as "Transfer seats", for the seats that suit | One claim in that band. No wheelchair space is used. The order's access needs say that a wheelchair needs storing |
+
+Rules:
+
+- **The displaced seats belong to the space.** They are claims with `displaced_for_id` set, carry no ticket and no price, and are held, confirmed, released and exchanged in the same statements as the wheelchair claim. Cancelling the space puts the seats back on sale at once.
+- **Counts are of people, not claims.** Sold, admitted and the figures given to Front of house count tickets. A space that removes two seats is one person in the house and three units of the seating plan's capacity; the performance screen shows both.
+- **Seating can sell out before a space is booked.** Where spaces are made from seats, the seats are not kept back automatically. A box-office manager who wants to protect them places an ordinary staff hold on the seating band with an end date (BO-36), and booking a space draws from that hold first.
+- **Changing `displaces_units`** affects new claims only. It is refused while it would need more seats than are free for spaces already sold.
+- **With a seating plan,** a `wheelchair_space` lists the `removable` seats it displaces. Booking the space claims those exact seats, and booking any one of those seats makes the space unavailable, by the same one-live-claim-per-seat index. Seats flagged `transfer` are offered first to a buyer who says they transfer.
+- **Who may book a space or a transfer seat** is the ticket type's choice. A theatre that wants them kept for people on the access scheme names the fact `core.access-scheme` in the ticket type's `requirement_refs`; a theatre that does not leaves it open. A seller with `box-office.ticket-type.override-requirement` can always book one at the desk.
+
+**Companion tickets.** A companion ticket is a ticket type of kind `companion`, usually free, priced in whichever band the companion sits in: beside a permanent space, the theatre makes a band for those fixed seats; where seats are removed, the companion takes an ordinary seat next to the space.
+
+- A companion ticket needs another ticket for the same performance in the same order, and cannot remain if that ticket is cancelled.
+- Without the access scheme, that is the only rule, and `max_per_order` limits how many.
+- With the access scheme, the ticket type names the requirement for the scheme's companion allowance. The answer carries a number (0, 1 or 2, as Identity sets it for that person), and the claim batch refuses more companion tickets for that holder at that performance than the number. The limit is written as a condition on the statement, so two baskets cannot each take the full allowance.
+- A companion ticket is scanned and counted like any other, and is reported separately, as complimentary tickets are.
+
 ## A ticket
 
 | Transition | Guard | Notes |

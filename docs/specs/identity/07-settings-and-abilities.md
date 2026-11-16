@@ -1,6 +1,6 @@
 # 6. Settings and abilities
 
-Identity registers 29 settings and 17 abilities, written here in the column layouts of the foundations draft. It also owns the list of preset roles that every other workstream maps its abilities to.
+Identity registers 37 settings and 19 abilities, written here in the column layouts of the foundations draft. It also owns the list of preset roles that every other workstream maps its abilities to.
 
 ## Settings
 
@@ -54,6 +54,19 @@ Every setting is changed by `core.identity-settings.manage` unless the row says 
 | `core.retention.run-cap` | integer (accounts) | 50 | 1 to 500 | staff | No | The most accounts one sweep run may anonymise |
 | `core.retention.armed` | boolean | false |  | staff | No | Whether the sweeps act or only report. Changed by `core.retention.arm`. |
 
+### Emergency contacts and the access scheme
+
+| Setting | Kind | Default | Limits | Audience | Quotable | Purpose |
+| --- | --- | --- | --- | --- | --- | --- |
+| `core.emergency-contacts.keep-after-standing` | duration | 30d | 0d to 365d | staff | Yes | How long emergency contacts are kept after a person's last standing ends |
+| `core.access-scheme.enabled` | boolean | true |  | public | No | Whether the theatre runs an access scheme people can apply to |
+| `core.access-scheme.name` | text | Access scheme | 1 to 40 characters | public | Yes | What the theatre calls its scheme |
+| `core.access-scheme.allow-note` | boolean | true |  | staff | No | Whether a person may add a short note beside each need |
+| `core.access-scheme.companions-need-verified` | boolean | false |  | staff | Yes | Whether companion tickets wait until a reviewer has seen evidence |
+| `core.access-scheme.reply-within` | duration | 14d | 1d to 90d | public | Yes | How long an application may wait before it is flagged |
+| `core.access-scheme.review-after` | duration | 1095d | 365d to 3650d | staff | Yes | How long after acceptance a person is asked to confirm their details |
+| `core.access-scheme.keep-rejected` | duration | 90d | 0d to 365d | staff | Yes | How long a rejected application is kept before it is deleted |
+
 ### Rules across settings
 
 | Rule | Check |
@@ -105,8 +118,8 @@ A privileged ability needs a strong session. One that changes something also nee
 | `core.account.merge` | `core.account` | privileged | refuses | `account.read` | Merge two accounts and undo a merge | Administrator |
 | `core.account.recover` | `core.account` | privileged | refuses | `account.read` | Issue a passkey enrolment link to somebody locked out | Administrator |
 | `core.session.end` | `core.account` | privileged | grants |  | End a person's sessions | Administrator |
-| `core.emergency-contact.read` | `core.account` | privileged | grants |  | Read a person's emergency contacts. Every read is audited. | Welfare lead; the shift lead's fact tonight, once the theatre confirms it |
-| `core.access-profile.read` | `core.account` | privileged | grants |  | Read the access needs a person agreed to share. Every read is audited. | Welfare lead; Box-office manager, only for what the person chose to share with box office; the shift lead's fact tonight, once the theatre confirms it |
+| `core.emergency-contact.read` | `core.account` | privileged | grants |  | Read a member's emergency contacts, one person at a time, with a reason. Every read is audited and shown to the person. | Welfare lead. By fact, only once the theatre maps it: the duty manager on tonight's confirmed shift. Not Owner or Administrator. |
+| `core.access-profile.read` | `core.account` | privileged | grants |  | Read a person's access needs for the purpose `core.welfare`, and for any purpose that names no ability of its own, when the person has switched that purpose on. Every read is audited and shown to the person. | Welfare lead. Box office reads under its own ability named by the purpose `box-office.booking`, not this one. |
 | `core.role.read` |  | normal |  |  | See roles, facts and what each holds | Administrator, Committee member |
 | `core.role.manage` |  | privileged |  | `role.read` | Create and edit roles; map abilities to facts | Administrator |
 | `core.grant.read` |  | normal |  | `account.search` | See who holds what | Administrator, Committee member, Membership officer |
@@ -137,10 +150,17 @@ A privileged ability needs a strong session. One that changes something also nee
 
 "Default" is the freshness window `core.access.fresh-within`. A person using an ability over their own account through `owner: 'grants'` meets the same assurance and freshness as staff would.
 
+Two more abilities run the access scheme, which makes nineteen.
+
+| Ability | Acts on | Risk | Owner | Implies | Purpose | Suggested holders | `assurance` | `fresh` | `grantAt` |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `core.access-scheme.read` | `core.account` | privileged | refuses | `account.search` | See the queue and open an application to the access scheme. Every opening is audited. | Box-office manager, Front-of-house manager, Welfare lead. Not Owner or Administrator by default. | strong | false, with `audit: 'read'` | site |
+| `core.access-scheme.review` | `core.account` | privileged | refuses | `access-scheme.read` | Accept, reject, ask for more, verify; invite a person to apply or apply for them | The same three | strong | default | site |
+
 - **"Owner" in the Owner column means the person whose account it is.** `grants` gives everyone these abilities over their own account with no role; `refuses` stops staff disabling, merging or recovering their own.
 - **`core.grant.manage` at a record scope is delegation.** A producer who holds it on one production can add their team to that production and nowhere else. They can give only roles whose abilities they hold there.
 - **Four further limits apply whatever is held:** nobody grants themselves a role; nobody gives what they do not have; an Owner's grant is changed only by another Owner; no change may leave the theatre without a usable Owner.
-- That makes 17 rows; `core.retention.arm` is deliberately held by no preset role.
+- That makes 17 rows in this table, with the access scheme's two abilities below; `core.retention.arm` is deliberately held by no preset role.
 
 ## Facts
 

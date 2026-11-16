@@ -36,6 +36,14 @@ Decision records are in [docs/decisions](https://github.com/newtheatre/prosceniu
 | RFC 8176 (authentication method references) | The vocabulary a session uses to record how it was made |
 | WebAuthn (W3C) | Passkeys |
 
+## Access needs
+
+| Source | Used for |
+| --- | --- |
+| [Nimbus Access Card overview](https://accesscard.online/overview) | The nine categories of barrier that seed the access-needs vocabulary (standing, crowds, level access, distance, urgent toilet needs, essential companion, visual information, audible information, and a catch-all). Matt suggested it as the basis on 16 November 2026. Only the categories are taken: the labels are our own and no Nimbus wording or symbols are used. The page says Nimbus asks for evidence for some categories; this platform asks for none, because needs here are self-declared. |
+
+Not verified: how Nimbus's checking service works. Its documentation is not public, so the later story ID-40 states only what it would need.
+
 ## Not verified
 
 - The Information Commissioner's Office guidance page on erasure could not be opened from here, so nothing is cited from it.

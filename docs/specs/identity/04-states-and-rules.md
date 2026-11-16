@@ -258,7 +258,7 @@ An export request uses the same row and the same path without the cooling-off or
 | Erasure requested | The same | State requested; a confirmation link goes to the audience address |
 | Confirmed | The link was used | Cooling-off starts; `not_before` set; the person can still cancel from their account or from the email |
 | Held | A module raised a hold | State held, with the hold codes shown to staff and a plain explanation to the person |
-| Run | Cooling-off over; no holds | One batch: every reference handled as declared; addresses, sign-in methods, sessions, tokens, contacts and access profile deleted; grants ended; `anonymised_at` set |
+| Run | Cooling-off over; no holds | One batch: every reference handled as declared; addresses, sign-in methods, sessions, tokens, contacts, access needs and sharing choices deleted; grants ended; `anonymised_at` set |
 | Cancelled | Before the batch runs | State cancelled; nothing else changes |
 
 - **Holds are declared by modules, never improvised.** Examples other workstreams are expected to register: money still owed either way, a ticket for a performance not yet over, an open incident the person is named in, the last usable Owner.
@@ -268,6 +268,79 @@ An export request uses the same row and the same path without the cooling-off or
 - **The batch asserts its own completeness**, as merge does: its last statement checks that no Personal column of the account is still set.
 - **A second run is harmless.** Erasing a tombstone succeeds and changes nothing, so a retried job never fails for having worked.
 - **Earlier states of the database.** The platform takes no backups of its own (decided by Matt, 16 November 2026). Cloudflare keeps its own history of the database, which holds earlier states for up to 30 days and then ages out. If a theatre ever restores its database from that history, every erasure completed after the restore point must be run again. This is a known limit: the erasure record in `core_data_requests` holds no personal data but lives in the same database, so a restore also loses the record of those erasures. Before restoring, the theatre must note the account ids of erasures completed since the restore point from the data-request queue, and run them again afterwards. The privacy page says this.
+
+## Emergency contacts
+
+Members' side only. An audience member never sees the words, and has nothing stored.
+
+| Matter | Rule |
+| --- | --- |
+| Who can hold them | An account with a standing. Up to three contacts: a name, a phone number and an optional relationship. They are optional; a module that needs one before an activity asks through `core.requirement`. |
+| Where the person edits them | "Member details" in the members' area. Without a standing the screen answers as a missing page and the write is refused on the server. |
+| What the person confirms | That they have told the contact their details are held here. The screen asks them to check the details when a year has passed since the last change. |
+| Who may read them | Somebody holding `core.emergency-contact.read` over that account: the welfare lead by role, and whoever the theatre maps the ability to by fact, such as the person leading tonight's shift (front of house's fact front-of-house.leading-shift on a performance), which the theatre must confirm because the ability is privileged. Nobody holds it by default except the welfare lead. An Owner does not hold it by being an Owner. |
+| How a read happens | One person at a time, from that person's page, after choosing a reason from a fixed list (an emergency now, an incident, a welfare follow-up, a check before an activity). Strong session; no fresh check, so an emergency is not slowed. There is no list of contacts for a team or a night. |
+| What a read leaves | An audit entry of kind read with the reader, the reason code and what allowed it. The person sees every read in "Member details": when, in what capacity, and why. |
+| When the last standing ends | Reads stop at once, because the person is no longer on the members' side. The rows are kept for `core.emergency-contacts.keep-after-standing` (30 days) so a gap between two memberships loses nothing, then deleted by the daily sweep. |
+| Class and storage | Personal, about a third person. Plain columns, not a special column. |
+| Download, merge, erasure | In the person's own download. Rows move on merge. Deleted in the erasure batch. |
+
+## The access scheme
+
+A person's access needs are held because they applied to the theatre's access scheme and the theatre accepted them (Matt, 16 November 2026). It is audience side, open to anybody with an account, member or not, and it is its own part of the core, not a switchable module. There is no ticking of needs at checkout: a buyer who is not on the scheme books as anybody does, and the checkout points to the scheme.
+
+### Applying
+
+| Matter | Rule |
+| --- | --- |
+| Where it starts | The theatre's public page `/access` says how the theatre supports people and carries an "Apply" button. The same button is in My account. Both lead to the application form, which needs a signed-in account; a person without one signs in or signs up on the way and lands back on the form. |
+| Asking by email or phone | Staff who run the scheme use "Invite to apply": they give a name and address, the platform finds or makes the account and emails a single-use link that signs the person in and opens the form. |
+| When a person cannot use the form | Staff may fill it in for them, by phone or in person. The application is marked as made by staff, and the person is told at their address and can correct it. |
+| What the form asks | Ticks against the vocabulary `core.access-need`, each with an optional note of up to 200 characters; how many essential companions they need (none, one or two); and anything else the theatre should know. Barriers, never diagnoses. No document is uploaded. |
+| What applying agrees to | That the people who run the scheme may read the application, and that the box office may use it for the person's bookings. Other uses stay off until the person switches them on (see Sharing). |
+
+### Deciding
+
+| State | Meaning | Who moves it on |
+| --- | --- | --- |
+| Submitted | Waiting for the theatre | A reviewer accepts, rejects or asks for more |
+| More information asked | The reviewer has written to the person with a question | The person answers, which makes it Submitted again, or withdraws |
+| Accepted | The person is on the scheme and can book with their arrangements, including companion tickets up to the number accepted | A reviewer may later mark it verified, or end it; the person may change or withdraw it |
+| Rejected | Not accepted, with a reason the person is given | The person may apply again |
+| Withdrawn | The person left the scheme; the needs are deleted | The person may apply again |
+
+- **Accepted is enough to book.** Verified is a separate mark on an accepted application, not a further state.
+- **Verified** means a reviewer has seen evidence, in person: a Nimbus Access Card, another document, or the theatre's own knowledge of the person. The platform records which of those, when and by whom, and stores no copy and no card number. A theatre that wants free companion tickets to wait for it turns on `core.access-scheme.companions-need-verified`; by default accepted is enough.
+- **A reviewer** holds `core.access-scheme.review`. They may accept fewer companions than were asked for, and say why. They cannot review their own application.
+- **Every decision tells the person**, by email and in My account, in plain words. A rejection or a request for more carries the reviewer's message.
+- **Changing an accepted application** sends the change for review. What was accepted stays in force until the change is decided, so nobody loses their arrangements by correcting a detail.
+- **Review date.** An accepted application is looked at again after `core.access-scheme.review-after` (three years by default): the person is asked to confirm it is still right. Nothing lapses without a person deciding.
+- **Nothing is public.** No screen, search or list shows that a person is on the scheme, except to a reviewer and to staff reading for a purpose below.
+
+### Storage and sharing
+
+| Matter | Rule |
+| --- | --- |
+| What is stored | The application: ticks against the core vocabulary `core.access-need`, each with an optional note, and the number of essential companions. The vocabulary describes barriers, never diagnoses, and a theatre can edit it. It is seeded with nine entries, in our own plain wording: difficulty standing or queueing, difficulty with crowds, level access, difficulty with distance, urgent toilet needs, an essential companion, visual information, audible information, and other (please ask). The categories follow those of the Nimbus Access Card (see Sources); no Nimbus wording or symbols are used. A record stores the entry's id, never its label. |
+| Class and storage | Special category, because a need can reveal health. One special column under `CORE_ENCRYPTION_KEY`. It cannot be searched, filtered or listed. |
+| Who writes it | The person, through the application form, or staff on their behalf as above. An unclaimed account has none until its owner signs in. |
+| Who it is shared with | The scheme's reviewers and the box office purpose `box-office.booking`, which applying agrees to and the form says so. Every other purpose is off until the person switches it on. Each purpose is declared by a module through `core.access-purpose`, with a plain sentence saying who will see the needs and why. An audience member sees audience purposes only, and a members' purpose appears only while they have a standing. In the first release the only members' purpose is the welfare lead's; production teams do not read access needs (Matt, 16 November 2026). |
+| What a purpose receives | Only the vocabulary entries it declared it uses, and the note only if it declared that. A course does not learn where somebody likes to sit. |
+| How a module reads | Through one service, `accessNeedsFor(actor, accountId, purpose, record?)`. It answers only when the person has switched that purpose on, the purpose's module is enabled, and the actor holds the ability the purpose names. Otherwise it answers nothing, and does not say which test failed. |
+| The person's own use | The person reading their own accepted application, for example at checkout so that the companion tickets they are entitled to are offered, needs no switch: it is their own record. |
+| What a read leaves | An audit entry of kind read with the reader, the purpose and the record. The person sees every read by staff in "Access needs". |
+| Copies | A module that must honour a need later, such as a booking, copies what it received onto its own record at that moment, declares that column special category with its own retention, and no longer depends on the profile. Changing or clearing the profile does not change a booking already made, and the screen says so. |
+| Switching a purpose off | Stops further reads at once. It does not withdraw copies already on a booking; the person changes those on the booking. The box office purpose cannot be switched off while on the scheme; leaving the scheme withdraws the application. |
+| Download, merge, erasure | In the person's own download with the decisions made and their sharing choices. On merge the survivor's application stays; if only the merged-away account has one, it moves. Deleted in the erasure batch, with the choices. A rejected application is deleted `core.access-scheme.keep-rejected` after the decision (90 days), and a withdrawn one at once. |
+
+The nine seeded entries have the keys `standing`, `crowds`, `level-access`, `distance`, `urgent-toilet`, `essential-companion`, `visual-information`, `audible-information` and `other`. Two more are seeded for box office and front of house, outside the Access Card's categories: `wheelchair-stays` (uses a wheelchair and stays in it) and `wheelchair-transfers` (uses a wheelchair and transfers to a seat). They allocate nothing; they tell the house team whether a chair needs storing.
+
+Four limits, agreed with box office:
+
+- **Being on the scheme reserves nothing.** Level access is not a wheelchair space: a space is a ticket with its own capacity, booked through box office. Box office decides which ticket types ask for the scheme, through `core.requirement`.
+- **Only an accepted application is read.** A module's read answers nothing while an application is submitted, rejected or withdrawn, exactly as it does for a person who never applied.
+- **A sale with no person holds no needs.** An order with no account never carries access needs. A buyer who has not signed in is not on the scheme for that order; the checkout says how to apply.
+- **Needs travel as data only where they are protected.** No entry or note goes into an event, a job payload or a log, in identity or in any module that reads them. Figures passed between modules are counts per need with no names.
 
 ## Retention of unused accounts
 

@@ -114,7 +114,7 @@ A grant on a production covers its performances and so their orders: a visiting 
 | Ability | Acts on | Risk | Owner | Implies | Purpose | Suggested holders |
 | --- | --- | --- | --- | --- | --- | --- |
 | `box-office.order.view` | `box-office.order` | normal | grants |  | See an order and its tickets | `box-office-staff`; fact `front-of-house.on-shift` |
-| `box-office.order.view-access-note` | `box-office.order` | privileged | grants | `order.view` | Read the access note | `box-office-manager`, `front-of-house-manager` |
+| `box-office.order.view-access-note` | `box-office.order` | privileged | grants | `order.view` | Read access needs: the order's copy, the access list for a performance, and a check of the access scheme on a customer's behalf. Declared with audit 'read', and the ability of the purpose box-office.booking | `box-office-manager`, `front-of-house-manager` |
 | `box-office.order.sell` | `core.performance` | normal |  | `order.view` | Sell at the desk and by phone | `box-office-staff` |
 | `box-office.order.reserve` | `core.performance` | normal |  | `order.view` | Reserve for a customer at the desk or by phone | `box-office-staff` |
 | `box-office.order.take-payment` | `box-office.order` | normal |  | `order.view` | Take payment for a reserved order, and adjust it first | `box-office-staff` |

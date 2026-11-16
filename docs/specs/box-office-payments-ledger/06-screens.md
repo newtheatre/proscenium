@@ -84,6 +84,7 @@ What the desk must get right:
 | Screen | Route | Ability | What it does | Release |
 | --- | --- | --- | --- | --- |
 | Door | `/live/door`, which opens tonight's performance, and `/live/door/<performance>` | `box-office.ticket.admit` | Scan, find by name, live counts. A Live page, reached from the Door tile on the Tonight hub | First |
+| Access list | `/live/door/<performance>/access` | `box-office.order.view-access-note` | Who is coming tonight with access needs, what they are, and which wheelchair spaces, transfer seats and companion tickets are booked. Made for a phone, every opening recorded as a read. Reached from the door screen and from the access figures on Front of house's Tonight page | First |
 
 ![door scanning wireframe · 3 phone states](images/06-w3-door-scanning-wireframe.png)
 

@@ -117,6 +117,8 @@ A priced part of the house for one production: "Stalls", "Balcony", "Wheelchair 
 | `production_id` | text | not null; `core.production` | Public | keep |
 | `name` | text | not null; unique per production | Public | keep |
 | `kind` | text | `standard`, `wheelchair`, `restricted_view` | Public | keep |
+| `displaces_band_id` | ref `box_office_bands` | `wheelchair` bands only. Null means permanent wheelchair spaces that take no seats. Set, it names the seating band whose seats are removed to make each space | Internal | keep |
+| `displaces_units` | integer | default 2, CHECK >= 1; how many seats one wheelchair space removes. Only meaningful with `displaces_band_id` | Internal | keep |
 | `sort` | integer | not null | Internal | keep |
 
 ### `box_office_ticket_types` (plain)
@@ -185,6 +187,7 @@ One unit of capacity, or one seat. The truth about what is sold.
 | `pool_id` | text | not null | Internal | keep |
 | `seat_id` | text | null for general admission; `box_office_performance_seats` | Internal | keep |
 | `hold_id` | text | not null | Internal | keep |
+| `displaced_for_id` | ref `box_office_claims` | null for an ordinary claim. Set on a claim that exists only because a wheelchair space removed this seat: it names the wheelchair space's claim, carries no ticket, and is released in the same statement as that claim | Internal | keep |
 | `state` | text | `held`, `confirmed`, `released` | Internal | keep |
 | `expires_at` | integer | null once confirmed, and for staff holds with no end | Internal | keep |
 | `released_at` | integer | set with `released` | Internal | keep |
@@ -207,7 +210,7 @@ Enforced in the database:
 | `state` | text | `basket`, `reserved`, `awaiting_payment`, `confirmed`, `cancelled`, `expired` | Internal | keep |
 | `account_id` | account (subject) | required to confirm or reserve an online or phone order; null for a basket not yet checked out and for an anonymous desk sale. Declared `unlinked: 'staff'` | Personal | keep reference |
 | `signed_in` | boolean | false when the order was made without signing in | Internal | keep |
-| `access_note` | text, encrypted | optional | Special category | clear |
+| `access_note` | text, encrypted | optional; a list of `{ term, note? }` whose terms come from the core vocabulary `core.access-need`, as the buyer gave them for this booking (part 4, "Access needs"). Never set on an order with no account | Special category | clear |
 | `currency` | currency | not null | Internal | keep |
 | `total_minor` | minor units | at least 0; the sum of live lines, rewritten in the same batch as any line change | Internal | keep |
 | `sold_by` | account (actor) | desk and phone orders | Personal | keep reference |
@@ -413,7 +416,8 @@ A waiting-list entry is only an address and a party size, so it creates no accou
 | `section`, `row`, `number` | text | unique together per plan | Public | keep |
 | `x`, `y` | integer | position on the drawing, in plan units | Public | keep |
 | `kind` | text | `seat`, `wheelchair_space`, `companion`, `removable` | Public | keep |
-| `flags` | text | JSON list: `restricted_view`, `aisle`, `step_free` | Public | keep |
+| `displaces` | text | `wheelchair_space` only: a JSON list of the `removable` seats of this plan that come out to make the space. Empty for a permanent space | Internal | keep |
+| `flags` | text | JSON list: `restricted_view`, `aisle`, `step_free`, `transfer` (a seat suited to someone transferring from a wheelchair) | Public | keep |
 | `default_band_name` | text | suggests a band when a performance is set up | Internal | keep |
 
 ### `box_office_performance_seats` (guarded)

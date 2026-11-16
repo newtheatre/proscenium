@@ -1,6 +1,6 @@
 # 2. Data model
 
-Identity owns seventeen tables, all inside the `core` module. One row in `core_accounts` is one person; everything else hangs off it. No table stores "is a member", "is staff" or "is pending": those are read from facts at the moment they are asked.
+Identity owns eighteen tables, all inside the `core` module. One row in `core_accounts` is one person; everything else hangs off it. No table stores "is a member", "is staff" or "is pending": those are read from facts at the moment they are asked.
 
 ## Reading the tables
 
@@ -32,10 +32,10 @@ The foundations layout gives every table a heading line. Realm is `audience`, `m
 | `core_account_merges` | operational | `survivor_id` | No | Kept |
 | `core_account_merge_items` | operational | none (reached through the merge) | No | Deleted when the undo window closes |
 | `core_data_requests` | operational | `account_id` | No | Kept as the record that the request was met; it holds no personal content after erasure |
-| `core_emergency_contacts` | members | `account_id` | No | With the account |
+| `core_emergency_contacts` | members | `account_id` | No | With the account, and deleted `core.emergency-contacts.keep-after-standing` after the last standing ends |
 | `core_access_profiles` | audience | `account_id` | No | With the account; a special column under `CORE_ENCRYPTION_KEY` |
 
-None of identity's tables is append-only; the audit trail of its actions is foundations' `core_audit`.
+`core_access_shares` has the same heading line as `core_access_profiles`: realm `audience`, subject `account_id`, kept with the account. None of identity's tables is append-only; the audit trail of its actions is foundations' `core_audit`.
 
 ### Id prefixes
 
@@ -57,9 +57,11 @@ Every id is a prefix, an underscore and 26 characters, in the foundations format
 | `core_account_merge_items` | `mrgi` | No |
 | `core_data_requests` | `dreq` | No |
 | `core_emergency_contacts` | `emc` | No |
-| `core_access_profiles` | `apr` | No |
+| `core_access_profiles` | none | No |
 
 `core_role_abilities` and `core_fact_abilities` have no id of their own. The first is keyed by `role_id` and `ability` together; the second by `fact`, `ability` and `pinned_record` together. The id of a session, token or challenge is never the secret itself: the secret is a separate value stored only as a hash.
+
+`core_access_profiles` has no id of its own either: a person has at most one application, so the row is keyed by `account_id` and anything that points at it names the account.
 
 ## core\_accounts
 
@@ -337,7 +339,7 @@ A request to download or erase a person's data, by them or by staff for them.
 
 ## core\_emergency\_contacts
 
-Somebody to ring for a member. It describes a third person, so it is never shown outside the members' side.
+Somebody to ring for a member: up to three per account. Members' side only. A row can be written and read only while the account has a standing, and rows are deleted `core.emergency-contacts.keep-after-standing` after the last standing ends. It describes a third person, so it is never shown outside the members' side and never appears in a list, a search or anybody else's export. Rules are in part 3.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
@@ -352,18 +354,47 @@ On merge: rows move; the survivor's rows are listed first.
 
 ## core\_access\_profiles
 
-A person's access needs, given once and offered wherever they are useful. The questions themselves are a form-builder form, so a theatre can change them.
+A person's application to the access scheme and, once accepted, the needs in force. Audience side: any claimed account may have one, member or not. At most one row per account. The sensitive content (entry ids from the access-needs vocabulary with their notes, the number of companions, the reviewer's message) is held in special columns because it may reveal health. Who else may see it is in `core_access_shares`. The states and rules are in part 3.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
-| account\_id | id | Primary key | Internal | Row deleted |
-| payload | text | Not null; the answers, encrypted in the application before storage | Special category | Row deleted |
-| key\_version | integer | Not null | Internal | Row deleted |
-| share\_with\_box\_office | flag | Not null; default false | Internal | Row deleted |
-| share\_with\_members\_side | flag | Not null; default false | Internal | Row deleted |
-| updated\_at | time | Not null | Internal | Row deleted |
+| `account_id` | id | Primary key | Internal | Row deleted |
+| `status` | enum | Not null; `submitted`, `more-info`, `accepted`, `rejected` | Special category | Row deleted |
+| `payload` | special | Null until accepted; the needs and companions in force | Special category | Row deleted |
+| `pending` | special | Null; an application or a change waiting for a decision | Special category | Row deleted |
+| `message` | special | Null; the reviewer's latest message to the person | Special category | Row deleted |
+| `submitted_at` | timestamp | Not null | Internal | Row deleted |
+| `submitted_via` | enum | Not null; `self`, `staff` | Internal | Row deleted |
+| `submitted_by` | id | Null; the staff account when `submitted_via` is `staff`; an actor reference | Internal | Row deleted |
+| `decided_at` | timestamp | Null | Internal | Row deleted |
+| `decided_by` | id | Null; an actor reference | Internal | Row deleted |
+| `verified_at` | timestamp | Null; set only while `status` is `accepted` | Internal | Row deleted |
+| `verified_by` | id | Null; an actor reference | Internal | Row deleted |
+| `verified_method` | enum | Null; `access-card`, `document`, `known` | Special category | Row deleted |
+| `review_due` | date | Null; set on acceptance | Internal | Row deleted |
+| `updated_at` | timestamp | Not null | Internal | Row deleted |
+
+- Withdrawing deletes the row, so `withdrawn` is not a stored status.
+- A check constraint holds `payload` not null exactly when `status` is `accepted`, and `verified_at` null unless it is.
+- While `status` is `accepted` and `pending` is not null, a change is waiting and `payload` stays in force.
+- No card number, document or image is stored. `verified_method` says only what kind of evidence a reviewer saw.
+- The row is never selected by a list or a search outside the scheme's review queue, which reads `status` and `submitted_at` only.
 
 On merge: the survivor's row stays; if only the merged-away account has one, it moves.
+
+## core\_access\_shares
+
+One row for each purpose the person has agreed may see their access needs. No row means no sharing. A purpose is declared by a module through the point `core.access-purpose` (part 4).
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `account_id` | id | Not null; part of the key | Internal | Row deleted |
+| `purpose` | text | Not null; part of the key; a declared purpose id such as `box-office.booking` | Internal | Row deleted |
+| `created_at` | timestamp | Not null | Internal | Row deleted |
+
+- Key: `account_id` and `purpose` together. No id of its own.
+- A row whose purpose is no longer declared (its module is switched off) counts for nothing and is kept, so switching the module back on restores the person's choice.
+- On merge: rows move to the survivor; where both have the same purpose, one row remains.
 
 ## What other modules declare about an account reference
 
