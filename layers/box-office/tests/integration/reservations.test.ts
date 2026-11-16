@@ -63,7 +63,9 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     const asked = await reserve(b, email)
     expect(asked.status, JSON.stringify(asked.body)).toBe(200)
     expect(asked.body).toEqual({ state: 'confirm-email', orderId: b.orderId, expiresAt: b.expiresAt })
-    expect(await order(b.orderId)).toMatchObject({ state: 'basket', account_id: null, desk_code_hash: null })
+    expect(await order(b.orderId)).toMatchObject({ state: 'basket', account_id: null, desk_code_hash: null, confirm_email: email, confirm_name: 'Guest Buyer', confirm_expires_at: b.expiresAt })
+    // Nobody has an account yet: a mistyped address leaves nothing behind.
+    expect(await count('SELECT count(*) AS n FROM core_account_emails WHERE address = ?', email)).toBe(0)
 
     const confirm = await mail('box-office.reservation-confirm', b.orderId)
     expect(confirm.link).toMatch(/^http:\/\/test\/book\/confirm\//)
@@ -72,7 +74,7 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     expect(done.body).toMatchObject({ state: 'reserved', orderId: b.orderId, reference: b.reference, amountDueMinor: b.totalMinor, releaseAt: null })
 
     const o = await order(b.orderId)
-    expect(o).toMatchObject({ state: 'reserved', signed_in: 0, expires_at: null, intent_id: null, total_minor: b.totalMinor })
+    expect(o).toMatchObject({ state: 'reserved', signed_in: 0, expires_at: null, intent_id: null, total_minor: b.totalMinor, confirm_token_hash: null, confirm_email: null, confirm_name: null, confirm_expires_at: null })
     const [account] = await rows<{ id: string, origin: string, first_signed_in_at: number | null }>('SELECT a.id, a.origin, a.first_signed_in_at FROM core_accounts a JOIN core_account_emails e ON e.account_id = a.id WHERE e.address = ?', email)
     expect(account).toMatchObject({ id: o.account_id, origin: 'guest', first_signed_in_at: null })
     // The seats are claimed as a sale claims them: confirmed, with no expiry, under a reservation hold.
@@ -92,11 +94,13 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     expect(o.desk_code_hash).toBe(await hashOf(done.body.deskCode))
     const stored = JSON.stringify(await rows('SELECT * FROM box_office_orders WHERE id = ?', b.orderId)) + JSON.stringify(await rows('SELECT payload FROM core_notifications WHERE subject_id = ?', b.orderId))
     for (const secret of [done.body.token, done.body.deskCode, b.token, tokenOf(confirm.link!)]) expect(stored).not.toContain(secret)
+    expect(stored).not.toContain(email)
 
-    // The basket's own token opens nothing now, and the link pressed again reserves nothing more.
-    expect((await req('GET', `/api/box-office/baskets/${b.orderId}`, undefined, null, { 'x-basket-token': b.token })).status).toBe(404)
+    // The browser that made the basket still sees what became of it; the link pressed again reserves nothing more.
+    expect((await req('GET', `/api/box-office/baskets/${b.orderId}`, undefined, null, { 'x-basket-token': b.token })).body).toMatchObject({ state: 'reserved' })
     const again = await req('POST', '/api/box-office/reservations/confirm', { token: tokenOf(confirm.link!) }, null)
-    expect(again.body).toMatchObject({ code: 'box-office.reservation.already-confirmed' })
+    expect(again.status).toBe(404)
+    expect(again.body).toMatchObject({ code: 'box-office.reservation.link-invalid' })
     expect((await pool(h)).claimed).toBe(2)
   })
 
@@ -107,13 +111,30 @@ describe('reserving as a guest, with a confirmed address asked for', () => {
     const confirm = await mail('box-office.reservation-confirm', b.orderId)
     advanceClock(HOUR)
     const late = await req('POST', '/api/box-office/reservations/confirm', { token: tokenOf(confirm.link!) }, null)
-    expect(late.status).toBe(409)
-    expect(late.body).toMatchObject({ code: 'box-office.basket.expired' })
+    // One answer, whatever is wrong with the link.
+    expect(late.status).toBe(404)
+    expect(late.body).toMatchObject({ code: 'box-office.reservation.link-invalid' })
     expect((await order(b.orderId)).state).toBe('basket')
     // The seats went back on sale with the lapsed hold.
     expect((await buy(h, 4)).ok).toBe(true)
-    expect((await req('POST', '/api/box-office/reservations/confirm', { token: 'bm90LW91cnM' }, null)).body).toMatchObject({ code: 'box-office.reservation.link-invalid' })
-    expect((await req('POST', '/api/box-office/reservations/confirm', { token: b.token }, null)).status).toBe(404)
+    expect((await req('POST', '/api/box-office/reservations/confirm', { token: 'bm90LW91cnM' }, null)).body).toEqual(late.body)
+    expect((await req('POST', '/api/box-office/reservations/confirm', { token: b.token }, null)).body).toEqual(late.body)
+  })
+
+  it('sends a new link when asked again with the address put right, and the first stops working', async () => {
+    const h = await house(4)
+    const b = await basket(h, 1)
+    await reserve(b, 'mistyped@example.org')
+    const first = await mail('box-office.reservation-confirm', b.orderId)
+    const right = address()
+    advanceClock(1000)
+    expect((await reserve(b, right)).body.state).toBe('confirm-email')
+    const second = await mail('box-office.reservation-confirm', b.orderId)
+    expect(second.link).not.toBe(first.link)
+    expect((await req('POST', '/api/box-office/reservations/confirm', { token: tokenOf(first.link!) }, null)).status).toBe(404)
+    expect((await req('POST', '/api/box-office/reservations/confirm', { token: tokenOf(second.link!) }, null)).body.state).toBe('reserved')
+    expect(await count('SELECT count(*) AS n FROM core_account_emails WHERE address = ?', 'mistyped@example.org')).toBe(0)
+    expect(await count('SELECT count(*) AS n FROM core_account_emails WHERE address = ?', right)).toBe(1)
   })
 
   it('needs an address from a guest, the right basket token and the total the buyer saw', async () => {
@@ -150,8 +171,8 @@ describe('reserving with no confirmation asked for', () => {
     const outcomes = await Promise.all(Array.from({ length: 20 }, () => buy(h, 1)))
     expect(outcomes.filter(o => o.ok)).toHaveLength(0)
     expect((await pool(h)).claimed).toBe(1)
-    // Pressed again, it is a basket no longer.
-    expect((await reserve(b, address())).status).toBe(404)
+    // Pressed again, it is reserved already.
+    expect((await reserve(b, address())).body).toMatchObject({ code: 'box-office.reservation.already-reserved' })
   })
 
   it('refuses a basket that has run out', async () => {

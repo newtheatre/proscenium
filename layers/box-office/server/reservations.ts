@@ -6,14 +6,16 @@
 //
 // A buyer who is not signed in proves their address first, when the theatre asks for that: the
 // basket stays a basket, its seats held for as long as any basket's, and the link in the email does
-// the reserving. That link is sealed with the site's key and carries the order and the account, so
-// nothing more is stored for it.
+// the reserving. That link holds a random token and nothing else: its hash is on the basket with
+// the address it was sent to, it works once, and it ends with the basket. The account is found or
+// made only when the link is pressed, so a mistyped address leaves nothing behind.
 import { sql } from 'drizzle-orm'
 import { all, first, inAccountScope, nowMs, refuse, theatreTimeZone, useContext, useSetting, type UnitView } from '#kit'
-import { findOrCreateAccount, getPerformance, getProduction, notify } from '#modules/core'
+import { findOrCreateAccount, getPerformance, getProduction, notify, notifyAddress } from '#modules/core'
 import { methodsFor } from '#modules/payments'
 import { cancellations } from './db/schema'
-import { hashOf, newDeskCode, openToken, randomToken, sealToken } from './codes'
+import { hashOf, newDeskCode, randomToken } from './codes'
+import { siteUrl } from './links'
 import { salesOf } from './setup'
 
 export type PaymentTiming = 'pay-now' | 'reserve' | 'buyer-chooses'
@@ -25,10 +27,10 @@ export async function timingFor(performanceId: string): Promise<PaymentTiming> {
   return (await salesOf(performanceId))?.paymentTiming ?? await useSetting('box-office.checkout.payment-timing') as PaymentTiming
 }
 
-interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null }
+interface OrderRow { id: string, reference: string, state: string, account_id: string | null, currency: string, total_minor: number, expires_at: number | null, release_at: number | null, confirm_email: string | null, confirm_name: string | null }
 interface LineRow { id: string, performance_id: string, band_id: string, ticket_type_id: string, amount_minor: number, type_name: string }
 
-const ORDER = 'SELECT id, reference, state, account_id, currency, total_minor, expires_at, release_at FROM box_office_orders'
+const ORDER = 'SELECT id, reference, state, account_id, currency, total_minor, expires_at, release_at, confirm_email, confirm_name FROM box_office_orders'
 const RAN_OUT = { code: 'box-office.basket.expired', reason: 'Your basket has run out, and the seats are back on sale.', remedy: 'Choose your tickets again.' }
 
 function liveLines(orderId: string): Promise<LineRow[]> {
@@ -86,42 +88,52 @@ export type ReserveOutcome = Reserved | { state: 'confirm-email', orderId: strin
  * when the theatre does not ask for a confirmed address. Otherwise the guest is sent the link that
  * does it.
  */
-export async function requestReservation(unit: UnitView, origin: string, input: ReserveInput): Promise<ReserveOutcome> {
-  const order = await first<OrderRow>(`${ORDER} WHERE id = ? AND link_token_hash = ?`, input.orderId, await hashOf(input.token))
+export async function requestReservation(unit: UnitView, input: ReserveInput): Promise<ReserveOutcome> {
+  const order = await first<OrderRow>(`${ORDER} WHERE id = ? AND basket_token_hash = ?`, input.orderId, await hashOf(input.token))
   if (!order) refuse('box-office.basket.not-found', 'There is no such basket.', { status: 404 })
   const lines = await checkBasket(order, input.expectedTotalMinor)
 
   const actor = useContext().actor
-  if (actor.kind === 'person' && actor.accountId) return reserve(unit, origin, order, lines, actor.accountId, true)
+  if (actor.kind === 'person' && actor.accountId) return reserve(unit, order, lines, actor.accountId, true)
 
   if (!input.email) refuse('box-office.reservation.email-needed', 'We need an email address to send your reservation to.', { status: 422, fields: { email: 'required' } })
-  const { accountId } = await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })
-  if (!await useSetting('box-office.reservations.confirm-email')) return reserve(unit, origin, order, lines, accountId, false)
+  if (!await useSetting('box-office.reservations.confirm-email')) {
+    const { accountId } = await findOrCreateAccount(unit, { address: input.email, name: input.name, origin: 'guest' })
+    return reserve(unit, order, lines, accountId, false)
+  }
 
+  // Asked again, perhaps with the address put right: the earlier link stops working.
+  const token = randomToken()
+  const at = nowMs()
+  unit.add(sql`UPDATE box_office_orders SET confirm_token_hash = ${await hashOf(token)}, confirm_expires_at = expires_at, confirm_email = ${input.email}, confirm_name = ${input.name ?? null}, updated_at = ${at}
+    WHERE id = ${order.id} AND state = 'basket' AND expires_at > ${at}`).expect(1, RAN_OUT)
   const words = await wordsFor(order, lines, order.total_minor)
-  const token = await sealToken({ order: order.id, account: accountId, total: order.total_minor })
-  await notify(unit, 'box-office.reservation-confirm', {
-    to: accountId,
-    variables: { link: `${origin}/book/confirm/${token}`, show: words.show, when: words.when, until: words.timeOf(order.expires_at!) },
-    subject: ['box-office.order', order.id],
+  await notifyAddress(unit, 'box-office.reservation-confirm', {
+    address: input.email,
+    variables: { link: siteUrl(`/book/confirm/${token}`), show: words.show, when: words.when, until: words.timeOf(order.expires_at!) },
+    record: ['box-office.order', order.id],
   })
   return { state: 'confirm-email', orderId: order.id, expiresAt: order.expires_at! }
 }
 
-/** The link in the confirmation message: the address is proved, so the basket is reserved. */
-export async function confirmReservation(unit: UnitView, origin: string, token: string): Promise<Reserved> {
-  const held = await openToken<{ order: string, account: string, total: number }>(token)
-  const order = held && typeof held.order === 'string' && typeof held.account === 'string' ? await first<OrderRow>(`${ORDER} WHERE id = ?`, held.order) : null
-  if (!held || !order) refuse('box-office.reservation.link-invalid', 'This link does not open a reservation.', { status: 404 })
-  // Pressed twice, or opened again later: the reservation it made is in the message that followed.
-  if (order.state === 'reserved') refuse('box-office.reservation.already-confirmed', 'This reservation is already confirmed.', { status: 409, remedy: 'Your booking reference is in the email we sent when it was confirmed.' })
-  const lines = await checkBasket(order, held.total)
-  return reserve(unit, origin, order, lines, held.account, false)
+/**
+ * The link in the confirmation message: the address is proved, so its account is found or made and
+ * the basket is reserved for it. A wrong, used or lapsed link gets the one answer.
+ */
+export async function confirmReservation(unit: UnitView, token: string): Promise<Reserved> {
+  const order = token
+    ? await first<OrderRow>(`${ORDER} WHERE confirm_token_hash = ? AND state = 'basket' AND confirm_expires_at > ?`, await hashOf(token), nowMs())
+    : null
+  if (!order) refuse('box-office.reservation.link-invalid', 'This link does not confirm a reservation. It may have been used already, or the seats were held for too short a time.', { status: 404, remedy: 'If your reservation was confirmed, its details are in the email that followed. Otherwise choose your tickets again.' })
+  const lines = await checkBasket(order, order.total_minor)
+  const { accountId } = await findOrCreateAccount(unit, { address: order.confirm_email, name: order.confirm_name, origin: 'guest' })
+  return reserve(unit, order, lines, accountId, false)
 }
 
 // What can be told before the batch: the basket is still held, reserving is offered, and the size
 // and total are as expected. The batch asserts again whatever a race could change.
 async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise<LineRow[]> {
+  if (order.state === 'reserved') refuse('box-office.reservation.already-reserved', 'These tickets are already reserved.', { status: 409, remedy: 'The details are in the email we sent.' })
   if (order.state !== 'basket' || order.expires_at === null || order.expires_at <= nowMs()) refuse(RAN_OUT.code, RAN_OUT.reason, { status: 409, remedy: RAN_OUT.remedy })
   const lines = await liveLines(order.id)
   if (!lines.length) refuse(RAN_OUT.code, RAN_OUT.reason, { status: 409, remedy: RAN_OUT.remedy })
@@ -140,7 +152,7 @@ async function checkBasket(order: OrderRow, expectedTotalMinor: number): Promise
 
 // Basket to reserved, in one batch (part 3): the limits are asserted where the reservation is
 // written, so parallel reservations by one person cannot pass them between them.
-async function reserve(unit: UnitView, origin: string, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean): Promise<Reserved> {
+async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accountId: string, signedIn: boolean): Promise<Reserved> {
   const at = nowMs()
   const perPerson = await useSetting('box-office.reservations.max-tickets-per-person') as number
   const releaseBefore = await useSetting('box-office.reservations.release-before') as number | null
@@ -162,7 +174,8 @@ async function reserve(unit: UnitView, origin: string, order: OrderRow, lines: L
   const token = randomToken()
   const deskCode = newDeskCode()
   unit.add(sql`UPDATE box_office_orders SET state = 'reserved', account_id = ${accountId}, signed_in = ${signedIn}, link_token_hash = ${await hashOf(token)},
-      desk_code_hash = ${await hashOf(deskCode)}, expires_at = NULL, release_at = ${releaseAt}, updated_at = ${at}
+      desk_code_hash = ${await hashOf(deskCode)}, expires_at = NULL, release_at = ${releaseAt}, updated_at = ${at},
+      confirm_token_hash = NULL, confirm_expires_at = NULL, confirm_email = NULL, confirm_name = NULL
     WHERE id = ${order.id} AND state = 'basket' AND expires_at > ${at} AND total_minor = ${order.total_minor}`)
     .expect(1, RAN_OUT)
   // Every seat of the basket is still held: none lapsed and was taken while the buyer read their email.
@@ -174,7 +187,7 @@ async function reserve(unit: UnitView, origin: string, order: OrderRow, lines: L
   unit.announce('box-office.order.reserved', { orderId: order.id, performanceIds: [...byPerformance.keys()] }, { record: ['box-office.order', order.id] })
   await notify(unit, 'box-office.order-reserved', {
     to: accountId,
-    variables: { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, amountDue: words.amount, deskCode, link: `${origin}/book/order/${token}` },
+    variables: { reference: order.reference, show: words.show, when: words.when, tickets: words.tickets, amountDue: words.amount, deskCode, link: siteUrl(`/book/order/${token}`) },
     subject: ['box-office.order', order.id],
     dedupeKey: order.id,
   })
@@ -193,9 +206,12 @@ export interface OrderView {
   lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number }[]
 }
 
-/** An order, for whoever holds the link from its message. No sign-in, and no name or address shown. */
+/**
+ * An order, for whoever holds the link from its message, in any state it reaches after the basket.
+ * No sign-in, and no name or address shown.
+ */
 export async function orderByLink(token: string): Promise<OrderView | null> {
-  const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ? AND state NOT IN ('basket', 'expired')`, await hashOf(token)) : null
+  const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ? AND state <> 'basket'`, await hashOf(token)) : null
   if (!order) return null
   const lines = await liveLines(order.id)
   return {
@@ -216,7 +232,7 @@ export async function orderByLink(token: string): Promise<OrderView | null> {
  */
 export async function cancelFromLink(unit: UnitView, token: string, lineIds?: string[]): Promise<OrderView> {
   const order = token ? await first<OrderRow>(`${ORDER} WHERE link_token_hash = ?`, await hashOf(token)) : null
-  if (!order || order.state === 'basket' || order.state === 'expired') refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
+  if (!order || order.state === 'basket') refuse('box-office.order.not-found', 'This link does not open a booking.', { status: 404 })
   if (order.state !== 'reserved')
     refuse('box-office.order.cancel-at-desk', 'This booking cannot be changed from here.', { status: 409, remedy: 'Ask the box office.' })
   const lines = await liveLines(order.id)
