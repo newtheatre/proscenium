@@ -8,6 +8,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import { CHOSEN_KEY, MODE_COOKIE_AGE } from '../../shared/appearance'
 import { shellOf } from '../../shared/navigation'
 
+defineProps<{ /** In a sidebar: fills its width, and shows only the person's mark when the sidebar is collapsed. */ block?: boolean, collapsed?: boolean }>()
 const { t } = useT()
 const route = useRoute()
 const { viewer, has } = useViewer()
@@ -52,14 +53,16 @@ const items = computed<DropdownMenuItem[][]>(() => {
   <UDropdownMenu
     v-if="viewer.signedIn"
     :items="items"
-    :content="{ align: 'end' }"
+    :content="{ align: block ? 'start' : 'end', side: block ? 'top' : 'bottom' }"
   >
     <UButton
       color="neutral"
       variant="ghost"
       icon="i-lucide-circle-user"
-      trailing-icon="i-lucide-chevron-down"
-      :label="viewer.name ?? t('core.menu.account')"
+      :trailing-icon="collapsed ? undefined : block ? 'i-lucide-chevrons-up-down' : 'i-lucide-chevron-down'"
+      :label="collapsed ? undefined : viewer.name ?? t('core.menu.account')"
+      :block="block"
+      :class="block ? 'justify-start' : ''"
       :aria-label="t('core.menu.open', { name: viewer.name ?? t('core.menu.account') })"
     />
   </UDropdownMenu>

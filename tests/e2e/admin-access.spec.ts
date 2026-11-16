@@ -18,6 +18,7 @@ test.describe('someone who reads roles and sets up sign-in', () => {
   test('finds Roles, Facts and Sign-in under Access', async ({ page }) => {
     await visit(page, '/admin')
     const nav = page.getByRole('navigation', { name: 'Site administration' })
+    await nav.getByRole('button', { name: 'Access' }).click() // a group is a collapsible section
     for (const name of ['Roles', 'Facts', 'Sign-in']) await expect(nav.getByRole('link', { name })).toBeVisible()
   })
 
