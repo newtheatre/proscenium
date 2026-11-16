@@ -13,7 +13,8 @@ function workerName(): string {
   return (JSON.parse(text) as { name: string }).name
 }
 const name = workerName()
-const queue = { prompt: `${name}-prompt`, bulk: `${name}-bulk` }
+// The two job lanes, and the queue Cloudflare Email Sending reports outcomes to (EMAIL_EVENTS).
+const queue = { prompt: `${name}-prompt`, bulk: `${name}-bulk`, emailEvents: `${name}-email-events` }
 const theatreLayers = existsSync(r('./site/layers'))
   ? readdirSync(r('./site/layers'), { withFileTypes: true }).filter(d => d.isDirectory()).map(d => `./site/layers/${d.name}`)
   : []
@@ -56,11 +57,16 @@ export default defineNuxtConfig({
           producers: [
             { binding: 'JOBS_PROMPT', queue: queue.prompt },
             { binding: 'JOBS_BULK', queue: queue.bulk },
+            // Written to by the sending domain's event subscription, a setup step in the dashboard.
+            { binding: 'EMAIL_EVENTS', queue: queue.emailEvents },
           ],
           consumers: [
             // not-policy: queue delivery tuning; job retries and back-off are core settings.
             { queue: queue.prompt, max_batch_size: 10, max_batch_timeout: 1, max_retries: 3, dead_letter_queue: `${queue.prompt}-dead` },
             { queue: queue.bulk, max_batch_size: 2, max_batch_timeout: 5, max_retries: 3, dead_letter_queue: `${queue.bulk}-dead` },
+            // An outcome can arrive before its send is recorded, so it is retried a few times, a few
+            // seconds apart, then set aside in the dead-letter queue (layers/core/kit/email-events.ts).
+            { queue: queue.emailEvents, max_batch_size: 10, max_batch_timeout: 5, max_retries: 5, dead_letter_queue: `${queue.emailEvents}-dead` },
           ],
         },
       },
@@ -91,7 +97,7 @@ export default defineNuxtConfig({
         r2_buckets: [{ binding: 'FILES', bucket_name: `${name}-files` }],
         kv_namespaces: [{ binding: 'CACHE', id: 'local' }],
         send_email: [{ name: 'EMAIL' }],
-        queues: { producers: [{ binding: 'JOBS_PROMPT', queue: queue.prompt }, { binding: 'JOBS_BULK', queue: queue.bulk }] },
+        queues: { producers: [{ binding: 'JOBS_PROMPT', queue: queue.prompt }, { binding: 'JOBS_BULK', queue: queue.bulk }, { binding: 'EMAIL_EVENTS', queue: queue.emailEvents }] },
       }, null, 2))
       config.cloudflare = { ...config.cloudflare, dev: { ...config.cloudflare?.dev, configPath: path, persistDir: r('./.wrangler/state') } }
     },
