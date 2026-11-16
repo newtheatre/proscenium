@@ -8,6 +8,8 @@ export interface KitEnv {
   CACHE?: KVNamespace
   JOBS_PROMPT?: Queue
   JOBS_BULK?: Queue
+  /** Cloudflare Email Sending's outcome events (bounced, complained, delivered and so on). */
+  EMAIL_EVENTS?: Queue
   /** Cloudflare Email Sending. Only core's mailer touches it. */
   EMAIL?: SendEmail
   CORE_ENCRYPTION_KEY?: string
@@ -57,6 +59,8 @@ export interface KitContext {
   ability?: string
   allowedBy?: string
   module?: string
+  /** The caller's network address, set by a route; keys the presented-value rate limit. */
+  address?: string
 }
 
 export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, fn: () => T): T {

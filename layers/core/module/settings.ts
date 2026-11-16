@@ -37,6 +37,7 @@ export const settings = defineSettings('core', {
   'rate-limits.sign-in': setting.integer({ default: 10, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
   'rate-limits.public-form': setting.integer({ default: 10, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
   'rate-limits.export': setting.integer({ default: 5, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
+  'rate-limits.presented-value': setting.integer({ default: 10, min: 1, max: 1000, unit: 'core.units.per-minute', change }),
 
   'retention.audit': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
   'retention.setting-changes': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),

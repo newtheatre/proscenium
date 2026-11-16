@@ -37,3 +37,11 @@ test.describe('in dark mode on a phone', () => {
     expect((await new AxeBuilder({ page }).withTags(tags).analyze()).violations).toEqual([])
   })
 })
+
+test('the built Worker takes its own origin from the request, so a same-site change is allowed', async ({ request, baseURL }) => {
+  const same = await request.post('/api/core/sign-in/passkey/options', { data: {}, headers: { origin: baseURL! } })
+  expect(same.status()).toBe(200)
+  expect((await same.json()).options.rpId).toBe(new URL(baseURL!).hostname)
+  const other = await request.post('/api/core/sign-in/passkey/options', { data: {}, headers: { origin: 'https://elsewhere.example' } })
+  expect(other.status()).toBe(403)
+})
