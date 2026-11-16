@@ -1,5 +1,5 @@
 <!-- The Site administration shell (R-33): the console's frame with a strip above the page header
-     that says where you are at every width, a "Back to console" row where the theatre's mark is,
+     that says where you are at every width, the theatre's mark where it is in the console and "Back to console" at the foot of the sidebar,
      neutral buttons (no brand colour), and no Tonight or work queue. Below 1024 pixels the sidebar
      is a drawer, opened from the strip. -->
 <script setup lang="ts">
@@ -7,7 +7,8 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 
 const { t } = useT()
 const route = useRoute()
-const { has } = useViewer()
+const { data: brandData } = await useBrand()
+const brand = computed(() => ({ name: brandData.value?.name ?? t('core.public.default-name') }))
 const { data: navigation } = await useNavigation('admin')
 const open = ref(false)
 provide(DASHBOARD_SHELL, true)
@@ -19,20 +20,9 @@ useHead({
   bodyAttrs: { class: 'admin-shell' },
 })
 
-const back = computed(() => has('console')
-  ? { label: t('core.admin.back-console'), to: '/console' }
-  : { label: t('core.admin.back-site'), to: '/' })
-
-function toItem(i: { id: string, label: string, to: string, icon: string, match?: string, count?: number }): NavigationMenuItem {
-  return { label: t(i.label), icon: i.icon, to: i.to, active: isCurrent(i, route.path), badge: i.count, onSelect: () => { open.value = false } }
-}
-
-const groups = computed<NavigationMenuItem[][]>(() => [
-  [{ label: t('core.admin.overview'), icon: 'i-lucide-layout-dashboard', to: '/admin', active: route.path === '/admin', onSelect: () => { open.value = false } }],
-  ...(navigation.value?.groups ?? []).map(g => [
-    { label: t(g.label), icon: g.icon, type: 'label' as const },
-    ...[...g.everyday, ...g.setup].map(toItem),
-  ]),
+const groups = computed<NavigationMenuItem[]>(() => [
+  { label: t('core.admin.overview'), icon: 'i-lucide-layout-dashboard', to: '/admin', active: route.path === '/admin', onSelect: () => { open.value = false } },
+  ...sidebarGroups(navigation.value?.groups ?? [], { t, path: route.path, onSelect: () => { open.value = false } }),
 ])
 </script>
 
@@ -43,35 +33,39 @@ const groups = computed<NavigationMenuItem[][]>(() => [
       id="admin"
       v-model:open="open"
       collapsible
+      resizable
+      :default-size="18"
+      :min-size="14"
+      :max-size="28"
     >
       <template #header="{ collapsed }">
-        <UButton
-          :to="back.to"
-          icon="i-lucide-arrow-left"
-          color="neutral"
-          variant="ghost"
-          :label="collapsed ? undefined : back.label"
-          :aria-label="back.label"
-        />
+        <NuxtLink
+          to="/admin"
+          class="truncate font-semibold"
+        >
+          <span v-if="!collapsed">{{ brand.name }}</span>
+          <UIcon
+            v-else
+            name="i-lucide-drama"
+            class="size-5"
+          />
+        </NuxtLink>
       </template>
       <template #default="{ collapsed }">
         <UNavigationMenu
           :items="groups"
           orientation="vertical"
           :collapsed="collapsed"
+          tooltip
+          popover
           :aria-label="t('core.admin.navigation')"
         />
       </template>
-      <!-- On a laptop these two sit in each page's navbar (ShellTools). -->
-      <template #footer>
-        <div class="flex flex-col gap-2 sm:hidden">
-          <UDashboardSearchButton
-            :label="t('core.palette.open')"
-            color="neutral"
-            variant="outline"
-          />
-          <AccountMenu />
-        </div>
+      <template #footer="{ collapsed }">
+        <SidebarFooter
+          :collapsed="collapsed"
+          admin
+        />
       </template>
     </UDashboardSidebar>
 
