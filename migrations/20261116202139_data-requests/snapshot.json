@@ -1,11 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "c0d8b572-5368-4065-87c5-3ff23c12f898",
+  "id": "67e65535-fc7f-4702-b313-41651340c285",
   "prevIds": [
-    "a2ed7eed-124d-4b66-9651-eb277b7576ca",
-    "bf5de3ce-afa2-4dc4-96ed-14d5b94e4551",
-    "f39fb455-d19c-415f-8f32-bef757dd2f0f"
+    "b58fe255-1bfb-465f-a30f-ffaaf78a96b4",
+    "bf5de3ce-afa2-4dc4-96ed-14d5b94e4551"
   ],
   "ddl": [
     {
@@ -1755,6 +1754,16 @@
     {
       "table": "core_files",
       "name": "purge_after",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_files",
+      "name": "expires_at",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -4036,6 +4045,20 @@
         },
         {
           "value": "purge_after",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_files",
+      "name": "core_files_expiry",
+      "columns": [
+        {
+          "value": "expires_at",
           "isExpression": false
         }
       ],
