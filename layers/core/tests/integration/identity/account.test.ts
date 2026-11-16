@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { accountScopeIds } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { Authenticator } from './authenticator'
-import { Browser, addPasskey, address, emailSignIn, env, goStale, grantDirectly, leaveIdentity, passkeySignIn, reset, setSetting, clearSetting, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
+import { Browser, addPasskey, address, deliver, emailSignIn, env, goStale, grantDirectly, leaveIdentity, passkeySignIn, reset, setSetting, clearSetting, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { canonicalAccount, accountLabel } from '../../../server/identity/accounts'
 import { mergePlan } from '../../../server/identity/merge'
@@ -204,7 +204,8 @@ describe('merging two accounts (ID-32)', () => {
     const again = new Browser()
     expect((await passkeySignIn(again, mergedDevice)).status).toBe(200)
     expect((await again.get('/api/core/me')).body.account.id).toBe(survivorId)
-    // Every move column of the plan points at the survivor now.
+    // Once stage two has run, every move column of the plan points at the survivor.
+    await deliver()
     for (const step of (await inContext(async () => mergePlan())).filter(s => s.action === 'move'))
       expect(await rows(`SELECT 1 FROM "${step.table}" WHERE "${step.column}" = ?`, mergedAccountId), `${step.table}.${step.column}`).toEqual([])
   })

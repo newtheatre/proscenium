@@ -1,18 +1,19 @@
-// Merging two accounts (ID-32). One batch: every column that refers to an account is handled by
-// the rule it declared. `move` columns are rewritten to the survivor and listed, so a merge can be
-// undone; `alias` columns keep the old id, which canonicalAccount follows to the survivor; the
-// `handler` columns are identity's own, handled here. Addresses, passkeys and grants move, and the
-// old account's sessions end.
+// Merging two accounts (ID-32), in two stages (part 4, Merge). Stage one, here, is one unit that
+// touches the core's own tables only, so its size never grows with the modules installed: the
+// merge is recorded, addresses and sign-in methods move, the old account's sessions end, its grants
+// carry over and it becomes an alias of the survivor. From that commit every read through the
+// account scope finds the whole person. Stage two, the job core.merge-move (merge-move.ts), then
+// re-points every other module's `move` columns and runs their merge handlers in the background.
 import { all, moveAccountColumn, newId, nowMs, refuse, useSetting, type Actor, type UnitView } from '#kit'
-import { useRegistry } from '#kit/registry'
 import { accountById } from './accounts'
 import { LIVE, guardLastOwner, isOwner } from './grants'
+import { SETTLED_IN_STAGE_ONE, accountColumns, moveModules, startMergeMove } from './merge-move'
 import { endSessionsOf } from './sessions'
 
-/** What a merge does to one account column. */
-export interface MergeStep { table: string, column: string, action: 'move' | 'move-unless-present' | 'alias' | 'delete' | 'end-sessions' | 'reissue-grants' | 'none' }
+/** What a merge does to one account column. `module-handler` is another module's merge handler, run by stage two. */
+export interface MergeStep { module: string, table: string, column: string, action: 'move' | 'move-unless-present' | 'alias' | 'delete' | 'end-sessions' | 'reissue-grants' | 'module-handler' | 'none' }
 
-/** identity's own `handler` columns, and what a merge does to each. */
+/** The core's own `handler` columns, and what stage one does to each. */
 const HANDLERS: Record<string, MergeStep['action']> = {
   'core_recovery_codes.account_id': 'delete',
   'core_account_tokens.account_id': 'delete',
@@ -38,17 +39,15 @@ const SPECIAL: Record<string, MergeStep['action']> = {
  * declaration problem, reported before anything is written.
  */
 export function mergePlan(): MergeStep[] {
+  moveModules() // throws for another module's handler column without a merge handler
   const steps: MergeStep[] = []
-  for (const [name, { meta }] of useRegistry().tables as Map<string, { meta: { columns: Record<string, { sql: string, meta: { account?: { onMerge: string } } }> } }>) {
-    for (const { sql, meta: column } of Object.values(meta.columns)) {
-      if (!column.account) continue
-      const key = `${name}.${sql}`
-      if (SPECIAL[key]) steps.push({ table: name, column: sql, action: SPECIAL[key] })
-      else if (column.account.onMerge === 'move') steps.push({ table: name, column: sql, action: 'move' })
-      else if (column.account.onMerge === 'alias') steps.push({ table: name, column: sql, action: 'alias' })
-      else if (HANDLERS[key]) steps.push({ table: name, column: sql, action: HANDLERS[key] })
-      else throw new Error(`${key} declares onMerge: 'handler' but no merge handler covers it`)
-    }
+  for (const { module, table, column, onMerge } of accountColumns()) {
+    const key = `${table}.${column}`
+    if (SPECIAL[key]) steps.push({ module, table, column, action: SPECIAL[key] })
+    else if (onMerge === 'move' || onMerge === 'alias') steps.push({ module, table, column, action: onMerge })
+    else if (module !== SETTLED_IN_STAGE_ONE) steps.push({ module, table, column, action: 'module-handler' })
+    else if (HANDLERS[key]) steps.push({ module, table, column, action: HANDLERS[key] })
+    else throw new Error(`${key} declares onMerge: 'handler' but no merge handler covers it`)
   }
   return steps
 }
@@ -56,7 +55,7 @@ export function mergePlan(): MergeStep[] {
 export async function mergePreview(survivorId: string, mergedAccountId: string) {
   const counts: { table: string, column: string, action: string, rows: number }[] = []
   for (const step of mergePlan()) {
-    if (step.action === 'none' || step.action === 'alias') continue
+    if (step.action === 'none' || step.action === 'alias' || step.action === 'module-handler') continue
     const [row] = await all<{ n: number }>(`SELECT count(*) AS n FROM "${step.table}" WHERE "${step.column}" = ?`, mergedAccountId)
     if (row?.n) counts.push({ ...step, rows: row.n })
   }
@@ -85,12 +84,12 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
     sql: 'INSERT INTO core_account_merges (id, survivor_id, merged_account_id, started_by, performed_by, performed_at, undo_until) VALUES (?, ?, ?, ?, ?, ?, ?)',
     params: [mergeId, survivorId, mergedAccountId, input.startedBy ?? 'staff', actor.accountId ?? null, at, at + undo * 1000], // not-policy: seconds to milliseconds
   })
-  for (const step of plan) {
+  // Stage one: the core's own columns. Every other module's wait for stage two.
+  for (const step of plan.filter(s => s.module === SETTLED_IN_STAGE_ONE)) {
     const t = `"${step.table}"`
     const c = `"${step.column}"`
     if (step.action === 'move') {
-      unit.add({ sql: `INSERT INTO core_account_merge_items (merge_id, table_name, column_name, row_id, action) SELECT ?, ?, ?, rowid, 'moved' FROM ${t} WHERE ${c} = ?`, params: [mergeId, step.table, step.column, mergedAccountId] })
-      unit.add({ sql: `UPDATE ${t} SET ${c} = ? WHERE ${c} = ?`, params: [survivorId, mergedAccountId] })
+      moveAccountColumn(unit, { mergeId, table: step.table, column: step.column, survivorId, mergedAccountId })
     }
     else if (step.action === 'move-unless-present') {
       // The row moves unless the survivor already has one with the same key; that one wins.
@@ -130,6 +129,7 @@ export async function mergeAccounts(unit: UnitView, actor: Actor, input: { survi
   unit.add({ sql: 'UPDATE core_accounts SET merged_into_id = ?, merged_at = ? WHERE id = ? AND merged_into_id IS NULL AND anonymised_at IS NULL', params: [survivorId, at, mergedAccountId] })
     .expect(1, { code: 'core.merge.already-merged', reason: 'One of these accounts was merged a moment ago.', remedy: 'Reload and try again.' })
   if ((await isOwner(mergedAccountId)) || (await isOwner(survivorId))) guardLastOwner(unit)
+  startMergeMove(unit, mergeId)
   unit.announce('core.account.merged', { survivorId, mergedAccountId, mergeId }, { record: ['core.account', survivorId] })
   unit.audit({ action: 'state', ...(input.startedBy === 'claim' ? {} : { ability: 'core.account.merge' }), record: ['core.account', survivorId], detail: { mergedAccountId, mergeId, grantsMoved: grants.length, startedBy: input.startedBy ?? 'staff' } })
   return mergeId

@@ -271,6 +271,9 @@ export const accountMerges = defineTable('core_account_merges', {
   performedBy: col.account('performed_by', { role: 'actor', onMerge: 'alias' }),
   performedAt: col.timestamp('performed_at').notNull(),
   undoUntil: col.timestamp('undo_until').notNull(),
+  // Set by the merge job's last unit once every module's rows have moved (stage two). Until then
+  // the merge is "still moving"; readers see no difference, because the account scope covers both.
+  completedAt: col.timestamp('completed_at'),
   undoneAt: col.timestamp('undone_at'),
   undoneBy: col.account('undone_by', { role: 'actor', onMerge: 'alias', nullable: true }),
 }, {
