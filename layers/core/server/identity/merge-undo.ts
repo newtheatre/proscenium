@@ -12,7 +12,7 @@
 // deleted (unless kept), the items go, and the merged-away account's own details are cleared. It
 // stays an alias for ever, so append-only history still resolves.
 import { NOT_YET, all, first, newId, nowMs, refuse, type Actor, type UnitView } from '#kit'
-import { SETTLED_IN_STAGE_ONE, accountColumns, moveModules, type MergeMovePayload } from './merge-move'
+import { SETTLED_IN_STAGE_ONE, accountColumns, moveModules, stuckMerges, type MergeMovePayload } from './merge-move'
 
 interface MergeRow {
   id: string
@@ -175,4 +175,61 @@ export async function restartStalledUndos(unit: UnitView): Promise<void> {
     nowMs() - 3_600_000, // not-policy: the specification's hour
   )
   for (const { id } of stalled) unit.enqueue('core.merge-move', { mergeId: id, stage: 'undo-start' }, { dedupeKey: `${id}:undo-start` })
+}
+
+export interface MergeSummary {
+  id: string
+  survivor: { id: string, name: string | null }
+  merged: { id: string, name: string | null }
+  startedBy: 'person' | 'staff' | 'claim'
+  performedAt: number
+  undoUntil: number
+  state: 'moving' | 'complete' | 'undoing' | 'undone' | 'closed'
+  undoable: boolean
+  /** Modules still holding up a merge unfinished for more than a day. */
+  waitingOn: string[]
+  /** What a module's own undo could not put back, with its reason code. */
+  notRestored: { handler: string, count: number, reason: string | null }[]
+}
+
+const RECENT = 50 // not-policy: a screenful of recent merges
+
+/** The Merges screen (identity spec part 6): recent merges, newest first, with where each stands. */
+export async function recentMerges(): Promise<MergeSummary[]> {
+  const at = nowMs()
+  const rows = await all<MergeRow & { started_by: MergeSummary['startedBy'], performed_at: number, undo_until: number, closed_at: number | null, survivor_name: string | null, merged_name: string | null }>(
+    `SELECT m.*, coalesce(s.preferred_name, s.name) AS survivor_name, coalesce(a.preferred_name, a.name) AS merged_name
+       FROM core_account_merges m
+       JOIN core_accounts s ON s.id = m.survivor_id
+       JOIN core_accounts a ON a.id = m.merged_account_id
+      ORDER BY m.performed_at DESC LIMIT ${RECENT}`,
+  )
+  const stuck = new Map((await stuckMerges()).map(s => [s.id, s.modules]))
+  const notes = rows.length
+    ? await all<{ detail: string }>(
+        `SELECT detail FROM core_audit WHERE record_type = 'core.account' AND json_extract(detail, '$.undo') = 'not-restored'
+          AND json_extract(detail, '$.mergeId') IN (${rows.map(() => '?').join(', ')})`,
+        ...rows.map(r => r.id),
+      )
+    : []
+  const kept = new Map<string, MergeSummary['notRestored']>()
+  for (const { detail } of notes) {
+    const d = JSON.parse(detail) as { mergeId: string, handler: string, notRestored: number, reason?: string | null }
+    kept.set(d.mergeId, [...(kept.get(d.mergeId) ?? []), { handler: d.handler, count: d.notRestored, reason: d.reason ?? null }])
+  }
+  return rows.map((r) => {
+    const state: MergeSummary['state'] = r.undone_at ? 'undone' : r.undo_started_at ? 'undoing' : r.closed_at ? 'closed' : r.completed_at ? 'complete' : 'moving'
+    return {
+      id: r.id,
+      survivor: { id: r.survivor_id, name: r.survivor_name },
+      merged: { id: r.merged_account_id, name: r.merged_name },
+      startedBy: r.started_by,
+      performedAt: r.performed_at,
+      undoUntil: r.undo_until,
+      state,
+      undoable: state === 'complete' && r.undo_until > at,
+      waitingOn: stuck.get(r.id) ?? [],
+      notRestored: kept.get(r.id) ?? [],
+    }
+  })
 }

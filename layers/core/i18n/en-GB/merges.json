@@ -1,0 +1,25 @@
+{
+  "core.navigation.merges.label": "Merges",
+
+  "core.merges.intro": "Accounts joined into one, newest first. A merge can be undone for a while after it finishes.",
+  "core.merges.thing": "{merged} into {survivor}",
+  "core.merges.unnamed": "Unnamed account",
+  "core.merges.by.staff": "Merged by staff on {date}",
+  "core.merges.by.person": "Merged by the person on {date}",
+  "core.merges.by.claim": "Merged when an address was confirmed, on {date}",
+  "core.merges.undo-until": "Can be undone until {date}",
+  "core.merges.waiting-on": "Still waiting on: {modules}",
+  "core.merges.not-restored.one": "{count} row was not put back by {handler}",
+  "core.merges.not-restored.other": "{count} rows were not put back by {handler}",
+  "core.merges.state.moving": "Still moving",
+  "core.merges.state.complete": "Complete",
+  "core.merges.state.undoing": "Being undone",
+  "core.merges.state.undone": "Undone",
+  "core.merges.state.closed": "Closed",
+  "core.merges.undo": "Undo",
+  "core.merges.undo-button": "Undo merge",
+  "core.merges.undo-consequence": "The two accounts part again, and everything that moved goes back to the account it came from.",
+  "core.merges.undo-started": "The merge is being undone. It may take a few minutes.",
+  "core.merges.empty": "No merges yet",
+  "core.merges.empty-description": "When two accounts are joined into one, the merge shows here."
+}

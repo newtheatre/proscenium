@@ -160,10 +160,14 @@ describe('undoing a merge with two merge handlers', () => {
     expect(calls).toEqual(['merge:first', 'merge:second'])
     const merge = await mergeOf(mergedAccountId)
     expect(merge.completed_at).not.toBeNull()
+    const listedOf = async () => ((await admin.browser.get('/api/core/accounts/merges')).body.merges as { id: string }[]).find(m => m.id === merge.id)
+    expect(await listedOf()).toEqual(expect.objectContaining({ state: 'complete', undoable: true, waitingOn: [], notRestored: [] }))
 
     expect((await admin.browser.post(`/api/core/accounts/merges/${merge.id}/undo`, {})).status).toBe(200)
     await deliver()
     expect(calls).toEqual(['merge:first', 'merge:second', 'undo:second', 'undo:first'])
+    // The Merges screen says the merge is undone and what the module kept.
+    expect(await listedOf()).toEqual(expect.objectContaining({ state: 'undone', undoable: false, notRestored: [{ handler: 'seats.second', count: 2, reason: 'seats.merge.second-kept' }] }))
     const notes = await rows<{ detail: string }>('SELECT detail FROM core_audit WHERE record_id = ? AND detail LIKE \'%not-restored%\'', survivorId)
     expect(notes.map(n => JSON.parse(n.detail))).toEqual([{ mergeId: merge.id, undo: 'not-restored', handler: 'seats.second', notRestored: 2, reason: 'seats.merge.second-kept' }])
     expect(await rows('SELECT merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ merged_into_id: null }])
