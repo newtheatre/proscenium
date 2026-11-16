@@ -29,7 +29,9 @@ export default defineModule({
     period: { table: 'finance_periods' },
   }),
   abilities: defineAbilities('finance', {
-    'ledger.view': ability({}),
+    // Granted on one production, it reads that production's statement only (FIN-04).
+    'ledger.view': ability({ on: 'core.production' }),
+    'ledger.export': ability({ risk: 'privileged', implies: ['ledger.view'] }),
     'posting.correct': ability({ risk: 'privileged', implies: ['ledger.view'] }),
     'account.manage': ability({ risk: 'privileged' }),
     'period.close': ability({ on: 'finance.period', risk: 'privileged', implies: ['ledger.view'] }),
@@ -84,6 +86,9 @@ export default defineModule({
     'core.navigation': [
       { id: 'finance.ledger', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/ledger', icon: 'i-lucide-book-open', ability: 'finance.ledger.view', order: 50 },
       { id: 'finance.periods', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/periods', icon: 'i-lucide-calendar-check', ability: 'finance.period.close', order: 60 },
+      { id: 'finance.productions', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/productions', icon: 'i-lucide-drama', ability: 'finance.ledger.view', order: 70 },
+      { id: 'finance.reconcile', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/reconcile', icon: 'i-lucide-scale', ability: 'finance.ledger.view', order: 80 },
+      { id: 'finance.export', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/export', icon: 'i-lucide-file-down', ability: 'finance.ledger.export', order: 90 },
       { id: 'finance.accounts', menu: 'console', group: 'money', section: 'setup', to: '/console/finance/accounts', icon: 'i-lucide-list-tree', ability: 'finance.account.manage', order: 20 },
     ],
   },
