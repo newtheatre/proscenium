@@ -464,8 +464,7 @@ export async function inviteToApply(unit: UnitView, event: H3Event, actor: Actor
   unit.audit({ action: 'create', ability: 'core.access-scheme.review', record: ['core.account', found.accountId], detail: { accessInvitation: true } })
   const link = `${relyingParty(event).origin}/sign-in/link#${token}`
   const scheme = await schemeName()
-  unit.afterCommit(async () => {
-    await notifyAddress(unit, 'core.access-invitation', { address, variables: { link, scheme }, dedupeKey: id })
-  })
+  // Written in this unit and sent after it commits, with the pipeline's retries; the link is sealed.
+  await notifyAddress(unit, 'core.access-invitation', { address, variables: { link, scheme }, dedupeKey: id })
   return { accountId: found.accountId }
 }
