@@ -17,7 +17,7 @@ Nine questions, in the order they matter. The document is written on the recomme
 ## Smaller points decided here unless you object
 
 - **Names.** "Members' area" is the default name and a theatre can rename it ("Company", "Volunteers"). "Console" is the name staff see. "My account" is the audience area. "Tonight" is the hub; "live mode" is only this document's word for the layout.
-- **Console group order** is fixed by the platform: Tonight, Programme, Box office, Front of house, Bar, Spaces, Training, Membership, People, Money, Communications, Forms, Reports, System. (Programme was added for core's screens and "Site settings" renamed System to match foundations' routes, after the consistency review of 16 November 2026; the principle Matt accepted, a fixed order set by the platform, is unchanged.)
+- **Console group order** is fixed by the platform: Tonight, Programme, Box office, Front of house, Bar, Room bookings, Training, Membership, People, Money, Communications, Forms, Reports. (Programme was added for core's screens after the consistency review of 16 November 2026. Later the same day Matt decided to add a fourth shell, Site administration at `/admin`, for the install-level screens, so the console's last group, System, is gone and question 1's answer now reads four shells plus a live mode. The principle he accepted, a fixed order set by the platform, is unchanged.)
 - **No infinite scroll in the console**; pages of 25.
 - **Short forms open in a side panel**, long ones on their own page, decided by the component and not by each screen's author.
 - **The command palette ships in the first release.** The component library provides it, and the console will pass forty screens quickly.

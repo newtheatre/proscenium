@@ -127,3 +127,8 @@ Part 6 of each specification uses these columns, one row per setting.
 ## What this takes from Proscenium
 
 Proscenium keeps its keys in one file, [`shared/utils/config.ts`](https://github.com/newtheatre/proscenium/blob/main/shared/utils/config.ts), each with a Zod schema, an optional default, a `sensitive` flag and a `synced` flag, and reads overrides once per request in [`server/utils/configuration.ts`](https://github.com/newtheatre/proscenium/blob/main/server/utils/configuration.ts). Its content pages quote keys as `{{HOLD_RELEASE_MINUTES_BEFORE}}`, checked by [`scripts/check-content-tokens.ts`](https://github.com/newtheatre/proscenium/blob/main/scripts/check-content-tokens.ts). This format keeps those four ideas (schema, unset keys, hashed audit, per-request reads) and changes three things: keys belong to modules, the kind drives the screen so no setting needs a hand-built control, and the ability to change a key is declared on the key.
+
+
+## Where a setting is shown: `scope`
+
+Added 16 November 2026 with Site administration (ruling R-33). A setting may declare `scope: 'site'`; the default is `scope: 'module'`. A module-scoped setting appears on its module's generated page at `/console/<module>/settings`. A site-scoped setting is about the installation (email sending, branding, the time zone, updates) and appears in Site administration under `/admin/settings`, grouped by module. The scope changes only where the setting is shown: its key, kind, ability, audit and `onChange` behave the same, and the same ability guards it in either place. Every `core.*` setting of foundations is site-scoped.

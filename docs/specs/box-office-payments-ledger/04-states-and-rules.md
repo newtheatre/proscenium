@@ -350,7 +350,9 @@ Positive is a debit, negative a credit. Account keys are `<module>.<key>`, decla
 
 | Transition | Guard |
 | --- | --- |
-| open to closed | `finance.period.close`; every earlier period is closed; no till session that opened in the period is still open; no intent from the period is unfulfilled without a refund; the ledger's total for the period is zero. The close row records the period's debit and credit totals |
+| open to closed | `finance.period.close`. Finance checks what it owns: the period has ended, every earlier period is closed, no posting in it is unsealed, and its entries sum to zero. Everything else that should hold a close comes from other modules through the point `finance.period-close-check` (part 4), since Finance requires nothing and reads no other module's tables: Payments reports a till session opened in the period and still open, and an intent from the period unfulfilled without a refund; Box office reports a performance completed in the period whose income is not yet recognised. Any blocker refuses the close and is listed with a link. The close row records the period's debit and credit totals |
 | closed to open | `finance.period.reopen`, a privileged ability, with a reason code. A new row; the old close stays in the history |
 
 A posting whose `occurred_at` falls in a closed period is written into the earliest open period instead, keeping its true `occurred_at`, so late facts (a provider fee, a refund) never reopen the books.
+
+Periods are made as they are needed. When a posting is written, Finance adds any missing periods up to today's, by month or quarter from `finance.year.starts`, and chooses the posting's period inside the same batch: the earliest period not closed whose end is on or after the fact's local date. A close racing a posting therefore cannot let the posting into a closed period. A period can be closed only after it has ended, so today's period is always open.

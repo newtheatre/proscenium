@@ -45,7 +45,7 @@ contributes: {
 | Field | Type | Meaning | Status |
 | --- | --- | --- | --- |
 | `id` | `<module>.<name>` | Unique. Its label is the translation key `<module>.navigation.<name>.label` | Draft 1 |
-| `menu` | `account`, `members`, `console` or `live` | Which menu it joins. `account` is My account in the public shell; `live` is a tile on the Tonight hub | Draft 1; this is the list workstream 1 left to this workstream |
+| `menu` | `account`, `members`, `console`, `admin` or `live` | Which menu it joins. `account` is My account in the public shell; `live` is a tile on the Tonight hub | Draft 1; this is the list workstream 1 left to this workstream |
 | `to` | Address | Must sit under the menu's prefix and the module's id | Draft 1 |
 | `icon` | Bundled icon name | Shown beside the label | Draft 1 |
 | `ability` | One ability, or a list meaning any of. Never a fact: a fact shows an entry by being mapped to an ability | Required on every entry. Hides the entry and guards the address. An `account` entry that every signed-in person has gives the route keyword `signed-in` | Draft 1; "any of" is **new** |
@@ -57,7 +57,7 @@ contributes: {
 
 - The public shell's own header and footer links are the theatre's, declared in its site folder, not contributed by modules. The public shell takes exactly two things from modules: account sections and public components.
 - The route guard resolves an address to the longest matching entry and checks its ability. A page under a shell prefix that no entry covers fails the build, so no screen is reachable only by typing its address.
-- A console group is declared once by the module that owns it (`core.navigation-group`: id, order, icon). The platform's own modules use the fixed order in the Shells sub-tab; a theatre's module places itself with `before` or `after`.
+- A console group is declared once by the module that owns it (`core.navigation-group`: id, `menu` (`console`, the default, or `admin`), order, icon). The platform's own groups use the fixed orders in the Shells sub-tab; a theatre's module places itself with `before` or `after`. Site administration's groups are `theatre`, `modules`, `access`, `email`, `connections` and `upkeep`, all declared by core; an entry with `menu: 'admin'` names one of them, and Overview alone has no group.
 
 ### `core.home-card`
 
@@ -90,8 +90,8 @@ The owning module's tabs always come first. A contributed tab receives the recor
 | Point | Fields beyond `id` |
 | --- | --- |
 | `core.account-section` | `target` (`account` or `console-person`), `side` (`audience` or `members`), `ability`, `component`, `order`; optional `to`, `icon` and `count`. This is the one definition of the point (integration ruling R-05); identity and the form builder contribute to it |
-| `core.search-source` | `record` (a record type), `ability`, `route` (the module's search route, returning ids), `shells` (where it may be searched from) |
-| `core.quick-action` | `to` or `action`, `icon`, `ability`, `keywords` (a translation key) |
+| `core.search-source` | `record` (a record type), `ability`, `route` (the module's search route: it takes `?q=` and returns `{ ids }`, which the record type's `core.record-resolver` turns into rows), `shells` (where it may be searched from) |
+| `core.quick-action` | `to`, `icon`, `ability`; optional `keywords` (a translation key). A quick action is always an address to go to; there is no `action` field |
 
 Search results are shown through `core.record-resolver`, so a person, an order and a production all look the same in the palette and the module supplies no markup.
 
@@ -148,7 +148,7 @@ The interface layer announces none. It listens for foundations' `core.module.ena
 Workstream 1 accepted these on 16 November 2026 and is logging them in its formats.
 
 1. Navigation entries gain `group`, `section`, `count` and `match`. `ability` takes one ability or a list, not a fact.
-2. The field is named `menu`, not shell, because there are only three shells. The menus a navigation entry may name are `account`, `members`, `console` and `live`. There are three shells (public, members' area, console) and a live mode, which is not a fourth shell. The whole reserved list, the same as foundations', is `/account`, `/members`, `/console`, `/live`, `/book`, `/sign-in`, `/setup`, `/api`, `/files`, `/mailing`, `/forms`, `/whats-on`, `/shows` and anything starting with an underscore; the build refuses a theatre's page under one.
+2. The field is named `menu`, not shell, because a menu is not always a shell: the menus a navigation entry may name are `account`, `members`, `console`, `admin` and `live`. There are four shells (public, members' area, console and site administration) and a live mode, which is not a shell (integration ruling R-33). `core.home-card` and `core.search-source` take the same `admin` value where they name a menu or a shell. A setting may declare `scope: 'site'` (default `'module'`), which draws it at `/admin/settings` in place of the module's console settings page; the declaration is foundations'. The whole reserved list, the same as foundations', is `/account`, `/members`, `/console`, `/admin`, `/live`, `/book`, `/sign-in`, `/setup`, `/api`, `/files`, `/mailing`, `/forms`, `/whats-on`, `/shows` and anything starting with an underscore; the build refuses a theatre's page under one.
 3. The new core points above are declared here and indexed by workstream 1. The shape of `core.public-component` is owned and defined by workstream 3. `/files` is also reserved, for workstream 3, and `/mailing` for communications' public confirm and manage pages, which are reached by token with no sign-in and drawn in the public shell. `PageEditor`, the layout added for the form builder, is specified in Page conventions.
 4. The build checks that every page under a shell prefix is covered by a navigation entry.
 5. A route declared idempotent requires an `Idempotency-Key` header and replays its stored answer. Every refusal has the body `{ code, reason, remedy?, fields? }`, where reason and remedy are translation keys.
