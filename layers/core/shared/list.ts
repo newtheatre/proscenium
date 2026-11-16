@@ -88,15 +88,16 @@ type Defaults = Partial<Pick<ListState, 'view' | 'sort' | 'order' | 'pageSize'>>
 
 const one = (value: Query[string]): string | undefined => (Array.isArray(value) ? value[0] : value) ?? undefined
 
-/** The defaults a declaration implies: its default view, and that view's or its own default sort. */
-export function listDefaults(list: Pick<ListDeclaration, 'defaultView' | 'defaultSort' | 'views' | 'sorts'>): Defaults {
-  const view = list.defaultView ? list.views?.[list.defaultView] : undefined
+/** The defaults a declaration implies for a view (the default view when none is named): its sort, or the list's own. */
+export function listDefaults(list: Pick<ListDeclaration, 'defaultView' | 'defaultSort' | 'views' | 'sorts'>, viewName?: string): Defaults {
+  const view = viewName ? list.views?.[viewName] : list.defaultView ? list.views?.[list.defaultView] : undefined
   const sort = view?.sort ? { key: view.sort, order: view.order ?? list.sorts?.[view.sort]?.natural } : list.defaultSort
   return { view: list.defaultView, sort: sort?.key, order: sort?.order ?? 'asc' }
 }
 
 export function parseList(query: Query, list: Pick<ListDeclaration, 'filters' | 'defaultView' | 'defaultSort' | 'views' | 'sorts'>): ListState {
-  const defaults = listDefaults(list)
+  const named = one(query.view)
+  const defaults = listDefaults(list, named && list.views?.[named] ? named : undefined)
   const filters: Record<string, string> = {}
   for (const name of Object.keys(list.filters)) {
     const value = one(query[name])
@@ -119,10 +120,10 @@ export function parseList(query: Query, list: Pick<ListDeclaration, 'filters' | 
 
 /** The address query for a state, leaving out whatever is the default so links stay short. */
 export function serialiseList(state: ListState, list: Pick<ListDeclaration, 'defaultView' | 'defaultSort' | 'views' | 'sorts'>): Record<string, string> {
-  const defaults = listDefaults(list)
+  const defaults = listDefaults(list, state.view)
   const out: Record<string, string> = {}
   if (state.search) out.q = state.search
-  if (state.view && state.view !== defaults.view) out.view = state.view
+  if (state.view && state.view !== listDefaults(list).view) out.view = state.view
   for (const [name, value] of Object.entries(state.filters)) if (value && !(RESERVED_KEYS as readonly string[]).includes(name)) out[name] = value
   if (state.sort && state.sort !== defaults.sort) out.sort = state.sort
   if (state.sort && state.order !== (defaults.order ?? 'asc')) out.order = state.order

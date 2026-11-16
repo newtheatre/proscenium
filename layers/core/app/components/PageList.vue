@@ -4,7 +4,7 @@
      returns to it. A module supplies columns, filters, row actions and the data route. -->
 <script setup lang="ts" generic="Row extends Record<string, any>">
 import type { DropdownMenuItem, TableColumn, TableRow } from '@nuxt/ui'
-import { activeFilterCount, filterChipText, filterCount, listDefaults, type ColumnDef, type FilterDef, type ListDeclaration, type ListOption, type ListResult, type SortDef } from '../../shared/list'
+import { activeFilterCount, filterChipText, listDefaults, type ColumnDef, type FilterDef, type ListDeclaration, type ListOption, type ListResult, type SortDef } from '../../shared/list'
 
 /** The older, flatter way a page names its columns and filters; it is read as a declaration. */
 export interface ListColumn { key: string, label: string, sortable?: boolean, /** What it sorts, which words its directions ("Lowest first"). Text by default. */ sortType?: SortDef['type'], /** Survives on a phone's card. */ card?: boolean }
@@ -37,14 +37,29 @@ const props = withDefaults(defineProps<{
   order?: 'asc' | 'desc'
   empty: { title: string, description: string, icon?: string, help?: string }
   width?: 'standard' | 'full'
-}>(), { list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
+  /** Child records shown under a row: performances under a production. At most the declaration's `subRows.max`. */
+  subRows?: (row: Row) => Row[]
+  /** What the children are called, for "Show performances of Hamlet". */
+  subRowsNoun?: string
+  /** How many children the row has in all; when more are shown than this, the last line links to them. */
+  subRowsTotal?: (row: Row) => number
+  /** Where "All 34 performances" goes. */
+  subRowsAllTo?: (row: Row) => string
+  subRowLabel?: (row: Row) => string
+  subRowTo?: (row: Row) => string
+}>(), { subRows: undefined, subRowsNoun: undefined, subRowsTotal: undefined, subRowsAllTo: undefined, subRowLabel: undefined, subRowTo: undefined, list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
 
 defineSlots<{
   primary?: () => unknown
   /** After the list: a panel or dialog the page opens from it. */
   default?: () => unknown
   [cell: `cell-${string}`]: (props: { row: Row }) => unknown
+  /** A column's cell on a child row. A column the child has nothing for stays empty. */
+  [subcell: `subcell-${string}`]: (props: { row: Row, parent: Row }) => unknown
+  /** A free panel under a row, for a few facts that do not merit a page. */
+  expanded?: (props: { row: Row }) => unknown
 }>()
+const slots = useSlots()
 
 const { t } = useT()
 
@@ -66,8 +81,9 @@ const decl = computed<ListDeclaration>(() => {
   for (const f of props.filters) filters[f.name] = { kind: 'choice', label: f.label, options: f.options }
   return { id: `route:${props.route}`, filters, sorts, columns, defaultSort: props.sort ? { key: props.sort, order: props.order } : undefined }
 })
-const defaults = computed(() => listDefaults(decl.value))
+const defaults = computed(() => listDefaults(decl.value, state.value.view))
 const { state, set, setInPanel, endVisit, clear } = useListQuery(decl)
+const viewDefaults = (view?: string) => listDefaults(decl.value, view)
 const { hidden, toggle: toggleColumn } = useListColumns(decl.value)
 
 const query = computed(() => ({
@@ -102,8 +118,10 @@ onBeforeUnmount(() => clearTimeout(timer))
 // One panel holds every filter; a chip for each one that is on says so and opens the panel.
 const panel = ref(false)
 watch(panel, endVisit)
+// A built-in view's own filters count as on, so the panel and the chips tell the truth about the rows.
+const effective = computed(() => ({ ...(state.value.view ? decl.value.views?.[state.value.view]?.filters : undefined), ...state.value.filters }))
 const chips = computed(() => Object.entries(decl.value.filters).flatMap(([name, def]) => {
-  const value = state.value.filters[name]
+  const value = effective.value[name]
   const text = value ? filterChipText(def, value, { yes: t('core.list.yes'), no: t('core.list.no') }) : null
   return text ? [{ name, text }] : []
 }))
@@ -130,10 +148,36 @@ const sortIcon = (sortKey: string) => state.value.sort === sortKey ? (state.valu
 const shown = computed(() => Object.entries(decl.value.columns).filter(([key]) => !hidden.value.includes(key)).map(([key, c]) => ({ key, ...c })))
 const rowId = (row: Row) => String(row[props.rowKey])
 const tableColumns = computed<TableColumn<Row>[]>(() => [
+  ...(expandable.value ? [{ id: 'expand', enableSorting: false }] : []),
   ...(props.bulkActions ? [{ id: 'select', enableSorting: false }] : []),
   ...shown.value.map(c => ({ id: c.key, accessorFn: (row: Row) => row[c.key], header: c.label, enableSorting: !!c.sort })),
   ...(props.rowActions ? [{ id: 'actions', enableSorting: false }] : []),
 ])
+
+// Built-in views are tabs above the toolbar; each is a preset of filters and sort kept in the address.
+const viewItems = computed(() => Object.entries(decl.value.views ?? {}).map(([value, v]) => ({ value, label: v.label })))
+function pickView(name: string) {
+  const cleared = Object.fromEntries(Object.keys(state.value.filters).map(k => [k, '']))
+  void set({ view: name, filters: cleared, sort: undefined, order: viewDefaults(name).order })
+}
+
+// Rows that open: children under a row (indented, in the same columns) or a free panel.
+const expandable = computed(() => !!props.subRows || !!slots.expanded)
+const maxChildren = computed(() => decl.value.subRows?.max ?? 20) // not-policy: the specification's ceiling on children shown for each parent
+const expanded = ref<Record<string, boolean>>({})
+const childrenOf = (row: Row) => (props.subRows?.(row) ?? []).slice(0, maxChildren.value)
+const childTotal = (row: Row) => props.subRowsTotal?.(row) ?? childrenOf(row).length
+const hasMore = (row: Row) => childTotal(row) > childrenOf(row).length
+const canExpand = (row: Row) => childrenOf(row).length > 0 || !!slots.expanded
+// A view that opens its rows starts them open, once, when its rows arrive.
+const opensRows = computed(() => !!(state.value.view && decl.value.views?.[state.value.view]?.open))
+watch([() => data.value?.rows, opensRows], ([rows, open]) => {
+  expanded.value = open ? Object.fromEntries((rows ?? []).filter(canExpand).map(r => [rowId(r), true])) : {}
+}, { immediate: true })
+const allOpen = computed(() => (data.value?.rows ?? []).filter(canExpand).every(r => expanded.value[rowId(r)]))
+function toggleAll() {
+  expanded.value = allOpen.value ? {} : Object.fromEntries((data.value?.rows ?? []).filter(canExpand).map(r => [rowId(r), true]))
+}
 
 // Selection is kept by row id and dropped when the rows change: a bulk action never reaches a row
 // that is no longer on screen.
@@ -198,8 +242,8 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
           v-if="Object.keys(decl.filters).length"
           v-model:open="panel"
           :filters="decl.filters"
-          :values="state.filters"
-          :count="filterCount(state)"
+          :values="effective"
+          :count="Object.keys(effective).length"
           @change="onFilter"
           @clear="set({ filters: Object.fromEntries(Object.keys(state.filters).map(k => [k, ''])) })"
         />
@@ -217,6 +261,18 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
         />
       </form>
     </template>
+
+    <!-- Built-in views, when the list declares any: tabs kept in the address as view=. -->
+    <UTabs
+      v-if="viewItems.length"
+      :model-value="state.view"
+      :items="viewItems"
+      :content="false"
+      color="neutral"
+      variant="link"
+      :aria-label="t('core.list.views', { title })"
+      @update:model-value="pickView(String($event))"
+    />
 
     <div
       v-if="chips.length"
@@ -297,8 +353,21 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
         </EmptyState>
 
         <template v-else>
+          <div
+            v-if="expandable && (data?.rows ?? []).some(canExpand)"
+            class="mb-2 flex justify-end max-lg:hidden"
+          >
+            <UButton
+              color="neutral"
+              variant="link"
+              size="sm"
+              :label="allOpen ? t('core.list.collapse-all') : t('core.list.expand-all')"
+              @click="toggleAll()"
+            />
+          </div>
           <!-- A table above 1024 pixels. -->
           <UTable
+            v-model:expanded="expanded"
             :data="result.rows"
             :columns="tableColumns"
             :caption="`${title}. ${pageLabel}`"
@@ -306,15 +375,32 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
             :row-selection="rowSelection"
             :sorting="sorting"
             :sorting-options="{ manualSorting: true }"
+            :get-sub-rows="subRows ? childrenOf : undefined"
             :on-select="rowTo ? open : undefined"
             :ui="{ caption: 'sr-only' }"
             class="max-lg:hidden"
           >
+            <template #expand-header>
+              <span class="sr-only">{{ t('core.list.expand') }}</span>
+            </template>
+            <template #expand-cell="{ row }">
+              <UButton
+                v-if="row.depth === 0 && canExpand(row.original)"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :icon="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                :aria-expanded="row.getIsExpanded()"
+                :aria-label="t(row.getIsExpanded() ? 'core.list.hide-children' : 'core.list.show-children', { what: subRowsNoun ?? t('core.list.details'), row: rowLabel(row.original) })"
+                @click.stop="row.toggleExpanded()"
+              />
+            </template>
             <template #select-header>
               <span class="sr-only">{{ t('core.list.select') }}</span>
             </template>
             <template #select-cell="{ row }">
               <UCheckbox
+                v-if="row.depth === 0"
                 :model-value="!!rowSelection[row.id]"
                 :aria-label="t('core.list.select-row', { row: rowLabel(row.original) })"
                 @update:model-value="toggle(row.original, $event === true)"
@@ -344,32 +430,68 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               :key="c.key"
               #[`${c.key}-cell`]="{ row }"
             >
-              <ULink
-                v-if="rowTo && i === 0"
-                :to="rowTo(row.original)"
-                class="font-medium text-highlighted hover:underline"
-              >
+              <template v-if="row.depth > 0">
+                <ULink
+                  v-if="subRowTo && i === 0"
+                  :to="subRowTo(row.original)"
+                  class="ps-6 font-medium text-highlighted hover:underline"
+                >
+                  <slot
+                    :name="`subcell-${c.key}`"
+                    :row="row.original"
+                    :parent="row.getParentRow()!.original"
+                  >
+                    {{ subRowLabel?.(row.original) }}
+                  </slot>
+                </ULink>
+                <span
+                  v-else
+                  :class="i === 0 ? 'ps-6' : ''"
+                >
+                  <slot
+                    :name="`subcell-${c.key}`"
+                    :row="row.original"
+                    :parent="row.getParentRow()!.original"
+                  >
+                    <template v-if="i === 0">{{ subRowLabel?.(row.original) }}</template>
+                  </slot>
+                </span>
+              </template>
+              <template v-else>
+                <ULink
+                  v-if="rowTo && i === 0"
+                  :to="rowTo(row.original)"
+                  class="font-medium text-highlighted hover:underline"
+                >
+                  <slot
+                    :name="`cell-${c.key}`"
+                    :row="row.original"
+                  >
+                    {{ row.original[c.key] }}
+                  </slot>
+                </ULink>
                 <slot
+                  v-else
                   :name="`cell-${c.key}`"
                   :row="row.original"
                 >
                   {{ row.original[c.key] }}
                 </slot>
-              </ULink>
-              <slot
-                v-else
-                :name="`cell-${c.key}`"
-                :row="row.original"
-              >
-                {{ row.original[c.key] }}
-              </slot>
+                <ULink
+                  v-if="i === 0 && hasMore(row.original) && subRowsAllTo && row.getIsExpanded()"
+                  :to="subRowsAllTo(row.original)"
+                  class="mt-1 block text-sm text-muted hover:underline"
+                >
+                  {{ t('core.list.all-children', { count: childTotal(row.original), what: subRowsNoun ?? '' }) }}
+                </ULink>
+              </template>
             </template>
             <template #actions-header>
               <span class="sr-only">{{ t('core.list.actions') }}</span>
             </template>
             <template #actions-cell="{ row }">
               <UDropdownMenu
-                v-if="rowActions"
+                v-if="rowActions && row.depth === 0"
                 :items="rowActions(row.original)"
               >
                 <UButton
@@ -379,6 +501,17 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                   :aria-label="t('core.list.actions-for', { row: rowLabel(row.original) })"
                 />
               </UDropdownMenu>
+            </template>
+            <template
+              v-if="$slots.expanded"
+              #expanded="{ row }"
+            >
+              <div class="px-4 py-3 text-sm">
+                <slot
+                  name="expanded"
+                  :row="row.original"
+                />
+              </div>
             </template>
           </UTable>
 
@@ -439,6 +572,37 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                     </dd>
                   </template>
                 </dl>
+                <UCollapsible
+                  v-if="subRows && childrenOf(row).length"
+                  class="mt-2"
+                >
+                  <UButton
+                    color="neutral"
+                    variant="link"
+                    size="sm"
+                    trailing-icon="i-lucide-chevron-down"
+                    :label="`${childTotal(row)} ${subRowsNoun ?? ''}`.trim()"
+                  />
+                  <template #content>
+                    <ul class="mt-1 space-y-1 text-sm">
+                      <li
+                        v-for="child in childrenOf(row)"
+                        :key="rowId(child)"
+                      >
+                        <ULink
+                          v-if="subRowTo"
+                          :to="subRowTo(child)"
+                          class="hover:underline"
+                        >
+                          {{ subRowLabel?.(child) }}
+                        </ULink>
+                        <template v-else>
+                          {{ subRowLabel?.(child) }}
+                        </template>
+                      </li>
+                    </ul>
+                  </template>
+                </UCollapsible>
               </UCard>
             </li>
           </ul>
