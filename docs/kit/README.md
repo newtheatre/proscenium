@@ -123,7 +123,8 @@ a module that is switched on. Payloads hold ids, numbers, enums and `code()` val
 person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is the truth, so a
 duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
 with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`.
-Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
+Core alone may declare `events.listens: { deliverable: '<listener>' }`, the listener on
+`'deliverable'`: it hears every event not marked `internal: true`, for the webhook sender. Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
 `POST /api/core/jobs/<id>/cancel`, ability `core.job.manage`) cancels a job that has not started. A
 switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `weeklyOn` in the
 theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
