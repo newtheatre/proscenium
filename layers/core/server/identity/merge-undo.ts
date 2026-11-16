@@ -12,6 +12,8 @@
 // deleted (unless kept), the items go, and the merged-away account's own details are cleared. It
 // stays an alias for ever, so append-only history still resolves.
 import { NOT_YET, all, first, newId, nowMs, refuse, type Actor, type UnitView } from '#kit'
+import { verifiedAddressesOf } from './accounts'
+import { queueNotice } from './notices'
 import { SETTLED_IN_STAGE_ONE, accountColumns, moveModules, stuckMerges, type MergeMovePayload } from './merge-move'
 
 interface MergeRow {
@@ -105,6 +107,10 @@ export async function runMergeUndo(unit: UnitView, payload: MergeMovePayload, jo
   unit.enqueue('core.merge-move', { mergeId: merge.id, stage: 'undo-finish' })
 }
 
+/** What core.merge-undone says came back: everything, or all but what a module's undo kept. */
+const KEPT_SENTENCE = 'Each has back what it had before they were joined, except a few things that had changed since and could not be put back. The theatre can tell you which.'
+const ALL_BACK = 'Each has back what it had before they were joined.'
+
 /** The last unit of an undo: the core's own rows, grants given back, the alias cleared. */
 async function finishUndo(unit: UnitView, merge: MergeRow): Promise<void> {
   const at = nowMs()
@@ -132,6 +138,16 @@ async function finishUndo(unit: UnitView, merge: MergeRow): Promise<void> {
   unit.add({ sql: 'UPDATE core_accounts SET merged_into_id = NULL, merged_at = NULL WHERE id = ? AND merged_into_id IS NOT NULL', params: [merge.merged_account_id] })
   unit.add({ sql: 'UPDATE core_account_merges SET undone_at = ? WHERE id = ? AND undone_at IS NULL', params: [at, merge.id] })
     .expect(1, { code: 'core.merge.undoing', reason: 'This merge was undone a moment ago.' })
+  // Both people are told, at every verified address the two accounts have (read before this unit
+  // returns them), and whether anything could not be put back.
+  const [kept] = await all<{ n: number }>(
+    `SELECT count(*) AS n FROM core_audit WHERE record_type = 'core.account' AND record_id = ?
+        AND json_extract(detail, '$.mergeId') = ? AND json_extract(detail, '$.undo') = 'not-restored'`,
+    merge.survivor_id, merge.id,
+  )
+  await queueNotice(unit, 'core.merge-undone', [...await verifiedAddressesOf(merge.survivor_id), ...await verifiedAddressesOf(merge.merged_account_id)], {
+    kept: kept?.n ? KEPT_SENTENCE : ALL_BACK,
+  })
   unit.announce('core.account.merge-undone', { survivorId: merge.survivor_id, mergedAccountId: merge.merged_account_id, mergeId: merge.id }, { record: ['core.account', merge.survivor_id] })
   unit.audit({ action: 'state', record: ['core.account', merge.survivor_id], detail: { mergeId: merge.id, undo: 'done', mergedAccountId: merge.merged_account_id, grantsGivenBack: ended.length } })
 }

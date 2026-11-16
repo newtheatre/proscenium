@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { NOT_YET, createUnit, inAccountScope, newId, recordMergeItems, useDb, type MergeHandler } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { sessions } from '../../../../payments/server/db/schema'
-import { Browser, deliver, env, grantDirectly, leaveIdentity, reset, signInByEmail, staff, useIdentity } from './helpers'
+import { Browser, deliver, env, grantDirectly, leaveIdentity, mailbox, reset, signInByEmail, staff, useIdentity } from './helpers'
 import { inContext, rows, sent } from '../../../../../tests/integration/helpers'
 import { restartStalledMerges } from '../../../server/identity/merge-move'
 import { closeMerges } from '../../../server/identity/merge-undo'
@@ -168,6 +168,11 @@ describe('undoing a merge with two merge handlers', () => {
     expect(calls).toEqual(['merge:first', 'merge:second', 'undo:second', 'undo:first'])
     // The Merges screen says the merge is undone and what the module kept.
     expect(await listedOf()).toEqual(expect.objectContaining({ state: 'undone', undoable: false, notRestored: [{ handler: 'seats.second', count: 2, reason: 'seats.merge.second-kept' }] }))
+    // Both people are told, at every address, that something could not be put back.
+    const told = mailbox.filter(m => m.subject === 'Your accounts at The Test Theatre have been separated again')
+    expect(told.length).toBeGreaterThan(0)
+    const addresses = (await rows<{ address: string }>('SELECT address FROM core_account_emails WHERE account_id IN (?, ?) AND verified_at IS NOT NULL', survivorId, mergedAccountId)).map(r => r.address).sort()
+    expect(told.map(m => m.address).sort()).toEqual(addresses)
     const notes = await rows<{ detail: string }>('SELECT detail FROM core_audit WHERE record_id = ? AND detail LIKE \'%not-restored%\'', survivorId)
     expect(notes.map(n => JSON.parse(n.detail))).toEqual([{ mergeId: merge.id, undo: 'not-restored', handler: 'seats.second', notRestored: 2, reason: 'seats.merge.second-kept' }])
     expect(await rows('SELECT merged_into_id FROM core_accounts WHERE id = ?', mergedAccountId)).toEqual([{ merged_into_id: null }])

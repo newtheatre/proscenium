@@ -377,6 +377,21 @@ export const identityContributions = {
       },
     },
   }, {
+    // A merge was undone (part 4, Merge, "Say what could not be put back"), to every verified
+    // address of both accounts. `kept` is one of two fixed sentences: everything came back, or all but what a module's undo kept.
+    id: 'core.merge-undone',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { kept: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your accounts at {{ theatre }} have been separated again',
+        body: 'Two accounts at {{ theatre }} that had been joined, including the one for this address, are separate again. {{ kept }}\n\nIf you did not expect this, contact the theatre.',
+      },
+    },
+  }, {
     // The download is ready (ID-15). It says when it will be removed, never what it holds.
     id: 'core.export-ready',
     category: 'transactional' as const,
