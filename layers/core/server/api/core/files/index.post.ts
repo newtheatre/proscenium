@@ -18,6 +18,7 @@ export default defineRoute({
 }, async (event, { input, actor, unit }) => {
   const slot = await fileSlot(input.slot)
   if (!slot) refuse('core.files.unknown-slot', `There is no file slot called ${input.slot}.`, { status: 404 })
+  if (slot.source === 'server') refuse('core.files.not-uploadable', 'Files in this place are made by Proscenium, not uploaded.', { status: 403 })
   if (slot.owner === 'site' && input.owner !== 'site') refuse('core.files.not-found', 'There is no such place for a file.', { status: 404 })
   const context = useContext()
   context.allowedBy = await requireAbility(actor, slot.ability as any, slot.owner === 'site' ? undefined : [slot.owner, input.owner])
