@@ -78,6 +78,32 @@ export const points = {
       hideEmpty: z.boolean().optional(),
     }).strict().refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] }),
   }),
+  // A card on a home page: one fact and one action, drawn by the module's own component. Cards are
+  // sorted overdue, today, information, and a card whose count is zero is not shown.
+  'core.home-card': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      home: z.enum(['console', 'members', 'tonight', 'admin']),
+      ability,
+      component: z.string(),
+      urgency: z.enum(['overdue', 'today', 'info']),
+      count: z.string().optional(),
+    }).strict(),
+  }),
+  // A tab another module adds to a record page. The owner's own tabs come first. The label is
+  // `<module>.record-tabs.<name>.label`; the component receives `recordId` and nothing else.
+  'core.record-tab': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      record: z.string(),
+      ability,
+      component: z.string(),
+      order: z.number().int(),
+      count: z.string().optional(),
+    }).strict(),
+  }),
   // A registered count, shown beside a menu entry or on a card. A module registers its own; another
   // module's is named by it. The contribution says how to count for the person asking.
   'core.count': point({ kind: 'code', contract: 'count' }),
