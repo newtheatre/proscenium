@@ -56,6 +56,8 @@ Foundations keeps the one index so two workstreams cannot claim the same name. T
 
 **The access scheme (Identity, 16 November 2026).** A named part of the core, not a module; its names are indexed here and defined in the Identity Doc, parts 2, 3, 4 and 6. Tables `core_access_profiles` (`keyed by account, no id`) and `core_access_shares` (keyed by account and purpose, no id). The point `core.access-purpose` is a data point: a module declares a purpose with an id, a side, a label and explanation, an ability, the entries it uses and an optional record type. The vocabulary `core.access-need` is declared through `core.vocabulary`. The fact `core.access-scheme` is not a standing and has no `holders`, which the fact format allows; the value `core.access-scheme.companions` is offered through `core.requirement`. Abilities: `core.access-scheme.read`, `core.access-scheme.review`, `core.access-profile.read`, `core.emergency-contact.read`. Settings: the group `core.access-scheme.*` and `core.emergency-contacts.keep-after-standing`; these are separate from `core.access.fresh-within`, which is about permissions. The public page `/access` is a theatre content page holding Identity's component `CoreAccessApplication`, so it is deliberately not a reserved address prefix.
 
+**Two interface points, as built (16 November 2026); the Interface Doc's part 4 defines them.** `core.search-source` takes `{ id, record, ability, route, shells }`: `route` is the module's own search route, which takes `?q=` and returns `{ ids }`, and the rows are resolved through the record type's `core.record-resolver`. `core.quick-action` takes `{ id, to, icon, ability, keywords? }`: `keywords` is a translation key, and there is no action field, because a quick action is always an address. The console group for the `spaces` module is labelled "Room bookings"; its id and `/console/spaces` are unchanged.
+
 `core.production-section` was withdrawn on 16 November: `core.record-tab` is the one way to add to a record page. `core.account-section` is defined once, by the interface.
 
 Workstream 4 owns three modules, `box-office`, `payments` and `finance`, and declares its names under `box-office.*`, `payments.*` and `finance.*` in its own document; it needs no row here. The same is true of every second-round module, whose names are listed after the prefix table below.
@@ -94,7 +96,7 @@ Each module's own document is the authority; these are listed so that nobody cla
 | --- | --- | --- | --- | --- |
 | `front-of-house` | as its document | `front-of-house.tonight-figure`, `front-of-house.report-section` | `front-of-house.on-shift` (on core.performance, standing), `front-of-house.leading-shift`, `front-of-house.rostered` (standing) | shift, assignment, incident, night-report, checklist-run |
 | `spaces` | as its document | none | none | bookable (parent core.space, optional), booking, purpose |
-| `bar` | requires payments, finance; uses front-of-house, membership, training | `bar.report` (later release) | none | outlet, opening, sale, product, stock-item, stocktake, tab (parent bar.outlet, optional) |
+| `bar` | requires payments, finance; uses front-of-house, membership, training | `bar.report` (later release) | `bar.tab-holder` | outlet, opening, sale, product, stock-item, stocktake, tab (parent bar.outlet, optional) |
 | `training` | as its document | none | `training.competent`, `training.course-trainer` (both `pin: true`) | course and others as its document |
 | `membership` | requires forms; uses communications | `membership.verifier`, `membership.charge` | `membership.holder` (standing), `membership.supporter`, `membership.scheme-holder`, `membership.voter` | scheme, membership, verification-list |
 | `membership-fees` | requires membership, payments, finance | none | none | price, charge |
@@ -113,9 +115,9 @@ Other platform names foundations added in the second round: the queue binding `E
 | `core.release.applied` | An update's migrations finish | release version | yes |
 | `core.job.died` | A job uses up its attempts | job name and id | yes |
 
-Core domain's vocabulary events, added from its build on 16 November 2026: `core.term.retired` (payload `termId`, `vocabulary`) and `core.term.merged` (payload `termId`, `vocabulary`, `intoId`). Neither is internal. `core.term.merged` is declared from the first release and first announced when merging terms ships (core domain's story C-22, later).
+Core domain's vocabulary events, added from its build on 16 November 2026: `core.term.retired` (payload `termId`, `vocabulary`) and `core.term.merged` (payload `termId`, `vocabulary`, `intoId`). These two belong to core domain and are not internal, unlike foundations' four. `core.term.merged` is declared from the first release and first announced when merging terms ships (core domain's story C-22, later).
 
-All four are internal: they are about the running of the site, so they are never sent to a theatre's webhooks. There is no event named `core.module.switched`.
+All four of foundations' own events in the table above are internal: they are about the running of the site, so they are never sent to a theatre's webhooks. There is no event named `core.module.switched`.
 
 ## What foundations needs from the others
 
