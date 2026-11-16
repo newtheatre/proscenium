@@ -46,7 +46,7 @@ export async function requestEmailSignIn(unit: UnitView, event: H3Event, input: 
   const quiet = { sent: true } as const
   if (!(await useSetting('core.sign-in.email-link'))) return quiet
   // The per-address limit: over it, the same screen and no email.
-  if (!(await takeRate('sign-in', `address:${address}`))) return quiet
+  if (!(await takeRate('sign-in', `address:${address}`)).allowed) return quiet
 
   const existing = await addressRow(address)
   if (!existing && !(await useSetting('core.sign-in.open-sign-up'))) return quiet

@@ -10,6 +10,8 @@ export interface KitEnv {
   JOBS_BULK?: Queue
   /** Cloudflare Email Sending. Only core's mailer touches it. */
   EMAIL?: SendEmail
+  /** The shared rate-limit counts (RateLimitCounter). Absent under nuxt dev, where they count in memory. */
+  RATE_LIMITS?: DurableObjectNamespace
   CORE_ENCRYPTION_KEY?: string
   CORE_TURNSTILE_SECRET_KEY?: string
   /** "1" applies pending migrations on the first request. Set by dev, preview and tests only. */

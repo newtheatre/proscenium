@@ -8,6 +8,9 @@ import { installMigrations } from '#kit/migrations'
 import { handleQueue, handleScheduled } from '#kit/worker'
 import type { KitEnv } from '#kit/context'
 
+// The Durable Object behind the shared rate-limit counts (binding RATE_LIMITS).
+export { RateLimitCounter } from './rate-counter'
+
 installRegistry(registry)
 installMigrations(migrations, release)
 
