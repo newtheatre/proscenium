@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createUnit } from '#kit/unit'
 import { Authenticator } from './authenticator'
-import { Browser, address, env, grantDirectly, leaveIdentity, reset, setSetting, clearSetting, setUpOwner, signInByEmail, staff, useIdentity } from './helpers'
+import { Browser, address, deliver, env, grantDirectly, leaveIdentity, mailbox, reset, setSetting, clearSetting, setUpOwner, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { findOrCreateAccount, type FindOrCreateInput } from '../../../server/identity/guests'
 
@@ -147,6 +147,31 @@ describe('adding and inviting people (ID-06)', () => {
     expect(await signInByEmail(browser, to)).toBe(accountId)
     expect((await browser.get('/api/core/roles')).status).toBe(200)
     expect((await owner.browser.get(`/api/core/grants?accountId=${accountId}`)).body.grants.map((g: any) => g.state)).toEqual(['live'])
+  })
+
+  it('emails an invitation whose link signs the person in, claims the account and starts the role', async () => {
+    const made = await owner.browser.post('/api/core/roles', { ...role(['core.role.read']), name: 'Front of house lead' })
+    const to = address()
+    const given = await owner.browser.post('/api/core/grants', { person: { address: to, name: 'Ivy Invited' }, roleId: made.body.id })
+    await deliver()
+    const message = mailbox.find(m => m.address === to)
+    expect(message?.subject).toBe('You have been given a role at The Test Theatre')
+    const browser = new Browser()
+    const used = await browser.post('/api/core/sign-in/link', { token: tokenOf(message!) })
+    expect(used.status).toBe(200)
+    expect((await browser.get('/api/core/me')).body.account.id).toBe(given.body.accountId)
+    expect((await browser.get('/api/core/roles')).status).toBe(200)
+    // It works once.
+    expect((await new Browser().post('/api/core/sign-in/link', { token: tokenOf(message!) })).body.code).toBe('core.sign-in.link-used')
+  })
+
+  it('an invitation already used or lapsed is not sent', async () => {
+    const roleId = await makeRole(['core.role.read'])
+    const to = address()
+    await owner.browser.post('/api/core/grants', { person: { address: to, name: 'Ivy Invited' }, roleId })
+    await env.DB.prepare('UPDATE core_account_tokens SET expires_at = 1 WHERE address = ? AND purpose = \'invite\'').bind(to).run()
+    await deliver()
+    expect(mailbox.find(m => m.address === to)).toBeUndefined()
   })
 
   it('the invitation lasts for the invite-lifetime setting', async () => {
