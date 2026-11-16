@@ -16,6 +16,10 @@
   --ui-primary: var(--ui-color-primary-400);
 }
 
+/* Site administration is not the theatre's brand: its filled buttons are neutral (R-33). */
+:root.light .admin-shell, :root:not(.dark) .admin-shell { --ui-primary: var(--ui-color-neutral-800); }
+.dark .admin-shell, .dark.admin-shell { --ui-primary: var(--ui-color-neutral-200); }
+
 /* Targets: 24 pixels everywhere (WCAG 2.2, 2.5.8), 44 in the public shell, 48 in live mode. */
 :root {
   --proscenium-target: 24px;

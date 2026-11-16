@@ -28,5 +28,6 @@ describe('matchSettings (UI-15)', () => {
     expect(matchSettings(index, '  ', t)).toEqual([])
     expect(matchSettings(index, 'theatre', t)[0]!.to).toBe('/console/system/settings?setting=core.brand.name')
     expect(settingsPageOf('seats')).toBe('/console/seats/settings')
+    expect(settingsPageOf('core', 'site')).toBe('/admin/settings')
   })
 })

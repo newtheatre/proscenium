@@ -17,7 +17,10 @@ const MOST_RESULTS = 8 // not-policy: a short list per group
 const { t, te } = useT()
 const open = ref(false)
 const term = ref('')
+const { has } = useViewer()
 const { data: navigation } = await useNavigation('console')
+// Someone entitled to both shells finds both shells' screens, each named with its shell.
+const { data: adminNavigation } = has('admin') ? await useNavigation('admin') : { data: ref(null) }
 // Fetched when the palette is first opened, so a page that never opens it makes no extra requests.
 const { data: settingsIndex, execute: loadSettings } = useSettingsIndex({ immediate: false })
 const { data: palette, execute: loadPalette } = useFetch<Palette>('/api/core/palette', { key: 'core:palette', lazy: true, server: false, immediate: false, default: () => ({ sources: [], actions: [] }) })
@@ -55,9 +58,15 @@ watchDebounced(term, async (q) => {
 const typeName = (type: string) => te(`${type.split('.')[0]}.records.${type.split('.').slice(1).join('.')}`) ? t(`${type.split('.')[0]}.records.${type.split('.').slice(1).join('.')}`) : type
 
 const groups = computed(() => {
-  const screens = (navigation.value?.groups ?? []).flatMap(g => [...g.everyday, ...g.setup].map(i => ({
-    id: `screen:${i.id}`, label: t(i.label), suffix: t(g.label), icon: i.icon, to: i.to,
-  })))
+  const both = has('admin') && has('console')
+  const screens = [
+    ...(navigation.value?.groups ?? []).flatMap(g => [...g.everyday, ...g.setup].map(i => ({
+      id: `screen:${i.id}`, label: t(i.label), suffix: both ? `${t('core.palette.shell.console')}: ${t(g.label)}` : t(g.label), icon: i.icon, to: i.to,
+    }))),
+    ...(adminNavigation.value?.groups ?? []).flatMap(g => [...g.everyday, ...g.setup].map(i => ({
+      id: `screen:${i.id}`, label: t(i.label), suffix: `${t('core.palette.shell.admin')}: ${t(g.label)}`, icon: i.icon, to: i.to,
+    }))),
+  ]
   const actions = (palette.value?.actions ?? []).map(a => ({
     id: `action:${a.id}`, label: t(a.labelKey), suffix: a.keywordsKey ? t(a.keywordsKey) : undefined, icon: a.icon, to: a.to,
   }))
