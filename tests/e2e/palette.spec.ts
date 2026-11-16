@@ -20,9 +20,11 @@ test.describe('staff with the gallery abilities', () => {
     const palette = page.getByRole('dialog')
     await expect(palette).toBeVisible()
     await page.keyboard.type('sample booking')
-    await expect(palette.getByText('New sample booking')).toBeVisible()
+    // The actions arrive after the palette opens, so wait for the one wanted rather than pressing Enter on whatever is first.
+    const action = palette.getByRole('option', { name: /New sample booking/ })
+    await expect(action).toBeVisible()
     expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations).toEqual([])
-    await page.keyboard.press('Enter')
+    await action.click()
     await expect(page).toHaveURL(/\/console\/gallery\/form/)
   })
 
