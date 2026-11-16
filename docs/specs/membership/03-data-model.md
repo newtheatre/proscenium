@@ -117,7 +117,7 @@ A scheme with one option never shows a choice: the person simply joins. An `inde
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
-| `account_id` | account, subject | not null; on merge `handler` | internal | keep | Follows a merge through the merge handler, part 3 |
+| `account_id` | account, subject | not null; on merge `move` | internal | keep | Moved, because the unique rule of one pending application per person per scheme would otherwise break, and one person's memberships of a scheme must count once (rule D4). The merge handler settles a clash of pending applications before the move (rule X2). Every read by account uses the kit's account scope, so nothing is missed while a merge is part done |
 | `scheme_id` | ref `membership_schemes` | not null | internal | keep |  |
 | length\_option\_id | ref membership\_length\_options | nullable | internal | keep | The length chosen. Null for an indefinite scheme, or when the end date came from a list entry or was set by hand |
 | `realm` | text | one of `member`s, `audience`; not null | internal | keep | Copied from the scheme's side when the row is written |
@@ -137,8 +137,8 @@ A scheme with one option never shows a choice: the person simply joins. An `inde
 | `expires_at` | timestamp | set while pending | internal | keep | When an unfinished application expires |
 | `ended_at` | timestamp | nullable | internal | keep |  |
 | `end_reason` | text | one of `by-holder`, `by-staff`, `refunded`, `superseded`, `erased`; set exactly when state is `ended` | internal | keep |  |
-| `added_by` | account, actor | nullable; on merge `move` | internal | keep | Staff who added the member directly |
-| `ended_by` | account, actor | nullable; on merge `move` | internal | keep |  |
+| `added_by` | account, actor | nullable; on merge `alias` | internal | keep | Staff who added the member directly |
+| `ended_by` | account, actor | nullable; on merge `alias` | internal | keep |  |
 | `note` | text | up to 1,000 characters | free text | redact | A staff note, never shown to the holder's peers |
 | `last_reminder` | text | nullable; one of `window-open`, `final`, `lapsed` | internal | keep | Makes the reminder task safe to run twice |
 | `lapse_announced_at` | timestamp | nullable | internal | keep | Makes the lapse event fire once |
@@ -165,7 +165,7 @@ On erasure the row is kept with its dates and scheme, so counts by year stay tru
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
-| `account_id` | account, subject | not null, unique; on merge `handler` | internal | keep | When two rows meet in a merge, the lower number survives |
+| `account_id` | account, subject | not null, unique; on merge `handler` | internal | keep | `handler`, because a person has this row once only and it is the living record a member number hangs on. When two rows meet in a merge, the lower number survives (rule X2) |
 | `number` | integer | not null, unique, at least 1 | internal | keep | Never reused, even after erasure |
 | `first_joined_on` | local date | not null | internal | keep | "Member since" |
 | `created_at` | timestamp | not null | internal | keep |  |
@@ -199,7 +199,7 @@ The number is taken from a one-row counter in the same batch as the first activa
 | `key_kind` | text | one of `email`, `reference`; not null | internal | keep | What each entry is. Rule V4 |
 | `entry_count` | integer | not null, at least 0 | internal | keep | Kept by the upload job |
 | `valid_until` | local date | nullable | internal | keep | After this date the list matches nothing and its entries are deleted |
-| `uploaded_by` | account, actor | not null; on merge `move` | internal | keep |  |
+| `uploaded_by` | account, actor | not null; on merge `alias` | internal | keep |  |
 | `uploaded_at` | timestamp | not null | internal | keep | Of the latest upload |
 | `created_at` | timestamp | not null | internal | keep |  |
 | reference\_label | text | up to 120 characters; required when key\_kind is reference | public | keep | The whole phrase shown as the field's label, naming the scheme and the issuer: "NNT member? Enter your University of Nottingham student ID". Never a bare noun (rule V13) |

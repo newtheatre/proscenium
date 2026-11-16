@@ -8,6 +8,7 @@ import type { RecordRef, UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { deliveries, inboxItems, notifications } from '../db/domain'
 import { addressesFor } from '../identity/addresses'
+import { accountScopeIdsFor } from '../account-scope'
 import { brandTokens } from '../brand/theme'
 import { checkVariables, render } from './render'
 import { suppressedAddresses } from './suppression'
@@ -79,14 +80,27 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
   if (options.senderKey && !await first('SELECT 1 AS one FROM core_sender_identities WHERE key = ? AND state = \'active\'', options.senderKey))
     refuse('core.notifications.unknown-sender', `There is no active sender called ${options.senderKey}.`, { status: 500 })
 
-  // A repeat under the same dedupe key writes nothing: read first, as U7 asks.
+  // A repeat under the same dedupe key writes nothing: read first, as U7 asks. Accounts merged into
+  // the recipient count as the recipient (R-34), so each key is hashed once per account in the
+  // scope and any earlier one matches. The unique index on dedupe_key backs up the same account.
   const hashes = await Promise.all(recipients.map(r => (r.dedupeKey ? dedupeHash(typeKey, r.accountId, r.dedupeKey) : Promise.resolve(null))))
-  const keyed = hashes.filter((h): h is string => h !== null)
-  const earlier = new Map<string, string>()
+  // The ids are needed here because the hash is made in the Worker; what goes into IN is hashes.
+  const scopes = await accountScopeIdsFor(recipients.filter(r => r.dedupeKey).map(r => r.accountId))
+  const candidates = await Promise.all(recipients.map(async (r, index) => (r.dedupeKey
+    ? [...new Set([hashes[index]!, ...await Promise.all(scopes.get(r.accountId)!.map(id => dedupeHash(typeKey, id, r.dedupeKey!)))])]
+    : [])))
+  const keyed = candidates.flat()
+  const found = new Map<string, string>()
   if (keyed.length) {
     for (const row of await all<{ id: string, dedupe_key: string }>('SELECT id, dedupe_key FROM core_notifications WHERE dedupe_key IN (SELECT value FROM json_each(?))', JSON.stringify(keyed)))
-      earlier.set(row.dedupe_key, row.id)
+      found.set(row.dedupe_key, row.id)
   }
+  // The earlier notification for each recipient's own hash, wherever in the scope it was sent.
+  const earlier = new Map<string, string>()
+  candidates.forEach((list, index) => {
+    const match = list.find(h => found.has(h))
+    if (match) earlier.set(hashes[index]!, found.get(match)!)
+  })
   const fresh: { index: number, accountId: string, values: Record<string, string>, hash: string | null }[] = []
   const inCall = new Set<string>()
   recipients.forEach((r, index) => {
@@ -152,7 +166,9 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     if (muted.has(`${accountId}\u0000${channel}`)) return { state: 'suppressed', reason: 'preference' }
     if (channel === 'inbox') return { state: 'sent', reason: null }
     const address = addresses.get(accountId)
-    if (!address) return { state: 'skipped', reason: 'no_address' }
+    // No committed address yet, perhaps because the account is made in this same unit (an
+    // invitation): queue it, and the send job, which reads the address again, decides.
+    if (!address) return { state: 'queued', reason: null }
     if (suppressed.has(address.toLowerCase())) return { state: 'skipped', reason: 'suppressed_address' }
     return { state: 'queued', reason: null }
   }

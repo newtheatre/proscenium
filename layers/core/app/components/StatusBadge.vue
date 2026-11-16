@@ -18,7 +18,6 @@ const look = computed(() => ({
 <template>
   <UBadge
     :color="look.color"
-    variant="subtle"
     :icon="look.icon"
     :label="label"
   />

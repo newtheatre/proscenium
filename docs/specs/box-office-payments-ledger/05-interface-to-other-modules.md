@@ -267,17 +267,16 @@ The rules are in part 3, "One payment for tickets and something else". These are
 | `panel` | The component shown in the till |
 | `summary(context)` | Lines and an amount for display. Reads only |
 | `prepare(unit, context)` | Adds to the unit of work whatever makes the sale real but unpaid, and returns `{ owner: { module, record }, amountMinor }` with `amountMinor` above zero. Called in the batch that creates the intent |
-| `release(unit, owner)` | Undoes `prepare`. Must be safe to call twice |
 
-Payments makes one intent with one part per owner. `release` is called for every part when the payment is cancelled, fails for good, or the intent expires; the task `payments.expire-intents` is the backstop, so a crash between `prepare` and payment cannot strand stock or seats.
+Payments makes one intent with one part per owner. Undoing `prepare` is not the panel's job: it is `release` on the owner's `payments.settlement` handler (below), because an owner paid online with no desk panel needs it too. `release` is called for every part when the payment is cancelled, fails for good, or the intent expires; the task `payments.expire-intents` is the backstop, so a crash between `prepare` and payment cannot strand stock or seats.
 
 **Online, any module can own a payment.** A part's owner is a module and a record, with nothing special about orders. An owner with its own checkout page, such as a membership fee, calls `collect` with its parts and then `startAttempt`; at the desk it contributes a panel and is paid inside the seller's till session, alone or beside tickets.
 
-**`payments.settlement` (code point).** A handler's `settle(unit, part)` and `refunded(unit, part, refund)` add their own statements and **return their ledger entries**. Payments writes one sealed posting: the money line, plus every part's entries.
+**`payments.settlement` (code point).** A handler's `settle(unit, part)` and `refunded(unit, part, refund)` add their own statements and return their ledger entries. Payments writes one sealed posting: the money line, plus every part's entries. A handler may also give `release(unit, part)`, which undoes whatever made the sale real but unpaid and must be safe to call twice; an owner with nothing to undo leaves it out.
 
-- A part's entries must total exactly that part's amount, or Payments refuses the batch. The seal then checks the whole posting balances.
+- A part's entries must total exactly that part's amount. The seal then checks the whole posting balances.
 - A handler may post only to accounts whose `module` is its own.
-- A handler never commits and never calls a provider.
+- A handler never commits and never calls a provider. A handler that breaks either rule above is treated as an owner refusing, not as an error: the provider's answer is still recorded, nothing settles, and the intent becomes unfulfilled with the money held in payments.unfulfilled and refunded. An attempt always ends in a recorded answer, even when an owner's code is wrong.
 
 **No partial settlement, in both directions.** If any handler refuses or throws, nothing settles: no tickets, no bar sale, no posting. The attempt's money is real, so the intent becomes unfulfilled and the ordinary unfulfilled-payment path refunds it in full. If the bar's part refuses, the reservation stays reserved; if the tickets' part refuses, the drinks are not sold.
 
@@ -286,6 +285,8 @@ Payments makes one intent with one part per owner. `release` is called for every
 **`finance.system-account` (data point).** A module declares the ledger accounts it posts to: `{ key, name, kind, taxCode? }`, where `kind` is income, liability, asset or expense. Finance creates each as a locked account keyed `<module>.<key>`, and the module obtains it with `accountFor`. Part 2 lists what Box office and Payments declare. In the first release only the no-tax code exists, so it is every declaration's default.
 
 An account belongs to one module (`finance_accounts.module`): set by Finance for a declared account, and chosen by the administrator for an account they add to the chart, such as a snacks income account given to the bar. So a treasurer shapes the chart, a module offers only its own accounts in its pickers, and no module can post into another's.
+
+**`finance.period-close-check` (code point).** Finance requires no other module, so it cannot look in their tables to see what should hold up a close. A contribution is given a period and returns blockers, each `{ sentence, link }`; it reads only and never commits. Payments contributes two: a till session opened in the period and still open, and an intent from the period that is unfulfilled without a refund. Box office contributes one: a performance completed in the period whose income the task `box-office.recognise-income` has not yet moved. The close screen lists every blocker and the close is refused while any remains.
 
 **When income counts is the owner's choice, not Finance's.** Finance has no recognition rule. An owner that returns entries crediting its income account at settlement has recognised the income when paid. An owner that credits a liability account it declared, and later posts the move to income itself, has deferred it. "At the performance" is Box office's rule for tickets and binds nobody else.
 
@@ -329,7 +330,7 @@ Foundations ruled one point for every per-person condition, `core.requirement`, 
 
 - A well-formed miss shows the source's message and help link, and the ticket type stays withheld.
 - **Tickets for friends.** Each ticket of such a type is met on its own. The buyer's account meets at most one; every further ticket shows its own field, labelled for another person. An order may hold several member tickets, each with its own evidence id.
-- **One membership, one ticket.** `max_per_holder` (default 1) limits live tickets of the type per performance for one holder, counted by evidence id when the answer carries one and by account otherwise, as a conditional write inside the claim batch. A source returns the same evidence for a person whether they were checked by account or by typed reference, so one membership cannot be used twice by two routes.
+- **One membership, one ticket.** `max_per_holder` (default 1) limits live tickets of the type per performance for one holder, counted on both keys: by account, on the kit's account scope (the survivor and its aliases), whenever the ticket keeps one, and by evidence id whenever it keeps one. A claim is refused when a live ticket matches on either key, as a conditional write inside the claim batch. A source returns the same evidence for a person whether they were checked by account or by typed reference, so one membership cannot be used twice by two routes. Counting by account as well covers a person who holds two memberships of one scheme after an account merge: two evidence ids, one account, one ticket. A ticket met by a typed reference keeps the holder's account as well as the evidence whenever the source's answer names one (the met answer's holderAccountId, which Membership returns when the membership belongs to an account; the name awaits Foundations' confirmation), so the same person is caught by that route too; a holder with no account is counted by evidence alone.
 
 **What the ticket keeps.** `requirement_ref`, and at least one of `requirement_account_id` and `requirement_evidence_id` (part 2).
 

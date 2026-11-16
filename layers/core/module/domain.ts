@@ -11,6 +11,7 @@ const branding = 'core.branding.edit'
 const filesConfigure = 'core.file.configure'
 const sender = 'core.sender.manage'
 const notificationConfigure = 'core.notification.configure'
+const programmeConfigure = 'core.programme.configure'
 
 export const settings = defineSettings('core', {
   // Organisation. The theatre's name, time zone, currency, language and day start are foundations'
@@ -34,6 +35,8 @@ export const settings = defineSettings('core', {
   'brand.display-font': setting.choice({ default: 'system', options: ['system', 'serif', 'rounded'], change: branding, audience: 'public' }),
   'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], change: branding, audience: 'public' }),
   'brand.credit-line': setting.boolean({ default: true, change: branding, audience: 'public' }),
+  // Programme (part 6). The other programme settings arrive with the performances they shape.
+  'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public' }),
   'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.logo-dark': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.revision': setting.integer({ default: 0, min: 0, max: 1_000_000_000, change: branding, audience: 'public', managed: true }), // not-policy: a counter's ceiling
@@ -83,6 +86,8 @@ export const records = defineRecords('core', {
   file: record({ table: 'core_files' }),
   sender: record({ table: 'core_sender_identities' }),
   vocabulary: record({ table: 'core_vocabularies' }),
+  season: record({ table: 'core_seasons' }),
+  production: record({ table: 'core_productions' }),
   venue: record({ table: 'core_venues' }),
   space: record({ table: 'core_spaces', parent: 'core.venue' }),
 })
@@ -96,6 +101,13 @@ export const abilities = defineAbilities('core', {
   'notification.configure': ability(),
   // Granted on one vocabulary, it lets a module's manager look after that list only.
   'vocabulary.manage': ability({ on: 'core.vocabulary', grantAt: ['site', 'record'] }),
+  // The programme (part 6). A grant of edit, publish or cancel on one production covers that production only.
+  'production.view': ability({ on: 'core.production', grantAt: ['site', 'record'] }),
+  'production.create': ability({ implies: ['production.view'] }),
+  'production.edit': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
+  'production.publish': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.edit'] }),
+  'season.manage': ability(),
+  'programme.configure': ability(),
   // A venue and its spaces. Creating a venue needs it site-wide; a grant on one venue covers its spaces.
   'venue.manage': ability({ on: 'core.venue', grantAt: ['site', 'record'] }),
 })
@@ -233,8 +245,16 @@ function terms(...list: [slug: string, label: string, icon?: string][]) {
   return list.map(([slug, label, icon]) => (icon ? { slug, label, icon } : { slug, label }))
 }
 
+/** The public fields of a production, as core.production.updated names them. */
+export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageGuidance', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories'] as const
+
 export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
+  'core.season.published': event({ version: 1, payload: z.object({ seasonId: z.string() }), internal: false }),
+  'core.season.archived': event({ version: 1, payload: z.object({ seasonId: z.string() }), internal: false }),
+  'core.production.published': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
+  'core.production.updated': event({ version: 1, payload: z.object({ productionId: z.string(), fields: z.array(z.enum(PRODUCTION_PUBLIC_FIELDS)) }), internal: false }),
+  'core.production.withdrawn': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
   'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
   'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),

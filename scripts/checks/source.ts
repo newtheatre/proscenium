@@ -129,13 +129,14 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
       need(`${id}.quick-actions.${name}.label`, 'the quick action\'s label')
       if (action.keywords) need(action.keywords, 'the quick action\'s search words')
     }
+    for (const tab of contributed('core.record-tab')) need(`${id}.record-tabs.${String(tab.id).slice(id.length + 1)}.label`, 'the record tab\'s label')
     for (const source of contributed('core.search-source')) need(`${id}.records.${String(source.record).slice(id.length + 1)}`, 'the name of the kind of record the search finds')
     const hasSettings = [...(registry.settings as Map<string, any>).values()].some(s => s.module === id)
     if (hasSettings && id !== 'core' && !contributed('core.navigation-group').length && !contributed('core.navigation').some((e: any) => e.group)) need(groupLabelKey(id, id), 'the label of the console group its settings page sits in')
     const sections = new Set<string>()
     for (const [key, { module }] of registry.settings as Map<string, any>) if (module === id) sections.add(key.slice(id.length + 1).split('.')[0]!)
     for (const section of sections) need(`${id}.settings-sections.${section}`, 'the heading of a group of settings on the generated settings page')
-    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.quick-actions.`, `${id}.records.`]
+    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.quick-actions.`, `${id}.records.`, `${id}.record-tabs.`]
     for (const key of keys) if (derived.some(p => key.startsWith(p))) problems.push(`${rel(file)}: "${key}" is not used by any declaration`)
   }
   return problems
@@ -213,8 +214,13 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
     }
   }
   const withSettings = new Set<string>()
-  for (const { module } of registry.settings.values() as Iterable<{ module: string }>) withSettings.add(module)
+  let siteSettings = false
+  for (const { module, entry } of registry.settings.values() as Iterable<{ module: string, entry: { scope?: string } }>) {
+    if (entry.scope === 'site') siteSettings = true
+    else withSettings.add(module)
+  }
   for (const module of withSettings) entries.push({ to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings` })
+  if (siteSettings) entries.push({ to: '/admin/settings' })
   const homes = new Set(Object.values(SHELL_PREFIXES))
   for (const m of modules) {
     const pagesDir = join(ROOT, m.found.root, 'app/pages')
@@ -287,11 +293,16 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
         if (/^\s*(\/\/|\/?\*)/.test(line)) return
         if (line.includes('exact-account:')) return
         const near = all.slice(Math.max(0, i - 6), i + 3).join('\n') // not-policy: the lines a statement usually spans
-        if (/\bexactAccount\(/.test(line)) {
+        if (/(?<!function\s+)\bexactAccount\(/.test(line)) {
           problems.push(`${at}:${i + 1}: exactAccount outside identity needs a reason; end the line with // exact-account: why`)
           return
         }
-        const compared = raw.flatMap(r => [...line.matchAll(r)].map(match => match[1]!.toLowerCase()))
+        // A name after SET and before WHERE is being assigned, not compared.
+        const assigned = (index: number) => {
+          const before = line.slice(0, index).toUpperCase()
+          return before.search(/\bSET\b(?![\s\S]*\bSET\b)/) > before.search(/\bWHERE\b(?![\s\S]*\bWHERE\b)/)
+        }
+        const compared = raw.flatMap(r => [...line.matchAll(r)].filter(match => !assigned(match.index!)).map(match => match[1]!.toLowerCase()))
         if (drizzle?.test(line) || compared.some(name => isAccount(name, near)))
           problems.push(`${at}:${i + 1}: compares an account column to an id; use inAccountScope(column, account) so rows of merged accounts are found, or exactAccount with // exact-account: why`)
       })
