@@ -37,6 +37,7 @@ export const files = defineTable('core_files', {
   id: 'fil',
   random: true,
   realm: 'operational',
+  subject: { account: 'uploaded_by', unlinked: 'staff' },
   retention: 'core.files.deleted-retention',
   extra: t => [
     index('core_files_owner').on(t.ownerType, t.ownerId, t.slot, t.sort),
