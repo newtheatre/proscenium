@@ -73,8 +73,16 @@ export function erasurePlan(): ErasureStep[] {
     if (meta.options.onErasure === 'delete-row') steps.push({ table: meta.name, match, action: 'delete', set: [] })
     else if (set.length || meta.name === 'core_accounts') steps.push({ table: meta.name, match, action: 'update', set })
   }
-  const rank = (s: ErasureStep) => s.table === 'core_accounts' ? 2 : tables.get(s.table)?.options.subject && typeof tables.get(s.table)!.options.subject === 'object' && 'via' in (tables.get(s.table)!.options.subject as object) ? 0 : 1
-  return steps.sort((a, b) => rank(a) - rank(b))
+  // Rows reached through parents go first, the deepest first (a ticket before its order line before
+  // its order), so a step never loses the parent rows a later step finds its rows by; the account last.
+  const depth = (meta: TableMeta | undefined, seen = 0): number => {
+    const subject = meta?.options.subject
+    if (!meta || seen > 4 || !subject || typeof subject !== 'object' || !('via' in subject)) return 0 // not-policy: a guard against a cycle
+    const via = Object.values(meta.columns).find(c => c.sql === subject.via)
+    return 1 + depth(via?.meta.ref ? tables.get(via.meta.ref.table) : undefined, seen + 1)
+  }
+  const rank = (s: ErasureStep) => s.table === 'core_accounts' ? -1 : depth(tables.get(s.table))
+  return steps.sort((a, b) => rank(b) - rank(a))
 }
 
 const VALUE: Record<ErasureStep['set'][number]['to'], string> = {

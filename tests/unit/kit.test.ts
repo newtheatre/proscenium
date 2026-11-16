@@ -263,6 +263,24 @@ describe('format additions of 16 November (fixed retention, erase clear, reserve
     expect(() => defineTable('lost_property_links3', { id: col.id(), hash: col.internal(text('hash'), { erase: 'clear' }) }, { id: 'lpo', realm: 'system', subject: 'none' })).toThrow(/subject is none/)
   })
 
+  it('takes erase: \'clear\' on a table that reaches a person through its parents, and refuses a chain that ends nowhere', async () => {
+    const { text } = await import('drizzle-orm/sqlite-core')
+    const { col, defineTable } = await import('../../layers/core/kit/db')
+    const orders = defineTable('lost_property_claims', { id: col.id(), owner: col.account('owner_id', { role: 'subject' }) }, { id: 'lpc', realm: 'audience' })
+    const lines = defineTable('lost_property_claim_lines', { id: col.id(), claimId: col.ref('lost_property_claims') }, { id: 'lpd', realm: 'audience', subject: { via: 'claim_id' } })
+    const passes = defineTable('lost_property_passes', { id: col.id(), lineId: col.ref('lost_property_claim_lines'), code: col.internal(text('code'), { encrypted: true, erase: 'clear' }) }, { id: 'lpe', realm: 'audience', subject: { via: 'line_id' } })
+    const things = defineTable('lost_property_things', { id: col.id() }, { id: 'lpf', realm: 'system', subject: 'none' })
+    const strays = defineTable('lost_property_strays', { id: col.id(), thingId: col.ref('lost_property_things'), code: col.internal(text('code'), { erase: 'clear' }) }, { id: 'lpg', realm: 'audience', subject: { via: 'thing_id' } })
+    const module = (tables: object) => ({ manifest: defineModule({ manifest: 1, since: '0.1.0', id: 'lost-property', tables } as any), root: 'layers/lost-property', owner: 'upstream', handlers: {} } as unknown as ModuleEntry)
+    expect(() => buildRegistry([module({ orders, lines, passes })])).not.toThrow()
+    expect(() => buildRegistry([module({ things, strays })])).toThrow(/does not lead to an account or an email/)
+    // Erasure finds the pass's rows through both parents, and clears its code.
+    const { matchOf } = await import('../../layers/core/server/identity/erasure')
+    const { tableMeta } = await import('../../layers/core/kit/db')
+    const metas = new Map([orders, lines, passes].map(t => [tableMeta(t)!.name, tableMeta(t)!]))
+    expect(matchOf(tableMeta(passes)!, metas)).toMatch(/"line_id" IN \(SELECT id FROM "lost_property_claim_lines" WHERE \("claim_id" IN \(SELECT id FROM "lost_property_claims" WHERE \("owner_id" IN/)
+  })
+
   it('reserves every settled module id', async () => {
     const { RESERVED_MODULE_IDS } = await import('../../layers/core/kit/registry')
     expect(RESERVED_MODULE_IDS).toEqual(expect.arrayContaining(['core', 'box-office', 'payments', 'finance', 'forms', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']))
