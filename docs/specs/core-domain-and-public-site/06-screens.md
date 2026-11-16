@@ -90,7 +90,7 @@ The foundations specification owns the Setup screen and its own steps, which inc
 | Your look | Accent colour and logo, with the live preview | Yes: the neutral default stays |
 | Your first venue | Name and capacity | Yes |
 | Your year | The day the theatre's year ends | Yes: year-end expiry is not offered until it is set |
-| Your sender | The address messages come from, with the domain check | No, once any module that sends is on |
+| Your sender | The address messages come from, with the domain check. A newly added domain can refuse sends for a few minutes; the step says "not ready yet, checking again" and keeps checking, and does not report a failure | No, once any module that sends is on |
 | Email outcomes | The clicks in the Cloudflare dashboard that subscribe the theatre's queue to bounces, complaints, failures and rejections | Shown once the sending domain is verified. A health check warns until it is done. |
 
 No step asks for a type of theatre, and none loads sample data. A demo mode is not scheduled, as the paper now says.
