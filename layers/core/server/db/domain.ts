@@ -149,8 +149,9 @@ export const notifications = defineTable('core_notifications', {
   subject: { account: 'account_id', unlinked: 'staff' },
   retention: 'core.notifications.log-retention',
   extra: t => [
-    // The key leaves the account out so it matches across a merge (R-34); the index keeps one per account.
-    uniqueIndex('core_notifications_dedupe_account').on(t.dedupeKey, t.accountId).where(sql`${t.dedupeKey} IS NOT NULL`),
+    // The key leaves the account out so it matches across a merge (R-34); the index keeps one per
+    // account, and one for all sends to bare addresses (notifyAddress's keys are its own).
+    uniqueIndex('core_notifications_dedupe_account').on(t.dedupeKey, sql`coalesce(${t.accountId}, '')`).where(sql`${t.dedupeKey} IS NOT NULL`),
     index('core_notifications_subject').on(t.subjectType, t.subjectId),
     index('core_notifications_account').on(t.accountId, t.createdAt),
     check('core_notifications_side', sql`${t.side} IN ${SIDES}`),
