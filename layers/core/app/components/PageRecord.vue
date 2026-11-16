@@ -4,6 +4,7 @@
      the owner's own tabs first, then tabs other modules add through `core.record-tab` (absent when
      the viewer may not open them or the module is off); and a history panel from the audit trail. -->
 <script setup lang="ts">
+import { useMediaQuery } from '@vueuse/core'
 import type { DropdownMenuItem } from '@nuxt/ui'
 
 export interface RecordTab { id: string, label: string }
@@ -24,8 +25,17 @@ const props = withDefaults(defineProps<{
   recordId: string
   /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. */
   tabs: RecordTab[]
-}>(), { status: undefined, primary: undefined, actions: () => [], summary: () => [] })
+  /** Where this record sits below a navigation entry, nearest parent last. */
+  trail?: { label: string, to: string }[]
+  /** What the readiness checklist is called, when other modules or the owner contribute checks. */
+  checklistTitle?: string
+}>(), { trail: undefined, checklistTitle: undefined, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
 const emit = defineEmits<{ (e: 'primary'): void }>()
+defineSlots<{
+  /** A side panel that stays put beside the tabs on a laptop (a poster); above them on a phone. */
+  aside?: () => unknown
+  [tab: `tab-${string}`]: () => unknown
+}>()
 
 const { t } = useT()
 const route = useRoute()
@@ -49,6 +59,19 @@ const current = computed({
 })
 const contributedNow = computed(() => others.value.find(o => o.id === current.value))
 
+// Facts and checklist lines other modules add (R-35): read-only, gated by ability, absent when their module is off.
+const { data: factList } = await useAPI<{ facts: { id: string, component: string }[] }>('/api/core/record-facts', { query: { record: props.recordType }, key: `core:record-facts:${props.recordType}`, default: () => ({ facts: [] }) })
+const facts = computed(() => (factList.value?.facts ?? []).flatMap((f) => {
+  const component = resolveComponent(f.component)
+  return typeof component === 'string' ? [] : [{ ...f, component }]
+}))
+const { data: checkList } = await useAPI<{ checks: { id: string, done: boolean, sentence: string, link?: string }[] }>('/api/core/record-checks', { query: { record: props.recordType, id: props.recordId }, key: `core:record-checks:${props.recordType}:${props.recordId}`, default: () => ({ checks: [] }) })
+const checks = computed(() => checkList.value?.checks ?? [])
+const checksDone = computed(() => checks.value.filter(c => c.done).length)
+const hasAside = computed(() => !!slots.aside || checks.value.length > 0)
+const slots = useSlots()
+const phone = import.meta.client ? useMediaQuery('(max-width: 1023px)') : ref(false)
+
 const historyOpen = ref(false)
 const history = ref<{ at: number, who: string | null, kind: string, action: string, ability: string | null, detail: Record<string, unknown> }[] | null>(null)
 const historyFailed = ref(false)
@@ -68,7 +91,10 @@ const { te } = useT()
 </script>
 
 <template>
-  <PageFrame :title="title">
+  <PageFrame
+    :title="title"
+    :trail="trail"
+  >
     <template #status>
       <StatusBadge
         v-if="status"
@@ -105,7 +131,7 @@ const { te } = useT()
     </template>
 
     <dl
-      v-if="summary.length"
+      v-if="summary.length || facts.length"
       class="mb-6 grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-default p-4 sm:grid-cols-3 lg:grid-cols-6"
     >
       <div
@@ -119,27 +145,70 @@ const { te } = useT()
           {{ fact.value }}
         </dd>
       </div>
-    </dl>
-
-    <UTabs
-      v-model="current"
-      :items="items"
-      :content="false"
-      class="mb-4"
-    />
-    <div
-      role="tabpanel"
-      :aria-label="items.find(i => i.value === current)?.label"
-    >
       <component
-        :is="contributedNow.component"
-        v-if="contributedNow"
+        :is="f.component"
+        v-for="f in facts"
+        :key="f.id"
         :record-id="recordId"
       />
-      <slot
-        v-else
-        :name="`tab-${current}`"
-      />
+    </dl>
+
+    <div :class="hasAside ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8' : ''">
+      <!-- On a phone the side panel folds to one line above the tabs, so the poster does not push the work down. -->
+      <aside
+        v-if="hasAside"
+        class="mb-4 lg:order-2"
+        :aria-label="t('core.record.side-panel')"
+      >
+        <UCollapsible
+          v-if="checks.length && phone"
+          class="mb-3"
+        >
+          <UButton
+            color="neutral"
+            variant="outline"
+            class="w-full justify-between"
+            trailing-icon="i-lucide-chevron-down"
+            :label="`${checklistTitle ?? t('core.record.checklist')}: ${t('core.record.checks-done', { done: checksDone, total: checks.length })}`"
+          />
+          <template #content>
+            <RecordChecks
+              :checks="checks"
+              :title="checklistTitle ?? t('core.record.checklist')"
+            />
+          </template>
+        </UCollapsible>
+        <template v-else>
+          <slot name="aside" />
+          <RecordChecks
+            v-if="checks.length"
+            :checks="checks"
+            :title="checklistTitle ?? t('core.record.checklist')"
+          />
+        </template>
+      </aside>
+      <div class="min-w-0 lg:order-1">
+        <UTabs
+          v-model="current"
+          :items="items"
+          :content="false"
+          class="mb-4"
+        />
+        <div
+          role="tabpanel"
+          :aria-label="items.find(i => i.value === current)?.label"
+        >
+          <component
+            :is="contributedNow.component"
+            v-if="contributedNow"
+            :record-id="recordId"
+          />
+          <slot
+            v-else
+            :name="`tab-${current}`"
+          />
+        </div>
+      </div>
     </div>
 
     <USlideover

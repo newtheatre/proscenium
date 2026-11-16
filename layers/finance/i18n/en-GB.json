@@ -1,7 +1,6 @@
 {
   "finance.module.name": "Finance",
   "finance.module.description": "The ledger: every sale, refund, fee and payout as a balanced, sealed posting, with periods a treasurer closes.",
-  "finance.navigation.groups.finance.label": "Finance",
 
   "finance.settings-sections.periods": "Accounting periods",
   "finance.settings-sections.year": "Financial year",

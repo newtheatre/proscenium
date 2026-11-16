@@ -4,7 +4,7 @@
 // is read when it is asked, so it can never fall out of step with what it sums.
 import { all, fact, factHolders, isEnabled, nowMs, useContext, useSetting, type Actor } from '#kit'
 import { useRegistry } from '#kit/registry'
-import { LIVE } from './grants'
+import { HELD_BY, HOLDER, LIVE } from './grants'
 
 export interface Standing {
   /** `role:<key>` for a role, or the fact's name. */
@@ -29,8 +29,8 @@ async function roleStandings(accountId: string): Promise<Standing[]> {
   const rows = await all<{ key: string, name: string }>(
     `SELECT DISTINCT r.key, r.name FROM core_grants g
        JOIN core_roles r ON r.id = g.role_id AND r.opens_members_area = 1 AND r.archived_at IS NULL
-       JOIN core_accounts a ON a.id = g.account_id
-      WHERE g.account_id = ? AND ${USABLE} AND ${LIVE}
+       JOIN core_accounts a ON a.id = ${HOLDER}
+      WHERE ${HELD_BY} AND ${USABLE} AND ${LIVE}
       ORDER BY r.name`,
     accountId, at, at,
   )
@@ -76,9 +76,9 @@ export async function hasStanding(actor: Actor): Promise<boolean> {
 export async function standingHolders(): Promise<{ accountIds: string[], complete: boolean }> {
   const at = nowMs()
   const rows = await all<{ account_id: string }>(
-    `SELECT DISTINCT g.account_id FROM core_grants g
+    `SELECT DISTINCT a.id AS account_id FROM core_grants g
        JOIN core_roles r ON r.id = g.role_id AND r.opens_members_area = 1 AND r.archived_at IS NULL
-       JOIN core_accounts a ON a.id = g.account_id
+       JOIN core_accounts a ON a.id = ${HOLDER}
       WHERE ${USABLE} AND ${LIVE}`,
     at, at,
   )

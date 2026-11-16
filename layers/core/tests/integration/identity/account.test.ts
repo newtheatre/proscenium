@@ -1,13 +1,15 @@
 // My account and people in the console: details, sessions, passkeys and recovery codes, the
 // passkey offer, disabling and merging (ID-03, ID-11, ID-13, ID-14, ID-31, ID-32).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { accountScopeIds } from '#kit'
+import { accountScopeIds, newId } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { Authenticator } from './authenticator'
-import { Browser, addPasskey, address, emailSignIn, env, goStale, grantDirectly, leaveIdentity, passkeySignIn, reset, setSetting, clearSetting, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
+import { Browser, addPasskey, address, deliver, emailSignIn, env, goStale, grantDirectly, leaveIdentity, passkeySignIn, reset, setSetting, clearSetting, signInByEmail, staff, tokenOf, useIdentity } from './helpers'
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { canonicalAccount, accountLabel } from '../../../server/identity/accounts'
 import { mergePlan } from '../../../server/identity/merge'
+import { liveGrantsOf } from '../../../server/identity/grants'
+import { holdersOfRole } from '../../../server/identity/holders'
 
 beforeAll(useIdentity)
 afterAll(leaveIdentity)
@@ -198,15 +200,36 @@ describe('merging two accounts (ID-32)', () => {
     expect(await rows('SELECT account_id FROM core_passkeys WHERE account_id = ?', mergedAccountId)).toEqual([])
     expect((await mergedBrowser.get('/api/core/me')).body.signedIn).toBe(false)
     expect(await inContext(() => canonicalAccount(mergedAccountId))).toBe(survivorId)
-    // The grant moved: the survivor holds the role, the old one's grant ended as merged.
-    expect(await rows('SELECT role_id FROM core_grants g WHERE account_id = ? AND NOT EXISTS (SELECT 1 FROM core_grant_ends e WHERE e.grant_id = g.id)', survivorId)).toEqual([{ role_id: roleId }])
+    // The grant stays as it was given, and the survivor holds the role through it.
+    expect(await rows('SELECT account_id FROM core_grants g WHERE role_id = ? AND NOT EXISTS (SELECT 1 FROM core_grant_ends e WHERE e.grant_id = g.id)', roleId)).toEqual([{ account_id: mergedAccountId }])
+    expect((await inContext(() => liveGrantsOf(survivorId))).map(g => g.role_id)).toContain(roleId)
     // The moved passkey now signs in to the survivor.
     const again = new Browser()
     expect((await passkeySignIn(again, mergedDevice)).status).toBe(200)
     expect((await again.get('/api/core/me')).body.account.id).toBe(survivorId)
-    // Every move column of the plan points at the survivor now.
+    // Once stage two has run, every move column of the plan points at the survivor.
+    await deliver()
     for (const step of (await inContext(async () => mergePlan())).filter(s => s.action === 'move'))
       expect(await rows(`SELECT 1 FROM "${step.table}" WHERE "${step.column}" = ?`, mergedAccountId), `${step.table}.${step.column}`).toEqual([])
+  })
+
+  it('where both accounts hold the same role, the grant that ends sooner ends as replaced, and is listed', async () => {
+    const admin = await staff()
+    await grantDirectly(admin.accountId, ['core.account.merge', 'core.role.read'])
+    const survivorId = await signInByEmail(new Browser())
+    const mergedAccountId = await signInByEmail(new Browser())
+    const { roleId, grantId: lasting } = await grantDirectly(survivorId, ['core.role.read'])
+    const sooner = newId('gra')
+    await env.DB.prepare('INSERT INTO core_grants (id, account_id, role_id, scope, starts_at, expires_at, granted_by, granted_at) VALUES (?, ?, ?, \'site\', ?, ?, \'acc_testgranter\', ?)')
+      .bind(sooner, mergedAccountId, roleId, Date.now() - 1000, Date.now() + 86_400_000, Date.now() - 1000).run()
+    expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+
+    expect(await rows('SELECT grant_id, ended_reason FROM core_grant_ends WHERE grant_id IN (?, ?)', lasting, sooner)).toEqual([{ grant_id: sooner, ended_reason: 'replaced' }])
+    expect(await rows('SELECT row_id, action FROM core_account_merge_items WHERE table_name = \'core_grants\'')).toEqual(expect.arrayContaining([{ row_id: sooner, action: 'ended' }]))
+    const live = await inContext(() => liveGrantsOf(mergedAccountId))
+    expect(live.filter(g => g.role_id === roleId).map(g => g.id)).toEqual([lasting])
+    // Who holds the role is the person, under the survivor's id.
+    expect(await inContext(() => holdersOfRole(roleId))).toEqual([survivorId])
   })
 
   it('a chain of merges keeps every account pointing at the final survivor, so its scope reaches them all', async () => {

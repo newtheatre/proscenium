@@ -11,6 +11,10 @@ import { expectedCash, getSession } from '../../server/sessions'
 import confirmRoute from '../../server/api/payments/refunds/[id]/confirm.post'
 import approveRoute from '../../server/api/payments/refunds/[id]/approve.post'
 import listRoute from '../../server/api/payments/refunds.get'
+import reasonsRoute from '../../server/api/payments/refunds/decline-reasons.get'
+import attentionRoute from '../../server/api/payments/attention.get'
+import attentionCount from '../../server/contributions/core.count/attention'
+import waitingCount from '../../server/contributions/core.count/refunds-waiting'
 import { world } from '../../../../tests/fixtures/modules/cardco/server/contributions/payments.provider/cardco'
 import { call, deliver, env, inContext, person, rows, sent, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -22,6 +26,8 @@ const handle = server({
   'POST /api/payments/refunds/:id/confirm': confirmRoute,
   'POST /api/payments/refunds/:id/approve': approveRoute,
   'GET /api/payments/refunds': listRoute,
+  'GET /api/payments/refunds/decline-reasons': reasonsRoute,
+  'GET /api/payments/attention': attentionRoute,
 })
 
 async function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Promise<T> {
@@ -191,6 +197,12 @@ describe('refunds through a provider', () => {
     await deliver()
     expect(await refundState(asked.refundId)).toBe('failed')
     expect(await counters(paid.ticketsPart, paid.attemptId)).toEqual({ part: 0, attempt: 0 })
+    // Needs attention lists the refund the provider turned down, and counts it beside its entry.
+    const reconciler = person(['payments.attempt.reconcile'])
+    const attention = await (await call(handle, 'GET', '/api/payments/attention', { actor: reconciler })).json() as any
+    expect(attention.failedRefunds).toContainEqual(expect.objectContaining({ id: asked.refundId, amountMinor: 1000, method: 'card_online' }))
+    expect(await inContext(() => attentionCount.value(reconciler))).toBeGreaterThanOrEqual(1)
+    expect(await inContext(() => attentionCount.value(person([])))).toBe(0)
     world.refundAnswer = { state: 'succeeded' }
     const again = await commit(unit => requestRefund(unit.view(), { partId: paid.ticketsPart, amountMinor: 1000, requestedBy: 'acc_j' }))
     await commit(unit => approveRefund(unit.view(), again.refundId, 'acc_k'))
@@ -252,5 +264,29 @@ describe('payment-after-hold-released', () => {
     expect(await rows('SELECT p.owner_module, r.amount_minor, r.state FROM payments_refunds r JOIN payments_intent_parts p ON p.id = r.part_id WHERE p.intent_id = ? ORDER BY r.amount_minor', intentId))
       .toEqual([{ owner_module: 'snacks', amount_minor: 300, state: 'approved' }, { owner_module: 'tickets', amount_minor: 700, state: 'approved' }])
     sent.length = 0
+  })
+})
+
+describe('the Refunds screen', () => {
+  it('names who asked, says which refunds a person hands back, and counts those waiting', async () => {
+    await setLimit(0)
+    const asker = newId('acc')
+    await env.DB.prepare("INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, 'Alex Asker', 'test', ?)").bind(asker, NOV_16).run()
+    const inCash = await paidInCash(800)
+    const byCard = await paidByCard(900)
+    const cashRefund = await commit(unit => requestRefund(unit.view(), { partId: inCash.ticketsPart, amountMinor: 800, requestedBy: asker }))
+    const cardRefund = await commit(unit => requestRefund(unit.view(), { partId: byCard.ticketsPart, amountMinor: 900, requestedBy: asker }))
+    const approver = person(['payments.refund.approve'])
+    const listed = await (await call(handle, 'GET', '/api/payments/refunds?state=requested', { actor: approver })).json() as any
+    expect(listed.refunds.find((r: any) => r.id === cashRefund.refundId)).toMatchObject({ requestedByName: 'Alex Asker', handBack: true, method: 'cash' })
+    expect(listed.refunds.find((r: any) => r.id === cardRefund.refundId)).toMatchObject({ requestedByName: 'Alex Asker', handBack: false })
+    expect(await inContext(() => waitingCount.value(approver))).toBeGreaterThanOrEqual(2)
+    expect(await inContext(() => waitingCount.value(person(['payments.refund.request'])))).toBe(0)
+  })
+
+  it('offers the theatre\'s reasons for declining', async () => {
+    const reasons = await (await call(handle, 'GET', '/api/payments/refunds/decline-reasons', { actor: person(['payments.refund.approve']) })).json() as any
+    expect(reasons.reasons.map((r: any) => r.label)).toEqual(['Outside the refund policy', 'Already refunded another way', 'Asked for twice', 'Other'])
+    expect((await call(handle, 'GET', '/api/payments/refunds/decline-reasons', { actor: person([]) })).status).toBe(403)
   })
 })

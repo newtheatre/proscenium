@@ -4,6 +4,7 @@
      whatever their type: a title, the type's name beside it, the type's own address. It works by
      keyboard alone: type, arrow, Enter. -->
 <script setup lang="ts">
+import type { CommandPaletteGroup, CommandPaletteItem } from '@nuxt/ui'
 import { watchDebounced } from '@vueuse/core'
 import { matchSettings } from '../../shared/search'
 
@@ -71,7 +72,7 @@ const groups = computed(() => {
   const actions = (palette.value?.actions ?? []).map(a => ({
     id: `action:${a.id}`, label: t(a.labelKey), suffix: a.keywordsKey ? t(a.keywordsKey) : undefined, icon: a.icon, to: a.to,
   }))
-  const out: Record<string, unknown>[] = [
+  const out: CommandPaletteGroup<CommandPaletteItem>[] = [
     { id: 'screens', label: t('core.palette.screens'), items: screens },
   ]
   if (actions.length) out.push({ id: 'actions', label: t('core.palette.actions'), items: actions })
@@ -88,7 +89,7 @@ const groups = computed(() => {
   <UDashboardSearch
     v-model:open="open"
     v-model:search-term="term"
-    :groups="groups as any"
+    :groups="groups"
     :loading="searching"
     :title="t('core.palette.title')"
     :placeholder="t('core.palette.placeholder')"

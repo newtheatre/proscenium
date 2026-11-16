@@ -200,7 +200,7 @@ What core does with each notification is core's: the address for the side, the s
 
 ## Content
 
-- **Markdown with blocks.** The body is markdown plus named blocks: button, image and divider in the first release; production card and performance list later, for mailings. A block names records by id; the renderer reads public data only, at the time sending starts.
+- **Markdown with blocks.** The body is markdown plus named blocks: button, image and divider in the first release; later, production card and performance list for mailings, and before-you-come for a mailing or a notice. A block names records by id; the renderer reads public data only, at the time sending starts. Before-you-come never names a content warning: it shows age guidance and staging effects from core's `beforeYouCome` read and links to the production page.
 - **Merge fields are few.** `first_name` with a required fallback, and the organisation's name. Nothing else about the person may appear in a body, so a mistake cannot leak a field.
 - **The brand wraps it.** Core's email layout, header image and footer apply. To a mailing, later, the module adds the reason line ("You are receiving this because you joined Season news") and the manage link, and neither can be removed.
 - **Preview is the real renderer.** The preview and the test send call the same resolver core calls for a delivery.

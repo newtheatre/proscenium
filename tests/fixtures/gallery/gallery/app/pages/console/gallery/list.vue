@@ -5,7 +5,7 @@ interface Item { id: string, name: string, status: string, seats: number }
 const columns = [
   { key: 'name', label: 'Production', sortable: true, card: true },
   { key: 'status', label: 'Status', card: true },
-  { key: 'seats', label: 'Seats', sortable: true, card: true },
+  { key: 'seats', label: 'Seats', sortable: true, sortType: 'number', card: true },
 ]
 const filters = [{
   name: 'status',

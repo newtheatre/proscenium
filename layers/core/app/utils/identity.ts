@@ -60,3 +60,15 @@ export async function addMyPasskey(label?: string): Promise<Answer<{ passkeyId: 
 export function nextPath(value: unknown): string | undefined {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : undefined
 }
+
+/**
+ * Goes on after a sign-in. Everything the app fetched so far (who is looking, the account menu,
+ * each shell's menu) was fetched signed out, so it is cleared and fetched again first: the header
+ * shows the account menu at once, without a reload. With `offerPasskey`, the passkey page comes first.
+ */
+export async function arriveSignedIn(target: { next: string, offerPasskey?: boolean }) {
+  clearNuxtData()
+  await refreshNuxtData()
+  if (target.offerPasskey) return navigateTo({ path: '/account/passkey', query: { next: target.next } })
+  return navigateTo(target.next)
+}

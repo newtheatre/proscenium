@@ -130,6 +130,18 @@ export const identityJobs = {
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
   // The erasure batch for one request (ID-16). Safe to repeat: a second run writes nothing.
   'core.run-erasure': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
+  // Stage two of a merge (part 4, Merge): `start` queues one chain per module, each `module` step is
+  // one unit (a handler, or a share of the module's move columns), and `finish` sets completed_at
+  // once nothing is left. Every step is safe to repeat.
+  'core.merge-move': job({
+    payload: z.object({
+      mergeId: z.string(),
+      stage: z.enum(['start', 'module', 'finish']),
+      module: z.string().optional(),
+      step: z.number().int().min(0).optional(),
+    }),
+    lane: 'prompt',
+  }),
   // Builds a person's data download (ID-15). Safe to repeat: a finished request is left alone.
   'core.build-export': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
 }
@@ -152,6 +164,9 @@ export const identityPoints = {
   // Given an account, the hold codes that pause its erasure. Each code has a sentence for staff and
   // one for the person in the module's catalogue, at "<code>.staff" and "<code>.person".
   'core.erasure-hold': point({ kind: 'code', contract: 'erasure-hold' }),
+  // A module's merge handler, for its onMerge 'handler' columns (the kit's MergeHandler). The merge
+  // job runs a module's handlers, in the order given, before re-pointing its move columns.
+  'core.merge-handler': point({ kind: 'code', contract: 'merge-handler' }),
   // Given an account, material for its data download that the registry cannot find (ID-15).
   'core.export-contributor': point({ kind: 'code', contract: 'export-contributor' }),
   // A reason a module reads access needs. The core knows none in advance (part 5, the purpose point).
@@ -470,5 +485,6 @@ export const identityContributions = {
     { id: 'core.session-key', file: 'session-key' },
     { id: 'core.sign-in-challenge', file: 'sign-in-challenge' },
     { id: 'core.owner-recovery', file: 'owner-recovery' },
+    { id: 'core.merges', file: 'merges' },
   ],
 }

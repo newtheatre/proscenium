@@ -125,4 +125,17 @@ One more, added on 16 November 2026 with the sealed variable kind:
 | --- | --- | --- | --- |
 | The link in the row | integration | An invitation with a sealed sign-in link is sent to an account, delivered, and then read back every way core offers: the notification row, the inbox, the console's delivery log, the preview, the audit trail, the event and the logs. | The email carries the link. Before delivery the row holds it only encrypted, in `sealed_variables`. After delivery the column is null. No other place ever holds or shows the value. There is no inbox item. Registering the same type with the inbox channel is refused. |
 
-That makes 64 named cases.
+Eight more belong to the content warnings slice (parts 2 and 4), and join the suite when it is built:
+
+| Name | Tier | Situation | Expected |
+| --- | --- | --- | --- |
+| The ungraded warning | integration | A content warning is saved with no level. | Refused. |
+| The graded effect | integration | An effect is saved with a level; a term of one vocabulary is saved in the other's table. | Both refused. |
+| The half answer | integration | Content warnings are listed; effects are neither listed nor confirmed as none. Publish. | Refused, naming effects. |
+| The hidden strobe | end to end | Collapse is on. The production page is opened and nothing is pressed. | Age and effects are on the page. Content warnings are not, and their count is. |
+| Order by seriousness | unit | Warnings are saved as mentioned, depicted, discussed. | They render depicted, discussed, mentioned, then by heading and term order. |
+| The merged term | integration | A production carries two terms, and one is merged into the other. | The surviving label shows once, at the more serious of the two levels. |
+| The relaxed performance | integration | An effect is switched off for one performance of three. | Absent from that performance's read and named as not used there; present in the other two. |
+| The quiet email | integration | The before-you-come block is rendered for a production with content warnings. | It contains no content warning's label. |
+
+That makes 72 named cases: 64 for the work now in hand and 8 for the content warnings slice.
