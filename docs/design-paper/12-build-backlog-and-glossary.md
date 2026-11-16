@@ -1,0 +1,118 @@
+# Build backlog and shared glossary
+
+As of 16 November 2026, after all of your answers. This tab is the index that joins the six specifications into one order of work. The stories themselves stay in each specification's "7. Stories" tab, so there is one copy of each. Dependencies were reported by each workstream and have not yet been checked story by story against the other documents; the cross-references by story id are the next piece of integration work.
+
+## The backlog in numbers
+
+| Workstream | Ids | Stories | Gate | Rest of first release | Later | Where |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1. Foundations | F-01 to F-35 | 35 | 11 | 22 | 2 | [Foundations](https://claude.ai/artifact/RKRTkLkrG98jXHSBptUc1x), tab 7 |
+| 2. Identity | ID-01 to ID-37 | 37 | 9 | 21 | 7 | [Identity](https://claude.ai/artifact/BcVS8iNe7oDZCPmW4gyus5), tab 7 |
+| 3. Core domain | C-01 to C-51 | 51 | 0 | 43 | 8 | [Core domain](https://claude.ai/artifact/Qt8cFSyEekr7tfpiMCqe2E), tab 7 |
+| 4. Box office, payments, finance | BO, PAY, FIN, R | 67 | 17 | 44 | 3, plus 3 for allocated seating | [Box office](https://claude.ai/artifact/MUbXSQbs4vQKMyvxZL44Po), tab 7 |
+| 5. Form builder | FB-101 onwards | 41 | 0 | 27 | 14 | [Form builder](https://claude.ai/artifact/6E5k2VS2PnhdciVNMeap5s), tab 7 |
+| 6. Interface | UI-01 to UI-34 | 34 | 0 | 24 | 10 | [Interface](https://claude.ai/artifact/KwZ3oXcFJSMNj98kNc9ywW), tab 7 |
+| **All** |  | **265** | **37** | **181** | **47** |  |
+
+A gate story is one that must be finished and proved before the work that rests on it starts. The form builder's first release belongs to roadmap phase 4, so phases 1 to 3 hold 191 stories: 37 gate and 154 others.
+
+## Order of work
+
+### Step 0: the kit (gate for everything)
+
+F-01 to F-10 (the repository and the kit) and F-34 (tests run locally on Linux). Nothing else starts until these pass, because every other story is written against the kit. The form builder's engine, FB-101 to FB-106, needs only this step and can be built alongside anything later if there is spare capacity.
+
+### Phase 1: a theatre can be set up and people can sign in
+
+| Order | Stories | What it gives | Rests on |
+| --- | --- | --- | --- |
+| 1 | UI-11, 13, 14, 18, 19, 24, then UI-08 | The standard components and page types every screen is built from | Step 0 |
+| 2 | ID-01, 02, 07, 10, 22, 23, 28, 29, 37 (Identity's gate) | Sign-in, the route guard, roles, grants and the first Owner | Step 0, and C-27, C-28 and C-32 pulled forward from Core domain to send one email (see finding 1) |
+| 3 | UI-01, 02, 04, 07, 17 | The three shells, drawn from who is looking | Identity's gate, and C-35, C-36, C-37 and C-40 pulled forward from Core domain, with the part of C-23 that uploads one file (see finding 2) |
+| 4 | F-11 to F-15 | Setup and one-step deploy | Identity's gate, the console shell |
+| 5 | F-16 to F-24 | Modules, settings and credentials in the console | The console shell |
+| 6 | F-26 to F-28, F-30 to F-33, F-35 | Merging a release, the owned-path check, applying migrations, health, jobs and audit, and linking a copy made by the deploy button to upstream | The console shell |
+| 7 | The rest of Identity's first release that needs nothing from phase 2: ID-03, 04, 09, 11, 13, 14, 31, 32 | My account, passkeys, recovery, staff merge | Identity's gate |
+
+### Phase 2: a programme, a public site and messages
+
+| Order | Stories | What it gives | Rests on |
+| --- | --- | --- | --- |
+| 1 | C-20 to C-22 (vocabularies), C-23 to C-26 (files), C-29 to C-31 (the rest of notifications) | Email and inbox, files, the term lists other modules use | Phase 1 |
+| 2 | C-01 to C-13 (programme), C-16 to C-18 and C-48 (places and their access features) | The programme | Phase 1 |
+| 3 | C-38 to C-47 except C-40 and C-44, UI-03, 09, 12, 15, 16 | The public site, search, audit reading and the remaining shell work | The public shell |
+| 4 | ID-05, 06, 08, 12, 15, 16, 18 to 21, 24, 30, 35 | Guest accounts, the members' area, data download, erasure | Core's notifications and files; the production-team fact |
+| 5 | C-49 to C-51 (webhooks, decided for the first release) | Outgoing webhooks | Events from every module |
+
+### Phase 3: the box office
+
+| Order | Stories | What it gives | Rests on |
+| --- | --- | --- | --- |
+| 1 | PAY-01 to PAY-07, FIN-01, FIN-02 | Payments with parts, cash and attested card, Stripe online, the ledger and period close | Phase 1; secrets only |
+| 2 | BO-01 to BO-06 | Putting a show on sale | Core's performances and the booking-action and change points |
+| 3 | BO-10, 12, 13 and the rest of BO-10 to BO-23 | Buying online, with the last-seat rule already proved | Identity's findOrCreateAccount; UI-20 |
+| 4 | R-1 to R-7 | Reserve now, pay on arrival | Order 3 |
+| 5 | BO-30 to BO-36 except BO-35; UI-20, 21 | The desk, including one payment for tickets and another module's lines, then the SumUp reader | Order 1 |
+| 6 | BO-40 to BO-44; UI-05, 06, 22, 23 | The door, live mode and offline scanning | Order 3 |
+| 7 | BO-50 to BO-55, BO-60 to BO-63, FIN-03 to FIN-06 | Changes, refunds, self-service cancellation (off by default), waiting list, complimentary tickets, statements | Orders 1 to 3 |
+
+Box office's own gate inside phase 3 is BO-10, 12, 13, 30, 40, 50, 51, PAY-05, FIN-01, FIN-02 and R-1 to R-7: a paid booking, a reservation, a refund and a period close that reconcile, with the last seat sold once. Its cut order, should the phase have to shrink, is the one you accepted in B9.
+
+### After phase 3
+
+Phase 4 holds the form builder's 27 first-release stories. Allocated seating (BO-70 to BO-72) and the 47 later stories are unscheduled. The second round of specifications (Front of house, Spaces, Bar, Training, Membership, Communications) adds its own stories.
+
+## Findings from putting the six together
+
+1. **Signing in needs an email before the notification pipeline exists.** Identity's gate sends a sign-in link in phase 1, but core's notification service is phase 2. The backlog pulls C-27, C-28 and C-32 (a module sends as part of its own save, retries, and the verified sending domain) into phase 1. Inbox, preferences and suppression stay in phase 2, because a transactional message has no preference switch.
+2. **The shells need a little of core early too.** UI-01 needs the public shell, the navigation file and the brand from Core domain. C-35, C-36, C-37 and C-40 move to phase 1 with it, bringing the part of C-23 that uploads one file.
+3. **The console shell comes before the Foundations screens.** Most of Foundations' first-release stories are console screens, so Interface's components are the first thing built after the kit.
+4. **Three stories wait on modules from the second round and are built to work without them:** the on-shift bar and door check (UI-05, BO-44, ID-26) wait on Front of house's shift fact, and member pricing (BO-20) waits on Membership's eligibility point.
+5. **Releases arrive by hand at first.** You chose an update pull request in the theatre's repository, but the action that opens it (F-25) is a later story. Until then a theatre merges the release tag itself, which the owned-paths proof showed is clean.
+6. **Nothing is left to settle between workstreams.** Identity has confirmed that a grant can be scoped to one production, which the production statement (FIN-04) needs. Interface has adopted the four changes Box office asked for on the desk and door screens, in its journeys and in the prototype.
+
+One more finding came from the real deploy on 16 November. The Deploy to Cloudflare button created the database, bucket, key-value store and queue with nothing typed, but the copy it makes starts a fresh history and is not a GitHub fork. So there are two supported routes: the button, after which a script links the copy to upstream once (the new story F-35), or forking on GitHub and importing into Cloudflare, which is two steps and keeps GitHub's Sync fork. Upstream's default branch must therefore hold only tagged releases. Durable Object and dead-letter queue creation were not tested and are left to the build.
+
+## Shared glossary
+
+Each specification keeps its own glossary, in its tab 1. This section rules on the words that mean different things in different modules, and says who owns which words.
+
+### Words with two meanings, and the ruling
+
+| Word | Meanings | Ruling |
+| --- | --- | --- |
+| hold | Identity: a module stopping an erasure. Box office: seats kept for a basket | Always "erasure hold" or "seat hold" |
+| claim | Identity: a person taking over an unclaimed account. Box office: one unit of capacity taken | "Account claim" and "capacity claim" |
+| slot | Form builder: a place a host offers for a form. Core: a place a record offers for a file | "Form slot" and "file slot" |
+| template | Form builder: a starting form. Core: the wording of a notification | "Form template" and "notification template" |
+| draft | Core: a performance or production not yet scheduled. Form builder: a form version being edited, or an answer in progress | "Draft" alone only for core's state; "draft version" and "draft response" in forms |
+| side | Identity and Core both use it for audience or members | One meaning; Identity owns it |
+| state of a performance | Core: draft, scheduled, cancelled, completed. Box office: whether it is selling | "Performance state" is core's; "sale state" is Box office's |
+| refusal | Foundations: a guard saying no. Interface: the page shown inside a shell | One idea at two levels. A person outside a shell sees "not found", never a refusal |
+| access | Core: access features of a performance, and place access of a venue. Core files: file access | Always qualified, as written here |
+
+### Who owns which words
+
+| Owner | Words |
+| --- | --- |
+| Foundations | module, manifest, always-on, switchable, requires, uses, kit, unit of work, guard, refusal, point, contribution, event, internal event, listener, job, lane, task, external call, secret, credential, setting, quotable, ability, record type, fact, risk, fresh, realm, subject, data class, erasure behaviour, append-only, scoped id, prefix, owned path, override, preset, setup step, health check |
+| Identity | account, unclaimed account, claimed, alias, tombstone, standing, side, assurance, fresh re-assertion, managed domain, role, grant, pending grant, scope, Owner, erasure hold, cooling-off, survivor |
+| Core domain | production, performance, season, venue, space, closure, operating day, credit, advisory, access feature, place access, vocabulary, term, file slot, file access, notification, delivery, notification type, topic, transactional, sender identity, suppression, webhook, current and past production, booking action, public component |
+| Box office, payments, finance | order, reservation, seat hold, capacity claim, pool, band, ticket type, ticket, desk code, booking reference, payment intent, part, attempt, attested card payment, till session, posting, entry, seal, period close, sale state, waiting-list entry, complimentary request |
+| Form builder | form, version, draft version, draft response, response, revision, form slot, placement, stage, stage kind, transition, review, reviewer, conflict, custom fields, binding, bindable attribute, outcome action, form template, respondent, submitter, co-author, restricted answer, retention period |
+| Interface | shell, live mode, account menu, Tonight, on-shift bar, the page types (List, Record, Form, Settings, Home, Steps, Live, Editor), status strip, queued act, not found, navigation group, saved view, primary action |
+
+## The data model in numbers
+
+| Owner | Tables | Where the list and id prefixes are |
+| --- | --- | --- |
+| Foundations (core) | 12 | Foundations, tab 2, "The tables foundations owns" |
+| Identity (core) | 17 | Identity, tab 2, "Id prefixes" |
+| Core domain (core) | 26 | Core domain, tab 2, "All 26 tables and their id prefixes" |
+| Box office | 22 | Box office, tab 2, "Id prefixes" |
+| Payments | 9 | Box office, tab 2 |
+| Finance | 7 | Box office, tab 2 |
+| Form builder | 16 | Form builder, tab 2, "Id prefixes" |
+| **All** | **109** | The one index of id prefixes, points, record types and facts is Foundations, tab 4 |
+
+Every id is a short table prefix and 26 characters, sortable by creation time. An id is never a secret: anything that grants access by being known is a separate random token stored hashed.

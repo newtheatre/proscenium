@@ -1,0 +1,33 @@
+# Phased roadmap
+
+Build the conventions and the core first, then the box office, which is the most important module, then the modules NNT needs, and leave programming and production management until last. No dates are set, because none were given.
+
+| Phase | What is built | Gate |
+| --- | --- | --- |
+| 0. Decisions | Done on 16 November 2026: see the Decisions tab and the design stage's questions tab. The detailed design is written as six specifications, and the story-level order of work is in the Build backlog and glossary tab. Remaining: move Parts A and B and the specifications into the new repository as living documents | The repository exists under Matt's account with this paper in it |
+| 1. Skeleton | Repository layout with owned paths, deploy button, first-run setup, in-app migrations, accounts with the audience and members' experiences, passkey and email-link sign-in, Google sign-in, roles and permissions, the three registries, audit, branding, upstream-merge workflow, CI with local tests on Linux, and, pulled forward from phase 2, sending one transactional email, the brand and the public shell | A stranger forks, deploys and brands a site in under 30 minutes, then merges a release with no conflict |
+| 2. Core domain and public site | Seasons, productions, performances, venues and their access features, vocabularies, notifications, files, public site with content components, outgoing webhooks | A theatre publishes a season and a what's-on page |
+| 3. Box office | Finance ledger, Payments with an in-person and an online provider, ticket types and pricing, holds, general admission, desk sales, e-tickets, door scanning, reserve now and pay on arrival, one desk payment covering tickets and another module's items, refunds and exchanges, buyer self-service cancellation (off by default), waiting list, complimentary tickets, customer records. Season passes follow later | A paid booking, a refund and a period close reconcile to the penny, and a full house sells its last seat once |
+| 4. Running the night | Front of house (rota, tonight screen, checklists, incidents, night report) and the form builder | A show night runs end to end from a phone |
+| 5. NNT parity | Spaces, Bar, Training, Membership, Communications | NNT runs a shadow night, then switches |
+| 6. Wider adoption | Allocated seating, gift vouchers and donations at checkout, Inventory, Fundraising, visiting companies, Governance, Reports | A second theatre, not NNT, goes live |
+| 7. Later, if wanted | Programming and production management, mostly as form templates and workflows on the form builder | A theatre asks for it |
+
+## Why this order
+
+- **Conventions before features.** The registries, the module manifest, the owned-path layout and the test harness are cheap to build first and expensive to retrofit. Proscenium's known issues show what retrofitting costs.
+- **Box office straight after the core.** It is the module every theatre needs and the one Matt ranks highest. It also forces the ledger, payments and the audience account to be right early.
+- **The form builder in phase 4.** It arrives before the modules that lean on it (membership applications, booking extras, incident reports) and removes the need for a programming module.
+- **NNT parity as a named phase.** It gives NNT a clear point to switch. Data migration is not a concern: losing data in the move is acceptable, and a standalone import tool is written only if it turns out to be needed.
+- **Programming and production management last.** NNT runs proposals on paper and in meetings, and many theatres have no proposals process at all.
+
+Allocated seating sits in phase 6 because NNT sells unreserved seats, but the seat model is designed in phase 3 so adding it later does not rework the box office.
+
+## Before any code
+
+- [x] Create the repository under Matt's account, licensed AGPL-3.0
+- [x] Confirm a deploy button can create every Cloudflare resource for a fork
+- [ ] Verify Square's and GoCardless's rates on their own pages
+- [ ] Ask two or three other theatres what would stop them adopting it
+
+The repository now exists as MattA-Official/proscenium. A real deploy on 16 November confirmed that the deploy button creates the database, bucket, key-value store and queue with nothing typed. Durable Object and dead-letter queue creation are left to check in the build.
