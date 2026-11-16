@@ -1,0 +1,34 @@
+// A production's performances, in time order (C-03), with the lists the console's pickers offer:
+// venues and the spaces in them that can hold performances, access features and cancel reasons.
+import { z } from 'zod'
+import { getRouterParam } from 'h3'
+import { defineRoute } from '#kit'
+import { listPerformances } from '../../../../../programme/performances'
+import { listVenues } from '../../../../../places/service'
+import { listTerms } from '../../../../../vocabularies/service'
+
+export default defineRoute({
+  ability: 'core.production.view',
+  record: event => ['core.production', getRouterParam(event, 'id')],
+  rateLimit: 'default',
+  input: z.object({}),
+}, async (_event, { record }) => {
+  const option = (t: { id: string, label: string, retired: boolean }) => ({ id: t.id, label: t.label, retired: t.retired })
+  const [performances, venues, access, reasons] = await Promise.all([
+    listPerformances({ productionId: record!.id }),
+    listVenues({ archived: true }),
+    listTerms('core.access-feature', { includeRetired: true }),
+    listTerms('core.cancel-reason'),
+  ])
+  const used = new Set(performances.flatMap(p => [p.venueId, p.spaceId]))
+  return {
+    performances,
+    options: {
+      venues: venues
+        .map(v => ({ id: v.id, name: v.name, archived: v.archived, spaces: v.spaces.filter(s => (s.performable && !s.archived) || used.has(s.id)).map(s => ({ id: s.id, name: s.name, defaultCapacity: s.defaultCapacity, archived: s.archived })) }))
+        .filter(v => (!v.archived && v.spaces.length) || used.has(v.id)),
+      access: access.map(option),
+      reasons: reasons.map(option),
+    },
+  }
+})

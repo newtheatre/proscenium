@@ -35,8 +35,10 @@ export const settings = defineSettings('core', {
   'brand.display-font': setting.choice({ default: 'system', options: ['system', 'serif', 'rounded'], change: branding, audience: 'public' }),
   'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], change: branding, audience: 'public' }),
   'brand.credit-line': setting.boolean({ default: true, change: branding, audience: 'public' }),
-  // Programme (part 6). The other programme settings arrive with the performances they shape.
+  // Programme (part 6). The other programme settings arrive with the screens they shape.
   'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public' }),
+  'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', change: programmeConfigure, audience: 'public' }),
+  'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', change: programmeConfigure }),
   'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.logo-dark': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.revision': setting.integer({ default: 0, min: 0, max: 1_000_000_000, change: branding, audience: 'public', managed: true }), // not-policy: a counter's ceiling
@@ -88,6 +90,8 @@ export const records = defineRecords('core', {
   vocabulary: record({ table: 'core_vocabularies' }),
   season: record({ table: 'core_seasons' }),
   production: record({ table: 'core_productions' }),
+  // A grant on a production covers its performances.
+  performance: record({ table: 'core_performances', parent: 'core.production' }),
   venue: record({ table: 'core_venues' }),
   space: record({ table: 'core_spaces', parent: 'core.venue' }),
   closure: record({ table: 'core_closures' }),
@@ -107,6 +111,9 @@ export const abilities = defineAbilities('core', {
   'production.create': ability({ implies: ['production.view'] }),
   'production.edit': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'production.publish': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.edit'] }),
+  // Scheduling and cancelling act on the production, so a grant on it covers all its dates (part 6).
+  'performance.schedule': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
+  'performance.cancel': ability({ risk: 'privileged', on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'season.manage': ability(),
   'programme.configure': ability(),
   // A venue and its spaces. Creating a venue needs it site-wide; a grant on one venue covers its spaces.
@@ -167,6 +174,16 @@ export const points = {
     }).strict()
       .refine(s => s.source === 'server' || s.accepts.every(kind => !['json', 'zip', 'csv'].includes(kind)), { message: 'only a server slot takes json, zip or csv', path: ['accepts'] }),
   }),
+  /**
+   * What a change to a public record would touch, in plain words, for the confirmation before a
+   * cancel, reschedule, move or capacity change: "42 tickets across 31 orders".
+   */
+  'core.change-impact': point({ kind: 'code', contract: 'change-impact' }),
+  /**
+   * Whether a module can live with a change: allow, or refuse with a reason and optionally a link to
+   * its own screen where the matter is settled. Core runs every guard and stops on the first refusal.
+   */
+  'core.change-guard': point({ kind: 'code', contract: 'change-guard' }),
   /** Whether an account may read the files of a record with `record` access, keyed by the record type. */
   'core.file-access': point({ kind: 'code', contract: 'file-access' }),
   /**
@@ -232,6 +249,8 @@ export const contributes = {
   'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/console/system/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
+  'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
+  'core.operating-day': [{ id: 'core.performances', table: 'core_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [
     { id: 'core.production-category', label: 'Production categories', terms: terms(['play', 'Play'], ['musical', 'Musical'], ['comedy', 'Comedy'], ['dance', 'Dance'], ['music', 'Music'], ['workshop', 'Workshop'], ['social', 'Social'], ['other', 'Other']) },
@@ -258,6 +277,12 @@ export const announces = {
   'core.production.published': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
   'core.production.updated': event({ version: 1, payload: z.object({ productionId: z.string(), fields: z.array(z.enum(PRODUCTION_PUBLIC_FIELDS)) }), internal: false }),
   'core.production.withdrawn': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
+  'core.performance.scheduled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), reinstated: z.boolean() }), internal: false }),
+  'core.performance.rescheduled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldStartsAt: z.number().int(), oldEndsAt: z.number().int(), startsAt: z.number().int(), endsAt: z.number().int() }), internal: false }),
+  'core.performance.moved': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldVenueId: z.string(), oldSpaceId: z.string(), venueId: z.string(), spaceId: z.string() }), internal: false }),
+  'core.performance.capacity-changed': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldCapacity: z.number().int().nullable(), capacity: z.number().int().nullable() }), internal: false }),
+  'core.performance.cancelled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), reason: code() }), internal: false }),
+  'core.performance.completed': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string() }), internal: false }),
   'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
   'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
   'core.closure.created': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
@@ -297,4 +322,5 @@ export const calls = {
 export const tasks = {
   'core.sweep-files': task({ every: '1h' }),
   'core.sweep-notifications': task({ every: '5m' }),
+  'core.complete-performances': task({ every: '5m' }),
 }
