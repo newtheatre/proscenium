@@ -1,6 +1,6 @@
 # 2. Data model
 
-Core owns 26 tables in six groups, and the public site module owns none: it only reads. The final list of tables with their id prefixes is at the end of this tab.
+Core owns 27 tables in six groups, and the public site module owns none: it only reads. The final list of tables with their id prefixes is at the end of this tab.
 
 ## Reading the tables
 
@@ -591,7 +591,7 @@ This specification asked three things of the data-class format. The rulings of 1
 
 Nuxt Content keeps its own tables in the same database, named `_content_*`. The migration journal ignores them and no module may use that prefix.
 
-## All 26 tables and their id prefixes
+## All 27 tables and their id prefixes
 
 The foundations format gives every generated id the shape `<prefix>_<26 characters>`, so an id says what kind of record it is. Each table with an `id` column declares its prefix. Ids sort by creation time unless marked random. Public addresses use slugs, never ids.
 
@@ -624,6 +624,19 @@ The foundations format gives every generated id the shape `<prefix>_<26 characte
 | `core_webhooks` | Webhooks | `whk` |  |
 | `core_webhook_deliveries` | Webhooks | `whd` |  |
 
+The twenty-seventh table was added on 16 November 2026, after Matt decided the complaint half of the email proof would not be run:
+
+**`core_email_events_set_aside`**: realm operational; subject none; retention 30 days; not append-only; keyed by the queue's message id, so no id prefix. It records an email outcome event that could not be read or could not be matched to a delivery, at the moment the queue gives up on it, because a Worker cannot read how many messages sit in a dead-letter queue.
+
+| Column | Type | Constraints | Class | On erasure | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `queue_message_id` | text | primary key | internal | keep | Makes recording safe to repeat |
+| `event_type` | text | nullable | internal | keep | One of the six event names core knows (delivered, deferred, bounced, failed, rejected, complained), or null. Never text copied from the message |
+| `reason` | text | not null, one of `unreadable`, `unmatched` | internal | keep |  |
+| `set_aside_at` | timestamp | not null | internal | keep |  |
+
+It holds no address, subject or message body, so it carries no personal data, and both text columns take only values from a fixed list. That is what lets its retention be declared as a fixed thirty days, written \`{ fixed: '30d' }\`, which the foundations format allows only on a table with no subject and no personal, special or free-text column. The message itself stays in the dead-letter queue. Part 4 gives the consumer's rule and the health line that reads this table.
+
 Eighteen tables have a prefix and eight have a natural key. Three prefixes registered earlier (`psl`, `adv`, `pfa`) are withdrawn, because the tables they were for are keyed by a slug or a pair and generate no id.
 
 ## Later slice: content warnings, staging effects and age
@@ -651,7 +664,7 @@ The one list of advisories becomes three things that behave differently:
 | `core_productions` | `age_guidance` is replaced by `age_min` (integer, nullable, 0 to 21) and `age_restricted` (boolean, not null, default false; true means nobody younger is admitted, false means a recommendation). Gains `effects_confirmed_none` (boolean, not null, default false) beside `advisories_confirmed_none`. |
 | `core_performance_effect_exceptions` (new, later than the slice) | `performance_id`, `term_id`: this effect is not used at this performance. The term must be one of the production's effects. Keyed by performance and term. |
 
-That takes the core domain from 26 tables to 28 with the slice, and to 29 when performance exceptions follow.
+That takes the core domain from 27 tables to 29 with the slice, and to 30 when performance exceptions follow.
 
 ### Rules
 

@@ -76,6 +76,7 @@ Words this module owns. "Template" and "draft" are qualified, as the shared glos
 | mailing template | Reusable starting content for a campaign. Never "template" alone |
 | block | A named piece of content in a body: a button, a production card, a list of performances |
 | reachable | Core says an email can be sent to this person on this side: a verified address that is not suppressed |
-| manage link | The per-subscription link that opens the preferences page without sign-in. It is in the confirmation message, in each row of the export and, later, in the footer of every mailing |
+| manage link | The per-subscription link that lets a person leave a list, or stop all, without sign-in. A signed token that holds the subscription id and an expiry. It is in the confirmation message, in each row of the export and, later, in the footer of every mailing |
+| preferences link | A link emailed on request that opens a signed-out person's lists on one side, to join, leave or rejoin. A random token that works once, for 24 hours |
 
 Words used here that others own: topic, notification type, delivery, suppression, sender identity, transactional (core); side, account, unclaimed account (identity); lane, job, task, point, fact, internal event (foundations); form slot, outcome action (form builder).
