@@ -247,14 +247,18 @@ A module declares its vocabularies and their starting terms in its manifest, and
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `vocabulary_key` | ref `core_vocabularies` | not null, restrict | internal | keep |  |
-| `slug` | text | not null, unique within the vocabulary | per row | keep | Never changes |
-| `label` | text | not null, 1 to 80 characters; unique within the vocabulary among live terms, ignoring case | per row | keep |  |
-| `description` | text | at most 300 characters | per row | keep |  |
-| `icon` | text | a name from the bundled icon set | per row | keep |  |
+| `slug` | text | not null, unique within the vocabulary | public | keep | Never changes |
+| `label` | text | not null, 1 to 80 characters; unique within the vocabulary among live terms, ignoring case | public | keep |  |
+| `description` | text | at most 300 characters | public | keep |  |
+| `icon` | text | a name from the bundled icon set | public | keep |  |
 | `sort` | integer | not null, default 0 | internal | keep |  |
 | `seeded` | boolean | not null, default false | internal | keep | True for a term a module shipped |
 | `retired_at` | timestamp |  | internal | keep |  |
 | `merged_into_id` | ref `core_terms` | nullable, restrict; same vocabulary | internal | keep |  |
+
+A term's slug, label, description and icon are public-class columns. They cannot take their class from a row, because `core_terms` has no subject, and a term is a word on a list, never a fact about a person. A label must not name a person; the vocabulary editor says so. Where a term is shown is decided by the screen that uses it, not by its class.
+
+A vocabulary and its seeded terms are created when the module that declares it is switched on, or the first time the vocabulary is read, whichever comes first. Both paths are safe to repeat and create nothing twice.
 
 The per row columns take their class from the vocabulary's `term_class`, one hop away through `vocabulary_key`, which the foundations format allows.
 

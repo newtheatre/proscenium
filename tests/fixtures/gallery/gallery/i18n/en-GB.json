@@ -20,5 +20,8 @@
   "gallery.navigation.feedback.label": "Sample feedback",
   "gallery.navigation.denied.label": "Administration",
   "gallery.navigation.account.label": "Sample tickets",
+  "gallery.records.production": "Production",
+  "gallery.quick-actions.new-booking.label": "New sample booking",
+  "gallery.quick-actions.new-booking.keywords": "book sell tickets",
   "gallery.navigation.drafts.label": "Sample drafts"
 }

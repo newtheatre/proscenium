@@ -95,6 +95,13 @@ Any module may import core's services without listing core: `import { notifyAddr
   encrypted in its own column, never in the payload, and cleared in the same unit that moves the
   email to a final state, or after seven days at most. A type with a sealed variable is email only;
   declaring one with another channel is refused at start-up. A cleared notification is not re-sent.
+  Cloudflare's later reports arrive on the EMAIL_EVENTS queue and are matched by the message id
+  `send()` returned: a hard bounce or a complaint marks the delivery Bounced or Complained,
+  announces `core.delivery.bounced` or `.complained`, and puts the address on core's suppression
+  list, which is what stops the next send (Cloudflare does not, soon enough). The task
+  `core.sweep-notifications` frees deliveries stuck in Sending, re-queues lost ones, clears a
+  notification's payload once every delivery is finished and any sealed variables left after seven
+  days.
 - `operatingDayOf(instant)` and `dayBounds(day)`: the theatre's operating day, which rolls over at
   `core.locale.day-start`. A table that stores one contributes to `core.operating-day`, so
   it is recalculated when the time zone or the rollover changes.
@@ -137,8 +144,10 @@ the rows in a single JSON parameter, and returns the ids it made in order. Ids a
 unit does not read. Every row gives the same columns; a column no row gives takes its SQL default.
 Binary values cannot travel in a set. `announce` and `audit` take one item or a set; a set is one
 statement, plus one statement per listener for the listener jobs, and each event in it is
-delivered as its own event. A set holds at most `core.units.set-rows-limit` rows (500, provisional
-until measured on a real D1); larger work is a job in chunks. Job messages go to the queues a
+delivered as its own event. A set holds at most `core.units.set-rows-limit` rows (500 by default;
+the setting refuses more than 2,000) and its JSON parameter at most 1 MB, a fixed kit constant,
+because row width varies by table and D1 refuses a string over 2 MB. Either limit refuses the unit
+with `core.unit.too-large` before anything is written; larger work is a job in chunks. Job messages go to the queues a
 hundred at a time.
 
 ## Events, jobs and tasks
@@ -284,6 +293,15 @@ Worker under wrangler. Everything runs on Linux.
 
 In an integration test that calls a route, send a `Host` header (the `call()` helper does): h3
 builds the request URL from it, and without one origin checks see `localhost`.
+
+## Measurements still owed
+
+- **Building a large set in the Worker.** Rule U9's limits were measured on 2026-11-16 on a
+  throwaway D1 through the HTTP query API: a unit writing a 10-column domain set with its events,
+  listener jobs and audit took 386 ms at 500 rows, 514 ms at 2,000 and 1.1 s at 8,000, with no
+  statement over 77 ms. The Worker's own processor time and memory to build the JSON parameters
+  were not measured, and the free plan gives a Worker little processor time, so the default stays
+  at 500. Measure that at the first deployed site before raising it.
 
 ## Where the build departs from the specification's wording
 
