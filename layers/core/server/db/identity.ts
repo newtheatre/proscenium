@@ -12,7 +12,7 @@ import { defineTable, col } from '#kit/db'
 
 export const ACCOUNT_ORIGINS = ['setup', 'self', 'guest', 'named-by-other', 'invite', 'staff'] as const
 export const DISABLED_REASONS = ['security', 'conduct', 'requested', 'duplicate'] as const
-export const TOKEN_PURPOSES = ['sign_in', 'verify_address', 'invite', 'enrol_passkey', 'owner_recovery', 'confirm_merge', 'confirm_erasure'] as const
+export const TOKEN_PURPOSES = ['sign_in', 'verify_address', 'invite', 'enrol_passkey', 'owner_recovery', 'confirm_merge', 'confirm_erasure', 'reassert'] as const
 export const SESSION_END_REASONS = ['signed_out', 'ended_by_person', 'ended_by_staff', 'credential_changed', 'disabled', 'merged', 'erased'] as const
 export const GRANT_END_REASONS = ['revoked', 'replaced', 'role_archived', 'account_closed', 'merged', 'given_up'] as const
 
