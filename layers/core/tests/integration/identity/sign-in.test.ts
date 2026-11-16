@@ -19,7 +19,7 @@ describe('email sign-in (ID-01)', () => {
     const { status, body, message } = await emailSignIn(browser, to)
     expect(status).toBe(200)
     expect(body).toEqual({ sent: true })
-    expect(message?.variables.link).toMatch(/^http:\/\/test\/sign-in\/link#/)
+    expect(message?.variables.link).toMatch(/^https:\/\/test\/sign-in\/link#/)
     expect(message?.variables.code).toMatch(/^\d{6}$/)
     const used = await browser.post('/api/core/sign-in/link', { token: tokenOf(message!) })
     expect(used.status).toBe(200)
