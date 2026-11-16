@@ -45,12 +45,12 @@ export function zip(entries: ZipEntry[], at = new Date()): Uint8Array {
     l.setUint16(4, 20, true) // not-policy: version needed, 2.0
     l.setUint16(6, 0x0800, true) // not-policy: the names are UTF-8
     l.setUint16(8, 0, true) // not-policy: stored
-    l.setUint16(10, time, true)
-    l.setUint16(12, date, true)
-    l.setUint32(14, crc, true)
-    l.setUint32(18, data.length, true)
-    l.setUint32(22, data.length, true)
-    l.setUint16(26, name.length, true)
+    l.setUint16(10, time, true) // not-policy: a field offset in the zip format
+    l.setUint16(12, date, true) // not-policy: a field offset in the zip format
+    l.setUint32(14, crc, true) // not-policy: a field offset in the zip format
+    l.setUint32(18, data.length, true) // not-policy: a field offset in the zip format
+    l.setUint32(22, data.length, true) // not-policy: a field offset in the zip format
+    l.setUint16(26, name.length, true) // not-policy: a field offset in the zip format
     local.set(name, 30) // not-policy: the zip format
     locals.push(local, data)
 
@@ -61,13 +61,13 @@ export function zip(entries: ZipEntry[], at = new Date()): Uint8Array {
     c.setUint16(6, 20, true) // not-policy: version needed
     c.setUint16(8, 0x0800, true) // not-policy: the names are UTF-8
     c.setUint16(10, 0, true) // not-policy: stored
-    c.setUint16(12, time, true)
-    c.setUint16(14, date, true)
-    c.setUint32(16, crc, true)
-    c.setUint32(20, data.length, true)
-    c.setUint32(24, data.length, true)
-    c.setUint16(28, name.length, true)
-    c.setUint32(42, offset, true)
+    c.setUint16(12, time, true) // not-policy: a field offset in the zip format
+    c.setUint16(14, date, true) // not-policy: a field offset in the zip format
+    c.setUint32(16, crc, true) // not-policy: a field offset in the zip format
+    c.setUint32(20, data.length, true) // not-policy: a field offset in the zip format
+    c.setUint32(24, data.length, true) // not-policy: a field offset in the zip format
+    c.setUint16(28, name.length, true) // not-policy: a field offset in the zip format
+    c.setUint32(42, offset, true) // not-policy: a field offset in the zip format
     central.set(name, 46) // not-policy: the zip format
     centrals.push(central)
 
@@ -77,10 +77,10 @@ export function zip(entries: ZipEntry[], at = new Date()): Uint8Array {
   const end = new Uint8Array(22) // not-policy: the zip format's end record
   const e = new DataView(end.buffer)
   e.setUint32(0, 0x06054B50, true) // not-policy: the zip format
-  e.setUint16(8, entries.length, true)
-  e.setUint16(10, entries.length, true)
-  e.setUint32(12, centralSize, true)
-  e.setUint32(16, offset, true)
+  e.setUint16(8, entries.length, true) // not-policy: a field offset in the zip format
+  e.setUint16(10, entries.length, true) // not-policy: a field offset in the zip format
+  e.setUint32(12, centralSize, true) // not-policy: a field offset in the zip format
+  e.setUint32(16, offset, true) // not-policy: a field offset in the zip format
 
   const out = new Uint8Array(offset + centralSize + end.length)
   let at2 = 0

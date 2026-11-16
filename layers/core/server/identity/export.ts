@@ -4,7 +4,7 @@
 // formats (JSON, and the contributors' own files) with a readable index. It is built by a job,
 // stored as a file on the account that only the person can read, announced by email, and removed
 // by the files sweep after core.privacy.export-lifetime.
-import { all, newId, nowMs, refuse, theatreTimeZone, usePoint, useSetting, type Actor, type UnitView } from '#kit'
+import { all, newId, nowMs, refuse, usePoint, useSetting, type Actor, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import type { TableMeta } from '#kit/db'
 import type { ExportContributor, ExportPart } from '../points/export-contributor'
@@ -16,6 +16,11 @@ import { privacyReady, requestById } from './data-requests'
 import { zip, type ZipEntry } from './zip'
 
 export const DOWNLOAD_SLOT = 'core.data-download'
+
+/** Dates in the download are the theatre's; before setup has set its zone, they are UTC. */
+async function zone(): Promise<string> {
+  return (await useSetting('core.locale.time-zone') as string | null) ?? 'UTC'
+}
 
 /**
  * Columns never put in a download, whatever their class: special category data (a module that
@@ -43,6 +48,8 @@ export function exportPlan(): ExportTable[] {
   return out.sort((a, b) => a.module.localeCompare(b.module) || a.table.localeCompare(b.table))
 }
 
+const STYLE = 'body{font-family:system-ui,sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem;line-height:1.5}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ccc;padding:.4rem;text-align:left}' // not-policy: the index page's layout
+
 const escape = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 /** The readable index: what each file is, and how many rows it holds. */
@@ -50,7 +57,7 @@ function indexPage(theatre: string, made: string, files: { path: string, what: s
   const items = files.map(f => `<tr><td><a href="${escape(f.path)}">${escape(f.path)}</a></td><td>${escape(f.what)}</td><td>${f.rows ?? ''}</td></tr>`).join('\n')
   return `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"><title>Your data from ${escape(theatre)}</title>
-<style>body{font-family:system-ui,sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem;line-height:1.5}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ccc;padding:.4rem;text-align:left}</style>
+<style>${STYLE}</style>
 </head><body>
 <h1>Your data from ${escape(theatre)}</h1>
 <p>Made on ${escape(made)}. Each file below holds the records about you in one place, as JSON, which any text editor opens. Records that are not linked to your account are searched for by a person and may follow separately.</p>
@@ -86,7 +93,7 @@ export async function buildExport(accountId: string, at = nowMs()): Promise<Uint
   }
 
   const theatre = await useSetting('core.site.name') as string | null ?? 'the theatre'
-  const made = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeStyle: 'short', timeZone: await theatreTimeZone() }).format(at)
+  const made = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeStyle: 'short', timeZone: await zone() }).format(at)
   return zip([{ name: 'index.html', bytes: indexPage(theatre, made, listed) }, ...entries], new Date(at))
 }
 
@@ -126,7 +133,7 @@ export async function runExport(unit: UnitView, requestId: string): Promise<void
   const bytes = await buildExport(accountId, at)
   const fileId = await storeFile(unit, { slot: DOWNLOAD_SLOT, ownerType: 'core.account', ownerId: accountId, bytes, mediaType: 'application/zip', title: 'Your data', expiresAt })
   unit.add({ sql: 'UPDATE core_data_requests SET state = \'done\', file_id = ?, finished_at = ? WHERE id = ? AND state = \'running\'', params: [fileId, at, requestId] }).expect(1)
-  const until = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: await theatreTimeZone() }).format(expiresAt)
+  const until = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: await zone() }).format(expiresAt)
   await notify(unit, 'core.export-ready', { to: accountId, variables: { until }, dedupeKey: requestId })
   unit.announce('core.data-request.finished', { requestId, kind: 'export' }, { record: ['core.data-request', requestId] })
 }
