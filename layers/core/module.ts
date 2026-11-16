@@ -32,9 +32,14 @@ export default defineModule({
     'core.vocabulary': [...domain.contributes['core.vocabulary'], ...identity.identityContributions['core.vocabulary']],
     'core.file-slot': [...domain.contributes['core.file-slot'], ...identity.identityContributions['core.file-slot']],
     'core.public-component': [...domain.contributes['core.public-component'], ...identity.identityContributions['core.public-component']],
-    // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
+    // My account's entries (identity spec part 6). The passkey offer after signing in is a getting-in
+    // screen, not an entry; "Signing in" is where passkeys are kept.
     'core.navigation': [
-      { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
+      { id: 'core.account-details', menu: 'account', to: '/account/details', icon: 'i-lucide-user-round', ability: 'signed-in', order: 10 },
+      { id: 'core.account-email', menu: 'account', to: '/account/email', icon: 'i-lucide-mail', ability: 'signed-in', order: 20 },
+      { id: 'core.account-sign-in', menu: 'account', to: '/account/sign-in', match: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 30 },
+      { id: 'core.account-sessions', menu: 'account', to: '/account/sessions', icon: 'i-lucide-monitor-smartphone', ability: 'signed-in', order: 35 },
+      { id: 'core.account-data', menu: 'account', to: '/account/data', icon: 'i-lucide-download', ability: 'signed-in', order: 50 },
       { id: 'core.venues', menu: 'admin', group: 'theatre', to: '/admin/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
       { id: 'core.closures', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/closures', icon: 'i-lucide-calendar-x', ability: 'core.closure.manage', order: 35 },
       { id: 'core.email', menu: 'admin', group: 'email', to: '/admin/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
