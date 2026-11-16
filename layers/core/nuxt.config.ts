@@ -27,8 +27,6 @@ export default defineNuxtConfig({
     '/console/system/email': { redirect: { to: '/admin/email', statusCode: 301 } },
     '/console/system/vocabularies': { redirect: { to: '/admin/vocabularies', statusCode: 301 } },
     '/console/system/vocabularies/**': { redirect: { to: '/admin/vocabularies/**', statusCode: 301 } },
-    '/console/programme/venues': { redirect: { to: '/admin/venues', statusCode: 301 } },
-    '/console/programme/venues/**': { redirect: { to: '/admin/venues/**', statusCode: 301 } },
   },
   experimental: {
     // A link's page is fetched when a person points at or focuses it, not when the link scrolls

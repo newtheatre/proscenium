@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Venues with their spaces nested (C-16). Adding a venue adds one space of the same name, so a
 // theatre with one room never has to think about spaces.
-import { venueInput } from '../../../../server/places/input'
+import { venueInput } from '../../../../../server/places/input'
 
 interface Space { id: string, name: string, defaultCapacity: number | null, archived: boolean }
 interface Row { id: string, name: string, locality: string | null, managed: boolean, archived: boolean, spaces: Space[] }
@@ -24,7 +24,7 @@ const fields = [
   { name: 'locality', label: 'Town or city', kind: 'text' as const, optional: true },
 ]
 const create = (values: Record<string, unknown>) => $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
-const created = (result: unknown) => navigateTo(`/admin/venues/${(result as { venueId: string }).venueId}`)
+const created = (result: unknown) => navigateTo(`/console/programme/venues/${(result as { venueId: string }).venueId}`)
 
 const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
   .map(s => (s.defaultCapacity ? `${s.name} (${s.defaultCapacity})` : s.name)).join(', ')
@@ -37,7 +37,7 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
     :columns="columns"
     :filters="filters"
     :row-label="(row: Row) => row.name"
-    :row-to="(row: Row) => `/admin/venues/${row.id}`"
+    :row-to="(row: Row) => `/console/programme/venues/${row.id}`"
     :empty="{ title: 'No venues yet', description: 'A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio.', icon: 'i-lucide-building' }"
   >
     <template #primary>
