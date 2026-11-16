@@ -282,7 +282,29 @@ export const accountMergeItems = defineTable('core_account_merge_items', {
   action: col.internal(text('action', { enum: ['moved', 'ended'] }).notNull()),
 }, { realm: 'operational', subject: 'none', extra: t => [primaryKey({ columns: [t.mergeId, t.tableName, t.columnName, t.rowId] })] })
 
+/**
+ * Somebody to ring for a member (ID-17): up to three per account, members' side only. A row is
+ * written and read only while the account has a standing. It describes a third person, so it is
+ * never in a list, a search or anybody else's export. `standing_lost_at` is when the daily sweep
+ * first found the account without a standing; the rows go `core.emergency-contacts.keep-after-standing`
+ * after that, and it is cleared if a standing returns first.
+ */
+export const emergencyContacts = defineTable('core_emergency_contacts', {
+  id: col.id(),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'move' }),
+  name: col.personal(text('name').notNull()),
+  relationship: col.personal(text('relationship')),
+  phone: col.personal(text('phone').notNull()),
+  updatedAt: col.timestamp('updated_at').notNull(),
+  standingLostAt: col.timestamp('standing_lost_at'),
+}, {
+  id: 'emc',
+  realm: 'members',
+  onErasure: 'delete-row',
+  extra: t => [index('core_emergency_contacts_account').on(t.accountId), check('core_emergency_contacts_relationship', sql`${t.relationship} IS NULL OR length(${t.relationship}) BETWEEN 1 AND 40`)],
+})
+
 export const identityTables = {
   accounts, accountEmails, passkeys, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
-  roles, roleAbilities, factAbilities, grants, grantEnds, accountMerges, accountMergeItems,
+  roles, roleAbilities, factAbilities, grants, grantEnds, accountMerges, accountMergeItems, emergencyContacts,
 }

@@ -5,3 +5,7 @@ export type { NotifyAddressOptions, NotificationType } from './notifications/sen
 export { getBrand } from './brand/theme'
 export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from './calendar'
 export { attachFile, detachFile, fileUrl } from './files/service'
+export { describeViewer } from './interface/viewer'
+export type { ViewerDescription } from './interface/viewer'
+export { standingOf, isMember } from './identity/standings'
+export type { Standing } from './identity/standings'
