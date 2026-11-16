@@ -3,7 +3,7 @@
 // through the point payments.settlement, so it never imports Box office, a bar or anything else that
 // sells. Cash and attested card ship with it, so a desk works on day one with no account anywhere.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'payments.settings.manage'
@@ -81,6 +81,11 @@ export default defineModule({
     'payments.prune-webhooks': task({ dailyAt: '03:40' }),
   },
 
+  calls: {
+    // Asking a provider to start a payment. The reconcile task asks after one with no answer as well.
+    'payments.start-payment': call({ reconcileAfter: '3m' }),
+  },
+
   jobs: {
     // One stored, verified webhook event. Retried while the provider has no answer.
     'payments.handle-webhook': job({ payload: z.object({ webhookEventId: z.string() }), retries: 8 }),
@@ -98,6 +103,8 @@ export default defineModule({
       { id: 'unfulfilled', name: 'Payments to return', kind: 'liability' },
     ],
     'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }],
+    // Payments' own part: guided setup's test payment.
+    'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
     'core.vocabulary': [{

@@ -62,6 +62,17 @@ describe('accounts a module declares', () => {
     expect(await inContext(() => accountFor('tickets.clearing', 'ppa_one'))).toMatch(/^lac_/)
     await expect(commit(unit => ensureScopedAccount(unit.view(), 'tickets.income', 'ppa_one'))).rejects.toThrow(/not a scoped account/)
   })
+
+  it('makes a new scoped account once when two postings in one unit both need it', async () => {
+    const entries = (amount: number) => [{ account: { key: 'tickets.clearing', scope: 'ppa_three' }, amountMinor: amount }, { account: { key: 'tickets.clearing', scope: 'ppa_four' }, amountMinor: -amount }]
+    await commit(async (unit) => {
+      await postEntries(unit.view(), { key: 'tickets:three:a', source: { module: 'tickets', type: 'tickets.order', id: 'three-a' }, kind: 'sale', entries: entries(100) })
+      await postEntries(unit.view(), { key: 'tickets:three:b', source: { module: 'tickets', type: 'tickets.order', id: 'three-b' }, kind: 'sale', entries: entries(200) })
+    })
+    expect(await count("SELECT count(*) AS n FROM finance_accounts WHERE system_key = 'tickets.clearing' AND scope IN ('ppa_three', 'ppa_four')")).toBe(2)
+    const totals = await inContext(() => balances({ systemKeys: ['tickets.clearing'] }))
+    expect(totals.map(b => b.balanceMinor).sort((a, b) => a - b)).toEqual(expect.arrayContaining([-300, 300]))
+  })
 })
 
 describe('a posting', () => {
