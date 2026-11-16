@@ -75,7 +75,7 @@ beforeAll(async () => {
 describe('opening a session', () => {
   it('opens one session per person with a float, and shows it', async () => {
     const me = seller()
-    expect((await get('/api/payments/session', me)).body).toEqual({ session: null })
+    expect((await get('/api/payments/session', me)).body).toEqual({ session: null, waiting: [] })
     const opened = await post('/api/payments/sessions', me, { pointLabel: 'Bar', floatMinor: 5000 }, true)
     expect(opened.body.session).toMatchObject({ state: 'open', floatMinor: 5000, expectedCashMinor: 5000, currency: 'GBP' })
     const again = await post('/api/payments/sessions', me, { pointLabel: 'Bar' }, true)
@@ -136,6 +136,9 @@ describe('cashing up (PAY-03)', () => {
       return attempt.id
     })
     expect(await post(`/api/payments/sessions/${sessionId}/count`, me)).toMatchObject({ status: 409, body: { code: 'payments.session.payment-waiting' } })
+    // My session names the payment it waits for, and when it turns unknown (answer-within, 3 minutes).
+    const mine = await get('/api/payments/session', me)
+    expect(mine.body.waiting).toEqual([{ id: attemptId, method: 'cash', amountMinor: 800, currency: 'GBP', state: 'started', provider: 'Cash', startedAt: NOV_16, unknownAt: NOV_16 + 3 * 60_000 }])
     await inContext(() => recordAnswer(attemptId, { state: 'failed', failureCode: 'declined' }, { kind: 'person' }))
     const counting = await post(`/api/payments/sessions/${sessionId}/count`, me)
     expect(counting.body.session).toMatchObject({ state: 'counting', expectedCashMinor: 500 })
@@ -145,13 +148,14 @@ describe('cashing up (PAY-03)', () => {
 
   it('closes with no difference and posts nothing', async () => {
     const me = seller()
+    await env.DB.prepare("INSERT INTO core_accounts (id, name, origin, created_at) VALUES (?, 'Sam Seller', 'test', ?)").bind(me.accountId, NOV_16).run()
     const { sessionId } = await sellForCash(me, 2000, 1500)
     await post(`/api/payments/sessions/${sessionId}/count`, me)
     const closed = await post(`/api/payments/sessions/${sessionId}/close`, me, { countedMinor: 3500 })
-    expect(closed.body).toMatchObject({ varianceMinor: 0, session: { state: 'closed', countedCashMinor: 3500 } })
+    expect(closed.body).toMatchObject({ varianceMinor: 0, session: { state: 'closed', countedCashMinor: 3500, openedByName: 'Sam Seller', closedByName: 'Sam Seller' } })
     expect(await rows("SELECT id FROM finance_postings WHERE source_type = 'payments.session' AND source_id = ?", sessionId)).toEqual([])
     expect(await rows("SELECT payload FROM core_events WHERE name = 'payments.session.closed' AND payload LIKE ?", `%${sessionId}%`)).toHaveLength(1)
-    expect((await get('/api/payments/session', me)).body).toEqual({ session: null })
+    expect((await get('/api/payments/session', me)).body).toEqual({ session: null, waiting: [] })
   })
 
   it('needs a reason for a difference, and posts it to cash over and short', async () => {

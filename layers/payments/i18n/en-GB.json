@@ -1,7 +1,6 @@
 {
   "payments.module.name": "Payments",
   "payments.module.description": "Taking money: payment providers and card readers, one payment for several things at the desk, till sessions, and refunds.",
-  "payments.navigation.groups.payments.label": "Payments",
 
   "payments.settings-sections.attempts": "Waiting for an answer",
   "payments.settings-sections.refunds": "Refunds",

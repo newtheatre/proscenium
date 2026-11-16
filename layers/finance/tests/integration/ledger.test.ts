@@ -10,6 +10,9 @@ import { listPeriods, getPeriod } from '../../server/periods'
 import closeRoute from '../../server/api/finance/periods/[id]/close.post'
 import periodRoute from '../../server/api/finance/periods/[id].get'
 import reverseRoute from '../../server/api/finance/postings/[id]/reverse.post'
+import postingsRoute from '../../server/api/finance/postings.get'
+import accountsRoute from '../../server/api/finance/accounts.get'
+import reasonsRoute from '../../server/api/finance/periods/reopen-reasons.get'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 const OCT_10 = Date.UTC(2026, 9, 10, 12)
@@ -242,6 +245,9 @@ describe('the routes', () => {
     'GET /api/finance/periods/:id': periodRoute,
     'POST /api/finance/periods/:id/close': closeRoute,
     'POST /api/finance/postings/:id/reverse': reverseRoute,
+    'GET /api/finance/postings': postingsRoute,
+    'GET /api/finance/accounts': accountsRoute,
+    'GET /api/finance/periods/reopen-reasons': reasonsRoute,
   })
 
   it('show the close checklist and refuse a close to someone without the ability', async () => {
@@ -251,6 +257,10 @@ describe('the routes', () => {
     expect(shown.status).toBe(200)
     const body = await shown.json() as { blockers: { sentence: string }[] }
     expect(body.blockers.map(b => b.sentence).join(' ')).toMatch(/has not ended yet/)
+    // The screen offers Close and Reopen only to those who may.
+    expect(body).toMatchObject({ canClose: false, canReopen: false })
+    const closer = await (await call(handle, 'GET', `/api/finance/periods/${november!.id}`, { actor: person(['finance.ledger.view', 'finance.period.close', 'finance.period.reopen']) })).json()
+    expect(closer).toMatchObject({ canClose: true, canReopen: true })
     const refused = await call(handle, 'POST', `/api/finance/periods/${november!.id}/close`, { actor: viewer })
     expect(refused.status).toBe(403)
   })
@@ -263,5 +273,20 @@ describe('the routes', () => {
     const again = await call(handle, 'POST', `/api/finance/postings/${posting!.id}/reverse`, { actor: treasurer, headers: { 'idempotency-key': 'rev-1' } })
     expect(again.headers.get('idempotent-replay')).toBe('true')
     expect(await count('SELECT count(*) AS n FROM finance_postings WHERE reverses_id = ?', posting!.id)).toBe(1)
+  })
+
+  it('tell the ledger screen whether the viewer may reverse a posting', async () => {
+    const viewing = await (await call(handle, 'GET', '/api/finance/postings', { actor: person(['finance.ledger.view']) })).json() as { postings: unknown[], canCorrect: boolean }
+    expect(viewing.postings.length).toBeGreaterThan(0)
+    expect(viewing.canCorrect).toBe(false)
+    const correcting = await (await call(handle, 'GET', '/api/finance/postings', { actor: person(['finance.posting.correct']) })).json() as { canCorrect: boolean }
+    expect(correcting.canCorrect).toBe(true)
+  })
+
+  it('list the modules an account may be given to, and the reasons for reopening', async () => {
+    const accounts = await (await call(handle, 'GET', '/api/finance/accounts', { actor: person(['finance.ledger.view']) })).json() as { modules: string[] }
+    expect(accounts.modules).toEqual(expect.arrayContaining(['core', 'finance']))
+    const reasons = await (await call(handle, 'GET', '/api/finance/periods/reopen-reasons', { actor: person(['finance.period.reopen']) })).json() as { reasons: { label: string }[] }
+    expect(reasons.reasons.map(r => r.label)).toEqual(['Late income', 'Missing expense', 'Correction', 'Auditor\'s request', 'Other'])
   })
 })
