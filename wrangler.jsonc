@@ -1,0 +1,2 @@
+// Theatre-owned. The deploy screen writes your Worker's name here. Bindings come from the build.
+{ "name": "kings-theatre", "observability": { "enabled": true } }
