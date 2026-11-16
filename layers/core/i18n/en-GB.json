@@ -97,6 +97,8 @@
   "core.settings.grants.default-expiry.options.none": "Never, until someone ends them",
   "core.settings.grants.allow-no-expiry.label": "Roles may be given with no end date",
   "core.settings.grants.allow-no-expiry.help": "When this is off, every role given must have an end date, except Owner.",
+  "core.settings.grants.expiry-warning.label": "Warn before a role ends",
+  "core.settings.grants.expiry-warning.help": "How far ahead the holder, and whoever can renew the role, are told that it is about to end.",
   "core.settings.members-area.enabled.label": "Members' area",
   "core.settings.members-area.enabled.help": "Whether the members' area exists at all. When it is off nobody sees a link to it.",
   "core.settings.members-area.name.label": "What you call the members' area",
