@@ -1,7 +1,9 @@
 // Security notices about an account (part 4, "Notification types"): a credential added, a recovery
 // used, an address changed or removed, and the link that verifies an address. Each goes to named
 // addresses (every verified one, the old one, the new one) rather than to a side, so it is sent
-// by notifyAddress from a job after the change commits. The addresses, and any link, travel sealed.
+// by notifyAddress from a job after the change commits: notify() reaches an account's one address
+// on a side, not named ones. The addresses, and any link, travel sealed in the job's payload, and
+// the verifying link is a sealed variable.
 import { newId, type UnitView } from '#kit'
 import { sealValue } from './crypto'
 import { verifiedAddressesOf } from './accounts'

@@ -223,7 +223,8 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const, code: 'text' as const },
+    // Both sign the person in, so both are sealed.
+    variables: { link: 'sealed' as const, code: 'sealed' as const },
     wording: {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
@@ -289,14 +290,14 @@ export const identityContributions = {
       },
     },
   }, {
-    // Sent by notifyAddress from a job, like the sign-in link, so the link (a sign-in) is never
-    // stored in clear in core_notifications.
+    // Sent by notifyAddress from a job, like the sign-in link. The link signs the person in, so it
+    // is sealed. It stays on the job until notify() can reach an account made in the same unit.
     id: 'core.invitation',
     category: 'transactional' as const,
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const, role: 'text' as const },
+    variables: { link: 'sealed' as const, role: 'text' as const },
     wording: {
       'en-GB': {
         subject: 'You have been given a role at {{ theatre }}',
@@ -309,7 +310,7 @@ export const identityContributions = {
     side: 'audience' as const,
     channels: ['email' as const],
     lane: 'prompt' as const,
-    variables: { link: 'url' as const },
+    variables: { link: 'sealed' as const },
     wording: {
       'en-GB': {
         subject: 'Confirm your email address for {{ theatre }}',
