@@ -8,11 +8,13 @@ import { MailError, setMailer, type OutgoingEmail } from '../../server/notificat
 import { setCloudflareFetch, zoneCandidates } from '../../server/notifications/cloudflare'
 import setUpDomain from '../../server/api/core/notifications/set-up-domain.post'
 import senderState from '../../server/api/core/notifications/sender.get'
+import verifyDomain from '../../server/api/core/notifications/verify-domain.post'
 import { env, inContext, person, rows, sent, server } from '../../../../tests/integration/helpers'
 
 const handle = server({
   'POST /api/core/notifications/set-up-domain': setUpDomain,
   'GET /api/core/notifications/sender': senderState,
+  'POST /api/core/notifications/verify-domain': verifyDomain,
 })
 const admin = () => person(['core.sender.manage'])
 const secrets = env as unknown as Record<string, string | undefined>
@@ -137,6 +139,40 @@ describe('setting the sending domain up automatically (C-52)', () => {
     await runQueued()
     expect(mails.map(m => m.to)).toEqual(['box-office@example.org'])
     expect(await setting('core.notifications.verified-domain')).toBe('"mail.tickets.example.org"')
+  })
+
+  it('sends one test message when the button is pressed while the automatic one waits', async () => {
+    await setSettings({ 'core.organisation.contact-email': 'box-office@example.org' })
+    await request('POST', 'https://example.org', '/api/core/notifications/set-up-domain', { actor: admin(), body: {} })
+    expect(await verifyJobs()).toHaveLength(1)
+
+    const pressed = await request('POST', 'https://example.org', '/api/core/notifications/verify-domain', { actor: admin(), body: {} })
+    expect(pressed.status).toBe(200)
+    expect(mails).toHaveLength(1)
+    // The waiting job was cancelled, so running it later sends nothing.
+    await runQueued()
+    expect(mails).toHaveLength(1)
+    expect(await rows("SELECT state FROM core_jobs WHERE name = 'core.verify-sending-domain'")).toEqual([{ state: 'cancelled' }])
+  })
+
+  it('sends nothing by hand while the automatic test is being sent, and resumes the retries if Cloudflare is not ready', async () => {
+    await setSettings({ 'core.organisation.contact-email': 'box-office@example.org' })
+    await request('POST', 'https://example.org', '/api/core/notifications/set-up-domain', { actor: admin(), body: {} })
+    await env.DB.prepare("UPDATE core_jobs SET state = 'running' WHERE name = 'core.verify-sending-domain'").run()
+    const busy = await request('POST', 'https://example.org', '/api/core/notifications/verify-domain', { actor: admin(), body: {} })
+    expect(busy.status).toBe(409)
+    expect((await busy.json()).code).toBe('core.notifications.test-under-way')
+    expect(mails).toHaveLength(0)
+
+    await env.DB.prepare("UPDATE core_jobs SET state = 'queued' WHERE name = 'core.verify-sending-domain'").run()
+    failWith = 'E_EMAIL_SENDING_NOT_READY'
+    const early = await request('POST', 'https://example.org', '/api/core/notifications/verify-domain', { actor: admin(), body: {} })
+    expect((await early.json()).code).toBe('core.notifications.domain-not-ready')
+    const resumed = await verifyJobs()
+    expect(resumed.map(m => m.delaySeconds)).toEqual([60])
+    failWith = undefined
+    await runQueued()
+    expect(mails).toHaveLength(1)
   })
 
   it('adopts a subdomain that already exists, and a second press changes nothing', async () => {

@@ -6,6 +6,7 @@
 import { defineTask, nowMs } from '#kit'
 import { sweepUnverifiedAddresses } from '../identity/my-addresses'
 import { sweepEmergencyContacts } from '../identity/emergency-contacts'
+import { sweepAccessScheme } from '../identity/access-scheme'
 
 export default defineTask(async (unit) => {
   const at = nowMs()
@@ -14,4 +15,5 @@ export default defineTask(async (unit) => {
   unit.add({ sql: 'DELETE FROM core_sessions WHERE ended_at IS NOT NULL OR expires_at <= ?', params: [at] })
   await sweepUnverifiedAddresses(unit)
   await sweepEmergencyContacts(unit)
+  await sweepAccessScheme(unit)
 })

@@ -70,7 +70,9 @@ export async function holdersOf(ability: string, record?: RecordRef): Promise<st
 
   const out: string[] = []
   for (const accountId of await usable(candidates)) {
-    const actor: Actor = { kind: 'person', accountId, assurance: 'strong' }
+    // Holding is about grants, not about a session: the person is taken as signed in strongly and
+    // just now, so an ability that asks for a fresh sign-in still counts them.
+    const actor: Actor = { kind: 'person', accountId, assurance: 'strong', reassertedAt: at }
     if ((await can(actor, ability as never, record)).allowed) out.push(accountId)
   }
   return out.sort()
