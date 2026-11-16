@@ -145,7 +145,6 @@
   "core.settings-page.hidden": "Hidden. Type a new value to replace it.",
   "core.settings-page.on": "on",
   "core.settings-page.off": "off",
-  "core.settings-sections.locale": "Place and money",
   "core.settings-sections.units": "Safety limits",
   "core.settings-sections.jobs": "Background work",
   "core.settings-sections.external": "Outside services",
@@ -170,5 +169,7 @@
   "core.navigation.groups.money.label": "Money",
   "core.navigation.groups.communications.label": "Communications",
   "core.navigation.groups.forms.label": "Forms",
-  "core.navigation.groups.reports.label": "Reports"
+  "core.navigation.groups.reports.label": "Reports",
+  "core.settings-sections.site": "The theatre",
+  "core.settings-sections.locale": "Place and money"
 }
