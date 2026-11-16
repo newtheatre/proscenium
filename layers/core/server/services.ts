@@ -7,3 +7,7 @@ export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from '.
 export { attachFile, detachFile, fileUrl } from './files/service'
 export { listTerms, getTerm, assertTerm } from './vocabularies/service'
 export type { Term } from './vocabularies/service'
+export { describeViewer } from './interface/viewer'
+export type { ViewerDescription } from './interface/viewer'
+export { standingOf, isMember } from './identity/standings'
+export type { Standing } from './identity/standings'
