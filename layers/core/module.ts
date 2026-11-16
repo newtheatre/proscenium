@@ -32,6 +32,7 @@ export default defineModule({
     // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
+      { id: 'core.venues', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
       { id: 'core.vocabularies', menu: 'console', group: 'system', section: 'setup', to: '/console/system/vocabularies', icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 40 },
     ],
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.

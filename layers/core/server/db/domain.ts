@@ -1,6 +1,6 @@
 // The core domain's tables (workstream 3, part 2): stored files, who mail comes from, the
 // vocabularies every module shares, and notifications. The rest arrive with the later slices.
-import { check, integer, text, index, primaryKey, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { check, integer, real, text, index, primaryKey, uniqueIndex, foreignKey } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { defineTable, col } from '#kit/db'
 
@@ -244,4 +244,91 @@ export const emailSuppressions = defineTable('core_email_suppressions', {
   extra: t => [check('core_email_suppressions_reason', sql`${t.reason} IN ('hard_bounce', 'complaint', 'manual')`)],
 })
 
-export const tables = { files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+/**
+ * A building or site (part 2, group 2). A venue the theatre uses but does not run (a hired hall) is
+ * the same record with managed false. A venue is never a flagged room.
+ */
+export const venues = defineTable('core_venues', {
+  id: col.id(),
+  slug: col.public(text('slug').notNull().unique()),
+  name: col.public(text('name').notNull()),
+  managed: col.internal(integer('managed', { mode: 'boolean' }).notNull().default(true)),
+  addressLines: col.public(text('address_lines')),
+  locality: col.public(text('locality')),
+  postcode: col.public(text('postcode')),
+  country: col.public(text('country')),
+  latitude: col.public(real('latitude')),
+  longitude: col.public(real('longitude')),
+  description: col.public(text('description')),
+  accessInfo: col.public(text('access_info')),
+  gettingHere: col.public(text('getting_here')),
+  state: col.internal(text('state').notNull().default('active')),
+  createdAt: col.createdAt(),
+}, {
+  id: 'ven',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_venues_name').on(sql`lower(${t.name})`),
+    check('core_venues_state', sql`${t.state} IN ('active', 'archived')`),
+    check('core_venues_position', sql`(${t.latitude} IS NULL) = (${t.longitude} IS NULL)`),
+    check('core_venues_country', sql`${t.country} IS NULL OR length(${t.country}) = 2`),
+  ],
+})
+
+/**
+ * A room or area inside a venue, where performances happen. (id, venue_id) is unique so a
+ * performance can reference the pair and never disagree with its venue.
+ */
+export const spaces = defineTable('core_spaces', {
+  id: col.id(),
+  venueId: col.internal(text('venue_id').notNull().references(() => venues.id, { onDelete: 'restrict' })),
+  slug: col.public(text('slug').notNull()),
+  name: col.public(text('name').notNull()),
+  // col.ref, so the vocabulary screen counts the use and refuses to delete a term in use.
+  kindTermId: col.ref('core_terms'),
+  defaultCapacity: col.internal(integer('default_capacity')),
+  performable: col.internal(integer('performable', { mode: 'boolean' }).notNull().default(true)),
+  exclusive: col.internal(integer('exclusive', { mode: 'boolean' }).notNull().default(true)),
+  description: col.public(text('description')),
+  accessInfo: col.public(text('access_info')),
+  state: col.internal(text('state').notNull().default('active')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+  createdAt: col.createdAt(),
+}, {
+  id: 'spc',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('core_spaces_venue_pair').on(t.id, t.venueId),
+    uniqueIndex('core_spaces_slug').on(t.venueId, t.slug),
+    uniqueIndex('core_spaces_name').on(t.venueId, sql`lower(${t.name})`),
+    check('core_spaces_state', sql`${t.state} IN ('active', 'archived')`),
+    check('core_spaces_capacity', sql`${t.defaultCapacity} IS NULL OR ${t.defaultCapacity} > 0`),
+  ],
+})
+
+/**
+ * The access features a venue or one of its spaces has, from the core.place-access vocabulary.
+ * A null space means the whole venue. A space shows its venue's features and its own.
+ */
+export const placeAccess = defineTable('core_place_access', {
+  id: col.id(),
+  venueId: col.internal(text('venue_id').notNull().references(() => venues.id, { onDelete: 'cascade' })),
+  spaceId: col.internal(text('space_id')),
+  termId: col.ref('core_terms'),
+  note: col.public(text('note')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+}, {
+  id: 'pla',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    // The space must belong to the venue: the pair references core_spaces (id, venue_id).
+    foreignKey({ columns: [t.spaceId, t.venueId], foreignColumns: [spaces.id, spaces.venueId] }).onDelete('cascade'),
+    uniqueIndex('core_place_access_term').on(t.venueId, sql`coalesce(${t.spaceId}, '')`, t.termId),
+    check('core_place_access_note', sql`${t.note} IS NULL OR length(${t.note}) <= 200`),
+  ],
+})
+
+export const tables = { venues, spaces, placeAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }

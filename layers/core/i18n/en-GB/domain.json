@@ -86,5 +86,7 @@
   "core.settings.notifications.inbox-retention.label": "Keep inbox messages for",
   "core.settings.notifications.inbox-retention.help": "How long a message stays in a person's inbox.",
   "core.settings.rules.stuck-after": "Treat as stuck after must be longer than the wait before the first retry.",
-  "core.abilities.notification.configure.label": "Change how messages are sent"
+  "core.abilities.notification.configure.label": "Change how messages are sent",
+  "core.abilities.venue.manage.label": "Manage venues and spaces",
+  "core.navigation.venues.label": "Venues and spaces"
 }
