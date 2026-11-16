@@ -31,6 +31,7 @@ export default defineModule({
     // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
+      { id: 'core.email', menu: 'console', group: 'system', section: 'setup', to: '/console/system/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
     ],
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
     // System holds core's own screens; each module's settings page sits in the module's own group.
@@ -67,6 +68,8 @@ export default defineModule({
 
   jobs: { ...identity.identityJobs, ...domain.jobs },
 
+  calls: { ...domain.calls },
+
   tasks: {
     'core.prune-history': task({ dailyAt: '04:00' }),
     ...identity.identityTasks,
@@ -77,5 +80,6 @@ export default defineModule({
     CORE_ENCRYPTION_KEY: secret({ needed: 'when-used' }),
     CORE_TURNSTILE_SECRET_KEY: secret({ needed: 'optional' }),
     ...identity.identitySecrets,
+    ...domain.secrets,
   },
 })

@@ -62,12 +62,16 @@
   "core.settings.notifications.verified-domain.help": "The sending domain that last passed a test message. Kept by the system.",
   "core.settings.notifications.email-footer.label": "Email footer",
   "core.settings.notifications.email-footer.help": "Text under every email, such as a registered address.",
+  "core.settings.notifications.sending-label.label": "Sending label",
+  "core.settings.notifications.sending-label.help": "The word put before the site's address when the sending domain is set up automatically. With \"mail\", a site at example.org sends from mail.example.org.",
   "core.settings.rules.country-code": "The country is a two-letter code in capitals, such as GB.",
   "core.settings.rules.contact-email": "The contact email is not an email address.",
   "core.settings.rules.sending-domain": "The sending domain is a domain name in lower case, such as example.org.",
+  "core.settings.rules.sending-label": "The sending label is one part of a domain name in lower case, such as mail.",
   "core.abilities.organisation.edit.label": "Change the organisation settings",
   "core.abilities.branding.edit.label": "Change the brand",
   "core.abilities.file.configure.label": "Change the file settings",
   "core.abilities.sender.manage.label": "Manage who email comes from",
-  "core.abilities.template.edit.label": "Change message wording"
+  "core.abilities.template.edit.label": "Change message wording",
+  "core.navigation.email.label": "Email sending"
 }

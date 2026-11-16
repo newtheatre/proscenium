@@ -2,7 +2,7 @@
 // settings and the operating day, files, the brand, sending email, and the public site's points.
 // module.ts spreads each field into the core manifest, beside foundations' and identity's parts.
 import { z } from 'zod'
-import { ability, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, secret, setting, task } from '#kit'
 import type { SettingRule } from '#kit'
 
 const organisation = 'core.organisation.edit'
@@ -44,12 +44,15 @@ export const settings = defineSettings('core', {
   'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender }),
   'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true }),
   'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
+  // C-52: the label put before the site's host when the sending domain is set up automatically.
+  'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender }),
 })
 
 export const settingRules: SettingRule[] = [
   { id: 'country-code', check: s => /^[A-Z]{2}$/.test(s['organisation.country']) },
   { id: 'contact-email', check: s => s['organisation.contact-email'] === null || z.email().safeParse(s['organisation.contact-email']).success },
   { id: 'sending-domain', check: s => s['notifications.sending-domain'] === null || /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(s['notifications.sending-domain']) },
+  { id: 'sending-label', check: s => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(s['notifications.sending-label']) }, // not-policy: a DNS label
 ]
 
 export const records = defineRecords('core', {
@@ -136,7 +139,8 @@ export const contributes = {
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
-  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }],
+  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
+  'core.setup-step': [{ id: 'core.sender', required: true, to: '/console/system/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
 }
 
@@ -153,6 +157,16 @@ export const listens = {
 export const jobs = {
   'core.check-file': job({ payload: z.object({ fileId: z.string() }) }),
   'core.recompute-days': job({ payload: z.object({}), lane: 'bulk' }),
+  'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
+}
+
+// C-52: optional. Without it the sending domain is set up by hand in the Cloudflare dashboard.
+export const secrets = {
+  CORE_CLOUDFLARE_TOKEN: secret({ needed: 'optional' }),
+}
+
+export const calls = {
+  'core.create-sending-domain': call({ reconcileAfter: '5m' }),
 }
 
 export const tasks = {
