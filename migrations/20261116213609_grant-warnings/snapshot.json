@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "128dbd23-edda-48c0-a28b-f51e5256e280",
+  "id": "2b12cfea-2f20-47f4-8a23-59c0a5df4cbe",
   "prevIds": [
-    "d6572f6a-f03b-4798-b13f-a673dbfd2526"
+    "3650cc34-c804-48b6-89bc-64b982b85c5d"
   ],
   "ddl": [
     {
@@ -36,6 +36,10 @@
     },
     {
       "name": "core_audit",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_closures",
       "entityType": "tables"
     },
     {
@@ -143,6 +147,18 @@
       "entityType": "tables"
     },
     {
+      "name": "core_production_advisories",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_production_slugs",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_productions",
+      "entityType": "tables"
+    },
+    {
       "name": "core_recovery_codes",
       "entityType": "tables"
     },
@@ -152,6 +168,10 @@
     },
     {
       "name": "core_roles",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_seasons",
       "entityType": "tables"
     },
     {
@@ -220,6 +240,42 @@
     },
     {
       "name": "finance_tax_codes",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_attempt_events",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_attempts",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_intent_parts",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_intents",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_provider_accounts",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_readers",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_refunds",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_sessions",
+      "entityType": "tables"
+    },
+    {
+      "name": "payments_webhook_events",
       "entityType": "tables"
     },
     {
@@ -1067,6 +1123,136 @@
       "name": "unit_id",
       "type": "text",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "space_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "starts_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "ends_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "all_day",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "blocks_performances",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "feed_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_closures",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -2494,6 +2680,16 @@
     },
     {
       "table": "core_jobs",
+      "name": "deferrals",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_jobs",
       "name": "max_attempts",
       "type": "integer",
       "notNull": true,
@@ -3283,6 +3479,326 @@
       "entityType": "columns"
     },
     {
+      "table": "core_production_advisories",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "slug",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "retired_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "title",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "subtitle",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "description",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "category_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "season_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "company_name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "age_guidance",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "advisories_confirmed_none",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "content_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "running_minutes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "interval_count",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "external_booking_url",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "credits_public",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "cancel_reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "listed",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "published_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "first_starts_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "last_ends_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "id",
       "type": "text",
@@ -3467,6 +3983,96 @@
       "name": "archived_at",
       "type": "integer",
       "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "slug",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "starts_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "ends_on",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "summary",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'draft'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_seasons",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -4883,6 +5489,966 @@
       "entityType": "columns"
     },
     {
+      "table": "payments_attempt_events",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempt_events",
+      "name": "attempt_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempt_events",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempt_events",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempt_events",
+      "name": "webhook_event_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempt_events",
+      "name": "by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempt_events",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "intent_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "provider_account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "method",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "idempotency_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "provider_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "reader_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "fee_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "refunded_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "tendered_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "answered_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "failure_code",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "started_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "answered_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "intent_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "owner_module",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "owner_record",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "open",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "refunded_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "settled_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "channel",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "expires_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "session_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "settled_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_intents",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "provider",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "channels",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "mode",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "external_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_readers",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_readers",
+      "name": "provider_account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_readers",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_readers",
+      "name": "external_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_readers",
+      "name": "active",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "true",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_readers",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_readers",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "attempt_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "part_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "idempotency_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "provider_ref",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "self_approve_limit_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "approved_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "decline_reason_term_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "session_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "fee_returned_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "point_label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "opened_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "closed_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "opened_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "closed_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "float_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "expected_cash_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "counted_cash_minor",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "variance_note",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "currency",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "provider_account_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "provider_event_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "type",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "signature_ok",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "attempt_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "received_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "handled_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_account_emails",
       "name": "core_account_emails_address",
       "columns": [
@@ -5025,6 +6591,56 @@
       ],
       "isUnique": false,
       "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_time",
+      "columns": [
+        {
+          "value": "starts_at",
+          "isExpression": false
+        },
+        {
+          "value": "ends_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_venue",
+      "columns": [
+        {
+          "value": "venue_id",
+          "isExpression": false
+        },
+        {
+          "value": "starts_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_feed_ref",
+      "columns": [
+        {
+          "value": "feed_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"core_closures\".\"feed_ref\" IS NOT NULL",
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -5487,6 +7103,66 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_productions",
+      "name": "core_productions_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_listing",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "last_ends_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_season",
+      "columns": [
+        {
+          "value": "season_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_category",
+      "columns": [
+        {
+          "value": "category_term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "core_recovery_codes_hash",
       "columns": [
@@ -5521,6 +7197,34 @@
         {
           "value": "key",
           "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_slug",
+      "columns": [
+        {
+          "value": "slug",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
         }
       ],
       "isUnique": true,
@@ -5945,6 +7649,258 @@
       "entityType": "indexes"
     },
     {
+      "table": "payments_attempt_events",
+      "name": "payments_attempt_events_attempt",
+      "columns": [
+        {
+          "value": "attempt_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_idempotency_key",
+      "columns": [
+        {
+          "value": "idempotency_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_provider_ref",
+      "columns": [
+        {
+          "value": "provider_account_id",
+          "isExpression": false
+        },
+        {
+          "value": "provider_ref",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "provider_ref IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_reader_busy",
+      "columns": [
+        {
+          "value": "reader_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "reader_id IS NOT NULL AND state IN ('started', 'pending')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_intent",
+      "columns": [
+        {
+          "value": "intent_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_waiting",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "state IN ('pending', 'unknown')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "payments_intent_parts_owner",
+      "columns": [
+        {
+          "value": "intent_id",
+          "isExpression": false
+        },
+        {
+          "value": "owner_module",
+          "isExpression": false
+        },
+        {
+          "value": "owner_record",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "payments_intent_parts_one_open",
+      "columns": [
+        {
+          "value": "owner_module",
+          "isExpression": false
+        },
+        {
+          "value": "owner_record",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "open = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_intents",
+      "name": "payments_intents_open",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "expires_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_intents",
+      "name": "payments_intents_session",
+      "columns": [
+        {
+          "value": "session_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "session_id IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_idempotency_key",
+      "columns": [
+        {
+          "value": "idempotency_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_part",
+      "columns": [
+        {
+          "value": "part_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_waiting",
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "state IN ('requested', 'approved', 'sent', 'failed')",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "payments_sessions_one_open",
+      "columns": [
+        {
+          "value": "opened_by",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "payments_webhook_events_event",
+      "columns": [
+        {
+          "value": "provider_account_id",
+          "isExpression": false
+        },
+        {
+          "value": "provider_event_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "signature_ok = 1",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "payments_webhook_events_received",
+      "columns": [
+        {
+          "value": "received_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_account_merge_items",
       "name": "fk_core_account_merge_items_merge_id_core_account_merges_id_fk",
       "columns": [
@@ -5956,6 +7912,38 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_closures",
+      "name": "fk_core_closures_venue_id_core_venues_id_fk",
+      "columns": [
+        "venue_id"
+      ],
+      "tableTo": "core_venues",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_closures",
+      "name": "fk_core_closures_space_id_venue_id_core_spaces_id_venue_id_fk",
+      "columns": [
+        "space_id",
+        "venue_id"
+      ],
+      "tableTo": "core_spaces",
+      "columnsTo": [
+        "id",
+        "venue_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -6142,6 +8130,96 @@
       "entityType": "fks"
     },
     {
+      "table": "core_production_advisories",
+      "name": "fk_core_production_advisories_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "fk_core_production_advisories_term_id_core_terms_id_fk",
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_slugs",
+      "name": "fk_core_production_slugs_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
+      "name": "fk_core_productions_category_term_id_core_terms_id_fk",
+      "columns": [
+        "category_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
+      "name": "fk_core_productions_season_id_core_seasons_id_fk",
+      "columns": [
+        "season_id"
+      ],
+      "tableTo": "core_seasons",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_productions",
+      "name": "fk_core_productions_cancel_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "cancel_reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_role_abilities",
       "name": "fk_core_role_abilities_role_id_core_roles_id_fk",
       "columns": [
@@ -6307,6 +8385,201 @@
       "entityType": "fks"
     },
     {
+      "table": "payments_attempt_events",
+      "name": "fk_payments_attempt_events_attempt_id_payments_attempts_id_fk",
+      "columns": [
+        "attempt_id"
+      ],
+      "tableTo": "payments_attempts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "fk_payments_attempts_intent_id_payments_intents_id_fk",
+      "columns": [
+        "intent_id"
+      ],
+      "tableTo": "payments_intents",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "fk_payments_attempts_provider_account_id_payments_provider_accounts_id_fk",
+      "columns": [
+        "provider_account_id"
+      ],
+      "tableTo": "payments_provider_accounts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "fk_payments_attempts_reader_id_payments_readers_id_fk",
+      "columns": [
+        "reader_id"
+      ],
+      "tableTo": "payments_readers",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "fk_payments_intent_parts_intent_id_payments_intents_id_fk",
+      "columns": [
+        "intent_id"
+      ],
+      "tableTo": "payments_intents",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_intents",
+      "name": "fk_payments_intents_session_id_payments_sessions_id_fk",
+      "columns": [
+        "session_id"
+      ],
+      "tableTo": "payments_sessions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_readers",
+      "name": "fk_payments_readers_provider_account_id_payments_provider_accounts_id_fk",
+      "columns": [
+        "provider_account_id"
+      ],
+      "tableTo": "payments_provider_accounts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "fk_payments_refunds_attempt_id_payments_attempts_id_fk",
+      "columns": [
+        "attempt_id"
+      ],
+      "tableTo": "payments_attempts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "fk_payments_refunds_part_id_payments_intent_parts_id_fk",
+      "columns": [
+        "part_id"
+      ],
+      "tableTo": "payments_intent_parts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "fk_payments_refunds_decline_reason_term_id_core_terms_id_fk",
+      "columns": [
+        "decline_reason_term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "fk_payments_refunds_session_id_payments_sessions_id_fk",
+      "columns": [
+        "session_id"
+      ],
+      "tableTo": "payments_sessions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "fk_payments_webhook_events_provider_account_id_payments_provider_accounts_id_fk",
+      "columns": [
+        "provider_account_id"
+      ],
+      "tableTo": "payments_provider_accounts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "fk_payments_webhook_events_attempt_id_payments_attempts_id_fk",
+      "columns": [
+        "attempt_id"
+      ],
+      "tableTo": "payments_attempts",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_access_profiles",
       "name": "core_access_profiles_pk",
       "columns": [
@@ -6400,6 +8673,16 @@
       "entityType": "pks"
     },
     {
+      "table": "core_production_advisories",
+      "name": "core_production_advisories_pk",
+      "columns": [
+        "production_id",
+        "term_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_role_abilities",
       "name": "core_role_abilities_pk",
       "columns": [
@@ -6458,6 +8741,15 @@
     {
       "table": "core_audit",
       "name": "core_audit_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_pk",
       "columns": [
         "id"
       ],
@@ -6627,6 +8919,24 @@
       "entityType": "pks"
     },
     {
+      "table": "core_production_slugs",
+      "name": "core_production_slugs_pk",
+      "columns": [
+        "slug"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_recovery_codes",
       "name": "core_recovery_codes_pk",
       "columns": [
@@ -6638,6 +8948,15 @@
     {
       "table": "core_roles",
       "name": "core_roles_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_pk",
       "columns": [
         "id"
       ],
@@ -6780,6 +9099,87 @@
       "entityType": "pks"
     },
     {
+      "table": "payments_attempt_events",
+      "name": "payments_attempt_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "payments_intent_parts_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_intents",
+      "name": "payments_intents_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "payments_provider_accounts_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_readers",
+      "name": "payments_readers_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "payments_sessions_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "payments_webhook_events",
+      "name": "payments_webhook_events_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_files",
       "name": "core_files_object_key_unique",
       "columns": [
@@ -6831,6 +9231,36 @@
       "table": "core_accounts",
       "name": "core_accounts_pronouns_length",
       "value": "pronouns IS NULL OR length(pronouns) BETWEEN 1 AND 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_kind",
+      "value": "\"kind\" IN ('closure', 'public_holiday')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_source",
+      "value": "\"source\" IN ('manual', 'feed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_scope",
+      "value": "\"space_id\" IS NULL OR \"venue_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_period",
+      "value": "\"ends_at\" > \"starts_at\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_closures",
+      "name": "core_closures_title",
+      "value": "length(\"title\") BETWEEN 1 AND 120",
       "entityType": "checks"
     },
     {
@@ -6918,9 +9348,81 @@
       "entityType": "checks"
     },
     {
+      "table": "core_production_advisories",
+      "name": "core_production_advisories_detail",
+      "value": "\"detail\" IS NULL OR length(\"detail\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_state",
+      "value": "\"state\" IN ('draft', 'published', 'withdrawn', 'cancelled')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_kind",
+      "value": "\"kind\" IN ('own', 'visiting', 'hire', 'event')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_title",
+      "value": "length(\"title\") BETWEEN 1 AND 200",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_summary",
+      "value": "\"summary\" IS NULL OR length(\"summary\") <= 300",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_age",
+      "value": "\"age_guidance\" IS NULL OR length(\"age_guidance\") <= 40",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_running",
+      "value": "\"running_minutes\" IS NULL OR \"running_minutes\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_intervals",
+      "value": "\"interval_count\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_booking_url",
+      "value": "\"external_booking_url\" IS NULL OR \"external_booking_url\" LIKE 'https://_%'",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_cancel_reason",
+      "value": "(\"state\" = 'cancelled') = (\"cancel_reason_term_id\" IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
       "table": "core_roles",
       "name": "core_roles_expiry_days",
       "value": "(expiry_rule = 'days') = (expiry_days IS NOT NULL)",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_state",
+      "value": "\"state\" IN ('draft', 'published', 'archived')",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_seasons",
+      "name": "core_seasons_dates",
+      "value": "\"ends_on\" >= \"starts_on\"",
       "entityType": "checks"
     },
     {
@@ -7029,6 +9531,114 @@
       "table": "finance_tax_codes",
       "name": "finance_tax_codes_rate",
       "value": "\"rate_basis_points\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_refunded",
+      "value": "\"refunded_minor\" >= 0 AND \"refunded_minor\" <= \"amount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_method",
+      "value": "\"method\" IN ('card_online', 'card_reader', 'card_attested', 'cash', 'other_attested')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_attempts",
+      "name": "payments_attempts_state",
+      "value": "\"state\" IN ('started', 'pending', 'succeeded', 'failed', 'cancelled', 'unknown')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "payments_intent_parts_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "payments_intent_parts_refunded",
+      "value": "\"refunded_minor\" >= 0 AND \"refunded_minor\" <= \"amount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_intent_parts",
+      "name": "payments_intent_parts_open",
+      "value": "\"open\" IS NULL OR \"open\" = 1",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_intents",
+      "name": "payments_intents_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_intents",
+      "name": "payments_intents_channel",
+      "value": "\"channel\" IN ('online', 'desk')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_intents",
+      "name": "payments_intents_state",
+      "value": "\"state\" IN ('open', 'succeeded', 'cancelled', 'expired', 'unfulfilled')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_provider_accounts",
+      "name": "payments_provider_accounts_mode",
+      "value": "\"mode\" IN ('live', 'test')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_amount",
+      "value": "\"amount_minor\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_state",
+      "value": "\"state\" IN ('requested', 'approved', 'sent', 'succeeded', 'failed', 'declined')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_two_people",
+      "value": "\"approved_by\" IS NULL OR \"requested_by\" IS NULL OR \"approved_by\" <> \"requested_by\" OR \"amount_minor\" <= \"self_approve_limit_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_refunds",
+      "name": "payments_refunds_declined_reason",
+      "value": "\"state\" <> 'declined' OR \"decline_reason_term_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "payments_sessions_state",
+      "value": "\"state\" IN ('open', 'counting', 'closed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "payments_sessions_float",
+      "value": "\"float_minor\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "payments_sessions_note",
+      "value": "\"variance_note\" IS NULL OR length(\"variance_note\") <= 200",
       "entityType": "checks"
     }
   ],
