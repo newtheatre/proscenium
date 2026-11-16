@@ -75,6 +75,18 @@ test.describe('a list with views and rows that open', () => {
     expect(asked.length).toBeLessThanOrEqual(1) // server render fetched it already; the browser asks at most once more
   })
 
+  test('a record page has a trail to its list, which returns the list as it was left', async ({ page }) => {
+    await visit(page, '/console/gallery/list?status=draft&sort=seats')
+    await visit(page, '/console/gallery/productions/prod-1')
+    const trail = page.getByRole('navigation', { name: 'Breadcrumb' })
+    await expect(trail.getByRole('link', { name: 'Sample list' })).toHaveAttribute('href', /status=draft&sort=seats|sort=seats&status=draft/)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1)
+    await page.setViewportSize({ width: 500, height: 800 })
+    await expect(page.getByRole('link', { name: 'Back to Sample list' })).toBeVisible()
+    await expect(trail).toBeHidden()
+    await noViolations(page)
+  })
+
   test('the server names a key it does not know', async ({ page }) => {
     const response = await page.request.get('/api/gallery/shows?colour=red', { headers: { 'x-test-actor': JSON.stringify(staff) } })
     expect(response.status()).toBe(422)

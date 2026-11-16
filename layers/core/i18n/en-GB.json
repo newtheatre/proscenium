@@ -200,6 +200,8 @@
   "core.list.search": "Search",
   "core.list.search-for": "search for \"{term}\"",
   "core.list.any": "Any",
+  "core.trail.label": "Breadcrumb",
+  "core.trail.back-to": "Back to {where}",
   "core.list.filters": "Filters",
   "core.list.views": "Views of {title}",
   "core.list.expand": "Show more",

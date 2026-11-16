@@ -13,6 +13,7 @@ export interface BulkAction { label: string, icon?: string, run: (rows: any[]) =
 
 const props = withDefaults(defineProps<{
   title: string
+  trail?: { label: string, to: string }[]
   /** The module's data route: answers { rows, total } for the query it is sent. */
   route: string
   /** The list's declaration (defineList). Leave out to describe the list with `columns` and `filters`. */
@@ -47,7 +48,7 @@ const props = withDefaults(defineProps<{
   subRowsAllTo?: (row: Row) => string
   subRowLabel?: (row: Row) => string
   subRowTo?: (row: Row) => string
-}>(), { subRows: undefined, subRowsNoun: undefined, subRowsTotal: undefined, subRowsAllTo: undefined, subRowLabel: undefined, subRowTo: undefined, list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
+}>(), { trail: undefined, subRows: undefined, subRowsNoun: undefined, subRowsTotal: undefined, subRowsAllTo: undefined, subRowLabel: undefined, subRowTo: undefined, list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
 
 defineSlots<{
   primary?: () => unknown
@@ -82,6 +83,10 @@ const decl = computed<ListDeclaration>(() => {
   return { id: `route:${props.route}`, filters, sorts, columns, defaultSort: props.sort ? { key: props.sort, order: props.order } : undefined }
 })
 const defaults = computed(() => listDefaults(decl.value, state.value.view))
+// The address this list was left at, so a way back to it lands where the person was.
+const { remember } = useListMemory()
+const listRoute = useRoute()
+watch(() => listRoute.fullPath, () => remember(listRoute.path, listRoute.fullPath), { immediate: true })
 const { state, set, setInPanel, endVisit, clear } = useListQuery(decl)
 const viewDefaults = (view?: string) => listDefaults(decl.value, view)
 const { hidden, toggle: toggleColumn } = useListColumns(decl.value)
@@ -226,6 +231,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
 <template>
   <PageFrame
     :title="title"
+    :trail="trail"
     :width="width"
   >
     <template #primary>

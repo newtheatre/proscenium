@@ -25,9 +25,11 @@ const props = withDefaults(defineProps<{
   recordId: string
   /** The owner's own tabs; each one's contents go in the slot `tab-<id>`. */
   tabs: RecordTab[]
+  /** Where this record sits below a navigation entry, nearest parent last. */
+  trail?: { label: string, to: string }[]
   /** What the readiness checklist is called, when other modules or the owner contribute checks. */
   checklistTitle?: string
-}>(), { checklistTitle: undefined, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
+}>(), { trail: undefined, checklistTitle: undefined, status: undefined, primary: undefined, actions: () => [], summary: () => [] })
 const emit = defineEmits<{ (e: 'primary'): void }>()
 defineSlots<{
   /** A side panel that stays put beside the tabs on a laptop (a poster); above them on a phone. */
@@ -89,7 +91,10 @@ const { te } = useT()
 </script>
 
 <template>
-  <PageFrame :title="title">
+  <PageFrame
+    :title="title"
+    :trail="trail"
+  >
     <template #status>
       <StatusBadge
         v-if="status"

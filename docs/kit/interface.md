@@ -239,3 +239,12 @@ and no overrides. All are read-only, gated by `ability`, and absent when the mod
 
 `PageRecord` shows the checklist and an `aside` slot beside the tabs on a laptop; on a phone the
 checklist folds to one line above the tabs ("Checklist: 3 of 5").
+
+### The trail and the way back
+
+`trail: { label, to }[]` (parents only, nearest last) on `PageFrame`, `PageRecord`, `PageList` and
+`PageSettings`; `PageFrame` alone draws it and never fetches a label. In the console and Site
+administration a `UBreadcrumb` of the parents sits in the navbar after the sidebar toggle from 640
+pixels up, and below that an icon-only back button ("Back to Productions") takes its place. Outside
+the console a worded back link sits above the title. A link to a list returns the list as it was left
+(`useListMemory`, kept for the tab's session). A page passes its own parent once its record has arrived.
