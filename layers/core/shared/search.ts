@@ -4,6 +4,8 @@
 export interface SettingRef {
   key: string
   module: string
+  /** 'site' settings are on the Site administration page. */
+  scope?: 'module' | 'site'
   section: string
   labelKey: string
   helpKey: string
@@ -16,7 +18,8 @@ export interface SettingHit extends SettingRef {
 }
 
 /** Core's own settings page is in System; every other module's is at /console/<module>/settings. */
-export function settingsPageOf(module: string): string {
+export function settingsPageOf(module: string, scope: 'module' | 'site' = 'module'): string {
+  if (scope === 'site') return '/admin/settings'
   return module === 'core' ? '/console/system/settings' : `/console/${module}/settings`
 }
 
@@ -33,7 +36,7 @@ export function matchSettings(index: readonly SettingRef[], term: string, t: (ke
     const inLabel = label.toLowerCase()
     const both = `${inLabel} ${help.toLowerCase()}`
     if (!wanted.every(w => both.includes(w))) continue
-    hits.push({ ...ref, label, help, to: `${settingsPageOf(ref.module)}?setting=${encodeURIComponent(ref.key)}`, rank: wanted.every(w => inLabel.includes(w)) ? 0 : 1 })
+    hits.push({ ...ref, label, help, to: `${settingsPageOf(ref.module, ref.scope)}?setting=${encodeURIComponent(ref.key)}`, rank: wanted.every(w => inLabel.includes(w)) ? 0 : 1 })
   }
   return hits.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label)).map(({ rank: _rank, ...hit }) => hit)
 }

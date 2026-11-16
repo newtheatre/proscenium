@@ -9,7 +9,7 @@ Front of house is the module that puts people on a night and records how the nig
 - **The on-shift fact and the shift window.** Three other specifications wait on these: Interface's on-shift bar (UI-05), Box office's door check (BO-44) and Identity's mapping of abilities to facts (ID-26). They are defined in part 3 and declared in parts 4 and 6.
 - **Three facts, not one.** `front-of-house.on-shift` gives authority for one performance while the window is open. `front-of-house.leading-shift` marks the person running the night. `front-of-house.rostered` only opens the members' area for someone with a shift ahead of them.
 - **The module needs nothing but the core.** It reads ticket and till figures through two points that Box office, Payments and Bar contribute to, so it runs with any of them switched off.
-- **Seventeen tables**, sixteen id prefixes, 46 stories (4 gate, 31 others in the first release, 11 later).
+- **Seventeen tables**, sixteen id prefixes, 47 stories (4 gate, 31 others in the first release, 12 later).
 
 ## How to read it
 
@@ -21,7 +21,7 @@ Front of house is the module that puts people on a night and records how the nig
 | 4. Interface to other modules | Facts, points, services, events, tasks, and what is asked of others |
 | 5. Screens | Members' area, console and live mode, by page type |
 | 6. Settings and abilities | One row each, in the registry columns |
-| 7. Stories | FH-01 to FH-46 |
+| 7. Stories | FH-01 to FH-47 |
 | 8. Tests | Named cases by tier |
 | 9. Questions for Matt | Ten decisions, each with the option chosen |
 

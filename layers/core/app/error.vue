@@ -13,41 +13,32 @@ const missing = computed(() => props.error.statusCode === 404)
 const title = computed(() => refused.value ? t('core.refused.title') : missing.value ? t('core.not-found.title') : t('core.failed.title'))
 useHead({ title })
 const home = () => clearError({ redirect: '/' })
+const description = computed(() => refused.value ? undefined : missing.value ? t('core.not-found.description') : t('core.failed.reason'))
 </script>
 
 <template>
   <UApp>
     <NuxtLayout name="default">
-      <UContainer class="py-16">
-        <div class="mx-auto max-w-xl space-y-4">
-          <h1 class="text-2xl font-semibold text-highlighted">
-            {{ title }}
-          </h1>
+      <UError
+        as="div"
+        :error="{ statusCode: error.statusCode, statusMessage: title, message: description }"
+        :ui="{ links: 'flex-col items-center' }"
+      >
+        <!-- The refusal is an alert, which cannot sit in the message's paragraph, so it leads the links. -->
+        <template #links>
           <RefusalPanel
             v-if="refused"
             :refusal="{ reason: phrase(props.error.data?.reason) ?? '', remedy: phrase(props.error.data?.remedy), code: props.error.data?.code }"
             :sign-in-to="`/sign-in?next=${encodeURIComponent(route.fullPath)}`"
           />
-          <p
-            v-else-if="missing"
-            class="text-muted"
-          >
-            {{ t('core.not-found.description') }}
-          </p>
-          <p
-            v-else
-            class="text-muted"
-          >
-            {{ t('core.failed.reason') }}
-          </p>
           <UButton
             :label="t('core.error.home')"
             color="neutral"
             variant="outline"
             @click="home"
           />
-        </div>
-      </UContainer>
+        </template>
+      </UError>
     </NuxtLayout>
   </UApp>
 </template>

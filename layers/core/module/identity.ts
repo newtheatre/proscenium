@@ -29,6 +29,7 @@ export const identitySettings = defineSettings('core', {
 
   'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
   'grants.allow-no-expiry': setting.boolean({ default: true, change }),
+  'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change }),
 
   'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
@@ -39,6 +40,7 @@ export const identitySettings = defineSettings('core', {
   'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, audience: 'public', quotable: true }),
   'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   // Erasure and the download are not offered until the theatre says who to contact about personal data.
+  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, audience: 'public', quotable: true }),
   'privacy.contact': setting.text({ unset: true, maxLength: 120, change, audience: 'public', quotable: true }),
 
   'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
@@ -128,6 +130,20 @@ export const identityJobs = {
   'core.send-sign-in-link': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
   // The erasure batch for one request (ID-16). Safe to repeat: a second run writes nothing.
   'core.run-erasure': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
+  // Stage two of a merge (part 4, Merge): `start` queues one chain per module, each `module` step is
+  // one unit (a handler, or a share of the module's move columns), and `finish` sets completed_at
+  // once nothing is left. Every step is safe to repeat.
+  'core.merge-move': job({
+    payload: z.object({
+      mergeId: z.string(),
+      stage: z.enum(['start', 'module', 'finish']),
+      module: z.string().optional(),
+      step: z.number().int().min(0).optional(),
+    }),
+    lane: 'prompt',
+  }),
+  // Builds a person's data download (ID-15). Safe to repeat: a finished request is left alone.
+  'core.build-export': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
 }
 
 export const identityTasks = {
@@ -148,6 +164,11 @@ export const identityPoints = {
   // Given an account, the hold codes that pause its erasure. Each code has a sentence for staff and
   // one for the person in the module's catalogue, at "<code>.staff" and "<code>.person".
   'core.erasure-hold': point({ kind: 'code', contract: 'erasure-hold' }),
+  // A module's merge handler, for its onMerge 'handler' columns (the kit's MergeHandler). The merge
+  // job runs a module's handlers, in the order given, before re-pointing its move columns.
+  'core.merge-handler': point({ kind: 'code', contract: 'merge-handler' }),
+  // Given an account, material for its data download that the registry cannot find (ID-15).
+  'core.export-contributor': point({ kind: 'code', contract: 'export-contributor' }),
   // A reason a module reads access needs. The core knows none in advance (part 5, the purpose point).
   'core.access-purpose': point({
     kind: 'data',
@@ -198,6 +219,19 @@ export const identityContributions = {
   }],
   // The companions a person on the scheme may book (ID-43), as core.access-scheme:companions.
   'core.requirement': [{ id: 'core.access-scheme', file: 'access-scheme' }],
+  // The access scheme's screens (ID-38, ID-40). "Offered" is one while the scheme runs, so My
+  // account's entry and section hide while it is off; "waiting" sits beside the console's entry.
+  'core.count': [
+    { id: 'core.access-scheme-offered', file: 'access-scheme-offered' },
+    { id: 'core.access-scheme-waiting', file: 'access-scheme-waiting' },
+  ],
+  'core.account-section': [
+    { id: 'core.access-scheme', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreAccessScheme', order: 40, to: '/account/access', icon: 'i-lucide-accessibility', count: 'core.access-scheme-offered', hideEmpty: true },
+  ],
+  // The button a fork's own access page carries: ::access-application.
+  'core.public-component': [
+    { id: 'access-application', component: 'CoreAccessApplication', alias: 'access-application', description: 'The access scheme\'s "Apply" button, or where the visitor\'s application stands.', setting: 'core.access-scheme.enabled' },
+  ],
   // The other identity messages (spec part 4) arrive with the stories that send them.
   'core.notification-type': [{
     // The code that confirms it is you in place, for a basic session with no passkey (ID-28). The
@@ -226,6 +260,20 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Sign in to {{ theatre }}',
         body: 'Use this link to sign in. It works once, in the browser where you asked for it.\n\n[Sign in]({{ link }})\n\nOr type this code on any device: **{{ code }}**\n\nIf you did not ask to sign in, you can ignore this email.',
+      },
+    },
+  }, {
+    // The single-use link to the form, by notifyAddress (ID-42). Sealed: email only, cleared once sent.
+    id: 'core.access-invitation',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'sealed' as const, scheme: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Apply to the {{ scheme }} at {{ theatre }}',
+        body: '{{ theatre }} has invited you to apply to its {{ scheme }}, so that what would help you is there every time you book.\n\n[Open the form]({{ link }})\n\nThe link signs you in and works once. If it has run out, sign in with this email address and choose Apply. If you were not expecting this, you can ignore this email.',
       },
     },
   }, {
@@ -327,6 +375,50 @@ export const identityContributions = {
       },
     },
   }, {
+    // The download is ready (ID-15). It says when it will be removed, never what it holds.
+    id: 'core.export-ready',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { until: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your data from {{ theatre }} is ready',
+        body: 'The download of your data you asked {{ theatre }} for is ready. Sign in to your account to get it. It is kept until {{ until }}, then removed.\n\nIf you did not ask for this, contact the theatre straight away.',
+      },
+    },
+  }, {
+    // To a holder, once per sweep, naming each of their roles that ends within
+    // core.grants.expiry-warning (ID-24). Grants are the members' side.
+    id: 'core.grant-expiring',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { roles: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'A role of yours at {{ theatre }} is ending',
+        body: 'These roles of yours at {{ theatre }} are ending:\n\n{{ roles }}\n\nIf you should keep one, ask whoever gave it to you to renew it. If not, there is nothing to do.',
+      },
+    },
+  }, {
+    // To whoever could renew those grants, once per sweep that found some (ID-24): a count and the
+    // earliest end, never one message per grant, because at a year end most lapse together.
+    id: 'core.grants-expiring',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { count: 'text' as const, date: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Roles at {{ theatre }} are about to lapse',
+        body: 'Roles you can renew are about to lapse: {{ count }}, the first on {{ date }}. Renew those that should carry on; the rest end by themselves.',
+      },
+    },
+  }, {
     id: 'core.address-changed',
     category: 'transactional' as const,
     side: 'audience' as const,
@@ -383,9 +475,16 @@ export const identityContributions = {
   }],
   // The last usable Owner cannot be erased until another Owner exists (part 3, "Export and erasure").
   'core.erasure-hold': [{ id: 'core.last-owner', file: 'last-owner' }],
+  // The data download (ID-15): a zip the server makes, on the account, that only its owner reads.
+  'core.file-slot': [{ id: 'core.data-download', owner: 'core.account', ability: 'core.data-request.manage', accepts: ['zip' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: false, source: 'server' as const }],
+  'core.file-access': [{ id: 'core.account', file: 'account' }],
+  // The access application is special category data, sealed in its table, so the registry leaves
+  // it out of the download; identity adds it opened, for its owner.
+  'core.export-contributor': [{ id: 'core.access-scheme', file: 'access-scheme' }],
   'core.health-check': [
     { id: 'core.session-key', file: 'session-key' },
     { id: 'core.sign-in-challenge', file: 'sign-in-challenge' },
     { id: 'core.owner-recovery', file: 'owner-recovery' },
+    { id: 'core.merges', file: 'merges' },
   ],
 }

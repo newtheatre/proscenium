@@ -6,7 +6,7 @@ Each story has an id, who it is for, and acceptance criteria written so a test c
 
 The roadmap's gate for phase 3 is: a paid booking, a refund and a period close reconcile to the penny, and a full house sells its last seat once. The stories marked **Gate** are the ones that gate rests on.
 
-Counts: 69 stories. 63 are in the first release (17 of them Gate; two with a part held for later, PAY-06 and FIN-06), 3 are later (BO-35, BO-64, FIN-07) and 3 come with allocated seating. Buyers cancelling and exchanging their own tickets (part of BO-22, and BO-55) ship switched off, so they are not Gate stories: the gate is passed with staff cancellation, and self-service is tested behind its setting. Part 9 lists which first-release stories would be cut first if the scope has to shrink.
+Counts: 71 stories. 63 are in the first release (17 of them Gate; two with a part held for later, PAY-06 and FIN-06), 5 are later (BO-35, BO-64, BO-65, BO-66, FIN-07) and 3 come with allocated seating. Buyers cancelling and exchanging their own tickets (part of BO-22, and BO-55) ship switched off, so they are not Gate stories: the gate is passed with staff cancellation, and self-service is tested behind its setting. Part 9 lists which first-release stories would be cut first if the scope has to shrink.
 
 ## Putting a show on sale
 
@@ -96,6 +96,8 @@ This is how the first theatre sells, so all seven are Gate stories. The rules ar
 | BO-62 | As a production team member I request complimentary tickets | I state how many, for whom and why. I see the decision. I cannot approve my own request | First |
 | BO-63 | As a box-office manager I approve and issue complimentary tickets | Approval within the cap issues zero-price tickets that scan like any other and are counted separately in reports | First |
 | BO-64 | As a buyer I buy and use a season pass | A pass is sold as an order line, and exchanged for tickets up to its allowance; the last use is given once | Later |
+| BO-65 | As a buyer I see a show's age guidance and staging effects before I pay | The basket shows, for each performance in it, the minimum age and the staging effects from Core's guidanceFor(productionId, performanceId), in Core's words. Where the age is a restriction and not guidance, the order cannot be paid or reserved until the buyer has acknowledged it, and the order keeps that they did and when. A seller at the desk sees the same and acknowledges on the buyer's behalf | Later (with Core's content warnings slice) |
+| BO-66 | As a booker I am told when a warning is added after I booked | When core.production.updated carries guidanceAdded (a staging effect or a depicted warning that was not there before), everyone holding a live ticket or reservation for an affected performance that has not yet happened is sent one message naming what was added, with the order's link and the refund terms that apply. A warning removed sends nothing, and the same addition is never sent twice to one order | Later (with Core's content warnings slice) |
 
 ## Allocated seating
 

@@ -256,6 +256,12 @@ export const grantEnds = defineTable('core_grant_ends', {
   endedReason: col.internal(text('ended_reason', { enum: GRANT_END_REASONS }).notNull()),
 }, { realm: 'operational', appendOnly: true, extra: t => [uniqueIndex('core_grant_ends_grant').on(t.grantId)] })
 
+/** A grant whose holder and renewers were told it is about to lapse (ID-24): written once, never updated. */
+export const grantWarnings = defineTable('core_grant_warnings', {
+  grantId: col.ref('core_grants').primaryKey(),
+  warnedAt: col.timestamp('warned_at').notNull(),
+}, { realm: 'operational' })
+
 /** The record of a merge, and below it the list of what moved, so that it can be undone. */
 export const accountMerges = defineTable('core_account_merges', {
   id: col.id(),
@@ -265,6 +271,9 @@ export const accountMerges = defineTable('core_account_merges', {
   performedBy: col.account('performed_by', { role: 'actor', onMerge: 'alias' }),
   performedAt: col.timestamp('performed_at').notNull(),
   undoUntil: col.timestamp('undo_until').notNull(),
+  // Set by the merge job's last unit once every module's rows have moved (stage two). Until then
+  // the merge is "still moving"; readers see no difference, because the account scope covers both.
+  completedAt: col.timestamp('completed_at'),
   undoneAt: col.timestamp('undone_at'),
   undoneBy: col.account('undone_by', { role: 'actor', onMerge: 'alias', nullable: true }),
 }, {
@@ -396,5 +405,5 @@ export const accessShares = defineTable('core_access_shares', {
 
 export const identityTables = {
   accounts, accountEmails, passkeys, federatedIdentities, recoveryCodes, accountTokens, passkeyChallenges, sessions,
-  roles, roleAbilities, factAbilities, grants, grantEnds, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
+  roles, roleAbilities, factAbilities, grants, grantEnds, grantWarnings, accountMerges, accountMergeItems, emergencyContacts, dataRequests, dataRequestChecks, accessProfiles, accessShares,
 }

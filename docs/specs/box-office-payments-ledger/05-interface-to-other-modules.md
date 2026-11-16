@@ -71,8 +71,8 @@ Every service that writes takes the caller's unit of work and adds statements to
 | `start(attempt)` | yes | Begin a payment. Returns the next step for the screen, and a provider reference if there is one |
 | `status(attempt)` | if not attested | Ask the provider for the truth now. Used by the reconcile task, by reconciliation and after every webhook |
 | `cancel(attempt)` | if `reader` | Ask the provider to stop a payment waiting on a reader. The attempt is cancelled only when the provider confirms |
-| `refund(refund)` | if `refund` | Send money back, with the refund's idempotency key |
-| `verifyWebhook(request)` | if `webhooks` | Check the signature and return the provider's event id, type and the attempt it concerns |
+| `refund(refund)` | if `refund` | Send money back, with the refund's idempotency key. The refund carries what Payments has already seen refunded, so a provider with no keys can compare and send nothing twice |
+| `verifyWebhook(request)` | if `webhooks` | Check the signature, or the provider's own proof where it signs nothing, and return the provider's event id, type and the attempt it concerns. It is given the request's address and the provider account |
 | `fees(attempt)`, `payouts(since)` | if reported | For the fee and payout postings |
 | `secrets` | yes | The Worker secrets it needs (`when-used`). The first release connects every provider this way |
 | `credentials` | optional | A credential (`oauth` or `api-key`) held in the core's encrypted credential store, for connecting from inside the application. Declared now and built later (Matt, question 3), so nothing may assume a key only ever comes from a secret |
@@ -81,7 +81,28 @@ Every service that writes takes the caller's unit of work and adds statements to
 
 Two families fall out of the capabilities. An **integrated** provider answers for itself (Stripe online; a SumUp reader through its cloud API, which reports the result by webhook and by status call, [SumUp Cloud API](https://developer.sumup.com/terminal-payments/cloud-api)). An **attested** provider has no API in the loop: a person states the outcome (cash; a standalone card machine). An attested card payment records who attested it and can be refunded only by a person attesting the refund.
 
+**A provider that keeps no idempotency keys or signs no webhooks** (the SumUp reader is both) must reach the same two guarantees another way, and the contract allows for it:
+
+- Asked once. The attempt's id travels with the request as the provider's own reference, and a repeated start looks the transaction up by that reference before asking again. A refund compares what the provider has already refunded with the refunds Payments has recorded as succeeded, and sends nothing the provider already has.
+- Told truthfully. An unsigned webhook is only a prompt: its address carries a token Payments can verify, and the job then reads the transaction from the provider. Nothing settles on the webhook's own word.
+- A provider with `reader` also implements `pairReader`. Cancelling at the reader is `cancelAttempt`, and the attempt becomes cancelled only when the provider says so: if the payment went through first, the provider's answer wins and the attempt succeeds.
+- A reader request with no transaction ten minutes after it was sent fails as not started. The seller is not held for that time: they may cancel and take the payment another way, and a late success on the abandoned attempt is refunded as money for an unfulfilled intent. Cancelling an intent whose attempt is still in flight asks the reader to stop as a best effort and does not wait for its answer; the intent stays cancelled whatever arrives. A till session cannot close while one of its attempts is still in flight, so its totals are final when it does; the close screen names the attempt and the latest time it can resolve.
+
+**Two SumUp providers.** A SumUp account that cannot use the Cloud API (the Nottingham New Theatre's is the students' union's, which works only with SumUp's older app hand-off, Payment Switch) is served by a second provider. Each provider account is one or the other, and a till offers the reader method of every account it has, so it may offer either or both.
+
+- `sumup` is the Cloud API, an integrated provider as described above.
+- `sumup-handoff` opens the SumUp app on the till's device with the total, the currency and the attempt's id as the app's reference. The contract's next step for it is `{ kind: 'handoff', url }`. The app returns to an address for that one attempt, signed with the kit's signing keys under the purpose `payments.handoff`.
+- The app's answer is unsigned by SumUp, so it is recorded as a claim by the person at the till, exactly as an attested card payment is: success makes the attempt succeed, anything else fails it, and SumUp's transaction code is kept for reconciliation against the SumUp statement.
+- An attempt with no answer becomes unknown through the reconcile task and is resolved by a person. Refunds are made in the SumUp app and confirmed by a person, as for attested.
+
 Matt chose the first providers (part 9, question 2): cash and attested card, then Stripe online, then the SumUp reader. `cash` and `attested-card` need no account anywhere and make the desk usable on day one.
+
+**Test mode.** A provider account is `live` or `test` (part 2), and test money never touches a live record or the ledger:
+
+- `startAttempt` refuses a test account for any intent with a part owned by a module other than Payments. Nothing a customer or seller can reach offers a test account.
+- Settling checks the account's mode again, as a backstop for an account switched part-way. If it is `test`, no owner's handler runs, the intent is left unfulfilled and the payment is refunded, so no live order, tab or fee is ever confirmed by test money.
+- The "test payment" in guided setup (PAY-01) is an intent with one part that Payments itself owns, for the record `payments.test-payment`. Its handler returns no entries, and Payments writes no posting for a test-mode payment or its refund. There is no test account in the ledger: the clearing accounts hold only real money, so reconciliation needs no exclusions.
+- The attempt and its events are kept as for any payment and show as test on the provider's page. Sales figures, reconciliation and payout matching read live accounts only.
 
 ### Offered by Box office
 

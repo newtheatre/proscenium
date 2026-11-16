@@ -288,7 +288,8 @@ test.describe('My account and counts', () => {
   test('lists the sections modules add, with the account entries as links, and has no violations', async ({ page }) => {
     await visit(page, '/account')
     await expect(page.getByRole('heading', { level: 1, name: 'My account' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Sample tickets' }).first()).toBeVisible()
+    // The card's link covers the card and has no box of its own, so it is checked by where it goes.
+    await expect(page.getByRole('link', { name: 'Sample tickets' }).first()).toHaveAttribute('href', '/account/gallery')
     await expect(page.getByText('Sample tickets section').first()).toBeVisible()
     await noViolations(page)
   })
@@ -339,6 +340,34 @@ test.describe('confirming it is you', () => {
     })
     await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
     expect(page.url()).toBe(at)
+    await noViolations(page)
+    await context.close()
+  })
+})
+
+test.describe('the access scheme screens', () => {
+  const reviewerActor = { ...person('Rhea Reviewer', [grant('core.access-scheme.review')]), assurance: 'strong', reassertedAt: Date.now() }
+
+  test('My account\'s access scheme page offers the scheme, with no accessibility violations', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(audience) })
+    const page = await context.newPage()
+    await visit(page, '/account/access')
+    await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('link', { name: 'Apply' }).click()
+    await expect(page).toHaveURL(/\/account\/access\/apply$/)
+    await expect(page.getByRole('radio', { name: 'None' })).toBeVisible()
+    await noViolations(page)
+    await context.close()
+  })
+
+  test('the reviewers\' queue lists what is waiting and offers "Invite to apply"', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(reviewerActor) })
+    const page = await context.newPage()
+    await visit(page, '/console/people/access-scheme')
+    await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
+    await page.getByRole('button', { name: 'Invite to apply' }).first().click()
+    await expect(page.getByRole('dialog', { name: 'Invite to apply' })).toBeVisible()
     await noViolations(page)
     await context.close()
   })

@@ -18,23 +18,71 @@ Public content pages are an eighth kind that the theatre owns: prose in the site
 
 ### List
 
-- **Filters live in the address.** A filtered list is a link that can be shared, bookmarked and reopened. Back returns to the same filter and scroll position.
-- **One filter bar:** search first, then the two or three filters used most, then "More filters". Active filters show as removable chips with a "Clear all".
-- **Table on a laptop, cards on a phone.** The module marks which two or three columns survive on a card. No sideways scrolling of a table on a phone.
-- **Every list exports** what is currently filtered, as CSV, if the viewer holds the module's export ability. The export says how many rows and which filters.
-- **Saved views:** a named filter, sort and column set, personal or shared with everyone who may open the list.
+The list rules below were redesigned on 16 November 2026 after Matt asked for Flytower-style filters, sorting by columns that are not shown and rows that open. He chose every option as recommended and added the search rule. The proposal behind them is `list-design/proposal.md` in the project files. They apply in the console and in site administration alike.
+
+- **Everything that chooses rows lives in the address.** Search, filters, the view, the sort and the page make a link that can be shared, bookmarked and reopened. Back returns to the same list and scroll position.
+- **One toolbar, in this order:** search, **Filters** (with a count when any are on), **Sort**, **Columns**. There are no separate menus for favourite filters and no "More filters".
+- **Every list has search, and it searches every field** (Matt's rule). A list cannot switch it off. It searches every text field of the row that the list can show, whether its column is on screen or hidden, plus any further fields the list names (a reference, an email address, a note), and the children of a list with sub-rows. Matching ignores case and accents and matches any part of a word; several words must all match, in any field. A field the viewer may not see is not searched for them, and foundations' data classes set a limit: an encrypted field and a special one (access needs, health) are never searched by a list. When the match was in a hidden column the row says so under its first cell ("Matches season: Autumn 2026"). Its address key is `q`, and it combines with filters and views.
+- **Filters open in one panel:** a popover from 640 pixels up, a drawer from the bottom below that. Each filter is a labelled field and the list updates as each changes. The panel ends with "Clear all" and "Done". Everything changed during one visit to the panel makes one history entry, so Back undoes the visit and not each field.
+- **Chips show what is on.** Under the toolbar, one chip for each filter in use, written "State: Draft, Published". Its cross removes it (named "Remove the filter State: Draft" for a screen reader); pressing the chip opens the panel at that field. "Clear all" follows the chips. The count on the Filters button counts filters, not values, and does not count search.
+- **A cell may offer its value as a filter:** the row menu gains "Show only Autumn 2026". The list chooses which columns do.
+- **A filter the viewer may not use is absent,** and its key in the address is ignored.
+- **Sorting has two controls.** A sortable column's heading is a button: the first press sorts by it in its natural direction, the second reverses, the third returns to the list's default sort; the heading carries an arrow and `aria-sort`. The Sort button always says how the list is sorted ("Sort: Run, soonest first") and its menu lists every sort the list declares, shown as a column or not, then the two directions. That is how a person sorts by something not on screen, and it is the only sort control below laptop width, where rows are cards.
+- **One sort at a time,** worded by type: text "A to Z" and "Z to A"; dates "Soonest first" or "Newest first" and the reverse; numbers "Lowest first" and "Highest first". The server always adds the id as a tie-break, so pages never shuffle. A module may declare only a sort the server can answer from an index or a bounded scan.
+- **Columns** ticks optional columns on and off; a column marked as always shown cannot be hidden. The choice is kept on the device for each list, cleared on sign-out, and stored in a saved view. It is not in the address, because it changes how rows look and not which rows.
+- **Built-in views** are a few named presets of filters and sort that a list may declare, shown as tabs above the toolbar and kept in the address as `view=`. Saved views appear in the same place.
+- **Table at laptop width, cards below it.** The list marks which two or three columns survive on a card. No sideways scrolling of a table.
+- **Rows that open.** A row may open in one of two ways. Sub-rows are child records shown indented under the row in the same columns (a production's performances, an order's tickets). A detail panel is a free panel under the row for a few facts that do not merit a page. The chevron is its own button at the start of the row, named with the row ("Show performances of Hamlet"), and pressing the rest of the row still opens the record. "Expand all" and "Collapse all" sit by the table; what is open is not in the address.
+- **Sub-rows follow the parents.** Children arrive with the page of parents, at most 20 for each; beyond that the last sub-row is a link ("All 34 performances"). Sort and paging apply to parents and children keep their own fixed order. A filter or a search that is about the children keeps a parent when any child matches and shows only the matching children, with "2 of 6 performances match. Show all". Bulk selection is of parents only. On a card the children are a disclosure ("6 performances") that opens a short list inside it.
+- **Every list exports** what is currently filtered, as CSV, if the viewer holds the module's export ability. The export says how many rows and which filters, in the words of the chips. A list with sub-rows exports parents only unless it declares a child export.
+- **Saved views:** a named filter, sort and column set, personal or shared with everyone who may open the list. A part that no longer validates is dropped and the view says so.
 - **Bulk actions** appear in a bar only once rows are selected, and say how many they will affect.
-- **Paging is by page with a stated total**, 25 rows by default. No infinite scroll in the console: a person must be able to say "it is on page 3".
+- **Paging is by page with a stated total**, 25 rows by default, or 50 or 100. A list stops at 10,000 rows deep and asks the person to narrow it. No infinite scroll in the console: a person must be able to say "it is on page 3".
 - **Row click opens the record.** Row actions sit in one menu at the row's end, each naming what it acts on for a screen reader.
+- **When nothing matches** the page says "Nothing matches these filters" and offers to clear them. Focus stays where it was when only a filter changes.
+
+The six kinds of filter, each with one key in the address so a filtered list stays a readable link:
+
+| Kind | For | Control | In the address |
+| --- | --- | --- | --- |
+| `choice` | One of a few fixed values | Menu | `state=draft` |
+| `choices` | Any of several values | Menu with ticks | `state=draft,published` |
+| `grouped` | Many values in groups; a whole group or one value | Two-level picker with search | `action=orders` or `action=orders.refund` |
+| `lookup` | A record: a person, a production, a venue | Search as you type | `production=prd_...` |
+| `dates` | A day or a range | Presets beside a calendar | `when=7d` or `when=2026-11-01..2026-11-16` |
+| `yes-no` | A flag | Three-way switch: any, yes, no | `listed=yes` |
+
+A date preset stays relative in the address, so a link to "Last 7 days" still means that next month; presets are declared for each filter and days are the theatre's days, not the device's. A `lookup` holds an id only, and an id that no longer resolves shows as "Unknown" and matches nothing. The list page owns the keys `q`, `sort`, `order`, `page`, `size` and `view`, and a filter may not use them.
+
+**The productions list** is the worked example. Its views are Now and next (the default: a performance today or later, soonest first, opened to show performances), Drafts, Past and All. Its columns are Production, Run, Venue, State and box office's Sales, and a production row opens to its performances as sub-rows. The column names, states and menus are core domain's, and the Sales column is box office's, contributed through `core.list-column` (part 4).
 
 ### Record
 
 - **The title is the thing's own name** ("Hamlet", "Order 4F7K2"), with its status as a badge beside it. A status badge always carries a word.
 - **One primary action** for the most likely next step in this state; everything else in an action menu. Destructive actions are last in the menu, separated.
-- **A summary strip** of four to six facts sits above the tabs and stays put as tabs change.
-- **Tabs come from modules.** A production's record shows core's own tabs first (Overview, Details, Dates, Credits, Media, Advisories and access), then Tickets, Rota and Budget from whichever modules are on, each contributed through `core.record-tab`, the one way to add to a record page. A tab the viewer may not open is absent.
+- **A summary strip** of four to six facts sits above the tabs and stays put as tabs change. The record's own module supplies the first facts. Other modules add theirs (box office's "Sold: 212 of 480" on a production) through a new point, `core.record-fact`. Integration's ruling R-35 allows it (part 4).
+- **Tabs come from modules.** A production's record shows core's own tabs first (Overview, Details, Dates, Credits, Media, Advisories and access), then Tickets, Rota and Budget from whichever modules are on, each contributed through `core.record-tab`, the only way to add a tab (a fact in the strip and a line in a checklist have their own points, under integration ruling R-35). A tab the viewer may not open is absent.
 - **History** is a panel on every record: who changed what and when, from the audit trail, with no personal free text.
 - **Related records are links**, never repeated data that can go stale.
+
+- **A side panel that stays** (the `aside` slot) may sit beside the tabs at laptop width, for the one or two things a person watches while working through the tabs. Below laptop width it folds to a single line above the tabs that opens ("Ready to publish: 3 of 5"), so it never pushes the work down.
+- **A tab's table follows the list rules.** A table inside a tab is a list in small: the same sorting, the same rows that open, and bulk actions in a bar once rows are selected.
+
+**The production record** is the worked example, kept with tabs at Matt's choice. Header: the title, the state as a badge with a word, and one primary action that follows the state (Draft has "Publish", Published has "View public page", Withdrawn has "Publish again"); the menu holds Preview, Add performances, Duplicate, Withdraw, Cancel the run and, last, Delete. Summary strip: Run, Next performance, Season, Performances. Side panel: the poster, with replace, and "Ready to publish?", a checklist of what the public page still lacks, each line linking to the place that fixes it; whether a missing line stops publishing is core's existing publish rule. Another module adds a line to that checklist through `core.record-check` (part 4). Tabs: core's Overview, Details, Dates, Credits, Media, and Advisories and access, then box office's Tickets and prices and Sales, and front of house's tab. The Dates tab is a table of performances by time with earlier ones folded away; a row opens to a detail panel, "Add performances" adds a run in one go, and moving, retiming or cancelling selected rows says what it touches before it happens. What each tab holds is its owner's to specify.
+
+### The trail and the way back
+
+Added 16 November 2026. Agreed between the list design, Nuxt UI and interface build threads; approved by Matt with a thumbs-up on the described design that evening.
+
+- **Console and site administration, from 640 pixels up: a breadcrumb trail** of the page's parents in the header, before the title: "Productions / Hamlet", "Venues / Main House / Edit". The first crumb is the navigation entry; a navigation group ("Programme") is not a crumb because it is not a page, and tabs are not crumbs. The page title stays the only top heading and is the last item, not a link. A page that is itself a navigation entry has no trail.
+- **Below 640 pixels the trail gives way to one back button** to the nearest parent. It is an icon only, because the header already holds the menu button, the title and the primary action, and it is named "Back to Productions" for a screen reader.
+- **Members' area and My account: a worded back link** above the title at every width ("‹ My bookings"). They are too shallow for a trail.
+- **A link to a list returns the list as it was left:** the same view, filters, search, sort and page. The kit remembers each list's last address for the browser tab's session, and a form panel's close uses the same one.
+- **One stated parent for each record.** A record with more than one way in has one parent that its page names (a performance's is its production). A page opened from a search result or a notification still shows its true parent; the browser's Back is the way to return to where one came from.
+- **No separate Back button beside a trail,** which would be two controls for one job. Public pages and live mode have neither. Steps pages keep their own Back and Continue; panels and dialogs have Cancel or Close, never Back.
+- **The page passes the trail, the frame draws it.** A page gives its parents' labels and addresses once its record has arrived; the frame never fetches a label or builds a trail from the address. The trail is a navigation landmark labelled "Breadcrumb", apart from the sidebar's.
+
+This does not touch site administration's "Back to console" at the top of its sidebar, which moves between shells; the trail moves within one.
 
 ### Form
 

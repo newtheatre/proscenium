@@ -3,12 +3,12 @@
 // and one delivery per channel, written set-wise (U7): a handful of statements for any number of
 // recipients up to core.units.set-rows-limit, which the kit enforces before anything is written.
 // Email is sent after the commit by the job core.send-notifications; the inbox item is written here.
-import { all, first, isEnabled, nowMs, refuse, sealSpecial, useContext, useSetting } from '#kit'
+import { sql } from 'drizzle-orm'
+import { all, first, inAccountScope, isEnabled, nowMs, refuse, sealSpecial, useContext, useDb, useSetting } from '#kit'
 import type { RecordRef, UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
 import { deliveries, inboxItems, notifications } from '../db/domain'
 import { addressesFor } from '../identity/addresses'
-import { accountScopeIdsFor } from '../account-scope'
 import { brandTokens } from '../brand/theme'
 import { checkVariables, render } from './render'
 import { suppressedAddresses } from './suppression'
@@ -44,8 +44,12 @@ export function declaredType(typeKey: string): { type: NotificationType, module:
   return undefined
 }
 
-async function dedupeHash(typeKey: string, accountId: string, key: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${typeKey}\u0000${accountId}\u0000${key}`))
+/**
+ * A dedupe key, without the account (R-34): the key has to match across a merge, so the account is
+ * compared in the statement instead, and the unique index is on the key and the account together.
+ */
+async function dedupeHash(typeKey: string, key: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${typeKey}\u0000${key}`))
   return `ntf:${[...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')}` // not-policy: hexadecimal
 }
 
@@ -81,32 +85,25 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     refuse('core.notifications.unknown-sender', `There is no active sender called ${options.senderKey}.`, { status: 500 })
 
   // A repeat under the same dedupe key writes nothing: read first, as U7 asks. Accounts merged into
-  // the recipient count as the recipient (R-34), so each key is hashed once per account in the
-  // scope and any earlier one matches. The unique index on dedupe_key backs up the same account.
-  const hashes = await Promise.all(recipients.map(r => (r.dedupeKey ? dedupeHash(typeKey, r.accountId, r.dedupeKey) : Promise.resolve(null))))
-  // The ids are needed here because the hash is made in the Worker; what goes into IN is hashes.
-  const scopes = await accountScopeIdsFor(recipients.filter(r => r.dedupeKey).map(r => r.accountId))
-  const candidates = await Promise.all(recipients.map(async (r, index) => (r.dedupeKey
-    ? [...new Set([hashes[index]!, ...await Promise.all(scopes.get(r.accountId)!.map(id => dedupeHash(typeKey, id, r.dedupeKey!)))])]
-    : [])))
-  const keyed = candidates.flat()
-  const found = new Map<string, string>()
+  // the recipient count as the recipient (R-34): one statement finds, for each recipient, an earlier
+  // notification with the key sent to any account in that recipient's scope. The unique index on
+  // the key and the account backs this up for the same account.
+  const hashes = await Promise.all(recipients.map(r => (r.dedupeKey ? dedupeHash(typeKey, r.dedupeKey) : Promise.resolve(null))))
+  const keyed = recipients.flatMap((r, index) => (hashes[index] ? [{ i: index, a: r.accountId, h: hashes[index] }] : []))
+  const earlier = new Map<number, string>()
   if (keyed.length) {
-    for (const row of await all<{ id: string, dedupe_key: string }>('SELECT id, dedupe_key FROM core_notifications WHERE dedupe_key IN (SELECT value FROM json_each(?))', JSON.stringify(keyed)))
-      found.set(row.dedupe_key, row.id)
+    const found = await useDb().all<{ i: number, id: string }>(sql`SELECT json_extract(r.value, '$.i') AS i, n.id
+      FROM json_each(${JSON.stringify(keyed)}) r
+      JOIN core_notifications n ON n.dedupe_key = json_extract(r.value, '$.h')
+        AND ${inAccountScope('n.account_id', sql`json_extract(r.value, '$.a')`)}`)
+    for (const row of found) earlier.set(Number(row.i), row.id)
   }
-  // The earlier notification for each recipient's own hash, wherever in the scope it was sent.
-  const earlier = new Map<string, string>()
-  candidates.forEach((list, index) => {
-    const match = list.find(h => found.has(h))
-    if (match) earlier.set(hashes[index]!, found.get(match)!)
-  })
   const fresh: { index: number, accountId: string, values: Record<string, string>, hash: string | null }[] = []
   const inCall = new Set<string>()
   recipients.forEach((r, index) => {
     const hash = hashes[index] ?? null
-    if (hash && (earlier.has(hash) || inCall.has(hash))) return
-    if (hash) inCall.add(hash)
+    if (hash && (earlier.has(index) || inCall.has(`${r.accountId}\u0000${hash}`))) return
+    if (hash) inCall.add(`${r.accountId}\u0000${hash}`)
     fresh.push({ index, accountId: r.accountId, values: r.values, hash })
   })
 
@@ -209,8 +206,9 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
   if (queued.length) unit.enqueue('core.send-notifications', { deliveryIds: queued }, { lane: type.lane ?? 'prompt' })
 
   // Each recipient's notification: the one made now, or the one its dedupe key already names.
-  const byHash = new Map(earlier)
-  fresh.forEach((r, i) => { if (r.hash) byHash.set(r.hash, ids[i]!) })
+  // A repeat within this call takes the id made for the same account and key.
+  const byKey = new Map<string, string>()
+  fresh.forEach((r, i) => { if (r.hash) byKey.set(`${r.accountId}\u0000${r.hash}`, ids[i]!) })
   const byIndex = new Map(fresh.map((r, i) => [r.index, ids[i]!]))
-  return recipients.map((_, index) => byIndex.get(index) ?? byHash.get(hashes[index]!)!)
+  return recipients.map((r, index) => byIndex.get(index) ?? earlier.get(index) ?? byKey.get(`${r.accountId}\u0000${hashes[index]!}`)!)
 }

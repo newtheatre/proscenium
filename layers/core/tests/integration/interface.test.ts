@@ -201,11 +201,13 @@ describe('counts and hideEmpty (UI-04)', () => {
 
   it('lists account sections for the person, in order, and drops an empty one', async () => {
     const actor = audience()
-    expect((await sections(actor)).map(s => s.id)).toEqual(['gallery.tickets', 'gallery.drafts'])
+    // The gallery's own sections; identity's (the access scheme) show beside them.
+    const gallery = async () => (await sections(actor)).map(s => s.id).filter(id => id.startsWith('gallery.'))
+    expect(await gallery()).toEqual(['gallery.tickets', 'gallery.drafts'])
     const admin = staff()
     await call(handle, 'PUT', '/api/core/settings', { actor: admin, body: { changes: [{ key: 'gallery.demo.open', value: false }] } })
     try {
-      expect((await sections(actor)).map(s => s.id)).toEqual(['gallery.tickets'])
+      expect(await gallery()).toEqual(['gallery.tickets'])
     }
     finally {
       await call(handle, 'PUT', '/api/core/settings', { actor: admin, body: { changes: [{ key: 'gallery.demo.open', reset: true }] } })
@@ -271,5 +273,20 @@ describe('home cards, record tabs and history (UI-12, UI-16)', () => {
     const { entries } = await get(path, person(['core.history.view']))
     expect(entries.map((e: { action: string }) => e.action)).toEqual(['update', 'create'])
     expect(entries[1].detail).toEqual({ field: 'name' })
+  })
+})
+
+describe('Site administration in the viewer (R-33)', () => {
+  const sides = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/viewer', { actor })).json()).sides as string[]
+
+  it('offers the admin side to someone who holds an admin entry\'s ability, and only them', async () => {
+    expect(await sides(person(['core.settings.manage']))).toContain('admin')
+    expect(await sides(staff())).not.toContain('admin')
+    expect(await sides(audience())).not.toContain('admin')
+  })
+
+  it('answers /admin as a missing page to someone with no admin ability', async () => {
+    expect((await decide('/admin', staff())).decision).toBe('not-found')
+    expect((await decide('/admin', person(['core.settings.manage']))).decision).toBe('allow')
   })
 })

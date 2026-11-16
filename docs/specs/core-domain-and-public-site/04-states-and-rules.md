@@ -204,3 +204,7 @@ The first four follow Flytower's branding, which is in use.
 - **What changes by the second is not cached.** Availability and the booking button's state are fetched by the page after it loads.
 - **A setting quoted on a page is always live.** A page quoting a setting that does not exist, or one not marked as quotable, fails the build.
 - **A site that is not ready asks search engines to stay away.** Until setup is complete, every page carries `noindex`.
+
+## Later slice: publishing asks two questions
+
+With the content warnings slice (part 2, "Later slice"), the publish rule above changes in one respect. Where it now needs advisories listed or confirmed as none, it will need two answers: staging effects listed or confirmed as none, and content warnings listed or confirmed as none. The refusal names whichever is missing. Once a production is published, neither answer can be emptied. Until the slice is built, the single answer stands.

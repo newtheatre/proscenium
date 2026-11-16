@@ -9,7 +9,7 @@ import { allowedEntries, declaredEntries, holds, mayOpen } from './navigation'
 import { abilityList, entryLabelKey } from '../../shared/navigation'
 import { isMember } from '../identity/standings'
 
-export type Side = 'audience' | 'members' | 'console'
+export type Side = 'audience' | 'members' | 'console' | 'admin'
 
 export interface ViewerDescription {
   signedIn: boolean
@@ -61,6 +61,7 @@ export async function describeViewer(actor: Actor): Promise<ViewerDescription> {
   const sides: Side[] = ['audience']
   if (await isMember(actor)) sides.push('members')
   if (await holdsConsole(actor)) sides.push('console')
+  if (await holdsAdmin(actor)) sides.push('admin')
   const navigation: ViewerDescription['navigation'] = []
   for (const shell of ['account', 'members'] as const) {
     if (shell === 'members' && !sides.includes('members')) continue
