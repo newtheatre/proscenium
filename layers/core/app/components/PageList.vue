@@ -3,7 +3,7 @@
      selected. Filters, sort and page live in the address, so a filtered list is a link and Back
      returns to it. A module supplies columns, filters, row actions and the data route. -->
 <script setup lang="ts" generic="Row extends Record<string, any>">
-import type { DropdownMenuItem } from '@nuxt/ui'
+import type { DropdownMenuItem, TableColumn, TableRow } from '@nuxt/ui'
 import { activeFilterCount, type ListResult } from '../../shared/list'
 
 export interface ListColumn { key: string, label: string, sortable?: boolean, /** Survives on a phone's card. */ card?: boolean }
@@ -39,6 +39,8 @@ const props = withDefaults(defineProps<{
 
 defineSlots<{
   primary?: () => unknown
+  /** After the list: a panel or dialog the page opens from it. */
+  default?: () => unknown
   [cell: `cell-${string}`]: (props: { row: Row }) => unknown
 }>()
 
@@ -83,16 +85,25 @@ function sortBy(key: string) {
   const same = state.value.sort === key
   set({ sort: key, order: same && state.value.order === 'asc' ? 'desc' : 'asc' })
 }
-const ariaSort = (key: string) => state.value.sort === key ? (state.value.order === 'asc' ? 'ascending' : 'descending') : 'none'
+// The table is told how the server sorted, so each heading says so to a screen reader.
+const sorting = computed(() => state.value.sort ? [{ id: state.value.sort, desc: state.value.order === 'desc' }] : [])
+const sortIcon = (key: string) => state.value.sort === key ? (state.value.order === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down') : 'i-lucide-arrow-up-down'
 
-const selected = ref<Set<string>>(new Set())
-watch(() => data.value?.rows, () => selected.value.clear())
 const rowId = (row: Row) => String(row[props.rowKey])
-const selectedRows = computed(() => (data.value?.rows ?? []).filter(r => selected.value.has(rowId(r))))
+const tableColumns = computed<TableColumn<Row>[]>(() => [
+  ...(props.bulkActions ? [{ id: 'select', enableSorting: false }] : []),
+  ...props.columns.map(c => ({ id: c.key, accessorFn: (row: Row) => row[c.key], header: c.label, enableSorting: !!c.sortable })),
+  ...(props.rowActions ? [{ id: 'actions', enableSorting: false }] : []),
+])
+
+// Selection is kept by row id and dropped when the rows change: a bulk action never reaches a row
+// that is no longer on screen.
+const rowSelection = ref<Record<string, boolean>>({})
+watch(() => data.value?.rows, () => { rowSelection.value = {} })
+const selectedRows = computed(() => (data.value?.rows ?? []).filter(r => rowSelection.value[rowId(r)]))
 function toggle(row: Row, on: boolean) {
-  if (on) selected.value.add(rowId(row))
-  else selected.value.delete(rowId(row))
-  selected.value = new Set(selected.value)
+  const { [rowId(row)]: _, ...rest } = rowSelection.value
+  rowSelection.value = on ? { ...rest, [rowId(row)]: true } : rest
 }
 
 const exportHref = computed(() => {
@@ -105,8 +116,8 @@ const exportHref = computed(() => {
 const exportBlocked = computed(() => total.value > props.exportCeiling)
 
 const cardColumns = computed(() => props.columns.filter(c => c.card).slice(0, 3))
-function open(row: Row) {
-  if (props.rowTo) void navigateTo(props.rowTo(row))
+function open(_event: Event, row: TableRow<Row>) {
+  if (props.rowTo) void navigateTo(props.rowTo(row.original))
 }
 const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page, pages: pages.value, total: total.value }))
 </script>
@@ -121,67 +132,64 @@ const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page
     </template>
 
     <!-- One filter bar: search first, then the filters used most, then "More filters". -->
-    <form
-      class="mb-3 flex flex-wrap items-end gap-3"
-      role="search"
-      :aria-label="t('core.list.filter-bar', { title })"
-      @submit.prevent="set({ search })"
-    >
-      <UFormField
-        :label="t('core.list.search')"
-        class="w-full sm:w-72"
+    <template #toolbar>
+      <form
+        class="flex flex-wrap items-center gap-1.5"
+        role="search"
+        :aria-label="t('core.list.filter-bar', { title })"
+        @submit.prevent="set({ search })"
       >
         <UInput
           :model-value="search"
           type="search"
           icon="i-lucide-search"
-          class="w-full"
+          :placeholder="t('core.list.search')"
+          :aria-label="t('core.list.search')"
+          class="sm:w-72"
           @update:model-value="onSearch(String($event))"
         />
-      </UFormField>
-      <UFormField
-        v-for="f in primaryFilters"
-        :key="f.name"
-        :label="f.label"
-      >
         <USelect
-          :model-value="state.filters[f.name] || ANY"
+          v-for="f in primaryFilters"
+          :key="f.name"
+          :model-value="state.filters[f.name] || undefined"
           :items="[{ value: ANY, label: t('core.list.any') }, ...f.options]"
           value-key="value"
-          class="min-w-40"
+          :placeholder="f.label"
+          :aria-label="f.label"
+          class="w-auto min-w-40"
           @update:model-value="set({ filters: { [f.name]: $event === ANY ? '' : String($event) } })"
         />
-      </UFormField>
-      <UPopover v-if="moreFilters.length">
-        <UButton
-          color="neutral"
-          variant="outline"
-          icon="i-lucide-sliders-horizontal"
-          :label="t('core.list.more-filters')"
-        />
-        <template #content>
-          <div class="w-72 space-y-3 p-4">
-            <UFormField
-              v-for="f in moreFilters"
-              :key="f.name"
-              :label="f.label"
-            >
-              <USelect
-                :model-value="state.filters[f.name] || ANY"
-                :items="[{ value: ANY, label: t('core.list.any') }, ...f.options]"
-                value-key="value"
-                class="w-full"
-                @update:model-value="set({ filters: { [f.name]: $event === ANY ? '' : String($event) } })"
-              />
-            </UFormField>
-          </div>
-        </template>
-      </UPopover>
-    </form>
+        <UPopover v-if="moreFilters.length">
+          <UButton
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-sliders-horizontal"
+            :label="t('core.list.more-filters')"
+          />
+          <template #content>
+            <UCard>
+              <UFormField
+                v-for="f in moreFilters"
+                :key="f.name"
+                :label="f.label"
+              >
+                <USelect
+                  :model-value="state.filters[f.name] || ANY"
+                  :items="[{ value: ANY, label: t('core.list.any') }, ...f.options]"
+                  value-key="value"
+                  class="min-w-56"
+                  @update:model-value="set({ filters: { [f.name]: $event === ANY ? '' : String($event) } })"
+                />
+              </UFormField>
+            </UCard>
+          </template>
+        </UPopover>
+      </form>
+    </template>
 
     <div
       v-if="chips.length"
-      class="mb-3 flex flex-wrap items-center gap-2"
+      class="flex flex-wrap items-center gap-2"
     >
       <UButton
         v-for="chip in chips"
@@ -211,24 +219,16 @@ const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page
     >
       <template #default="{ data: result }">
         <!-- Bulk actions appear only once rows are selected, and say how many they affect. -->
-        <div
+        <UAlert
           v-if="bulkActions && selectedRows.length"
-          class="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-elevated p-3"
+          color="neutral"
           role="region"
           :aria-label="t('core.list.bulk')"
-        >
-          <span class="text-sm font-medium">{{ t('core.list.selected', { count: selectedRows.length }) }}</span>
-          <UButton
-            v-for="action in bulkActions"
-            :key="action.label"
-            color="neutral"
-            variant="outline"
-            size="sm"
-            :icon="action.icon"
-            :label="`${action.label} (${selectedRows.length})`"
-            @click="action.run(selectedRows)"
-          />
-        </div>
+          :title="t('core.list.selected', { count: selectedRows.length })"
+          :actions="bulkActions.map(action => ({ label: `${action.label} (${selectedRows.length})`, icon: action.icon, color: 'neutral' as const, variant: 'outline' as const, onClick: () => { void action.run(selectedRows) } }))"
+          orientation="horizontal"
+          class="mb-3"
+        />
 
         <EmptyState
           v-if="result.total === 0"
@@ -254,173 +254,148 @@ const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page
 
         <template v-else>
           <!-- A table above 1024 pixels. -->
-          <div class="hidden lg:block">
-            <div class="overflow-x-auto rounded-lg border border-default">
-              <table class="w-full text-left text-sm">
-                <caption class="sr-only">
-                  {{ title }}. {{ pageLabel }}
-                </caption>
-                <thead class="bg-elevated text-muted">
-                  <tr>
-                    <th
-                      v-if="bulkActions"
-                      scope="col"
-                      class="w-10 px-3 py-2"
-                    >
-                      <span class="sr-only">{{ t('core.list.select') }}</span>
-                    </th>
-                    <th
-                      v-for="c in columns"
-                      :key="c.key"
-                      scope="col"
-                      class="px-3 py-2 font-medium"
-                      :aria-sort="c.sortable ? ariaSort(c.key) : undefined"
-                    >
-                      <UButton
-                        v-if="c.sortable"
-                        color="neutral"
-                        variant="ghost"
-                        size="sm"
-                        :label="c.label"
-                        :trailing-icon="state.sort === c.key ? (state.order === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down') : 'i-lucide-arrow-up-down'"
-                        class="-mx-2"
-                        @click="sortBy(c.key)"
-                      />
-                      <template v-else>
-                        {{ c.label }}
-                      </template>
-                    </th>
-                    <th
-                      v-if="rowActions"
-                      scope="col"
-                      class="w-12 px-3 py-2"
-                    >
-                      <span class="sr-only">{{ t('core.list.actions') }}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-default">
-                  <tr
-                    v-for="row in result.rows"
-                    :key="rowId(row)"
-                    class="hover:bg-elevated/60"
-                    :class="rowTo ? 'cursor-pointer' : ''"
-                    @click="open(row)"
-                  >
-                    <td
-                      v-if="bulkActions"
-                      class="px-3 py-2"
-                      @click.stop
-                    >
-                      <UCheckbox
-                        :model-value="selected.has(rowId(row))"
-                        :aria-label="t('core.list.select-row', { row: rowLabel(row) })"
-                        @update:model-value="toggle(row, $event === true)"
-                      />
-                    </td>
-                    <td
-                      v-for="(c, i) in columns"
-                      :key="c.key"
-                      class="px-3 py-2"
-                    >
-                      <NuxtLink
-                        v-if="rowTo && i === 0"
-                        :to="rowTo(row)"
-                        class="font-medium text-highlighted hover:underline"
-                        @click.stop
-                      >
-                        <slot
-                          :name="`cell-${c.key}`"
-                          :row="row"
-                        >
-                          {{ row[c.key] }}
-                        </slot>
-                      </NuxtLink>
-                      <slot
-                        v-else
-                        :name="`cell-${c.key}`"
-                        :row="row"
-                      >
-                        {{ row[c.key] }}
-                      </slot>
-                    </td>
-                    <td
-                      v-if="rowActions"
-                      class="px-3 py-2 text-right"
-                      @click.stop
-                    >
-                      <UDropdownMenu :items="rowActions(row)">
-                        <UButton
-                          color="neutral"
-                          variant="ghost"
-                          icon="i-lucide-ellipsis"
-                          :aria-label="t('core.list.actions-for', { row: rowLabel(row) })"
-                        />
-                      </UDropdownMenu>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <UTable
+            :data="result.rows"
+            :columns="tableColumns"
+            :caption="`${title}. ${pageLabel}`"
+            :get-row-id="rowId"
+            :row-selection="rowSelection"
+            :sorting="sorting"
+            :sorting-options="{ manualSorting: true }"
+            :on-select="rowTo ? open : undefined"
+            :ui="{ caption: 'sr-only' }"
+            class="max-lg:hidden"
+          >
+            <template #select-header>
+              <span class="sr-only">{{ t('core.list.select') }}</span>
+            </template>
+            <template #select-cell="{ row }">
+              <UCheckbox
+                :model-value="!!rowSelection[row.id]"
+                :aria-label="t('core.list.select-row', { row: rowLabel(row.original) })"
+                @update:model-value="toggle(row.original, $event === true)"
+              />
+            </template>
+            <template
+              v-for="c in columns"
+              :key="c.key"
+              #[`${c.key}-header`]
+            >
+              <UButton
+                v-if="c.sortable"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :label="c.label"
+                :trailing-icon="sortIcon(c.key)"
+                class="-mx-2.5"
+                @click="sortBy(c.key)"
+              />
+              <template v-else>
+                {{ c.label }}
+              </template>
+            </template>
+            <template
+              v-for="(c, i) in columns"
+              :key="c.key"
+              #[`${c.key}-cell`]="{ row }"
+            >
+              <ULink
+                v-if="rowTo && i === 0"
+                :to="rowTo(row.original)"
+                class="font-medium text-highlighted hover:underline"
+              >
+                <slot
+                  :name="`cell-${c.key}`"
+                  :row="row.original"
+                >
+                  {{ row.original[c.key] }}
+                </slot>
+              </ULink>
+              <slot
+                v-else
+                :name="`cell-${c.key}`"
+                :row="row.original"
+              >
+                {{ row.original[c.key] }}
+              </slot>
+            </template>
+            <template #actions-header>
+              <span class="sr-only">{{ t('core.list.actions') }}</span>
+            </template>
+            <template #actions-cell="{ row }">
+              <UDropdownMenu
+                v-if="rowActions"
+                :items="rowActions(row.original)"
+              >
+                <UButton
+                  color="neutral"
+                  variant="ghost"
+                  icon="i-lucide-ellipsis"
+                  :aria-label="t('core.list.actions-for', { row: rowLabel(row.original) })"
+                />
+              </UDropdownMenu>
+            </template>
+          </UTable>
 
           <!-- Cards below it. No sideways scrolling of a table on a phone. -->
           <ul class="space-y-3 lg:hidden">
             <li
               v-for="row in result.rows"
               :key="rowId(row)"
-              class="rounded-lg border border-default p-4"
             >
-              <div class="flex items-start justify-between gap-2">
-                <div class="flex min-w-0 items-start gap-3">
-                  <UCheckbox
-                    v-if="bulkActions"
-                    :model-value="selected.has(rowId(row))"
-                    :aria-label="t('core.list.select-row', { row: rowLabel(row) })"
-                    @update:model-value="toggle(row, $event === true)"
-                  />
-                  <NuxtLink
-                    v-if="rowTo"
-                    :to="rowTo(row)"
-                    class="min-w-0 truncate font-medium text-highlighted hover:underline"
-                  >
-                    {{ rowLabel(row) }}
-                  </NuxtLink>
-                  <span
-                    v-else
-                    class="min-w-0 truncate font-medium text-highlighted"
-                  >{{ rowLabel(row) }}</span>
-                </div>
-                <UDropdownMenu
-                  v-if="rowActions"
-                  :items="rowActions(row)"
-                >
-                  <UButton
-                    color="neutral"
-                    variant="ghost"
-                    icon="i-lucide-ellipsis"
-                    :aria-label="t('core.list.actions-for', { row: rowLabel(row) })"
-                  />
-                </UDropdownMenu>
-              </div>
-              <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                <template
-                  v-for="c in cardColumns"
-                  :key="c.key"
-                >
-                  <dt class="text-muted">
-                    {{ c.label }}
-                  </dt>
-                  <dd>
-                    <slot
-                      :name="`cell-${c.key}`"
-                      :row="row"
+              <UCard>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex min-w-0 items-start gap-3">
+                    <UCheckbox
+                      v-if="bulkActions"
+                      :model-value="!!rowSelection[rowId(row)]"
+                      :aria-label="t('core.list.select-row', { row: rowLabel(row) })"
+                      @update:model-value="toggle(row, $event === true)"
+                    />
+                    <ULink
+                      v-if="rowTo"
+                      :to="rowTo(row)"
+                      class="min-w-0 truncate font-medium text-highlighted hover:underline"
                     >
-                      {{ row[c.key] }}
-                    </slot>
-                  </dd>
-                </template>
-              </dl>
+                      {{ rowLabel(row) }}
+                    </ULink>
+                    <span
+                      v-else
+                      class="min-w-0 truncate font-medium text-highlighted"
+                    >{{ rowLabel(row) }}</span>
+                  </div>
+                  <UDropdownMenu
+                    v-if="rowActions"
+                    :items="rowActions(row)"
+                  >
+                    <UButton
+                      color="neutral"
+                      variant="ghost"
+                      icon="i-lucide-ellipsis"
+                      :aria-label="t('core.list.actions-for', { row: rowLabel(row) })"
+                    />
+                  </UDropdownMenu>
+                </div>
+                <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                  <template
+                    v-for="c in cardColumns"
+                    :key="c.key"
+                  >
+                    <dt class="text-muted">
+                      {{ c.label }}
+                    </dt>
+                    <dd>
+                      <slot
+                        :name="`cell-${c.key}`"
+                        :row="row"
+                      >
+                        {{ row[c.key] }}
+                      </slot>
+                    </dd>
+                  </template>
+                </dl>
+              </UCard>
             </li>
           </ul>
 
@@ -470,5 +445,6 @@ const pageLabel = computed(() => t('core.list.page-of', { page: state.value.page
         </template>
       </template>
     </DataBoundary>
+    <slot />
   </PageFrame>
 </template>

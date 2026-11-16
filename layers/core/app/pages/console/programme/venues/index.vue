@@ -39,46 +39,44 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
 </script>
 
 <template>
-  <div>
-    <PageList
-      title="Venues and spaces"
-      route="/api/core/venues"
-      :columns="columns"
-      :filters="filters"
-      :row-label="(row: Row) => row.name"
-      :row-to="(row: Row) => `/console/programme/venues/${row.id}`"
-      :empty="{ title: 'No venues yet', description: 'A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio.', icon: 'i-lucide-building' }"
-    >
-      <template #primary>
-        <UButton
-          label="New venue"
-          icon="i-lucide-plus"
-          @click="creating = true"
+  <PageList
+    title="Venues and spaces"
+    route="/api/core/venues"
+    :columns="columns"
+    :filters="filters"
+    :row-label="(row: Row) => row.name"
+    :row-to="(row: Row) => `/console/programme/venues/${row.id}`"
+    :empty="{ title: 'No venues yet', description: 'A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio.', icon: 'i-lucide-building' }"
+  >
+    <template #primary>
+      <UButton
+        label="New venue"
+        icon="i-lucide-plus"
+        @click="creating = true"
+      />
+    </template>
+    <template #cell-name="{ row }">
+      <span class="inline-flex items-center gap-2">
+        {{ row.name }}
+        <UBadge
+          v-if="!row.managed"
+          label="Visiting"
+          color="neutral"
+          size="sm"
         />
-      </template>
-      <template #cell-name="{ row }">
-        <span class="inline-flex items-center gap-2">
-          {{ row.name }}
-          <UBadge
-            v-if="!row.managed"
-            label="Visiting"
-            color="neutral"
-            size="sm"
-          />
-          <StatusBadge
-            v-if="row.archived"
-            tone="neutral"
-            label="Archived"
-          />
-        </span>
-      </template>
-      <template #cell-locality="{ row }">
-        {{ row.locality ?? '' }}
-      </template>
-      <template #cell-spaces="{ row }">
-        {{ spaceList(row) }}
-      </template>
-    </PageList>
+        <StatusBadge
+          v-if="row.archived"
+          tone="neutral"
+          label="Archived"
+        />
+      </span>
+    </template>
+    <template #cell-locality="{ row }">
+      {{ row.locality ?? '' }}
+    </template>
+    <template #cell-spaces="{ row }">
+      {{ spaceList(row) }}
+    </template>
 
     <UModal
       v-model:open="creating"
@@ -122,5 +120,5 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
         />
       </template>
     </UModal>
-  </div>
+  </PageList>
 </template>

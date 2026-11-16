@@ -128,7 +128,6 @@ defineExpose({ errors })
     </nav>
 
     <section
-      class="mt-6"
       :aria-labelledby="`step-${current.id}`"
     >
       <h2
@@ -148,7 +147,6 @@ defineExpose({ errors })
         v-if="Object.keys(errors).length"
         class="mb-4"
         color="error"
-        variant="subtle"
         icon="i-lucide-octagon-alert"
         :title="t('core.form.problems', { count: Object.keys(errors).length })"
         :description="Object.values(errors).join(' ')"
@@ -170,35 +168,34 @@ defineExpose({ errors })
       </div>
     </section>
 
-    <div class="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-default pt-4">
+    <template #footer>
       <UButton
         color="neutral"
         variant="link"
+        class="me-auto"
         :label="t('core.steps.later')"
         @click="leave"
       />
-      <div class="flex gap-2">
-        <UButton
-          v-if="index > 0"
-          color="neutral"
-          variant="outline"
-          :label="t('core.steps.back')"
-          :disabled="finishing"
-          @click="back"
-        />
-        <UButton
-          v-if="!onSummary"
-          :label="t('core.steps.continue')"
-          @click="next"
-        />
-        <UButton
-          v-else
-          :label="finishLabel"
-          :loading="finishing"
-          :disabled="finishing"
-          @click="done"
-        />
-      </div>
-    </div>
+      <UButton
+        v-if="index > 0"
+        color="neutral"
+        variant="outline"
+        :label="t('core.steps.back')"
+        :disabled="finishing"
+        @click="back"
+      />
+      <UButton
+        v-if="!onSummary"
+        :label="t('core.steps.continue')"
+        @click="next"
+      />
+      <UButton
+        v-else
+        :label="finishLabel"
+        :loading="finishing"
+        :disabled="finishing"
+        @click="done"
+      />
+    </template>
   </PageFrame>
 </template>

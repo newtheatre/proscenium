@@ -62,6 +62,8 @@ const toast = useToast()
 const USlideover = resolveComponent('USlideover')
 const PageFrame = resolveComponent('PageFrame')
 const bodySlot = computed(() => panel.value ? 'body' : 'default')
+// The buttons sit in the panel's or the page's footer, outside the form they submit.
+const formId = useId()
 const panel = computed(() => props.open !== undefined && props.fields.length <= PANEL_FIELD_LIMIT)
 // A tick list holds { value, note? } for each ticked option, in the order of the options.
 function tickOf(name: string, value: string | number) {
@@ -231,7 +233,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <UAlert
           v-if="summary.length"
           color="error"
-          variant="subtle"
           icon="i-lucide-octagon-alert"
           :title="t('core.form.problems', { count: summary.length })"
           role="alert"
@@ -255,7 +256,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <UAlert
           v-if="draft"
           color="info"
-          variant="subtle"
           icon="i-lucide-history"
           :title="t('core.form.draft')"
           :actions="[
@@ -268,7 +268,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         <UAlert
           v-if="conflicts.length"
           color="warning"
-          variant="subtle"
           icon="i-lucide-git-compare"
           :title="t('core.form.conflict.title')"
           :description="t('core.form.conflict.description')"
@@ -299,6 +298,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
         />
 
         <UForm
+          :id="formId"
           ref="form"
           :schema="schema"
           :state="state"
@@ -322,7 +322,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <UTextarea
                 v-if="g.kind === 'textarea'"
                 v-model="state[g.name]"
-                class="w-full"
               />
               <URadioGroup
                 v-else-if="g.kind === 'radio'"
@@ -359,7 +358,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                     <UInput
                       :model-value="tickOf(g.name, o.value)?.note ?? ''"
                       :maxlength="g.notes.max"
-                      class="w-full"
                       @update:model-value="setNote(g, o.value, String($event))"
                     />
                   </UFormField>
@@ -370,7 +368,6 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
                 v-model="state[g.name]"
                 :items="g.options ?? []"
                 value-key="value"
-                class="w-full"
               />
               <UCheckbox
                 v-else-if="g.kind === 'checkbox'"
@@ -380,36 +377,34 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <UInputNumber
                 v-else-if="g.kind === 'number'"
                 v-model="state[g.name]"
-                class="w-full"
               />
               <UInput
                 v-else
                 v-model="state[g.name]"
                 :type="g.kind"
                 :placeholder="g.placeholder"
-                class="w-full"
               />
             </UFormField>
           </div>
-
-          <!-- The save bar stays visible at the foot. -->
-          <div class="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-default bg-default px-4 py-3 sm:-mx-6 sm:px-6">
-            <UButton
-              color="neutral"
-              variant="outline"
-              :label="t('core.form.cancel')"
-              :disabled="submitting"
-              @click="cancel"
-            />
-            <UButton
-              type="submit"
-              :label="submitLabel"
-              :loading="submitting"
-              :disabled="submitting || conflicts.length > 0"
-            />
-          </div>
         </UForm>
       </div>
+    </template>
+    <!-- The save bar stays in view at the foot. -->
+    <template #footer>
+      <UButton
+        color="neutral"
+        variant="outline"
+        :label="t('core.form.cancel')"
+        :disabled="submitting"
+        @click="cancel"
+      />
+      <UButton
+        type="submit"
+        :form="formId"
+        :label="submitLabel"
+        :loading="submitting"
+        :disabled="submitting || conflicts.length > 0"
+      />
     </template>
   </component>
 </template>

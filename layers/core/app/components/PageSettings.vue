@@ -133,116 +133,114 @@ onMounted(() => {
       <form
         v-for="section in sections"
         :key="section.id"
-        class="mb-8"
         @submit.prevent="save(section.id, section.settings)"
       >
-        <h2 class="mb-3 text-lg font-semibold text-highlighted">
-          {{ t(`${module}.settings-sections.${section.id}`) }}
-        </h2>
-        <div class="divide-y divide-default rounded-lg border border-default">
-          <div
-            v-for="s in section.settings"
-            :id="`setting-${s.key}`"
-            :key="s.key"
-            class="space-y-2 p-4"
-            :class="highlight === s.key ? 'bg-primary/10' : ''"
-          >
-            <UFormField
-              :label="t(s.labelKey)"
-              :help="t(s.helpKey)"
-              :error="problems[s.key]"
-              :name="s.key"
+        <PageSection :title="t(`${module}.settings-sections.${section.id}`)">
+          <div class="divide-y divide-default">
+            <div
+              v-for="s in section.settings"
+              :id="`setting-${s.key}`"
+              :key="s.key"
+              class="space-y-2 py-4 first:pt-0 last:pb-0"
+              :class="highlight === s.key ? 'bg-primary/10' : ''"
             >
-              <USwitch
-                v-if="s.kind === 'boolean'"
-                :model-value="draft[s.key]"
-                :disabled="!s.canChange"
-                @update:model-value="onEdit(s, $event)"
-              />
-              <UInputNumber
-                v-else-if="s.kind === 'integer' || s.kind === 'money'"
-                :model-value="draft[s.key]"
-                :disabled="!s.canChange"
-                :min="limit(s, 'min')"
-                :max="limit(s, 'max')"
-                :format-options="s.kind === 'money' ? { style: 'currency', currency: 'GBP' } : undefined"
-                class="w-48"
-                @update:model-value="onEdit(s, $event)"
-              />
-              <USelect
-                v-else-if="s.kind === 'choice'"
-                :model-value="draft[s.key]"
-                :items="optionItems(s)"
-                value-key="value"
-                :disabled="!s.canChange"
-                class="w-64"
-                @update:model-value="onEdit(s, $event)"
-              />
-              <UInputTags
-                v-else-if="s.kind === 'list'"
-                :model-value="draft[s.key]"
-                :disabled="!s.canChange"
-                class="w-full"
-                @update:model-value="onEdit(s, $event)"
-              />
-              <UInput
-                v-else
-                :model-value="draft[s.key]"
-                :type="s.sensitive ? 'password' : s.kind === 'time' ? 'time' : 'text'"
-                :disabled="!s.canChange"
-                :maxlength="s.maxLength"
-                :placeholder="s.sensitive ? t('core.settings-page.hidden') : undefined"
-                class="w-full max-w-md"
-                @update:model-value="onEdit(s, $event)"
-              />
-              <template
-                v-if="unitText(s)"
-                #hint
+              <UFormField
+                :label="t(s.labelKey)"
+                :help="t(s.helpKey)"
+                :error="problems[s.key]"
+                :name="s.key"
               >
-                {{ unitText(s) }}
-              </template>
-            </UFormField>
-
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-              <span v-if="s.overridden || resets[s.key]">
-                {{ t('core.settings-page.default', { value: defaultText(s) }) }}
-                <UButton
-                  v-if="s.canChange && !resets[s.key]"
-                  color="neutral"
-                  variant="link"
-                  size="sm"
-                  :label="t('core.settings-page.reset')"
-                  :aria-label="t('core.settings-page.reset-named', { setting: t(s.labelKey) })"
-                  @click="resetToDefault(s)"
+                <USwitch
+                  v-if="s.kind === 'boolean'"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  @update:model-value="onEdit(s, $event)"
                 />
-              </span>
-              <UBadge
-                v-if="s.quotable"
-                color="neutral"
-                variant="subtle"
-                :label="t('core.settings-page.quoted')"
-              />
-              <span v-if="!s.canChange">
-                {{ s.managed ? t('core.settings-page.managed') : t('core.settings-page.read-only', { ability: t(s.changeLabelKey) }) }}
-              </span>
-              <span v-else>{{ t('core.settings-page.who', { ability: t(s.changeLabelKey) }) }}</span>
+                <UInputNumber
+                  v-else-if="s.kind === 'integer' || s.kind === 'money'"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  :min="limit(s, 'min')"
+                  :max="limit(s, 'max')"
+                  :format-options="s.kind === 'money' ? { style: 'currency', currency: 'GBP' } : undefined"
+                  class="w-48"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <USelect
+                  v-else-if="s.kind === 'choice'"
+                  :model-value="draft[s.key]"
+                  :items="optionItems(s)"
+                  value-key="value"
+                  :disabled="!s.canChange"
+                  class="w-64"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <UInputTags
+                  v-else-if="s.kind === 'list'"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <UInput
+                  v-else
+                  :model-value="draft[s.key]"
+                  :type="s.sensitive ? 'password' : s.kind === 'time' ? 'time' : 'text'"
+                  :disabled="!s.canChange"
+                  :maxlength="s.maxLength"
+                  :placeholder="s.sensitive ? t('core.settings-page.hidden') : undefined"
+                  class="max-w-md"
+                  @update:model-value="onEdit(s, $event)"
+                />
+                <template
+                  v-if="unitText(s)"
+                  #hint
+                >
+                  {{ unitText(s) }}
+                </template>
+              </UFormField>
+
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+                <span v-if="s.overridden || resets[s.key]">
+                  {{ t('core.settings-page.default', { value: defaultText(s) }) }}
+                  <UButton
+                    v-if="s.canChange && !resets[s.key]"
+                    color="neutral"
+                    variant="link"
+                    size="sm"
+                    :label="t('core.settings-page.reset')"
+                    :aria-label="t('core.settings-page.reset-named', { setting: t(s.labelKey) })"
+                    @click="resetToDefault(s)"
+                  />
+                </span>
+                <UBadge
+                  v-if="s.quotable"
+                  color="neutral"
+                  :label="t('core.settings-page.quoted')"
+                />
+                <span v-if="!s.canChange">
+                  {{ s.managed ? t('core.settings-page.managed') : t('core.settings-page.read-only', { ability: t(s.changeLabelKey) }) }}
+                </span>
+                <span v-else>{{ t('core.settings-page.who', { ability: t(s.changeLabelKey) }) }}</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="mt-3 flex items-center justify-end gap-3">
-          <p
-            class="text-sm text-muted"
-            aria-live="polite"
-          >
-            {{ changesIn(section.settings).length ? t('core.settings-page.changes', { count: changesIn(section.settings).length }) : t('core.settings-page.no-changes') }}
-          </p>
-          <UButton
-            type="submit"
-            :label="t('core.settings-page.save', { section: t(`${module}.settings-sections.${section.id}`) })"
-            :loading="saving === section.id"
-            :disabled="!changesIn(section.settings).length || saving !== null"
-          />
-        </div>
+          <template #footer>
+            <div class="flex items-center justify-end gap-3">
+              <p
+                class="text-sm text-muted"
+                aria-live="polite"
+              >
+                {{ changesIn(section.settings).length ? t('core.settings-page.changes', { count: changesIn(section.settings).length }) : t('core.settings-page.no-changes') }}
+              </p>
+              <UButton
+                type="submit"
+                :label="t('core.settings-page.save', { section: t(`${module}.settings-sections.${section.id}`) })"
+                :loading="saving === section.id"
+                :disabled="!changesIn(section.settings).length || saving !== null"
+              />
+            </div>
+          </template>
+        </PageSection>
       </form>
     </DataBoundary>
   </PageFrame>
