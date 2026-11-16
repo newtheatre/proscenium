@@ -338,6 +338,10 @@ test.describe('confirming it is you', () => {
     })
     await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
     expect(page.url()).toBe(at)
+    await noViolations(page)
+    await context.close()
+  })
+})
 
 test.describe('the access scheme screens', () => {
   const reviewerActor = { ...person('Rhea Reviewer', [grant('core.access-scheme.review')]), assurance: 'strong', reassertedAt: Date.now() }
@@ -347,8 +351,10 @@ test.describe('the access scheme screens', () => {
     const page = await context.newPage()
     await visit(page, '/account/access')
     await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
-    await page.getByRole('button', { name: 'Apply' }).click()
-    await expect(page.getByRole('group', { name: 'Companion tickets' })).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('link', { name: 'Apply' }).click()
+    await expect(page).toHaveURL(/\/account\/access\/apply$/)
+    await expect(page.getByRole('radio', { name: 'None' })).toBeVisible()
     await noViolations(page)
     await context.close()
   })

@@ -1,10 +1,10 @@
 <!-- The access scheme in My account (ID-38, ID-44; identity spec part 6). Before applying: what the
-     scheme is and an "Apply" button. The form: ticks with optional notes, companions, who will read
-     it. Afterwards: the application's state in plain words, the reviewer's message, change or leave,
+     scheme is, who will read an application, and an "Apply" button to the form (access/apply).
+     Afterwards: the application's state in plain words, the reviewer's message, change or leave,
      switches for other uses, and every read by staff. With the scheme off it is a missing page. -->
 <script setup lang="ts">
-import type { AccessApplicationValue } from '../../components/AccessApplicationFields.vue'
-import type { RefusalView } from '../../composables/useRefusal'
+import type { AccessApplicationValue } from '../../../composables/useAccessApplicationForm'
+import type { RefusalView } from '../../../composables/useRefusal'
 
 interface Mine {
   enabled: boolean
@@ -31,7 +31,6 @@ const { t } = useT()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
-const route = useRoute()
 
 const { data, refresh } = await useFetch<Mine>('/api/core/me/access', { key: 'core:my-access' })
 if (!data.value?.enabled) throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
@@ -41,34 +40,8 @@ const application = computed(() => data.value?.application ?? null)
 const labelOf = (id: string) => data.value?.needs?.find(n => n.id === id)?.label ?? t('core.access.retired-need')
 const day = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(ms)
 
-const editing = ref(route.query.apply !== undefined && !application.value)
-const draft = ref<AccessApplicationValue>({ needs: [], companions: 0 })
 const refusal = ref<RefusalView | null>(null)
-const busy = ref(false)
-
-function startEditing() {
-  const from = application.value?.pending ?? application.value?.inForce
-  draft.value = from ? structuredClone(toRaw(from)) : { needs: [], companions: 0 }
-  refusal.value = null
-  editing.value = true
-}
-
-async function send() {
-  busy.value = true
-  refusal.value = null
-  try {
-    await $fetch('/api/core/me/access', { method: 'POST', body: draft.value })
-    editing.value = false
-    toast.add({ title: t('core.access.sent'), color: 'success' })
-    await refresh()
-  }
-  catch (error) {
-    refusal.value = toRefusal(error)
-  }
-  finally {
-    busy.value = false
-  }
-}
+const APPLY = '/account/access/apply'
 
 async function leave() {
   const ok = await confirm({
@@ -129,18 +102,15 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
   >
     <RefusalNotice :refusal="refusal" />
 
-    <!-- The form, for a first application, an answer to a question, or a change. -->
-    <form
-      v-if="editing"
-      class="space-y-6"
-      @submit.prevent="send"
+    <!-- Before applying. -->
+    <div
+      v-if="!application"
+      class="space-y-4"
     >
-      <AccessApplicationFields
-        v-model="draft"
-        :needs="data?.needs ?? []"
-        :allow-note="!!data?.allowNote"
-        :errors="refusal?.fields"
-      />
+      <p>{{ t('core.access.intro', { scheme: name }) }}</p>
+      <p class="text-muted">
+        {{ t('core.access.intro-detail') }}
+      </p>
       <UAlert
         color="neutral"
         variant="subtle"
@@ -148,34 +118,10 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
         :title="t('core.access.form.who-reads')"
         :description="t('core.access.form.who-reads-detail')"
       />
-      <div class="flex flex-wrap gap-2">
-        <UButton
-          type="submit"
-          :loading="busy"
-          :label="application ? t('core.access.form.send-change') : t('core.access.form.send')"
-        />
-        <UButton
-          color="neutral"
-          variant="ghost"
-          :label="t('core.form.cancel')"
-          @click="editing = false"
-        />
-      </div>
-    </form>
-
-    <!-- Before applying. -->
-    <div
-      v-else-if="!application"
-      class="space-y-4"
-    >
-      <p>{{ t('core.access.intro', { scheme: name }) }}</p>
-      <p class="text-muted">
-        {{ t('core.access.intro-detail') }}
-      </p>
       <UButton
         icon="i-lucide-file-pen-line"
         :label="t('core.access.apply')"
-        @click="startEditing"
+        :to="APPLY"
       />
     </div>
 
@@ -257,13 +203,13 @@ const purposeLabel = (read: { capacity: string | null, purpose: string | null })
           v-if="application.status !== 'rejected'"
           icon="i-lucide-pencil"
           :label="application.status === 'more-info' ? t('core.access.answer') : t('core.access.change')"
-          @click="startEditing"
+          :to="APPLY"
         />
         <UButton
           v-else
           icon="i-lucide-file-pen-line"
           :label="t('core.access.apply-again')"
-          @click="startEditing"
+          :to="APPLY"
         />
         <UButton
           v-if="application.status === 'accepted'"

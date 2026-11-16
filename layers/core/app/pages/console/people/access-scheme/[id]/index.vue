@@ -1,9 +1,9 @@
 <!-- One application to the access scheme (ID-40 to ID-42; identity spec part 6): what the person
      asked for, what is in force, what has happened to it, and the reviewer's actions: accept, reject,
-     ask for more, verify and apply on their behalf. Opening it is recorded; nobody opens their own. -->
+     ask for more, verify, and a way to apply on their behalf (the form is [id]/apply). Opening it is recorded; nobody opens their own. -->
 <script setup lang="ts">
-import type { AccessApplicationValue } from '../../../../components/AccessApplicationFields.vue'
-import type { RefusalView } from '../../../../composables/useRefusal'
+import type { AccessApplicationValue } from '../../../../../composables/useAccessApplicationForm'
+import type { RefusalView } from '../../../../../composables/useRefusal'
 
 definePageMeta({ layout: 'console' })
 
@@ -86,19 +86,6 @@ async function decide() {
 // Verifying.
 const method = ref<'access-card' | 'document' | 'known'>('access-card')
 const methods = computed(() => (['access-card', 'document', 'known'] as const).map(m => ({ value: m, label: t(`core.access.review.method.${m}`) })))
-
-// Applying on their behalf.
-const applying = ref(false)
-const draft = ref<AccessApplicationValue>({ needs: [], companions: 0 })
-function startApplying() {
-  const from = app.value?.pending ?? app.value?.inForce
-  draft.value = from ? structuredClone(toRaw(from)) : { needs: [], companions: 0 }
-  applying.value = true
-}
-async function applyForThem() {
-  if (await act('/application', 'POST', draft.value, t('core.access.review.applied'))) applying.value = false
-}
-const liveNeeds = computed(() => data.value?.needs.filter(n => !n.retired) ?? [])
 </script>
 
 <template>
@@ -310,38 +297,12 @@ const liveNeeds = computed(() => data.value?.needs.filter(n => !n.retired) ?? []
           <p class="text-sm text-muted">
             {{ t('core.access.review.behalf-help') }}
           </p>
-          <form
-            v-if="applying"
-            class="space-y-4"
-            @submit.prevent="applyForThem"
-          >
-            <AccessApplicationFields
-              v-model="draft"
-              :needs="liveNeeds"
-              :allow-note="data?.allowNote ?? false"
-              :errors="refusal?.fields"
-            />
-            <div class="flex flex-wrap gap-2">
-              <UButton
-                type="submit"
-                :loading="busy"
-                :label="t('core.access.review.send-behalf')"
-              />
-              <UButton
-                color="neutral"
-                variant="ghost"
-                :label="t('core.form.cancel')"
-                @click="applying = false"
-              />
-            </div>
-          </form>
           <UButton
-            v-else
             color="neutral"
             variant="outline"
             icon="i-lucide-file-pen-line"
             :label="t('core.access.review.start-behalf')"
-            @click="startApplying"
+            :to="`/console/people/access-scheme/${encodeURIComponent(id)}/apply`"
           />
         </section>
 

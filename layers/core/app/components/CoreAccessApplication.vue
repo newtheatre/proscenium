@@ -16,8 +16,8 @@ const { data: mine } = await useFetch<{ enabled: boolean, application?: { status
 })
 const applied = computed(() => viewer.value.signedIn && !!mine.value?.application)
 const to = computed(() => viewer.value.signedIn
-  ? (applied.value ? '/account/access' : '/account/access?apply')
-  : `/sign-in?next=${encodeURIComponent('/account/access?apply')}`)
+  ? (applied.value ? '/account/access' : '/account/access/apply')
+  : `/sign-in?next=${encodeURIComponent('/account/access/apply')}`)
 </script>
 
 <template>

@@ -439,7 +439,7 @@ async function flagWaiting(unit: UnitView, at: number, replyWithin: number, sche
 }
 
 /** Where an invitation's link lands once it has signed the person in: the form, open. */
-export const APPLY_PATH = '/account/access?apply'
+export const APPLY_PATH = '/account/access/apply'
 
 /**
  * "Invite to apply" (ID-42): finds or makes the account for a name and an address, and emails a

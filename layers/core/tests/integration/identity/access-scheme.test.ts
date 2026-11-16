@@ -288,7 +288,7 @@ describe('changing, confirming and leaving (ID-42, ID-44)', () => {
     const browser = new Browser()
     const used = await browser.post('/api/core/sign-in/link', { token })
     expect(used.status).toBe(200)
-    expect(used.body.next).toBe('/account/access?apply')
+    expect(used.body.next).toBe('/account/access/apply')
     expect((await browser.get('/api/core/me')).body.account.id).toBe(answer.body.accountId)
     // Once only, and never stored in clear.
     expect((await new Browser().post('/api/core/sign-in/link', { token })).body.code).toBe('core.sign-in.link-used')

@@ -46,7 +46,7 @@
 
   "core.access.form.needs": "What makes things harder for you?",
   "core.access.form.needs-help": "Tick all that apply. Say what would help, not why: we do not need a diagnosis.",
-  "core.access.form.note": "Anything we should know about {need}",
+  "core.access.form.note": "Anything we should know?",
   "core.access.form.optional": "Optional",
   "core.access.form.companions": "Companion tickets",
   "core.access.form.companions-help": "A companion comes with you to help, and their ticket is free.",
@@ -117,6 +117,7 @@
   "core.access.review.remove-mark": "Remove the verified mark",
   "core.access.review.unmarked": "Verified mark removed",
   "core.access.review.behalf": "Apply on their behalf",
+  "core.access.review.behalf-for": "Apply on behalf of {name}",
   "core.access.review.behalf-help": "For a phone call or a visit: fill the form in with them. It is marked as entered by you, they are emailed, and another reviewer decides it.",
   "core.access.review.start-behalf": "Fill in the form for them",
   "core.access.review.send-behalf": "Send on their behalf",
