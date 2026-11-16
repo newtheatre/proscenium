@@ -5,3 +5,13 @@
 
 @source "../../..";
 @source "../../../../../site";
+
+/* White text on Nuxt UI's default light primary (shade 500) is below 4.5:1, so filled buttons use
+   shade 700 in light mode; dark mode keeps 400. */
+:root {
+  --ui-primary: var(--ui-color-primary-700);
+}
+
+.dark {
+  --ui-primary: var(--ui-color-primary-400);
+}

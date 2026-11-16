@@ -36,6 +36,8 @@ export interface Actor {
   assurance?: 'basic' | 'strong'
   /** When the person last re-asserted who they are, in UTC milliseconds. */
   reassertedAt?: number
+  /** The sign-in session the request came with, so identity need not look it up again. */
+  sessionId?: string
 }
 
 export const ANONYMOUS: Actor = { kind: 'anonymous' }

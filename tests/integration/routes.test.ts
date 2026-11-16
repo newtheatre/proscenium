@@ -45,6 +45,12 @@ describe('routes (F-04)', () => {
     expect((await response.json()).code).toMatch(/^core\.access\./)
   })
 
+  it('checks the ability before the input, so a refused caller learns nothing of its shape', async () => {
+    const id = await performance()
+    const response = await call(handle, 'POST', `/api/seats/${id}/sell`, { actor: person([]), body: { quantity: 'two' }, headers: { 'idempotency-key': crypto.randomUUID() } })
+    expect(response.status).toBe(403)
+  })
+
   it('names the invalid fields', async () => {
     const id = await performance()
     const response = await call(handle, 'POST', `/api/seats/${id}/sell`, { actor: seller(), body: { quantity: 'two' }, headers: { 'idempotency-key': crypto.randomUUID() } })

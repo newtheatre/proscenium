@@ -1,5 +1,6 @@
 // defineRoute: the only way to write an API route (R1, R2, R6). Before the handler runs it checks
-// the module is on, the rate limit, the challenge, the input and the permission; it opens the unit
+// the module is on, the rate limit, the challenge, the permission and then the input, so a caller
+// without the ability learns nothing about the input's shape; it opens the unit
 // of work, commits it after the handler returns, and shapes every refusal the same way.
 import { defineEventHandler, getHeader, getQuery, getRequestIP, readRawBody, setResponseHeader, setResponseStatus, type H3Event } from 'h3'
 import type { z } from 'zod'
@@ -122,6 +123,17 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
       if (!(await verifyTurnstile(token, who))) throw new Refusal('core.challenge.failed', 'We could not confirm you are a person.', { status: 403, remedy: 'Complete the check, then try again.' })
     }
 
+    const declared = typeof decl.record === 'function' ? decl.record(event) : undefined
+    const record = declared ? (Array.isArray(declared) ? { type: declared[0], id: declared[1] } : declared as { type: string, id: string | undefined }) : undefined
+    if (record && !record.id) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
+
+    if (decl.ability) {
+      const decision = await can(actor, decl.ability, record as { type: string, id: string } | undefined)
+      if (!decision.allowed) throw new Refusal(decision.code, decision.reason, { status: decision.status, remedy: decision.remedy })
+      context.ability = decl.ability === 'signed-in' ? undefined : decl.ability
+      context.allowedBy = decision.by
+    }
+
     let input: unknown
     if (decl.input) {
       let raw: unknown = reads ? getQuery(event) : undefined
@@ -136,17 +148,6 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
         throw new Refusal('core.input.invalid', 'Some of what was sent is not valid.', { status: 422, fields })
       }
       input = parsed.data
-    }
-
-    const declared = typeof decl.record === 'function' ? decl.record(event) : undefined
-    const record = declared ? (Array.isArray(declared) ? { type: declared[0], id: declared[1] } : declared as { type: string, id: string | undefined }) : undefined
-    if (record && !record.id) throw new Refusal('core.not-found', 'There is nothing here.', { status: 404 })
-
-    if (decl.ability) {
-      const decision = await can(actor, decl.ability, record as { type: string, id: string } | undefined)
-      if (!decision.allowed) throw new Refusal(decision.code, decision.reason, { status: decision.status, remedy: decision.remedy })
-      context.ability = decl.ability === 'signed-in' ? undefined : decl.ability
-      context.allowedBy = decision.by
     }
 
     let idempotency: { key: string, route: string, hash: string } | undefined

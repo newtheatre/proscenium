@@ -142,7 +142,7 @@ export function checkPolicyNumbers(modules: Loaded[]): string[] {
     for (const file of walk(join(ROOT, m.found.root, 'server'), ['.ts'])) {
       if (file.includes('/server/db/')) continue
       lines(file).forEach((line, i) => {
-        if (line.includes('not-policy') || /^\s*(\/\/|\*)/.test(line)) return
+        if (line.includes('not-policy') || /^\s*(\/\/|\/?\*)/.test(line)) return
         // Strings and HTTP statuses are not policy.
         const stripped = line.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""').replace(/status(Code)?:\s*\d{3}/g, '')
         for (const [number] of stripped.matchAll(/(?<![\w.])\d[\d_]*(\.\d+)?(?![\w])/g)) {

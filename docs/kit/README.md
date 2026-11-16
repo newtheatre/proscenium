@@ -57,8 +57,8 @@ export default defineRoute({
 ```
 
 Before the handler runs the kit checks, in order: the module is on (else 404), the rate limit
-(429), Turnstile if `protect: 'turnstile'`, the input (422 naming the fields), and the ability (401
-or 403). Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
+(429), Turnstile if `protect: 'turnstile'`, the ability (401 or 403), and then the input (422
+naming the fields), so a caller without the ability learns nothing about the input. Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
 of work after the handler returns, with an audit entry when the ability is audited.
 
 ## The unit of work
@@ -113,6 +113,9 @@ Unit tests run in Node; integration tests run in workerd with a local D1, using 
 modules in `tests/fixtures/modules` (their migrations are in `tests/fixtures/migrations`,
 written with `bun run db:generate -- --name <what> --owner fixtures`). Browser tests run the built
 Worker under wrangler. Everything runs on Linux.
+
+In an integration test that calls a route, send a `Host` header (the `call()` helper does): h3
+builds the request URL from it, and without one origin checks see `localhost`.
 
 ## Where the build departs from the specification's wording
 
