@@ -86,6 +86,13 @@ Any module may import core's services without listing core: `import { notifyAddr
 - `attachFile(unit, fileId, { slot, ownerType, ownerId })` and `detachFile(unit, fileId)`. Declare
   where your records hold files as contributions to `core.file-slot`; uploads go to
   `POST /api/core/files?slot=<id>&owner=<record id>` and are checked and cleaned by a job.
+- `storeFile(unit, { slot, ownerType, ownerId, bytes, mediaType, title?, expiresAt? })` for a file
+  your module makes itself, such as a download: it is ready and attached in your unit, with no
+  upload check. Its slot says `source: 'server'` (and only such a slot may accept `json`, `zip` or
+  `csv`); nobody can upload into it. With `expiresAt` the files sweep removes it, bytes and row,
+  once that passes, and it is not served after. A slot with `access: 'record'` is served only to
+  someone your `core.file-access` contribution allows: key it by the owning record type and export
+  `{ canRead(actor, record, file) }` (type `FileAccess` from `#modules/core`).
 - `getBrand()`: the theatre's name, logos and colour tokens for light and dark.
 - Vocabularies, the shared lists of options such as production categories and advisories. Declare
   yours, with its starting terms, as a contribution to `core.vocabulary` (`id` is

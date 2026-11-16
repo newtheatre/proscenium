@@ -12,7 +12,10 @@ import themeCss from '../../server/api/core/branding/theme.css.get'
 import serveFile from '../../server/routes/files/[id].get'
 import { runJob } from '#kit/jobs'
 import { resetRateLimits } from '#kit/ratelimit'
-import { setClock } from '#kit'
+import { createUnit, setClock } from '#kit'
+import { storeFile } from '../../server/files/service'
+import sweepFiles from '../../server/tasks/sweep-files'
+import { readers } from '../../../../tests/fixtures/modules/seats/server/contributions/core.file-access/seats-performance'
 import { env, inContext, person, rows, sent, server } from '../../../../tests/integration/helpers'
 
 const handle = server({
@@ -182,5 +185,70 @@ describe('the brand (C-35, C-36)', () => {
     expect(preview.tokens.dark.link).toBe('#fde047')
     expect(preview.email.html).toContain(preview.tokens.light.link)
     expect(await rows("SELECT key FROM core_settings WHERE key = 'core.brand.accent'")).toHaveLength(0)
+  })
+})
+
+describe('a file the server makes (storeFile)', () => {
+  const owner = 'sp_2222222222aaaaaaaaaaaaaaaa'
+  const make = (options: { expiresAt?: number, slot?: string, mediaType?: string, fail?: boolean } = {}) => inContext(async () => {
+    const unit = createUnit()
+    const id = await storeFile(unit.view(), { slot: options.slot ?? 'seats.door-list', ownerType: 'seats.performance', ownerId: owner, bytes: new TextEncoder().encode('{"names":["Pat"]}'), mediaType: options.mediaType ?? 'application/json', title: 'Door list', expiresAt: options.expiresAt })
+    if (options.fail) unit.add({ sql: 'SELECT no_such_column FROM core_files', params: [] })
+    await unit.commit()
+    return id
+  })
+
+  afterEach(() => readers.clear())
+
+  it('is ready at once and served only to someone the owning module allows', async () => {
+    const id = await make()
+    expect(await rows('SELECT state, access, media_type, owner_type, owner_id FROM core_files WHERE id = ?', id)).toEqual([{ state: 'ready', access: 'record', media_type: 'application/json', owner_type: 'seats.performance', owner_id: owner }])
+    const reader = person([])
+    expect((await send('GET', `/files/${id}`, { actor: reader })).status).toBe(404)
+    readers.add(`${owner}:${reader.accountId}`)
+    const served = await send('GET', `/files/${id}`, { actor: reader })
+    expect(served.status).toBe(200)
+    expect(served.headers.get('cache-control')).toBe('private, no-store')
+    expect(await served.text()).toBe('{"names":["Pat"]}')
+    expect((await send('GET', `/files/${id}`)).status).toBe(404)
+  })
+
+  it('cannot be uploaded into, and refuses a type the slot does not take', async () => {
+    const response = await send('POST', '/api/core/files?slot=seats.door-list&owner=sp_x', { actor: person(['seats.settings.manage']), body: new TextEncoder().encode('{}') })
+    expect(response.status).toBe(403)
+    expect((await response.json()).code).toBe('core.files.not-uploadable')
+    await expect(make({ mediaType: 'application/zip' })).rejects.toMatchObject({ code: 'core.files.type-not-accepted' })
+    await expect(make({ slot: 'core.brand-logo' })).rejects.toMatchObject({ code: 'core.files.not-server-slot' })
+  })
+
+  it('goes, bytes and all, once its expiry passes, and is not served meanwhile', async () => {
+    const id = await make({ expiresAt: Date.now() + 60_000 })
+    const reader = person([])
+    readers.add(`${owner}:${reader.accountId}`)
+    expect((await send('GET', `/files/${id}`, { actor: reader })).status).toBe(200)
+    setClock(Date.now() + 61_000)
+    expect((await send('GET', `/files/${id}`, { actor: reader })).status).toBe(404)
+    const [row] = await rows<{ object_key: string }>('SELECT object_key FROM core_files WHERE id = ?', id)
+    await inContext(async () => {
+      const unit = createUnit()
+      await sweepFiles(unit.view(), { dueAt: Date.now() })
+      await unit.commit()
+    }, { kind: 'job' })
+    expect(await rows('SELECT id FROM core_files WHERE id = ?', id)).toEqual([])
+    expect(await env.FILES!.get(row!.object_key)).toBeNull()
+  })
+
+  it('leaves nothing usable when the caller\'s unit fails, and the sweep clears it up', async () => {
+    await expect(make({ fail: true })).rejects.toThrow()
+    const [left] = await rows<{ id: string, state: string, object_key: string }>("SELECT id, state, object_key FROM core_files WHERE slot = 'seats.door-list'")
+    expect(left!.state).toBe('pending')
+    setClock(Date.now() + 2 * 3_600_000)
+    await inContext(async () => {
+      const unit = createUnit()
+      await sweepFiles(unit.view(), { dueAt: Date.now() })
+      await unit.commit()
+    }, { kind: 'job' })
+    expect(await rows('SELECT state FROM core_files WHERE id = ?', left!.id)).toEqual([{ state: 'rejected' }])
+    expect(await env.FILES!.get(left!.object_key)).toBeNull()
   })
 })

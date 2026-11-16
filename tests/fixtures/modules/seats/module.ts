@@ -36,6 +36,9 @@ export default defineModule({
   signing: [{ purpose: 'seats.door-code', rotateEvery: '90d', keepFor: '365d' }],
   contributes: {
     'core.requirement': [{ id: 'seats' }],
+    // A file the server makes for a performance, readable only through core.file-access.
+    'core.file-slot': [{ id: 'seats.door-list', owner: 'seats.performance', ability: 'seats.settings.manage', accepts: ['json'], limit: 'core.files.brand-limit', access: 'record', textClass: 'personal', clean: false, source: 'server' }],
+    'core.file-access': [{ id: 'seats.performance', file: 'seats-performance' }],
     'core.operating-day': [{ id: 'seats.performances', table: 'seats_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   },
 })

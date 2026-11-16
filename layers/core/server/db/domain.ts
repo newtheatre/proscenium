@@ -33,6 +33,8 @@ export const files = defineTable('core_files', {
   attachedAt: col.timestamp('attached_at'),
   deletedAt: col.timestamp('deleted_at'),
   purgeAfter: col.timestamp('purge_after'),
+  // A file the server made for a while only, such as a data download: removed once this passes.
+  expiresAt: col.timestamp('expires_at'),
 }, {
   id: 'fil',
   random: true,
@@ -42,6 +44,7 @@ export const files = defineTable('core_files', {
   extra: t => [
     index('core_files_owner').on(t.ownerType, t.ownerId, t.slot, t.sort),
     index('core_files_purge').on(t.state, t.purgeAfter),
+    index('core_files_expiry').on(t.expiresAt),
     check('core_files_byte_size', sql`${t.byteSize} > 0`),
   ],
 })

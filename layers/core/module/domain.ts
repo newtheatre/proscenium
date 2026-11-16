@@ -120,13 +120,19 @@ export const points = {
       owner: z.string(),
       ability: z.string(),
       many: z.boolean().optional(),
-      accepts: z.array(z.enum(['png', 'jpeg', 'webp', 'svg', 'pdf'])).min(1),
+      // json, zip and csv only for a slot whose files the server makes.
+      accepts: z.array(z.enum(['png', 'jpeg', 'webp', 'svg', 'pdf', 'json', 'zip', 'csv'])).min(1),
       limit: z.string(),
       access: z.enum(['public', 'signed_in', 'record']),
       textClass: z.enum(['public', 'internal', 'personal']),
       clean: z.boolean(),
-    }).strict(),
+      /** 'server': the files are made by the module with storeFile, never uploaded. */
+      source: z.enum(['upload', 'server']).optional(),
+    }).strict()
+      .refine(s => s.source === 'server' || s.accepts.every(kind => !['json', 'zip', 'csv'].includes(kind)), { message: 'only a server slot takes json, zip or csv', path: ['accepts'] }),
   }),
+  /** Whether an account may read the files of a record with `record` access, keyed by the record type. */
+  'core.file-access': point({ kind: 'code', contract: 'file-access' }),
   /**
    * A table whose rows carry an operating day worked out from an instant. Recalculated when the
    * time zone or the rollover changes (C-37). Rows whose `done` column is set are left alone.

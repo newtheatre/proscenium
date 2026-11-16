@@ -1,8 +1,9 @@
 // The file service (C-23, C-36): an upload is stored, checked and cleaned in a job, then attached
 // to its owner. Nothing is served until it is ready, and the bytes are only reachable through the
 // row, at /files/<id>.
-import { first, nowMs, refuse, usePoint, useSetting, files as store } from '#kit'
-import type { UnitView } from '#kit'
+import { createUnit, first, newId, nowMs, refuse, usePoint, useSetting, files as store } from '#kit'
+import type { Actor, UnitView } from '#kit'
+import type { FileAccess } from '../points/file-access'
 import { clean, MEDIA_TYPES, Rejected, sniff, type FileKind } from './inspect'
 
 export interface FileSlot {
@@ -15,6 +16,7 @@ export interface FileSlot {
   access: 'public' | 'signed_in' | 'record'
   textClass: 'public' | 'internal' | 'personal'
   clean: boolean
+  source?: 'upload' | 'server'
 }
 
 export interface FileRow {
@@ -133,4 +135,50 @@ export async function detachFile(unit: UnitView, fileId: string): Promise<void> 
   const at = nowMs()
   unit.add({ sql: "UPDATE core_files SET state = 'deleted', deleted_at = ?, purge_after = ? WHERE id = ? AND state IN ('ready', 'pending')", params: [at, at + keep * 1000, fileId] }) // not-policy: seconds to milliseconds
   unit.audit({ action: 'delete', record: ['core.file', fileId] })
+}
+
+/**
+ * Stores a file the server made itself, such as a data download, and attaches it to its owner in
+ * the caller's unit, ready at once: it is the module's own output, so it is not checked as an
+ * upload is. The slot must say `source: 'server'`. The bytes are stored and a pending row is
+ * committed first, so if the caller's unit fails, the files sweep removes both after
+ * core.files.upload-timeout. With `expiresAt`, the sweep removes the file once it passes.
+ */
+export async function storeFile(unit: UnitView, input: { slot: string, ownerType: string, ownerId: string, bytes: Uint8Array, mediaType: string, title?: string, expiresAt?: number }): Promise<string> {
+  const slot = await fileSlot(input.slot)
+  if (!slot || slot.source !== 'server') refuse('core.files.not-server-slot', `${input.slot} is not a slot for files the server makes.`, { status: 500 })
+  if (slot.owner !== input.ownerType) refuse('core.files.not-found', 'There is no such place for a file.', { status: 500 })
+  const kind = slot.accepts.find(k => MEDIA_TYPES[k] === input.mediaType)
+  if (!kind) refuse('core.files.type-not-accepted', `${input.slot} does not take ${input.mediaType}.`, { status: 500 })
+  if (input.bytes.length === 0) refuse('core.files.empty', 'The file is empty.', { status: 500 })
+  if (input.bytes.length > await slotLimit(slot)) refuse('core.files.too-large', 'This file is larger than this place takes.', { status: 500 })
+
+  const id = newId('fil', { random: true })
+  const objectKey = `files/${crypto.randomUUID()}`
+  const at = nowMs()
+  await store.put(objectKey, input.bytes, { httpMetadata: { contentType: input.mediaType } })
+  const pending = createUnit()
+  pending.add({
+    sql: "INSERT INTO core_files (id, object_key, owner_type, owner_id, slot, text_class, title, media_type, byte_size, sha256, access, state, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+    params: [id, objectKey, input.ownerType, input.ownerId, slot.id, slot.textClass, input.title ?? null, input.mediaType, input.bytes.length, await sha256(input.bytes), slot.access, at, input.expiresAt ?? null],
+  })
+  await pending.commit()
+
+  const row = { id, owner_type: input.ownerType, owner_id: input.ownerId, slot: slot.id } as FileRow
+  if (!slot.many) await setAsideOthers(unit, row, at)
+  unit.add({ sql: "UPDATE core_files SET state = 'ready', ready_at = ?, attached_at = ? WHERE id = ? AND state = 'pending'", params: [at, at, id] }).expect(1)
+  unit.audit({ action: 'create', record: ['core.file', id], detail: { slot: slot.id } })
+  return id
+}
+
+/** Whether this account may read a file with `record` access: the owning record type's module decides. */
+export async function mayReadRecordFile(actor: Actor, row: { id: string, slot: string, owner_type: string, owner_id: string }): Promise<boolean> {
+  const access = (await usePoint<FileAccess>('core.file-access')).find(c => c.id === row.owner_type)
+  if (!access) return false
+  try {
+    return await access.value.canRead(actor, { type: row.owner_type, id: row.owner_id }, { id: row.id, slot: row.slot })
+  }
+  catch {
+    return false
+  }
 }

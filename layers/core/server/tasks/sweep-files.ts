@@ -1,5 +1,6 @@
 // Hourly: an upload that never finished checking within core.files.upload-timeout is refused, and
-// a removed file whose restore period has passed loses its bytes and its row.
+// a removed file whose restore period has passed loses its bytes and its row. A file the server
+// made whose expiry has passed goes at once, bytes and row: it was never the theatre's to restore.
 import { all, defineTask, files as store, nowMs, useSetting } from '#kit'
 
 export default defineTask(async (unit) => {
@@ -14,7 +15,12 @@ export default defineTask(async (unit) => {
   }
   const purged = await all<{ id: string, object_key: string }>("SELECT id, object_key FROM core_files WHERE state = 'deleted' AND purge_after < ? LIMIT ?", at, batch)
   for (const row of purged) unit.add({ sql: "DELETE FROM core_files WHERE id = ? AND state = 'deleted'", params: [row.id] })
+  const expired = await all<{ id: string, object_key: string }>("SELECT id, object_key FROM core_files WHERE expires_at < ? AND state != 'pending' LIMIT ?", at, batch)
+  for (const row of expired) {
+    unit.add({ sql: 'DELETE FROM core_files WHERE id = ? AND expires_at < ?', params: [row.id, at] })
+    unit.audit({ action: 'delete', record: ['core.file', row.id], detail: { expired: true } })
+  }
   unit.afterCommit(async () => {
-    for (const row of [...stale, ...purged]) await store.delete(row.object_key)
+    for (const row of [...stale, ...purged, ...expired]) await store.delete(row.object_key)
   })
 })
