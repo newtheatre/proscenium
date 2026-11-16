@@ -55,10 +55,10 @@ test.describe('a site owner with no console', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Rate limit: exports goes from 10 in 1h to 12 in 2h.')
     await dialog.getByRole('button', { name: 'Go back' }).click()
-    await expect(page.getByText('Saved 1 change', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Saved 1 change')).toHaveCount(0)
     await section.getByRole('button', { name: /^Save/ }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Save the change' }).click()
-    await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible()
+    await expect(page.getByText('Saved 1 change', { exact: true })).toBeVisible() // not the toaster's own live-region copy
     await visit(page, '/admin/settings')
     await expect(page.getByRole('spinbutton', { name: 'Rate limit: exports: how many times' })).toHaveValue('12')
     await expect(page.getByRole('textbox', { name: 'Rate limit: exports: in what period' })).toHaveValue('2h')
