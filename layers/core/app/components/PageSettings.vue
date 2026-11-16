@@ -41,6 +41,8 @@ const props = defineProps<{
   title: string
   /** A setting to scroll into view and highlight, from settings search. */
   highlight?: string
+  /** Only settings whose key starts with one of these, for a page of one subject (Sign-in). */
+  only?: string[]
 }>()
 
 const { t } = useT()
@@ -64,8 +66,11 @@ const resets = reactive<Record<string, boolean>>({})
 const problems = reactive<Record<string, string>>({})
 const saving = ref<string | null>(null)
 
+// The settings this page draws: all of them, or those of its subject.
+const shown = computed(() => (data.value?.settings ?? []).filter(s => !props.only || props.only.some(prefix => s.key.startsWith(prefix))))
+
 function load() {
-  for (const s of data.value?.settings ?? []) {
+  for (const s of shown.value) {
     draft[s.key] = s.sensitive ? '' : toControl(s)
     resets[s.key] = false
   }
@@ -75,7 +80,7 @@ watch(data, load, { immediate: true })
 const sections = computed(() => {
   // Sections are a module's own groups; on the site page the same group of two modules stays apart.
   const groups = new Map<string, SettingView[]>()
-  for (const s of data.value?.settings ?? []) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
+  for (const s of shown.value) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
   return [...groups].map(([id, settings]) => ({ id, module: settings[0]!.module, group: settings[0]!.group, settings }))
 })
 

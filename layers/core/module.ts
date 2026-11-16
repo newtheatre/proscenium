@@ -43,6 +43,10 @@ export default defineModule({
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.seasons', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20 },
       { id: 'core.vocabularies', menu: 'admin', group: 'theatre', to: '/admin/vocabularies', icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 40 },
+      // Identity's site administration (identity spec part 6): defining roles and facts, and how people sign in.
+      { id: 'core.roles', menu: 'admin', group: 'access', to: '/admin/roles', match: '/admin/roles', icon: 'i-lucide-shield-user', ability: 'core.role.read', order: 10 },
+      { id: 'core.facts', menu: 'admin', group: 'access', to: '/admin/facts', icon: 'i-lucide-badge-check', ability: 'core.role.read', order: 20 },
+      { id: 'core.sign-in-settings', menu: 'admin', group: 'access', to: '/admin/sign-in', icon: 'i-lucide-log-in', ability: 'core.identity-settings.manage', order: 30 },
     ],
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
     // System holds core's own screens; each module's settings page sits in the module's own group.

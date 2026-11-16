@@ -41,7 +41,7 @@ export async function notHeld(actor: Actor, wanted: string[], scope: Scope = { k
   }))
 }
 
-function abilityError(missing: string[]): never {
+export function abilityError(missing: string[]): never {
   refuse('core.role.not-held', 'You can only give abilities you hold yourself.', { status: 403, remedy: `Ask someone who holds ${missing.join(', ')} to do this.` })
 }
 
