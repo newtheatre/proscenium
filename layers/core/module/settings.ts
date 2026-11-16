@@ -16,7 +16,7 @@ export const settings = defineSettings('core', {
   'external.timeout': setting.duration({ default: '15s', min: '1s', max: '60s', change }),
   'external.reconcile-after': setting.duration({ default: '5m', min: '1m', max: '1d', change }),
 
-  'access.fresh-within': setting.duration({ default: '15m', min: '1m', max: '1d', change }),
+  'access.fresh-within': setting.duration({ default: '10m', min: '1m', max: '1d', change }),
   'idempotency.keep-for': setting.duration({ default: '48h', min: '1h', max: '7d', change }),
 
   'rate-limits.default': setting.integer({ default: 120, min: 1, max: 10000, unit: 'core.units.per-minute', change }),

@@ -132,6 +132,10 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
     }
   }
   for (const [key] of registry.abilities as Map<string, any>) if (!required.has(key)) problems.push(`abilities.${key}: is declared but nothing requires it`)
+  for (const route of allRoutes(modules)) {
+    const decl = route.ability && registry.abilities.get(route.ability)?.decl
+    if (decl?.risk === 'privileged' && decl.fresh === false && route.method !== 'get' && route.method !== 'head') problems.push(`${route.file}: requires ${route.ability}, which skips freshness because it only reads, but this route changes something`)
+  }
   return problems
 }
 

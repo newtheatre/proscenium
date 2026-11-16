@@ -78,6 +78,9 @@ describe('abilities', () => {
   it('refuse a privileged ability without freshness', () => {
     expect(() => defineAbilities('finance', { 'refunds.issue': ability({ risk: 'privileged', fresh: false }) })).toThrow(DeclarationError)
   })
+  it('let a privileged ability that only reads, audited, skip freshness', () => {
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', fresh: false, audit: 'read' }) })).not.toThrow()
+  })
 })
 
 describe('manifests', () => {
