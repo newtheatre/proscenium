@@ -1,0 +1,230 @@
+// The module manifest: `layers/<id>/module.ts`, default export `defineModule({...})`. Pure data,
+// read by the build, the checks and the running app alike (Module manifest tab).
+import { z } from 'zod'
+import { DeclarationError } from './refusal'
+import { isDuration } from './duration'
+import { tableMeta } from './db'
+import type { SettingEntry, SettingRule } from './settings'
+import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
+
+export interface EventDecl<P extends z.ZodObject<any> = z.ZodObject<any>> {
+  version: number
+  payload: P
+  /** Kept off webhooks: the fact that it happened should not leave the system. */
+  internal?: boolean
+}
+export interface JobDecl<P extends z.ZodType = z.ZodType> {
+  payload: P
+  /** Attempts before the job is dead. Default from core.jobs.attempts. */
+  retries?: number
+  lane?: 'prompt' | 'bulk'
+}
+export type Weekday = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+export interface TaskDecl {
+  /** A whole number of minutes or hours: '5m', '1h'. */
+  every?: string
+  /** HH:MM in the theatre's time zone. */
+  dailyAt?: string
+  weeklyOn?: { day: Weekday, at: string }
+}
+export type PointDecl = { kind: 'data', schema: z.ZodType } | { kind: 'code', contract: string }
+export interface SecretDecl { needed: 'always' | 'when-used' | 'optional' }
+export interface CredentialDecl { needed: 'always' | 'when-used' | 'optional' }
+export interface CallDecl {
+  /** After how long an attempt with no outcome is handed to the reconcile handler. Default core.external.reconcile-after. */
+  reconcileAfter?: string
+}
+export interface Contribution { id: string, file?: string, [field: string]: unknown }
+export interface Preset {
+  on?: boolean
+  settings?: Record<string, unknown>
+  roles?: Record<string, string[]>
+  facts?: Record<string, string[]>
+}
+
+export interface ModuleManifest {
+  id: string
+  manifest: 1
+  since: string
+  stability?: 'experimental' | 'stable' | 'deprecated'
+  /** false: has its own layer and id but is always on. */
+  switchable?: boolean
+  requires?: readonly string[]
+  uses?: readonly string[]
+  settings?: Record<string, SettingEntry<any, any>>
+  settingRules?: { module: string, rules: SettingRule[] }
+  abilities?: Record<string, AbilityDecl>
+  facts?: Record<string, FactDecl>
+  records?: Record<string, RecordDecl>
+  tables?: Record<string, unknown>
+  events?: { announces?: Record<string, EventDecl<any>>, listens?: Record<string, string> }
+  jobs?: Record<string, JobDecl<any>>
+  tasks?: Record<string, TaskDecl>
+  calls?: Record<string, CallDecl>
+  points?: Record<string, PointDecl>
+  contributes?: Record<string, Contribution[]>
+  secrets?: Record<string, SecretDecl>
+  credentials?: Record<string, CredentialDecl>
+  presets?: Partial<Record<PresetId, Preset>>
+}
+
+export const PRESETS = ['student-society', 'amateur-company', 'small-venue'] as const
+export type PresetId = typeof PRESETS[number]
+
+export const event = <const P extends z.ZodObject<any>>(d: EventDecl<P>): EventDecl<P> => d
+export const job = <P extends z.ZodType>(d: JobDecl<P>): JobDecl<P> => d
+export const task = (d: TaskDecl): TaskDecl => d
+export const point = (d: PointDecl): PointDecl => d
+export const secret = (d: SecretDecl): SecretDecl => d
+export const credential = (d: CredentialDecl): CredentialDecl => d
+export const call = (d: CallDecl = {}): CallDecl => d
+
+/**
+ * A machine code in an event payload or audit detail: lower-case, kebab or dotted, never a person's
+ * words. Event payload strings must be ids (`*Id`, `*Ids`), enums, literals or `code()`.
+ */
+export const code = () => z.string().regex(/^[a-z0-9]+([.-][a-z0-9]+)*$/).describe('code')
+
+/** Declares a module. Validated here and again, across modules, when the registry is built. */
+export function defineModule<const M extends ModuleManifest>(manifest: M): M {
+  validateManifest(manifest)
+  return manifest
+}
+
+const KEBAB = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*'
+const kebab = new RegExp(`^${KEBAB}$`)
+const SEMVER = /^\d+\.\d+\.\d+(-[0-9a-z.-]+)?$/
+const FIELDS = new Set(['id', 'manifest', 'since', 'stability', 'switchable', 'requires', 'uses', 'settings', 'settingRules', 'abilities', 'facts', 'records', 'tables', 'events', 'jobs', 'tasks', 'calls', 'points', 'contributes', 'secrets', 'credentials', 'presets'])
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+export function snake(id: string): string {
+  return id.replace(/-/g, '_')
+}
+
+/** The manifest's own rules. Cross-module rules are in the registry. Throws a DeclarationError naming the field. */
+export function validateManifest(m: ModuleManifest): void {
+  if (!m || typeof m !== 'object') throw new DeclarationError('(manifest)', 'the default export must be defineModule({...})')
+  for (const key of Object.keys(m)) if (!FIELDS.has(key)) throw new DeclarationError(key, `is not a manifest field. Fields are: ${[...FIELDS].join(', ')}`)
+  if (typeof m.id !== 'string' || !kebab.test(m.id)) throw new DeclarationError('id', 'is required and kebab-case, such as box-office')
+  if (m.manifest !== 1) throw new DeclarationError('manifest', 'must be 1, the version of this format')
+  if (typeof m.since !== 'string' || !SEMVER.test(m.since)) throw new DeclarationError('since', 'is the release the module first shipped in, such as 0.3.0')
+  if (m.stability !== undefined && !['experimental', 'stable', 'deprecated'].includes(m.stability)) throw new DeclarationError('stability', "is 'experimental', 'stable' or 'deprecated'")
+  if (m.switchable !== undefined && typeof m.switchable !== 'boolean') throw new DeclarationError('switchable', 'is true or false')
+  const id = m.id
+  const own = (kind: string, rest: string) => new RegExp(`^${escape(id)}\\.${rest}$`)
+
+  for (const field of ['requires', 'uses'] as const) {
+    const list = m[field]
+    if (list === undefined) continue
+    if (!Array.isArray(list)) throw new DeclarationError(field, 'is a list of module ids')
+    for (const other of list) {
+      if (typeof other !== 'string' || !kebab.test(other)) throw new DeclarationError(field, `"${other}" is not a module id`)
+      if (other === 'core') throw new DeclarationError(field, 'core is always on and never listed')
+      if (other === id) throw new DeclarationError(field, 'a module cannot list itself')
+    }
+  }
+  for (const other of m.requires ?? []) if (m.uses?.includes(other)) throw new DeclarationError('uses', `${other} is already in requires`)
+
+  for (const key of Object.keys(m.settings ?? {})) {
+    if (!key.startsWith(`${id}.`)) throw new DeclarationError(`settings.${key}`, `belongs to another module: use defineSettings('${id}', {...})`)
+  }
+  if (m.settingRules && m.settingRules.module !== id) throw new DeclarationError('settingRules', `use defineSettingRules('${id}', [...])`)
+  for (const key of Object.keys(m.abilities ?? {})) if (!own('', `${KEBAB}\\.${KEBAB}`).test(key)) throw new DeclarationError(`abilities.${key}`, `is <module>.<record>.<verb>: use defineAbilities('${id}', {...})`)
+  for (const key of Object.keys(m.facts ?? {})) if (!own('', KEBAB).test(key)) throw new DeclarationError(`facts.${key}`, `is <module>.<name>: use defineFacts('${id}', {...})`)
+  for (const key of Object.keys(m.records ?? {})) if (!own('', KEBAB).test(key)) throw new DeclarationError(`records.${key}`, `is <module>.<noun>: use defineRecords('${id}', {...})`)
+
+  for (const [key, table] of Object.entries(m.tables ?? {})) {
+    const meta = tableMeta(table)
+    if (!meta) throw new DeclarationError(`tables.${key}`, 'is not a table: declare it with defineTable from #kit/db')
+    if (!meta.name.startsWith(`${snake(id)}_`)) throw new DeclarationError(`tables.${key}`, `"${meta.name}" must start with ${snake(id)}_`)
+  }
+
+  const events = m.events ?? {}
+  for (const key of Object.keys(events)) if (key !== 'announces' && key !== 'listens') throw new DeclarationError(`events.${key}`, 'events has announces and listens')
+  for (const [name, decl] of Object.entries(events.announces ?? {})) {
+    const f = `events.announces.${name}`
+    if (!own('', `${KEBAB}\\.${KEBAB}`).test(name)) throw new DeclarationError(f, 'an event is <module>.<record>.<past participle>, announced by its own module')
+    if (!decl || !Number.isInteger(decl.version) || decl.version < 1) throw new DeclarationError(`${f}.version`, 'is a whole number from 1')
+    if (!(decl.payload instanceof z.ZodObject)) throw new DeclarationError(`${f}.payload`, 'is a z.object({...})')
+    checkPayload(f, decl.payload)
+  }
+  for (const [name, listener] of Object.entries(events.listens ?? {})) {
+    if (!new RegExp(`^${KEBAB}\\.${KEBAB}\\.${KEBAB}$`).test(name)) throw new DeclarationError(`events.listens.${name}`, 'is an event name')
+    if (typeof listener !== 'string' || !kebab.test(listener)) throw new DeclarationError(`events.listens.${name}`, 'names a listener file under server/listeners/, kebab-case')
+  }
+
+  const work = own('', '[a-z]+(?:-[a-z0-9]+)+')
+  for (const [name, decl] of Object.entries(m.jobs ?? {})) {
+    const f = `jobs.${name}`
+    if (!work.test(name)) throw new DeclarationError(f, 'a job is <module>.<verb>-<noun>')
+    if (!decl || !(decl.payload instanceof z.ZodType)) throw new DeclarationError(`${f}.payload`, 'is a Zod schema')
+    if (decl.retries !== undefined && !(Number.isInteger(decl.retries) && decl.retries >= 1)) throw new DeclarationError(`${f}.retries`, 'is a whole number from 1')
+    if (decl.lane !== undefined && !['prompt', 'bulk'].includes(decl.lane)) throw new DeclarationError(`${f}.lane`, "is 'prompt' or 'bulk'")
+  }
+  for (const [name, decl] of Object.entries(m.tasks ?? {})) {
+    const f = `tasks.${name}`
+    if (!work.test(name)) throw new DeclarationError(f, 'a task is <module>.<verb>-<noun>')
+    const given = ['every', 'dailyAt', 'weeklyOn'].filter(k => (decl as any)?.[k] !== undefined)
+    if (given.length !== 1) throw new DeclarationError(f, 'give exactly one of every, dailyAt or weeklyOn')
+    if (decl.every !== undefined && !/^\d+[mh]$/.test(decl.every)) throw new DeclarationError(`${f}.every`, "is a whole number of minutes or hours, such as '5m' or '1h'")
+    const at = decl.dailyAt ?? decl.weeklyOn?.at
+    if (at !== undefined && !/^([01]\d|2[0-3]):[0-5]\d$/.test(at)) throw new DeclarationError(`${f}.${decl.dailyAt ? 'dailyAt' : 'weeklyOn.at'}`, 'is a time such as 06:00')
+    if (decl.weeklyOn && !['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(decl.weeklyOn.day)) throw new DeclarationError(`${f}.weeklyOn.day`, 'is a day of the week, such as monday')
+  }
+  for (const [name, decl] of Object.entries(m.calls ?? {})) {
+    if (!work.test(name)) throw new DeclarationError(`calls.${name}`, 'an external call is <module>.<verb>-<noun>')
+    if (decl?.reconcileAfter !== undefined && !isDuration(decl.reconcileAfter)) throw new DeclarationError(`calls.${name}.reconcileAfter`, 'is a duration such as 5m')
+  }
+  for (const [name, decl] of Object.entries(m.points ?? {})) {
+    const f = `points.${name}`
+    if (!own('', KEBAB).test(name)) throw new DeclarationError(f, 'a point is <module>.<noun>')
+    if (decl?.kind === 'data' && !(decl.schema instanceof z.ZodType)) throw new DeclarationError(`${f}.schema`, 'a data point has a Zod schema')
+    else if (decl?.kind === 'code' && !(typeof decl.contract === 'string' && kebab.test(decl.contract))) throw new DeclarationError(`${f}.contract`, 'a code point names its contract file under server/points/')
+    else if (decl?.kind !== 'data' && decl?.kind !== 'code') throw new DeclarationError(`${f}.kind`, "is 'data' or 'code'")
+  }
+  for (const [name, list] of Object.entries(m.contributes ?? {})) {
+    const f = `contributes.${name}`
+    if (!new RegExp(`^${KEBAB}\\.${KEBAB}$`).test(name)) throw new DeclarationError(f, 'names a point, <module>.<noun>')
+    if (!Array.isArray(list)) throw new DeclarationError(f, 'is a list of contributions')
+    const seen = new Set<string>()
+    for (const c of list) {
+      if (!c || typeof c.id !== 'string' || !c.id) throw new DeclarationError(f, 'every contribution has an id')
+      if (seen.has(c.id)) throw new DeclarationError(`${f}.${c.id}`, 'is listed twice')
+      seen.add(c.id)
+    }
+  }
+  const SECRET = new RegExp(`^${snake(id).toUpperCase()}_[A-Z0-9]+(_[A-Z0-9]+)*$`)
+  for (const section of ['secrets', 'credentials'] as const) {
+    for (const [name, decl] of Object.entries(m[section] ?? {})) {
+      if (!SECRET.test(name)) throw new DeclarationError(`${section}.${name}`, `is ${snake(id).toUpperCase()}_<NAME> in capitals`)
+      if (!['always', 'when-used', 'optional'].includes(decl?.needed)) throw new DeclarationError(`${section}.${name}.needed`, "is 'always', 'when-used' or 'optional'")
+    }
+  }
+  for (const [preset, value] of Object.entries(m.presets ?? {})) {
+    if (!(PRESETS as readonly string[]).includes(preset)) throw new DeclarationError(`presets.${preset}`, `is not a preset. Presets are ${PRESETS.join(', ')}`)
+    for (const key of Object.keys(value?.settings ?? {})) if (!(key in (m.settings ?? {}))) throw new DeclarationError(`presets.${preset}.settings.${key}`, `is not a setting of ${id}`)
+  }
+}
+
+/**
+ * Payloads carry identifiers, never people (E7). A string field is allowed only when its name ends
+ * in Id or Ids, or it is an enum, a literal or a `code()`. Numbers and booleans are fine.
+ */
+function checkPayload(field: string, schema: z.ZodObject<any>) {
+  for (const [key, value] of Object.entries(schema.shape as Record<string, z.ZodType>)) {
+    let inner: any = value
+    while (inner?.def?.innerType || inner?.def?.type === 'array') inner = inner.def.innerType ?? inner.def.element
+    const type = inner?.def?.type
+    if (type === 'string') {
+      const named = /Ids?$/.test(key)
+      const isCode = inner.description === 'code'
+      if (!named && !isCode) throw new DeclarationError(`${field}.payload.${key}`, 'a payload string must be an id (name it ...Id), an enum, a literal or code(): never a name, an address or free text')
+    }
+    else if (type === 'object') {
+      checkPayload(`${field}.payload.${key}`, inner)
+    }
+    else if (!['number', 'boolean', 'enum', 'literal', 'int', 'bigint'].includes(type)) {
+      throw new DeclarationError(`${field}.payload.${key}`, `a payload field of type ${type} cannot be checked for personal data; use ids, enums, numbers or booleans`)
+    }
+  }
+}

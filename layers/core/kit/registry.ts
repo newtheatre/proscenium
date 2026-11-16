@@ -1,0 +1,227 @@
+// The registry: every module's manifest and handler files, collected by the build into
+// .generated/registry.ts and checked here across modules (F-02).
+import { DeclarationError } from './refusal'
+import { snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl } from './manifest'
+import { tableMeta, type TableMeta } from './db'
+import type { SettingEntry, SettingRule } from './settings'
+import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
+import type { ModuleHandlers } from './handlers'
+import { setPersonalFields } from './log'
+
+/**
+ * Module ids the design has reserved (Formats tab). `uses` may name one before it is written; a
+ * `uses` on an absent module contributes nothing.
+ */
+export const RESERVED_MODULE_IDS: readonly string[] = ['public-site', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']
+
+export type Owner = 'upstream' | 'site' | 'fixtures'
+
+export interface ModuleEntry {
+  manifest: ModuleManifest
+  /** The module's folder, relative to the repository: layers/core, site/layers/x-raffle. */
+  root: string
+  owner: Owner
+  handlers: ModuleHandlers
+}
+
+export interface Registry {
+  modules: Map<string, ModuleEntry>
+  settings: Map<string, { module: string, entry: SettingEntry }>
+  settingRules: Map<string, SettingRule[]>
+  abilities: Map<string, { module: string, decl: AbilityDecl }>
+  records: Map<string, { module: string, decl: RecordDecl }>
+  facts: Map<string, { module: string, decl: FactDecl }>
+  tables: Map<string, { module: string, table: any, meta: TableMeta }>
+  prefixes: Map<string, string>
+  events: Map<string, { module: string, decl: EventDecl }>
+  listeners: Map<string, { module: string, listener: string }[]>
+  jobs: Map<string, { module: string, decl: JobDecl }>
+  tasks: Map<string, { module: string, decl: TaskDecl }>
+  calls: Map<string, { module: string, decl: CallDecl }>
+  points: Map<string, { module: string, decl: PointDecl }>
+}
+
+/** The events, jobs and tasks of the core itself are always present, so other modules may name them. */
+export function buildRegistry(entries: ModuleEntry[]): Registry {
+  const r: Registry = {
+    modules: new Map(), settings: new Map(), settingRules: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
+    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(),
+  }
+  const fail = (entry: ModuleEntry, field: string, message: string): never => {
+    throw new DeclarationError(field, message, `${entry.root}/module.ts`)
+  }
+
+  for (const entry of entries) {
+    const m = entry.manifest
+    const folder = entry.root.split('/').pop()!
+    if (m.id !== folder) fail(entry, 'id', `is "${m.id}" but the folder is "${folder}": they must match`)
+    if (r.modules.has(m.id)) fail(entry, 'id', `"${m.id}" is declared twice`)
+    if (m.id === 'core' && entry.root !== 'layers/core') fail(entry, 'id', 'only layers/core may be the core')
+    if (entry.owner === 'site' && !m.id.startsWith('x-')) fail(entry, 'id', "a theatre's own module starts with x-")
+    if (entry.owner === 'upstream' && m.id.startsWith('x-')) fail(entry, 'id', 'x- is reserved for a theatre\'s own modules')
+    r.modules.set(m.id, entry)
+  }
+
+  const add = <V>(map: Map<string, V>, entry: ModuleEntry, field: string, key: string, value: V) => {
+    if (map.has(key)) fail(entry, `${field}.${key}`, 'is declared twice')
+    map.set(key, value)
+  }
+
+  for (const entry of entries) {
+    const m = entry.manifest
+    const id = m.id
+    for (const [key, setting] of Object.entries(m.settings ?? {})) add(r.settings, entry, 'settings', key, { module: id, entry: setting })
+    if (m.settingRules) r.settingRules.set(id, m.settingRules.rules)
+    for (const [key, decl] of Object.entries(m.abilities ?? {})) add(r.abilities, entry, 'abilities', key, { module: id, decl })
+    for (const [key, decl] of Object.entries(m.records ?? {})) add(r.records, entry, 'records', key, { module: id, decl })
+    for (const [key, decl] of Object.entries(m.facts ?? {})) add(r.facts, entry, 'facts', key, { module: id, decl })
+    for (const [key, table] of Object.entries(m.tables ?? {})) {
+      const meta = tableMeta(table)!
+      add(r.tables, entry, 'tables', meta.name, { module: id, table, meta })
+      const prefix = meta.options.id
+      if (prefix) {
+        const holder = r.prefixes.get(prefix)
+        if (holder) fail(entry, `tables.${key}.id`, `the prefix "${prefix}" is already used by ${holder}`)
+        if (entry.owner === 'site' ? !prefix.startsWith('x') : prefix.startsWith('x')) fail(entry, `tables.${key}.id`, entry.owner === 'site' ? "a theatre's own prefixes start with x" : "prefixes starting with x belong to a theatre's own modules")
+        r.prefixes.set(prefix, meta.name)
+      }
+    }
+    for (const [key, decl] of Object.entries(m.events?.announces ?? {})) add(r.events, entry, 'events.announces', key, { module: id, decl })
+    for (const [key, decl] of Object.entries(m.jobs ?? {})) add(r.jobs, entry, 'jobs', key, { module: id, decl })
+    for (const [key, decl] of Object.entries(m.tasks ?? {})) add(r.tasks, entry, 'tasks', key, { module: id, decl })
+    for (const [key, decl] of Object.entries(m.calls ?? {})) add(r.calls, entry, 'calls', key, { module: id, decl })
+    for (const [key, decl] of Object.entries(m.points ?? {})) add(r.points, entry, 'points', key, { module: id, decl })
+  }
+
+  for (const entry of entries) {
+    const m = entry.manifest
+    const linked = new Set(['core', m.id, ...(m.requires ?? []), ...(m.uses ?? [])])
+    for (const other of m.requires ?? []) if (!r.modules.has(other)) fail(entry, 'requires', `"${other}" is not a module in this repository`)
+    for (const other of m.uses ?? []) if (!r.modules.has(other) && !RESERVED_MODULE_IDS.includes(other)) fail(entry, 'uses', `"${other}" is neither a module in this repository nor an id the design has reserved`)
+    for (const other of m.requires ?? []) {
+      if (entry.owner === 'upstream' && r.modules.get(other)!.owner === 'site') fail(entry, 'requires', `upstream never depends on a theatre's module (${other})`)
+    }
+    const absent = (name: string) => {
+      const owner = name.split('.')[0]!
+      return !!m.uses?.includes(owner) && !r.modules.has(owner)
+    }
+    for (const [event, listener] of Object.entries(m.events?.listens ?? {})) {
+      if (absent(event)) continue
+      const announced = r.events.get(event)
+      if (!announced) fail(entry, `events.listens.${event}`, 'no module announces this event')
+      if (!linked.has(announced!.module)) fail(entry, `events.listens.${event}`, `${announced!.module} announces it, so list ${announced!.module} in requires or uses`)
+      if (!entry.handlers.listeners?.[listener]) fail(entry, `events.listens.${event}`, `the listener file ${entry.root}/server/listeners/${listener}.ts does not exist`)
+      const list = r.listeners.get(event) ?? []
+      list.push({ module: m.id, listener })
+      r.listeners.set(event, list)
+    }
+    for (const name of Object.keys(m.jobs ?? {})) if (!entry.handlers.jobs?.[name]) fail(entry, `jobs.${name}`, `the handler ${entry.root}/server/jobs/${short(name)}.ts does not exist`)
+    for (const name of Object.keys(m.tasks ?? {})) if (!entry.handlers.tasks?.[name]) fail(entry, `tasks.${name}`, `the handler ${entry.root}/server/tasks/${short(name)}.ts does not exist`)
+    for (const name of Object.keys(m.facts ?? {})) if (!entry.handlers.facts?.[name]) fail(entry, `facts.${name}`, `the resolver ${entry.root}/server/facts/${short(name)}.ts does not exist`)
+    for (const name of Object.keys(m.calls ?? {})) {
+      const handler = entry.handlers.calls?.[name]
+      if (!handler || typeof handler.reconcile !== 'function' || typeof handler.outcome !== 'function') fail(entry, `calls.${name}`, `${entry.root}/server/calls/${short(name)}.ts must export defineCall({ outcome, reconcile })`)
+    }
+    for (const [name, list] of Object.entries(m.contributes ?? {})) {
+      if (absent(name)) continue
+      const declared = r.points.get(name)
+      if (!declared) fail(entry, `contributes.${name}`, 'no module declares this point')
+      if (!linked.has(declared!.module)) fail(entry, `contributes.${name}`, `${declared!.module} owns this point, so list it in requires or uses`)
+      for (const c of list) {
+        if (declared!.decl.kind === 'data') {
+          const parsed = declared!.decl.schema.safeParse(c)
+          if (!parsed.success) fail(entry, `contributes.${name}.${c.id}`, parsed.error.issues.map(i => `${i.path.join('.') || '(entry)'}: ${i.message}`).join('; '))
+        }
+        else if (!entry.handlers.contributions?.[name]?.[c.file ?? c.id]) {
+          fail(entry, `contributes.${name}.${c.id}`, `the file ${entry.root}/server/contributions/${name}/${c.file ?? c.id}.ts does not exist`)
+        }
+      }
+    }
+    for (const [key, setting] of Object.entries(m.settings ?? {})) {
+      if (!r.abilities.has(setting.change)) fail(entry, `settings.${key}.change`, `"${setting.change}" is not a declared ability`)
+      if (setting.kind === 'reference' && !r.records.has(setting.record!)) fail(entry, `settings.${key}.record`, `"${setting.record}" is not a record type`)
+    }
+    for (const [key, { decl }] of [...r.abilities].filter(([, a]) => a.module === m.id)) {
+      if (decl.on && !r.records.has(decl.on)) fail(entry, `abilities.${key}.on`, `"${decl.on}" is not a record type`)
+      if (decl.owner && decl.owner !== 'ignored') {
+        const rec = decl.on ? r.records.get(decl.on) : undefined
+        if (!rec?.decl.owner) fail(entry, `abilities.${key}.owner`, `owner: '${decl.owner}' needs a record type that declares an owner column`)
+      }
+    }
+    for (const [key, { decl }] of [...r.records].filter(([, a]) => a.module === m.id)) {
+      if (decl.parent && !r.records.has(decl.parent)) fail(entry, `records.${key}.parent`, `"${decl.parent}" is not a record type`)
+      if (decl.table === undefined) {
+        if (!Array.isArray(decl.ids) || !decl.ids.length || !decl.ids.every(i => /^[a-z][a-z0-9-]*$/.test(i))) fail(entry, `records.${key}.ids`, 'a record type without a table lists its fixed ids, kebab-case')
+        if (decl.owner) fail(entry, `records.${key}.owner`, 'a record type without a table has no owner column')
+        continue
+      }
+      const table = r.tables.get(decl.table)
+      if (!table) fail(entry, `records.${key}.table`, `"${decl.table}" is not a declared table`)
+      if (decl.owner && !Object.values(table!.meta.columns).some(c => c.sql === decl.owner)) fail(entry, `records.${key}.owner`, `"${decl.owner}" is not a column of ${decl.table}`)
+    }
+    for (const [key, { decl }] of [...r.facts].filter(([, a]) => a.module === m.id)) {
+      if (decl.on && !r.records.has(decl.on)) fail(entry, `facts.${key}.on`, `"${decl.on}" is not a record type`)
+    }
+    for (const [key, table] of Object.entries(m.tables ?? {})) {
+      const meta = tableMeta(table)!
+      for (const [col, { meta: c }] of Object.entries(meta.columns)) {
+        if (c.ref) {
+          const target = r.tables.get(c.ref.table)
+          if (!target) fail(entry, `tables.${key}.${col}`, `references "${c.ref.table}", which no module declares`)
+          if (!linked.has(target!.module)) fail(entry, `tables.${key}.${col}`, `${target!.module} owns ${c.ref.table}, so list it in requires`)
+        }
+        if (c.erase === 'retain' && !r.settings.has(c.until!)) fail(entry, `tables.${key}.${col}`, `retain until "${c.until}", which is not a setting`)
+      }
+      if (meta.options.retention && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+    }
+  }
+
+  // requires may not form a loop.
+  const visiting = new Set<string>()
+  const done = new Set<string>()
+  const visit = (id: string, path: string[]) => {
+    if (done.has(id)) return
+    if (visiting.has(id)) {
+      const entry = r.modules.get(path[0]!)!
+      fail(entry, 'requires', `forms a loop: ${[...path, id].join(' → ')}`)
+    }
+    visiting.add(id)
+    for (const next of r.modules.get(id)?.manifest.requires ?? []) visit(next, [...path, id])
+    visiting.delete(id)
+    done.add(id)
+  }
+  for (const id of r.modules.keys()) visit(id, [])
+  return r
+}
+
+/** The part of a job, task or call name after the module: `box-office.sweep-holds` → `sweep-holds`. */
+export function short(name: string): string {
+  return name.slice(name.indexOf('.') + 1)
+}
+
+/** The module that owns a table name, by its prefix. */
+export function moduleOfTable(name: string): string {
+  return name.split('_')[0]!
+}
+
+let installed: Registry | undefined
+
+/** Installs the registry the running Worker uses: the generated one, or a test's. */
+export function installRegistry(registry: Registry): Registry {
+  installed = registry
+  const personal = new Set<string>()
+  for (const { meta } of registry.tables.values()) {
+    for (const [key, { sql, meta: column }] of Object.entries(meta.columns)) {
+      if (column.class === 'personal' || column.class === 'freeText' || column.class === 'special') personal.add(key).add(sql)
+    }
+  }
+  setPersonalFields(personal)
+  return registry
+}
+
+export function useRegistry(): Registry {
+  if (!installed) throw new Error('No registry installed. The core layer\'s server plugin installs the generated one; a test calls installRegistry().')
+  return installed
+}
+
+export { snake }

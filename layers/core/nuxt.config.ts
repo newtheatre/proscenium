@@ -1,0 +1,20 @@
+// The core layer: the kit, the generated registry, the Worker's background handlers and the
+// interface's foundations (Nuxt UI v4 on Tailwind CSS v4, as in Mailflare).
+import { fileURLToPath } from 'node:url'
+import { kitAliases } from './aliases'
+
+const root = fileURLToPath(new URL('../..', import.meta.url))
+const generatedTypes = fileURLToPath(new URL('../../.generated/types/registry.d.ts', import.meta.url))
+
+export default defineNuxtConfig({
+  app: { head: { htmlAttrs: { lang: 'en-GB' } } },
+  css: [fileURLToPath(new URL('./app/assets/css/main.css', import.meta.url))],
+  alias: kitAliases(root),
+  nitro: {
+    typescript: { tsConfig: { include: [generatedTypes], compilerOptions: { types: ['@cloudflare/workers-types'] } } },
+  },
+  // The app's typed $fetch reads the server routes, and with them the kit's Cloudflare types.
+  typescript: { tsConfig: { compilerOptions: { types: ['@cloudflare/workers-types'] } } },
+  // Icons are bundled, so nothing is fetched from Iconify at run time.
+  icon: { clientBundle: { scan: true }, serverBundle: 'local' },
+})
