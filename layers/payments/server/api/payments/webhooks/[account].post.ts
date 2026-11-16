@@ -3,7 +3,7 @@
 // on, and only once, by the job payments.handle-webhook, which asks the provider for the truth rather
 // than trusting the body. The body itself is never stored.
 import { z } from 'zod'
-import { getRequestHeaders, getRouterParam, readRawBody, setResponseStatus } from 'h3'
+import { getRequestHeaders, getRequestURL, getRouterParam, readRawBody, setResponseStatus } from 'h3'
 import { credential, defineRoute, first, newId, nowMs, Refusal } from '#kit'
 import { providerAccount, providers } from '../../../providers'
 
@@ -22,7 +22,7 @@ export default defineRoute({
 
   const body = (await readRawBody(event, 'utf8')) ?? ''
   const secret = provider.webhookSecret ? await credential(provider.webhookSecret) ?? undefined : undefined
-  const verified = await provider.verifyWebhook({ body, headers: getRequestHeaders(event) as Record<string, string>, secret })
+  const verified = await provider.verifyWebhook({ body, headers: getRequestHeaders(event) as Record<string, string>, secret, url: getRequestURL(event).href, providerAccountId: account.id })
   if (!verified?.eventId) {
     setResponseStatus(event, BAD_REQUEST)
     return { received: false }
@@ -38,9 +38,11 @@ export default defineRoute({
 
   const seen = await first<{ id: string }>('SELECT id FROM payments_webhook_events WHERE provider_account_id = ? AND provider_event_id = ? AND signature_ok = 1', account.id, verified.eventId)
   if (seen) return { received: true }
-  const attempt = verified.providerRef
-    ? await first<{ id: string }>('SELECT id FROM payments_attempts WHERE provider_account_id = ? AND provider_ref = ?', account.id, verified.providerRef)
-    : null
+  const attempt = verified.attemptId
+    ? await first<{ id: string }>('SELECT id FROM payments_attempts WHERE provider_account_id = ? AND id = ?', account.id, verified.attemptId)
+    : verified.providerRef
+      ? await first<{ id: string }>('SELECT id FROM payments_attempts WHERE provider_account_id = ? AND provider_ref = ?', account.id, verified.providerRef)
+      : null
   // A race with the same delivery meets the unique index and inserts nothing; its job finds no row.
   unit.add({
     sql: `INSERT INTO payments_webhook_events (id, provider_account_id, provider_event_id, type, signature_ok, attempt_id, received_at, handled_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?)
