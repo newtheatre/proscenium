@@ -1,0 +1,11 @@
+node_modules/
+.nuxt/
+.output/
+.data/
+.wrangler/
+.generated/
+test-results/
+playwright-report/
+.env
+.dev.vars
+*.log

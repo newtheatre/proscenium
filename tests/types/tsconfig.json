@@ -1,0 +1,5 @@
+{
+  "extends": "../../.nuxt/tsconfig.server.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["./*.ts", "../../.generated/types/registry.d.ts", "../../.nuxt/types/nitro.d.ts"]
+}

@@ -1,0 +1,126 @@
+# The kit
+
+Every module is built with the kit in `layers/core/kit`, imported as `#kit`. It turns a module's
+declarations into a running system and enforces the Foundations specification's rules, so a module
+cannot forget a permission check, half-write a change, or run a job twice.
+
+## A module
+
+A module is a folder in `layers/` (upstream) or `site/layers/x-<name>/` (a theatre's own) holding:
+
+```
+module.ts                     The manifest: defineModule({ id, manifest: 1, since, ... })
+server/db/schema.ts           Tables, with defineTable and col.*
+server/api/<id>/...           Routes, each written with defineRoute
+server/listeners/<name>.ts    One per entry in events.listens
+server/jobs/<name>.ts         One per job (the part of the name after the module)
+server/tasks/<name>.ts        One per task
+server/calls/<name>.ts        One per external call: defineCall({ outcome, reconcile })
+server/services.ts            What other modules may import as #modules/<id>
+i18n/en-GB.json               Labels and help for everything declared
+```
+
+`bun install` (or `bun run generate`) reads every manifest and writes `.generated/`: the registry,
+the bundled migrations and the types that make `useSetting('x')`, `enqueue('x')` and a route's
+`ability` type errors for undeclared names. A manifest mistake fails with the file and the field.
+
+## Tables
+
+```ts
+export const items = defineTable('lost_property_items', {
+  id: col.id(),
+  description: col.freeText(text('description')),
+  finder: col.account('finder_id', { role: 'subject', onMerge: 'move' }),
+  foundAt: col.timestamp('found_at').notNull(),
+}, { id: 'lpi', realm: 'operational' })
+```
+
+Every column has a data class (`public`, `internal`, `personal`, `freeText`, `special`); a column
+without one fails the build. Ids are `<prefix>_<26 characters>`, sorted by creation time unless
+`random: true`. `appendOnly: true` adds database triggers that refuse updates and deletes, except
+erasure writing its placeholder. After changing a table run `bun run db:generate -- --name <what>`;
+the conformance check fails while the code and the migrations disagree.
+
+## Routes
+
+```ts
+export default defineRoute({
+  ability: 'lost-property.items.record',   // or public: true, or 'signed-in'
+  rateLimit: 'write',
+  idempotent: true,                        // needs an Idempotency-Key header; repeats replay
+  input: z.object({ description: z.string().max(500) }),
+}, async (event, { input, actor, unit }) => {
+  unit.add(insertStatement).expect(1)
+  unit.announce('lost-property.item.recorded', { itemId })
+  return { itemId }
+})
+```
+
+Before the handler runs the kit checks, in order: the module is on (else 404), the rate limit
+(429), Turnstile if `protect: 'turnstile'`, the input (422 naming the fields), and the ability (401
+or 403). Every refusal has the body `{ code, reason, remedy?, fields? }`. The kit commits the unit
+of work after the handler returns, with an audit entry when the ability is audited.
+
+## The unit of work
+
+A change, its audit entry, its events and the jobs it queues commit together as one D1 batch, or
+not at all. `unit.add(statement).expect(n)` guards a contended row: if the statement does not change
+exactly `n` rows the whole batch rolls back and the caller gets a 409 refusal (the guard is an
+insert into `core_guard` that a trigger aborts). A service receives the unit without `commit`.
+`unit.afterCommit(fn)` runs after a successful commit; its failure never undoes the commit.
+
+## Events, jobs and tasks
+
+`unit.announce(name, payload)` writes the event and, in the same batch, a job for each listener in
+a module that is switched on. Payloads hold ids, numbers, enums and `code()` values only, never a
+person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is the truth, so a
+duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
+with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`. A
+switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `weeklyOn` in the
+theatre's time zone; the cron trigger runs only the latest due slot, once.
+
+## External calls
+
+`externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency
+key, then records the outcome and applies it through the module's `outcome` handler. A call that
+throws or times out leaves the attempt with no outcome; the `reconcile` handler asks the provider
+later. Nothing is shown as done before its outcome commits.
+
+## Settings
+
+```ts
+defineSettings('box-office', {
+  'holds.length': setting.duration({ default: '15m', min: '5m', max: '1h', change: 'box-office.settings.manage' }),
+})
+```
+
+Read with `await useSetting('box-office.holds.length')` (seconds for a duration). A value outside
+the limits cannot be saved. A quotable public setting can be quoted in content as
+`:setting{name="box-office.fees.booking"}`.
+
+## Testing
+
+Unit tests run in Node; integration tests run in workerd with a local D1, using the fixture
+modules in `tests/fixtures/modules` (their migrations are in `tests/fixtures/migrations`,
+written with `bun run db:generate -- --name <what> --owner fixtures`). Browser tests run the built
+Worker under wrangler. Everything runs on Linux.
+
+## Where the build departs from the specification's wording
+
+These were settled while building and are reported to the Foundations workstream:
+
+- `defineTable(name, columns, options)`, as ruled for scoped ids; the worked example's older order
+  `(name, options, columns)` is not supported.
+- The content token is `:setting{name="..."}` rather than `:setting{key}`, because `key` is
+  reserved in Vue and never reaches the component.
+- Points are read with `usePoint(name)`; `point()` is the manifest helper that declares one.
+- Cross-setting rules are declared in the manifest field `settingRules`.
+- The jobs of a switched-off module wait (M4) rather than run.
+- External calls are declared in the manifest's `calls` section, each with a handler file.
+- Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning
+  old history is the daily task `core.prune-history`.
+- Rate limits are counted per Worker instance in memory, with the limits as core settings.
+- Pending migrations are applied automatically only where `PROSCENIUM_AUTO_MIGRATE=1` (dev,
+  preview and tests) until F-28's maintenance page and Apply button exist.
+- Not yet checked by `bun run check`: the erasure scan, soft-dependency switching and navigation
+  coverage, which need the modules they check.
