@@ -99,8 +99,31 @@ function checkDetail(detail: Record<string, unknown>) {
   }
 }
 
+/**
+ * The most a set's JSON parameter may hold, in bytes, whatever its row count (rule U9). D1 refuses a
+ * string over 2,000,000 bytes, and row width varies by table, so rows alone cannot keep a set under
+ * it. A fixed kit constant, not a setting.
+ */
+export const SET_PARAM_MAX_BYTES = 1_000_000 // not-policy: half D1's 2 MB string limit
+
 /** Reads element `i` of each json_each row. */
 const at_ = (i: number) => `json_extract(value, '$[${i}]')`
+
+/** The length of `text` in UTF-8 bytes, as D1 counts a string, without copying it. */
+function utf8Length(text: string): number {
+  let bytes = 0
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i)
+    if (unit < 0x80) bytes += 1
+    else if (unit < 0x800) bytes += 2
+    else if (unit >= 0xD800 && unit <= 0xDBFF && i + 1 < text.length) {
+      bytes += 4 // a surrogate pair: one character, four bytes
+      i++
+    }
+    else bytes += 3
+  }
+  return bytes
+}
 
 /** A JSON array of rows for json_each, each value already as D1 would bind it. */
 function setParam(rows: unknown[][]): string {
@@ -262,7 +285,7 @@ export class UnitOfWork implements UnitView {
     const added: number[] = []
     const jobs: { index: number, id: string, lane: Lane, delay?: number }[] = []
     const eventIds: string[] = []
-    const sets: number[] = []
+    const sets: { rows: number, param: string }[] = []
     const jobSets: { id: string, lane: Lane }[] = []
     const needsModules = this.items.some(i => i.kind === 'event')
     const enabled = needsModules ? await enabledModules() : undefined
@@ -283,7 +306,7 @@ export class UnitOfWork implements UnitView {
     for (const item of this.items) {
       switch (item.kind) {
         case 'statement':
-          if (item.rows) sets.push(item.rows)
+          if (item.rows) sets.push({ rows: item.rows, param: item.statement.params.at(-1) as string })
           statements.push(item.statement)
           added.push(statements.length - 1)
           break
@@ -310,10 +333,11 @@ export class UnitOfWork implements UnitView {
             })
           }
           else {
-            sets.push(rows.length)
+            const param = setParam(rows)
+            sets.push({ rows: rows.length, param })
             statements.push({
               sql: `INSERT INTO core_audit (id, at, actor_account_id, actor_name, actor_kind, action, ability, allowed_by, module_id, record_type, record_id, detail, request_id, unit_id) SELECT ${at_(0)}, ?, ?, ?, ?, ${at_(1)}, ${at_(2)}, ?, ${at_(3)}, ${at_(4)}, ${at_(5)}, ${at_(6)}, ?, ? FROM json_each(?)`,
-              params: [at, ...actor, context.allowedBy ?? null, context.requestId, this.id, setParam(rows)],
+              params: [at, ...actor, context.allowedBy ?? null, context.requestId, this.id, param],
             })
           }
           break
@@ -331,10 +355,11 @@ export class UnitOfWork implements UnitView {
             })
           }
           else {
-            sets.push(rows.length)
+            const param = setParam(rows)
+            sets.push({ rows: rows.length, param })
             statements.push({
               sql: `INSERT INTO core_events (id, name, record_type, record_id, payload, announced_at, unit_id, dispatched_at) SELECT ${at_(0)}, ?, ${at_(1)}, ${at_(2)}, ${at_(3)}, ?, ?, ? FROM json_each(?)`,
-              params: [item.name, at, this.id, at, setParam(rows)],
+              params: [item.name, at, this.id, at, param],
             })
           }
           eventIds.push(...item.events.map(e => e.id))
@@ -350,10 +375,11 @@ export class UnitOfWork implements UnitView {
               continue
             }
             const jobRows = item.events.map(event => [newId('job'), JSON.stringify({ eventId: event.id }), event.id])
-            sets.push(jobRows.length)
+            const param = setParam(jobRows)
+            sets.push({ rows: jobRows.length, param })
             statements.push({
               sql: `INSERT OR IGNORE INTO core_jobs (id, kind, name, module_id, lane, payload, dedupe_key, state, attempts, max_attempts, run_after, created_at) SELECT ${at_(0)}, 'listener', ?, ?, 'prompt', ${at_(1)}, ${at_(2)}, 'queued', 0, ?, ?, ? FROM json_each(?)`,
-              params: [name, listener.module, maxAttempts, at, at, setParam(jobRows)],
+              params: [name, listener.module, maxAttempts, at, at, param],
             })
             // Event ids are new, so no listener job here can meet an unfinished duplicate. Every
             // job gets its message; a message for a row that is not queued is ignored (J1).
@@ -374,10 +400,15 @@ export class UnitOfWork implements UnitView {
     }
     if (sets.length) {
       const rowsLimit = await useSetting('core.units.set-rows-limit') as number
-      const largest = Math.max(...sets)
+      const largest = Math.max(...sets.map(set => set.rows))
       if (largest > rowsLimit) {
         this.state = 'open'
         throw new Refusal('core.unit.too-large', `This change writes ${largest} rows in one set, more than the limit of ${rowsLimit}, so nothing was saved.`, { status: 500 })
+      }
+      const heaviest = Math.max(...sets.map(set => utf8Length(set.param)))
+      if (heaviest > SET_PARAM_MAX_BYTES) {
+        this.state = 'open'
+        throw new Refusal('core.unit.too-large', `This change writes ${Math.ceil(heaviest / 1000).toLocaleString('en-GB')} KB in one set, more than the limit of ${(SET_PARAM_MAX_BYTES / 1000).toLocaleString('en-GB')} KB, so nothing was saved.`, { status: 500 }) // not-policy: bytes to KB
       }
     }
     if (!statements.length) {
