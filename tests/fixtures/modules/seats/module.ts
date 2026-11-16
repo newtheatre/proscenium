@@ -26,6 +26,7 @@ export default defineModule({
   },
   jobs: {
     'seats.retry-flaky': job({ payload: z.object({ failTimes: z.number() }), retries: 3 }),
+    'seats.wait-a-while': job({ payload: z.object({ deferTimes: z.number(), title: z.string() }), retries: 1 }),
   },
   tasks: {
     'seats.count-seats': task({ dailyAt: '02:00' }),

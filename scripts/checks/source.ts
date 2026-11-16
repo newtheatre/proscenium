@@ -232,3 +232,70 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
   }
   return problems
 }
+
+/** Identity's own code may compare an account column to an id: its tables are keyed by the account itself. */
+const EXACT_ACCOUNT_HOME = 'layers/core/server/identity/'
+
+/**
+ * A read by account goes through the account scope (Foundations, Data-class registry, "The account
+ * scope"): a merge leaves most account columns holding the id they were written with, so comparing
+ * one to an id misses the person's other rows. Refuses eq, ne, inArray and raw SQL that compare a
+ * col.account column to a value, and exactAccount without a reason, outside identity's own code.
+ */
+export function checkAccountComparisons(modules: Loaded[], registry: any): string[] {
+  // Which tables hold each column name as an account column, and which hold it as something else
+  // (finance_entries.account_id is a ledger account), so a name is judged by the tables on its line.
+  const accountIn = new Map<string, Set<string>>()
+  const otherIn = new Map<string, Set<string>>()
+  const keyIs = new Map<string, { account: boolean, other: boolean }>()
+  const add = (map: Map<string, Set<string>>, name: string, table: string) => map.set(name, (map.get(name) ?? new Set()).add(table))
+  for (const [table, { meta }] of registry.tables as Map<string, any>) {
+    for (const [key, c] of Object.entries(meta.columns as Record<string, any>)) {
+      add(c.meta.account ? accountIn : otherIn, c.sql, table)
+      const k = keyIs.get(key) ?? { account: false, other: false }
+      k[c.meta.account ? 'account' : 'other'] = true
+      keyIs.set(key, k)
+    }
+  }
+  if (!accountIn.size) return []
+  const alt = (names: Iterable<string>) => [...names].sort((a, b) => b.length - a.length).join('|')
+  const column = `(?<![\\w])(?:\\w+\\.)?"?(${alt(accountIn.keys())})"?`
+  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope|inAccountScope)\\())'
+  const raw = [
+    new RegExp(`${column}\\s*(?:==?|!=|<>)\\s*${value}`, 'gi'),
+    new RegExp(`${column}\\s+IS\\s+(?:NOT\\s+)?${value}`, 'gi'),
+    new RegExp(`${column}\\s+(?:NOT\\s+)?IN\\s*(?:\\(\\s*)?(?:${value}|SELECT\\s+value\\s+FROM\\s+json_each)`, 'gi'),
+  ]
+  const accountKeys = [...keyIs].filter(([, k]) => k.account && !k.other).map(([key]) => key)
+  const drizzle = accountKeys.length ? new RegExp(`\\b(?:eq|ne|inArray|notInArray)\\(\\s*[\\w.]+\\.(?:${alt(accountKeys)})\\b`) : undefined
+  const tableNames = new RegExp(`\\b(${alt((registry.tables as Map<string, any>).keys())})\\b`, 'g')
+  // A name compared on a line is an account column if a table named near it (the statement's
+  // lines) holds it as one, or, with no table in sight, if no table holds that name as anything else.
+  const isAccount = (name: string, near: string) => {
+    const named = [...near.matchAll(tableNames)].map(m => m[1]!)
+    if (named.length) return named.some(t => accountIn.get(name)?.has(t))
+    return !otherIn.has(name)
+  }
+  const problems: string[] = []
+  for (const m of modules) {
+    if (m.found.root.startsWith('tests/')) continue // fixtures show the kit, not a module's reads
+    for (const file of walk(join(ROOT, m.found.root, 'server'), ['.ts'])) {
+      const at = rel(file)
+      if (at.includes('/server/db/') || at.startsWith(EXACT_ACCOUNT_HOME)) continue
+      const all = lines(file)
+      all.forEach((line, i) => {
+        if (/^\s*(\/\/|\/?\*)/.test(line)) return
+        if (line.includes('exact-account:')) return
+        const near = all.slice(Math.max(0, i - 6), i + 3).join('\n') // not-policy: the lines a statement usually spans
+        if (/\bexactAccount\(/.test(line)) {
+          problems.push(`${at}:${i + 1}: exactAccount outside identity needs a reason; end the line with // exact-account: why`)
+          return
+        }
+        const compared = raw.flatMap(r => [...line.matchAll(r)].map(match => match[1]!.toLowerCase()))
+        if (drizzle?.test(line) || compared.some(name => isAccount(name, near)))
+          problems.push(`${at}:${i + 1}: compares an account column to an id; use inAccountScope(column, account) so rows of merged accounts are found, or exactAccount with // exact-account: why`)
+      })
+    }
+  }
+  return problems
+}
