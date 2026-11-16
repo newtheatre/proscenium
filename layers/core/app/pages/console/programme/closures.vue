@@ -107,25 +107,17 @@ async function remove(c: Closure) {
           description="Record a closure for a holiday shutdown, building work or anything else that keeps the doors shut."
           icon="i-lucide-calendar-x"
         />
-        <ul
+        <RecordList
           v-else
-          class="divide-y divide-default rounded-lg border border-default"
-          aria-label="Closures"
+          label="Closures"
         >
-          <li
+          <RecordListItem
             v-for="c in data.rows"
             :key="c.id"
-            class="flex flex-wrap items-center gap-3 px-3 py-2"
-            :class="{ 'text-muted': c.kind === 'public_holiday' }"
+            :name="c.title"
+            :description="`${when(c)} · ${where(c)}`"
+            :muted="c.kind === 'public_holiday'"
           >
-            <div class="min-w-0 flex-1">
-              <p class="font-medium">
-                {{ c.title }}
-              </p>
-              <p class="text-sm text-muted">
-                {{ when(c) }} · {{ where(c) }}
-              </p>
-            </div>
             <StatusBadge
               v-if="c.kind === 'public_holiday'"
               tone="neutral"
@@ -145,8 +137,8 @@ async function remove(c: Closure) {
               :aria-label="`Delete ${c.title}`"
               @click="remove(c)"
             />
-          </li>
-        </ul>
+          </RecordListItem>
+        </RecordList>
       </div>
     </DataBoundary>
 
@@ -155,10 +147,11 @@ async function remove(c: Closure) {
       title="New closure"
     >
       <template #body>
-        <form
+        <UForm
           id="new-closure"
+          :state="form"
           class="space-y-4"
-          @submit.prevent="add"
+          @submit="add"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -169,14 +162,12 @@ async function remove(c: Closure) {
               v-model="form.title"
               placeholder="Christmas shutdown"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <UFormField label="Where">
             <USelect
               v-model="form.scope"
               :items="scopes"
-              class="w-full"
             />
           </UFormField>
           <USwitch
@@ -191,7 +182,6 @@ async function remove(c: Closure) {
               <UInput
                 v-model="form.from"
                 :type="form.allDay ? 'date' : 'datetime-local'"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -202,7 +192,6 @@ async function remove(c: Closure) {
               <UInput
                 v-model="form.to"
                 :type="form.allDay ? 'date' : 'datetime-local'"
-                class="w-full"
               />
             </UFormField>
           </div>
@@ -211,7 +200,7 @@ async function remove(c: Closure) {
             label="Blocks performances"
             description="Turn off to show the closure on the calendar as a warning only."
           />
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

@@ -42,7 +42,10 @@ describe('the signing service (F-37)', () => {
     expect(signature).toMatch(/^[\w-]{86}$/) // not-policy: 64 bytes in base64url
     expect(await inContext(() => signing.verify(PURPOSE, keyId, code, signature))).toBe(true)
     expect(await inContext(() => signing.verify(PURPOSE, keyId, `${code}x`, signature))).toBe(false)
-    expect(await inContext(() => signing.verify(PURPOSE, keyId, code, `${signature.slice(0, -2)}AA`))).toBe(false)
+    // One character changed where every bit counts: replacing the last two with "AA" changed nothing
+    // in about one signature in 256, whose last byte was already zero.
+    const altered = `${signature[0] === 'A' ? 'B' : 'A'}${signature.slice(1)}`
+    expect(await inContext(() => signing.verify(PURPOSE, keyId, code, altered))).toBe(false)
     expect(await inContext(() => signing.verify(PURPOSE, keyId, code, 'not a signature'))).toBe(false)
     expect(await inContext(() => signing.verify(PURPOSE, 'sgk_aaaaaaaaaaaaaaaaaaaaaaaaaa', code, signature))).toBe(false)
   })

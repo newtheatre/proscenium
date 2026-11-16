@@ -3,6 +3,7 @@
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { createUnit, defineRoute, newId, nowMs, Refusal } from '#kit'
+import { siteOrigin } from '../../../../origin'
 import { createIntent } from '../../../../intents'
 import { providerAccount } from '../../../../providers'
 import { startAttempt } from '../../../../start'
@@ -23,5 +24,5 @@ export default defineRoute({
   const unit = createUnit()
   const { intentId } = await createIntent(unit.view(), { parts: [{ owner: { module: 'payments', record: newId('pay') }, amountMinor: TEST_AMOUNT }], channel, expiresAt: nowMs() + LIFETIME })
   await unit.commit()
-  return { intentId, ...await startAttempt(intentId, { providerAccountId: account.id, method: input.method, readerId: input.readerId }) }
+  return { intentId, ...await startAttempt(intentId, { providerAccountId: account.id, method: input.method, readerId: input.readerId, origin: siteOrigin(event) }) }
 })

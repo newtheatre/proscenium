@@ -28,6 +28,6 @@ Second-round specification, 16 November 2026, with all eleven of its questions d
 | Abilities | 15 |
 | Points offered | 2 |
 | Audience sources this module declares | 6 |
-| Stories | 38 (21 first release, of which 6 gate; 17 later) |
+| Stories | 39 (21 first release, of which 6 gate; 18 later) |
 | Questions for Matt | 11, all decided |
 | Requests to other workstreams | 9, all ruled |

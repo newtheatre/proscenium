@@ -1,6 +1,6 @@
 # 7. Stories
 
-The interface backlog is 36 stories: 24 in the first release (roadmap phases 1 to 3), 11 later, and one (UI-36) whose release follows the bar's. Each has criteria a test can check. Story ids start `UI-`; the phase is the roadmap phase the story is needed by.
+The interface backlog is 40 stories: 26 in the first release (roadmap phases 1 to 3), 13 later, and one (UI-36) whose release follows the bar's. Each has criteria a test can check. Story ids start `UI-`; the phase is the roadmap phase the story is needed by.
 
 ## First release
 
@@ -28,8 +28,8 @@ The interface backlog is 36 stories: 24 in the first release (roadmap phases 1 t
 
 | Id | Story | Acceptance criteria | Phase |
 | --- | --- | --- | --- |
-| UI-11 | As a module author I build a list from the list component | Filters, sort and page are in the address; Back restores them; table at laptop width (1024 pixels and above) and cards below it; export respects filters and the row ceiling; empty list and empty filter show different messages | 1 |
-| UI-12 | As a module author I build a record page | Title, status badge with a word, one primary action, summary strip, tabs; another module's tab appears through the record-tab point and vanishes when that module is off; a history panel lists audit entries | 2 |
+| UI-11 | As a module author I build a list from the list component | The list is declared once with `defineList` and the page, data route and export read that declaration. Search, filters, view, sort and page are in the address; Back restores them. Search is always present and matches every text field the list can show, hidden columns included, and says where a hidden match was. The toolbar is search, Filters, Sort, Columns; filters open in one panel (a drawer below 640 pixels) and show as chips; the six filter kinds work and an unknown key or value is refused. A heading sorts, and the Sort control offers every declared sort, shown or not. Table at laptop width (1024 pixels and above) and cards below it; export respects filters and the row ceiling; empty list and empty filter show different messages | 1 |
+| UI-12 | As a module author I build a record page | Title, status badge with a word, one primary action, summary strip, tabs; another module's tab appears through the record-tab point and vanishes when that module is off; a history panel lists audit entries; an optional side panel sits beside the tabs at laptop width and folds to one line above them below it | 2 |
 | UI-13 | As a module author I build a form from a schema | Browser and server show the same message for the same invalid value; the button names the act and cannot be pressed twice; leaving with changes asks once; a stale save shows a conflict, never overwrites | 1 |
 | UI-14 | As an officer I change a setting on a generated page | A module with settings gets a page with no page code; each setting shows value, default, reset, limits, who may change it, when and by whom it was last changed, and a tag when quoted publicly; a read-only viewer sees who can change it | 1 |
 | UI-15 | As a site owner I find a setting by searching | Search matches label and help text across all modules that are on; a result opens the setting scrolled into view and highlighted | 2 |
@@ -62,7 +62,7 @@ The interface backlog is 36 stories: 24 in the first release (roadmap phases 1 t
 
 | Id | Story | Acceptance criteria |
 | --- | --- | --- |
-| UI-25 | As an officer I save and share a view of a list | A view stores filters, sort and columns; a shared view is offered to everyone who may open the list; a view with a removed filter opens with a notice |
+| UI-25 | As an officer I save and share a view of a list | A view stores filters, sort and columns; saved views sit beside a list's built-in views and use the same `view=` key; a shared view is offered to everyone who may open the list; a view with a removed filter opens with a notice |
 | UI-26 | As a site owner I rearrange and rename members' sections | Order, label and hidden state are settings; nothing can be shown to someone without the ability |
 | UI-27 | As a member I see my own history across modules | Shifts, training and credits from whichever modules are on, in one place |
 | UI-28 | As a new member I am welcomed once | A one-time introduction after becoming entitled; never shown again once dismissed |
@@ -76,6 +76,14 @@ The interface backlog is 36 stories: 24 in the first release (roadmap phases 1 t
 **UI-35, added 16 November 2026 at the request of Spaces.** As a module author I show bookings, a rota or sessions with the shared calendar. Criteria: day and week views with several columns; every block shows its state as a word and a border as well as a colour; a List view holds the same items, filters and actions and is fully usable by keyboard and screen reader; colours come only from the eight named calendar colours, which pass contrast in light and dark under any brand. Needed by roadmap phase 4, when Spaces and the Front of house rota arrive, so it is not in the first release.
 
 **UI-36, added 16 November 2026 at the request of Bar.** As a volunteer on a till I type an amount on a keypad made for a touch screen. Criteria: keys are at least 56 by 56 pixels; money mode holds pence and shows pounds and pence; the figure is announced as it changes; a physical keyboard works too; nothing is confirmed until the screen's primary action is pressed. Needed with the bar's first stories: phase 3 if Matt accepts the bar there, otherwise with the bar.
+
+**UI-37, added 16 November 2026 with the list design.** As an officer I open a row to see what is under it, choose my columns and start from a built-in view. Criteria: a list may declare sub-rows or a detail panel; the chevron is its own named button and the rest of the row still opens the record; at most 20 children show for a parent, then a link to them all; sort, paging and bulk selection are of parents; a filter or search about children keeps a parent when any child matches and says how many match; built-in views are tabs above the toolbar; the Columns choice survives a reload on the same device, is cleared on sign-out and never appears in the address. Phase 2, with the productions list.
+
+**UI-38, added 16 November 2026 with the list design.** As a module author I add a column to another module's list. Criteria: a `core.list-column` contribution appears after the owner's columns for a viewer who holds its ability and is absent otherwise and when its module is off; it makes one request for a page of rows, however many rows there are. Later than the first release unless box office's Sales column is wanted in phase 3.
+
+**UI-39, added 16 November 2026 with core domain's content warnings (a later slice Matt accepted).** As an audience member I read a production's content warnings in layers. Criteria: warnings are grouped under headings; each carries its level (mentioned, discussed or depicted) as a word, never as colour alone; the advisories component has a compact form for cards and listings that opens to the full one; both forms are usable by keyboard and screen reader. Later, with core domain's slice; the detail is to be agreed with core domain.
+
+**UI-40, added 16 November 2026 with the list design.** As anyone below a list I can see where I am and get back. Criteria: a console or site administration page that gives a trail shows a breadcrumb from 640 pixels up and one back button, named with its destination, below that; a members' or My account page shows a worded back link; a crumb to a list reopens it with the view, filters, search, sort and page it was left with; the page title stays the only top heading. Phase 2.
 
 ## Not stories here
 

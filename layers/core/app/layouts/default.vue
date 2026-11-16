@@ -23,28 +23,21 @@ const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col">
+  <div>
     <SkipLink />
     <UHeader :title="name">
-      <template #title>
-        <picture v-if="brand?.logo">
-          <source
-            v-if="brand.logoDark"
-            :srcset="brand.logoDark.url"
-            media="(prefers-color-scheme: dark)"
-          >
-          <img
-            :src="brand.logo.url"
-            :alt="brand.logo.alt || name"
-            :width="brand.logo.width ?? undefined"
-            :height="brand.logo.height ?? undefined"
-            class="h-10 w-auto"
-          >
-        </picture>
-        <span
-          v-else
-          class="font-semibold"
-        >{{ name }}</span>
+      <template
+        v-if="brand?.logo"
+        #title
+      >
+        <UColorModeImage
+          :light="brand.logo.url"
+          :dark="brand.logoDark?.url ?? brand.logo.url"
+          :alt="brand.logo.alt || name"
+          :width="brand.logo.width ?? undefined"
+          :height="brand.logo.height ?? undefined"
+          class="h-10 w-auto"
+        />
       </template>
       <UNavigationMenu
         :items="links"
@@ -65,37 +58,26 @@ const footer = computed(() => (navigation.value?.footer ?? []).map(l => ({ label
     <UMain
       id="main"
       tabindex="-1"
-      class="flex-1 outline-none"
+      class="outline-none"
     >
       <slot />
     </UMain>
 
     <!-- One shape for everybody: the same footer signed in or out. -->
-    <footer class="border-t border-default py-8">
-      <UContainer class="flex flex-col gap-4 text-sm sm:flex-row sm:items-start sm:justify-between">
-        <nav :aria-label="t('core.public.footer-navigation')">
-          <ul class="flex flex-wrap gap-x-5 gap-y-2">
-            <li
-              v-for="l in footer"
-              :key="l.to"
-            >
-              <ULink
-                :to="l.to"
-                :target="l.target"
-                class="text-muted hover:text-highlighted"
-              >
-                {{ l.label }}
-              </ULink>
-            </li>
-          </ul>
-        </nav>
-        <p
-          v-if="brand?.creditLine"
-          class="text-muted"
-        >
+    <UFooter>
+      <template
+        v-if="brand?.creditLine"
+        #left
+      >
+        <p class="text-sm text-muted">
           {{ t('core.public.credit') }}
         </p>
-      </UContainer>
-    </footer>
+      </template>
+      <UNavigationMenu
+        :items="footer"
+        variant="link"
+        :aria-label="t('core.public.footer-navigation')"
+      />
+    </UFooter>
   </div>
 </template>
