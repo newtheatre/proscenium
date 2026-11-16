@@ -229,6 +229,20 @@ export const identityContributions = {
       },
     },
   }, {
+    // The single-use link to the form, by notifyAddress (ID-42). Sealed: email only, cleared once sent.
+    id: 'core.access-invitation',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'sealed' as const, scheme: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Apply to the {{ scheme }} at {{ theatre }}',
+        body: '{{ theatre }} has invited you to apply to its {{ scheme }}, so that what would help you is there every time you book.\n\n[Open the form]({{ link }})\n\nThe link signs you in and works once. If it has run out, sign in with this email address and choose Apply. If you were not expecting this, you can ignore this email.',
+      },
+    },
+  }, {
     id: 'core.access-application-received',
     category: 'transactional' as const,
     side: 'audience' as const,

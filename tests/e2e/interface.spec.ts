@@ -323,3 +323,29 @@ test.describe('the starting colour mode', () => {
     }
   })
 })
+
+test.describe('the access scheme screens', () => {
+  const reviewerActor = { ...person('Rhea Reviewer', [grant('core.access-scheme.review')]), assurance: 'strong', reassertedAt: Date.now() }
+
+  test('My account\'s access scheme page offers the scheme, with no accessibility violations', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(audience) })
+    const page = await context.newPage()
+    await visit(page, '/account/access')
+    await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
+    await page.getByRole('button', { name: 'Apply' }).click()
+    await expect(page.getByRole('group', { name: 'Companion tickets' })).toBeVisible()
+    await noViolations(page)
+    await context.close()
+  })
+
+  test('the reviewers\' queue lists what is waiting and offers "Invite to apply"', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(reviewerActor) })
+    const page = await context.newPage()
+    await visit(page, '/console/people/access-scheme')
+    await expect(page.getByRole('heading', { level: 1, name: 'Access scheme' })).toBeVisible()
+    await page.getByRole('button', { name: 'Invite to apply' }).first().click()
+    await expect(page.getByRole('dialog', { name: 'Invite to apply' })).toBeVisible()
+    await noViolations(page)
+    await context.close()
+  })
+})

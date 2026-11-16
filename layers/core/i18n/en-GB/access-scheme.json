@@ -63,6 +63,13 @@
   "core.access.public.apply": "Apply to the {scheme}",
   "core.access.public.see": "See your application to the {scheme}",
 
+  "core.access.invite.button": "Invite to apply",
+  "core.access.invite.description": "For an email or a phone call: they get a link that signs them in and opens the form.",
+  "core.access.invite.name": "Their name",
+  "core.access.invite.address": "Their email address",
+  "core.access.invite.send": "Send invitation",
+  "core.access.invite.sent": "Invitation sent to {address}",
+
   "core.access.queue.person": "Person",
   "core.access.queue.kind": "Kind",
   "core.access.queue.waited": "Waiting",
