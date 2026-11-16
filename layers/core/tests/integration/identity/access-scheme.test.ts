@@ -118,6 +118,31 @@ describe('reviewing (ID-40)', () => {
     expect((await desk.browser.post(`/api/core/access-scheme/${desk.accountId}/decision`, { action: 'accept' })).body.code).toBe('core.access.own-record')
   })
 
+  it('an application waiting past reply-within is flagged in the queue and the reviewers are told once', async () => {
+    const { browser, accountId, need } = await applicant()
+    await browser.post('/api/core/me/access', { needs: [{ term: need.distance }], companions: 0 })
+    const desk = await reviewer()
+    const [{ address: desks }] = await rows<{ address: string }>('SELECT address FROM core_account_emails WHERE account_id = ?', desk.accountId)
+    await deliver()
+    sent.length = 0
+    await env.DB.prepare('UPDATE core_access_profiles SET submitted_at = 1 WHERE account_id = ?').bind(accountId).run()
+    const sweep = async () => {
+      await inContext(async () => {
+        const unit = createUnit()
+        await sweepAccessScheme(unit)
+        await unit.commit()
+      })
+      await deliver()
+    }
+    await sweep()
+    await sweep()
+    expect(to(desks!).map(e => e.subject)).toEqual(['Applications to the Access scheme are waiting'])
+    expect(to(desks!)[0]!.text).not.toContain('Ada')
+    expect((await desk.browser.get('/api/core/access-scheme')).body.applications.find((a: any) => a.accountId === accountId)).toMatchObject({ overdue: true })
+    const [row] = await rows<{ flagged_at: number | null }>('SELECT flagged_at FROM core_access_profiles WHERE account_id = ?', accountId)
+    expect(row!.flagged_at).not.toBeNull()
+  })
+
   it('asking for more needs a question, and the answer returns it to the queue', async () => {
     const { browser, accountId, mine, need } = await applicant()
     await browser.post('/api/core/me/access', { needs: [{ term: need.other }], companions: 0 })
@@ -223,6 +248,10 @@ describe('changing, confirming and leaving (ID-42, ID-44)', () => {
     await deliver()
     expect(to(mine).map(e => e.subject)).toEqual(['We have your application to the Access scheme'])
     expect((await browser.get('/api/core/me/access')).body.application.submittedVia).toBe('staff')
+    // Once another reviewer exists, the one who entered it does not decide it.
+    const second = await reviewer()
+    expect((await desk.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })).body.code).toBe('core.access.entered-by-you')
+    expect((await second.browser.post(`/api/core/access-scheme/${accountId}/decision`, { action: 'accept' })).status).toBe(200)
   })
 
   it('leaving deletes the application and the sharing choices', async () => {

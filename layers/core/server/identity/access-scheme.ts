@@ -8,6 +8,7 @@ import { all, can, first, isEnabled, nowMs, openSpecial, refuse, sealSpecial, us
 import { notify } from '../notifications/notify'
 import { getTerm, listTerms } from '../vocabularies/service'
 import { accountById, isUsable } from './accounts'
+import { holdersOf } from './holders'
 import { hasStanding } from './standings'
 import { z } from 'zod'
 import type { VERIFIED_METHODS } from '../db/identity'
@@ -167,6 +168,11 @@ export type Decision
 export async function decide(unit: UnitView, actor: Actor, accountId: string, decision: Decision): Promise<void> {
   const row = await profileOf(accountId)
   if (!row?.pending) refuse('core.access.nothing-to-decide', 'There is nothing waiting for a decision.', { status: 409 })
+  // An application staff entered is decided by another reviewer, when there is one (ID-42).
+  if (row.submitted_via === 'staff' && row.submitted_by === actor.accountId) {
+    const others = (await holdersOf('core.access-scheme.review', ['core.account', accountId])).filter(id => id !== actor.accountId && id !== accountId)
+    if (others.length) refuse('core.access.entered-by-you', 'You entered this application, so another reviewer decides it.', { status: 403 })
+  }
   const at = nowMs()
   const pending = (await openApp(row.pending))!
   const message = decision.message?.trim() || null
@@ -381,5 +387,29 @@ export async function sweepAccessScheme(unit: UnitView): Promise<void> {
     }
     unit.add({ sql: 'UPDATE core_access_profiles SET reminders = reminders + 1, review_due = ?, updated_at = ? WHERE account_id = ?', params: [at + gap * 1000, at, row.account_id] }) // not-policy: seconds to milliseconds
     await notify(unit, 'core.access-review-due', { to: row.account_id, variables: { scheme }, dedupeKey: `${row.account_id}:${row.review_due}:${row.reminders}` })
+  }
+  await flagWaiting(unit, at, gap, scheme)
+}
+
+/**
+ * Applications waiting longer than reply-within are flagged once, and the reviewers told in one
+ * message per sweep (ID-40). A reviewer is not told about their own application.
+ */
+async function flagWaiting(unit: UnitView, at: number, replyWithin: number, scheme: string): Promise<void> {
+  const late = await all<{ account_id: string }>(
+    `SELECT account_id FROM core_access_profiles
+      WHERE flagged_at IS NULL AND pending IS NOT NULL AND (status = 'submitted' OR status = 'accepted') AND submitted_at <= ?`,
+    at - replyWithin * 1000, // not-policy: seconds to milliseconds
+  )
+  if (!late.length) return
+  for (const r of late) unit.add({ sql: 'UPDATE core_access_profiles SET flagged_at = ? WHERE account_id = ? AND flagged_at IS NULL', params: [at, r.account_id] })
+  for (const reviewer of await holdersOf('core.access-scheme.review')) {
+    const count = late.filter(r => r.account_id !== reviewer).length
+    if (!count) continue
+    await notify(unit, 'core.access-application-waiting', {
+      to: reviewer,
+      variables: { scheme, count: String(count) },
+      dedupeKey: `${reviewer}:${at}`,
+    })
   }
 }

@@ -205,6 +205,21 @@ export const identityContributions = {
       },
     },
   }, {
+    // To the reviewers, once, when an application has waited longer than reply-within (ID-40).
+    id: 'core.access-application-waiting',
+    category: 'transactional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { scheme: 'text' as const, count: 'text' as const },
+    link: '/console/people/access-scheme',
+    wording: {
+      'en-GB': {
+        subject: 'Applications to the {{ scheme }} are waiting',
+        body: 'Applications waiting longer than {{ theatre }} aims to answer: {{ count }}. The queue shows which.',
+      },
+    },
+  }, {
     // The email names no need: there is news, and the account says what it is.
     id: 'core.access-application-decided',
     category: 'transactional' as const,
