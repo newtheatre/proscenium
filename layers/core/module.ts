@@ -28,7 +28,7 @@ export default defineModule({
   contributes: {
     ...domain.contributes,
     ...identity.identityContributions,
-    'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }],
+    'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }, { id: 'core.site-origin', file: 'site-origin' }],
     'core.vocabulary': [...domain.contributes['core.vocabulary'], ...identity.identityContributions['core.vocabulary']],
     'core.file-slot': [...domain.contributes['core.file-slot'], ...identity.identityContributions['core.file-slot']],
     'core.public-component': [...domain.contributes['core.public-component'], ...identity.identityContributions['core.public-component']],

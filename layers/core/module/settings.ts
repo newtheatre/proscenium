@@ -1,5 +1,6 @@
 // The core's settings: the platform's own operational numbers.
 import { defineSettings, defineSettingRules, setting } from '#kit'
+import { normaliseOrigin } from '#kit/origin'
 
 const change = 'core.settings.manage'
 // Every one of foundations' settings is the site's, shown under /admin/settings (R-33).
@@ -13,6 +14,8 @@ export const settings = defineSettings('core', {
   'appearance.live-dark': setting.boolean({ default: true, change, scope, audience: 'public' }),
 
   'site.name': setting.text({ unset: true, minLength: 1, maxLength: 80, change, scope, audience: 'public', quotable: true }),
+  // The one public origin (https://host). Setup records it; other hosts redirect reads and refuse changes.
+  'site.origin': setting.text({ unset: true, maxLength: 200, change, scope, onChange: 'confirm' }),
 
   // Unset until setup: until then scheduled tasks run on UTC and no theatre date is computed.
   'locale.time-zone': setting.text({ unset: true, maxLength: 64, change, scope, audience: 'public', onChange: 'confirm' }),
@@ -61,6 +64,7 @@ export const settingRules = defineSettingRules('core', [
     },
   },
   { id: 'currency-code', check: s => /^[A-Z]{3}$/.test(s['locale.currency']) },
+  { id: 'site-origin-shape', check: s => s['site.origin'] === null || normaliseOrigin(s['site.origin']) === s['site.origin'] },
   {
     id: 'language-known',
     check: (s) => {

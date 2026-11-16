@@ -13,6 +13,7 @@ import { countAgainstRate, RATE_CLASSES, type RateClass } from './ratelimit'
 import { useRegistry } from './registry'
 import { verifyTurnstile } from './turnstile'
 import { nowMs } from './clock'
+import { requestUrl } from './origin'
 import { useSetting } from './settings-store'
 import { ensureMigrated } from './migrations'
 import type { AbilityName } from './registry-types'
@@ -141,6 +142,7 @@ export function defineRoute<I extends z.ZodType | undefined = undefined, R = unk
     const actor = await provider.actor(event)
     context.actor = actor
 
+    context.requestOrigin = requestUrl(event).origin
     context.address = getRequestIP(event, { xForwardedFor: true }) ?? getHeader(event, 'cf-connecting-ip') ?? undefined
     const who = actor.accountId ?? context.address ?? 'unknown'
     const rate = await countAgainstRate(decl.rateLimit, who)
