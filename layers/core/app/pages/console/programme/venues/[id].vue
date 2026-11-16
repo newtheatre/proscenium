@@ -113,6 +113,7 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
 <template>
   <PageFrame
     :title="venue?.name ?? 'Venue'"
+    :trail="[{ label: 'Venues', to: '/console/programme/venues' }]"
     width="reading"
   >
     <template #status>

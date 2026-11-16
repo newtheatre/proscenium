@@ -23,6 +23,9 @@ export default defineModule({
   }),
   contributes: {
     'core.count': [{ id: 'gallery.drafts', file: 'drafts' }, { id: 'gallery.none', file: 'none' }],
+    'core.record-fact': [{ id: 'gallery.seats-held', record: 'gallery.production', ability: 'gallery.sample.view', component: 'GalleryFactSeats', order: 10 }],
+    'core.record-check': [{ id: 'gallery.poster', file: 'has-poster' }],
+    'core.list-column': [{ id: 'gallery.sales', list: 'gallery.shows', ability: 'gallery.sample.view', component: 'GalleryShowSales', order: 10 }],
     'core.record-tab': [{ id: 'gallery.tickets', record: 'gallery.production', ability: 'gallery.sample.view', component: 'GalleryTicketsTab', order: 10, count: 'gallery.drafts' }],
     'core.home-card': [
       { id: 'gallery.drafts-waiting', home: 'console', ability: 'gallery.sample.view', component: 'GalleryDraftsCard', urgency: 'overdue', count: 'gallery.drafts' },
@@ -42,6 +45,7 @@ export default defineModule({
       { id: 'gallery.form', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/form', icon: 'i-lucide-square-pen', ability: 'gallery.sample.view', order: 20 },
       { id: 'gallery.record', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/productions/prod-1', match: '/console/gallery/productions', icon: 'i-lucide-theater', ability: 'gallery.sample.view', order: 27 },
       { id: 'gallery.choices', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/choices', icon: 'i-lucide-list-checks', ability: 'gallery.sample.view', order: 25 },
+      { id: 'gallery.shows', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/shows', icon: 'i-lucide-drama', ability: 'gallery.sample.view', order: 12 },
       { id: 'gallery.steps', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/steps', icon: 'i-lucide-footprints', ability: 'gallery.sample.view', order: 30 },
       { id: 'gallery.feedback', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/feedback', icon: 'i-lucide-message-square', ability: 'gallery.sample.view', order: 40 },
       { id: 'gallery.denied', menu: 'console', group: 'gallery', section: 'setup', to: '/console/gallery/denied', icon: 'i-lucide-lock', ability: 'gallery.sample.admin', order: 50 },

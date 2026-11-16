@@ -107,6 +107,23 @@ export const points = {
       count: z.string().optional(),
     }).strict(),
   }),
+  // One fact another module adds to a record's summary strip, after the owner's own. Read-only: the
+  // component receives `recordId` and nothing else, and says its own label and value.
+  'core.record-fact': point({
+    kind: 'data',
+    schema: z.object({ id: z.string(), record: z.string(), ability, component: z.string(), order: z.number().int() }).strict(),
+  }),
+  // One line another module adds to a record's side-panel checklist ("Prices set" on a production).
+  // It reports only; whether a missing line stops anything stays the owner's own rule. The file
+  // exports { record, ability, order, check(recordId) }.
+  'core.record-check': point({ kind: 'code', contract: 'record-check' }),
+  // A column another module adds to a list, after the owner's own. The component receives the list
+  // id, the page's query and the row's id, and fetches once for the page. The label is
+  // `<module>.list-columns.<name>.label`.
+  'core.list-column': point({
+    kind: 'data',
+    schema: z.object({ id: z.string(), list: z.string(), ability, component: z.string(), order: z.number().int() }).strict(),
+  }),
   // A registered count, shown beside a menu entry or on a card. A module registers its own; another
   // module's is named by it. The contribution says how to count for the person asking.
   'core.count': point({ kind: 'code', contract: 'count' }),
