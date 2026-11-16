@@ -195,3 +195,32 @@ ability. Sign-out posts `{}` to `/api/core/sign-out`; the sign-in page is read w
 (sample list, form, steps, feedback and denied screens, plus a header-based test sign-in), and runs
 Playwright with axe in light, dark and phone widths. Contrast, hydration and rate limits are
 all exercised there; the tests use one worker because they share a local database.
+
+## Lists: defineList, filters, sort and columns
+
+A list is declared once and read by the page, the data route and the export. The declaration is
+pure data in `layers/core/shared/list.ts` (the kit's `readList` and `defineListSource` import it and add
+the SQL side). `defineList(id, { filters, sorts, columns, search, views, defaultView, defaultSort, subRows })`
+keeps filter and sort keys literal and refuses a reserved key (`q`, `sort`, `order`, `page`, `size`,
+`view`), an undeclared sort or a view naming something undeclared.
+
+`PageList` takes `:list` (a declaration) and, for a choice filter whose options are the theatre's own
+(seasons), `:filter-options="{ seasonId: [...] }"`. A page that still passes `columns` and `filters`
+gets the same declaration made for it: each filter is a `choice`, each `sortable` column a text sort
+(`sortType` words it as numbers or dates).
+
+- **Toolbar:** search (always first, across every field), **Filters** with a count, **Sort**, **Columns**.
+  Filters opens a popover on a laptop and a drawer on a phone, one labelled field for each filter, in six
+  kinds: `choice`, `choices`, `grouped`, `lookup`, `dates` (relative presets or two days; days are the
+  device's until the theatre's day is passed in) and `yes-no`. Changes made in one visit to the panel make
+  one history entry. A chip for each filter that is on opens the panel; its cross is named "Remove the
+  filter State: Draft".
+- **Sort** says how the list is sorted ("Sort: Seats, Lowest first") and lists every declared sort, shown or not.
+  A heading sorts in its natural direction, again reverses, a third press returns to the default.
+- **Columns** ticks optional columns; the choice is kept on the device for each list
+  (`core:list-columns:<id>`), is not in the address, and is cleared on sign-out.
+- **Address:** one key for each filter (`state=draft,published`, `when=7d`, `action=orders.refund`),
+  `view`, `sort`, `order`, `page`, `size` (25, 50 or 100), left out when default.
+- **Server:** `decodeList(query, list, { can, today })` (alias `parse`) validates strictly and answers a typed
+  `ListQuery` (folded search words, validated filters, dropped filters, view, sort, page, size) or a
+  `ListRefusal` naming the key. Routes call the kit's `readList`, not this.

@@ -4,20 +4,22 @@
      returns to it. A module supplies columns, filters, row actions and the data route. -->
 <script setup lang="ts" generic="Row extends Record<string, any>">
 import type { DropdownMenuItem, TableColumn, TableRow } from '@nuxt/ui'
-import { activeFilterCount, type ListResult } from '../../shared/list'
+import { activeFilterCount, filterChipText, filterCount, listDefaults, type ColumnDef, type FilterDef, type ListDeclaration, type ListOption, type ListResult, type SortDef } from '../../shared/list'
 
-export interface ListColumn { key: string, label: string, sortable?: boolean, /** Survives on a phone's card. */ card?: boolean }
-export interface ListFilter { name: string, label: string, options: { value: string, label: string }[], /** One of the two or three used most; the rest sit under "More filters". */ primary?: boolean }
+/** The older, flatter way a page names its columns and filters; it is read as a declaration. */
+export interface ListColumn { key: string, label: string, sortable?: boolean, /** What it sorts, which words its directions ("Lowest first"). Text by default. */ sortType?: SortDef['type'], /** Survives on a phone's card. */ card?: boolean }
+export interface ListFilter { name: string, label: string, options: { value: string, label: string }[], primary?: boolean }
 export interface BulkAction { label: string, icon?: string, run: (rows: any[]) => void | Promise<void> }
-
-// A select item cannot have an empty value, so "Any" has its own and the address leaves the filter out.
-const ANY = '__any'
 
 const props = withDefaults(defineProps<{
   title: string
   /** The module's data route: answers { rows, total } for the query it is sent. */
   route: string
-  columns: ListColumn[]
+  /** The list's declaration (defineList). Leave out to describe the list with `columns` and `filters`. */
+  list?: ListDeclaration
+  /** For a declared choice filter whose options are the theatre's own (seasons): its key, then the options. */
+  filterOptions?: Record<string, ListOption[]>
+  columns?: ListColumn[]
   filters?: ListFilter[]
   rowKey?: string
   /** Row click opens the record. */
@@ -35,7 +37,7 @@ const props = withDefaults(defineProps<{
   order?: 'asc' | 'desc'
   empty: { title: string, description: string, icon?: string, help?: string }
   width?: 'standard' | 'full'
-}>(), { filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
+}>(), { list: undefined, filterOptions: undefined, columns: () => [], filters: () => [], rowKey: 'id', rowTo: undefined, rowActions: undefined, bulkActions: undefined, exportRoute: undefined, canExport: false, exportCeiling: 10_000, sort: undefined, order: 'asc', width: 'standard' }) // not-policy: the row ceiling's default
 
 defineSlots<{
   primary?: () => unknown
@@ -45,12 +47,33 @@ defineSlots<{
 }>()
 
 const { t } = useT()
-const defaults = { sort: props.sort, order: props.order }
-const { state, set, clear } = useListQuery(props.filters.map(f => f.name), defaults)
+
+// A page that names columns and filters gets the same declaration a defined list has.
+const decl = computed<ListDeclaration>(() => {
+  if (props.list) {
+    if (!props.filterOptions) return props.list
+    const filters: Record<string, FilterDef> = {}
+    for (const [k, f] of Object.entries(props.list.filters)) filters[k] = props.filterOptions[k] ? { ...f, options: props.filterOptions[k] } : f
+    return { ...props.list, filters }
+  }
+  const sorts: Record<string, SortDef> = {}
+  const columns: Record<string, ColumnDef> = {}
+  for (const c of props.columns) {
+    if (c.sortable) sorts[c.key] = { label: c.label, type: c.sortType ?? 'text' }
+    columns[c.key] = { label: c.label, sort: c.sortable ? c.key : undefined, card: c.card, always: c === props.columns[0] }
+  }
+  const filters: Record<string, FilterDef> = {}
+  for (const f of props.filters) filters[f.name] = { kind: 'choice', label: f.label, options: f.options }
+  return { id: `route:${props.route}`, filters, sorts, columns, defaultSort: props.sort ? { key: props.sort, order: props.order } : undefined }
+})
+const defaults = computed(() => listDefaults(decl.value))
+const { state, set, setInPanel, endVisit, clear } = useListQuery(decl)
+const { hidden, toggle: toggleColumn } = useListColumns(decl.value)
 
 const query = computed(() => ({
   q: state.value.search || undefined,
   ...state.value.filters,
+  view: state.value.view,
   sort: state.value.sort,
   order: state.value.sort ? state.value.order : undefined,
   page: state.value.page,
@@ -76,26 +99,39 @@ function onSearch(value: string) {
 }
 onBeforeUnmount(() => clearTimeout(timer))
 
-const primaryFilters = computed(() => props.filters.filter(f => f.primary))
-const moreFilters = computed(() => props.filters.filter(f => !f.primary))
-const chips = computed(() => props.filters.flatMap((f) => {
-  const value = state.value.filters[f.name]
-  if (!value) return []
-  return [{ name: f.name, text: `${f.label}: ${f.options.find(o => o.value === value)?.label ?? value}` }]
+// One panel holds every filter; a chip for each one that is on says so and opens the panel.
+const panel = ref(false)
+watch(panel, endVisit)
+const chips = computed(() => Object.entries(decl.value.filters).flatMap(([name, def]) => {
+  const value = state.value.filters[name]
+  const text = value ? filterChipText(def, value, { yes: t('core.list.yes'), no: t('core.list.no') }) : null
+  return text ? [{ name, text }] : []
 }))
+const onFilter = (name: string, value: string) => { void setInPanel({ filters: { [name]: value } }) }
 
-function sortBy(key: string) {
-  const same = state.value.sort === key
-  set({ sort: key, order: same && state.value.order === 'asc' ? 'desc' : 'asc' })
+// Pressing a heading sorts by it in its natural direction, again reverses, a third time returns to the default.
+function sortBy(sortKey: string) {
+  const natural = decl.value.sorts[sortKey]?.natural ?? 'asc'
+  const reverse = (o: 'asc' | 'desc') => (o === 'asc' ? 'desc' : 'asc')
+  if (sortKey === defaults.value.sort) void set({ sort: sortKey, order: reverse(state.value.order) })
+  else if (state.value.sort !== sortKey) void set({ sort: sortKey, order: natural })
+  else if (state.value.order === natural) void set({ order: reverse(natural) })
+  else void set({ sort: defaults.value.sort, order: defaults.value.order ?? 'asc' })
 }
 // The table is told how the server sorted, so each heading says so to a screen reader.
-const sorting = computed(() => state.value.sort ? [{ id: state.value.sort, desc: state.value.order === 'desc' }] : [])
-const sortIcon = (key: string) => state.value.sort === key ? (state.value.order === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down') : 'i-lucide-arrow-up-down'
+const sorting = computed(() => {
+  const column = shown.value.find(c => c.sort === state.value.sort)
+  return column ? [{ id: column.key, desc: state.value.order === 'desc' }] : []
+})
+const sortIcon = (sortKey: string) => state.value.sort === sortKey ? (state.value.order === 'asc' ? 'i-lucide-arrow-up' : 'i-lucide-arrow-down') : 'i-lucide-arrow-up-down'
 
+// The columns on show: the declared ones less what this device has hidden. A column's heading
+// sorts by the declared sort it names.
+const shown = computed(() => Object.entries(decl.value.columns).filter(([key]) => !hidden.value.includes(key)).map(([key, c]) => ({ key, ...c })))
 const rowId = (row: Row) => String(row[props.rowKey])
 const tableColumns = computed<TableColumn<Row>[]>(() => [
   ...(props.bulkActions ? [{ id: 'select', enableSorting: false }] : []),
-  ...props.columns.map(c => ({ id: c.key, accessorFn: (row: Row) => row[c.key], header: c.label, enableSorting: !!c.sortable })),
+  ...shown.value.map(c => ({ id: c.key, accessorFn: (row: Row) => row[c.key], header: c.label, enableSorting: !!c.sort })),
   ...(props.rowActions ? [{ id: 'actions', enableSorting: false }] : []),
 ])
 
@@ -118,7 +154,7 @@ const exportHref = computed(() => {
 })
 const exportBlocked = computed(() => total.value > props.exportCeiling)
 
-const cardColumns = computed(() => props.columns.filter(c => c.card).slice(0, 3))
+const cardColumns = computed(() => Object.entries(decl.value.columns).filter(([, c]) => c.card).slice(0, 3).map(([key, c]) => ({ key, ...c })))
 function open(_event: Event, row: TableRow<Row>) {
   if (props.rowTo) void navigateTo(props.rowTo(row.original))
 }
@@ -141,7 +177,7 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
       <slot name="primary" />
     </template>
 
-    <!-- One filter bar: search first, then the filters used most, then "More filters". -->
+    <!-- The toolbar: search first, then Filters (with a count), Sort and Columns. -->
     <template #toolbar>
       <form
         class="flex flex-wrap items-center gap-1.5"
@@ -158,42 +194,27 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
           class="sm:w-72"
           @update:model-value="onSearch(String($event))"
         />
-        <USelect
-          v-for="f in primaryFilters"
-          :key="f.name"
-          :model-value="state.filters[f.name] || undefined"
-          :items="[{ value: ANY, label: t('core.list.any') }, ...f.options]"
-          value-key="value"
-          :placeholder="f.label"
-          :aria-label="f.label"
-          class="w-auto min-w-40"
-          @update:model-value="set({ filters: { [f.name]: $event === ANY ? '' : String($event) } })"
+        <ListFilters
+          v-if="Object.keys(decl.filters).length"
+          v-model:open="panel"
+          :filters="decl.filters"
+          :values="state.filters"
+          :count="filterCount(state)"
+          @change="onFilter"
+          @clear="set({ filters: Object.fromEntries(Object.keys(state.filters).map(k => [k, ''])) })"
         />
-        <UPopover v-if="moreFilters.length">
-          <UButton
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-sliders-horizontal"
-            :label="t('core.list.more-filters')"
-          />
-          <template #content>
-            <UCard>
-              <UFormField
-                v-for="f in moreFilters"
-                :key="f.name"
-                :label="f.label"
-              >
-                <USelect
-                  :model-value="state.filters[f.name] || ANY"
-                  :items="[{ value: ANY, label: t('core.list.any') }, ...f.options]"
-                  value-key="value"
-                  class="min-w-56"
-                  @update:model-value="set({ filters: { [f.name]: $event === ANY ? '' : String($event) } })"
-                />
-              </UFormField>
-            </UCard>
-          </template>
-        </UPopover>
+        <ListSort
+          v-if="Object.keys(decl.sorts).length"
+          :sorts="decl.sorts"
+          :sort="state.sort"
+          :order="state.order"
+          @change="(sort, order) => set({ sort, order })"
+        />
+        <ListColumns
+          :columns="decl.columns"
+          :hidden="hidden"
+          @toggle="toggleColumn"
+        />
       </form>
     </template>
 
@@ -201,17 +222,30 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
       v-if="chips.length"
       class="flex flex-wrap items-center gap-2"
     >
-      <UButton
+      <span
         v-for="chip in chips"
         :key="chip.name"
-        color="neutral"
-        variant="subtle"
-        size="sm"
-        trailing-icon="i-lucide-x"
-        :label="chip.text"
-        :aria-label="t('core.list.remove-filter', { filter: chip.text })"
-        @click="set({ filters: { [chip.name]: '' } })"
-      />
+        class="inline-flex"
+      >
+        <UButton
+          color="neutral"
+          variant="subtle"
+          size="sm"
+          class="rounded-e-none"
+          :label="chip.text"
+          :aria-label="t('core.list.change-filter', { filter: chip.text })"
+          @click="panel = true"
+        />
+        <UButton
+          color="neutral"
+          variant="subtle"
+          size="sm"
+          class="rounded-s-none border-s border-default"
+          icon="i-lucide-x"
+          :aria-label="t('core.list.remove-filter', { filter: chip.text })"
+          @click="set({ filters: { [chip.name]: '' } })"
+        />
+      </span>
       <UButton
         color="neutral"
         variant="link"
@@ -287,26 +321,26 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               />
             </template>
             <template
-              v-for="c in columns"
+              v-for="c in shown"
               :key="c.key"
               #[`${c.key}-header`]
             >
               <UButton
-                v-if="c.sortable"
+                v-if="c.sort"
                 color="neutral"
                 variant="ghost"
                 size="sm"
                 :label="c.label"
-                :trailing-icon="sortIcon(c.key)"
+                :trailing-icon="sortIcon(c.sort)"
                 class="-mx-2.5"
-                @click="sortBy(c.key)"
+                @click="sortBy(c.sort)"
               />
               <template v-else>
                 {{ c.label }}
               </template>
             </template>
             <template
-              v-for="(c, i) in columns"
+              v-for="(c, i) in shown"
               :key="c.key"
               #[`${c.key}-cell`]="{ row }"
             >
