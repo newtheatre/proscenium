@@ -17,10 +17,10 @@ export interface SettingHit extends SettingRef {
   to: string
 }
 
-/** Core's own settings page is in System; every other module's is at /console/<module>/settings. */
+/** A module's settings page is at /console/<module>/settings; the site's settings are in Site administration. */
 export function settingsPageOf(module: string, scope: 'module' | 'site' = 'module'): string {
   if (scope === 'site') return '/admin/settings'
-  return module === 'core' ? '/console/system/settings' : `/console/${module}/settings`
+  return `/console/${module}/settings`
 }
 
 const words = (term: string) => term.toLowerCase().split(/\s+/).filter(Boolean)

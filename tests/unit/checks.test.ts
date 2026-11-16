@@ -103,3 +103,15 @@ describe('counts of changed rows', () => {
     ].join('\n'))).toEqual([1, 4, 5, 8])
   })
 })
+
+describe('changes() in SQL', () => {
+  it('is found in SQL text and sql templates, and not in a comment', async () => {
+    const { changesInSql } = await import('../../scripts/checks/source')
+    expect(changesInSql([
+      "unit.add({ sql: 'INSERT INTO scans (id, ok) VALUES (?, CASE WHEN changes() > 0 THEN 1 ELSE 0 END)', params })",
+      'const ok = sql`SELECT changes ( ) AS n`',
+      '// never read changes() here',
+      'if (result.meta.changes > 0) done()',
+    ].join('\n'))).toEqual([1, 2])
+  })
+})

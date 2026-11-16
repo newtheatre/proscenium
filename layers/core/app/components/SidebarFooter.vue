@@ -1,5 +1,5 @@
 <!-- The foot of the console's and Site administration's sidebar: a Documentation link for everyone,
-     a Site administration link for anyone who holds an admin entry (in Site administration itself, the way back to the console in its place), and the account menu, the one way
+     a Site administration link for anyone who holds an admin entry (in Site administration itself, the way back to the console in its place, beneath Documentation either way), and the account menu, the one way
      between shells (UI-02). The documentation link is a placeholder until the screens have help pages
      of their own (core.help-page). -->
 <script setup lang="ts">
@@ -14,8 +14,9 @@ const back = computed(() => has('console')
   : { label: t('core.admin.back-site'), to: '/', icon: 'i-lucide-arrow-left' })
 
 const links = computed<NavigationMenuItem[]>(() => [
-  ...(props.admin ? [back.value] : []),
+  // Documentation is always first and the link to the other shell always beneath it, so the two never swap places.
   { label: t('core.sidebar.documentation'), icon: 'i-lucide-book-open', to: 'https://github.com/MattA-Official/proscenium/tree/next/docs', target: '_blank' },
+  ...(props.admin ? [back.value] : []),
   ...(has('admin') && !props.admin ? [{ label: t('core.menu.admin'), icon: 'i-lucide-shield-check', to: '/admin' }] : []),
 ])
 </script>
