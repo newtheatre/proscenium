@@ -71,6 +71,7 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
   const domain = await sendingDomain()
   const maxAttempts = await useSetting('core.notifications.max-attempts') as number
   const firstRetry = await useSetting('core.notifications.first-retry') as number
+  const stuckAfter = await useSetting('core.notifications.stuck-after') as number
   const brand = await brandTokens()
   const theatre = await theatreName(domain)
   const footer = await useSetting('core.notifications.email-footer') as string | null
@@ -84,7 +85,8 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
   for (const row of due) {
     // Claim it: only one copy of this job may move it to sending.
     const claim = createUnit()
-    claim.add({ sql: 'UPDATE core_notification_deliveries SET state = \'sending\', attempts = attempts + 1 WHERE id = ? AND state IN (\'queued\', \'retrying\')', params: [row.id] }).expect(1)
+    // next_attempt_at is the claim's lease: past it, the sweep takes a still-sending row as stuck.
+    claim.add({ sql: 'UPDATE core_notification_deliveries SET state = \'sending\', attempts = attempts + 1, next_attempt_at = ? WHERE id = ? AND state IN (\'queued\', \'retrying\')', params: [nowMs() + stuckAfter * 1000, row.id] }).expect(1) // not-policy: seconds to milliseconds
     try {
       await claim.commit()
     }
