@@ -7,3 +7,6 @@ export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from '.
 export { attachFile, detachFile, fileUrl } from './files/service'
 export { addressFor, addressesFor } from './identity/addresses'
 export type { Side } from './identity/addresses'
+export { findOrCreateAccount } from './identity/guests'
+export type { FindOrCreateInput, FoundAccount, UnclaimedOrigin } from './identity/guests'
+export { canonicalAccount, accountLabel } from './identity/accounts'
