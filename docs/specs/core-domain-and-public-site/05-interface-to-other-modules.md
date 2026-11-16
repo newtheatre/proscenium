@@ -503,3 +503,32 @@ The names the build registers for this story:
 | Setup step | `core.sender`, at `/console/system/email` |
 
 Not checked by this specification: the exact Cloudflare API call for creating a sending subdomain. The pull request that builds this story records it.
+
+## Later slice: guidance for a production (content warnings, effects and age)
+
+Part 2 gives the data and rules of this slice, which Matt accepted on 16 November 2026. This section gives what other modules and the public site see. None of it changes what is built today.
+
+| Item | What is specified |
+| --- | --- |
+| One read | `guidanceFor(productionId, performanceId?)` returns the age (`ageMin`, `ageRestricted`), the staging effects with their details, the content warnings with level and detail in their derived order, the content note, and whether each of the two questions has been answered. With a performance id, effects switched off for that performance are left out and listed separately as `notAtThisPerformance`. Core does not know who calls it. |
+| The vocabulary format | A contribution to `core.vocabulary` may say `grouped: true`. The vocabulary services return each term's heading, and `listTermGroups(vocabulary)` returns the headings in order. |
+| Public component | `advisories` keeps its name and gains a `compact` form for cards and a basket: the age badge and an icon when there are staging effects. The full form is the layered display in part 5's terms: age and effects always visible, one line counting the content warnings, one press to list them by level, a second press on any one for its detail and the content note. A production with nothing to declare says so in words. |
+| Event | `core.production.updated` already announces a change to advisories. Its payload gains `guidanceAdded`: the term ids of effects added and of content warnings added with their levels. It names terms, never people, so it may leave in a webhook. A module that holds bookings decides from it whether bookers are told; the rule proposed is an added effect or an added `depicted` warning. |
+| For message templates | A block, `before-you-come`, built from the same read: age, effects and a link to the production page. It never contains a content warning's label, because an inbox is not private. Core offers the rendering as a component and contributes it to no module's point; a module that wants it in its own messages declares its own block and uses the component or the read. |
+
+Agreed with the Communications module on 16 November 2026 (its later story COM-39). `guidanceFor` returns public data only, but it includes content warnings, so it is not rendered whole into an email. A second read, `beforeYouCome(productionId, performanceId?)`, returns only what is safe in an inbox, and a module renders all of it without choosing fields:
+
+| Field | Holds |
+| --- | --- |
+| `ageMin`, `ageRestricted` | The age, or null |
+| `effects` | Each staging effect's term id, label in the reader's language, and detail, after any performance exceptions |
+| `notAtThisPerformance` | Labels of effects switched off for this performance |
+| `hasContentWarnings` | True or false, never a count or a name, so a message can say "content warnings are on the show's page" |
+| `pageUrl` | The production's public address, current or archive form, absolute |
+| `empty` | True when there is no age, no effect and no content warning, so the caller renders nothing |
+
+Core offers a rendering of this read in the brand as a component, for its own notification templates and for any module to reuse. Core contributes it to no module's point (integration ruling R-06): the Communications module declares its own block on `communications.block` and renders it from this read. Either way it is a service message, not promotion, so a reminder to ticket holders may carry it, as may a mailing.
+
+What each bordering module does with the read is its own specification's: Box office states age and effects in the basket and asks for an age restriction to be acknowledged, Front of house puts effects with their timing notes and the age restriction on its briefing, and Communications places the block. Each of those is a later story in that module, following this slice.
+
+The audience's own "tell me about" list (story C-58) is kept in the browser only. Core stores nothing about what a named person wants to be warned of, and no service returns it.

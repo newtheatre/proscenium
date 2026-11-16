@@ -4,7 +4,7 @@
 
 Each story has an id, who it is for, and acceptance criteria that a test can check. **First** means the first release of this workstream's subject, which is roadmap phase 2: "a theatre publishes a season and a what's-on page". **Later** means after it. The person named in a story describes who does the job and is not a preset role: part 6 maps every ability onto the identity specification's presets.
 
-52 stories: 44 first, 8 later. Seven were added at the end after Matt's decisions.
+58 stories: 44 first, 14 later. Thirteen were added at the end after Matt's decisions.
 
 ## Programme
 
@@ -105,4 +105,24 @@ One more was added on 16 November 2026 at Matt's request, for the first release:
 | --- | --- | --- | --- |
 | C-52 | As an administrator I have the sending domain set up for me. | With the optional Cloudflare token present, "Set up automatically" creates the sending subdomain under the site's hostname, sets the sending domain, waits while Cloudflare reports it not ready, and verifies it, with no DNS typed by anyone. It asks for a fresh passkey check and is audited. Pressing it twice creates nothing twice. A sending domain already set is not replaced without confirmation. On a `workers.dev` address the button is replaced by an explanation. Without the token nothing changes and the manual route works. The token appears in no response, log or audit entry. | First |
 
-That makes 52 stories: 44 first, 8 later.
+Six more came with the content warnings slice, which Matt accepted on 16 November 2026. Part 2 and part 4 give its design. "Slice" means the content warnings slice, built after the work now in hand; "later" means after that again.
+
+| Id | Story | Acceptance criteria | Release |
+| --- | --- | --- | --- |
+| C-53 | As a programmer I say who a production is for. | A minimum age from 0 to 21, as a recommendation or as a restriction. A restriction cannot be set without an age. Cards and the production page show it, worded differently for each ("Recommended for 14 and over", "18 and over only"). | Slice |
+| C-54 | As a vocabulary manager I keep a long list under headings. | In a grouped vocabulary I add, rename, order and remove headings and move terms between them. A heading with terms cannot be removed. Every active term has a heading. | Slice |
+| C-55 | As a technical manager I switch an effect off for one performance. | The effect must be one the production lists. That date says so on the public page ("No strobe lighting at this performance"), and the read for that performance leaves it out. Content warnings cannot differ by performance. | Later |
+| C-56 | As a module I show the same guidance wherever someone decides. | `guidanceFor` gives one answer to booking, emails and the front of house briefing. The email block never contains a content warning's label. | Later, with each module |
+| C-57 | As a booker I am told when a warning is added after I booked. | Adding an effect or a depicted warning to a production announces what was added, and a module holding bookings can tell its bookers. Adding a mentioned or discussed warning tells nobody. | Later |
+| C-58 | As a visitor I mark the topics I always want to know about. | Marked topics show on every production page without pressing "show". The list is kept in the browser only; nothing about it reaches the server. | Later |
+
+The slice also changes four existing stories when it is built, and not before:
+
+| Story | Change with the slice |
+| --- | --- |
+| C-02 publish | The refusal names effects and content warnings separately. |
+| C-10 record advisories | Splits into effects and content warnings. Every content warning needs a level. The picker is grouped by heading and searchable, with "set all to" for speed and a notice naming anything ungraded. |
+| C-39 read about a production | The layered display: age and effects always, a count of content warnings, one press for the list, a second for a detail. |
+| C-14 duplicate | Copies effects, content warnings, levels and age. |
+
+That makes 58 stories: 44 first, 14 later, of which two (C-53 and C-54) are the content warnings slice.
