@@ -17,7 +17,7 @@ const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.string
 test.beforeAll(async ({ playwright }) => {
   const siteOwner = { ...person('Rate Owner', [grant('core.settings.manage')]), assurance: 'strong', reassertedAt: Date.now() }
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(siteOwner) })
-  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
+  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: { count: 10000, per: '1m' } }] } })
   await api.dispose()
 })
 
