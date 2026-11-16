@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "56b3e764-bf35-4128-8e75-45869ca1e7e6",
+  "id": "67f8b07e-6114-43c7-9c8b-f545cc68c911",
   "prevIds": [
-    "2b12cfea-2f20-47f4-8a23-59c0a5df4cbe"
+    "3d0ea085-8f47-412d-8fe7-07ed4680ccc9"
   ],
   "ddl": [
     {
@@ -7208,11 +7208,15 @@
     },
     {
       "table": "core_notifications",
-      "name": "core_notifications_dedupe",
+      "name": "core_notifications_dedupe_account",
       "columns": [
         {
           "value": "dedupe_key",
           "isExpression": false
+        },
+        {
+          "value": "coalesce(\"account_id\", '')",
+          "isExpression": true
         }
       ],
       "isUnique": true,
