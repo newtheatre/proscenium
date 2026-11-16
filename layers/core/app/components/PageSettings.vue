@@ -123,6 +123,7 @@ onMounted(() => {
     :title="title"
     width="reading"
   >
+    <SettingsSearch />
     <DataBoundary
       :data="data"
       :status="status"
