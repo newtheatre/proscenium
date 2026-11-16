@@ -8,6 +8,7 @@ const tabs = [{ id: 'overview', label: 'Overview' }, { id: 'details', label: 'De
 <template>
   <PageRecord
     title="Hamlet"
+    :trail="[{ label: 'Sample list', to: '/console/gallery/list' }]"
     :status="{ label: 'On sale', tone: 'success' }"
     :primary="{ label: 'Open the form', to: '/console/gallery/form' }"
     :actions="[[{ label: 'Duplicate' }], [{ label: 'Delete production', color: 'error' }]]"

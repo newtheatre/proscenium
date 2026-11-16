@@ -118,6 +118,7 @@ async function remove() {
 <template>
   <PageFrame
     :title="production?.title ?? 'Production'"
+    :trail="[{ label: 'Productions', to: '/console/programme/productions' }]"
     width="reading"
   >
     <template #status>
