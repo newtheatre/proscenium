@@ -29,6 +29,7 @@ export default defineModule({
     ...domain.contributes,
     ...identity.identityContributions,
     'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }],
+    'core.vocabulary': [...domain.contributes['core.vocabulary'], ...identity.identityContributions['core.vocabulary']],
     // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
