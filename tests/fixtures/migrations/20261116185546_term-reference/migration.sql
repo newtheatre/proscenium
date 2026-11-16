@@ -1,0 +1,1 @@
+ALTER TABLE `seats_performances` ADD `category_id` text REFERENCES core_terms(id);

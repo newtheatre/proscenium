@@ -69,5 +69,10 @@
   "core.abilities.branding.edit.label": "Change the brand",
   "core.abilities.file.configure.label": "Change the file settings",
   "core.abilities.sender.manage.label": "Manage who email comes from",
-  "core.abilities.template.edit.label": "Change message wording"
+  "core.abilities.template.edit.label": "Change message wording",
+  "core.settings.organisation.year-end.label": "Year end",
+  "core.settings.organisation.year-end.help": "The last day of the theatre's own year, as month and day, such as 07-31 for 31 July. Roles can be set to end on it. The financial year is set in Finance.",
+  "core.settings.rules.year-end": "The year end is a month and a day that falls in every year, written as MM-DD, such as 07-31.",
+  "core.abilities.vocabulary.manage.label": "Edit vocabularies",
+  "core.navigation.vocabularies.label": "Vocabularies"
 }
