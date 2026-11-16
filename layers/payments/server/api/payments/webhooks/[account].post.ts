@@ -3,7 +3,7 @@
 // on, and only once, by the job payments.handle-webhook, which asks the provider for the truth rather
 // than trusting the body. The body itself is never stored.
 import { z } from 'zod'
-import { getRequestHeaders, getRouterParam, readRawBody, setResponseStatus } from 'h3'
+import { getRequestHeaders, getRequestURL, getRouterParam, readRawBody, setResponseStatus } from 'h3'
 import { credential, defineRoute, first, newId, nowMs, Refusal } from '#kit'
 import { providerAccount, providers } from '../../../providers'
 
@@ -22,7 +22,7 @@ export default defineRoute({
 
   const body = (await readRawBody(event, 'utf8')) ?? ''
   const secret = provider.webhookSecret ? await credential(provider.webhookSecret) ?? undefined : undefined
-  const verified = await provider.verifyWebhook({ body, headers: getRequestHeaders(event) as Record<string, string>, secret })
+  const verified = await provider.verifyWebhook({ body, headers: getRequestHeaders(event) as Record<string, string>, secret, url: getRequestURL(event).href, providerAccountId: account.id })
   if (!verified?.eventId) {
     setResponseStatus(event, BAD_REQUEST)
     return { received: false }

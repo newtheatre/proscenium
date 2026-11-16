@@ -1,7 +1,7 @@
 // Guided setup's test payment on a test-mode account (PAY-01): a payment Payments owns, for a small
 // amount, that sells nothing and posts nothing.
 import { z } from 'zod'
-import { getRouterParam } from 'h3'
+import { getRequestURL, getRouterParam } from 'h3'
 import { createUnit, defineRoute, newId, nowMs, Refusal } from '#kit'
 import { createIntent } from '../../../../intents'
 import { providerAccount } from '../../../../providers'
@@ -23,5 +23,5 @@ export default defineRoute({
   const unit = createUnit()
   const { intentId } = await createIntent(unit.view(), { parts: [{ owner: { module: 'payments', record: newId('pay') }, amountMinor: TEST_AMOUNT }], channel, expiresAt: nowMs() + LIFETIME })
   await unit.commit()
-  return { intentId, ...await startAttempt(intentId, { providerAccountId: account.id, method: input.method, readerId: input.readerId }) }
+  return { intentId, ...await startAttempt(intentId, { providerAccountId: account.id, method: input.method, readerId: input.readerId, origin: getRequestURL(event).origin }) }
 })

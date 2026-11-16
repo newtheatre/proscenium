@@ -94,10 +94,14 @@ export default defineModule({
   },
 
   // Provider keys are Worker secrets in the first release (Matt's question 3). Stripe's are needed
-  // only once a Stripe account is added.
+  // only once a Stripe account is added, and SumUp's once a SumUp account is.
   secrets: {
     PAYMENTS_STRIPE_SECRET_KEY: secret({ needed: 'when-used' }),
     PAYMENTS_STRIPE_WEBHOOK_SECRET: secret({ needed: 'when-used' }),
+    // SumUp's API key, and the affiliate app id and key every reader checkout carries.
+    PAYMENTS_SUMUP_API_KEY: secret({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_AFFILIATE_KEY: secret({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_APP_ID: secret({ needed: 'when-used' }),
   },
 
   contributes: {
@@ -109,7 +113,7 @@ export default defineModule({
       { id: 'cash-variance', name: 'Cash over and short', kind: 'expense' },
       { id: 'unfulfilled', name: 'Payments to return', kind: 'liability' },
     ],
-    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'stripe' }],
+    'payments.provider': [{ id: 'cash' }, { id: 'attested-card' }, { id: 'stripe' }, { id: 'sumup' }],
     // Payments' own part: guided setup's test payment.
     'payments.settlement': [{ id: 'payments' }],
     'finance.period-close-check': [{ id: 'payments.money-in-flight', file: 'money-in-flight' }],
