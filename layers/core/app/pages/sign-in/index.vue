@@ -15,7 +15,10 @@ const next = nextPath(route.query.next)
 const refusal = ref<Refusal | null>(null)
 const busy = ref(false)
 const address = ref('')
-const code = ref('')
+const CODE_LENGTH = 6 // not-policy: the length of the code the server sends
+// One box a digit; the request takes them as one string.
+const digits = ref<number[]>([])
+const code = computed(() => digits.value.join(''))
 const challenge = ref('')
 const sent = ref(false)
 const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, google: boolean } }>('core:me')
@@ -30,17 +33,12 @@ const providerErrors: Record<string, string> = {
 const providerError = errorCode ? (providerErrors[errorCode] ?? 'Google did not confirm who you are. Try again.') : null
 const googleHref = `/api/core/sign-in/google${next ? `?next=${encodeURIComponent(next)}` : ''}`
 
-function arrive(target: { next: string, offerPasskey?: boolean }) {
-  if (target.offerPasskey) return navigateTo({ path: '/account/passkey', query: { next: target.next } })
-  return navigateTo(target.next)
-}
-
 async function withPasskey() {
   busy.value = true
   refusal.value = null
   const answer = await provePasskey<{ next: string }>('/api/core/sign-in/passkey/options', '/api/core/sign-in/passkey', next ? { next } : {})
   busy.value = false
-  if (answer.ok) return arrive(answer.data)
+  if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
 }
 
@@ -62,7 +60,7 @@ async function useCode() {
   refusal.value = null
   const answer = await callIdentity<{ next: string, offerPasskey: boolean }>('/api/core/sign-in/code', { address: address.value, code: code.value })
   busy.value = false
-  if (answer.ok) return arrive(answer.data)
+  if (answer.ok) return arriveSignedIn(answer.data)
   refusal.value = answer.refusal
 }
 </script>
@@ -141,11 +139,11 @@ async function useCode() {
           label="Six-digit code"
           name="code"
         >
-          <UInput
-            v-model="code"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            pattern="[0-9]{6}"
+          <UPinInput
+            v-model="digits"
+            otp
+            type="number"
+            :length="CODE_LENGTH"
             required
           />
         </UFormField>

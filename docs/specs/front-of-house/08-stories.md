@@ -1,6 +1,6 @@
 # 7. Stories
 
-Forty-six stories, FH-01 to FH-46: 4 gate, 31 others in the first release, 11 later. Front of house is roadmap phase 4, so "first release" means the module's own first release. The gate stories are the ones Interface, Box office and Identity wait on and can be built ahead of the rest.
+Forty-seven stories, FH-01 to FH-47: 4 gate, 31 others in the first release, 12 later. Front of house is roadmap phase 4, so "first release" means the module's own first release. The gate stories are the ones Interface, Box office and Identity wait on and can be built ahead of the rest.
 
 ## Gate
 
@@ -86,6 +86,7 @@ FH-02 unblocks UI-05 (on-shift bar and Tonight), BO-44 (scan without a role) and
 | FH-44 | As a duty manager, I see bar figures on the board and in the report | Bar |
 | FH-45 | As a trustee, I see incident trends by category, venue and month, with no personal detail | FH-30 |
 | FH-46 | As a communications lead, I write to "everyone on the rota this week" | Communications audience source |
+| FH-47 | As anyone on shift, I see tonight's staging effects (strobe, haze, loud noises) and the minimum age, and whether it is a restriction, in my shift briefing and on Tonight, so I can answer the audience and apply an age restriction at the door | Core domain's later content warnings slice: guidanceFor(productionId, performanceId), vocabulary core.staging-effect, age\_min and age\_restricted. Read live, never copied |
 
 ## Order of building
 

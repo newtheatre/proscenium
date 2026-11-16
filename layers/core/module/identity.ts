@@ -40,6 +40,7 @@ export const identitySettings = defineSettings('core', {
   'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, audience: 'public', quotable: true }),
   'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   // Erasure and the download are not offered until the theatre says who to contact about personal data.
+  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, audience: 'public', quotable: true }),
   'privacy.contact': setting.text({ unset: true, maxLength: 120, change, audience: 'public', quotable: true }),
 
   'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
@@ -143,6 +144,8 @@ export const identityJobs = {
     }),
     lane: 'prompt',
   }),
+  // Builds a person's data download (ID-15). Safe to repeat: a finished request is left alone.
+  'core.build-export': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
 }
 
 export const identityTasks = {
@@ -166,6 +169,8 @@ export const identityPoints = {
   // A module's merge handler, for its onMerge 'handler' columns (the kit's MergeHandler). The merge
   // job runs a module's handlers, in the order given, before re-pointing its move columns.
   'core.merge-handler': point({ kind: 'code', contract: 'merge-handler' }),
+  // Given an account, material for its data download that the registry cannot find (ID-15).
+  'core.export-contributor': point({ kind: 'code', contract: 'export-contributor' }),
   // A reason a module reads access needs. The core knows none in advance (part 5, the purpose point).
   'core.access-purpose': point({
     kind: 'data',
@@ -372,6 +377,20 @@ export const identityContributions = {
       },
     },
   }, {
+    // The download is ready (ID-15). It says when it will be removed, never what it holds.
+    id: 'core.export-ready',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const, 'inbox' as const],
+    lane: 'prompt' as const,
+    variables: { until: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your data from {{ theatre }} is ready',
+        body: 'The download of your data you asked {{ theatre }} for is ready. Sign in to your account to get it. It is kept until {{ until }}, then removed.\n\nIf you did not ask for this, contact the theatre straight away.',
+      },
+    },
+  }, {
     // To a holder, once per sweep, naming each of their roles that ends within
     // core.grants.expiry-warning (ID-24). Grants are the members' side.
     id: 'core.grant-expiring',
@@ -458,6 +477,12 @@ export const identityContributions = {
   }],
   // The last usable Owner cannot be erased until another Owner exists (part 3, "Export and erasure").
   'core.erasure-hold': [{ id: 'core.last-owner', file: 'last-owner' }],
+  // The data download (ID-15): a zip the server makes, on the account, that only its owner reads.
+  'core.file-slot': [{ id: 'core.data-download', owner: 'core.account', ability: 'core.data-request.manage', accepts: ['zip' as const], limit: 'core.files.document-limit', access: 'record' as const, textClass: 'personal' as const, clean: false, source: 'server' as const }],
+  'core.file-access': [{ id: 'core.account', file: 'account' }],
+  // The access application is special category data, sealed in its table, so the registry leaves
+  // it out of the download; identity adds it opened, for its owner.
+  'core.export-contributor': [{ id: 'core.access-scheme', file: 'access-scheme' }],
   'core.health-check': [
     { id: 'core.session-key', file: 'session-key' },
     { id: 'core.sign-in-challenge', file: 'sign-in-challenge' },

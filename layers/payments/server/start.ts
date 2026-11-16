@@ -15,12 +15,15 @@ export interface StartInput {
   readerId?: string
   /** Defaults to what is still to pay. */
   amountMinor?: number
+  /** The site's address, from the request, so a provider can be told where to send its webhook. */
+  origin?: string
 }
 
 export interface StartResult { attemptId: string, next: NextStep, state: string, settled: boolean, unfulfilled: boolean }
 
-async function call(attempt: AttemptRow): Promise<StartResult> {
-  const { provider, attempt: asked } = await forProvider(attempt)
+async function call(attempt: AttemptRow, origin?: string, retrying = false): Promise<StartResult> {
+  const { provider, attempt: found } = await forProvider(attempt, origin)
+  const asked = retrying ? { ...found, retrying } : found
   let next: NextStep = { kind: 'none' }
   let answer: ProviderAnswer | undefined
   const result = await externalCall('payments.start-payment', {
@@ -72,13 +75,32 @@ export async function startAttempt(intentId: string, input: StartInput): Promise
   const unit = createUnit()
   const added = addAttempt(unit.view(), { intentId: intent.id, providerAccountId: account.id, method: input.method, amountMinor: amount, readerId: input.readerId ?? null })
   await unit.commit()
-  return call(added)
+  return call(added, input.origin)
 }
 
 /** Calls the provider again for an attempt whose start had no answer, with the same key. */
-export async function retryStart(attemptId: string): Promise<StartResult> {
+export async function retryStart(attemptId: string, origin?: string): Promise<StartResult> {
   const attempt = await first<AttemptRow>('SELECT * FROM payments_attempts WHERE id = ?', attemptId)
   if (!attempt) throw new Refusal('core.not-found', 'There is no such payment attempt.', { status: 404 })
   if (attempt.state !== 'started') throw new Refusal('payments.attempt.already-answered', 'This payment already has its answer.', { status: 409 })
-  return call(attempt)
+  return call(attempt, origin, true)
+}
+
+/**
+ * Asks the provider to stop a payment waiting on a reader. The attempt is cancelled only when the
+ * provider confirms it stopped; if the reader had already taken the payment, the provider's answer
+ * wins and the payment succeeds (Box office specification, part 4, "Cancelling at the reader").
+ */
+export async function cancelAttempt(attemptId: string): Promise<{ state: string }> {
+  const attempt = await first<AttemptRow>('SELECT * FROM payments_attempts WHERE id = ?', attemptId)
+  if (!attempt) throw new Refusal('core.not-found', 'There is no such payment attempt.', { status: 404 })
+  if (!['started', 'pending'].includes(attempt.state)) throw new Refusal('payments.attempt.already-answered', 'This payment already has its answer.', { status: 409 })
+  const { provider, attempt: asked } = await forProvider(attempt)
+  if (!provider?.cancel) throw new Refusal('payments.attempt.cannot-cancel', 'This payment cannot be stopped from here.', { status: 409 })
+  if (await provider.cancel(asked)) await recordAnswer(attempt.id, { state: 'cancelled', providerRef: attempt.provider_ref ?? undefined }, { kind: 'poll' })
+  else {
+    const answer = await provider.status?.(asked).catch(() => 'unknown' as const)
+    if (answer && answer !== 'unknown' && answer.state !== 'pending') await recordAnswer(attempt.id, answer, { kind: 'poll' })
+  }
+  return { state: (await first<{ state: string }>('SELECT state FROM payments_attempts WHERE id = ?', attempt.id))!.state }
 }

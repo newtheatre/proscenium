@@ -5,6 +5,7 @@
      overwriting. Up to about six fields it opens as a panel over the list; longer forms get a page. -->
 <script setup lang="ts">
 import { watchDebounced } from '@vueuse/core'
+import { parseDate } from '@internationalized/date'
 import type { z } from 'zod'
 import type { FormErrorEvent } from '@nuxt/ui'
 import { isConflict, mergeConflict, PANEL_FIELD_LIMIT } from '../../shared/form'
@@ -27,6 +28,8 @@ export interface FormField {
 
 const props = withDefaults(defineProps<{
   title: string
+  /** A line under the title, for what the form will do. */
+  description?: string
   /** The button names the act: "Create performance", "Refund £12.00". Never "Submit". */
   submitLabel: string
   /** The schema the server validates with, so both show the same message for the same value. */
@@ -45,7 +48,7 @@ const props = withDefaults(defineProps<{
   draftKey?: string
   /** Panel mode: whether the panel is open. */
   open?: boolean
-}>(), { open: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
+}>(), { description: undefined, open: undefined, version: undefined, current: undefined, returnTo: undefined, draftKey: undefined })
 const emit = defineEmits<{
   (e: 'saved', result: unknown): void
   (e: 'cancel'): void
@@ -76,6 +79,12 @@ function setTick(g: FormField, value: string | number, on: boolean | 'indetermin
 }
 function setNote(g: FormField, value: string | number, note: string) {
   state[g.name] = ((state[g.name] as { value: string | number, note?: string }[] | undefined) ?? []).map(x => x.value === value ? (note ? { value, note } : { value }) : x)
+}
+
+// A date is kept as the server takes it (2027-09-01); the control works in calendar dates.
+function dateOf(value: unknown) {
+  try { return typeof value === 'string' && value ? parseDate(value) : undefined }
+  catch { return undefined }
 }
 
 const state = reactive<Record<string, any>>({ ...props.initial })
@@ -199,6 +208,8 @@ async function cancel() {
   if (dirty.value && !(await confirm({ verb: t('core.form.leave'), thing: t('core.form.leave-thing'), consequence: t('core.form.leave-consequence') }))) return
   saved.value = true // asked once
   emit('cancel')
+  // A panel is kept by its list, so it opens clean the next time.
+  if (panel.value) Object.assign(state, base.value)
   if (panel.value) emit('update:open', false)
   else await (props.returnTo ? navigateTo(props.returnTo) : router.back())
 }
@@ -219,7 +230,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
   <!-- One body, placed in the panel's body slot or the page's default slot. -->
   <component
     :is="panel ? USlideover : PageFrame"
-    v-bind="panel ? { open, title } : { title, width: 'reading' }"
+    v-bind="panel ? { open, title, description } : { title, description, width: 'reading' }"
     @update:open="(v: boolean) => { if (!v) cancel(); else emit('update:open', v) }"
   >
     <template #[bodySlot]>
@@ -273,22 +284,17 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           :description="t('core.form.conflict.description')"
           role="alert"
         />
-        <fieldset
+        <URadioGroup
           v-for="c in conflicts"
           :key="c.field"
-          class="rounded-lg border border-default p-3"
-        >
-          <legend class="px-1 text-sm font-medium">
-            {{ labelOf(c.field) }}
-          </legend>
-          <URadioGroup
-            v-model="c.take"
-            :items="[
-              { value: 'mine', label: t('core.form.conflict.mine', { value: show(c.mine) }) },
-              { value: 'theirs', label: t('core.form.conflict.theirs', { value: show(c.theirs) }) },
-            ]"
-          />
-        </fieldset>
+          v-model="c.take"
+          :legend="labelOf(c.field)"
+          variant="table"
+          :items="[
+            { value: 'mine', label: t('core.form.conflict.mine', { value: show(c.mine) }) },
+            { value: 'theirs', label: t('core.form.conflict.theirs', { value: show(c.theirs) }) },
+          ]"
+        />
         <UButton
           v-if="conflicts.length"
           :label="t('core.form.conflict.apply')"
@@ -316,7 +322,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               v-for="g in row"
               :key="g.name"
               :name="g.name"
-              :label="g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
+              :label="g.kind === 'checkbox' ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
               :help="g.help"
             >
               <UTextarea
@@ -377,6 +383,11 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
               <UInputNumber
                 v-else-if="g.kind === 'number'"
                 v-model="state[g.name]"
+              />
+              <UInputDate
+                v-else-if="g.kind === 'date'"
+                :model-value="dateOf(state[g.name])"
+                @update:model-value="state[g.name] = $event ? $event.toString() : ''"
               />
               <UInput
                 v-else

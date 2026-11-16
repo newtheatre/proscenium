@@ -28,6 +28,55 @@ Foundations has no feature of its own to offer. What it offers is **the kit**: t
 
 **Added to the kit for account merges (pull request 54, 16 November 2026).** `inAccountScope(column, account)`, `accountScope(account)`, `accountScopeIds(accountId)`, `canonicalAccount(accountId)` and `exactAccount(column, accountId)` are how a module compares an account column; the signatures and the rule that nothing else may compare one are in the Data-class registry tab, "How a merge scales". A job answers "not yet" with `job.defer(code)`, counted in `core_jobs.deferrals` and never as a failed attempt. A merge handler lists a row it takes out of use through the kit's set-aside helper, with `onClose` of `'delete'` or `'keep'`.
 
+## Lists: defineList and readList
+
+Added 16 November 2026 for the list design Matt accepted (Interface Doc: Page conventions, List; part 4, Lists). The page behaviour is Interface's; the declaration and the server reader are the kit's, and foundations owns them.
+
+**One declaration in two parts (settled with the interface build, 16 November 2026); this prevails over the sketch below where they differ.** The shared part is pure and holds no SQL: `defineList` itself, its validation (reserved keys, sort and view references), the address codec that parses and serialises each filter kind, the types, and everything the page needs (labels, option labels, date presets, which columns are hidden, always on or card columns, which sort a heading names) beside each filter's `kind`, `values`, `ability` and whether it is a child filter. It lives in the kit at `layers/core/shared/list.ts`; the interface build writes it, and a change to its format passes through this Doc like any other kit format. The server part binds each key to the database and is declared in the module's server folder, because a shared file may not import the schema: `defineListSource(list, { table, filters, sorts, search })` gives each filter its column or child subquery, each sort its `columns` with `index` or `bounded`, and each searched field its column. It is typed against the declaration, so a filter, sort or searched field with no binding, or a binding for a key the declaration lacks, does not compile. The route calls `readList(event, source)`. Index names, column objects and subqueries therefore never reach the browser.
+
+```ts
+// shared/lists/<name>.ts in the module: read by the page and by the data route.
+export const orders = defineList('box-office.orders', {
+  filters,   // key -> { kind, values?, ability?, child? }
+  sorts,     // key -> { columns, index }  or  { columns, bounded: n }
+  columns,   // key -> { field, ability?, hidden? }
+  search,    // extras: further fields and children the search also covers
+  views,     // built-in views: name -> { filters, sort, order }
+  subRows,   // optional child rows shown under a row
+})
+
+// In the data route. The one way a route reads a list's address.
+readList(event, list): Promise<ListRead>
+
+interface ListRead {
+  filters: Record<string, unknown>        // validated, only those the viewer may use
+  dropped: string[]                       // filter keys left out because the viewer lacks the ability
+  words: string[]                         // the search words, folded
+  sort: { key: string, order: 'asc' | 'desc' }
+  view: string | null
+  page: number
+  size: number
+  where(table): SQL                       // filters and search as one condition
+  orderBy(table): SQL                     // the sort, with the id as the last key
+  limit: number
+  offset: number
+}
+```
+
+Rules:
+
+- **L1. Every key is checked against the declaration.** An unknown key, value, sort or view is refused with the standard refusal body, code `core.list.unknown`, naming the key. `q`, `sort`, `order`, `page`, `size` and `view` are reserved, and `defineList` refuses a filter that uses one of them.
+- **L2. A filter whose ability the viewer lacks is dropped, not refused,** and its key is returned in `dropped` so the page can remove the chip. Dropping a filter never shows a row the viewer could not already see: a filter only narrows, and what the viewer may see at all is the route's own ability check, which `readList` does not replace.
+- **L3. The id is always the last sort key,** so pages never shuffle. A sort is declared with the index that answers it, and the conformance check refuses a sort with no index beginning with its columns unless the sort declares `bounded: n`, a scan the list's own filters hold to at most n rows.
+- **L4. A child filter or child search is a subquery,** never a list of ids read first (rule U4 and the chunk of 90 apply as everywhere). An account filter goes through `inAccountScope`.
+- **L5. Pages are by offset, and bounded.** `size` is 25 (the default), 50 or 100; `page` times `size` may not pass 10,000 rows, and beyond that the route refuses with `core.list.too-deep` and the page asks the person to narrow the list. An export is a job, not a deep page.
+- **L6. `view=` is a built-in view's name now.** A saved view's id (prefix `svw`) is later, and resolves the same way. Keys in the address override the view's.
+- **L7. Date presets are relative** and are worked out in the theatre's days (`core.locale.time-zone`) on the server at the time of the request, never stored as dates.
+
+**Search.** `q` is on for every list. What the person gets is Interface's contract: every text field of the list, shown or hidden, plus the declaration's extras and children; case and accent insensitive; any part of a word; every word must match; a field the viewer may not see is not searched. The formats set four limits on it. A column that is encrypted is never searched, because its text is not in the database. A column of class special is never searched by a list; it is reached only through its own audited service. A personal column is searched only under the ability that shows it, and a search that covers one under an ability with `audit: 'read'` is audited as a read. An erased value is gone from search in the same unit as the erasure, so any folded copy of a column is declared with the column and erased with it.
+
+How the search is answered is the kit's, behind `where()`, and is not yet fixed: accent-insensitive matching of any part of a word cannot use an ordinary index in D1, so the choice lies between a folded copy kept beside each searched column and a full-text index with trigrams. Proof P-LIST-1 decides it: 100,000 rows, three words, on a real D1 database, measuring rows read and time for both. The proof also asks whether the mechanism can name, for each row, the column that matched: the page shows it when the match was in a hidden column ("Matches season: Autumn 2026"), and drops that line if the winning mechanism cannot. Until it passes, a module writes nothing that depends on the mechanism, and no module writes a LIKE of its own to search a list. A prefix lookup on an indexed column that is not a search (finding a free slug) is not caught by this.
+
 Services of another module are imported from `#modules/<id>` and are only what that module exports from `server/services.ts`. Importing any other file of another module fails a lint, and importing a module not listed in `requires` fails the build.
 
 ## Points foundations declares
@@ -54,13 +103,15 @@ Foundations keeps the one index so two workstreams cannot claim the same name. T
 | Identity (2) | `core.sign-in-method`, `core.erasure-hold`, `core.merge-handler`, `core.export-contributor`, core.access-purpose | `core.account`, `core.role`, `core.grant`, `core.data-request` | `core.member`, core.access-scheme |
 | Core domain (3), in `core` and in its second module `public-site` | `core.change-impact`, `core.change-guard`, `core.delete-guard`, `core.space-busy`, `core.booking-action`, `core.notification-channel`, `core.notification-type`, `core.notification-topic`, `core.holiday-feed`, `core.file-access`, `core.file-slot`, `core.public-component`, `core.vocabulary` | `core.season`, `core.production`, `core.performance`, `core.venue`, `core.space`, `core.file`, `core.vocabulary`, `core.branding` | `core.production-team` |
 | Forms (5) | `forms.slot`, `forms.field-type`, `forms.bindable`, `forms.outcome-action`, `forms.template` | `forms.form`, `forms.response` | `forms.submitter`, `forms.co-author`, `forms.reviewer` |
-| Interface (6) | `core.navigation-group`, `core.home-card`, `core.record-tab`, `core.account-section`, `core.search-source`, `core.quick-action`, `core.help-page`, `core.on-shift-bar`, `core.tonight-tile` | none | none |
+| Interface (6) | `core.navigation-group`, `core.home-card`, `core.record-tab`, `core.account-section`, `core.search-source`, `core.quick-action`, `core.help-page`, `core.on-shift-bar`, `core.tonight-tile` Added under R-35: `core.record-fact`, `core.record-check`, `core.list-column` | none | none |
 
 **The access scheme (Identity, 16 November 2026).** A named part of the core, not a module; its names are indexed here and defined in the Identity Doc, parts 2, 3, 4 and 6. Tables `core_access_profiles` (`keyed by account, no id`) and `core_access_shares` (keyed by account and purpose, no id). The point `core.access-purpose` is a data point: a module declares a purpose with an id, a side, a label and explanation, an ability, the entries it uses and an optional record type. The vocabulary `core.access-need` is declared through `core.vocabulary`. The fact `core.access-scheme` is not a standing and has no `holders`, which the fact format allows; the value `core.access-scheme.companions` is offered through `core.requirement`. Abilities: `core.access-scheme.read`, `core.access-scheme.review`, `core.access-profile.read`, `core.emergency-contact.read`. Settings: the group `core.access-scheme.*` and `core.emergency-contacts.keep-after-standing`; these are separate from `core.access.fresh-within`, which is about permissions. The public page `/access` is a theatre content page holding Identity's component `CoreAccessApplication`, so it is deliberately not a reserved address prefix.
 
 **Two interface points, as built (16 November 2026); the Interface Doc's part 4 defines them.** `core.search-source` takes `{ id, record, ability, route, shells }`: `route` is the module's own search route, which takes `?q=` and returns `{ ids }`, and the rows are resolved through the record type's `core.record-resolver`. `core.quick-action` takes `{ id, to, icon, ability, keywords? }`: `keywords` is a translation key, and there is no action field, because a quick action is always an address. The console group for the `spaces` module is labelled "Room bookings"; its id and `/console/spaces` are unchanged.
 
 `core.production-section` was withdrawn on 16 November: `core.record-tab` is the one way to add to a record page. `core.account-section` is defined once, by the interface.
+
+**Three more interface points (ruling R-35, 16 November 2026), which makes twelve; the Interface Doc's part 4 defines them.** `core.list-column` takes `{ id, list, ability, component, order, sort? }` and adds a column to another module's list. `core.record-fact` takes `{ id, record, ability, component, order }`. `core.record-check` takes `{ id, record, ability, order, check(recordId) }` and its check answers `{ done, sentence, link }`. Three rules from the formats apply to them. A contribution from a switched-off module is not shown, and one whose ability the viewer lacks is left out without a trace. A check runs on the server as the viewer, in one bounded statement, and its sentence is a label key with values, never prose built in code. A contributed column's `sort` is allowed only where it meets the same index rule as the list's own sorts (below), and `readList` joins it by subquery on the record id. Label keys for a list derive as `<module>.lists.<name>.<part>.<key>`.
 
 Workstream 4 owns three modules, `box-office`, `payments` and `finance`, and declares its names under `box-office.*`, `payments.*` and `finance.*` in its own document; it needs no row here. The same is true of every second-round module, whose names are listed after the prefix table below.
 
@@ -85,6 +136,8 @@ Every id is `<prefix>_<26 characters>`. Prefixes are unique across the system, s
 | Membership, `membership_` | `msch` schemes, `mshp` memberships, `mbr` members, `mver` verifications, `mvl` verification lists, `mve` list entries, `mlo` length\_options | none |  |
 | Membership fees, `membership_fees_` | `mfp` prices, `mfc` charges | none |  |
 | Communications, `communications_` | `cml` lists, `cwd` consent\_wordings, `csub` subscriptions, `ccon` consent\_records, `cam` campaigns, `crcp` campaign\_recipients, `cmt` mailing\_templates, `cimp` imports, `cseg` segments (later release) | none |  |
+
+**Indexed as later, not in the first release (16 November 2026).** Content warnings, a later slice of the core domain that Matt accepted: the point `core.vocabulary` gains `grouped: true` (terms under headings), with table `core_term_groups` and column `core_terms.group_id`; tables `core_production_effects` and, later again, `core_performance_effect_exceptions`; a new vocabulary `core.staging-effect`. Their id prefixes are fixed when the slice is specified, and none of these names may be used for anything else meanwhile. Saved list views (id prefix svw, a view= value that is a saved view's id) are later too. Ruling R-35 is no longer later: Matt accepted the list and record page design on 16 November, and the three interface points beside `core.record-tab`, namely `core.record-fact`, `core.record-check` and `core.list-column`, declared by Interface in its part 4, and a kit server helper `readList` are indexed above and specified under "Lists" in this part.
 
 Not available: every prefix above, and any prefix starting with `x`, which belongs to a theatre's own modules. Withdrawn and free again: `psl`, `adv`, `pfa`, `per`, fdr, fans, fopt, fpar (the four forms tables response\_drafts, answers, option\_counts and participation are keyed by their own columns).
 

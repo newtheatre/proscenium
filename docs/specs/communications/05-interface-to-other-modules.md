@@ -104,7 +104,7 @@ Communications may read core's facts and identity's services because it requires
 
 ### communications.block (data)
 
-A content block a body may use: a name, its properties, an email rendering and a plain-text rendering, and `promotional: true` or `false`. Communications ships button, image and divider in the first release, and production card and performance list later. Box office could add a "book now" block. A block whose module is off renders nothing and fails the content checks, as a public component does.
+A content block a body may use: a name, its properties, an email rendering and a plain-text rendering, and `promotional: true` or `false`. Communications ships button, image and divider in the first release, and production card, performance list and before-you-come later. Before-you-come is declared here, because the core contributes to no module's point, and is not promotional. It renders the whole of core's `beforeYouCome` read, which holds only what is safe in an inbox: age guidance, staging effects, whether the production page has content warnings (never their names or a count) and the page's address. It does not read `guidanceFor`, which includes the warnings. Box office could add a "book now" block. A block whose module is off renders nothing and fails the content checks, as a public component does.
 
 ## What Communications contributes to other points
 
@@ -161,6 +161,7 @@ None may join a digest. Mailings have no coalescing window. The lane and content
 | verifiedAddressesOf(accountId) | Identity | The duplicate check at snapshot, and finding a signed-in person's email-subject rows. Server side only |
 | can, fact | Foundations | Every screen and route |
 | files | Core | Images and import files |
+| beforeYouCome(productionId, performanceId?) | Core | The before-you-come block: ageMin, ageRestricted, effects, notAtThisPerformance, hasContentWarnings, pageUrl, empty. Rendered whole, unfiltered. Later, with core's content warnings slice |
 
 `findOrCreateAccount` and `addressFor` are not called. This module creates no account, and core resolves the delivery address.
 
