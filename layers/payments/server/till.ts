@@ -43,11 +43,14 @@ export async function tillSummary(actor: Actor, sessionId: string, panels: Panel
 export async function prepareSale(unit: UnitView, actor: Actor, sessionId: string, panels: PanelInput[]): Promise<{ intentId: string, amountMinor: number }> {
   if (!panels.length) throw new Refusal('payments.till.empty', 'There is nothing to take payment for.', { status: 422 })
   const parts = []
+  const prepared = []
   for (const { panel, input } of await chosen(actor, panels)) {
-    const prepared = await panel.value.prepare(unit, { sessionId, input })
-    if (prepared.owner.module !== panel.module) throw new Error(`${panel.module}'s panel prepared a part for ${prepared.owner.module}`)
-    parts.push(prepared)
+    const part = await panel.value.prepare(unit, { sessionId, input })
+    if (part.owner.module !== panel.module) throw new Error(`${panel.module}'s panel prepared a part for ${part.owner.module}`)
+    parts.push(part)
+    prepared.push({ panel, part })
   }
   const { intentId } = await createIntent(unit, { parts, channel: 'desk', sessionId, expiresAt: nowMs() + DESK_INTENT_LIFETIME })
+  for (const { panel, part } of prepared) await panel.value.attach?.(unit, part.owner.record, intentId)
   return { intentId, amountMinor: parts.reduce((s, p) => s + p.amountMinor, 0) }
 }

@@ -21,7 +21,10 @@ export default defineModule({
   settings: defineSettings('box-office', {
     'baskets.hold-for': setting.duration({ default: '10m', min: '2m', max: '60m', change, audience: 'public', quotable: true }),
     'baskets.pay-within': setting.duration({ default: '15m', min: '5m', max: '60m', change, audience: 'public' }),
+    'orders.desk-seat-cap': setting.integer({ default: 30, min: 1, max: 500, change, audience: 'staff' }),
     'orders.seat-cap': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
+    // How long after curtain the desk may still sell, for latecomers.
+    'sales.desk-until-after': setting.duration({ default: '30m', min: '0m', max: '4h', change, audience: 'staff' }),
     'sales.close-before': setting.duration({ default: '0m', min: '0m', max: '7d', change, audience: 'public', quotable: true }),
     // What is in force is `reserve` whenever no online payment provider is connected, whatever this says.
     'checkout.payment-timing': setting.choice({ default: 'pay-now', options: ['pay-now', 'reserve', 'buyer-chooses'], change, audience: 'public' }),
@@ -42,10 +45,13 @@ export default defineModule({
     'performance.manage': ability({ on: 'core.performance' }),
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
-    'order.release': ability({ on: 'box-office.order' }),
+    'order.view': ability({ on: 'box-office.order', owner: 'grants' }),
+    'order.sell': ability({ on: 'core.performance', implies: ['order.view'] }),
+    'order.take-payment': ability({ on: 'box-office.order', implies: ['order.view'] }),
+    'order.release': ability({ on: 'box-office.order', implies: ['order.view'] }),
     // Cancelling does not imply refunding: staff with only the first cancel with no refund.
-    'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses' }),
-    'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses' }),
+    'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
+    'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
     'ticket.admit': ability({ on: 'core.performance' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
@@ -82,6 +88,8 @@ export default defineModule({
   contributes: {
     // Box office owns its part of a payment: it makes the sale real when the money arrives.
     'payments.settlement': [{ id: 'box-office' }],
+    // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
+    'payments.desk-basket': [{ id: 'box-office' }],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
       { id: 'deferred-ticket-income', name: 'Deferred ticket income', kind: 'liability' },

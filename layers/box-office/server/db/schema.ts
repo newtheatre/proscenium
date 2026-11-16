@@ -176,6 +176,8 @@ export const orders = defineTable('box_office_orders', {
   extendedAt: col.timestamp('extended_at'),
   releaseAt: col.timestamp('release_at'),
   keep: col.internal(integer('keep', { mode: 'boolean' }).notNull().default(false)),
+  // Set by the desk when the buyer is standing there: the tickets are admitted as they are issued.
+  admitOnPayment: col.internal(integer('admit_on_payment', { mode: 'boolean' }).notNull().default(false)),
   confirmedAt: col.timestamp('confirmed_at'),
   cancelledAt: col.timestamp('cancelled_at'),
   createdAt: col.createdAt(),

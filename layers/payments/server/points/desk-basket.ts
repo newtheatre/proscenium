@@ -22,6 +22,12 @@ export interface DeskBasket {
    * (above zero). Called in the batch that creates the intent.
    */
   prepare: (unit: UnitView, context: DeskContext) => Promise<{ owner: { module: string, record: string }, amountMinor: number }>
+  /**
+   * Called once the intent is in the batch, with the record `prepare` named and the intent's id,
+   * for an owner that keeps on its record which payment it is waiting for. The intent's row comes
+   * before these statements, so a foreign key to it holds.
+   */
+  attach?: (unit: UnitView, record: string, intentId: string) => Promise<void> | void
   /** Lines and an amount for display. Reads only. */
   summary: (context: DeskContext) => Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }>
 }
