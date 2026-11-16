@@ -544,7 +544,6 @@ function actions(p: Performance) {
       v-model:open="addingRun"
       :production-id="productionId"
       :spaces="spaces"
-      :time-zone="timeZone"
       @added="added"
     />
   </PageSection>

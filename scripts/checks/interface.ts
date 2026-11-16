@@ -22,7 +22,7 @@ export function interfaceProblems(name: string, source: string): { line: number,
     const line = i + 1
     const opened = /<([A-Za-z][\w-]*)/.exec(text)
     if (opened && !/^\s*<\//.test(text)) tag = opened[1]!
-    if (/<form[\s>]/.test(text) && !RAW_FORM.includes(name)) problems.push({ line, problem: 'a raw <form>; use UForm (or PageForm), so the form validates with its schema and shows each message beside its field' })
+    if (/<form(\s|>|$)/.test(text) && !RAW_FORM.includes(name)) problems.push({ line, problem: 'a raw <form>; use UForm (or PageForm), so the form validates with its schema and shows each message beside its field' })
     const classes = /\bclass="([^"]*)"/.exec(text)?.[1]?.split(/\s+/) ?? []
     if (classes.includes('w-full') && CONTROLS.includes(tag)) problems.push({ line, problem: `w-full on ${tag}; form controls already fill their field (app.config.ts). Pass a width only to make one narrower` })
     if (classes.includes('divide-y') && classes.includes('border') && classes.some(c => c.startsWith('rounded')) && !HAND_LIST.includes(name)) problems.push({ line, problem: 'a hand-built bordered list; use RecordList and RecordListItem' })
