@@ -20,6 +20,10 @@ const HANDLERS: Record<string, MergeStep['action']> = {
   'core_sessions.account_id': 'end-sessions',
   // A notification preference is keyed by account: where both accounts chose, the survivor's choice stands.
   'core_notification_preferences.account_id': 'move-unless-present',
+  // The survivor's access application stands; the merged-away one moves only if the survivor has
+  // none. Sharing choices move, one row per purpose remaining.
+  'core_access_profiles.account_id': 'move-unless-present',
+  'core_access_shares.account_id': 'move-unless-present',
 }
 
 /** Columns a merge must leave alone because they record the merge or the grant history itself. */

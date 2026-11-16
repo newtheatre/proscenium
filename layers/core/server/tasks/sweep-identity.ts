@@ -4,6 +4,7 @@
 // long enough (ID-17).
 import { defineTask, nowMs } from '#kit'
 import { sweepEmergencyContacts } from '../identity/emergency-contacts'
+import { sweepAccessScheme } from '../identity/access-scheme'
 
 export default defineTask(async (unit) => {
   const at = nowMs()
@@ -11,4 +12,5 @@ export default defineTask(async (unit) => {
   unit.add({ sql: 'DELETE FROM core_passkey_challenges WHERE expires_at <= ? OR used_at IS NOT NULL', params: [at] })
   unit.add({ sql: 'DELETE FROM core_sessions WHERE ended_at IS NOT NULL OR expires_at <= ?', params: [at] })
   await sweepEmergencyContacts(unit)
+  await sweepAccessScheme(unit)
 })
