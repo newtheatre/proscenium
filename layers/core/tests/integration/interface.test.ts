@@ -3,6 +3,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import access from '../../server/api/core/access.get'
 import navigation from '../../server/api/core/navigation.get'
+import accountSections from '../../server/api/core/account-sections.get'
 import viewer from '../../server/api/core/viewer.get'
 import settingsGet from '../../server/api/core/settings/index.get'
 import settingsPut from '../../server/api/core/settings/index.put'
@@ -13,6 +14,7 @@ const handle = server({
   'GET /api/core/access': access,
   'GET /api/core/navigation': navigation,
   'GET /api/core/viewer': viewer,
+  'GET /api/core/account-sections': accountSections,
   'GET /api/core/settings': settingsGet,
   'PUT /api/core/settings': settingsPut,
 })
@@ -70,7 +72,7 @@ describe('navigation and the viewer', () => {
     expect(ids).toContain('gallery')
     expect(ids).not.toContain('system') // nothing of core's is theirs to open
     const gallery = body.groups.find(g => g.id === 'gallery')!
-    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.form', 'gallery.feedback'])
+    expect(gallery.everyday.map(e => e.id)).toEqual(['gallery.list', 'gallery.form', 'gallery.feedback', 'gallery.drafts'])
     expect(gallery.setup.map(e => e.id)).toEqual(['gallery.steps', 'gallery.settings']) // its settings page sits in its own group
     expect(gallery.setup.map(e => e.id)).not.toContain('gallery.denied')
   })
@@ -128,5 +130,53 @@ describe("core's own settings page", () => {
     const admin = person(['core.settings.manage'])
     expect((await decide('/console/system/settings', admin)).decision).toBe('allow')
     expect((await decide('/console/core/settings', admin)).decision).toBe('not-found')
+  })
+})
+
+describe('counts and hideEmpty (UI-04)', () => {
+  const sections = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/account-sections', { actor })).json() as { sections: { id: string, count?: number }[] }).sections
+  const entries = async () => (await (await call(handle, 'GET', '/api/core/navigation?shell=console', { actor: staff() })).json() as { groups: { id: string, everyday: { id: string, count?: number }[] }[] }).groups.find(g => g.id === 'gallery')!.everyday
+
+  it('shows an entry with its count while there is something to count', async () => {
+    const drafts = (await entries()).find(e => e.id === 'gallery.drafts')
+    expect(drafts?.count).toBe(3)
+  })
+
+  it('leaves an empty entry out of the menu, but still opens its address', async () => {
+    const actor = staff()
+    await call(handle, 'PUT', '/api/core/settings', { actor, body: { changes: [{ key: 'gallery.demo.open', value: false }] } })
+    try {
+      expect((await entries()).map(e => e.id)).not.toContain('gallery.drafts')
+      expect((await decide('/console/gallery/drafts', actor)).decision).toBe('allow')
+    }
+    finally {
+      await call(handle, 'PUT', '/api/core/settings', { actor, body: { changes: [{ key: 'gallery.demo.open', reset: true }] } })
+    }
+  })
+
+  it('lists account sections for the person, in order, and drops an empty one', async () => {
+    const actor = audience()
+    expect((await sections(actor)).map(s => s.id)).toEqual(['gallery.tickets', 'gallery.drafts'])
+    const admin = staff()
+    await call(handle, 'PUT', '/api/core/settings', { actor: admin, body: { changes: [{ key: 'gallery.demo.open', value: false }] } })
+    try {
+      expect((await sections(actor)).map(s => s.id)).toEqual(['gallery.tickets'])
+    }
+    finally {
+      await call(handle, 'PUT', '/api/core/settings', { actor: admin, body: { changes: [{ key: 'gallery.demo.open', reset: true }] } })
+    }
+  })
+
+  it('refuses account sections to someone signed out', async () => {
+    expect((await call(handle, 'GET', '/api/core/account-sections')).status).toBe(401)
+  })
+})
+
+describe("the members' area (UI-03)", () => {
+  it('answers not found for a person who is not a member, and for the area when it is off', async () => {
+    expect((await decide('/members', audience())).decision).toBe('not-found')
+    expect((await call(handle, 'GET', '/api/core/navigation?shell=members', { actor: audience() })).status).toBe(404)
+    const sections = await (await call(handle, 'GET', '/api/core/account-sections?side=members', { actor: audience() })).json() as { sections: unknown[] }
+    expect(sections.sections).toEqual([])
   })
 })

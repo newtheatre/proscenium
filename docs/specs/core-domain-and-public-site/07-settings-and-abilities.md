@@ -28,7 +28,7 @@ One more organisation setting, added on 16 November 2026 by the integrating thre
 
 | Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `core.organisation.year-end` | text | unset | A day and a month, such as 31 July | `core.organisation.edit` | staff | No | The day the theatre's own year ends. The single source for the identity module's year-end expiry of roles. While it is unset, "year end" cannot be chosen as an expiry. The financial year is the Finance module's own setting. |
+| `core.organisation.year-end` | text | unset | A day and a month, such as 31 July | `core.organisation.edit` | staff | No | The day the theatre's own year ends, stored as month and day in the form MM-DD, such as 07-31. 29 February is refused, so the day exists in every year. The single source for the identity module's year-end expiry of roles. While it is unset, "year end" cannot be chosen as an expiry. The financial year is the Finance module's own setting. |
 
 The time zone stays unset until setup, and its audience is public, because public pages and the calendar feed show local times.
 

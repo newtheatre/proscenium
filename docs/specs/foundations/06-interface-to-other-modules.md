@@ -113,6 +113,8 @@ Other platform names foundations added in the second round: the queue binding `E
 | `core.release.applied` | An update's migrations finish | release version | yes |
 | `core.job.died` | A job uses up its attempts | job name and id | yes |
 
+Core domain's vocabulary events, added from its build on 16 November 2026: `core.term.retired` (payload `termId`, `vocabulary`) and `core.term.merged` (payload `termId`, `vocabulary`, `intoId`). Neither is internal. `core.term.merged` is declared from the first release and first announced when merging terms ships (core domain's story C-22, later).
+
 All four are internal: they are about the running of the site, so they are never sent to a theatre's webhooks. There is no event named `core.module.switched`.
 
 ## What foundations needs from the others
