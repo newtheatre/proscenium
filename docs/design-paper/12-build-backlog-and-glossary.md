@@ -113,14 +113,14 @@ Each specification keeps its own glossary, in its tab 1. This section rules on t
 | Owner | Tables | Where the list and id prefixes are |
 | --- | --- | --- |
 | Foundations (core) | 13 | Foundations, tab 2, "The tables foundations owns" |
-| Identity (core) | 18 | Identity, tab 2, "Id prefixes" |
+| Identity (core) | 20 | Identity, tab 2, "Id prefixes" |
 | Core domain (core) | 26 | Core domain, tab 2, "All 26 tables and their id prefixes" |
 | Box office | 22 | Box office, tab 2, "Id prefixes" |
 | Payments | 9 | Box office, tab 2 |
 | Finance | 7 | Box office, tab 2 |
 | Form builder | 17 | Form builder, tab 2, "Id prefixes" |
 | Interface (core) | 3 | Interface, part 2; one id prefix, svw, for core\_saved\_views |
-| **All** | **115** | The one index of id prefixes, points, record types and facts is Foundations, tab 4 |
+| **All** | **117** | The one index of id prefixes, points, record types and facts is Foundations, tab 4 |
 
 Every id is a short table prefix and 26 characters, sortable by creation time. An id is never a secret: anything that grants access by being known is a separate random token stored hashed.
 

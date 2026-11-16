@@ -28,14 +28,14 @@ The foundations layout gives every table a heading line. Realm is `audience`, `m
 | `core_roles` | operational | none | No | Kept |
 | `core_role_abilities` | operational | none | No | Kept |
 | `core_fact_abilities` | operational | none | No | Kept |
-| `core_grants` | operational | `account_id`; `granted_by` and `ended_by` are actors | No | Ended rows are kept as the record of who held what |
+| `core_grants` | operational | `account_id`; `granted_by` is an actor | Yes | Ended rows are kept as the record of who held what |
 | `core_account_merges` | operational | `survivor_id` | No | Kept |
 | `core_account_merge_items` | operational | none (reached through the merge) | No | Deleted when the undo window closes |
 | `core_data_requests` | operational | `account_id` | No | Kept as the record that the request was met; it holds no personal content after erasure |
 | `core_emergency_contacts` | members | `account_id` | No | With the account, and deleted `core.emergency-contacts.keep-after-standing` after the last standing ends |
 | `core_access_profiles` | audience | `account_id` | No | With the account; a special column under `CORE_ENCRYPTION_KEY` |
 
-`core_access_shares` has the same heading line as `core_access_profiles`: realm `audience`, subject `account_id`, kept with the account. None of identity's tables is append-only; the audit trail of its actions is foundations' `core_audit`.
+`core_access_shares` has the same heading line as `core_access_profiles`: realm `audience`, subject `account_id`, kept with the account. Two of identity's tables are append-only, core\_grants and core\_grant\_ends (realm operational, kept as the record of who held what); none of the others is. core\_grant\_warnings is an ordinary table. The audit trail of its actions is foundations' `core_audit`.
 
 ### Id prefixes
 
@@ -269,33 +269,44 @@ A pinned mapping allows the ability only when the fact holds for the actor on th
 
 ## core\_grants
 
-A role given to an account. A grant is never edited: it is ended, and a renewal is a new row.
+A role given to an account. Append-only: a grant row is written once and never changed. Ending a grant writes a row to `core_grant_ends`; changing a grant's end or scope ends it as replaced and writes a new grant; a renewal is a new grant. The history therefore answers who could do what on any past date.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
-| id | id | Primary key | Internal | Kept, ended |
-| account\_id | id | Not null | Internal | Kept |
-| role\_id | id | Not null | Internal | Kept |
-| scope | enum | site, module, record | Internal | Kept |
-| scope\_module | text | Null unless scope is module or record | Internal | Kept |
-| scope\_type | text | Null unless scope is record; a record type its module registered as grantable | Internal | Kept |
-| scope\_id | id | Null unless scope is record | Internal | Kept |
-| starts\_at | time | Not null | Internal | Kept |
-| expires\_at | time | Null means no expiry | Internal | Kept |
-| granted\_by | id | Not null; never equal to account\_id, by check constraint, except on the setup grant | Internal | Kept |
-| granted\_at | time | Not null | Internal | Kept |
-| ended\_at | time | Null | Internal | Set to now if still live |
-| ended\_by | id | Null | Internal | Kept |
-| ended\_reason | enum | Null; revoked, replaced, role\_archived, account\_closed, merged | Internal | Kept |
+| `id` | id | Primary key | Internal | Kept; a live grant is ended |
+| `account_id` | id | Not null | Internal | Kept |
+| `role_id` | id | Not null | Internal | Kept |
+| `scope` | enum | `site`, `module`, `record` | Internal | Kept |
+| `scope_module` | text | Null unless scope is module or record | Internal | Kept |
+| `scope_type` | text | Null unless scope is record; a record type its module registered as grantable | Internal | Kept |
+| `scope_id` | id | Null unless scope is record | Internal | Kept |
+| `starts_at` | time | Not null | Internal | Kept |
+| `expires_at` | time | Null means no expiry | Internal | Kept |
+| `granted_by` | id | Not null; never equal to `account_id`, by check constraint, except on the setup grant | Internal | Kept |
+| `granted_at` | time | Not null | Internal | Kept |
 
-- A partial unique index allows one live grant per account, role and scope.
-- *Live*, *lapsed* and *pending* are read at query time. Pending means the account is unclaimed.
-- A trigger allows only the three `ended_` columns to change after insert.
-- On merge: live rows move to the survivor. Where both hold the same role at the same scope, the later expiry stays and the other ends as `replaced`.
+- A grant is *live* when `starts_at` has passed, `expires_at` is null or still to come, and it has no row in `core_grant_ends`. *Lapsed* and *pending* are read at query time too. Pending means the account is unclaimed.
+- One live grant per account, role and scope. An index cannot see the ends table, so the rule is a condition on the statement that writes the grant: it writes nothing if a live grant for the same account, role and scope exists, counting through the account scope.
+- On merge: `account_id` is `alias`, as it must be in an append-only table, so both accounts' grants are read as the survivor's from stage one. Where both hold the same role at the same scope, a handler ends the one with the earlier expiry as replaced. On undo that grant cannot be un-ended, so the handler's undo writes a new grant to the returned account with the same role, scope and expiry, if it would still be live.
+
+## core\_grant\_ends
+
+That a grant was ended, by whom and why. Append-only; one row per grant at most.
+
+| Column | Type | Constraints | Class | On erasure |
+| --- | --- | --- | --- | --- |
+| `grant_id` | id | Primary key; a grant in `core_grants` | Internal | Kept |
+| `ended_at` | time | Not null | Internal | Kept |
+| `ended_by` | id | Null when the system ended it; an actor, `alias` on merge | Internal | Kept |
+| `ended_reason` | enum | `revoked`, `replaced`, `role_archived`, `account_closed`, `merged` | Internal | Kept |
+
+It has no id or prefix of its own and no free text. Erasure writes a row here with the reason `account_closed` for each of the person's live grants; it changes no existing row, so the trigger needs no exception.
+
+The ability check reads a grant as live in one statement: the grant row and the absence of a `core_grant_ends` row for it are tested together, never in two reads, so a grant ended a moment ago cannot allow anything. An audit entry's `allowed_by` still names the grant's id.
 
 ## core\_account\_merges and core\_account\_merge\_items
 
-The record of a merge, and the list of what it moved so that it can be undone. Besides the columns below, `core_account_merges` has `completed_at` (timestamp, null while rows are still moving) and `undo_started_at` (timestamp, null unless an undo is under way or done); both Internal and kept on erasure. `core_account_merge_items` is unique on merge, table and row, so listing a row twice does nothing.
+The record of a merge, and the list of what it moved so that it can be undone. Besides the columns below, `core_account_merges` has `completed_at` (timestamp, null while rows are still moving) and `undo_started_at` (timestamp, null unless an undo is under way or done); both Internal and kept on erasure. `core_account_merge_items` is unique on merge, table and row, so listing a row twice does nothing, and has `kind` (enum: `moved`, `set-aside`, `set-aside-keep`; Internal). A set-aside item names a row a handler took out of use: `set-aside` rows are deleted when the undo window closes, `set-aside-keep` rows are left to the module's own retention. How the row is out of use meanwhile is the module's own state, and no column is added to a module's table for it.
 
 | Column | Type | Constraints | Class | On erasure |
 | --- | --- | --- | --- | --- |
@@ -336,6 +347,10 @@ A request to download or erase a person's data, by them or by staff for them.
 | holds | text | Null; a list of hold codes that modules raised, never free text | Internal | Kept |
 | file\_id | id | Null; the export, held by Files | Internal | File deleted, column set to null |
 | finished\_at | time | Null | Internal | Kept |
+
+## core\_grant\_warnings
+
+That a grant's coming end has been announced, so nobody is told twice. `core_grants` is append-only and cannot carry the mark itself. Columns: `grant_id` (id, primary key, so one row per grant and no id or prefix of its own) and `warned_at` (timestamp, not null). Both Internal. It has no account column and no free text, so merge and erasure do not touch it. Realm operational, append-only: no. It is an ordinary table whose rows are simply never updated, and the daily sweep may delete a row once its grant has lapsed or ended.
 
 ## core\_emergency\_contacts
 
