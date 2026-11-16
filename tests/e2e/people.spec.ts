@@ -30,6 +30,21 @@ test.describe('Merges', () => {
   })
 })
 
+test.describe('Merge accounts', () => {
+  test.use(as(person('Morgan Merger', [grant('core.account.merge'), grant('core.account.search')])))
+
+  test('chooses both accounts with the person picker, which searches as you type', async ({ page }) => {
+    await visit(page, '/console/people/merges')
+    await page.getByRole('link', { name: 'Merge accounts' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Merge accounts' })).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('button', { name: 'The account to keep' }).click()
+    await expect(page.getByText('Type at least two letters')).toBeVisible()
+    await page.getByPlaceholder('Name or full email address').fill('Zzyzx Nobody')
+    await expect(page.getByText('Nobody matches.')).toBeVisible()
+  })
+})
+
 test.describe('without the merge ability', () => {
   test.use(as(person('Pat Plain', [grant('core.role.read')])))
 

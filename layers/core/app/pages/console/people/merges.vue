@@ -62,6 +62,13 @@ async function undo(merge: Merge) {
     :title="t('core.navigation.merges.label')"
     :description="t('core.merges.intro')"
   >
+    <template #primary>
+      <UButton
+        icon="i-lucide-merge"
+        to="/console/people/merge"
+        :label="t('core.merges.merge-accounts')"
+      />
+    </template>
     <div class="space-y-6">
       <RefusalNotice :refusal="refusal" />
       <DataBoundary
