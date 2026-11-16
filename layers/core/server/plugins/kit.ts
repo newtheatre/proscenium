@@ -9,10 +9,12 @@ import { setDispatcher } from '#kit/dispatch'
 import { runInContext, useContext, type KitEnv } from '#kit/context'
 import { runJob, tick } from '#kit/jobs'
 import { log } from '#kit/log'
+import { rememberEnv } from '#kit/route'
 
 export default defineNitroPlugin((nitroApp) => {
   installRegistry(registry)
   installMigrations(migrations, release)
+  nitroApp.hooks.hook('request', (event) => { rememberEnv(event.context.cloudflare?.env as KitEnv | undefined) })
   if (!import.meta.dev) return
 
   let env: KitEnv | undefined

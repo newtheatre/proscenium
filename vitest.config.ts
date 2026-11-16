@@ -6,11 +6,11 @@ import { fileURLToPath } from 'node:url'
 import { cloudflareTest } from '@cloudflare/vitest-plugin'
 import { defineConfig } from 'vitest/config'
 import { kitAliases } from './layers/core/aliases.ts'
-import { loadRegistry, ROOTS, FIXTURES } from './scripts/lib/load.ts'
+import { loadRegistry, ROOTS, FIXTURES, GALLERY } from './scripts/lib/load.ts'
 import { writeGenerated } from './scripts/lib/write.ts'
 
 const root = fileURLToPath(new URL('.', import.meta.url))
-const { modules } = await loadRegistry([...ROOTS, FIXTURES])
+const { modules } = await loadRegistry([...ROOTS.filter(r => r !== GALLERY), FIXTURES, GALLERY])
 writeGenerated(modules, { version: '0.0.0-test', registryFile: join(root, '.generated/test-registry.ts'), migrationOwners: ['upstream', 'fixtures'] })
 
 const fixtureRoots = modules.filter(m => m.found.owner === 'fixtures').map(m => join(root, m.found.root))

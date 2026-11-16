@@ -28,6 +28,28 @@ export default defineModule({
     ...domain.contributes,
     ...identity.identityContributions,
     'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check']],
+    // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
+    'core.navigation': [
+      { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
+    ],
+    // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
+    // System holds core's own screens; each module's settings page sits in the module's own group.
+    'core.navigation-group': [
+      { id: 'tonight', icon: 'i-lucide-moon-star' },
+      { id: 'programme', icon: 'i-lucide-calendar-days' },
+      { id: 'box-office', icon: 'i-lucide-ticket' },
+      { id: 'front-of-house', icon: 'i-lucide-door-open' },
+      { id: 'bar', icon: 'i-lucide-wine' },
+      { id: 'spaces', icon: 'i-lucide-building-2' },
+      { id: 'training', icon: 'i-lucide-graduation-cap' },
+      { id: 'membership', icon: 'i-lucide-id-card' },
+      { id: 'people', icon: 'i-lucide-users' },
+      { id: 'money', icon: 'i-lucide-pound-sterling' },
+      { id: 'communications', icon: 'i-lucide-mail' },
+      { id: 'forms', icon: 'i-lucide-file-text' },
+      { id: 'reports', icon: 'i-lucide-chart-column' },
+      { id: 'system', icon: 'i-lucide-settings' },
+    ],
   },
 
   events: {

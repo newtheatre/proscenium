@@ -14,7 +14,7 @@ export const points = {
       menu: z.enum(['account', 'members', 'console', 'live']),
       to: z.string().startsWith('/'),
       icon: z.string(),
-      ability,
+      ability: ability.optional(),
       order: z.number().int().optional(),
       group: z.string().optional(),
       section: z.enum(['everyday', 'setup']).optional(),
@@ -24,6 +24,18 @@ export const points = {
     }).strict()
       .refine(e => e.ability !== 'signed-in' || e.menu === 'account', { message: "only an account entry may give ability 'signed-in'", path: ['ability'] })
       .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] }),
+  }),
+  // A console group is declared once, by the module that owns it. A theatre's own module places its
+  // group with `before` or `after`; the platform's own groups keep the fixed order.
+  'core.navigation-group': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      icon: z.string(),
+      order: z.number().int().optional(),
+      before: z.string().optional(),
+      after: z.string().optional(),
+    }).strict(),
   }),
   'core.setup-step': point({
     kind: 'data',
