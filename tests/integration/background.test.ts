@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { changeSetting, createUnit, enqueue, externalCall, newId, setClock } from '#kit'
-import { runJob, runScheduler, sweepJobs } from '#kit/jobs'
+import { cancelJob, runJob, runScheduler, sweepJobs } from '#kit/jobs'
 import { reconcileDue } from '#kit/external'
 import { provider } from '../fixtures/modules/seats/server/calls/take-payment'
 import { deliver, env, inContext, performance, rows, sent, setModule } from './helpers'
@@ -89,6 +89,23 @@ describe('jobs (F-07)', () => {
     expect(await rows('SELECT state FROM core_jobs WHERE id = ?', id)).toEqual([{ state: 'queued' }])
     await setModule('seats', true)
     expect(await inContext(() => runJob(id))).toBe('done')
+  })
+
+  it('cancels a job that has not started, and never runs it', async () => {
+    const jobId = await inContext(() => enqueue('seats.retry-flaky', { failTimes: 0 }))
+    await inContext(async () => {
+      const unit = createUnit()
+      await cancelJob(unit.view(), jobId)
+      await unit.commit()
+    })
+    expect(await rows('SELECT state FROM core_jobs WHERE id = ?', jobId)).toEqual([{ state: 'cancelled' }])
+    expect(await inContext(() => runJob(jobId))).toBe('skipped')
+    const again = inContext(async () => {
+      const unit = createUnit()
+      await cancelJob(unit.view(), jobId)
+      await unit.commit()
+    })
+    await expect(again).rejects.toMatchObject({ code: 'core.job.not-cancellable' })
   })
 
   it('sends a lost message again from the sweep', async () => {
