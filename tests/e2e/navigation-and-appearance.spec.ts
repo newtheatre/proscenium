@@ -35,6 +35,7 @@ test.describe('moving between pages', () => {
 
   test('focus moves to the main content after following a link, and stays put when only a filter changes', async ({ page }) => {
     await visit(page, '/console')
+    await page.getByRole('navigation', { name: 'Console' }).getByRole('button', { name: 'Gallery' }).click()
     await page.getByRole('navigation', { name: 'Console' }).getByRole('link', { name: /Sample list/ }).click()
     await expect(page).toHaveURL(/\/console\/gallery\/list/)
     await expect(page.locator('main#main')).toBeFocused()
@@ -58,6 +59,7 @@ test.describe('moving between pages', () => {
     await visit(page, '/console')
     const asked: string[] = []
     page.on('request', (request) => { if (request.url().includes('/api/core/access')) asked.push(request.url()) })
+    await page.getByRole('navigation', { name: 'Console' }).getByRole('button', { name: 'Gallery' }).click()
     await page.getByRole('navigation', { name: 'Console' }).getByRole('link', { name: /Sample list/ }).click()
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     expect(asked).toEqual([])
