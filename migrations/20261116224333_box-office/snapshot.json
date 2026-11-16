@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "2bd69ee8-4f64-4609-b84b-f08beef63e74",
+  "id": "0ec6aec9-cd36-4422-bfd9-aa6932e41e9c",
   "prevIds": [
-    "67f8b07e-6114-43c7-9c8b-f545cc68c911"
+    "80a2970d-132b-4eae-966f-680e3c1b93e3"
   ],
   "ddl": [
     {
@@ -2159,6 +2159,16 @@
       "name": "undo_until",
       "type": "integer",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_account_merges",
+      "name": "completed_at",
+      "type": "integer",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
