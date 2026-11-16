@@ -1,18 +1,21 @@
-// Who is looking, as the shells need to know it. Identity's `describeViewer` replaces `describe`
-// below; the answer keeps this shape so no component ever tests a role or an ability: it draws from
-// the name, the sides that are open and the entries the viewer may open.
-import { fact } from '#kit'
-import { useRegistry } from '#kit/registry'
+// Who is looking, as the shells need to know it. The members' side is identity's to decide
+// (isMember, from the fact core.member and the members' area setting); identity's describeViewer
+// gives the whole answer, in this shape, so no component ever tests a role or an ability: it
+// draws from the name, the sides that are open and the entries the viewer may open.
+import { useSetting } from '#kit'
 import type { Actor } from '#kit'
 import type { NavItem, ShellName } from '../../shared/navigation'
 import { allowedEntries, declaredEntries, holds, mayOpen } from './navigation'
 import { abilityList, entryLabelKey } from '../../shared/navigation'
+import { isMember } from '../identity/standings'
 
 export type Side = 'audience' | 'members' | 'console'
 
 export interface ViewerDescription {
   signedIn: boolean
   name?: string
+  /** What the theatre calls the members' area (core.members-area.name). */
+  membersName?: string
   sides: Side[]
   navigation: (NavItem & { shell: ShellName })[]
 }
@@ -21,11 +24,7 @@ export function isSignedIn(actor: Actor): boolean {
   return actor.kind === 'person' || actor.kind === 'setup'
 }
 
-/** Members' area: the site-wide fact core.member, once identity declares it. Until then nobody is a member. */
-export async function isMember(actor: Actor): Promise<boolean> {
-  if (!useRegistry().facts.has('core.member')) return false
-  return fact('core.member', actor)
-}
+export { isMember }
 
 /** Console: holding any ability a console entry names. */
 export async function holdsConsole(actor: Actor): Promise<boolean> {
@@ -44,7 +43,8 @@ export async function isEntitled(actor: Actor, shell: ShellName): Promise<boolea
   return false // live mode is entered from the Tonight hub, which the front-of-house module brings
 }
 
-export async function describe(actor: Actor): Promise<ViewerDescription> {
+/** Identity's describeViewer (part 4, "Services"): the name, the sides open and the entries the viewer may open. */
+export async function describeViewer(actor: Actor): Promise<ViewerDescription> {
   if (!isSignedIn(actor)) return { signedIn: false, sides: ['audience'], navigation: [] }
   const sides: Side[] = ['audience']
   if (await isMember(actor)) sides.push('members')
@@ -53,8 +53,9 @@ export async function describe(actor: Actor): Promise<ViewerDescription> {
   for (const shell of ['account', 'members'] as const) {
     if (shell === 'members' && !sides.includes('members')) continue
     for (const e of await allowedEntries(actor, shell)) {
-      navigation.push({ id: e.id, shell, label: e.label ?? entryLabelKey(e.id), to: e.to, icon: e.icon, match: e.match, count: e.count, order: e.order ?? 0 })
+      navigation.push({ id: e.id, shell, label: e.label ?? entryLabelKey(e.id), to: e.to, icon: e.icon, match: e.match, count: e.countValue, order: e.order ?? 0 })
     }
   }
-  return { signedIn: true, name: actor.name, sides, navigation: navigation.sort((a, b) => a.order - b.order) }
+  const membersName = sides.includes('members') ? await useSetting('core.members-area.name') as string : undefined
+  return { signedIn: true, name: actor.name, membersName, sides, navigation: navigation.sort((a, b) => a.order - b.order) }
 }

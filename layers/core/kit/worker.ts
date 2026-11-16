@@ -4,8 +4,11 @@
 import { runInContext, type KitEnv } from './context'
 import { runJob, tick } from './jobs'
 import { log } from './log'
+import { handleEmailEvents, isEmailEventsQueue } from './email-events'
 
 export async function handleQueue(batch: MessageBatch<{ jobId?: string }>, env: KitEnv): Promise<void> {
+  // The outcome queue carries Cloudflare's messages, not the platform's: it has its own handler.
+  if (isEmailEventsQueue(batch.queue)) return handleEmailEvents(batch as MessageBatch<unknown>, env)
   for (const message of batch.messages) {
     const jobId = message.body?.jobId
     if (!jobId) {

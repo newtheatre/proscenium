@@ -36,9 +36,16 @@ export async function ownerRoleId(): Promise<string | null> {
   return (await first<{ id: string }>('SELECT id FROM core_roles WHERE key = ?', OWNER))?.id ?? null
 }
 
-/** Every ability a role brings, with what each implies. Owner brings every declared ability. */
+/**
+ * Reads of information about other people that an Owner does not hold by being an Owner (part 3,
+ * "Emergency contacts"): only somebody given them, such as the welfare lead, reads them. An Owner
+ * can still give them, because an Owner may give any role.
+ */
+export const OWNER_DOES_NOT_READ: ReadonlySet<string> = new Set(['core.emergency-contact.read'])
+
+/** Every ability a role brings, with what each implies. Owner brings every declared ability but those above. */
 export async function roleAbilities(roleId: string, roleKey?: string): Promise<string[]> {
-  if (roleKey === OWNER) return [...useRegistry().abilities.keys()]
+  if (roleKey === OWNER) return [...useRegistry().abilities.keys()].filter(a => !OWNER_DOES_NOT_READ.has(a))
   const rows = await all<{ ability: string }>('SELECT ability FROM core_role_abilities WHERE role_id = ?', roleId)
   return withImplied(rows.map(r => r.ability))
 }

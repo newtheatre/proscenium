@@ -22,12 +22,13 @@ export default defineModule({
   settingRules: defineSettingRules('core', [...settingRules.rules, ...identity.identitySettingRules, ...domain.settingRules]),
   abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities },
   records: { ...records, ...identity.identityRecords, ...domain.records },
+  facts: { ...identity.identityFacts },
   tables: { ...tables, ...domainTables },
   points: { ...points, ...identity.identityPoints, ...domain.points },
   contributes: {
     ...domain.contributes,
     ...identity.identityContributions,
-    'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check']],
+    'core.health-check': [...identity.identityContributions['core.health-check'], ...domain.contributes['core.health-check'], { id: 'core.signing-keys', file: 'signing-keys' }],
     // The account menu's entries. Identity's passkey page is the first; the rest arrive with their screens.
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
@@ -70,6 +71,7 @@ export default defineModule({
 
   tasks: {
     'core.prune-history': task({ dailyAt: '04:00' }),
+    'core.rotate-signing-keys': task({ dailyAt: '03:30' }),
     ...identity.identityTasks,
     ...domain.tasks,
   },

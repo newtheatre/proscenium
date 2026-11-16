@@ -2,7 +2,7 @@
 // rules, abilities, record types, events, background work, secrets and health checks. Phase 1
 // declares what the first stories use; the rest arrives with the stories that need it.
 import { z } from 'zod'
-import { ability, defineAbilities, defineRecords, defineSettings, event, job, point, record, secret, setting, task, useContext, type SettingRule } from '#kit'
+import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task, useContext, type SettingRule } from '#kit'
 
 const change = 'core.identity-settings.manage'
 
@@ -29,6 +29,7 @@ export const identitySettings = defineSettings('core', {
 
   'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
   'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
+  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change }),
 
   'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change }),
 
@@ -44,6 +45,8 @@ export const identitySettingRules: SettingRule[] = [
   { id: 'idle-within-lifetime', check: s => s['sessions.idle-limit'] <= s['sessions.lifetime'] },
   { id: 'managed-domains-need-provider', check: s => !s['sign-in.managed-domains'].length || s['sign-in.google'] },
   { id: 'strong-provider-needs-managed-domain', check: s => !s['sign-in.provider-is-strong'] || s['sign-in.managed-domains'].length > 0 },
+  // Ruling R-09: year-end expiry reads core.organisation.year-end, and cannot be chosen while it is unset.
+  { id: 'default-expiry-needs-year-end', check: s => s['grants.default-expiry'] !== 'year-end' || !!s['organisation.year-end'] },
   { id: 'google-needs-client-id', check: s => !s['sign-in.google'] || !!s['sign-in.google-client-id'] },
   // Rules run while a setting is saved, inside the request, so the Worker secret can be read here.
   { id: 'google-needs-client-secret', check: s => !s['sign-in.google'] || !!useContext().env.CORE_GOOGLE_CLIENT_SECRET },
@@ -69,6 +72,17 @@ export const identityAbilities = defineAbilities('core', {
   'grant.read': ability({ risk: 'normal', implies: ['account.search'], audit: false, grantAt: ['site'] }),
   'grant.manage': ability({ on: 'core.grant', risk: 'privileged', owner: 'refuses', implies: ['grant.read'], grantAt: ['site', 'module', 'record'] }),
   'identity-settings.manage': ability({ risk: 'privileged', grantAt: ['site'] }),
+  // Read one member's emergency contacts, with a reason. Strong but never asked again, so an
+  // emergency is not slowed; an Owner does not hold it by being an Owner (OWNER_DOES_NOT_READ).
+  'emergency-contact.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', grantAt: ['site'] }),
+})
+
+/**
+ * Identity's one fact (part 6, "Facts"): the account holds at least one standing now. It sums the
+ * standings and is not one itself; it is derived on every request and stored nowhere.
+ */
+export const identityFacts = defineFacts('core', {
+  member: factDecl(),
 })
 
 const account = z.object({ accountId: z.string() })

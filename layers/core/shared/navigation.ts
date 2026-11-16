@@ -48,7 +48,8 @@ export interface NavItem {
   to: string
   icon: string
   match?: string
-  count?: string
+  /** The number shown beside the label: the count for this viewer. */
+  count?: number
   order: number
 }
 

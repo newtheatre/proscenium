@@ -148,7 +148,8 @@ a module that is switched on. Payloads hold ids, numbers, enums and `code()` val
 person's words. Jobs run from two queues (`prompt` and `bulk`); the job row is the truth, so a
 duplicate message runs once and a lost one is sent again by the sweep. A failed job is retried
 with back-off (`core.jobs.backoff`) and is dead after its attempts, announcing `core.job.died`.
-Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
+Core alone may declare `events.listens: { deliverable: '<listener>' }`, the listener on
+`'deliverable'`: it hears every event not marked `internal: true`, for the webhook sender. Stored states are queued, running, done, dead and cancelled; `cancelJob` (route
 `POST /api/core/jobs/<id>/cancel`, ability `core.job.manage`) cancels a job that has not started. A
 switched-off module's jobs wait. Tasks are declared with `every`, `dailyAt` or `weeklyOn` in the
 theatre's time zone (UTC until setup sets it); the cron trigger runs only the latest due slot, once.
@@ -164,12 +165,88 @@ names a `menu` (account, members, console or live) and may set `hideEmpty` besid
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
 
+## Requirements
+
+A module that can judge a condition contributes a source to `core.requirement` under its own id,
+in `server/contributions/core.requirement/<id>.ts`:
+`export default defineRequirementSource({ options, describe, check, holder?, holderAbility?, checkAbility? })`.
+A host stores references as text, `<source>:<id>`, or `fact:<name>` for a fact, which core
+answers. It asks with
+`requirements.check({ accounts, refs, at?, record?, presented?, whenUnavailable })`, and every pair
+of account and reference gets `{ verdict: 'met' | 'not-met', unavailable, until?, reason?, summary?,
+evidence?, help?, quantity? }`. `whenUnavailable` is required: `'met'` where the requirement
+restricts who may do something, `'not-met'` where it grants a benefit. A source that is off, absent
+or fails answers unavailable. `quantity` (a whole number, nought or more) is kept only on a met
+verdict. With `checkAbility`, a check about any account but the actor's own reaches the source only
+if the actor holds that ability, and the read is audited against the account; a job or task never
+holds it. A check carrying a typed value counts against the `presented-value` rate-limit class, by
+session and by address; past it, those pairs answer not met and the source is not called.
+`requirements.holder(ref, evidence)` gives staff with the source's `holderAbility` a display name,
+and audits the read.
+
+## Email outcomes
+
+Cloudflare Email Sending reports each message's outcome (delivered, bounced, complained and so on)
+to a second queue, `EMAIL_EVENTS` (`<worker>-email-events`), through the sending domain's event
+subscription, a setup step in the dashboard. The Worker's queue handler sends that queue's batches
+to `handleEmailEvents`, which hands each message to core's consumer, `core.email-events`
+(`layers/core/server/email-events.ts`), with a unit of work of its own. The consumer answers
+`'done'` (the unit commits and the message is acknowledged) or `'not-yet'` when the send is not
+recorded yet, since an outcome can arrive 0.6 seconds after `send()`. The message is then tried again
+after 5 seconds; a throw waits 30. After five tries the message is set aside in
+`<worker>-email-events-dead`. The body names the recipient and the subject, so only the queue
+message's id and the event's type are ever logged.
+
+## Public components
+
+A module offers a component to the fork's Markdown pages through `core.public-component`:
+`{ id, component: 'CoreAccessApplication', alias: 'access-application' }`. The component's own name
+starts with its module's name; the alias is what a content file writes (`::access-application`),
+kebab-case, unique across modules and never an HTML element's name. The build refuses a clash, and
+the core layer registers the component a second time, globally, under its alias.
+
 ## External calls
 
 `externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency
 key, then records the outcome and applies it through the module's `outcome` handler. A call that
 throws or times out leaves the attempt with no outcome; the `reconcile` handler asks the provider
 later. Nothing is shown as done before its outcome commits.
+
+## Signing
+
+A module that issues codes a device must check with no connection (door codes, membership cards)
+declares a purpose and signs under it; the kit owns the keys (F-37):
+
+```ts
+signing: [{ purpose: 'box-office.door-code', rotateEvery: '90d', keepFor: '1460d' }],
+```
+
+```ts
+import { signing } from '#kit/signing'
+// What is signed may name the key: pass a function of the key id, and the key named is the one that signs.
+const { keyId, signature } = await signing.sign('box-office.door-code', keyId => `tkt.${keyId}.${code}`)
+const genuine = await signing.verify('box-office.door-code', keyId, `tkt.${keyId}.${code}`, signature)
+const keys = await signing.publicKeys('box-office.door-code') // for the device's offline data
+```
+
+- Keys are ECDSA on P-256 with SHA-256 (`ES256`). A signature is 64 bytes (r and s), base64url; a
+  public key is the 65-byte uncompressed point, base64url, which a browser imports with
+  `crypto.subtle.importKey('raw', bytes, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify'])`.
+- The first signature under a purpose makes its key. The daily task `core.rotate-signing-keys`
+  makes a new current key every `rotateEvery`; the old key then only checks, for `keepFor` counted
+  from when it stopped signing, so anything signed can be checked for at least `keepFor`. After
+  that it is retired and checks nothing.
+- The private part is sealed with `CORE_ENCRYPTION_KEY` in `core_signing_keys` and never leaves it.
+  It is erased as soon as the key stops signing. Public parts are kept for ever.
+- An Owner can retire a key at once (`POST /api/core/signing-keys/:id/retire`, ability
+  `core.signing-key.retire`). Without `{ confirm: true }` it refuses with
+  `core.signing-key.confirm-needed`, whose reason says what retiring would invalidate. Retiring the
+  current key makes a new one straight away. `GET /api/core/signing-keys` (`core.health.view`)
+  lists the keys in use with their dates and the same sentence, for the Health screen.
+- A route signs only under its own module's purposes. A module that adds a kind of code to another
+  module's point signs through that point, so the host makes the call.
+- A signature proves the theatre issued a code. It does not prove what the code stands for is still
+  valid, and a signed code is not a secret.
 
 ## Settings
 
@@ -223,10 +300,13 @@ in the specification's "As built" list; this guide is the reference from here on
 - External calls are declared in the manifest's `calls` section, each with a handler file.
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning
   old history is the daily task `core.prune-history`.
-- Rate limits are counted per Worker instance in memory, with the limits as core settings. This
-  is accepted for the kit gate only: one instance does not see another's counts, so it does not
-  protect sign-in or public forms. Before the first release the `sign-in` and `public-form`
-  classes must count in a shared store, starting from Cloudflare's rate limiting binding (F-36).
+- Rate limits (F-36): each class's allowance is the `rate` setting `core.rate-limits.<class>`, a
+  count in a period. `sign-in`, `public-form` and `presented-value` count in the RateLimitCounter
+  Durable Object (binding `RATE_LIMITS`), one object per class and caller, shared by every
+  instance; the others count in memory in each instance. Cloudflare's rate limiting binding was
+  evaluated and not used: its period is fixed at deploy to 10 or 60 seconds and its counts are
+  approximate and kept per location. Call `countAgainstRate(class, who)`; it answers
+  `{ allowed, retryAfter }`.
 - Pending migrations are applied automatically only where `PROSCENIUM_AUTO_MIGRATE=1` (dev,
   preview and tests). It is not a production option and is removed when F-28's maintenance page
   and Apply button land.

@@ -2,6 +2,7 @@
 // modules which are switched on contribute, plus a settings page generated for each module that
 // has settings. The menu and the guard agree because they read the same declaration.
 import { can, usePoint, type Actor, type Decision } from '#kit'
+import { shows } from './counts'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import {
@@ -13,6 +14,8 @@ export interface DeclaredEntry extends NavigationEntry {
   module: string
   /** A label key of its own, for entries the platform generates. */
   label?: string
+  /** The entry's count for this viewer, when it has one. */
+  countValue?: number
 }
 
 /** Core's own screens (modules, settings, jobs, credentials, health, audit) sit in the System group. */
@@ -74,7 +77,10 @@ export async function allowedEntries(actor: Actor, shell: ShellName): Promise<De
   const out: DeclaredEntry[] = []
   for (const entry of await declaredEntries()) {
     if (entry.menu !== shell) continue
-    if (holds(await mayOpen(actor, entry))) out.push(entry)
+    if (!holds(await mayOpen(actor, entry))) continue
+    // Hiding an empty entry is tidiness: the address still opens (the guard does not look at counts).
+    const { show, value } = await shows(entry, actor)
+    if (show) out.push({ ...entry, countValue: value })
   }
   return out
 }
@@ -82,7 +88,7 @@ export async function allowedEntries(actor: Actor, shell: ShellName): Promise<De
 const byOrder = (a: NavItem, b: NavItem) => a.order - b.order || a.id.localeCompare(b.id)
 
 function item(entry: DeclaredEntry): NavItem {
-  return { id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.count, order: entry.order ?? 0 }
+  return { id: entry.id, label: entry.label ?? entryLabelKey(entry.id), to: entry.to, icon: entry.icon, match: entry.match, count: entry.countValue, order: entry.order ?? 0 }
 }
 
 /** The flat list for a shell without groups, or the grouped sidebar for the console. */

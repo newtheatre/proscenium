@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f2eb8762-4455-4bb7-8926-fc151b917ac9",
+  "id": "f39fb455-d19c-415f-8f32-bef757dd2f0f",
   "prevIds": [
-    "bf5de3ce-afa2-4dc4-96ed-14d5b94e4551"
+    "52849583-0382-4463-8ab3-fb002c267030"
   ],
   "ddl": [
     {
@@ -32,18 +32,6 @@
     },
     {
       "name": "core_credentials",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_data_request_checks",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_data_requests",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_email_suppressions",
       "entityType": "tables"
     },
     {
@@ -83,10 +71,6 @@
       "entityType": "tables"
     },
     {
-      "name": "core_inbox_items",
-      "entityType": "tables"
-    },
-    {
       "name": "core_jobs",
       "entityType": "tables"
     },
@@ -99,19 +83,7 @@
       "entityType": "tables"
     },
     {
-      "name": "core_notification_deliveries",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_notification_preferences",
-      "entityType": "tables"
-    },
-    {
       "name": "core_notification_routing",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_notifications",
       "entityType": "tables"
     },
     {
@@ -151,15 +123,11 @@
       "entityType": "tables"
     },
     {
+      "name": "core_signing_keys",
+      "entityType": "tables"
+    },
+    {
       "name": "core_task_runs",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_terms",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_vocabularies",
       "entityType": "tables"
     },
     {
@@ -885,246 +853,6 @@
     {
       "table": "core_credentials",
       "name": "hint",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_request_checks",
-      "name": "request_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_request_checks",
-      "name": "table_name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_request_checks",
-      "name": "outcome",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_request_checks",
-      "name": "ticked_by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_request_checks",
-      "name": "ticked_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "kind",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "requested_by",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "requested_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "identity_check",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "respond_by",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "not_before",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "holds",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "file_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "finished_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "closed_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "closed_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_email_suppressions",
-      "name": "address_hash",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_email_suppressions",
-      "name": "reason",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_email_suppressions",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_email_suppressions",
-      "name": "lifted_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_email_suppressions",
-      "name": "lifted_by",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -1923,116 +1651,6 @@
       "entityType": "columns"
     },
     {
-      "table": "core_inbox_items",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "delivery_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "side",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "title",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "body",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "link",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "read_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "archived_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "expires_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "core_jobs",
       "name": "id",
       "type": "text",
@@ -2303,216 +1921,6 @@
       "entityType": "columns"
     },
     {
-      "table": "core_notification_deliveries",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "notification_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "side",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "channel",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "state",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "reason",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "template_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "sender_key",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "provider_ref",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "attempts",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "next_attempt_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "last_error",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "rolled_into_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "sent_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "account_id",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "topic_key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "channel",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "side",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "enabled",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "digest",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'immediate'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
       "table": "core_notification_routing",
       "name": "topic_key",
       "type": "text",
@@ -2526,146 +1934,6 @@
       "table": "core_notification_routing",
       "name": "sender_key",
       "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "type_key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "side",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "account_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "address",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "locale",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "subject_type",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "subject_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "dedupe_key",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "coalesce_key",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "payload",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "sealed_variables",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "actor_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_notifications",
-      "name": "created_at",
-      "type": "integer",
       "notNull": true,
       "autoincrement": false,
       "default": null,
@@ -3323,6 +2591,86 @@
       "entityType": "columns"
     },
     {
+      "table": "core_signing_keys",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_signing_keys",
+      "name": "purpose",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_signing_keys",
+      "name": "public_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_signing_keys",
+      "name": "private_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_signing_keys",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_signing_keys",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_signing_keys",
+      "name": "checking_from",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_signing_keys",
+      "name": "retired_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_task_runs",
       "name": "task",
       "type": "text",
@@ -3379,186 +2727,6 @@
       "notNull": false,
       "autoincrement": false,
       "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "vocabulary_key",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "slug",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "label",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "description",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "icon",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "sort",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "0",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "seeded",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "retired_at",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "merged_into_id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_terms",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "key",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "owner",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "label",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "description",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "ordering",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'manual'",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "locked",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "term_class",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "'public'",
       "generated": null,
       "entityType": "columns"
     },
@@ -3700,46 +2868,6 @@
         },
         {
           "value": "at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "core_data_requests_account",
-      "columns": [
-        {
-          "value": "account_id",
-          "isExpression": false
-        },
-        {
-          "value": "kind",
-          "isExpression": false
-        },
-        {
-          "value": "state",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_data_requests",
-      "name": "core_data_requests_state",
-      "columns": [
-        {
-          "value": "state",
-          "isExpression": false
-        },
-        {
-          "value": "not_before",
           "isExpression": false
         }
       ],
@@ -3913,32 +3041,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "core_inbox_items",
-      "name": "core_inbox_items_account",
-      "columns": [
-        {
-          "value": "account_id",
-          "isExpression": false
-        },
-        {
-          "value": "side",
-          "isExpression": false
-        },
-        {
-          "value": "archived_at",
-          "isExpression": false
-        },
-        {
-          "value": "created_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "core_jobs",
       "name": "core_jobs_dedupe",
       "columns": [
@@ -3966,106 +3068,6 @@
         },
         {
           "value": "run_after",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "core_notification_deliveries_channel",
-      "columns": [
-        {
-          "value": "notification_id",
-          "isExpression": false
-        },
-        {
-          "value": "channel",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "core_notification_deliveries_due",
-      "columns": [
-        {
-          "value": "state",
-          "isExpression": false
-        },
-        {
-          "value": "next_attempt_at",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "core_notification_deliveries_provider",
-      "columns": [
-        {
-          "value": "provider_ref",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_notifications",
-      "name": "core_notifications_dedupe",
-      "columns": [
-        {
-          "value": "dedupe_key",
-          "isExpression": false
-        }
-      ],
-      "isUnique": true,
-      "where": "\"core_notifications\".\"dedupe_key\" IS NOT NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_notifications",
-      "name": "core_notifications_subject",
-      "columns": [
-        {
-          "value": "subject_type",
-          "isExpression": false
-        },
-        {
-          "value": "subject_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_notifications",
-      "name": "core_notifications_account",
-      "columns": [
-        {
-          "value": "account_id",
-          "isExpression": false
-        },
-        {
-          "value": "created_at",
           "isExpression": false
         }
       ],
@@ -4223,51 +3225,29 @@
       "entityType": "indexes"
     },
     {
-      "table": "core_terms",
-      "name": "core_terms_slug",
+      "table": "core_signing_keys",
+      "name": "core_signing_keys_current",
       "columns": [
         {
-          "value": "vocabulary_key",
-          "isExpression": false
-        },
-        {
-          "value": "slug",
+          "value": "purpose",
           "isExpression": false
         }
       ],
       "isUnique": true,
-      "where": null,
+      "where": "state = 'current'",
       "origin": "manual",
       "entityType": "indexes"
     },
     {
-      "table": "core_terms",
-      "name": "core_terms_live_label",
+      "table": "core_signing_keys",
+      "name": "core_signing_keys_purpose",
       "columns": [
         {
-          "value": "vocabulary_key",
+          "value": "purpose",
           "isExpression": false
         },
         {
-          "value": "lower(\"label\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": "\"core_terms\".\"retired_at\" IS NULL",
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_terms",
-      "name": "core_terms_order",
-      "columns": [
-        {
-          "value": "vocabulary_key",
-          "isExpression": false
-        },
-        {
-          "value": "sort",
+          "value": "state",
           "isExpression": false
         }
       ],
@@ -4283,21 +3263,6 @@
         "merge_id"
       ],
       "tableTo": "core_account_merges",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_data_request_checks",
-      "name": "fk_core_data_request_checks_request_id_core_data_requests_id_fk",
-      "columns": [
-        "request_id"
-      ],
-      "tableTo": "core_data_requests",
       "columnsTo": [
         "id"
       ],
@@ -4337,66 +3302,6 @@
       "entityType": "fks"
     },
     {
-      "table": "core_inbox_items",
-      "name": "fk_core_inbox_items_delivery_id_core_notification_deliveries_id_fk",
-      "columns": [
-        "delivery_id"
-      ],
-      "tableTo": "core_notification_deliveries",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "fk_core_notification_deliveries_notification_id_core_notifications_id_fk",
-      "columns": [
-        "notification_id"
-      ],
-      "tableTo": "core_notifications",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "fk_core_notification_deliveries_sender_key_core_sender_identities_key_fk",
-      "columns": [
-        "sender_key"
-      ],
-      "tableTo": "core_sender_identities",
-      "columnsTo": [
-        "key"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "fk_core_notification_deliveries_rolled_into_id_core_notifications_id_fk",
-      "columns": [
-        "rolled_into_id"
-      ],
-      "tableTo": "core_notifications",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "SET NULL",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
       "table": "core_notification_routing",
       "name": "fk_core_notification_routing_sender_key_core_sender_identities_key_fk",
       "columns": [
@@ -4418,36 +3323,6 @@
         "role_id"
       ],
       "tableTo": "core_roles",
-      "columnsTo": [
-        "id"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "NO ACTION",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_terms",
-      "name": "fk_core_terms_vocabulary_key_core_vocabularies_key_fk",
-      "columns": [
-        "vocabulary_key"
-      ],
-      "tableTo": "core_vocabularies",
-      "columnsTo": [
-        "key"
-      ],
-      "onUpdate": "NO ACTION",
-      "onDelete": "RESTRICT",
-      "nameExplicit": false,
-      "entityType": "fks"
-    },
-    {
-      "table": "core_terms",
-      "name": "fk_core_terms_merged_into_id_core_terms_id_fk",
-      "columns": [
-        "merged_into_id"
-      ],
-      "tableTo": "core_terms",
       "columnsTo": [
         "id"
       ],
@@ -4479,16 +3354,6 @@
       "entityType": "pks"
     },
     {
-      "table": "core_data_request_checks",
-      "name": "core_data_request_checks_pk",
-      "columns": [
-        "request_id",
-        "table_name"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "core_fact_abilities",
       "name": "core_fact_abilities_pk",
       "columns": [
@@ -4515,17 +3380,6 @@
       "columns": [
         "owner",
         "name"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "core_notification_preferences_pk",
-      "columns": [
-        "account_id",
-        "topic_key",
-        "channel"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -4596,24 +3450,6 @@
       "entityType": "pks"
     },
     {
-      "table": "core_data_requests",
-      "name": "core_data_requests_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_email_suppressions",
-      "name": "core_email_suppressions_pk",
-      "columns": [
-        "address_hash"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "core_events",
       "name": "core_events_pk",
       "columns": [
@@ -4659,15 +3495,6 @@
       "entityType": "pks"
     },
     {
-      "table": "core_inbox_items",
-      "name": "core_inbox_items_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "core_jobs",
       "name": "core_jobs_pk",
       "columns": [
@@ -4686,28 +3513,10 @@
       "entityType": "pks"
     },
     {
-      "table": "core_notification_deliveries",
-      "name": "core_notification_deliveries_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "core_notification_routing",
       "name": "core_notification_routing_pk",
       "columns": [
         "topic_key"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_notifications",
-      "name": "core_notifications_pk",
-      "columns": [
-        "id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -4785,19 +3594,10 @@
       "entityType": "pks"
     },
     {
-      "table": "core_terms",
-      "name": "core_terms_pk",
+      "table": "core_signing_keys",
+      "name": "core_signing_keys_pk",
       "columns": [
         "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "core_vocabularies_pk",
-      "columns": [
-        "key"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -4836,12 +3636,6 @@
       "entityType": "checks"
     },
     {
-      "table": "core_email_suppressions",
-      "name": "core_email_suppressions_reason",
-      "value": "\"reason\" IN ('hard_bounce', 'complaint', 'manual')",
-      "entityType": "checks"
-    },
-    {
       "table": "core_files",
       "name": "core_files_byte_size",
       "value": "\"byte_size\" > 0",
@@ -4854,87 +3648,9 @@
       "entityType": "checks"
     },
     {
-      "table": "core_inbox_items",
-      "name": "core_inbox_items_side",
-      "value": "\"side\" IN ('audience', 'members')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "core_inbox_items_title",
-      "value": "length(\"title\") BETWEEN 1 AND 120",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_inbox_items",
-      "name": "core_inbox_items_body",
-      "value": "\"body\" IS NULL OR length(\"body\") <= 500",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "core_notification_deliveries_side",
-      "value": "\"side\" IN ('audience', 'members')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_notification_deliveries",
-      "name": "core_notification_deliveries_state",
-      "value": "\"state\" IN ('queued', 'held', 'sending', 'sent', 'retrying', 'failed', 'suppressed', 'skipped', 'bounced', 'complained')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "core_notification_preferences_side",
-      "value": "\"side\" IN ('audience', 'members')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_notification_preferences",
-      "name": "core_notification_preferences_digest",
-      "value": "\"digest\" IN ('immediate', 'daily', 'weekly')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_notifications",
-      "name": "core_notifications_side",
-      "value": "\"side\" IN ('audience', 'members')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_notifications",
-      "name": "core_notifications_recipient",
-      "value": "(\"account_id\" IS NULL) <> (\"address\" IS NULL) OR \"payload\" IS NULL",
-      "entityType": "checks"
-    },
-    {
       "table": "core_roles",
       "name": "core_roles_expiry_days",
       "value": "(expiry_rule = 'days') = (expiry_days IS NOT NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_terms",
-      "name": "core_terms_label_length",
-      "value": "length(\"label\") BETWEEN 1 AND 80",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_terms",
-      "name": "core_terms_description_length",
-      "value": "\"description\" IS NULL OR length(\"description\") <= 300",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "core_vocabularies_ordering",
-      "value": "\"ordering\" IN ('manual', 'alphabetical')",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_vocabularies",
-      "name": "core_vocabularies_term_class",
-      "value": "\"term_class\" IN ('public', 'internal')",
       "entityType": "checks"
     }
   ],
