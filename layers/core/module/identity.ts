@@ -74,7 +74,10 @@ export const identityRecords = defineRecords('core', {
 })
 
 export const identityAbilities = defineAbilities('core', {
-  'account.search': ability({ risk: 'normal', grantAt: ['site'] }),
+  'account.search': ability({ risk: 'normal', implies: ['account.find'], grantAt: ['site'] }),
+  // findAccounts, the filter by a person's name or email on another module's list (part 4, "Finding
+  // rows by a person's name or email"). Every use is audited as a read, naming the list.
+  'account.find': ability({ risk: 'normal', fresh: false, audit: 'read', grantAt: ['site'] }),
   'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'], grantAt: ['site'] }),
   'account.create': ability({ risk: 'privileged', implies: ['account.search'], grantAt: ['site'] }),
   'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
