@@ -266,7 +266,7 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
   if (!accountIn.size) return []
   const alt = (names: Iterable<string>) => [...names].sort((a, b) => b.length - a.length).join('|')
   const column = `(?<![\\w])(?:\\w+\\.)?"?(${alt(accountIn.keys())})"?`
-  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope|inAccountScope)\\())'
+  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope(?:Sql)?|inAccountScope)\\())'
   const raw = [
     new RegExp(`${column}\\s*(?:==?|!=|<>)\\s*${value}`, 'gi'),
     new RegExp(`${column}\\s+IS\\s+(?:NOT\\s+)?${value}`, 'gi'),
