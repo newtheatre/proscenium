@@ -1,6 +1,6 @@
 # 7. Stories
 
-Thirty-eight stories, COM-01 to COM-38: 21 for the module's first release, of which 6 are gate stories, and 17 later. A gate story must be finished and proved before the stories that rest on it start.
+Thirty-nine stories, COM-01 to COM-39: 21 for the module's first release, of which 6 are gate stories, and 18 later. A gate story must be finished and proved before the stories that rest on it start.
 
 Every story is done only when its named tests in part 8 pass, its strings have British English translations, and `bun run check` is clean.
 
@@ -76,6 +76,7 @@ Communications is a second-round module, after roadmap phase 3. It rests on core
 | COM-36 | a marketing lead | to send a correction to those who got a mailing, or the rest to those who did not | The campaign-recipients source selects by an earlier campaign and outcome | COM-19 |
 | COM-37 | a subscriber | to read past mailings on the website | A list may publish an archive of its sent mailings, per list and off by default | COM-17 |
 | COM-38 | a marketing lead | to know which links were followed, in total | Aggregate counts per link with no per-person record. Opens are never tracked | COM-17 |
+| COM-39 | a member of staff | to put a "before you come" panel for a production or performance into a notice or a mailing | A before-you-come block reads core's beforeYouCome(productionId, performanceId?) when sending starts and renders all of it and nothing else: the age guidance, the staging effects, those not used at this performance, and a link to the production page. It never names or counts a content warning, only says that the page has them. It is not promotional, so a notice may carry it. When the read says empty it renders nothing | COM-12, core's content warnings slice |
 
 ## If the first release has to shrink
 
