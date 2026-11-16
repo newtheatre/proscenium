@@ -15,7 +15,10 @@ const next = nextPath(route.query.next)
 const refusal = ref<Refusal | null>(null)
 const busy = ref(false)
 const address = ref('')
-const code = ref('')
+const CODE_LENGTH = 6 // not-policy: the length of the code the server sends
+// One box a digit; the request takes them as one string.
+const digits = ref<number[]>([])
+const code = computed(() => digits.value.join(''))
 const challenge = ref('')
 const sent = ref(false)
 const { data: me } = useNuxtData<{ signedIn: boolean, signIn?: { email: boolean, google: boolean } }>('core:me')
@@ -141,11 +144,11 @@ async function useCode() {
           label="Six-digit code"
           name="code"
         >
-          <UInput
-            v-model="code"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            pattern="[0-9]{6}"
+          <UPinInput
+            v-model="digits"
+            otp
+            type="number"
+            :length="CODE_LENGTH"
             required
           />
         </UFormField>
