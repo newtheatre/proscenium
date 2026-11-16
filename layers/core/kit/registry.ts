@@ -1,7 +1,7 @@
 // The registry: every module's manifest and handler files, collected by the build into
 // .generated/registry.ts and checked here across modules (F-02).
 import { DeclarationError } from './refusal'
-import { DELIVERABLE, snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl } from './manifest'
+import { DELIVERABLE, snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
 import type { SettingEntry, SettingRule } from './settings'
 import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
@@ -39,13 +39,15 @@ export interface Registry {
   tasks: Map<string, { module: string, decl: TaskDecl }>
   calls: Map<string, { module: string, decl: CallDecl }>
   points: Map<string, { module: string, decl: PointDecl }>
+  /** Signing purposes (F-37), by purpose. */
+  signing: Map<string, { module: string, decl: SigningDecl }>
 }
 
 /** The events, jobs and tasks of the core itself are always present, so other modules may name them. */
 export function buildRegistry(entries: ModuleEntry[]): Registry {
   const r: Registry = {
     modules: new Map(), settings: new Map(), settingRules: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
-    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(),
+    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(),
   }
   const fail = (entry: ModuleEntry, field: string, message: string): never => {
     throw new DeclarationError(field, message, `${entry.root}/module.ts`)
@@ -90,6 +92,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
     for (const [key, decl] of Object.entries(m.jobs ?? {})) add(r.jobs, entry, 'jobs', key, { module: id, decl })
     for (const [key, decl] of Object.entries(m.tasks ?? {})) add(r.tasks, entry, 'tasks', key, { module: id, decl })
     for (const [key, decl] of Object.entries(m.calls ?? {})) add(r.calls, entry, 'calls', key, { module: id, decl })
+    for (const decl of m.signing ?? []) add(r.signing, entry, 'signing', decl.purpose, { module: id, decl })
     for (const [key, decl] of Object.entries(m.points ?? {})) add(r.points, entry, 'points', key, { module: id, decl })
   }
 

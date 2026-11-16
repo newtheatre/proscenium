@@ -61,6 +61,26 @@ export const points = {
       keywords: z.string().optional(),
     }).strict(),
   }),
+  // A section of My account (or of a member's own pages, or of a person's page in the console). The
+  // component is a name the app resolves; `count` with the section's own hiding is the same as an entry's.
+  'core.account-section': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      target: z.enum(['account', 'console-person']),
+      side: z.enum(['audience', 'members']),
+      ability,
+      component: z.string(),
+      order: z.number().int(),
+      to: z.string().startsWith('/').optional(),
+      icon: z.string().optional(),
+      count: z.string().optional(),
+      hideEmpty: z.boolean().optional(),
+    }).strict().refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] }),
+  }),
+  // A registered count, shown beside a menu entry or on a card. A module registers its own; another
+  // module's is named by it. The contribution says how to count for the person asking.
+  'core.count': point({ kind: 'code', contract: 'count' }),
   'core.setup-step': point({
     kind: 'data',
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),

@@ -83,6 +83,25 @@ the server for actions and sources when it is first opened, not on every page.
   page with the setting highlighted (`?setting=<key>`). Settings on pages the viewer may not open,
   sensitive settings and settings of modules that are off are never listed.
 
+## Members' area, My account and counts
+
+- **Members' area** (`/members`, layout `members.vue`): a top bar of sections on a laptop; below 640
+  pixels a bottom bar of the first four plus More. Its entries are `core.navigation` entries with
+  `menu: 'members'`. With `core.members-area.enabled` off, or for anyone for whom the fact
+  `core.member` is not true, every `/members` address answers "not found". The name shown is
+  `core.members-area.name`.
+- **My account** (`/account`): the same page for everyone signed in. A module adds a section through
+  `core.account-section` (`target`, `side`, `ability`, `component`, `order`, optional `to`, `icon`,
+  `count`, `hideEmpty`). The `component` is the file name of a component in the module's
+  `app/account-sections/` folder; it receives `headingId` for its heading. A module that is off
+  leaves nothing behind.
+- **Counts**: a module registers one through `core.count` (a code point; the contribution's `value(actor)`
+  returns a number; a count that fails reads as zero). An entry or section names it with `count`, and
+  with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.
+- **Colour mode**: `core.appearance.default` is what a first-time visitor sees; a person's own choice
+  from the menu is kept; `let-people-choose` off removes the choice; `public-dark` off keeps the public
+  pages light.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the

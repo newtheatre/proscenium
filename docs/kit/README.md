@@ -80,6 +80,28 @@ Any module may import core's services without listing core: `import { notifyAddr
   core). It throws on failure, so your job retries; nothing is sent until the sending domain is set
   and verified. In tests, `setMailer(fn)` from `layers/core/server/notifications/mailer.ts`
   records messages instead of sending them.
+- `notify(unit, typeKey, { to, variables?, dedupeKey?, senderKey?, subject? })` tells accounts
+  something (C-29). `to` is an account id or a set of them, each optionally
+  `{ accountId, variables?, dedupeKey? }`. It adds the notifications, their deliveries and inbox
+  items to your unit set-wise (a handful of statements up to `core.units.set-rows-limit`), so they
+  exist only if your change is saved. Email goes out after the commit from the job
+  `core.send-notifications`, at the address `addressesFor` gives for the type's side, and is
+  retried with back-off; the inbox item is written at once. A repeat with the same dedupe key for
+  the same type and account writes nothing and returns the earlier id. A channel the person
+  switched off for an optional type's topic is recorded as suppressed; no address, an address on
+  the suppression list or the type's module being off as skipped. Declare `channels: ['email',
+  'inbox']` and, for the inbox, `link: '/path/{{ variable }}'`. The variables are cleared once no
+  delivery needs them. A variable of kind `sealed` (a link that signs someone in, say) is kept
+  encrypted in its own column, never in the payload, and cleared in the same unit that moves the
+  email to a final state, or after seven days at most. A type with a sealed variable is email only;
+  declaring one with another channel is refused at start-up. A cleared notification is not re-sent.
+  Cloudflare's later reports arrive on the EMAIL_EVENTS queue and are matched by the message id
+  `send()` returned: a hard bounce or a complaint marks the delivery Bounced or Complained,
+  announces `core.delivery.bounced` or `.complained`, and puts the address on core's suppression
+  list, which is what stops the next send (Cloudflare does not, soon enough). The task
+  `core.sweep-notifications` frees deliveries stuck in Sending, re-queues lost ones, clears a
+  notification's payload once every delivery is finished and any sealed variables left after seven
+  days.
 - `operatingDayOf(instant)` and `dayBounds(day)`: the theatre's operating day, which rolls over at
   `core.locale.day-start`. A table that stores one contributes to `core.operating-day`, so
   it is recalculated when the time zone or the rollover changes.
@@ -169,12 +191,69 @@ session and by address; past it, those pairs answer not met and the source is no
 `requirements.holder(ref, evidence)` gives staff with the source's `holderAbility` a display name,
 and audits the read.
 
+## Email outcomes
+
+Cloudflare Email Sending reports each message's outcome (delivered, bounced, complained and so on)
+to a second queue, `EMAIL_EVENTS` (`<worker>-email-events`), through the sending domain's event
+subscription, a setup step in the dashboard. The Worker's queue handler sends that queue's batches
+to `handleEmailEvents`, which hands each message to core's consumer, `core.email-events`
+(`layers/core/server/email-events.ts`), with a unit of work of its own. The consumer answers
+`'done'` (the unit commits and the message is acknowledged) or `'not-yet'` when the send is not
+recorded yet, since an outcome can arrive 0.6 seconds after `send()`. The message is then tried again
+after 5 seconds; a throw waits 30. After five tries the message is set aside in
+`<worker>-email-events-dead`. The body names the recipient and the subject, so only the queue
+message's id and the event's type are ever logged.
+
+## Public components
+
+A module offers a component to the fork's Markdown pages through `core.public-component`:
+`{ id, component: 'CoreAccessApplication', alias: 'access-application' }`. The component's own name
+starts with its module's name; the alias is what a content file writes (`::access-application`),
+kebab-case, unique across modules and never an HTML element's name. The build refuses a clash, and
+the core layer registers the component a second time, globally, under its alias.
+
 ## External calls
 
 `externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency
 key, then records the outcome and applies it through the module's `outcome` handler. A call that
 throws or times out leaves the attempt with no outcome; the `reconcile` handler asks the provider
 later. Nothing is shown as done before its outcome commits.
+
+## Signing
+
+A module that issues codes a device must check with no connection (door codes, membership cards)
+declares a purpose and signs under it; the kit owns the keys (F-37):
+
+```ts
+signing: [{ purpose: 'box-office.door-code', rotateEvery: '90d', keepFor: '1460d' }],
+```
+
+```ts
+import { signing } from '#kit/signing'
+// What is signed may name the key: pass a function of the key id, and the key named is the one that signs.
+const { keyId, signature } = await signing.sign('box-office.door-code', keyId => `tkt.${keyId}.${code}`)
+const genuine = await signing.verify('box-office.door-code', keyId, `tkt.${keyId}.${code}`, signature)
+const keys = await signing.publicKeys('box-office.door-code') // for the device's offline data
+```
+
+- Keys are ECDSA on P-256 with SHA-256 (`ES256`). A signature is 64 bytes (r and s), base64url; a
+  public key is the 65-byte uncompressed point, base64url, which a browser imports with
+  `crypto.subtle.importKey('raw', bytes, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify'])`.
+- The first signature under a purpose makes its key. The daily task `core.rotate-signing-keys`
+  makes a new current key every `rotateEvery`; the old key then only checks, for `keepFor` counted
+  from when it stopped signing, so anything signed can be checked for at least `keepFor`. After
+  that it is retired and checks nothing.
+- The private part is sealed with `CORE_ENCRYPTION_KEY` in `core_signing_keys` and never leaves it.
+  It is erased as soon as the key stops signing. Public parts are kept for ever.
+- An Owner can retire a key at once (`POST /api/core/signing-keys/:id/retire`, ability
+  `core.signing-key.retire`). Without `{ confirm: true }` it refuses with
+  `core.signing-key.confirm-needed`, whose reason says what retiring would invalidate. Retiring the
+  current key makes a new one straight away. `GET /api/core/signing-keys` (`core.health.view`)
+  lists the keys in use with their dates and the same sentence, for the Health screen.
+- A route signs only under its own module's purposes. A module that adds a kind of code to another
+  module's point signs through that point, so the host makes the call.
+- A signature proves the theatre issued a code. It does not prove what the code stands for is still
+  valid, and a signed code is not a secret.
 
 ## Settings
 
@@ -228,16 +307,27 @@ in the specification's "As built" list; this guide is the reference from here on
 - External calls are declared in the manifest's `calls` section, each with a handler file.
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning
   old history is the daily task `core.prune-history`.
-- Rate limits are counted per Worker instance in memory, with the limits as core settings. This
-  is accepted for the kit gate only: one instance does not see another's counts, so it does not
-  protect sign-in or public forms. Before the first release the `sign-in` and `public-form`
-  classes must count in a shared store, starting from Cloudflare's rate limiting binding (F-36).
+- Rate limits (F-36): each class's allowance is the `rate` setting `core.rate-limits.<class>`, a
+  count in a period. `sign-in`, `public-form` and `presented-value` count in the RateLimitCounter
+  Durable Object (binding `RATE_LIMITS`), one object per class and caller, shared by every
+  instance; the others count in memory in each instance. Cloudflare's rate limiting binding was
+  evaluated and not used: its period is fixed at deploy to 10 or 60 seconds and its counts are
+  approximate and kept per location. Call `countAgainstRate(class, who)`; it answers
+  `{ allowed, retryAfter }`.
 - Pending migrations are applied automatically only where `PROSCENIUM_AUTO_MIGRATE=1` (dev,
   preview and tests). It is not a production option and is removed when F-28's maintenance page
   and Apply button land.
 - In phase 1 `notifyAddress` sends at once, inside the caller's job, so the job's lane is the lane;
   a notification type's `lane` takes effect with the full pipeline in phase 2.
 - An upload is one request carrying the bytes, rather than a begun upload and a second request.
+- `core_notifications` has the account as its subject; the spec's `{ account, email }` subject
+  is not a form the kit allows, and the `address` column is used only once `notifyAddress` joins
+  the pipeline. Phase 1's `notifyAddress` still sends at once and records nothing.
+- The suppression list's keyed hash uses `CORE_SESSION_KEY`, so rotating that secret empties
+  the list in effect.
+- Digests are not built yet: a preference of `daily` or `weekly` is treated as `immediate`.
+- On a merge, a notification preference moves to the survivor unless the survivor has one for the
+  same topic and channel, which stands; it is not restored by undoing the merge.
 - Vocabulary terms keep `slug`, `label`, `description` and `icon` as public columns rather than per-row
   columns classed by the vocabulary's `term_class`: a per-row column needs a subject, which
   `core_terms` does not have. No vocabulary core ships is internal; one that is waits on the kit

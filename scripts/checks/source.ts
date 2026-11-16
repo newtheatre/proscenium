@@ -203,6 +203,15 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
   for (const m of modules) {
     for (const entry of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.navigation'] ?? []) entries.push(entry)
   }
+  // A count named by an entry or a section is registered by some module's core.count contribution.
+  const counts = new Set<string>()
+  for (const m of modules) for (const c of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.count'] ?? []) counts.add(c.id)
+  for (const m of modules) {
+    const contributes = (m.manifest.contributes ?? {}) as Record<string, any[]>
+    for (const point of ['core.navigation', 'core.account-section']) {
+      for (const e of contributes[point] ?? []) if (e.count && !counts.has(e.count)) problems.push(`${m.found.root}: ${point} ${e.id} names the count "${e.count}", which no module registers in core.count`)
+    }
+  }
   const withSettings = new Set<string>()
   for (const { module } of registry.settings.values() as Iterable<{ module: string }>) withSettings.add(module)
   for (const module of withSettings) entries.push({ to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings` })

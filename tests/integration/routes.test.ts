@@ -8,7 +8,8 @@ import indexSearch from '../../layers/core/server/api/core/settings/index-search
 import putModule from '../../layers/core/server/api/core/modules/[id].put'
 import sell from '../fixtures/modules/seats/server/api/seats/[id]/sell.post'
 import { resetRateLimits } from '#kit/ratelimit'
-import { call, performance, person, rows, server, setModule } from './helpers'
+import { changeSetting, createUnit } from '#kit'
+import { call, inContext, performance, person, rows, server, setModule } from './helpers'
 
 const handle = server({
   'GET /api/core/health': health,
@@ -93,11 +94,28 @@ describe('routes (F-04)', () => {
   })
 
   it('limits the rate per person with a 429 and Retry-After', async () => {
-    const actor = person(['core.settings.manage'])
-    const statuses: number[] = []
-    for (let i = 0; i < 31; i++) statuses.push((await call(handle, 'PUT', '/api/core/settings/core.jobs.attempts', { actor, body: { value: 5 } })).status)
-    expect(statuses.slice(0, 30).every(s => s === 200)).toBe(true)
-    expect(statuses[30]).toBe(429)
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'core.rate-limits.write', { count: 5, per: '1m' }, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
+    try {
+      const actor = person(['core.settings.manage'])
+      const responses: Response[] = []
+      for (let i = 0; i < 6; i++) responses.push(await call(handle, 'PUT', '/api/core/settings/core.jobs.attempts', { actor, body: { value: 5 } }))
+      expect(responses.slice(0, 5).every(r => r.status === 200)).toBe(true)
+      expect(responses[5]!.status).toBe(429)
+      const retryAfter = Number(responses[5]!.headers.get('retry-after'))
+      expect(retryAfter).toBeGreaterThan(0)
+      expect(retryAfter).toBeLessThanOrEqual(60)
+    }
+    finally {
+      await inContext(async () => {
+        const unit = createUnit()
+        await changeSetting(unit.view(), 'core.rate-limits.write', null, { reset: true, reason: 'test', confirm: true })
+        await unit.commit()
+      })
+    }
   })
 })
 
