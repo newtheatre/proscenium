@@ -24,6 +24,34 @@ export default defineModule({
       lane: 'prompt',
       variables: { link: 'url', seat: 'text' },
       wording: { 'en-GB': { subject: 'Your ticket for {{ theatre }}', body: 'Your seat is **{{ seat }}**.\n\n[Open your ticket]({{ link }})\n\nSee you soon.' } },
+    }, {
+      // For notify(): a receipt by email and to the inbox, which nobody can switch off.
+      id: 'notify.receipt',
+      category: 'transactional',
+      side: 'audience',
+      channels: ['email', 'inbox'],
+      variables: { order: 'text' },
+      link: '/account/orders/{{ order }}',
+      wording: { 'en-GB': { subject: 'Your order {{ order }}', body: 'Thank you for order **{{ order }}**.' } },
+    }, {
+      // An optional message on the members' side, which a person may switch off.
+      id: 'notify.rota-reminder',
+      category: 'optional',
+      side: 'members',
+      channels: ['email', 'inbox'],
+      topic: 'notify.rota',
+      lane: 'bulk',
+      variables: { shift: 'text' },
+      wording: { 'en-GB': { subject: 'Your shift: {{ shift }}', body: 'You are on the rota for {{ shift }}.' } },
+    }, {
+      // A link that signs someone in: sealed at rest, sent by email only.
+      id: 'notify.invite',
+      category: 'transactional',
+      side: 'members',
+      channels: ['email'],
+      variables: { link: 'sealed' },
+      wording: { 'en-GB': { subject: 'You are invited', body: 'Join the team.\n\n[Accept the invitation]({{ link }})' } },
     }],
+    'core.notification-topic': [{ id: 'notify.rota', side: 'members' }],
   },
 })
