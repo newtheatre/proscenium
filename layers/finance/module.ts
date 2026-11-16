@@ -80,6 +80,12 @@ export default defineModule({
       ],
     }],
     'core.health-check': [{ id: 'finance.unsealed-postings', file: 'unsealed-postings' }],
+    // The console's Money group (Box office specification, part 5), beside Payments' screens.
+    'core.navigation': [
+      { id: 'finance.ledger', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/ledger', icon: 'i-lucide-book-open', ability: 'finance.ledger.view', order: 50 },
+      { id: 'finance.periods', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/periods', icon: 'i-lucide-calendar-check', ability: 'finance.period.close', order: 60 },
+      { id: 'finance.accounts', menu: 'console', group: 'money', section: 'setup', to: '/console/finance/accounts', icon: 'i-lucide-list-tree', ability: 'finance.account.manage', order: 20 },
+    ],
   },
 
   presets: {
