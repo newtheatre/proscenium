@@ -5,3 +5,5 @@ export type { NotifyAddressOptions, NotificationType } from './notifications/sen
 export { getBrand } from './brand/theme'
 export { operatingDayOf, dayBounds, operatingDayAt, operatingDayBounds } from './calendar'
 export { attachFile, detachFile, fileUrl } from './files/service'
+export { addressFor, addressesFor } from './identity/addresses'
+export type { Side } from './identity/addresses'
