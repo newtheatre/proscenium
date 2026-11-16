@@ -60,6 +60,7 @@ export default defineRoute({
       maxLength: entry.maxLength,
       options: entry.options,
       of: entry.of,
+      record: entry.record,
     })
   }
   return { module: input.module ?? null, scope: input.scope ?? null, settings: out }

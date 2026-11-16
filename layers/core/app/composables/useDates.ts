@@ -51,6 +51,9 @@ export function useDates() {
     return first === last ? first : t('core.dates.range', { from: first, to: last })
   }
 
+  /** A month's name from its number, 1 to 12: "August". */
+  const monthName = (month: number) => new Intl.DateTimeFormat(language.value, { month: 'long', timeZone: 'UTC' }).format(Date.UTC(2001, month - 1, 1)) // not-policy: any year, to name a month
+
   /** The zone the date-time fields work in. */
   const zone = computed(() => timeZone.value ?? getLocalTimeZone())
   /** An instant as a local date and time in the theatre's zone ("2027-09-01T19:30"), as some routes take it. */
@@ -59,5 +62,5 @@ export function useDates() {
     return toCalendarDateTime(fromAbsolute(ms, zone.value)).toString().slice(0, 16) // not-policy: the length of a date and time to the minute
   }
 
-  return { language, timeZone, zone, day, dayLong, dayNamed, dateTime, time, range, toLocal }
+  return { language, timeZone, zone, monthName, day, dayLong, dayNamed, dateTime, time, range, toLocal }
 }
