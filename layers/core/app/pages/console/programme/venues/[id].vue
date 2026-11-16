@@ -154,7 +154,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               <UInput
                 v-model="details.name"
                 maxlength="120"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -171,7 +170,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.addressLines"
                 :rows="2"
                 maxlength="300"
-                class="w-full"
               />
             </UFormField>
             <div class="grid gap-4 sm:grid-cols-3">
@@ -179,14 +177,12 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 <UInput
                   v-model="details.locality"
                   maxlength="120"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField label="Postcode">
                 <UInput
                   v-model="details.postcode"
                   maxlength="20"
-                  class="w-full"
                 />
               </UFormField>
               <UFormField
@@ -196,7 +192,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 <UInput
                   v-model="details.country"
                   maxlength="2"
-                  class="w-full"
                 />
               </UFormField>
             </div>
@@ -208,7 +203,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.description"
                 :rows="4"
                 maxlength="4000"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -219,7 +213,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.gettingHere"
                 :rows="3"
                 maxlength="4000"
-                class="w-full"
               />
             </UFormField>
             <UFormField
@@ -230,7 +223,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 v-model="details.accessInfo"
                 :rows="3"
                 maxlength="4000"
-                class="w-full"
               />
             </UFormField>
             <div class="flex flex-wrap gap-2">
@@ -385,7 +377,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <UInput
               v-model="space.name"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -395,7 +386,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
             <USelect
               v-model="space.kindTermId"
               :items="liveKinds"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -426,7 +416,6 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
               v-model="space.accessInfo"
               :rows="2"
               maxlength="4000"
-              class="w-full"
             />
           </UFormField>
         </form>

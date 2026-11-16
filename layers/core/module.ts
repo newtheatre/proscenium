@@ -34,6 +34,7 @@ export default defineModule({
     'core.navigation': [
       { id: 'core.passkey', menu: 'account', to: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 10 },
       { id: 'core.venues', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
+      { id: 'core.closures', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/closures', icon: 'i-lucide-calendar-x', ability: 'core.closure.manage', order: 35 },
       { id: 'core.email', menu: 'console', group: 'system', section: 'setup', to: '/console/system/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
       { id: 'core.seasons', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20 },
@@ -56,6 +57,13 @@ export default defineModule({
       { id: 'forms', icon: 'i-lucide-file-text' },
       { id: 'reports', icon: 'i-lucide-chart-column' },
       { id: 'system', icon: 'i-lucide-settings' },
+      // Site administration's groups (R-33); their order is fixed in shared/navigation.ts.
+      { id: 'theatre', menu: 'admin', icon: 'i-lucide-theater' },
+      { id: 'modules', menu: 'admin', icon: 'i-lucide-blocks' },
+      { id: 'access', menu: 'admin', icon: 'i-lucide-shield-check' },
+      { id: 'email', menu: 'admin', icon: 'i-lucide-mail' },
+      { id: 'connections', menu: 'admin', icon: 'i-lucide-plug' },
+      { id: 'upkeep', menu: 'admin', icon: 'i-lucide-wrench' },
     ],
   },
 

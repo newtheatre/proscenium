@@ -1,13 +1,14 @@
 // What the shells share with the server: the shell prefixes, the fixed order of console groups
 // and the one rule that turns an address into a navigation entry. Pure, so it runs anywhere.
 
-export type ShellName = 'account' | 'members' | 'console' | 'live'
+export type ShellName = 'account' | 'members' | 'console' | 'admin' | 'live'
 
 /** The prefix each shell owns. Everything else belongs to the theatre's own pages. */
 export const SHELL_PREFIXES: Record<ShellName, string> = {
   account: '/account',
   members: '/members',
   console: '/console',
+  admin: '/admin',
   live: '/live',
 }
 
@@ -17,9 +18,12 @@ export const CONSOLE_GROUP_ORDER = [
   'people', 'money', 'communications', 'forms', 'reports', 'system',
 ] as const
 
+/** Site administration's groups (R-33), in their fixed order. Every admin entry but the Overview names one. */
+export const ADMIN_GROUP_ORDER = ['theatre', 'modules', 'access', 'email', 'connections', 'upkeep'] as const
+
 export interface NavigationEntry {
   id: string
-  /** Which of the three shells, or live mode, shows it. */
+  /** Which of the four shells, or live mode, shows it. */
   menu: ShellName
   to: string
   icon: string
@@ -35,6 +39,8 @@ export interface NavigationEntry {
 
 export interface NavigationGroupDecl {
   id: string
+  /** The console's groups by default; 'admin' for Site administration's. */
+  menu?: 'console' | 'admin'
   order?: number
   icon: string
   before?: string
@@ -109,8 +115,8 @@ export function abilityList(ability: string | string[] | undefined): string[] {
  * Puts groups in order: the platform's fixed order first, a theatre's own groups where `before` or
  * `after` places them (at the end otherwise), then each group's entries by `order`.
  */
-export function orderGroups<G extends { id: string, order?: number, before?: string, after?: string }>(groups: readonly G[]): G[] {
-  const fixed = new Map(CONSOLE_GROUP_ORDER.map((id, i) => [id, i * 10] as const))
+export function orderGroups<G extends { id: string, order?: number, before?: string, after?: string }>(groups: readonly G[], order: readonly string[] = CONSOLE_GROUP_ORDER): G[] {
+  const fixed = new Map(order.map((id, i) => [id, i * 10] as const))
   // Every platform group has a place, whether or not this viewer has any entry in it, so a theatre's
   // own group can be placed before or after one that is absent here.
   const position = new Map<string, number>(fixed as Map<string, number>)
@@ -119,12 +125,12 @@ export function orderGroups<G extends { id: string, order?: number, before?: str
   while (rest.length && guard-- > 0) {
     for (const g of [...rest]) {
       const anchor = g.before ?? g.after
-      const base = anchor ? position.get(anchor) : g.order ?? CONSOLE_GROUP_ORDER.length * 10 + 10
+      const base = anchor ? position.get(anchor) : g.order ?? order.length * 10 + 10
       if (base === undefined) continue
       position.set(g.id, g.before ? base - 5 : g.after ? base + 5 : base)
       rest.splice(rest.indexOf(g), 1)
     }
   }
-  for (const g of rest) position.set(g.id, CONSOLE_GROUP_ORDER.length * 10 + 20) // an anchor that does not exist: last
+  for (const g of rest) position.set(g.id, order.length * 10 + 20) // an anchor that does not exist: last
   return [...groups].sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0) || a.id.localeCompare(b.id))
 }

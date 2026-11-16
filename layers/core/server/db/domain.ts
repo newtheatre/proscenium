@@ -433,4 +433,41 @@ export const placeAccess = defineTable('core_place_access', {
   ],
 })
 
-export const tables = { venues, spaces, placeAccess, seasons, productions, productionSlugs, productionAdvisories, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+/**
+ * Times when the whole theatre (no venue), a venue (no space) or one space is shut, and the
+ * public holidays brought in from a feed (C-18, C-19). A blocking closure refuses a performance
+ * scheduled inside it; a public holiday only warns.
+ */
+export const closures = defineTable('core_closures', {
+  id: col.id(),
+  venueId: col.internal(text('venue_id').references(() => venues.id, { onDelete: 'cascade' })),
+  spaceId: col.internal(text('space_id')),
+  kind: col.internal(text('kind').notNull()),
+  title: col.public(text('title').notNull()),
+  startsAt: col.public(integer('starts_at').notNull()),
+  endsAt: col.public(integer('ends_at').notNull()),
+  allDay: col.public(integer('all_day', { mode: 'boolean' }).notNull().default(false)),
+  blocksPerformances: col.internal(integer('blocks_performances', { mode: 'boolean' }).notNull()),
+  source: col.internal(text('source').notNull()),
+  feedRef: col.internal(text('feed_ref')),
+  createdBy: col.account('created_by', { role: 'actor', onMerge: 'alias', nullable: true }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'clo',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    // The space must belong to the venue: the pair references core_spaces (id, venue_id).
+    foreignKey({ columns: [t.spaceId, t.venueId], foreignColumns: [spaces.id, spaces.venueId] }).onDelete('cascade'),
+    index('core_closures_time').on(t.startsAt, t.endsAt),
+    index('core_closures_venue').on(t.venueId, t.startsAt),
+    uniqueIndex('core_closures_feed_ref').on(t.feedRef).where(sql`${t.feedRef} IS NOT NULL`),
+    check('core_closures_kind', sql`${t.kind} IN ('closure', 'public_holiday')`),
+    check('core_closures_source', sql`${t.source} IN ('manual', 'feed')`),
+    check('core_closures_scope', sql`${t.spaceId} IS NULL OR ${t.venueId} IS NOT NULL`),
+    check('core_closures_period', sql`${t.endsAt} > ${t.startsAt}`),
+    check('core_closures_title', sql`length(${t.title}) BETWEEN 1 AND 120`),
+  ],
+})
+
+export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
