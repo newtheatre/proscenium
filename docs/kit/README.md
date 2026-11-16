@@ -107,7 +107,8 @@ Worker under wrangler. Everything runs on Linux.
 
 ## Where the build departs from the specification's wording
 
-These were settled while building and are reported to the Foundations workstream:
+These were settled while building and accepted by the Foundations workstream, which records them
+in the specification's "As built" list; this guide is the reference from here on:
 
 - `defineTable(name, columns, options)`, as ruled for scoped ids; the worked example's older order
   `(name, options, columns)` is not supported.
@@ -119,8 +120,12 @@ These were settled while building and are reported to the Foundations workstream
 - External calls are declared in the manifest's `calls` section, each with a handler file.
 - Sweeps (stuck jobs, lost messages, reconciliation) run inline in the minute's cron tick; pruning
   old history is the daily task `core.prune-history`.
-- Rate limits are counted per Worker instance in memory, with the limits as core settings.
+- Rate limits are counted per Worker instance in memory, with the limits as core settings. This
+  is accepted for the kit gate only: one instance does not see another's counts, so it does not
+  protect sign-in or public forms. Before the first release the `sign-in` and `public-form`
+  classes must count in a shared store, starting from Cloudflare's rate limiting binding (F-36).
 - Pending migrations are applied automatically only where `PROSCENIUM_AUTO_MIGRATE=1` (dev,
-  preview and tests) until F-28's maintenance page and Apply button exist.
+  preview and tests). It is not a production option and is removed when F-28's maintenance page
+  and Apply button land.
 - Not yet checked by `bun run check`: the erasure scan, soft-dependency switching and navigation
   coverage, which need the modules they check.
