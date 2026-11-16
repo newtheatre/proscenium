@@ -2,12 +2,12 @@
 // written set-wise in the caller's unit; email sent by a job after the commit, the inbox written at
 // once; dedupe, preferences, the suppression list and a module that is off; retries and failure.
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { changeSetting, createUnit, isRefusal, newId, setClock } from '#kit'
+import { changeSetting, createUnit, isRefusal, newId, setClock, usePoint } from '#kit'
 import { runJob } from '#kit/jobs'
 import { MailError, setMailer, type OutgoingEmail } from '../../server/notifications/mailer'
 import { notify } from '../../server/services'
 import { addressHash } from '../../server/notifications/suppression'
-import { emailEventsConsumer } from '../../server/email-events'
+import { emailEventsConsumer, emailEventsSetAside } from '../../server/email-events'
 import sweep from '../../server/tasks/sweep-notifications'
 import { env, inContext, rows, sent, setModule } from '../../../../tests/integration/helpers'
 
@@ -311,7 +311,7 @@ async function outcome(type: string, messageId: string, extra: Record<string, un
   return inContext(async () => {
     const unit = createUnit()
     const answer = await emailEventsConsumer({ type: `cf.email.sending.message.${type}`, payload: { messageId, ...extra } }, unit.view(), { id: 'q1', attempts })
-    if (answer === 'done') await unit.commit()
+    if (answer !== 'not-yet') await unit.commit()
     return answer
   }, { kind: 'job' })
 }
@@ -356,11 +356,34 @@ describe('what Cloudflare reports afterwards', () => {
     expect(await suppressed('angry@example.org')).toMatchObject({ reason: 'complaint' })
   })
 
-  it('suppresses an address whose send it never recorded, after giving the send a moment to be recorded', async () => {
-    expect(await outcome('bounced', '<unknown@mail.example.org>', { recipient: 'stranger@example.org', bounce: { type: 'hard' } }, 1)).toBe('not-yet')
-    expect(await suppressed('stranger@example.org')).toBeUndefined()
-    expect(await outcome('bounced', '<unknown@mail.example.org>', { recipient: 'stranger@example.org', bounce: { type: 'hard' } }, 3)).toBe('done')
+  it('suppresses an address whose send it never recorded, and never lets the event go as matched', async () => {
+    expect(await outcome('bounced', '<unknown@mail.example.org>', { recipient: 'stranger@example.org', bounce: { type: 'hard' } }, 1)).toBe('unmatched')
     expect(await suppressed('stranger@example.org')).toMatchObject({ reason: 'hard_bounce' })
+    // A complaint made to Cloudflare's documented shape, for a send core never recorded (core part 4).
+    expect(await outcome('complained', '<other@mail.example.org>', { recipient: 'cross@example.org', timestamp: '2026-11-16T22:00:00Z' }, 5)).toBe('unmatched')
+    expect(await suppressed('cross@example.org')).toMatchObject({ reason: 'complaint' })
+  })
+
+  it('keeps a row for each event set aside, once, and says so on the health screen', async () => {
+    const health = async () => inContext(async () => {
+      const [found] = (await usePoint<{ check: () => Promise<{ state: string, sentence: string }> }>('core.health-check')).filter(c => c.id === 'core.email-events')
+      return found!.value.check()
+    })
+    await inContext(() => emailEventsSetAside({ queueMessageId: 'q-old', type: 'bounced', reason: 'unmatched' }), { kind: 'job' })
+    setClock(Date.now() + 31 * 86_400_000) // not-policy: past the thirty days a row is kept
+    try {
+      expect(await health()).toMatchObject({ state: 'ok' })
+      for (const info of [{ queueMessageId: 'q1', type: 'complained' as const, reason: 'unmatched' as const }, { queueMessageId: 'q1', type: 'complained' as const, reason: 'unmatched' as const }, { queueMessageId: 'q2', type: null, reason: 'unreadable' as const }])
+        await inContext(() => emailEventsSetAside(info), { kind: 'job' })
+      expect(await rows('SELECT queue_message_id, event_type, reason FROM core_email_events_set_aside ORDER BY queue_message_id')).toEqual([
+        { queue_message_id: 'q1', event_type: 'complained', reason: 'unmatched' },
+        { queue_message_id: 'q2', event_type: null, reason: 'unreadable' },
+      ])
+      expect(await health()).toMatchObject({ state: 'warning', sentence: '2 email outcomes could not be read or matched in the last 7 days.' })
+    }
+    finally {
+      setClock(undefined)
+    }
   })
 })
 

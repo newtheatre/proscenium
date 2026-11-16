@@ -533,4 +533,24 @@ export const performanceAccess = defineTable('core_performance_access', {
   ],
 })
 
-export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+/**
+ * Email outcomes the queue gave up on, unread or unmatched (core part 4), for the health screen. It
+ * holds no text from the message: the queue's own id, one of six known types or null, and why. Kept
+ * 30 days, fixed; the writer removes older rows.
+ */
+export const emailEventsSetAside = defineTable('core_email_events_set_aside', {
+  queueMessageId: col.internal(text('queue_message_id').primaryKey()),
+  eventType: col.internal(text('event_type')),
+  reason: col.internal(text('reason').notNull()),
+  setAsideAt: col.internal(integer('set_aside_at').notNull()),
+}, {
+  realm: 'system',
+  subject: 'none',
+  extra: t => [
+    index('core_email_events_set_aside_at').on(t.setAsideAt),
+    check('core_email_events_set_aside_type', sql`${t.eventType} IS NULL OR ${t.eventType} IN ('delivered', 'deferred', 'bounced', 'failed', 'rejected', 'complained')`),
+    check('core_email_events_set_aside_reason', sql`${t.reason} IN ('unreadable', 'unmatched')`),
+  ],
+})
+
+export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
