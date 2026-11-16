@@ -96,6 +96,26 @@ exactly `n` rows the whole batch rolls back and the caller gets a 409 refusal (t
 insert into `core_guard` that a trigger aborts). A service receives the unit without `commit`.
 `unit.afterCommit(fn)` runs after a successful commit; its failure never undoes the commit.
 
+A unit holds at most `core.units.statement-limit` statements (50). A fan-out (one row for each of
+many people, performances or seats) is written set-wise, never one statement per row:
+
+```ts
+const ids = unit.insertSet(deliveries, recipients.map(r => ({ notificationId: r.id, channel: 'email', state: 'queued' })))
+unit.expect(recipients.length)
+unit.announce('lost-property.item.recorded', items.map(itemId => ({ payload: { itemId }, record: ['lost-property.item', itemId] })))
+unit.audit(items.map(itemId => ({ action: 'create', record: ['lost-property.item', itemId] })))
+```
+
+`insertSet(table, rows)` writes every row with one `INSERT ... SELECT` over `json_each`, carrying
+the rows in a single JSON parameter, and returns the ids it made in order. Ids and other
+`$defaultFn` defaults (such as `col.createdAt()`) are made before the unit is built, because the
+unit does not read. Every row gives the same columns; a column no row gives takes its SQL default.
+Binary values cannot travel in a set. `announce` and `audit` take one item or a set; a set is one
+statement, plus one statement per listener for the listener jobs, and each event in it is
+delivered as its own event. A set holds at most `core.units.set-rows-limit` rows (500, provisional
+until measured on a real D1); larger work is a job in chunks. Job messages go to the queues a
+hundred at a time.
+
 ## Events, jobs and tasks
 
 `unit.announce(name, payload)` writes the event and, in the same batch, a job for each listener in
@@ -190,5 +210,9 @@ in the specification's "As built" list; this guide is the reference from here on
 - An upload is one request carrying the bytes, rather than a begun upload and a second request.
 - A file with `record` access is not served until a module answers `core.file-access`.
 - The theatre's own files (its logos) have the owner `site`, so there is no `core.branding` record.
+- A set given to `announce` is a list of `{ payload, record? }`, since each event may name its own
+  record. `insertSet` has no conflict clause: a caller that must skip rows already written (a
+  notification's dedupe key) reads them before building the unit and guards the set with
+  `expect(n)` (U2, U4), so a duplicate written meanwhile rolls the unit back and the job retries.
 - Not yet checked by `bun run check`: the erasure scan, soft-dependency switching and navigation
   coverage, which need the modules they check.

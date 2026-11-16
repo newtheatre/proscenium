@@ -2,6 +2,7 @@
 import { integer, text, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 import { defineTable, col } from '#kit/db'
+import { identityTables } from './identity'
 
 export const modules = defineTable('core_modules', {
   moduleId: col.internal(text('module_id').primaryKey()),
@@ -153,4 +154,4 @@ export const guard = defineTable('core_guard', {
   code: col.internal(text('code')),
 }, { realm: 'system' })
 
-export const tables = { modules, settings, settingChanges, migrations, events, jobs, taskRuns, externalCalls, audit, credentials, idempotencyKeys, guard }
+export const tables = { modules, settings, settingChanges, migrations, events, jobs, taskRuns, externalCalls, audit, credentials, idempotencyKeys, guard, ...identityTables }

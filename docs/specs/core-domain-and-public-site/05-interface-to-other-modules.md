@@ -398,3 +398,32 @@ The identity specification defines an access scheme a person applies to. Its pub
 Identity has confirmed the component's name and behaviour. It shows "Apply" to a person who is signed out or has not applied, and the state of their own application to one who has. While `core.access-scheme.enabled` is off it shows nothing, so the seeded wording is written to read sensibly without it, and the site-readiness screen says the page has nothing to offer. The page names the scheme with `:setting{name="core.access-scheme.name"}`, so it uses the theatre's own name for it. The form itself lives under `/account`.
 
 Identity's eighteen notification types, the five for the access scheme among them, are declared through `core.notification-type` in the format this part gives: each has one side, a kind, a lane and its channels. They need nothing the format lacks.
+
+## Fan-out: many rows in one unit of work
+
+The kit refuses a unit of work with more statements than `core.units.statement-limit`, which defaults to 50. The integrating thread has ruled that the limit stands. So nothing in core writes one statement per row when it tells many people or makes many records at once.
+
+The rules are the kit's, in the foundations specification's part 3 (U7 to U9), and core follows them:
+
+| Rule | Detail |
+| --- | --- |
+| Write set-wise (U7) | Every row of the set travels in one JSON parameter, and each table is written by one `INSERT ... SELECT` that reads it with `json_each`, through the kit's helper. Ids are made by the kit before the unit is built and travel in the JSON. A unit costs the same few statements however many rows it carries, and no statement comes near D1's limit of 100 bound parameters. |
+| Events and audit entries take a set (U8) | `unit.announce()` and `unit.audit()` each take one row or a set, and a set of any size is one statement. The caller passes the set it read before building the unit. The guards on the change make that set true or roll everything back. Each event is still delivered as its own event, at least once and unordered. |
+| The most one unit may carry (U9) | The kit setting `core.units.set-rows-limit`, 500 as shipped and provisional until measured on real D1. Over it the unit is refused with `core.unit.too-large`, and the work becomes a job in chunks, each its own unit and safe to repeat. Core states no figure of its own. |
+| `notify()` | Four statements for any number of recipients up to that limit: notifications, email deliveries, inbox deliveries and inbox items, plus the caller's audit entry. A repeat with the same dedupe keys writes nothing at all. It never chunks silently, because a chunked send is no longer all or nothing and the caller must know that. |
+| Still one unit | The statements join the caller's unit, so a unit whose expectation fails leaves no notification behind, as before. |
+| After the unit commits | Email deliveries are put on the queue in calls of 100, the most one `sendBatch` takes. The sweep in part 3 covers any that are lost. |
+
+What has been measured: the build's proof ran fifty recipients on local D1 (five statements and 4 ms set-wise, against 201 statements and 10 ms row by row). Nothing larger has been run, and nothing on real D1.
+
+Core's fan-outs under these rules:
+
+| Fan-out | How it is written |
+| --- | --- |
+| A run of performances (C-04) | The performances travel as one JSON parameter. A run within the limit is saved whole or not at all: the clash and closure guards are predicates on the insert, with an expectation that the number inserted is the number asked for, and one announce of the set. A longer run is a chunked job, as C-04 says. |
+| Cancelling a production | The scheduled performances are read first. Then one conditional `UPDATE` with an expectation of that number, one announce of that many events and one audit set. If a performance changed in between, the expectation fails and nothing is written. |
+| `notifyHolders` and a notification to a production team | The recipients are resolved first, then passed to `notify()` as one set. |
+| Webhook deliveries | One set-wise insert for the webhooks subscribed to the event. |
+| Recalculating operating days | One `UPDATE` over every performance not completed. |
+
+Sources: the proof report at `/mnt/project-files/core-domain-proofs/report.md`; D1's limits (developers.cloudflare.com/d1/platform/limits) for 100 bound parameters, 2 MB for one value and a batch counting as one query; Queues' limits (developers.cloudflare.com/queues/platform/limits) for 100 messages or 256 KB in one `sendBatch`. Both read on 16 November 2026.

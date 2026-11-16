@@ -45,6 +45,16 @@ describe('brand colours (C-35)', () => {
     expect(css).toContain(`--brand-link:${tokens.light.link}`)
     expect(css).toMatch(new RegExp(`html\\.dark\\{[^}]*--brand-link:${tokens.dark.link}`))
   })
+
+  it('gives Nuxt UI a primary that reads under its inverted text and on the page, in both modes', () => {
+    for (const accent of ['#2563eb', '#ffff00', '#7f1d1d', '#10b981']) {
+      const tokens = tokensFor(choice(accent))
+      const [, light, dark] = themeCss(tokens).match(/html:root\{[^}]*--ui-primary:(#[0-9a-f]{6})[^}]*\}\s*html\.dark\{[^}]*--ui-primary:(#[0-9a-f]{6})/)!
+      expect(contrast(light!, '#ffffff')).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(dark!, tokens.neutral[9]!)).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(dark!, tokens.dark.background)).toBeGreaterThanOrEqual(4.5)
+    }
+  })
 })
 
 function png(extra: number[][] = []) {
