@@ -11,7 +11,7 @@ beforeAll(useIdentity)
 afterAll(leaveIdentity)
 beforeEach(reset)
 
-const list = { id: 'seats.sales' }
+const list = 'core.accounts'
 
 async function person(name: string, extra: { preferred?: string, address?: string, verified?: boolean, disabled?: boolean } = {}): Promise<string> {
   const id = newId('acc')
@@ -96,11 +96,12 @@ describe('findAccounts', () => {
     await expect(find(outsider, 'anybody')).rejects.toMatchObject({ code: expect.stringMatching(/^core\.access\./) })
 
     const actor = await finder()
+    await expect(inContext(() => findAccounts(createUnit().view(), actor, 'anybody', 'seats.no-such-list'), actor)).rejects.toThrow(/no module declares/)
     await find(actor, 'secretword')
     const entries = await rows<{ action: string, ability: string, detail: string }>('SELECT action, ability, detail FROM core_audit WHERE actor_account_id = ? AND ability = \'core.account.find\'', actor.accountId)
     expect(entries).toHaveLength(1)
     expect(entries[0]).toMatchObject({ action: 'read' })
-    expect(JSON.parse(entries[0]!.detail)).toEqual({ list: 'seats.sales' })
+    expect(JSON.parse(entries[0]!.detail)).toEqual({ list: 'core.accounts' })
     expect(await rows('SELECT count(*) AS n FROM core_audit WHERE detail LIKE \'%secretword%\'')).toEqual([{ n: 0 }])
   })
 
