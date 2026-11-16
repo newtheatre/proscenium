@@ -31,7 +31,7 @@ describe('the route check', () => {
 
 describe('the reserved address list', () => {
   it('holds the platform\'s prefixes', () => {
-    expect(RESERVED_PREFIXES).toEqual(expect.arrayContaining(['account', 'console', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing']))
+    expect(RESERVED_PREFIXES).toEqual(expect.arrayContaining(['account', 'console', 'admin', 'sign-in', 'setup', 'api', 'files', 'whats-on', 'shows', 'book', 'forms', 'mailing']))
   })
 })
 

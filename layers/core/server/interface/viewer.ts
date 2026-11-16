@@ -35,11 +35,23 @@ export async function holdsConsole(actor: Actor): Promise<boolean> {
   return false
 }
 
+/**
+ * Whether the actor may open Site administration (R-33): it has no ability of its own, so a person
+ * sees it when they hold the ability of at least one admin entry.
+ */
+export async function holdsAdmin(actor: Actor): Promise<boolean> {
+  for (const entry of await declaredEntries()) {
+    if (entry.menu === 'admin' && abilityList(entry.ability).length && holds(await mayOpen(actor, entry))) return true
+  }
+  return false
+}
+
 export async function isEntitled(actor: Actor, shell: ShellName): Promise<boolean> {
   if (!isSignedIn(actor)) return false
   if (shell === 'account') return true
   if (shell === 'members') return isMember(actor)
   if (shell === 'console') return holdsConsole(actor)
+  if (shell === 'admin') return holdsAdmin(actor)
   return false // live mode is entered from the Tonight hub, which the front-of-house module brings
 }
 

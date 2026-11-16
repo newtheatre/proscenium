@@ -12,9 +12,10 @@ here is stable before 1.0.
 | Account | `/account` | any signed-in person |
 | Members' area | `/members` | people for whom the fact `core.member` is true (false until Identity declares it) |
 | Console | `/console` | people holding any entry ability of a console entry |
+| Site administration | `/admin` | people holding the ability of at least one admin entry; it has no ability of its own, and is not found for anyone else (R-33) |
 | Live mode | `/live` | front-of-house and bar screens (not part of phase 1) |
 
-`/account /members /console /live /book /sign-in /setup /api /files` are reserved. A page under a
+`/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks
 `GET /api/core/access?path=...`. The order never varies:
 
@@ -41,10 +42,19 @@ contributes: {
 
 - The console's platform groups (Tonight to System) are declared by core, in a fixed order.
   A theatre's own group says `before` or `after` one of them.
+- Site administration is grouped like the console. Its six groups are declared by core with
+  `menu: 'admin'` on `core.navigation-group`, in a fixed order: theatre, modules, access, email,
+  connections, upkeep. Every admin entry names one of them; only the shell's Overview, `/admin`
+  itself, has none.
 - `section` is `everyday` or `setup`; everyday entries come first in a group.
 - An entry shows only to someone holding one of its abilities (or any signed-in person, for an
   account entry with none). `match` widens the addresses an entry covers.
 - A module with settings gets an entry for its generated settings page without declaring one. It sits in the set-up half of the module's own group (the group of its first console entry, or one named for the module), at `/console/<module>/settings` (core's own is `/console/system/settings`, in System), so a module that is off takes its settings page with it.
+- A setting declared with `scope: 'site'` is shown with the site's own settings at `/admin/settings`
+  (the entry `core.site-settings`, in the modules group) instead of on its module's page; nothing
+  else about it changes. Every one of foundations' `core.*` settings is site-scoped.
+  `GET /api/core/settings?module=x` gives all of a module's settings, each with its `scope`;
+  `&scope=module` narrows it to the module's own page and `?scope=site` gives the site page.
 - Labels are translated: `<module>.navigation.<name>.label` for an entry,
   `<module>.navigation.groups.<id>.label` for a group, `<module>.settings-sections.<group>` for a
   heading on the settings page. `bun run check:conformance` fails for a missing key, an unused one,
