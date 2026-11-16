@@ -6,24 +6,12 @@
 // reservation being paid at the desk goes back to reserved with its seats intact.
 import { sql } from 'drizzle-orm'
 import { first, nowMs, type UnitView } from '#kit'
-import { getPerformance } from '#modules/core'
-import type { OwnerEntry, Part, Settlement } from '#modules/payments'
+import type { Part, Settlement } from '#modules/payments'
+import { refundEntries, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
-import { liveLines, ORDER, type LineRow, type OrderRow } from '../../orders'
+import { liveLines, ORDER, type OrderRow } from '../../orders'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
-
-// The lines' amounts by performance, each tagged with its production for the ledger's reports.
-async function byPerformance(lines: LineRow[], sign: number): Promise<OwnerEntry[]> {
-  const totals = new Map<string, number>()
-  for (const line of lines) totals.set(line.performance_id, (totals.get(line.performance_id) ?? 0) + line.amount_minor)
-  return Promise.all([...totals].filter(([, amount]) => amount !== 0).map(async ([performanceId, amount]) => ({
-    account: DEFERRED,
-    amountMinor: sign * amount,
-    performanceId,
-    productionId: (await getPerformance(performanceId)).productionId,
-  })))
-}
 
 export default {
   async settle(unit: UnitView, part: Part) {
@@ -32,14 +20,14 @@ export default {
     const lines = await liveLines(order.id)
     // The batch refuses unless the order is still waiting for this payment and its total is the part's.
     await confirmOrder(unit, { ...order, total_minor: part.amountMinor }, lines, { from: 'awaiting_payment', intentId: part.intentId })
-    return byPerformance(lines, -1)
+    const totals = new Map<string, number>()
+    for (const line of lines) totals.set(line.performance_id, (totals.get(line.performance_id) ?? 0) + line.amount_minor)
+    return tagged(DEFERRED, totals, -1)
   },
 
-  // Cancelling and refunding tickets arrive with their own slice; until then a refund Payments
-  // makes of this part comes off deferred income for the order's first performance.
-  async refunded(_unit: UnitView, part: Part, refund: { amountMinor: number }) {
-    const [line] = await liveLines(part.record)
-    return [{ account: DEFERRED, amountMinor: refund.amountMinor, performanceId: line?.performance_id ?? null }]
+  // The money for cancelled tickets has gone back: it is no longer owed to the audience.
+  refunded(_unit: UnitView, part: Part, refund: { id: string, amountMinor: number }) {
+    return refundEntries(part.record, refund)
   },
 
   async release(unit: UnitView, part: Part) {

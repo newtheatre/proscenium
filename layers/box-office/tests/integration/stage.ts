@@ -27,6 +27,7 @@ import confirmPost from '../../server/api/box-office/reservations/confirm.post'
 import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
 import orderLinkGet from '../../server/api/box-office/orders/link/index.get'
+import cancelPost from '../../server/api/box-office/orders/[id]/cancel.post'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
@@ -59,6 +60,7 @@ export const handle = server({
   'POST /api/box-office/orders/:id/release': releasePost,
   'POST /api/box-office/orders/:id/keep': keepPost,
   'POST /api/box-office/orders/link/cancel': orderCancelPost,
+  'POST /api/box-office/orders/:id/cancel': cancelPost,
 })
 
 export const manager = person(['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage'])

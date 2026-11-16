@@ -29,6 +29,8 @@ export default defineModule({
     'reservations.max-tickets-per-order': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.max-tickets-per-person': setting.integer({ default: 8, min: 1, max: 50, change, audience: 'public', quotable: true }),
     'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true }),
+    // Kept from each ticket when staff refund less the fee.
+    'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true }),
     'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff' }),
   }),
 
@@ -41,6 +43,9 @@ export default defineModule({
     'performance.exceed-venue': ability({ on: 'core.performance', risk: 'privileged' }),
     'pricing.manage': ability({ on: 'core.production' }),
     'order.release': ability({ on: 'box-office.order' }),
+    // Cancelling does not imply refunding: staff with only the first cancel with no refund.
+    'order.cancel': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses' }),
+    'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses' }),
     'ticket.admit': ability({ on: 'core.performance' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
@@ -81,7 +86,19 @@ export default defineModule({
     'finance.system-account': [
       { id: 'deferred-ticket-income', name: 'Deferred ticket income', kind: 'liability' },
       { id: 'ticket-income', name: 'Ticket income', kind: 'income' },
+      // What is kept of a ticket's price when it is cancelled and refunded less the fee.
+      { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
+    'core.vocabulary': [{
+      id: 'box-office.cancellation-reason',
+      label: 'Reasons for cancelling tickets',
+      terms: [
+        { slug: 'illness', label: 'Illness' },
+        { slug: 'cannot-attend', label: 'Cannot attend' },
+        { slug: 'booked-in-error', label: 'Booked in error' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }],
     // Ticket money still deferred for a performance that has taken place holds up closing its period.
     'finance.period-close-check': [
       { id: 'box-office.unrecognised-income', file: 'unrecognised-income' },
