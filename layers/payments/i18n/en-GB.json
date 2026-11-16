@@ -30,5 +30,6 @@
   "payments.settings.retention.webhooks.help": "How long a record of each notification from a payment provider is kept. Only its id and type are kept, never its contents.",
 
   "payments.abilities.provider.manage.label": "Add payment providers, pair card readers and switch test mode",
-  "payments.abilities.settings.manage.label": "Change payments settings"
+  "payments.abilities.settings.manage.label": "Change payments settings",
+  "payments.abilities.attempt.reconcile.label": "Answer a payment with no answer from the provider's own records"
 }
