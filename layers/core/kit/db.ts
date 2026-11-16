@@ -17,7 +17,7 @@ export interface ColumnMeta {
   reason?: string
   helper: 'id' | 'ref' | 'account' | 'timestamp' | 'localDate' | 'minor' | 'currency' | 'email' | 'wrapped' | 'special'
   ref?: { table: string, nullable: boolean }
-  account?: { role: 'subject' | 'actor', onMerge: 'move' | 'alias' | 'handler', nullable: boolean }
+  account?: { role: 'subject' | 'actor', onMerge: 'move' | 'alias' | 'handler', nullable: boolean, reason?: string }
   classColumn?: string
   /** Sealed with the core key before it is written (`seal`/`open`). Always so for special. */
   encrypted?: boolean
@@ -58,6 +58,9 @@ const META = Symbol.for('proscenium.column')
 export const TABLE = Symbol.for('proscenium.table')
 
 /** The placeholder values erasure writes. Append-only triggers allow exactly these. */
+/** The longest reason a move column may give: one line. */
+const MERGE_REASON_MAX = 200 // not-policy: one line of prose
+
 export const ERASED = { anonymise: 'Former member', redact: '[removed]' } as const
 
 const ALLOWED: Record<DataClass, Erasure[]> = {
@@ -108,12 +111,19 @@ export const col = {
   /**
    * A column that refers to an account. `subject`: the row is about this person. `actor`: the
    * person did something to the row. No SQL foreign key is written, so a merge or an erasure never
-   * has to rebuild a table.
+   * has to rebuild a table. `onMerge` is 'alias' when left out: the column keeps the id it was
+   * written with and reads follow the merge through the account scope (inAccountScope). 'move'
+   * rewrites it to the survivor and needs a one-line `reason`; 'handler' leaves it to the module's
+   * merge handler.
    */
-  account: (name: string, options: { role: 'subject' | 'actor', onMerge: 'move' | 'alias' | 'handler', nullable?: boolean }) => {
+  account: (name: string, options: { role: 'subject' | 'actor', onMerge?: 'move' | 'alias' | 'handler', reason?: string, nullable?: boolean }) => {
+    const onMerge = options.onMerge ?? 'alias'
+    if (onMerge === 'move' && !(typeof options.reason === 'string' && options.reason.trim() && !options.reason.includes('\n') && options.reason.length <= MERGE_REASON_MAX))
+      throw new DeclarationError(`col.account('${name}')`, `onMerge: 'move' needs a one-line reason (at most ${MERGE_REASON_MAX} characters): why the stored id must be the survivor's`)
+    if (onMerge !== 'move' && options.reason !== undefined) throw new DeclarationError(`col.account('${name}')`, "a reason is given only for onMerge: 'move'")
     const builder = text(name)
     if (!options.nullable) builder.notNull()
-    return tag(builder, { class: 'internal', helper: 'account', account: { role: options.role, onMerge: options.onMerge, nullable: !!options.nullable } })
+    return tag(builder, { class: 'internal', helper: 'account', account: { role: options.role, onMerge, nullable: !!options.nullable, ...(options.reason ? { reason: options.reason.trim() } : {}) } })
   },
   /** When the row was made, in UTC milliseconds, from the kit's clock. */
   createdAt: () => tag(integer('created_at').notNull().$defaultFn(() => nowMs()), { class: 'internal', helper: 'timestamp' }),
@@ -212,6 +222,9 @@ export function defineTable<TName extends string, TColumns extends Record<string
   }
   if (holdsPersonal && !subjects.length && !subject && !options.retention)
     throw new DeclarationError(field('subject'), 'this table holds personal data but no subject reaches a person and it has no retention. Add a col.account(..., { role: \'subject\' }) column, a subject or a retention setting')
+  for (const [key, c] of Object.entries(metas)) {
+    if (c.meta.account?.role === 'actor' && c.meta.account.onMerge !== 'alias') throw new DeclarationError(field(key), "an actor column keeps who did it, so it uses onMerge: 'alias' (the default)")
+  }
   if (options.appendOnly) {
     for (const [key, c] of Object.entries(metas)) {
       if (c.meta.account && c.meta.account.onMerge !== 'alias') throw new DeclarationError(field(key), "an append-only table cannot be rewritten by a merge, so its account columns use onMerge: 'alias'")

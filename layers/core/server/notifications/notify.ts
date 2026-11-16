@@ -117,7 +117,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
   const muted = new Set<string>()
   if (type.category !== 'transactional' && type.topic && accountIds.length) {
     const rows = await all<{ account_id: string, channel: string }>(
-      'SELECT account_id, channel FROM core_notification_preferences WHERE topic_key = ? AND enabled = 0 AND account_id IN (SELECT value FROM json_each(?))',
+      'SELECT account_id, channel FROM core_notification_preferences WHERE topic_key = ? AND enabled = 0 AND account_id IN (SELECT value FROM json_each(?))', // exact-account: a preference is moved to the survivor by the merge handler; to become set-wise scope
       type.topic, JSON.stringify(accountIds),
     )
     for (const row of rows) muted.add(`${row.account_id}\u0000${row.channel}`)
