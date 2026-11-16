@@ -309,6 +309,7 @@ export const jobs = {
   'core.check-file': job({ payload: z.object({ fileId: z.string() }) }),
   'core.recompute-days': job({ payload: z.object({}), lane: 'bulk' }),
   'core.send-notifications': job({ payload: z.object({ deliveryIds: z.array(z.string()).min(1) }) }),
+  'core.create-run': job({ payload: z.object({ runId: z.string() }) }),
   'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
 }
 

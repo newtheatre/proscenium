@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// A production's performances (C-03 to C-07, C-10): added as drafts, scheduled into a free space,
-// changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
+// A production's performances (C-03 to C-07, C-10): added one at a time or as a run (C-04), scheduled
+// into a free space, changed, cancelled with a reason and reinstated. A change with a wide reach shows what it touches
 // first, and a module that refuses it says why. Times are shown and entered in the theatre's time
 // zone, whatever the viewer's.
 type State = 'draft' | 'scheduled' | 'cancelled' | 'completed'
@@ -21,8 +21,10 @@ interface Performance {
   access: { termId: string, detail: string | null }[]
 }
 interface Option { id: string, label: string, retired: boolean }
+interface Run { id: string, total: number, done: number, state: 'running' | 'stopped' | 'done' | 'removing' | 'removed', stopReason: string | null, scheduled: boolean }
 interface Answer {
   performances: Performance[]
+  runs: Run[]
   options: { venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null }[] }[], access: Option[], reasons: Option[] }
 }
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
@@ -185,6 +187,31 @@ async function saveAccess() {
   if (await run(() => call(p.id, '/access', 'PUT', { features }), 'Access saved')) accessFor.value = null
 }
 
+// Runs (C-04). A long run is made by a job; while one is moving the list is refreshed.
+const addingRun = ref(false)
+const runs = computed(() => data.value?.runs ?? [])
+const moving = computed(() => runs.value.some(r => r.state === 'running' || r.state === 'removing'))
+let timer: ReturnType<typeof setInterval> | undefined
+watch(moving, (on) => {
+  if (on && !timer) timer = setInterval(() => refresh(), 3000) // not-policy: how often a moving run's progress is fetched
+  if (!on && timer) {
+    clearInterval(timer)
+    timer = undefined
+    emit('changed')
+  }
+}, { immediate: true })
+onBeforeUnmount(() => clearInterval(timer))
+async function added(answer: { created: number } | { run: { id: string, total: number } }) {
+  await refresh()
+  emit('changed')
+  toast.add({ title: 'created' in answer ? `${answer.created} performances added` : `Adding ${answer.run.total} performances`, color: 'success' })
+}
+const finishRun = (r: Run) => run(() => $api<unknown>(`/api/core/productions/${props.productionId}/runs/${r.id}/finish` as string, { method: 'POST', body: {} }), 'Finishing the run')
+async function removeRun(r: Run) {
+  if (!await confirm({ verb: 'Remove', thing: `the ${r.done} performances this run added`, consequence: 'Drafts are deleted and scheduled performances are cancelled, as if each were cancelled.', button: 'Remove them' })) return
+  await run(() => $api<unknown>(`/api/core/productions/${props.productionId}/runs/${r.id}/remove` as string, { method: 'POST', body: {} }), 'Removing the run')
+}
+
 function actions(p: Performance) {
   const items = []
   if (p.state === 'draft') items.push({ label: 'Schedule', icon: 'i-lucide-calendar-check', onSelect: () => schedule(p) })
@@ -205,15 +232,35 @@ function actions(p: Performance) {
     description="Each starts as a draft and is public once scheduled."
   >
     <template #actions>
-      <UButton
-        label="Add performance"
-        icon="i-lucide-plus"
-        color="neutral"
-        variant="outline"
-        :disabled="!spaces.length"
-        @click="start(null)"
-      />
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          label="Add a run"
+          icon="i-lucide-calendar-plus"
+          color="neutral"
+          variant="outline"
+          :disabled="!spaces.length"
+          @click="addingRun = true"
+        />
+        <UButton
+          label="Add performance"
+          icon="i-lucide-plus"
+          color="neutral"
+          variant="outline"
+          :disabled="!spaces.length"
+          @click="start(null)"
+        />
+      </div>
     </template>
+    <UAlert
+      v-for="r in runs"
+      :key="r.id"
+      :color="r.state === 'stopped' ? 'warning' : 'info'"
+      variant="subtle"
+      :icon="r.state === 'stopped' ? 'i-lucide-triangle-alert' : 'i-lucide-loader'"
+      :title="r.state === 'stopped' ? `A run stopped after ${r.done} of ${r.total}` : r.state === 'removing' ? 'Removing a run' : `Adding a run: ${r.done} of ${r.total}`"
+      :description="r.stopReason ?? undefined"
+      :actions="r.state === 'stopped' ? [{ label: 'Finish it', onClick: () => finishRun(r) }, { label: 'Remove what it added', color: 'error', variant: 'outline', onClick: () => removeRun(r) }] : undefined"
+    />
     <p
       v-if="data && !spaces.length"
       class="text-sm text-muted"
@@ -221,7 +268,7 @@ function actions(p: Performance) {
       Add a venue with a space that can hold performances first.
     </p>
     <RefusalNotice
-      v-if="!open && !cancelling && !accessFor"
+      v-if="!open && !cancelling && !accessFor && !addingRun"
       :refusal="refusal"
     />
     <DataBoundary
@@ -493,5 +540,12 @@ function actions(p: Performance) {
         />
       </template>
     </UModal>
+    <PerformanceRunDialog
+      v-model:open="addingRun"
+      :production-id="productionId"
+      :spaces="spaces"
+      :time-zone="timeZone"
+      @added="added"
+    />
   </PageSection>
 </template>

@@ -377,6 +377,22 @@ export const identityContributions = {
       },
     },
   }, {
+    // Two accounts were joined into one (part 4, Merge, "Tell both"), to every verified address of
+    // both, read before the merge moved them. It names nobody, so it says nothing to an address
+    // about another person's account.
+    id: 'core.merge-notice',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: {},
+    wording: {
+      'en-GB': {
+        subject: 'Your accounts at {{ theatre }} have been joined',
+        body: 'Two accounts at {{ theatre }} that belong to you, including the one for this address, have been joined into one, so your bookings and history are now in one place. You sign in as before, with any of your addresses.\n\nIf you did not expect this, contact the theatre soon: for a while it can be undone.',
+      },
+    },
+  }, {
     // The download is ready (ID-15). It says when it will be removed, never what it holds.
     id: 'core.export-ready',
     category: 'transactional' as const,
