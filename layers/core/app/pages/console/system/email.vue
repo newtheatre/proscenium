@@ -10,7 +10,6 @@ interface Sender {
   automatic: { proposed: string | null, unavailable: 'no-token' | 'workers-dev' | 'local' | null }
 }
 
-const route = useRoute()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const { data, status, error, refresh } = useFetch<Sender>('/api/core/notifications/sender')
@@ -38,7 +37,6 @@ async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}
   }
   catch (failure) {
     const view = toRefusal(failure)
-    if (view.code === 'core.access.not-fresh') return navigateTo({ path: '/sign-in/confirm', query: { next: route.fullPath } })
     refusal.value = view
   }
   finally {
