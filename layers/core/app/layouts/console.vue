@@ -66,6 +66,8 @@ const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
       </template>
     </UDashboardSidebar>
 
+    <CommandPalette />
+
     <UDashboardPanel>
       <template #header>
         <UDashboardNavbar>
@@ -73,6 +75,11 @@ const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
             <UDashboardSidebarCollapse />
           </template>
           <template #right>
+            <UDashboardSearchButton
+              :label="t('core.palette.open')"
+              color="neutral"
+              variant="outline"
+            />
             <AccountMenu />
           </template>
         </UDashboardNavbar>

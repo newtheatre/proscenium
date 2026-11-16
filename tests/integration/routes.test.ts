@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import health from '../../layers/core/server/api/core/health.get'
 import publicSettings from '../../layers/core/server/api/core/settings/public.get'
 import putSetting from '../../layers/core/server/api/core/settings/[key].put'
+import indexSearch from '../../layers/core/server/api/core/settings/index-search.get'
 import putModule from '../../layers/core/server/api/core/modules/[id].put'
 import sell from '../fixtures/modules/seats/server/api/seats/[id]/sell.post'
 import { resetRateLimits } from '#kit/ratelimit'
@@ -153,5 +154,23 @@ describe('modules (F-10)', () => {
   it('refuses to switch off the core', async () => {
     const response = await call(handle, 'PUT', '/api/core/modules/core', { actor: manager(), body: { on: false } })
     expect(response.status).toBe(409)
+  })
+})
+
+describe('settings index for search (UI-15)', () => {
+  const find = server({ 'GET /api/core/settings/index-search': indexSearch })
+
+  it('lists only settings on pages the person may open', async () => {
+    const mine = await (await call(find, 'GET', '/api/core/settings/index-search', { actor: manager() })).json()
+    expect(mine.settings.some((s: { module: string }) => s.module === 'seats')).toBe(true)
+    const none = await (await call(find, 'GET', '/api/core/settings/index-search', { actor: person([]) })).json()
+    expect(none.settings.some((s: { module: string }) => s.module === 'seats')).toBe(false)
+  })
+
+  it('refuses a signed-out caller and hides a module that is off', async () => {
+    expect((await call(find, 'GET', '/api/core/settings/index-search')).status).toBe(401)
+    await setModule('seats', false)
+    const off = await (await call(find, 'GET', '/api/core/settings/index-search', { actor: manager() })).json()
+    expect(off.settings.some((s: { module: string }) => s.module === 'seats')).toBe(false)
   })
 })

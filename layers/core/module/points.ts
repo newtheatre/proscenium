@@ -37,6 +37,30 @@ export const points = {
       after: z.string().optional(),
     }).strict(),
   }),
+  // A record type the command palette can search: the module's own search route takes `q` and
+  // answers ids; the palette shows them through the type's `core.record-resolver`, so every type
+  // looks the same and the module supplies no markup.
+  'core.search-source': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      record: z.string(),
+      ability,
+      route: z.string().startsWith('/api/'),
+      shells: z.array(z.enum(['console', 'members'])).min(1).default(['console']),
+    }).strict(),
+  }),
+  // A common action offered in the palette (and on an empty home): a place to go, with words that find it.
+  'core.quick-action': point({
+    kind: 'data',
+    schema: z.object({
+      id: z.string(),
+      to: z.string().startsWith('/'),
+      icon: z.string(),
+      ability,
+      keywords: z.string().optional(),
+    }).strict(),
+  }),
   'core.setup-step': point({
     kind: 'data',
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),

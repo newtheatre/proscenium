@@ -12,6 +12,15 @@ const reader = person('Robin Reader', [grant('gallery.sample.view')])
 const audience = person('Alex Audience', [])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 
+// The tests share one local database and make many requests as a handful of people; the platform's
+// own limit (core.rate-limits.default) is exercised by the kit's tests, not these.
+test.beforeAll(async ({ playwright }) => {
+  const siteOwner = { ...person('Rate Owner', [grant('core.settings.manage')]), assurance: 'strong', reassertedAt: Date.now() }
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(siteOwner) })
+  await api.put('/api/core/settings', { data: { changes: [{ key: 'core.rate-limits.default', value: 10000 }] } })
+  await api.dispose()
+})
+
 // Waits for the page to hydrate, so a test never acts on markup that has no behaviour yet.
 async function visit(page: Page, url: string) {
   const response = await page.goto(url)

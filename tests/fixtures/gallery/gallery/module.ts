@@ -23,6 +23,9 @@ export default defineModule({
   }),
   contributes: {
     'core.navigation-group': [{ id: 'gallery', icon: 'i-lucide-layout-grid', after: 'box-office' }],
+    'core.search-source': [{ id: 'gallery.production-search', record: 'gallery.production', ability: 'gallery.sample.view', route: '/api/gallery/search', shells: ['console'] }],
+    'core.record-resolver': [{ id: 'gallery.production', file: 'gallery.production' }],
+    'core.quick-action': [{ id: 'gallery.new-booking', to: '/console/gallery/form', icon: 'i-lucide-plus', ability: 'gallery.sample.view', keywords: 'gallery.quick-actions.new-booking.keywords' }],
     'core.navigation': [
       { id: 'gallery.list', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/list', icon: 'i-lucide-list', ability: 'gallery.sample.view', order: 10 },
       { id: 'gallery.form', menu: 'console', group: 'gallery', section: 'everyday', to: '/console/gallery/form', icon: 'i-lucide-square-pen', ability: 'gallery.sample.view', order: 20 },

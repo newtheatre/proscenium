@@ -65,6 +65,24 @@ contributes: {
 `useConfirm` asks once, naming the act and what it costs; `useUndo` is preferred wherever an act
 can be reversed. Browser `alert`, `confirm` and `prompt` are a lint error.
 
+## Finding things: the command palette and settings search
+
+Ctrl or Cmd K (or the Search button in the console's top bar) opens the command palette. It works by
+keyboard alone and offers only what the viewer may reach: the screens in their navigation, the quick
+actions and record types they hold the ability for, and the settings on pages they may open. It asks
+the server for actions and sources when it is first opened, not on every page.
+
+- `core.quick-action` (data point): `{ id, to, icon, ability, keywords? }`. The label is
+  `<module>.quick-actions.<name>.label`; `keywords` is a translation key of extra search words.
+- `core.search-source` (data point): `{ id, record, ability, route, shells }`. `route` is an `/api/`
+  route taking `?q=` and returning `{ ids: string[] }`; the palette resolves the ids to titles and
+  addresses through that type's `core.record-resolver`, so every kind of record looks the same. The
+  type's name is `<module>.records.<name>`.
+- Settings search (UI-15) sits above every generated settings page and in the palette. Every word
+  typed must appear in a setting's label or help text; label matches come first; a result opens the
+  page with the setting highlighted (`?setting=<key>`). Settings on pages the viewer may not open,
+  sensitive settings and settings of modules that are off are never listed.
+
 ## Seams for Identity
 
 Until Identity lands, `layers/core/server/interface/viewer.ts` describes the viewer from the
