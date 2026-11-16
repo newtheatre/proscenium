@@ -10,7 +10,6 @@ defineProps<{ refusal: Refusal | null }>()
     v-if="refusal"
     role="alert"
     color="error"
-    variant="subtle"
     icon="i-lucide-circle-alert"
     :title="refusal.reason"
     :description="refusal.remedy"

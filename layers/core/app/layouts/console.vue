@@ -17,11 +17,13 @@ function toItem(i: { id: string, label: string, to: string, icon: string, match?
   return { label: t(i.label), icon: i.icon, to: i.to, active: isCurrent(i, route.path), badge: i.count, onSelect: () => { open.value = false } }
 }
 
-const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
+// One menu for the whole sidebar: each module's group is a list of its own, headed by the group's
+// name, then its everyday entries and its set-up entries.
+const groups = computed<NavigationMenuItem[][]>(() => (navigation.value?.groups ?? []).map((g) => {
   const items: NavigationMenuItem[] = [{ label: t(g.label), icon: g.icon, type: 'label' }]
-  if (g.everyday.length) items.push({ label: t('core.console.everyday'), type: 'label', class: 'text-xs' }, ...g.everyday.map(toItem))
-  if (g.setup.length) items.push({ label: t('core.console.setup'), type: 'label', class: 'text-xs' }, ...g.setup.map(toItem))
-  return { id: g.id, items }
+  if (g.everyday.length) items.push({ label: t('core.console.everyday'), type: 'label' }, ...g.everyday.map(toItem))
+  if (g.setup.length) items.push({ label: t('core.console.setup'), type: 'label' }, ...g.setup.map(toItem))
+  return items
 }))
 </script>
 
@@ -47,19 +49,12 @@ const groups = computed(() => (navigation.value?.groups ?? []).map((g) => {
         </NuxtLink>
       </template>
       <template #default="{ collapsed }">
-        <nav
+        <UNavigationMenu
+          :items="groups"
+          orientation="vertical"
+          :collapsed="collapsed"
           :aria-label="t('core.console.navigation')"
-          class="space-y-4"
-        >
-          <UNavigationMenu
-            v-for="g in groups"
-            :key="g.id"
-            :items="g.items"
-            orientation="vertical"
-            :collapsed="collapsed"
-            :aria-label="t('core.console.group', { group: String(g.items[0]?.label) })"
-          />
-        </nav>
+        />
       </template>
       <template #footer>
         <AccountMenu />

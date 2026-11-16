@@ -6,7 +6,5 @@
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
-    <ConfirmDialog />
-    <ConfirmItsYouDialog />
   </UApp>
 </template>

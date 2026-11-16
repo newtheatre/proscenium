@@ -15,7 +15,6 @@ const { t } = useT()
     :title="title"
     :description="description"
     :icon="icon ?? 'i-lucide-inbox'"
-    class="py-12"
   >
     <template #actions>
       <slot name="actions" />
