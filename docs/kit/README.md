@@ -160,6 +160,19 @@ names a `menu` (account, members, console or live) and may set `hideEmpty` besid
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
 
+## Email outcomes
+
+Cloudflare Email Sending reports each message's outcome (delivered, bounced, complained and so on)
+to a second queue, `EMAIL_EVENTS` (`<worker>-email-events`), through the sending domain's event
+subscription, a setup step in the dashboard. The Worker's queue handler sends that queue's batches
+to `handleEmailEvents`, which hands each message to core's consumer, `core.email-events`
+(`layers/core/server/email-events.ts`), with a unit of work of its own. The consumer answers
+`'done'` (the unit commits and the message is acknowledged) or `'not-yet'` when the send is not
+recorded yet, since an outcome can arrive 0.6 seconds after `send()`. The message is then tried again
+after 5 seconds; a throw waits 30. After five tries the message is set aside in
+`<worker>-email-events-dead`. The body names the recipient and the subject, so only the queue
+message's id and the event's type are ever logged.
+
 ## External calls
 
 `externalCall(name, { reference, call })` records the attempt, makes the call with an idempotency

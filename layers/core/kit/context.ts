@@ -8,6 +8,8 @@ export interface KitEnv {
   CACHE?: KVNamespace
   JOBS_PROMPT?: Queue
   JOBS_BULK?: Queue
+  /** Cloudflare Email Sending's outcome events (bounced, complained, delivered and so on). */
+  EMAIL_EVENTS?: Queue
   /** Cloudflare Email Sending. Only core's mailer touches it. */
   EMAIL?: SendEmail
   CORE_ENCRYPTION_KEY?: string
