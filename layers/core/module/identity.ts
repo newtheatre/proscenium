@@ -2,7 +2,7 @@
 // rules, abilities, record types, events, background work, secrets and health checks. Phase 1
 // declares what the first stories use; the rest arrives with the stories that need it.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, record, secret, setting, task, useContext, type SettingRule } from '#kit'
+import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task, useContext, type SettingRule } from '#kit'
 
 const change = 'core.identity-settings.manage'
 
@@ -35,6 +35,11 @@ export const identitySettings = defineSettings('core', {
   'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change }),
 
   'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change }),
+
+  'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, audience: 'public', quotable: true }),
+  'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
+  // Erasure and the download are not offered until the theatre says who to contact about personal data.
+  'privacy.contact': setting.text({ unset: true, maxLength: 120, change, audience: 'public', quotable: true }),
 })
 
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
@@ -52,9 +57,10 @@ export const identitySettingRules: SettingRule[] = [
 ]
 
 export const identityRecords = defineRecords('core', {
-  account: record({ table: 'core_accounts', owner: 'id' }),
-  role: record({ table: 'core_roles' }),
-  grant: record({ table: 'core_grants', owner: 'account_id' }),
+  'account': record({ table: 'core_accounts', owner: 'id' }),
+  'role': record({ table: 'core_roles' }),
+  'grant': record({ table: 'core_grants', owner: 'account_id' }),
+  'data-request': record({ table: 'core_data_requests', owner: 'account_id' }),
 })
 
 export const identityAbilities = defineAbilities('core', {
@@ -64,6 +70,7 @@ export const identityAbilities = defineAbilities('core', {
   'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'account.recover': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'account.merge': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
+  'data-request.manage': ability({ on: 'core.data-request', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
   'session.end': ability({ on: 'core.account', risk: 'privileged', owner: 'grants', grantAt: ['site'] }),
   'role.read': ability({ risk: 'normal', audit: false, grantAt: ['site'] }),
   'role.manage': ability({ risk: 'privileged', implies: ['role.read'], grantAt: ['site'] }),
@@ -90,6 +97,8 @@ export const identityEvents = {
   'core.account.claimed': event({ version: 1, payload: account, internal: true }),
   'core.account.disabled': event({ version: 1, payload: account, internal: true }),
   'core.account.enabled': event({ version: 1, payload: account, internal: true }),
+  'core.account.erased': event({ version: 1, payload: account, internal: true }),
+  'core.data-request.finished': event({ version: 1, payload: z.object({ requestId: z.string(), kind: z.enum(['export', 'erasure']) }), internal: true }),
   'core.account.merged': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
   'core.account-email.verified': event({ version: 1, payload: z.object({ accountId: z.string(), emailId: z.string() }), internal: true }),
   'core.grant.created': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string() }), internal: true }),
@@ -103,10 +112,22 @@ export const identityJobs = {
   // Security notices to named addresses (identity/notices.ts), sealed like the sign-in link.
   'core.send-account-notice': job({ payload: z.object({ sealed: z.string() }), lane: 'prompt' }),
   'core.send-invitation': job({ payload: z.object({ tokenId: z.string(), sealed: z.string() }), lane: 'prompt' }),
+  // The erasure batch for one request (ID-16). Safe to repeat: a second run writes nothing.
+  'core.run-erasure': job({ payload: z.object({ requestId: z.string() }), lane: 'prompt' }),
+}
+
+/** Points identity offers other modules (spec part 5). */
+export const identityPoints = {
+  // Given an account, the hold codes that pause its erasure. Each code has a sentence for staff and
+  // one for the person in the module's catalogue, at "<code>.staff" and "<code>.person".
+  'core.erasure-hold': point({ kind: 'code', contract: 'erasure-hold' }),
 }
 
 export const identityTasks = {
   'core.sweep-identity': task({ every: '1h' }),
+  // Runs confirmed erasures whose cooling-off is over, and re-checks held ones (ID-16, ID-35).
+  // Hourly rather than the specification's daily, so an erasure runs within the hour it falls due.
+  'core.review-data-requests': task({ every: '1h' }),
 }
 
 export const identitySecrets = {
@@ -197,7 +218,37 @@ export const identityContributions = {
         body: 'This address is no longer the one {{ theatre }} uses for members\' messages.\n\nIf this was you, there is nothing to do. If it was not, contact the theatre straight away.',
       },
     },
+  }, {
+    // The link confirms an erasure request (ID-16). It is sealed: kept encrypted, cleared once sent.
+    id: 'core.erasure-confirm',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'sealed' as const, wait: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Confirm that {{ theatre }} should erase your account',
+        body: 'You asked {{ theatre }} to erase your account. Nothing happens until you confirm.\n\n[Confirm erasure]({{ link }})\n\nOnce confirmed, it runs after {{ wait }}. Until then you can cancel it from your account. Tickets and sales stay on the theatre\'s records with your name taken off.\n\nIf you did not ask for this, you can ignore this email and nothing will change.',
+      },
+    },
+  }, {
+    // Sent once, to the address the account had, after the erasure batch commits.
+    id: 'core.erasure-done',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: {},
+    wording: {
+      'en-GB': {
+        subject: 'Your account at {{ theatre }} has been erased',
+        body: 'Your account at {{ theatre }} has been erased. Your name, addresses and sign-in methods are gone, and this address can be used for a new account.\n\nThis is the last email we will send you about this account.',
+      },
+    },
   }],
+  // The last usable Owner cannot be erased until another Owner exists (part 3, "Export and erasure").
+  'core.erasure-hold': [{ id: 'core.last-owner', file: 'last-owner' }],
   'core.health-check': [
     { id: 'core.session-key', file: 'session-key' },
     { id: 'core.sign-in-challenge', file: 'sign-in-challenge' },

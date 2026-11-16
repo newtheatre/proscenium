@@ -24,7 +24,7 @@ export default defineModule({
   records: { ...records, ...identity.identityRecords, ...domain.records },
   facts: { ...identity.identityFacts },
   tables: { ...tables, ...domainTables },
-  points: { ...points, ...domain.points },
+  points: { ...points, ...identity.identityPoints, ...domain.points },
   contributes: {
     ...domain.contributes,
     ...identity.identityContributions,
