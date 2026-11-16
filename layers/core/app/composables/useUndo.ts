@@ -1,5 +1,3 @@
-import { translate } from './useT'
-
 // Undo beats confirm: where an act can be reversed, do it at once and offer Undo for ten seconds.
 const UNDO_SECONDS = 10 // not-policy: the specification's ten seconds
 
