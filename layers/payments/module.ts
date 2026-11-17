@@ -30,6 +30,12 @@ export default defineModule({
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
+  // R-37: every other group sits on /console/payments/settings, the module's own page; how long
+  // webhook bodies are kept is upkeep, on the shared Advanced page.
+  settingGroups: {
+    retention: { advanced: true },
+  },
+
   records: defineRecords('payments', {
     'provider-account': { table: 'payments_provider_accounts' },
     'intent': { table: 'payments_intents' },
@@ -42,9 +48,9 @@ export default defineModule({
     'attempt.reconcile': ability({ on: 'payments.attempt', risk: 'privileged' }),
     'attempt.attest': ability(),
     'refund.request': ability(),
-    'refund.approve': ability({ on: 'payments.refund', risk: 'privileged', owner: 'refuses' }),
+    'refund.approve': ability({ on: 'payments.refund', risk: 'privileged', owner: 'refuses', implies: ['core.account.find'] }),
     'session.open': ability(),
-    'session.view': ability({ on: 'payments.session', owner: 'grants' }),
+    'session.view': ability({ on: 'payments.session', owner: 'grants', implies: ['core.account.find'] }),
     'session.close-any': ability({ on: 'payments.session', risk: 'privileged', owner: 'refuses', implies: ['session.view'] }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),

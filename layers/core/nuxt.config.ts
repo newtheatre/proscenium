@@ -6,7 +6,7 @@ import { kitAliases } from './aliases'
 import { MODE_COOKIE_AGE, MODE_KEY } from './shared/appearance'
 
 /** The layout of each shell that has one of its own, by the prefix of its addresses. */
-const SHELL_LAYOUTS = { '/console': 'console', '/members': 'members', '/admin': 'admin' }
+const SHELL_LAYOUTS = { '/console': 'console', '/members': 'members', '/admin': 'admin', '/live': 'live' }
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const publicComponentsFile = fileURLToPath(new URL('../../.generated/public-components.json', import.meta.url))
@@ -30,8 +30,10 @@ export default defineNuxtConfig({
     '/console/system/email': { redirect: { to: '/admin/email', statusCode: 301 } },
     '/console/system/vocabularies': { redirect: { to: '/admin/vocabularies', statusCode: 301 } },
     '/console/system/vocabularies/**': { redirect: { to: '/admin/vocabularies/**', statusCode: 301 } },
-    '/console/programme/venues': { redirect: { to: '/admin/venues', statusCode: 301 } },
-    '/console/programme/venues/**': { redirect: { to: '/admin/venues/**', statusCode: 301 } },
+    '/console/programme/venues': { redirect: { to: '/console/venues', statusCode: 301 } },
+    '/console/programme/venues/**': { redirect: { to: '/console/venues/**', statusCode: 301 } },
+    '/admin/venues': { redirect: { to: '/console/venues', statusCode: 301 } },
+    '/admin/venues/**': { redirect: { to: '/console/venues/**', statusCode: 301 } },
   },
   experimental: {
     // A link's page is fetched when a person points at or focuses it, not when the link scrolls

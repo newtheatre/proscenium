@@ -6,7 +6,7 @@ export interface Viewer {
   signedIn: boolean
   name?: string
   membersName?: string
-  sides: ('audience' | 'members' | 'console' | 'admin')[]
+  sides: ('audience' | 'members' | 'console' | 'admin' | 'live')[]
   navigation: (NavItem & { shell: ShellName })[]
 }
 

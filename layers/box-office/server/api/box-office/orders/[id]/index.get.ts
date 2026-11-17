@@ -54,6 +54,7 @@ export default defineRoute({
       release: order.state === 'reserved' && await allowed('box-office.order.release'),
       cancel: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.cancel'),
       refund: order.state === 'confirmed' && await allowed('box-office.order.refund'),
+      exchange: (order.state === 'reserved' || order.state === 'confirmed') && await allowed('box-office.order.exchange'),
     },
   }
 })
