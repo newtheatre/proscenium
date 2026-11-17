@@ -9,7 +9,7 @@ const title = computed(() => te(`${module.value}.module.name`) ? t('core.setting
 <template>
   <PageSettings
     :key="module"
-    :module="module"
+    :page="`${module}.settings`"
     :title="title"
     :highlight="typeof route.query.setting === 'string' ? route.query.setting : undefined"
   />
