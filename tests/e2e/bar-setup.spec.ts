@@ -1,6 +1,7 @@
 // The bar's set-up screens for products and recipes in a real browser: Choices, a product's choices,
 // mixer tick and allergens, sub-categories, and an outlet's till layout and favourites. Each loads for
-// someone who sets the bar up and has no accessibility violations, and the forms write.
+// someone who sets the bar up and has no accessibility violations, and the forms write. Stock: its
+// items and locations, and a size's recipe.
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
@@ -11,7 +12,7 @@ const manager = {
   name: 'Bea Setup',
   assurance: 'strong',
   reassertedAt: Date.now(),
-  grants: ['core.settings.manage', 'core.modules.manage', 'bar.product.manage', 'bar.price.manage', 'bar.outlet.manage', 'bar.allergens.manage', 'bar.settings.manage'].map(grant),
+  grants: ['core.settings.manage', 'core.modules.manage', 'bar.product.manage', 'bar.price.manage', 'bar.outlet.manage', 'bar.allergens.manage', 'bar.stock.manage', 'bar.settings.manage'].map(grant),
 }
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
 const stamp = Date.now() % 1_000_000
@@ -87,4 +88,38 @@ test('an outlet takes a till layout', async ({ page }) => {
   await noViolations(page)
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Outlet saved.').first()).toBeVisible()
+})
+
+test('Stock takes a location and an item, and a size takes a recipe', async ({ page }) => {
+  await visit(page, '/admin/modules/bar/stock')
+  await expect(page.getByRole('tab', { name: 'Stock', selected: true })).toBeVisible()
+  await noViolations(page)
+
+  await page.getByRole('button', { name: 'New location' }).click()
+  let dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Name', { exact: true }).fill(`Cellar ${stamp}`)
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText('Location saved.').first()).toBeVisible()
+
+  await page.getByRole('button', { name: 'New stock item' }).click()
+  dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Name', { exact: true }).fill(`Cocoa ${stamp}`)
+  await dialog.getByLabel('Delivered as').fill('tub')
+  await dialog.getByLabel('Amount in one').fill('500')
+  await noViolations(page)
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText('Stock item saved.').first()).toBeVisible()
+  await expect(page.getByText(`Cocoa ${stamp}`)).toBeVisible()
+
+  await visit(page, `/admin/modules/bar/products/${s.product}`)
+  await expect(page.getByText('No recipe: moves no stock')).toBeVisible()
+  await page.getByRole('button', { name: 'Edit the recipe of Each' }).click()
+  dialog = page.getByRole('dialog')
+  await dialog.getByRole('button', { name: 'Ingredient', exact: true }).click()
+  await page.getByRole('option', { name: `Cocoa ${stamp}` }).click()
+  await dialog.getByLabel('Amount').fill('20')
+  await noViolations(page)
+  await dialog.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText('Recipe saved.').first()).toBeVisible()
+  await expect(page.getByText(`20 ml · Cocoa ${stamp}`)).toBeVisible()
 })
