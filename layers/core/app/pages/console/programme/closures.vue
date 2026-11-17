@@ -118,13 +118,11 @@ async function remove(c: Closure) {
               tone="warning"
               label="Blocks performances"
             />
-            <UButton
+            <IconButton
               v-if="c.source === 'manual'"
               icon="i-lucide-trash-2"
-              color="neutral"
-              variant="ghost"
               size="sm"
-              :aria-label="`Delete ${c.title}`"
+              :label="`Delete ${c.title}`"
               @click="remove(c)"
             />
           </RecordListItem>
@@ -155,8 +153,9 @@ async function remove(c: Closure) {
             />
           </UFormField>
           <UFormField label="Where">
-            <USelect
+            <USelectMenu
               v-model="form.scope"
+              value-key="value"
               :items="scopes"
             />
           </UFormField>

@@ -285,15 +285,10 @@ const saveAccess = () => run(() => api('/access', 'PUT', {
                 tone="neutral"
                 label="Archived"
               />
-              <UDropdownMenu :items="spaceActions(s)">
-                <UButton
-                  icon="i-lucide-ellipsis"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  :aria-label="`Actions for ${s.name}`"
-                />
-              </UDropdownMenu>
+              <RowActions
+                :items="spaceActions(s)"
+                :label="`Actions for ${s.name}`"
+              />
             </RecordListItem>
           </RecordList>
         </PageSection>

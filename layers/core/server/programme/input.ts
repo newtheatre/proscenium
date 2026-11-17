@@ -1,6 +1,8 @@
 // The shapes the programme routes accept, shared so a create and an edit agree on every bound.
 import { z } from 'zod'
-import { SLUG } from './service'
+
+// Nothing here imports server code, so a screen can check a form with the same schema its route uses.
+export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/ // not-policy: a slug's pattern
 
 const text = (max: number) => z.string().trim().max(max).transform(v => v || null).nullable()
 const DATE = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a date's shape

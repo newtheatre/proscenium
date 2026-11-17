@@ -55,12 +55,12 @@ onMounted(() => { elsewhere.value = getLocalTimeZone() !== zone.value })
     >
       <template #trailing>
         <UPopover v-model:open="open">
-          <UButton
+          <IconButton
             color="neutral"
             variant="link"
             size="sm"
             icon="i-lucide-calendar"
-            :aria-label="t('core.dates.pick')"
+            :label="t('core.dates.pick')"
             :disabled="disabled"
             class="px-0"
           />

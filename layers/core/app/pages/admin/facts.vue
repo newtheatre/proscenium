@@ -15,7 +15,6 @@ const { data, status, error, refresh } = await useAPI<{ facts: Fact[], catalogue
 const drafts = reactive<Record<string, string[]>>({})
 const confirmations = reactive<Record<string, boolean>>({})
 const refusals = reactive<Record<string, ReturnType<typeof toRefusal> | null>>({})
-const saving = ref<string | null>(null)
 watch(data, (d) => {
   for (const fact of d?.facts ?? []) drafts[fact.name] = fact.abilities.map(a => a.ability)
 }, { immediate: true })
@@ -28,7 +27,6 @@ const unconfirmed = (fact: Fact) => (drafts[fact.name] ?? []).filter(a => privil
 
 async function save(fact: Fact) {
   refusals[fact.name] = null
-  saving.value = fact.name
   try {
     await $api(`/api/core/facts/${encodeURIComponent(fact.name)}` as '/api/core/facts/:fact', { method: 'PUT', body: { abilities: drafts[fact.name] ?? [], confirmPrivileged: !!confirmations[fact.name] } })
     toast.add({ title: t('core.facts.saved', { fact: nameOf(fact) }), color: 'success' })
@@ -37,9 +35,6 @@ async function save(fact: Fact) {
   }
   catch (e) {
     refusals[fact.name] = toRefusal(e)
-  }
-  finally {
-    saving.value = null
   }
 }
 </script>
@@ -82,7 +77,7 @@ async function save(fact: Fact) {
         />
         <UButton
           :label="t('core.facts.save')"
-          :loading="saving === fact.name"
+          loading-auto
           @click="save(fact)"
         />
       </PageSection>

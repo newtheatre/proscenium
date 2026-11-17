@@ -325,13 +325,13 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
           :aria-label="t('core.list.change-filter', { filter: chip.text })"
           @click="panel = true"
         />
-        <UButton
+        <IconButton
           color="neutral"
           variant="subtle"
           size="sm"
           class="rounded-s-none border-s border-default"
           icon="i-lucide-x"
-          :aria-label="t('core.list.remove-filter', { filter: chip.text })"
+          :label="t('core.list.remove-filter', { filter: chip.text })"
           @click="set({ filters: { [chip.name]: '' } })"
         />
       </span>
@@ -425,14 +425,12 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               <span class="sr-only">{{ t('core.list.expand') }}</span>
             </template>
             <template #expand-cell="{ row }">
-              <UButton
+              <IconButton
                 v-if="row.depth === 0 && canExpand(row.original)"
-                color="neutral"
-                variant="ghost"
                 size="sm"
                 :icon="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
                 :aria-expanded="row.getIsExpanded()"
-                :aria-label="t(row.getIsExpanded() ? 'core.list.hide-children' : 'core.list.show-children', { what: subRowsNoun ?? t('core.list.details'), row: rowLabel(row.original) })"
+                :label="t(row.getIsExpanded() ? 'core.list.hide-children' : 'core.list.show-children', { what: subRowsNoun ?? t('core.list.details'), row: rowLabel(row.original) })"
                 @click.stop="row.toggleExpanded()"
               />
             </template>
@@ -548,17 +546,12 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
               <span class="sr-only">{{ t('core.list.actions') }}</span>
             </template>
             <template #actions-cell="{ row }">
-              <UDropdownMenu
+              <RowActions
                 v-if="rowActions && row.depth === 0"
                 :items="rowActions(row.original)"
-              >
-                <UButton
-                  color="neutral"
-                  variant="ghost"
-                  icon="i-lucide-ellipsis"
-                  :aria-label="t('core.list.actions-for', { row: rowLabel(row.original) })"
-                />
-              </UDropdownMenu>
+                :label="t('core.list.actions-for', { row: rowLabel(row.original) })"
+                size="md"
+              />
             </template>
             <template
               v-if="$slots.expanded"
@@ -600,17 +593,12 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                       class="min-w-0 truncate font-medium text-highlighted"
                     >{{ rowLabel(row) }}</span>
                   </div>
-                  <UDropdownMenu
+                  <RowActions
                     v-if="rowActions"
                     :items="rowActions(row)"
-                  >
-                    <UButton
-                      color="neutral"
-                      variant="ghost"
-                      icon="i-lucide-ellipsis"
-                      :aria-label="t('core.list.actions-for', { row: rowLabel(row) })"
-                    />
-                  </UDropdownMenu>
+                    :label="t('core.list.actions-for', { row: rowLabel(row) })"
+                    size="md"
+                  />
                 </div>
                 <p
                   v-if="matchLine(row)"

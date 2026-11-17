@@ -5,6 +5,7 @@
 type State = 'draft' | 'published' | 'archived'
 interface Season { id: string, name: string, startsOn: string, endsOn: string, summary: string | null, state: State, productions: number }
 
+const { t } = useT()
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<{ rows: Season[] }>('/api/core/seasons', { key: 'core:seasons', query: { size: 100 } })
 const { toRefusal } = useRefusal()
@@ -97,21 +98,16 @@ const actions = (s: Season) => [[
             v-for="s in data.rows"
             :key="s.id"
             :name="s.name"
-            :description="`${span(s)} · ${s.productions === 1 ? '1 production' : `${s.productions} productions`}`"
+            :description="`${span(s)} · ${t('core.counts.productions', { count: s.productions })}`"
           >
             <StatusBadge
               :tone="TONES[s.state]"
-              :label="s.state.charAt(0).toUpperCase() + s.state.slice(1)"
+              :label="t(`core.states.${s.state}`)"
             />
-            <UDropdownMenu :items="actions(s)">
-              <UButton
-                icon="i-lucide-ellipsis"
-                color="neutral"
-                variant="ghost"
-                size="sm"
-                :aria-label="`Actions for ${s.name}`"
-              />
-            </UDropdownMenu>
+            <RowActions
+              :items="actions(s)"
+              :label="`Actions for ${s.name}`"
+            />
           </RecordListItem>
         </RecordList>
       </div>

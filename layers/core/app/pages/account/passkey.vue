@@ -6,17 +6,14 @@ useSeoMeta({ title: 'Add a passkey' })
 const route = useRoute()
 const next = nextPath(route.query.next) ?? '/'
 const refusal = ref<Refusal | null>(null)
-const busy = ref(false)
 const codes = ref<string[] | null>(null)
 // The account shell's guard has already sent a signed-out visitor to sign in (middleware/access.global.ts).
 const { data: me } = await useAPI<{ signedIn: boolean, consoleNeedsPasskey?: boolean }>('/api/core/me', { key: 'core:me' })
 
 async function add() {
-  busy.value = true
   refusal.value = null
   // A stale sign-in is confirmed in place and the request sent again by `$api` (ID-28).
   const answer = await addMyPasskey()
-  busy.value = false
   if (!answer.ok) {
     refusal.value = answer.refusal
     return
@@ -42,7 +39,7 @@ async function add() {
       <UButton
         block
         icon="i-lucide-key-round"
-        :loading="busy"
+        loading-auto
         @click="add()"
       >
         Add a passkey

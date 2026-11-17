@@ -124,6 +124,17 @@ describe('the interface check', () => {
     expect(interfaceProblems('PageSettings.vue', '<form>')).toEqual([])
     expect(interfaceProblems('RecordList.vue', '<ul class="divide-y rounded-lg border">')).toEqual([])
     expect(interfaceProblems('useDates.ts', 'new Intl.DateTimeFormat(language)')).toEqual([])
+    // An icon-only button is IconButton's job; one with a label, or with content of its own, is not.
+    const buttons = [
+      '<UButton',
+      '  icon="i-lucide-trash-2"',
+      '  :aria-label="`Delete ${name}`"',
+      '/>',
+      '<UButton icon="i-lucide-plus" label="Add" aria-label="Add a venue" />',
+      '<UButton :aria-label="pick"><span /></UButton>',
+    ].join('\n')
+    expect(interfaceProblems('page.vue', buttons).map(p => p.line)).toEqual([1])
+    expect(interfaceProblems('IconButton.vue', buttons)).toEqual([])
   })
 })
 
