@@ -244,7 +244,11 @@ export const identityContributions = {
     { id: 'core.access-scheme-waiting', file: 'access-scheme-waiting' },
     // Data requests that need staff: finished but not yet closed, or past their respond-by date (ID-35).
     { id: 'core.data-requests-waiting', file: 'data-requests-waiting' },
+    // Addresses waiting for their link: marks My account's "Email addresses" entry (ID-12).
+    { id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' },
   ],
+  // What needs the person on My account's overview.
+  'core.account-notice': [{ id: 'core.unconfirmed-addresses', file: 'unconfirmed-addresses' }],
   'core.account-section': [
     { id: 'core.access-scheme', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'CoreAccessScheme', order: 40, to: '/account/access', icon: 'i-lucide-accessibility', count: 'core.access-scheme-offered', hideEmpty: true },
   ],
