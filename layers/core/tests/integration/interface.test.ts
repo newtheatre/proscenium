@@ -196,6 +196,9 @@ describe('Site administration (R-33)', () => {
     const theatre = await (await settings('page=core.theatre', person(['core.sender.manage']))).json() as Settings
     expect(theatre.settings.map(s => s.key)).toEqual(expect.arrayContaining(['core.notifications.email-footer', 'core.notifications.sending-label']))
     expect(new Set(email.settings.map(s => s.screen))).toEqual(new Set(['/admin/email']))
+    // Until an address is recorded, the site's address offers the one the page came on.
+    const origin = (await (await settings('page=core.theatre')).json() as { settings: { key: string, suggestion: string | null }[] }).settings.find(s => s.key === 'core.site.origin')
+    expect(origin?.suggestion).toMatch(/^https?:\/\/[^/]+$/)
     expect((await settings('page=core.advanced', staff())).status).toBe(404)
     expect((await settings('page=core.advanced&scope=site')).status).toBe(422) // one page, screen or module at a time
   })

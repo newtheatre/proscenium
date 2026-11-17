@@ -305,7 +305,7 @@ gets the same declaration made for it: each filter is a `choice`, each `sortable
 - **Columns** ticks optional columns; the choice is kept on the device for each list
   (`core:list-columns:<id>`), is not in the address, and is cleared on sign-out.
 - **Address:** one key for each filter (`state=draft,published`, `when=7d`, `action=orders.refund`),
-  `view`, `sort`, `order`, `page`, `size` (25, 50 or 100), left out when default.
+  `view`, `sort`, `order`, `page`, `size` (25, 50 or 100), left out when default (for `size`, the site's `core.lists.page-size`).
 - **Server:** `decodeList(query, list, { can, today })` (alias `parse`) validates strictly and answers a typed
   `ListQuery` (folded search words, validated filters, dropped filters, view, sort, page, size) or a
   `ListRefusal` naming the key. Routes call the kit's `readList`, not this.
