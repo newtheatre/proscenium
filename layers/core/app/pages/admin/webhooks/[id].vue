@@ -238,6 +238,7 @@ async function retry(d: WebhookDelivery) {
           :schema="isNew ? webhookInput : webhookPatch"
           :state="body"
           class="space-y-6"
+          novalidate
           @submit="save"
         >
           <PageSection :title="t('core.webhooks.about')">

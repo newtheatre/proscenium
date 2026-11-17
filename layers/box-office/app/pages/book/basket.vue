@@ -4,6 +4,8 @@
      second. When it runs out the seats are released and the buyer is offered to choose again. Once
      the booking is made, this page says what happened and forgets the basket. -->
 <script setup lang="ts">
+import { z } from 'zod'
+
 type Timing = 'pay-now' | 'reserve' | 'buyer-chooses'
 interface Basket { orderId: string, reference: string, state: string, expiresAt: number | null, currency: string, totalMinor: number, lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, amountMinor: number }[] }
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string }[] }[] }
@@ -18,7 +20,7 @@ interface CardStep { kind: 'client-secret', provider: string, secret: string, pu
 definePageMeta({ key: 'box-office-basket' })
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { toRefusal } = useRefusal()
+const { toRefusal, fieldErrors } = useRefusal()
 const { dateTime, time } = useDates()
 const { money } = await useMoney()
 const { viewer } = useViewer()
@@ -128,7 +130,21 @@ const free = computed(() => basket.value?.totalMinor === 0)
 const canPay = computed(() => free.value || page.value?.timing !== 'reserve')
 const canReserve = computed(() => !free.value && page.value?.timing !== 'pay-now' && basket.value?.state === 'basket')
 const detailsNeeded = computed(() => !viewer.value.signedIn)
-const ready = computed(() => (!detailsNeeded.value || /.+@.+\..+/.test(form.value.email.trim())) && (!siteKey || !!challenge.value))
+// The buyer's details, checked as the reserve and checkout routes check them, beside each field.
+const detailsSchema = z.object({ name: z.string().trim().max(120), email: z.string().trim().email().max(254) }) // not-policy: the routes' bounds
+const detailsForm = useTemplateRef('detailsForm')
+const ready = computed(() => !siteKey || !!challenge.value)
+/** Shows each problem beside its field; false while there is one. */
+async function detailsValid(): Promise<boolean> {
+  if (!detailsNeeded.value) return true
+  try {
+    await detailsForm.value?.validate({})
+    return true
+  }
+  catch {
+    return false
+  }
+}
 const body = computed(() => ({ expectedTotalMinor: basket.value!.totalMinor, ...(detailsNeeded.value ? { email: form.value.email.trim(), name: form.value.name.trim() || undefined } : {}) }))
 
 function done(result: Outcome) {
@@ -137,7 +153,7 @@ function done(result: Outcome) {
 }
 
 async function pay() {
-  if (!basket.value || !remembered.value) return
+  if (!basket.value || !remembered.value || !await detailsValid()) return
   refusal.value = null
   busy.value = true
   try {
@@ -158,6 +174,7 @@ async function pay() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    detailsForm.value?.setErrors(fieldErrors(refusal.value))
     challenge.value = ''
   }
   finally {
@@ -166,7 +183,7 @@ async function pay() {
 }
 
 async function reserve() {
-  if (!basket.value) return
+  if (!basket.value || !await detailsValid()) return
   refusal.value = null
   busy.value = true
   try {
@@ -175,6 +192,7 @@ async function reserve() {
   }
   catch (e) {
     refusal.value = toRefusal(e)
+    detailsForm.value?.setErrors(fieldErrors(refusal.value))
     challenge.value = ''
   }
   finally {
@@ -319,13 +337,19 @@ async function reserve() {
             </div>
             <UForm
               v-else
+              ref="detailsForm"
               class="space-y-4"
+              :schema="detailsNeeded ? detailsSchema : undefined"
               :state="form"
+              novalidate
               @submit="canPay ? pay() : reserve()"
             >
               <RefusalNotice :refusal="refusal" />
               <template v-if="detailsNeeded">
-                <UFormField :label="t('box-office.basket.name')">
+                <UFormField
+                  name="name"
+                  :label="t('box-office.basket.name')"
+                >
                   <UInput
                     v-model="form.name"
                     autocomplete="name"
@@ -333,6 +357,7 @@ async function reserve() {
                   />
                 </UFormField>
                 <UFormField
+                  name="email"
                   :label="t('box-office.basket.email')"
                   :help="t('box-office.basket.email-help')"
                   required

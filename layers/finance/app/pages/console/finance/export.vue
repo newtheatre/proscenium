@@ -51,6 +51,7 @@ async function download() {
     <UForm
       class="space-y-4"
       :state="form"
+      novalidate
       @submit="download"
     >
       <RefusalNotice :refusal="refusal" />

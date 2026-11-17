@@ -101,6 +101,7 @@ const describe = (l: List) => [
           id="membership-new-list"
           :state="form"
           class="space-y-4"
+          novalidate
           @submit="create"
         >
           <RefusalNotice :refusal="refusal" />

@@ -379,6 +379,7 @@ async function recordPayout() {
           id="add-provider"
           class="space-y-4"
           :state="form"
+          novalidate
           @submit="add"
         >
           <RefusalNotice :refusal="refusal" />
@@ -459,6 +460,7 @@ async function recordPayout() {
           id="record-payout"
           class="space-y-4"
           :state="payout"
+          novalidate
           @submit="recordPayout"
         >
           <RefusalNotice :refusal="payoutRefusal" />

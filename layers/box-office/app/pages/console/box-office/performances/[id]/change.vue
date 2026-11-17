@@ -130,6 +130,7 @@ const trail = computed(() => [
             <UForm
               class="space-y-4"
               :state="{ choice }"
+              novalidate
               @submit="save"
             >
               <RefusalNotice :refusal="refusal" />

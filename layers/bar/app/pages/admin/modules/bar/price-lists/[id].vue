@@ -137,6 +137,7 @@ function onStandard(v: Variant): string {
           id="bar-raise"
           :state="raising"
           class="space-y-4"
+          novalidate
           @submit="send(!preview)"
         >
           <RefusalNotice :refusal="refusal" />

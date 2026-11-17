@@ -105,6 +105,7 @@ async function retire(r: Reader) {
           :id="`pair-${accountId}`"
           class="space-y-4"
           :state="form"
+          novalidate
           @submit="pair"
         >
           <RefusalNotice :refusal="refusal" />

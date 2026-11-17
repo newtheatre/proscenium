@@ -361,6 +361,7 @@ const dialogTitle = computed(() => dialog.value ? t(`front-of-house.incident.dia
             id="front-of-house-incident-dialog"
             class="space-y-4"
             :state="{ closeForm, reviewForm, reopenForm, personForm, actionForm }"
+            novalidate
             @submit="submit"
           >
             <RefusalNotice :refusal="refusal" />

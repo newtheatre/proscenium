@@ -54,6 +54,7 @@ async function cancel() {
         id="cancel-production"
         class="space-y-4"
         :state="form"
+        novalidate
         @submit="cancel"
       >
         <RefusalNotice :refusal="refusal" />

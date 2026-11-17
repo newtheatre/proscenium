@@ -115,6 +115,7 @@ const minutes = (n: number) => t('front-of-house.minutes', { count: n })
         <UForm
           class="space-y-4"
           :state="form"
+          novalidate
           @submit="save"
         >
           <UFormField
