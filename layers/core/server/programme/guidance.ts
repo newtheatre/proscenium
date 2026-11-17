@@ -23,7 +23,7 @@ export interface Guidance {
   ageMin: number | null
   ageRestricted: boolean
   effects: GuidanceEffect[]
-  /** Effects switched off for the performance asked about. Performance exceptions follow the slice; empty until then. */
+  /** Labels of the production's effects switched off for the performance asked about (C-55). Empty when none, or no performance was asked about. */
   notAtThisPerformance: string[]
   warnings: GuidanceWarning[]
   contentNote: string | null
@@ -113,24 +113,34 @@ export async function productionEffects(productionId: string): Promise<GuidanceE
   return rows.map(r => ({ termId: r.term_id, label: r.label, description: r.description, icon: r.icon, detail: r.detail }))
 }
 
+/** The effects (surviving term ids, merges followed) a performance does not use. */
+async function effectsOffFor(performanceId: string): Promise<Set<string>> {
+  const rows = await all<{ term_id: string }>(
+    'SELECT coalesce(t.merged_into_id, t.id) AS term_id FROM core_performance_effect_exceptions x JOIN core_terms t ON t.id = x.term_id WHERE x.performance_id = ?',
+    performanceId,
+  )
+  return new Set(rows.map(r => r.term_id))
+}
+
 /**
  * Everything the audience is told before they decide: the age, the effects with their details, the
  * content warnings with level and detail in their derived order, the content note, and whether
  * each of the two questions has been answered. Public data only.
  */
-export async function guidanceFor(productionId: string, _performanceId?: string): Promise<Guidance | null> {
+export async function guidanceFor(productionId: string, performanceId?: string): Promise<Guidance | null> {
   const row = await first<{ age_min: number | null, age_restricted: number, content_note: string | null, effects_confirmed_none: number, advisories_confirmed_none: number }>(
     'SELECT age_min, age_restricted, content_note, effects_confirmed_none, advisories_confirmed_none FROM core_productions WHERE id = ?', productionId)
   if (!row) return null
-  const [effects, warnings] = await Promise.all([productionEffects(productionId), productionWarnings(productionId)])
+  const [allEffects, warnings, off] = await Promise.all([productionEffects(productionId), productionWarnings(productionId), performanceId ? effectsOffFor(performanceId) : Promise.resolve(new Set<string>())])
+  const effects = allEffects.filter(e => !off.has(e.termId))
   return {
     ageMin: row.age_min,
     ageRestricted: !!row.age_restricted,
     effects,
-    notAtThisPerformance: [],
+    notAtThisPerformance: allEffects.filter(e => off.has(e.termId)).map(e => e.label),
     warnings,
     contentNote: row.content_note,
-    effectsAnswered: !!row.effects_confirmed_none || effects.length > 0,
+    effectsAnswered: !!row.effects_confirmed_none || allEffects.length > 0,
     warningsAnswered: !!row.advisories_confirmed_none || warnings.length > 0,
   }
 }

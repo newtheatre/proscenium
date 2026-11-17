@@ -48,6 +48,12 @@ test.describe('someone who looks after webhooks', () => {
 
     await page.getByRole('button', { name: 'Pause' }).click()
     await expect(page.getByText('Paused. Events are not sent')).toBeVisible()
+    // Undo on the toast resumes it; pausing again leaves it paused.
+    await page.getByRole('region', { name: /Notifications/ }).getByRole('button', { name: 'Undo' }).click()
+    await expect(page.getByText('Paused. Events are not sent')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible()
+    await page.getByRole('button', { name: 'Pause' }).click()
+    await expect(page.getByText('Paused. Events are not sent')).toBeVisible()
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'The signing secret' })).toHaveCount(0)

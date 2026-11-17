@@ -392,6 +392,18 @@ export const productionEffects = defineTable('core_production_effects', {
   ],
 })
 
+/** A staging effect a production uses but one performance does not ("not used at this performance"). The term must be one of the production's effects. */
+export const performanceEffectExceptions = defineTable('core_performance_effect_exceptions', {
+  performanceId: col.internal(text('performance_id').notNull().references(() => performances.id, { onDelete: 'cascade' })),
+  termId: col.ref('core_terms'),
+}, {
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    primaryKey({ columns: [t.performanceId, t.termId] }),
+  ],
+})
+
 /**
  * Who made the show (C-09): a printed name and a role in a section, linked to an account or not. A
  * credit with no account is a historical or outside credit, found for a data request by staff
@@ -731,4 +743,4 @@ export const webhookDeliveries = defineTable('core_webhook_deliveries', {
   ],
 })
 
-export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }
+export const tables = { webhooks, webhookDeliveries, venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionEffects, termGroups, productionCredits, performanceRuns, performances, performanceAccess, performanceEffectExceptions, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }

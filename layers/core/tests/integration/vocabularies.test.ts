@@ -90,7 +90,8 @@ describe('vocabularies core ships', () => {
 
   it('lets a grant on one vocabulary edit that vocabulary only', async () => {
     const manager = person([], { grants: [{ ability: 'core.vocabulary.manage', via: 'grant', record: { type: 'core.vocabulary', id: 'core.advisory' } }] } as any)
-    expect((await call(handle, 'POST', '/api/core/vocabularies/core.advisory/terms', { actor: manager, body: { label: 'Puppetry' } })).status).toBe(200)
+    const [heading] = await rows<{ id: string }>("SELECT id FROM core_term_groups WHERE vocabulary_key = 'core.advisory' LIMIT 1")
+    expect((await call(handle, 'POST', '/api/core/vocabularies/core.advisory/terms', { actor: manager, body: { label: 'Puppetry', groupId: heading!.id } })).status).toBe(200)
     expect((await call(handle, 'POST', `${CATEGORY}/terms`, { actor: manager, body: { label: 'Puppetry' } })).status).toBe(403)
   })
 })

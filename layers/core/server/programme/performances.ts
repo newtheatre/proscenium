@@ -97,12 +97,12 @@ export async function productionOfPerformance(id: string): Promise<string> {
 // ---------------------------------------------------------------------------------------------
 // Reads (part 4, services)
 
-export async function getPerformance(id: string): Promise<Performance & { access: AccessFeature[], productionTitle: string, venueName: string, spaceName: string }> {
+export async function getPerformance(id: string): Promise<Performance & { access: AccessFeature[], effectsOff: string[], productionTitle: string, venueName: string, spaceName: string }> {
   const row = await first<PerformanceRow & { production_title: string, venue_name: string, space_name: string }>(`SELECT f.*, p.title AS production_title, v.name AS venue_name, s.name AS space_name, s.managed AS space_managed
     FROM core_performances f JOIN core_productions p ON p.id = f.production_id JOIN core_venues v ON v.id = f.venue_id JOIN core_spaces s ON s.id = f.space_id
     WHERE f.id = ?`, id)
   if (!row) refuse('core.performance.not-found', 'There is no such performance.', { status: 404 })
-  return { ...toPerformance(row), access: await accessOf(id), productionTitle: row.production_title, venueName: row.venue_name, spaceName: row.space_name }
+  return { ...toPerformance(row), access: await accessOf(id), effectsOff: await effectsOffOf(id), productionTitle: row.production_title, venueName: row.venue_name, spaceName: row.space_name }
 }
 
 async function accessOf(id: string): Promise<AccessFeature[]> {
@@ -110,10 +110,15 @@ async function accessOf(id: string): Promise<AccessFeature[]> {
     .map(a => ({ termId: a.term_id, detail: a.detail }))
 }
 
+/** The staging effects (term ids) a performance does not use. */
+export async function effectsOffOf(id: string): Promise<string[]> {
+  return (await all<{ term_id: string }>('SELECT term_id FROM core_performance_effect_exceptions WHERE performance_id = ? ORDER BY term_id', id)).map(r => r.term_id)
+}
+
 export interface PerformanceQuery { productionId?: string, from?: number, to?: number, state?: PerformanceState, spaceId?: string, venueId?: string }
 
 /** Performances in a window, in time order, each with its access features. */
-export async function listPerformances(query: PerformanceQuery): Promise<(Performance & { access: AccessFeature[] })[]> {
+export async function listPerformances(query: PerformanceQuery): Promise<(Performance & { access: AccessFeature[], effectsOff: string[] })[]> {
   const where: string[] = []
   const params: unknown[] = []
   for (const [clause, wanted] of [['production_id = ?', query.productionId], ['state = ?', query.state], ['space_id = ?', query.spaceId], ['venue_id = ?', query.venueId], ['ends_at > ?', query.from], ['starts_at < ?', query.to]] as const) {
@@ -123,11 +128,14 @@ export async function listPerformances(query: PerformanceQuery): Promise<(Perfor
   }
   const rows = await all<PerformanceRow>(`SELECT *, ${SPACE_MANAGED} FROM core_performances ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY starts_at, id`, ...params)
   const access = new Map<string, AccessFeature[]>()
+  const off = new Map<string, string[]>()
   if (rows.length) {
+    for (const e of await all<{ performance_id: string, term_id: string }>('SELECT performance_id, term_id FROM core_performance_effect_exceptions WHERE performance_id IN (SELECT value FROM json_each(?)) ORDER BY term_id', JSON.stringify(rows.map(r => r.id))))
+      off.set(e.performance_id, [...(off.get(e.performance_id) ?? []), e.term_id])
     for (const a of await all<{ performance_id: string, term_id: string, detail: string | null }>('SELECT performance_id, term_id, detail FROM core_performance_access WHERE performance_id IN (SELECT value FROM json_each(?)) ORDER BY term_id', JSON.stringify(rows.map(r => r.id))))
       access.set(a.performance_id, [...(access.get(a.performance_id) ?? []), { termId: a.term_id, detail: a.detail }])
   }
-  return rows.map(r => ({ ...toPerformance(r), access: access.get(r.id) ?? [] }))
+  return rows.map(r => ({ ...toPerformance(r), access: access.get(r.id) ?? [], effectsOff: off.get(r.id) ?? [] }))
 }
 
 /** Everything on one operating day: front of house's "tonight". */
@@ -385,6 +393,23 @@ export async function setPerformanceAccess(unit: UnitView, id: string, features:
       .expect(1, { code: 'core.performance.access-unknown', reason: 'Choose access features from the list.' })
   }
   unit.audit({ action: 'update', record: record(id), detail: { access: features.length } })
+}
+
+/**
+ * C-55: the staging effects this performance does not use, replacing the list. Each must be one of
+ * the production's effects; the audience is told those effects are not used at this performance.
+ */
+export async function setPerformanceEffectExceptions(unit: UnitView, id: string, termIds: string[]): Promise<void> {
+  const row = await performanceRow(id)
+  if (row.state === 'completed') refuse('core.performance.completed', 'A completed performance cannot be changed.', { status: 409 })
+  if (new Set(termIds).size !== termIds.length) refuse('core.performance.effects-repeated', 'Each staging effect can be listed once.', { status: 422 })
+  unit.add(sql`DELETE FROM core_performance_effect_exceptions WHERE performance_id = ${id}`)
+  for (const termId of termIds) {
+    unit.add(sql`INSERT INTO core_performance_effect_exceptions (performance_id, term_id)
+      SELECT ${id}, ${termId} WHERE EXISTS (SELECT 1 FROM core_production_effects WHERE production_id = ${row.production_id} AND term_id = ${termId})`)
+      .expect(1, { code: 'core.performance.effects-unknown', reason: 'Choose from the staging effects the production lists.' })
+  }
+  unit.audit({ action: 'update', record: record(id), detail: { effectsOff: termIds.length } })
 }
 
 /** A draft that was never scheduled can be deleted (a draft never was: nothing returns to draft). */

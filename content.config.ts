@@ -13,6 +13,8 @@ export default defineContentConfig({
     pages: defineCollection({ type: 'page', source: { include: '**/*.md', cwd: site('pages') }, schema: z.object({ placeholder: z.boolean().default(false), noindex: z.boolean().default(false) }) }),
     // The public menu (C-40): one file, site/content/navigation.yml.
     navigation: defineCollection({ type: 'data', source: { include: 'navigation.yml', cwd: site('') }, schema: z.object({ header: z.array(link).default([]), footer: z.array(link).default([]) }) }),
+    // Old addresses kept working after a move (C-45): one file, site/content/redirects.yml.
+    redirects: defineCollection({ type: 'data', source: { include: 'redirects.yml', cwd: site('') }, schema: z.object({ redirects: z.array(z.object({ from: z.string(), to: z.string() })).default([]) }) }),
     ...theatre,
   },
 })

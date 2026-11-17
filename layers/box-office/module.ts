@@ -160,6 +160,8 @@ export default defineModule({
     ],
     // Box office owns its part of a payment: it makes the sale real when the money arrives.
     'payments.settlement': [{ id: 'box-office' }],
+    // Box office's part of the night report, when Front of house is on.
+    'front-of-house.report-section': [{ id: 'box-office.attendance', file: 'attendance' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
     // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.

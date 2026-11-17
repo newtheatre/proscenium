@@ -19,13 +19,14 @@ interface Performance {
   cancelReasonTermId: string | null
   cancelNote: string | null
   access: { termId: string, detail: string | null }[]
+  effectsOff: string[]
 }
 interface Option { id: string, label: string, retired: boolean }
 interface Run { id: string, total: number, done: number, state: 'running' | 'stopped' | 'done' | 'removing' | 'removed', stopReason: string | null, scheduled: boolean }
 interface Answer {
   performances: Performance[]
   runs: Run[]
-  options: { venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null }[] }[], access: Option[], reasons: Option[] }
+  options: { venues: { id: string, name: string, spaces: { id: string, name: string, defaultCapacity: number | null }[] }[], access: Option[], reasons: Option[], effects: { id: string, label: string }[] }
 }
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: { code: string, reason: string, link: string | null } | null }
@@ -188,6 +189,23 @@ async function saveAccess() {
   if (await run(() => call(p.id, '/access', 'PUT', { features }), 'Access saved')) accessFor.value = null
 }
 
+// Staging effects not used at one performance (C-55)
+const effectsFor = ref<Performance | null>(null)
+const effectsOpen = computed({ get: () => !!effectsFor.value, set: (v) => { if (!v) effectsFor.value = null } })
+const effectsOff = ref<Record<string, boolean>>({})
+const productionEffects = computed(() => data.value?.options.effects ?? [])
+function startEffects(p: Performance) {
+  refusal.value = null
+  effectsOff.value = Object.fromEntries(productionEffects.value.map(e => [e.id, p.effectsOff.includes(e.id)]))
+  effectsFor.value = p
+}
+async function saveEffects() {
+  const p = effectsFor.value
+  if (!p) return
+  const termIds = productionEffects.value.filter(e => effectsOff.value[e.id]).map(e => e.id)
+  if (await run(() => call(p.id, '/effects', 'PUT', { termIds }), 'Staging effects saved')) effectsFor.value = null
+}
+
 // Runs (C-04). A long run is made by a job; while one is moving the list is refreshed.
 const addingRun = ref(false)
 const runs = computed(() => data.value?.runs ?? [])
@@ -219,6 +237,7 @@ function actions(p: Performance) {
   if (p.state === 'draft' || p.state === 'scheduled') {
     items.push({ label: 'Edit', icon: 'i-lucide-pencil', onSelect: () => start(p) })
     items.push({ label: 'Access', icon: 'i-lucide-accessibility', onSelect: () => startAccess(p) })
+    if (productionEffects.value.length) items.push({ label: 'Staging effects', icon: 'i-lucide-zap-off', onSelect: () => startEffects(p) })
   }
   if (p.state === 'scheduled') items.push({ label: 'Cancel', icon: 'i-lucide-calendar-x', color: 'error' as const, onSelect: () => startCancel(p) })
   if (p.state === 'cancelled' && p.startsAt > Date.now()) items.push({ label: 'Reinstate', icon: 'i-lucide-undo-2', onSelect: () => reinstate(p) })
@@ -269,7 +288,7 @@ function actions(p: Performance) {
       Add a venue with a space that can hold performances first.
     </p>
     <RefusalNotice
-      v-if="!open && !cancelling && !accessFor && !addingRun"
+      v-if="!open && !cancelling && !accessFor && !effectsFor && !addingRun"
       :refusal="refusal"
     />
     <DataBoundary
@@ -533,6 +552,35 @@ function actions(p: Performance) {
           type="submit"
           form="performance-access"
           label="Save access"
+        />
+      </template>
+    </UModal>
+    <UModal
+      v-model:open="effectsOpen"
+      title="Staging effects at this performance"
+      description="Tick any effect the production uses that this performance does not. The audience is told it is not used at this performance."
+    >
+      <template #body>
+        <UForm
+          id="performance-effects"
+          class="space-y-3"
+          :state="effectsOff"
+          @submit="saveEffects"
+        >
+          <RefusalNotice :refusal="refusal" />
+          <UCheckbox
+            v-for="e in productionEffects"
+            :key="e.id"
+            v-model="effectsOff[e.id]"
+            :label="`Not used: ${e.label}`"
+          />
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="performance-effects"
+          label="Save"
         />
       </template>
     </UModal>
