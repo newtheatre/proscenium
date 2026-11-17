@@ -24,7 +24,7 @@ const fields = [
   { name: 'locality', label: 'Town or city', kind: 'text' as const, optional: true },
 ]
 const create = (values: Record<string, unknown>) => $api<{ venueId: string }>('/api/core/venues', { method: 'POST', body: values })
-const created = (result: unknown) => navigateTo(`/admin/venues/${(result as { venueId: string }).venueId}`)
+const created = (result: unknown) => navigateTo(`/console/venues/${(result as { venueId: string }).venueId}`)
 
 // A space the theatre does not run (R-36) is marked in the list.
 const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
@@ -38,7 +38,7 @@ const spaceList = (row: Row) => row.spaces.filter(s => !s.archived)
     :columns="columns"
     :filters="filters"
     :row-label="(row: Row) => row.name"
-    :row-to="(row: Row) => `/admin/venues/${row.id}`"
+    :row-to="(row: Row) => `/console/venues/${row.id}`"
     :empty="{ title: 'No venues yet', description: 'A venue is a building or site the theatre performs in. Each has one or more spaces, such as a main house and a studio.', icon: 'i-lucide-building' }"
   >
     <template #primary>
