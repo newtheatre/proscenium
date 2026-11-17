@@ -389,5 +389,15 @@
   "box-office.door.scan.result.card_not_allowed": "You cannot check this kind of card.",
   "box-office.door.scan.result.card": "Card checked.",
   "box-office.basket.desk-code-qr": "Your box office code, to scan at the desk",
-  "box-office.door.scan.button": "Scan tickets"
+  "box-office.door.scan.button": "Scan tickets",
+  "box-office.setup.copy.title": "Copy set-up",
+  "box-office.setup.copy.description": "Start from another performance: its bands, capacities, prices and limits are copied here. Sold tickets and holds are not.",
+  "box-office.setup.copy.from": "Copy from",
+  "box-office.setup.copy.placeholder": "Choose a performance",
+  "box-office.setup.copy.none": "No other performance has been set up yet.",
+  "box-office.setup.copy.button": "Copy set-up",
+  "box-office.setup.copy.verb": "Copy the set-up of",
+  "box-office.setup.copy.consequence": "This performance's capacities and limits are replaced. Prices that differ are set here; other performances keep theirs.",
+  "box-office.setup.copy.done": "Set-up copied",
+  "box-office.setup.copy.done-detail": "{pools} bands with capacity, {prices} prices set, {bands} bands added."
 }
