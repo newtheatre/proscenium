@@ -28,7 +28,13 @@ test('a booking link that is not a web address is explained beside the field, no
   // Every form leaves checking to its schema.
   expect(await page.locator('form:not([novalidate])').count()).toBe(0)
 
-  const link = page.getByRole('textbox', { name: 'Booking link' })
+  // The link is asked for once the production is booked on another website, and is then needed.
+  await page.getByRole('checkbox', { name: 'Booked elsewhere' }).check()
+  const link = page.getByRole('textbox', { name: /^Booking link/ })
+  await page.getByRole('button', { name: 'Save production' }).click()
+  await expect(page.getByText('This is needed.')).toBeVisible()
+  expect(saves).toEqual([])
+
   await link.fill('not a link')
   await page.getByRole('button', { name: 'Save production' }).click()
   await expect(page.getByText('Enter a web address, such as https://example.org.')).toBeVisible()
@@ -40,12 +46,13 @@ test('a booking link that is not a web address is explained beside the field, no
   await expect(page.getByText('Start it with https://')).toBeVisible()
 
   // A title left empty says it is needed, rather than the button going grey.
+  await link.fill('https://tickets.example.org/checked')
   await page.getByRole('textbox', { name: /^Title/ }).fill('')
   await page.getByRole('button', { name: 'Save production' }).click()
   await expect(page.getByText('This is needed.')).toBeVisible()
+  expect(saves).toEqual([])
 
   await page.getByRole('textbox', { name: /^Title/ }).fill('The Checked Play')
-  await link.fill('https://tickets.example.org/checked')
   await page.getByRole('button', { name: 'Save production' }).click()
   await expect(page.getByText('Production saved', { exact: true })).toBeVisible()
 })
