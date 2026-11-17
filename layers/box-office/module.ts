@@ -3,7 +3,7 @@
 // posted. It names no module that provides a member price: that is a requirement reference checked
 // through the kit. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting, task } from '#kit'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'box-office.settings.manage'
@@ -77,6 +77,12 @@ export default defineModule({
   // Door codes are signed so a device can check one with no connection. A key must outlast the
   // longest-lived thing signed under it, and a membership card can run for three years.
   signing: [{ purpose: 'box-office.door-code', rotateEvery: '90d', keepFor: '1460d' }],
+
+  points: {
+    // Another kind of code the door reads, such as a membership card. Signed here, under the same
+    // purpose, so no other module handles a key; a scan of one shows what it says and admits nobody.
+    'box-office.door-code': point({ kind: 'code', contract: 'door-code' }),
+  },
 
   events: {
     announces: {

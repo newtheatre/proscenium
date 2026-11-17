@@ -140,6 +140,8 @@ export default defineModule({
     }],
     // On the audience side, so anyone can find how to join.
     'core.requirement': [{ id: 'membership', file: 'membership' }],
+    // The membership card: Box office signs it and its door reads it (MEM-51). Absent while Box office is off.
+    'box-office.door-code': [{ id: 'membership.card', file: 'card' }],
     'core.account-section': [
       { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
     ],
