@@ -25,6 +25,9 @@ export default defineModule({
     'refunds.window': setting.duration({ default: '180d', min: '1d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
     'sessions.variance-needs-second-person': setting.money({ default: 500, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
     'sessions.default-float': setting.money({ default: 0, min: 0, max: 100000, change, audience: 'staff' }),
+    // Where the till opens a session when the device has not used one before: a core space's id.
+    'sessions.default-space': setting.custom({ schema: z.string().min(1).max(40), unset: true, change, audience: 'staff' }), // not-policy: an id's length
+    'sessions.close-when-quiet': setting.duration({ default: '2h', min: '15m', max: '12h', change, audience: 'staff' }),
     'cash.enabled': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
     'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
@@ -86,6 +89,8 @@ export default defineModule({
   tasks: {
     // The backstop for a sale prepared and never paid.
     'payments.expire-intents': task({ every: '5m' }),
+    // Ends till sessions quiet for payments.sessions.close-when-quiet.
+    'payments.close-quiet-sessions': task({ every: '5m' }),
     // Asks providers about attempts still waiting, and marks unknown those past the time allowed.
     'payments.reconcile-attempts': task({ every: '5m' }),
     'payments.prune-webhooks': task({ dailyAt: '03:40' }),
@@ -143,10 +148,10 @@ export default defineModule({
     'core.navigation': [
       // The till is a live screen (selling proposal); the Money group links to it.
       { id: 'payments.open-till', menu: 'console', group: 'money', section: 'everyday', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 5 },
-      { id: 'payments.session', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/session', icon: 'i-lucide-calculator', ability: 'payments.session.open', order: 10 },
       { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },
       { id: 'payments.refunds', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/refunds', icon: 'i-lucide-undo-2', ability: 'payments.refund.approve', order: 30, count: 'payments.refunds-waiting' },
-      { id: 'payments.sessions', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/sessions', icon: 'i-lucide-receipt', ability: 'payments.session.view', order: 40 },
+      // Every session, with the seller's own above them; a seller who may not see everyone's sees only theirs.
+      { id: 'payments.sessions', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/sessions', icon: 'i-lucide-receipt', ability: ['payments.session.view', 'payments.session.open'], order: 40 },
       { id: 'payments.providers', menu: 'console', group: 'money', section: 'setup', to: '/console/payments/providers', icon: 'i-lucide-credit-card', ability: 'payments.provider.manage', order: 10 },
       // The combined till's tile on the Tonight hub.
       { id: 'payments.live-till', menu: 'live', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 20 },

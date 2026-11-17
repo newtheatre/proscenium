@@ -144,7 +144,7 @@ Who a ticket is for: "Full price", "Concession", "Companion". Site-wide, so repo
 | `needs_paid_ticket` | integer | boolean; a companion ticket needs a paid ticket in the same order | Internal | keep |
 | `active` | integer | boolean | Internal | keep |
 | `managed_by` | text | null, or `<module>.<id>` for a type a module declares through `box-office.ticket-type` (part 5); unique when set. Its kind, requirements, `needs_paid_ticket`, `max_per_holder` and `recheck_at_entry` follow the declaration. Companion and complimentary types exist only this way | Internal | keep |
-| `sort` | integer | default 0; the order every list shows types in, the name breaking a tie | Internal | keep |
+| `sort` | integer | default 0; the order every list shows types in, the name breaking a tie. Set by dragging rows on the Ticket types screen, saved whole through `PUT /api/box-office/ticket-types/order`; a new type goes last | Internal | keep |
 
 ### `box_office_prices` (append-only)
 

@@ -24,7 +24,7 @@ interface Scheme {
   requiresPayment: boolean
 }
 interface Option { id: string, name: string, count: number, state: 'offered' | 'withdrawn' }
-interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean }
+interface Detail { scheme: Scheme, options: Option[], checklist: { code: string, done: boolean }[], sideLocked: boolean, example: { lengthOptionId: string | null, endsOn: string | null }[], lists: { id: string, name: string }[], feesOn: boolean, canImport: boolean }
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -95,9 +95,42 @@ const actions = computed(() => {
   const out = []
   if (s.state === 'closed') out.push({ label: t('membership.screens.scheme.to-archived'), icon: 'i-lucide-archive', onSelect: () => move('archived') })
   if (s.state === 'archived') out.push({ label: t('membership.screens.scheme.to-closed'), icon: 'i-lucide-archive-restore', onSelect: () => move('closed') })
+  if (data.value?.canImport && (s.state === 'open' || s.state === 'closed')) out.push({ label: t('membership.screens.import.action'), icon: 'i-lucide-file-up', onSelect: openImport })
   if (s.state === 'draft') out.push({ label: t('membership.screens.scheme.delete'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: remove })
   return out
 })
+
+// Importing members from a file (MEM-49): tried first, then queued once the officer has seen the outcome.
+interface Imported { queued: number, wouldImport?: number, refused: { line: number, reason: string }[] }
+const importing = ref(false)
+const importFile = ref<File | null>(null)
+const importPreview = ref<Imported | null>(null)
+const importRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+function openImport() {
+  importFile.value = null
+  importPreview.value = null
+  importRefusal.value = null
+  importing.value = true
+}
+async function sendImport(dryRun: boolean): Promise<Imported | null> {
+  importRefusal.value = null
+  try {
+    return await $api<Imported>(`/api/membership/schemes/${id.value}/import` as string, { method: 'POST', body: { file: await importFile.value!.text(), dryRun } })
+  }
+  catch (e) {
+    importRefusal.value = toRefusal(e)
+    return null
+  }
+}
+watch(importFile, async (f) => {
+  importPreview.value = f ? await sendImport(true) : null
+})
+async function runImport() {
+  const done = await sendImport(false)
+  if (!done) return
+  toast.add({ title: t('membership.screens.import.queued', { count: done.queued }), description: t('membership.screens.import.queued-help'), color: 'success' })
+  importing.value = false
+}
 
 // Lengths.
 const option = reactive({ name: '', count: 12, idempotency: '' })
@@ -560,6 +593,55 @@ async function addMember() {
           loading-auto
           :disabled="!member.address.trim() || (asksFee && member.fee === 'waive' && !member.note.trim())"
           :label="t('membership.screens.add-member.submit')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="importing"
+      :title="t('membership.screens.import.title')"
+      :description="t('membership.screens.import.help')"
+    >
+      <template #body>
+        <div class="space-y-4">
+          <RefusalNotice :refusal="importRefusal" />
+          <UFileUpload
+            v-model="importFile"
+            accept=".csv,text/csv,text/plain"
+            :label="t('membership.screens.import.file')"
+            :description="t('membership.screens.import.file-help')"
+            class="w-full"
+          />
+          <UAlert
+            v-if="importPreview"
+            :color="importPreview.refused.length ? 'warning' : 'success'"
+            variant="subtle"
+            :title="t('membership.screens.import.would-import', { count: importPreview.wouldImport ?? 0 })"
+          >
+            <template
+              v-if="importPreview.refused.length"
+              #description
+            >
+              <p>{{ t('membership.screens.import.refused', { count: importPreview.refused.length }) }}</p>
+              <ul class="list-disc ps-5">
+                <li
+                  v-for="r in importPreview.refused.slice(0, 10)"
+                  :key="r.line"
+                >
+                  {{ t('membership.screens.list.refused-line', { line: r.line, reason: t(`membership.screens.import.reasons.${r.reason}`) }) }}
+                </li>
+              </ul>
+            </template>
+          </UAlert>
+        </div>
+      </template>
+      <template #footer>
+        <UButton
+          icon="i-lucide-file-up"
+          loading-auto
+          :disabled="!importPreview?.wouldImport"
+          :label="t('membership.screens.import.submit')"
+          @click="runImport"
         />
       </template>
     </UModal>

@@ -1,10 +1,13 @@
 <!-- Ticket types (Box office specification, part 6): the kinds of ticket the theatre sells, such as
      Full price and Concession, shared by every production and listed in the order set here. A type
      a module keeps (Companion, Complimentary, Member) shows which module, and only its name, order
-     and whether it is sold can be changed; its rules are the module's. A type a person made may ask
+     and whether it is sold can be changed; its rules are the module's. The order is set by dragging a
+     row's handle, or from the keyboard with the arrow keys on the handle or Move up and Move down. A type a person made may ask
      for requirements, such as a membership, chosen from what the switched-on modules provide. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
+import { unrefElement } from '@vueuse/core'
+import { insertNodeAt, removeNode, useSortable } from '@vueuse/integrations/useSortable'
 
 definePageMeta({ layout: 'console' })
 
@@ -39,13 +42,13 @@ const labelOf = (ref: string) => data.value?.requirementLabels[ref] ?? ref
 // `box-office.companion` is kept by box-office: the module's own name for it.
 const moduleName = (managedBy: string) => t(`${managedBy.slice(0, managedBy.lastIndexOf('.'))}.module.name`)
 
-interface FormState { name: string, kind: 'standard' | 'concession', proofNote: string, requirementRefs: string[], maxPerHolder: number, sort: number, active: boolean }
-const blank = (): FormState => ({ name: '', kind: 'standard', proofNote: '', requirementRefs: [], maxPerHolder: 1, sort: 0, active: true })
+interface FormState { name: string, kind: 'standard' | 'concession', proofNote: string, requirementRefs: string[], maxPerHolder: number, active: boolean }
+const blank = (): FormState => ({ name: '', kind: 'standard', proofNote: '', requirementRefs: [], maxPerHolder: 1, active: true })
 const form = ref<FormState>(blank())
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
 function body(f: FormState, managed: boolean) {
-  const common = { name: f.name.trim(), proofNote: f.proofNote.trim() || null, sort: f.sort }
+  const common = { name: f.name.trim(), proofNote: f.proofNote.trim() || null }
   if (managed) return common
   return { ...common, kind: f.kind, requirementRefs: f.requirementRefs, ...(f.requirementRefs.length ? { maxPerHolder: f.maxPerHolder } : {}) }
 }
@@ -71,7 +74,7 @@ const editOpen = computed({ get: () => !!editing.value, set: (v) => { if (!v) ed
 
 function startEdit(type: TicketType) {
   editRefusal.value = null
-  editForm.value = { name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, sort: type.sort, active: type.active }
+  editForm.value = { name: type.name, kind: type.kind === 'concession' ? 'concession' : 'standard', proofNote: type.proofNote ?? '', requirementRefs: [...type.requirementRefs], maxPerHolder: type.maxPerHolder, active: type.active }
   editing.value = type
 }
 
@@ -115,8 +118,73 @@ async function remove(type: TicketType) {
   }
 }
 
+// The order, as shown: dragged rows move here first and are then saved as a whole.
+const ordered = ref<TicketType[]>([])
+watch(() => data.value?.ticketTypes, (types) => { ordered.value = [...(types ?? [])] }, { immediate: true })
+// The RecordList component; Sortable works on its <ul>.
+const list = useTemplateRef('list')
+const moved = ref('')
+
+async function saveOrder(type: TicketType) {
+  const at = ordered.value.findIndex(x => x.id === type.id)
+  moved.value = t('box-office.ticket-types.order.moved', { name: type.name, position: at + 1, count: ordered.value.length })
+  refusal.value = null
+  try {
+    await $api('/api/box-office/ticket-types/order', { method: 'PUT', body: { ticketTypeIds: ordered.value.map(x => x.id) } })
+    await refresh()
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+    await refresh()
+    ordered.value = [...(data.value?.ticketTypes ?? [])]
+  }
+}
+
+useSortable(list, ordered, {
+  watchElement: true,
+  handle: '[data-drag-handle]',
+  animation: 150,
+  onUpdate: (e: { item: HTMLElement, from: HTMLElement, oldIndex?: number, newIndex?: number }) => {
+    if (e.oldIndex === undefined || e.newIndex === undefined || e.oldIndex === e.newIndex) return
+    // Sortable has already moved the row; put it back so Vue draws the new order itself.
+    removeNode(e.item)
+    insertNodeAt(e.from, e.item, e.oldIndex)
+    const next = [...ordered.value]
+    const [type] = next.splice(e.oldIndex, 1)
+    next.splice(e.newIndex, 0, type!)
+    ordered.value = next
+    saveOrder(type!)
+  },
+})
+
+function move(type: TicketType, by: -1 | 1) {
+  const from = ordered.value.findIndex(x => x.id === type.id)
+  const to = from + by
+  if (from < 0 || to < 0 || to >= ordered.value.length) return
+  const next = [...ordered.value]
+  next.splice(to, 0, next.splice(from, 1)[0]!)
+  ordered.value = next
+  saveOrder(type)
+}
+
+async function onHandleKey(event: KeyboardEvent, type: TicketType) {
+  const by = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+  if (!by) return
+  event.preventDefault()
+  move(type, by)
+  // The row is drawn again in its new place: keep the keyboard on its handle.
+  await nextTick()
+  const ul = unrefElement(list) as HTMLElement | undefined
+  ul?.querySelector<HTMLElement>(`[data-drag-handle="${type.id}"]`)?.focus()
+}
+
 function actions(type: TicketType): DropdownMenuItem[] {
-  const items: DropdownMenuItem[] = [{ label: t('box-office.ticket-types.edit'), icon: 'i-lucide-pencil', onSelect: () => startEdit(type) }]
+  const at = ordered.value.findIndex(x => x.id === type.id)
+  const items: DropdownMenuItem[] = [
+    { label: t('box-office.ticket-types.edit'), icon: 'i-lucide-pencil', onSelect: () => startEdit(type) },
+    { label: t('box-office.ticket-types.order.up'), icon: 'i-lucide-arrow-up', disabled: at <= 0, onSelect: () => move(type, -1) },
+    { label: t('box-office.ticket-types.order.down'), icon: 'i-lucide-arrow-down', disabled: at >= ordered.value.length - 1, onSelect: () => move(type, 1) },
+  ]
   items.push(type.active
     ? { label: t('box-office.ticket-types.retire'), icon: 'i-lucide-archive', onSelect: () => setActive(type, false) }
     : { label: t('box-office.ticket-types.restore'), icon: 'i-lucide-archive-restore', onSelect: () => setActive(type, true) })
@@ -155,24 +223,50 @@ function describe(type: TicketType): string {
             :description="t('box-office.ticket-types.empty.description')"
             icon="i-lucide-tags"
           />
+          <p
+            v-if="d.ticketTypes.length > 1"
+            class="mb-2 text-sm text-muted"
+          >
+            {{ t('box-office.ticket-types.order.help') }}
+          </p>
           <RecordList
-            v-else
+            v-if="d.ticketTypes.length"
+            ref="list"
             :label="t('box-office.navigation.ticket-types.label')"
           >
             <RecordListItem
-              v-for="type in d.ticketTypes"
+              v-for="type in ordered"
               :key="type.id"
               :name="type.name"
               :description="describe(type)"
               :icon="type.managedBy ? 'i-lucide-lock' : undefined"
               :muted="!type.active || !type.available"
             >
+              <template #leading>
+                <IconButton
+                  :data-drag-handle="type.id"
+                  icon="i-lucide-grip-vertical"
+                  size="sm"
+                  class="cursor-grab touch-none"
+                  :label="t('box-office.ticket-types.order.handle', { name: type.name })"
+                  aria-describedby="ticket-types-order-help"
+                  @keydown="onHandleKey($event, type)"
+                />
+              </template>
               <RowActions
                 :items="actions(type)"
                 :label="t('box-office.ticket-types.actions', { name: type.name })"
               />
             </RecordListItem>
           </RecordList>
+          <span
+            id="ticket-types-order-help"
+            class="sr-only"
+          >{{ t('box-office.ticket-types.order.keys') }}</span>
+          <span
+            class="sr-only"
+            aria-live="polite"
+          >{{ moved }}</span>
         </template>
       </DataBoundary>
 
@@ -225,16 +319,6 @@ function describe(type: TicketType): string {
               v-model="form.maxPerHolder"
               :min="1"
               :max="50"
-            />
-          </UFormField>
-          <UFormField
-            :label="t('box-office.ticket-types.add.sort')"
-            :help="t('box-office.ticket-types.add.sort-help')"
-          >
-            <UInputNumber
-              v-model="form.sort"
-              :min="0"
-              :max="999"
             />
           </UFormField>
           <UButton
@@ -309,16 +393,6 @@ function describe(type: TicketType): string {
               />
             </UFormField>
           </template>
-          <UFormField
-            :label="t('box-office.ticket-types.add.sort')"
-            :help="t('box-office.ticket-types.add.sort-help')"
-          >
-            <UInputNumber
-              v-model="editForm.sort"
-              :min="0"
-              :max="999"
-            />
-          </UFormField>
         </UForm>
       </template>
       <template #footer>
