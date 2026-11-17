@@ -81,17 +81,18 @@ export interface ParsedRow { value: string, endsOn: string | null, name: string 
 const DATE = /^\d{4}-\d{2}-\d{2}$/ // not-policy: the shape of a date
 const UK_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/ // not-policy: day/month/year as spreadsheets write it
 
-function dateOf(text: string): string | null | undefined {
+export function dateOf(text: string): string | null | undefined {
   const t = text.trim()
   if (!t) return null
-  if (DATE.test(t)) return t
   const uk = UK_DATE.exec(t)
-  if (uk) return `${uk[3]}-${uk[2]!.padStart(2, '0')}-${uk[1]!.padStart(2, '0')}`
-  return undefined
+  const iso = DATE.test(t) ? t : uk ? `${uk[3]}-${uk[2]!.padStart(2, '0')}-${uk[1]!.padStart(2, '0')}` : null
+  // A date that does not exist, such as 31 February, is not read as another.
+  const parsed = iso ? new Date(`${iso}T00:00:00Z`) : null
+  return parsed && !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(iso!) ? iso : undefined
 }
 
 /** Splits one CSV line, honouring double quotes. */
-function cells(line: string): string[] {
+export function cells(line: string): string[] {
   const out: string[] = []
   let cell = ''
   let quoted = false

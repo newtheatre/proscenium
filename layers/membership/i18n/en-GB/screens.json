@@ -345,5 +345,25 @@
   "membership.screens.mine.valid-until": "Valid until",
   "membership.screens.mine.card-code": "Membership card code",
   "membership.screens.mine.card-help": "Show this at the door or the desk to be scanned.",
-  "membership.screens.mine.card-no-code": "Show this card at the door or the desk."
+  "membership.screens.mine.card-no-code": "Show this card at the door or the desk.",
+
+  "membership.screens.import.action": "Import members",
+  "membership.screens.import.title": "Import members",
+  "membership.screens.import.help": "Add last year's members, or members from another system, from a spreadsheet saved as CSV. Each becomes an active member of this scheme.",
+  "membership.screens.import.file": "File",
+  "membership.screens.import.file-help": "Columns in this order: email address, name, start date, end date. Leave a date empty and the scheme's rule decides it.",
+  "membership.screens.import.would-import.one": "{count} member is ready to import",
+  "membership.screens.import.would-import.other": "{count} members are ready to import",
+  "membership.screens.import.refused.one": "{count} row will be left out:",
+  "membership.screens.import.refused.other": "{count} rows will be left out:",
+  "membership.screens.import.reasons.not-an-address": "not an email address",
+  "membership.screens.import.reasons.bad-date": "a date cannot be read",
+  "membership.screens.import.reasons.dates": "the end date is before the start",
+  "membership.screens.import.reasons.repeated": "appears earlier in the file",
+  "membership.screens.import.reasons.own-account": "this is your own account",
+  "membership.screens.import.reasons.already-held": "already holds this scheme",
+  "membership.screens.import.submit": "Import",
+  "membership.screens.import.queued.one": "{count} member is being imported",
+  "membership.screens.import.queued.other": "{count} members are being imported",
+  "membership.screens.import.queued-help": "They appear in the members list over the next few minutes."
 }

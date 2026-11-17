@@ -6,7 +6,7 @@
 // The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
 // needs no form (tab 7), so forms is only used until the application form is wired in.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, point, secret, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, job, point, secret, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'membership.settings.manage'
@@ -64,6 +64,8 @@ export default defineModule({
     // Correcting a membership's dates (D7, MEM-28). Nobody corrects their own.
     'membership.update': ability({ on: 'membership.membership', owner: 'refuses', implies: ['membership.view'] }),
     // Exporting the members list (MEM-27): a file of people, so privileged.
+    // Importing members from a file (MEM-49): a dry run, then bulk jobs. Privileged: it makes accounts.
+    'membership.import': ability({ on: 'membership.scheme', risk: 'privileged', implies: ['membership.add'] }),
     'membership.export': ability({ risk: 'privileged', implies: ['membership.view'] }),
     // Asking whether somebody else holds a membership: a seller checking a customer's member price,
     // a steward at the door. The requirement source's checkAbility.
@@ -95,6 +97,20 @@ export default defineModule({
   secrets: {
     // The key verification lists are hashed with (V10). Lists cannot be used until it is set.
     MEMBERSHIP_LIST_KEY: secret({ needed: 'when-used' }),
+  },
+
+  jobs: {
+    // A share of a members import (MEM-49), on the bulk lane so a large file never holds up the prompt one.
+    'membership.import-members': job({
+      payload: z.object({
+        importId: z.string(),
+        schemeId: z.string(),
+        importedBy: z.string().nullable(),
+        day: z.string(),
+        rows: z.array(z.object({ line: z.number(), address: z.string(), name: z.string().nullable(), startsOn: z.string().nullable(), endsOn: z.string().nullable() })),
+      }),
+      lane: 'bulk',
+    }),
   },
 
   tasks: {
