@@ -125,6 +125,7 @@ export default defineModule({
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
     // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
     'core.navigation': [
+      { id: 'payments.till', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 5 },
       { id: 'payments.session', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/session', icon: 'i-lucide-calculator', ability: 'payments.session.open', order: 10 },
       { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },
       { id: 'payments.refunds', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/refunds', icon: 'i-lucide-undo-2', ability: 'payments.refund.approve', order: 30, count: 'payments.refunds-waiting' },

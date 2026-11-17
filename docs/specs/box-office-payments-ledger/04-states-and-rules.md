@@ -2,16 +2,16 @@
 
 ## The rule behind every rule
 
-Every change of state below is **one unit of work, committed as one D1 batch** (Foundations draft 1). A guard is written on the statement itself, as a `WHERE` clause, a CHECK or a trigger, never as a read followed by a write. Where a guarded update could match no rows without raising an error, the batch carries a final assertion that fails it, so a transition either happens whole or leaves nothing behind.
+Every change of state below is **one unit of work, committed as one D1 batch** (Foundations draft 1). A guard is written on the statement itself, as a `WHERE` clause, a CHECK or a trigger, never as a read followed by a write. Where a guarded update could match no rows without raising an error, the batch carries the kit's guard, a read statement that raises and fails it, so a transition either happens whole or leaves nothing behind. No unit here compares D1's count of changed rows with an exact number: that count includes rows written by triggers and search indexes, and the claim tables carry triggers (Foundations part 3, "Counting changes once tables have triggers"). Wherever this part says a conditional write must take effect, it means the guard passed.
 
 ## A performance on sale
 
 | From | To | Guard | Who |
 | --- | --- | --- | --- |
 | draft | on sale | At least one pool with capacity above zero; every pool's band has at least one price; if any price is above zero, a payment provider is active for the online channel or the performance is desk-only | `box-office.performance.manage`, or automatically at `on_sale_at` |
-| on sale | paused | None. New baskets are refused; open baskets may finish | `box-office.performance.manage` |
+| on sale | paused | None. New baskets are refused, at the desk as online; open baskets may finish, and payment for an existing reservation is still taken | `box-office.performance.manage` |
 | paused | on sale | Same as draft to on sale | `box-office.performance.manage` |
-| on sale, paused | closed | Automatically at `off_sale_at` online; the desk may sell until the performance ends | system |
+| on sale, paused | closed | Automatically at `off_sale_at` online; the desk may go on selling until box-office.sales.desk-until-after has passed after the start. The desk never sells a performance that is draft or paused | system |
 
 **Cancelling, rescheduling or moving a performance with tickets** (integration ruling R-11). Box office's contribution to `core.change-guard` refuses the core's change while the performance has live tickets or reservations and no decision is recorded, and the refusal links to the Bulk cancellation screen. There a person with `box-office.performance.manage` records the decision on the sales record: refund all, offer exchange, or keep (not offered for a cancellation). The core's change then goes through, and its event runs the recorded decision as jobs (see Cancelling). Box office never refunds without that decision.
 
@@ -66,7 +66,7 @@ Some theatres take no money online: people reserve weeks ahead and pay at the de
 | Transition | Trigger | Guards | Effects, one batch |
 | --- | --- | --- | --- |
 | basket to reserved | Buyer presses Reserve online, or staff reserve at the desk or by phone | Account present; email confirmed if `box-office.reservations.confirm-email` is on; within the per-order and per-person limits; holds still live; expected total matches | Every claim moves from `held` to `confirmed` and its `expires_at` is cleared; the hold's kind becomes `reservation`; lines fix their price rows; the order gets its reference and desk code; `box-office.order.reserved` is announced; the confirmation message is queued. No payment intent, no tickets, no ledger posting |
-| reserved to reserved (amended) | Buyer reduces from the link; staff reduce, add or change a ticket type at the desk | Adding needs free capacity through the ordinary claim; a change of type re-prices that line at the price current when reserved | Claims released or added; lines superseded; amount due recomputed |
+| reserved to reserved (amended) | Buyer reduces from the link; staff reduce, add or change a ticket type at the desk | Adding needs free capacity through the ordinary claim; a change of type re-prices that line at the price that was in force when the order was reserved (the order's reserved\_at), so a price rise since then is not charged to someone who booked before it; an added ticket is a new claim at today's price | Claims released or added; lines superseded; amount due recomputed. A removal writes a cancellation row; a reason may be given and is not required, because nothing was paid |
 | reserved to awaiting payment | Staff press Take payment at the desk | Ability `box-office.order.take-payment`; open till session; expected total matches | Payment intent created for the amount due, with one part for the order and one for each other module's panel in the till. The attempt is then started, its provider call going through `externalCall` |
 | awaiting payment to confirmed | Provider or staff report success | As the ordinary settle batch | The settle batch below in its reserved form: the claims are already `confirmed`, so they are asserted and not changed; tickets issued; ledger posting. When staff chose Pay and admit, the tickets are marked admitted in the same batch |
 | awaiting payment to reserved | Payment failed or was cancelled | Attempt is final and not succeeded | Order returns to `reserved`; its claims stay `confirmed`; staff may try again or use another method |
@@ -81,9 +81,13 @@ Some theatres take no money online: people reserve weeks ahead and pay at the de
 - The desk code in the message identifies the order and is stored hashed. It is not an admission ticket, and the door scanner answers "Not paid. Send to the desk" if it is shown there.
 - An attempt with no answer leaves the order in `awaiting_payment` and is listed under Needs attention like any other unknown attempt. The release task never releases an order with an attempt in flight.
 - Release time is `box-office.reservations.release-before` ahead of the performance's start. Unset means never release automatically. Staff can mark one reservation `keep` (a known latecomer) and can release any by hand.
-- Limits: `box-office.reservations.max-tickets-per-order` and `box-office.reservations.max-tickets-per-person` (per performance, across that account's live reservations).
+- Limits: `box-office.reservations.max-tickets-per-order` and `box-office.reservations.max-tickets-per-person` (per performance, across that person's live reservations). The count is of live ticket lines on orders that are reserved, or awaiting payment under a reservation hold, taken on the kit's account scope and guarded in the reserving batch.
 - A reminder is sent `box-office.reservations.remind-before` ahead, with the amount due and the cancel link. The task `box-office.send-reservation-reminders` queues it.
 - Payment methods at the desk are whatever Payments has connected: the reader driven from the screen, cash, or a card payment attested by staff when the reader is used on its own.
+
+**Confirming by email.** When `box-office.reservations.confirm-email` is on and the buyer is not signed in, pressing Reserve does not reserve. The order stays a basket with no account, its seats held for the ordinary hold time. The basket stores the name and address the buyer typed and the hash and expiry of an ordinary link token (random, made by the kit's `linkTokens`; Foundations part 4, rules T1 to T4), and the message `box-office.reservation-confirm` is sent to that address with a link to `/book/confirm/<token>`, built with the kit's `siteUrl`. The address carries the token and nothing else: the page reads the order, the address and the total from the row. Pressing the link finds or creates the account for that address and runs the reserve batch above with it, clearing the token and the stored address in the same batch. The page gives one answer for a link that is wrong, used or expired, and a basket whose link is never pressed expires like any other. A signed-in buyer skips the step.
+
+**The order's link.** The link in the reserved message opens the order without signing in. It is the same kind of link token, stored on the order as `link_token_hash` with `link_token_expires_at`. The landing page reads the token from the address once, under the kit's rules for such a route (the token kept out of logs and audit, no referrer, nothing cached), and from then on sends it in the header `x-order-token`: one route reads the order in whatever state it has reached, and one cancels or reduces it while it is reserved. Confirming an order always issues a new link, sent in the confirmation message, so the link in a reservation's message stops working once the order is paid; that message says the link is for managing the reservation until it is paid.
 
 ### One payment for tickets and something else
 
@@ -115,6 +119,8 @@ Left to the owning modules: their stock and prices, and whether their items can 
 
 **The total.** A line's amount is its list price less its discount, both fixed when the line is written. The order total is the sum of live lines, rewritten in the same batch as any line change. Booking fees are lines, so the total a buyer sees is the total they pay.
 
+**Born a basket.** Every order row is inserted in state `basket`, and a trigger refuses any other. A desk sale or a reservation that never shows a basket to anyone still inserts one and moves it on in the same batch, so every order passes the same guarded transitions.
+
 ## A claim
 
 ```mermaid
@@ -138,13 +144,13 @@ flowchart LR
 
 | Rule | How it is enforced |
 | --- | --- |
-| A pool never holds more live claims than its capacity | CHECK on the pool, fed by triggers (Proof, cases 2, 3 and 7) |
+| A pool never holds more live claims than its capacity | The claim is a conditional write on the pool (room for the whole party) followed by the kit's guard, so a full pool is a refusal in the theatre's words ("These have just gone", "Only 1 is left") and the batch takes nothing. Behind it, as the backstop the proof tested, the CHECK on the pool, fed by triggers, refuses any insert past capacity however it arrives, and a trigger keeps the pool's counter equal to the count of its live claims. Every other condition on the claim (a limit per person, a hold that must still be live, the party's size) is followed by the kit's guard too, never by a test of changed rows (Proof, cases 2, 3 and 7) |
 | A seat has one live claim | Partial unique index (Proof, cases 5 and 6) |
 | A party is seated whole or not at all | All of its claims are in one batch (Proof, cases 3 and 4) |
 | An expired hold never blocks a sale | Every claim batch first releases the pool's expired holds (Proof, case 8) |
 | Capacity cannot be cut below what is sold | The same CHECK (Proof, case 10) |
 | A released claim cannot come back | Trigger (Proof, case 10) |
-| A hold being paid for is not swept | The sweep and the lazy release both skip a hold whose order has an attempt that is pending or unknown |
+| A hold being paid for is not swept | The sweep and the lazy release never release a hold of kind payment. Box office does not read Payments' tables to judge it: Payments ends such a hold through the settlement handler's release, when the intent is cancelled or expires with no attempt pending or unknown |
 
 **Kinds of hold and how long they last.**
 
@@ -186,12 +192,12 @@ Rules:
 
 | Transition | Guard | Notes |
 | --- | --- | --- |
-| (none) to valid | Order confirmed | One per ticket line, with a fresh random code. The signed code goes to the buyer; the database keeps only its hash |
+| (none) to valid | Order confirmed | One per ticket line, with a fresh random code. The signed code goes to the buyer; the database keeps its hash for scanning and an encrypted copy for showing it again |
 | valid to void | Line cancelled or exchanged, ticket reissued, or performance cancelled | A reissue voids the old code and writes a new ticket, so a forwarded or lost ticket can be killed |
-| valid to admitted | `admitted_at` is null; the scanner is set to this ticket's performance; doors are open | One conditional update. A second scan matches no row and is recorded as `already_admitted`, showing when and at which door |
+| valid to admitted | `admitted_at` is null; the scanner is set to this ticket's performance; doors are open | One conditional update, which stamps the ticket with the admitting scan's id. The scan row's result is read from that stamp, never from a count of changed rows: admitted when the stamp is this scan's id; otherwise the scan is recorded as `already_admitted`, showing when and at which door |
 | admitted to not admitted | `box-office.ticket.admit` and a reason code | Writes a `reversed` scan. For a mis-scan at the door |
 
-**Finding a ticket from a scan.** A scanned code is checked for its signature, then hashed, and the ticket is found by `code_hash`. No table stores a code in the clear.
+**Finding a ticket from a scan.** A scanned code is checked for its signature, then hashed, and the ticket is found by `code_hash`. No table stores a code in the clear. Showing or sending a ticket again (Manage booking, My tickets, the desk's Show and Resend) decrypts the stored copy and signs it afresh, so the code the buyer already holds keeps working. The message that first carried it cannot be sent again, because its code is a sealed variable and is cleared once delivered. Reissuing is different: it voids the old code and makes a new one. Three callers, and no others, may cause a decrypt: the holder signed in, for an order on their account, through My tickets; whoever holds the order's link token, through Manage booking; and staff with box-office.order.resend, through the desk's and the order screen's Show and Resend. Seeing an order under box-office.order.view shows that a ticket exists and its state, never its code. Each staff use is an audited read naming the ticket and the person, never the code. The decrypted code goes only into the page or the message being made: it is never in a download, an export, an event, a job's payload, a log or audit detail.
 
 **Scanning offline.** The door device downloads a manifest for one performance: ticket ids, code hashes and states, the signing public keys, and no names unless the theatre turns on `box-office.scanning.names-on-device`. With names off, Find by name works only while online. Offline, the device checks the signature on the code, hashes it, looks it up in its own list, admits locally and queues the scan. Each queued scan has an id the device made in the standard form (`scan_` and 26 characters), so a scan sent twice is stored once. On reconnection two things are flagged on the door report: a ticket two devices both admitted offline (the earlier `scanned_at` wins the admission and the later is stored as `already_admitted`), and a ticket that was voided after the manifest was downloaded and admitted all the same (stored as `void`, with `offline` set). Offline scanning accepts these small risks in exchange for a door that never stops; the setting `box-office.scanning.offline` turns it off for a theatre that would rather not.
 
@@ -285,12 +291,12 @@ It should not happen, because a hold with a pending or unknown attempt is never 
 | Case | Rule |
 | --- | --- |
 | Buyer cancels online | Allowed only if `box-office.cancellations.by-buyer` is on and the performance is more than `box-office.cancellations.until-before` away. The fee setting is deducted |
-| Staff cancel | Cancelling needs `box-office.order.cancel`. Refunding as well needs `box-office.order.refund`, which cancelling does not imply: staff with both choose refund in full or refund less the fee; staff with only the first cancel with no refund, and a refund can be asked for afterwards by someone who holds the second |
-| Part of an order | Any subset of lines. A companion ticket cannot remain without a paid ticket |
+| Staff cancel | Cancelling needs `box-office.order.cancel`. Refunding as well needs `box-office.order.refund`, which cancelling does not imply: staff with both choose refund in full or refund less the fee; staff with only the first cancel with no refund, and a refund can be asked for afterwards by someone who holds the second. Only a reserved or confirmed order can be cancelled, and an admitted ticket cannot be cancelled until the mis-scan is undone. A reason from the theatre's cancellation reasons is required when staff cancel a paid line; for a reservation, where nothing was paid, it is optional |
+| Part of an order | Any subset of lines. A companion ticket cannot be left as the only kind of ticket for a performance on the order |
 | Performance cancelled | The decision was recorded before the core would cancel (see A performance on sale). `core.performance.cancelled` runs it: for refund all, every confirmed order is cancelled and refunded in full, booking fee included unless `box-office.cancellations.refund-fee-on-cancelled-show` is off, and every reservation is cancelled. Processed as jobs, one order each, so a failure stops one order and not the run |
 | Exchange | Old lines become `exchanged` and their claims released; new lines are claimed on the target performance; all in one batch, so the buyer never loses the old seats without getting the new. A price rise creates an intent for the difference and the exchange completes when it settles; a price fall creates a refund |
 
-In every case one batch releases the claims, voids the tickets, updates the lines and total, writes the cancellation row and requests any refund.
+In every case one batch releases the claims, voids the tickets, updates the lines and total, writes the cancellation row and requests any refund. The refund is asked for through Payments' requestRefund in the same unit, and its id is kept on the cancellation row. A refund made from Payments' screens with no cancellation behind it is set against the order's cancelled lines first, then its live lines. The entries Box office returns for a refund debit deferred ticket income, per performance, while that performance's income has not been recognised, and ticket income once it has.
 
 ## The waiting list
 

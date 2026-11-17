@@ -40,12 +40,18 @@ test.describe('a site owner who runs the console', () => {
 
   test('the console foot links to Site administration, and there the way back sits at the foot beside the account menu', async ({ page }) => {
     await visit(page, '/console')
-    await page.getByRole('navigation', { name: 'Help and administration' }).getByRole('link', { name: 'Site administration' }).click()
+    const foot = page.getByRole('navigation', { name: 'Help and administration' })
+    const docsHere = (await foot.getByRole('link', { name: 'Documentation' }).boundingBox())!
+    expect(docsHere.y).toBeLessThan((await foot.getByRole('link', { name: 'Site administration' }).boundingBox())!.y)
+    await foot.getByRole('link', { name: 'Site administration' }).click()
     await expect(page).toHaveURL(/\/admin$/)
     const back = page.getByRole('link', { name: 'Back to console' })
     await expect(back).toBeVisible()
     expect((await back.boundingBox())!.y).toBeGreaterThan(page.viewportSize()!.height / 2)
     await expect(page.getByRole('link', { name: 'Site administration' })).toHaveCount(0) // its own link is not repeated
+    // The link to the other shell sits beneath Documentation here as it does in the console.
+    const docs = (await page.getByRole('link', { name: 'Documentation' }).boundingBox())!
+    expect(docs.y).toBeLessThan((await back.boundingBox())!.y)
     await noViolations(page)
     await back.click()
     await expect(page).toHaveURL(/\/console$/)

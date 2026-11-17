@@ -8,7 +8,7 @@ Settings are site-wide. Where a value varies by record, such as a performance's 
 
 ## Settings: organisation
 
-Five facts about the theatre are foundations settings, because the kit is built on them, and are not repeated here: its name (`core.site.name`), time zone (`core.locale.time-zone`), language (`core.locale.language`), currency (`core.locale.currency`) and the hour the operating day begins (`core.locale.day-start`, default 04:00). Wherever this specification speaks of the theatre's name, time zone, language, currency or day rollover, it means those keys. The organisation screen shows them beside the settings below, so an administrator sees one page.
+Five facts about the theatre are foundations settings, because the kit is built on them, and are not repeated here: its name (`core.site.name`), time zone (`core.locale.time-zone`), language (`core.locale.language`), currency (`core.locale.currency`) and the hour the operating day begins (`core.locale.day-start`, default 04:00). Wherever this specification speaks of the theatre's name, time zone, language, currency or day rollover, it means those keys. The Theatre page in Site administration shows them beside the organisation settings below, so an administrator sees one page.
 
 | Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -75,13 +75,13 @@ The brand limit is Flytower's figure for a raw logo. The others are judgement.
 | Key | Kind | Default | Limits | Changed by | Audience | Quotable | Purpose |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `core.notifications.sending-domain` | text | unset | A domain name | `core.sender.manage` | staff | No | The domain mail is sent from. No mail is sent until it is set and verified. |
-| `core.notifications.max-attempts` | integer | 5 | 1 to 10 | `core.notification.configure` | staff | No | Tries before a delivery fails for good |
-| `core.notifications.first-retry` | duration | 2m | 1m to 1h | `core.notification.configure` | staff | No | Wait before the first retry. Each later wait is four times the last. |
-| `core.notifications.stuck-after` | duration | 10m | 5m to 2h | `core.notification.configure` | staff | No | When a queued or sending delivery is treated as stuck |
+| `core.delivery.max-attempts` | integer | 5 | 1 to 10 | `core.notification.configure` | staff | No | Tries before a delivery fails for good |
+| `core.delivery.first-retry` | duration | 2m | 1m to 1h | `core.notification.configure` | staff | No | Wait before the first retry. Each later wait is four times the last. |
+| `core.delivery.stuck-after` | duration | 10m | 5m to 2h | `core.notification.configure` | staff | No | When a queued or sending delivery is treated as stuck |
 | `core.notifications.digest-time` | time | 08:00 | Any | `core.notification.configure` | signed-in | No | When daily digests go out |
 | `core.notifications.digest-day` | choice | monday | A day of the week | `core.notification.configure` | signed-in | No | When weekly digests go out |
-| `core.notifications.log-retention` | duration | 400d | 30d to 2555d | `core.notification.configure` | staff | No | How long the delivery log is kept |
-| `core.notifications.inbox-retention` | duration | 180d | 30d to 730d | `core.notification.configure` | signed-in | No | How long an inbox message stays |
+| `core.delivery.log-retention` | duration | 400d | 30d to 2555d | `core.notification.configure` | staff | No | How long the delivery log is kept |
+| `core.delivery.inbox-retention` | duration | 180d | 30d to 730d | `core.notification.configure` | signed-in | No | How long an inbox message stays |
 | `core.notifications.email-footer` | text | unset | up to 500 characters | `core.template.edit` | staff | No | Text under every email, such as a registered address |
 
 One more notification setting belongs to story C-52: `core.notifications.sending-label` (text, changed by `core.sender.manage`), the label of the sending subdomain that automatic setup creates under the site's hostname. It holds one DNS label, and its default is `mail`, Matt's choice of 16 November 2026. The optional secret `CORE_CLOUDFLARE_TOKEN` that automatic setup needs is listed in the foundations specification's secrets table, not here. Part 4 gives the whole design.
@@ -109,7 +109,46 @@ One more notification setting belongs to story C-52: `core.notifications.sending
 | `public-site.feeds.calendar` | boolean | true |  | `public-site.site.configure` | public | No | Offer the calendar feed |
 | `public-site.data.open` | boolean | true |  | `public-site.site.configure` | public | No | Offer the published programme as open data |
 
-**One rule across settings:** `core.notifications.stuck-after` must be longer than `core.notifications.first-retry`.
+**One rule across settings:** `core.delivery.stuck-after` must be longer than `core.delivery.first-retry`.
+
+## Where each setting is shown
+
+By ruling R-37 (Matt's settings redesign of 16 November 2026, brief at `/mnt/project-files/settings-design/build-brief.md`), a setting carries no scope of its own. The manifest declares `settingGroups`, keyed by the first segment of a setting's short key, and `settingPages`. Every setting has exactly one home: one generated settings page, or one named bespoke screen, never both and never none. There is no core settings page in either shell.
+
+| Group | Place | Home | Declared as |
+| --- | --- | --- | --- |
+| `site` (foundations' `core.site.name` and `core.site.origin`) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'theatre' }` |
+| `organisation` | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'theatre' }` |
+| `locale` (foundations' keys) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'theatre' }` |
+| `brand`, `appearance` | Site administration, Theatre | Branding, the bespoke screen | `{ place: 'admin', screen: '/admin/branding' }` |
+| `notifications` | Site administration, Email | Email, the bespoke screen | `{ place: 'admin', screen: '/admin/email' }` |
+| `delivery` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
+| `files` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
+| `webhooks` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` (ruled by Integration, 16 November 2026) |
+| `programme` | Console, Programme | Programme settings page | `{ place: 'console', page: 'programme' }` |
+| every `public-site.*` group | Site administration, Modules | the public site module's own settings page | `place: 'admin'`, page left to the module default (ruled by Integration, 16 November 2026) |
+
+The other core groups in the brief's table (`sign-in`, `sessions`, `recovery`, `access`, `privacy`, `grants`, `members-area`, `access-scheme`, `emergency-contacts`, `merge`, and the kit's `units`, `jobs`, `external`, `idempotency`, `rate-limits`, `retention`) belong to the identity and foundations specifications, which declare them.
+
+**The notifications group was split by rename** (ruled by Foundations, 16 November 2026). `core.notifications.*` keeps what the Email screen manages: `sending-domain`, `verified-domain`, `sending-label` and `email-footer`, with `digest-time` and `digest-day` beside them (ruled by Integration, 16 November 2026: they are a choice about the theatre's email, not an engineering limit, so the group keeps six settings). The engineering half became the group `core.delivery.*`, each key declared with `replaces` naming its old key so a stored override carries across:
+
+| New key | `replaces` |
+| --- | --- |
+| `core.delivery.max-attempts` | `core.notifications.max-attempts` |
+| `core.delivery.first-retry` | `core.notifications.first-retry` |
+| `core.delivery.stuck-after` | `core.notifications.stuck-after` |
+| `core.delivery.log-retention` | `core.notifications.log-retention` |
+| `core.delivery.inbox-retention` | `core.notifications.inbox-retention` |
+
+The setting group `delivery` and the ability `core.delivery.read` share a word and nothing else: one is a group of settings, the other lets a person read the delivery log.
+
+**The site's address.** `core.site.origin`, the site's one public address, is a foundations setting in group `site` on the Theatre page, declared `onChange: 'confirm'`. Core reads it wherever it builds an absolute link and does not redeclare it.
+
+**The Organisation screen is the Theatre page.** Core no longer draws a screen of its own at `/admin/organisation`. The organisation settings sit on the generated Theatre page with the site and locale groups, and part 5 names it so.
+
+**Durations.** Every duration setting above is entered through the kit's `DurationInput` (a number and a unit, from seconds to years, with a month as 30 days and a year as 365). Storage is unchanged, whole seconds, and the written defaults in this part keep their form.
+
+A stored duration is shown in the largest unit that divides it exactly, so a duration setting's label and help never name a unit (a foundations ruling of 16 November 2026). The labels are written as "How long a sent message is kept", never "Days to keep". The same holds for the catalogue text of every duration setting in this part.
 
 ## Abilities
 

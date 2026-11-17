@@ -123,6 +123,17 @@ describe('performances', () => {
     expect((await req('POST', `/api/core/productions/${s.productionId}/performances`, { venueId: s.venueId, spaceId: s.main, startsAt: at('2027-03-04T19:30:00Z'), endsAt: at('2027-03-04T19:00:00Z') })).body.code).toBe('core.performance.times')
   })
 
+  it('carry whether the theatre runs their space (R-36)', async () => {
+    const s = await stage()
+    const visiting = await req('POST', `/api/core/venues/${s.venueId}/spaces`, { name: 'Hired hall', kindTermId: await term('core.space-kind', 'studio'), managed: false })
+    const ours = await add(s, '2027-03-06T19:30:00Z')
+    const theirs = await add(s, '2027-03-07T19:30:00Z', { spaceId: visiting.body.id })
+    expect((await req('GET', `/api/core/performances/${ours}`)).body.spaceManaged).toBe(true)
+    expect((await req('GET', `/api/core/performances/${theirs}`)).body.spaceManaged).toBe(false)
+    const items: { id: string, spaceManaged: boolean }[] = (await req('GET', `/api/core/productions/${s.productionId}/performances`)).body.performances
+    expect(Object.fromEntries(items.map(p => [p.id, p.spaceManaged]))).toEqual({ [ours]: true, [theirs]: false })
+  })
+
   it('refuse a space from another venue', async () => {
     const a = await stage()
     const b = await stage()
