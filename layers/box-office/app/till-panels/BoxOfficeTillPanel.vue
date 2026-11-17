@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import type { Buyer } from '../components/BoxOfficeBuyerPicker.vue'
 
-interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }
+interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number, reference?: { label: string, shape: string } }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
@@ -58,7 +58,17 @@ const performance = computed(() => performances.value.find(p => p.performanceId 
 const choices = computed(() => performances.value.map(p => ({ value: p.performanceId, label: `${p.title}, ${dateTime(p.startsAt)}` })))
 const quantities = ref<Record<string, number>>({})
 const keyOf = (row: { bandId: string, ticketTypeId: string }) => `${row.bandId} ${row.ticketTypeId}`
-watch(performanceId, () => { quantities.value = {} })
+// A member's references, typed for each ticket of a member price.
+const references = ref<Record<string, string[]>>({})
+function setReference(row: PerformanceRow, n: number, value: string) {
+  const list = [...(references.value[keyOf(row)] ?? [])]
+  list[n] = value
+  references.value = { ...references.value, [keyOf(row)]: list }
+}
+watch(performanceId, () => {
+  quantities.value = {}
+  references.value = {}
+})
 
 // Collecting: one order, found by what the buyer shows.
 const query = ref('')
@@ -81,14 +91,19 @@ function say() {
     return
   }
   if (mode.value === 'sell') {
-    const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0).map(r => ({ bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity: quantities.value[keyOf(r)]! }))
+    const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0).map((r) => {
+      const quantity = quantities.value[keyOf(r)]!
+      // The buyer's references, when the seller typed one for every ticket; otherwise the seller has checked by hand.
+      const typed = (references.value[keyOf(r)] ?? []).slice(0, quantity).map(x => x.trim())
+      return { bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity, ...(r.reference && typed.filter(Boolean).length === quantity ? { references: typed } : {}) }
+    })
     emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value, ...sendTo.value } : null)
   }
   else {
     emit('update:modelValue', order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, order, exchange, sendTo], say, { deep: true })
+watch([mode, admit, quantities, references, order, exchange, sendTo], say, { deep: true })
 onMounted(() => {
   if (exchange.value) say()
 })
@@ -98,6 +113,7 @@ watch(() => props.modelValue, (now) => {
   if (now !== null && now !== undefined) return
   if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
+  if (Object.keys(references.value).length) references.value = {}
   // The next buyer never sees who the last one was.
   buyer.value = undefined
   if (order.value && mode.value === 'collect' && order.value.state === 'reserved') void find(order.value.reference)
@@ -259,12 +275,31 @@ function clear() {
             :label="t('box-office.screens.panel.row', { band: row.band, type: row.ticketType, price: money(row.amountMinor) })"
             :help="t('box-office.screens.panel.left', { count: row.free })"
           >
-            <UInputNumber
-              v-model="quantities[keyOf(row)]"
-              :min="0"
-              :max="row.free"
-              :disabled="locked"
-            />
+            <div class="space-y-2">
+              <UInputNumber
+                v-model="quantities[keyOf(row)]"
+                :min="0"
+                :max="row.free"
+                :disabled="locked"
+              />
+              <template v-if="row.reference && (quantities[keyOf(row)] ?? 0) > 0">
+                <UInput
+                  v-for="n in quantities[keyOf(row)]"
+                  :key="n"
+                  :model-value="references[keyOf(row)]?.[n - 1] ?? ''"
+                  :aria-label="t('box-office.screens.panel.reference', { label: row.reference.label, n })"
+                  :placeholder="t('box-office.screens.panel.reference-placeholder', { n })"
+                  :disabled="locked"
+                  autocomplete="off"
+                  maxlength="64"
+                  class="block w-64"
+                  @update:model-value="setReference(row, n - 1, String($event))"
+                />
+                <p class="text-xs text-muted">
+                  {{ t('box-office.screens.panel.reference-help') }}
+                </p>
+              </template>
+            </div>
           </UFormField>
         </template>
       </template>

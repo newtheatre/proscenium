@@ -14,7 +14,8 @@ import { entitle, type Buyer, type Requirement } from './entitlement'
 import { applyCode, judgeCode, redeem } from './promo-codes'
 import { sellableTypes, soldOn } from './ticket-types'
 
-export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number }
+/** `references`, one for each ticket in turn, are typed in place of signing in, such as student IDs for a member price. */
+export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number, references?: string[] }
 /** `promoCode`, as the buyer typed it (BO-17). */
 export interface BasketInput { performanceId: string, lines: BasketLineInput[], promoCode?: string }
 
@@ -62,12 +63,13 @@ export async function pricedLines(performanceId: string, asked: BasketLineInput[
   if (asked.some(l => types.get(l.ticketTypeId)!.needsPaidTicket) && !asked.some(l => !types.get(l.ticketTypeId)!.needsPaidTicket))
     refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })
   const lowered = await lowestFor(performanceId, asked, prices, types, buyer)
-  const each = asked.flatMap(l => Array.from({ length: l.quantity }, () => {
+  const each = asked.flatMap(l => Array.from({ length: l.quantity }, (_, n) => {
     const p = lowered.get(`${l.bandId} ${l.ticketTypeId}`) ?? price.get(`${l.bandId} ${l.ticketTypeId}`)!
-    return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor }
+    const reference = l.references?.[n]?.trim() || undefined
+    return { bandId: l.bandId, ticketTypeId: l.ticketTypeId, priceId: p.id, amountMinor: p.amountMinor, ...(reference ? { reference } : {}) }
   }))
   const entitled = await entitle(performanceId, each, types, buyer)
-  const lines = each.map((l, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
+  const lines = each.map(({ reference: _typed, ...l }, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
   return { pool, lines, currency: prices[0]!.currency, guard: entitled.guard }
 }
 
