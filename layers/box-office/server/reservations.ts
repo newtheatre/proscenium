@@ -146,7 +146,7 @@ async function reserve(unit: UnitView, order: OrderRow, lines: LineRow[], accoun
   const token = randomToken()
   const deskCode = newDeskCode()
   unit.add(sql`UPDATE box_office_orders SET state = 'reserved', account_id = ${accountId}, signed_in = ${signedIn}, link_token_hash = ${await hashOf(token)},
-      desk_code_hash = ${await hashOf(deskCode)}, expires_at = NULL, release_at = ${releaseAt}, updated_at = ${at},
+      desk_code_hash = ${await hashOf(deskCode)}, expires_at = NULL, release_at = ${releaseAt}, reserved_at = ${at}, updated_at = ${at},
       confirm_token_hash = NULL, confirm_expires_at = NULL, confirm_email = NULL, confirm_name = NULL
     WHERE id = ${order.id} AND state = 'basket' AND expires_at > ${at} AND total_minor = ${order.total_minor}`)
     .expect(1, RAN_OUT)
