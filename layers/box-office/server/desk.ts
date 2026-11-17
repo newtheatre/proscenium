@@ -32,10 +32,8 @@ const id = z.string().min(1).max(64) // not-policy: shape bound
 const exchangeInput = z.object({
   exchange: z.object({
     orderId: id,
-    lineIds: z.array(id).min(1).max(50), // not-policy: more lines than any order holds
     performanceId: id,
-    bandId: id,
-    ticketTypeId: id,
+    lines: z.array(z.object({ lineId: id, bandId: id, ticketTypeId: id }).strict()).min(1).max(50), // not-policy: more lines than any order holds
     expectedDifferenceMinor: z.number().int().min(1),
   }).strict(),
 }).strict()
