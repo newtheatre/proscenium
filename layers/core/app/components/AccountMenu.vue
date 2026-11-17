@@ -86,12 +86,10 @@ const label = computed(() => viewer.value.name ?? t('core.menu.account'))
       v-model:open="drawer"
       :title="label"
     >
-      <UButton
-        color="neutral"
-        variant="ghost"
+      <IconButton
         icon="i-lucide-circle-user"
         class="sm:hidden"
-        :aria-label="t('core.menu.open', { name: label })"
+        :label="t('core.menu.open', { name: label })"
       />
       <template #body>
         <nav
