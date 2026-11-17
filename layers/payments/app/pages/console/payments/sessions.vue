@@ -5,7 +5,8 @@
 interface Session { id: string, pointLabel: string, openedByName: string, closedByName: string | null, openedAt: number, closedAt: number | null, state: 'open' | 'counting' | 'closed', floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
 
 const { t } = useT()
-const { money, signed, when } = await useMoney()
+const { money, signed } = await useMoney()
+const { dateTime: when } = useDates()
 const { data, status, error, refresh } = await useAPI<{ sessions: Session[] }>('/api/payments/sessions', { key: 'payments:sessions' })
 
 const closing = ref<Session | null>(null)

@@ -1,6 +1,6 @@
 # 3. Rules and flows
 
-Every write below is one unit of work: the change, its audit entry and its event go in one batch or none do. Every refusal uses the Foundations body `{ code, reason, remedy? }`; codes are listed at the end of this part. A write that reaches many rows at once (cancelling a performance's shifts, telling everyone on a rota) is written set-wise, as Foundations' rules U7 to U9 require, never one statement per person.
+Every write below is one unit of work: the change, its audit entry and its event go in one batch or none do. Every refusal uses the Foundations body `{ code, reason, remedy? }`; codes are listed at the end of this part. A write that reaches many rows at once (cancelling a performance's shifts, telling everyone on a rota) is written set-wise, as Foundations' rules U7 to U9 require, never one statement per person. No rule here depends on how many rows a statement changed, because D1's count includes rows written by triggers and indexes. A change that is only valid from a given state (taking cover, check-in, completing a checklist run, closing an incident, signing off a report) succeeds when the kit's guard passed in the same unit, and is refused when it did not. None of those records its outcome in a later statement, so none needs more than the guard. The one unit that must know which rows a conditional write changed is the account merge, which uses Foundations' claim stamp (below).
 
 ## The shift window
 
@@ -55,7 +55,7 @@ States: draft, published, completed, cancelled.
 | published | completed | task | After the window closes |
 | draft, published | cancelled | manager, or core's cancelled event | Needs a reason from a manager. Live assignments are released and people told |
 
-A manager may change `places` at any time, never below `places_taken`. A draft shift is invisible to members.
+A manager may change `places` at any time, never below `places_taken`. A draft shift is invisible to members. Nothing here is created automatically for any performance, so a performance in a space the theatre uses but does not manage gets no shifts unless a manager adds them by hand; once added they behave like any others. The flag is core's and sits on the space, not the venue, and is read through core's service. Front of house uses it in two places only: the Rota page marks such a performance and the bulk "Apply rota template" skips it, and the emergency card health check does not ask for a card on its account.
 
 ## Assignments
 
@@ -69,7 +69,7 @@ A manager may change `places` at any time, never below `places_taken`. A draft s
 | confirmed | release\_requested | the person | Inside the release notice. The place stays theirs and the shift is offered as cover |
 | release\_requested | released | another member taking cover, or a manager | Taking cover creates the taker's confirmed assignment (source cover) and releases the first in one batch |
 | release\_requested | confirmed | the person | They change their mind before anyone takes it |
-| confirmed, release\_requested | checked\_in | the person, or someone leading | Only inside the window |
+| confirmed, release\_requested | checked\_in | the person, or someone leading | Only inside the window. A repeat, such as two leads marking the same person, is accepted, keeps the first time and changes nothing else |
 | confirmed, release\_requested, checked\_in | worked, no\_show | someone leading at sign-off, or a manager | Default is worked. No-show is never set by a task |
 | any live state | removed | manager | The person is told. A reason is not required and is not shown |
 
@@ -135,7 +135,7 @@ States: reported, in\_review, closed.
 
 ## Volunteer hours
 
-A list of worked assignments, filtered by date range, person and duty, with totals. It can be exported under the export rate-limit class. A member sees their own total on "My shifts".
+A list of worked assignments, filtered by date range, person and duty, with totals. The person filter narrows this list, which is already on the screen, through identity's service findAccounts(text, list), exported from core's services: it answers a subquery of account ids that is passed to the kit's account scope, it is guarded by Identity's ability core.account.find, which front-of-house.hours.view implies, and it writes one audit read entry per call that never holds the text typed. Choosing a person who is not yet on the screen, as when a manager adds someone to a shift, is identity's other service, the person picker searchAccounts, under core.account.search, which every preset with console work already holds, so front-of-house.shift.manage implies nothing for it. Front of house never queries the accounts table itself. The search for an incident person with no account is a different thing: it reads this module's own rows. It can be exported under the export rate-limit class. A member sees their own total on "My shifts".
 
 ## The emergency card
 
@@ -148,6 +148,17 @@ One per venue, shown in live mode without any network once it has been opened on
 - **A person with no account.** Reached only by staff: holders of `front-of-house.incident.redact-person` find the person through the incident search and redact their row. Identity's data-request screen lists this as a manual step.
 - **Retention.** A daily sweep in the close-shifts task removes assignments, checklist runs and incident personal data past their periods. An incident with a child involved uses the longer period (part 6).
 - **Download of my data.** The module contributes the person's assignments and hours, the incidents they reported (their own words), and their rows in incident people without the welfare details of others.
+
+## Account merge and undo
+
+Identity stages a merge and may undo it for 30 days. Only `front_of_house_assignments.account_id` is moved to the survivor; every other account column is an alias and is read through the kit's account scope.
+
+1. **Before the move.** Where both accounts hold a live assignment on one shift, the handler keeps the one further along (checked\_in, then confirmed, then release\_requested, then requested; the older on a tie) and releases the other, stamping it `freed_by_merge` with the merge's id. This is Foundations' claim stamp: the merge's id is held before the unit starts. The released assignment is also listed through the kit's merge helper as a merge item of kind set-aside with onClose 'keep', because the released row is kept when the undo window closes; the stamp remains this module's own state.
+2. **Places.** The next statement sets `places_taken`, on each shift that has an assignment stamped by this merge, to that shift's count of live assignments. It reads the stamp, never a count of changed rows, so running the merge again changes nothing.
+3. **Undo.** After Identity has moved the column back, a stamped assignment is restored when its shift's call time is still ahead, a rota place is free and the account holds no other live assignment on the shift. It returns as a new sign-up would: confirmed when `front-of-house.shifts.confirmation` is automatic, requested when a manager confirms. `places_taken` is set again as in step 2. Nothing is taken back from anyone else.
+4. **What undo reports.** The assignments still stamped and still released after step 3, as Identity's contract asks: { notRestored, reason }, where the reason is one of three fixed codes. They are front-of-house.shift-begun (the call time has passed), front-of-house.shift-full (no place is free) and front-of-house.already-on-shift (the account has signed up for the shift again since the merge). The daily sweep clears the stamp once the undo window has closed.
+
+Merge and undo are each one unit and safe to repeat.
 
 ## Refusal codes
 

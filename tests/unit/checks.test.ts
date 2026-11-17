@@ -87,3 +87,54 @@ describe('the account scope check', () => {
     expect(problems('export function exactAccount(column: string, accountId: string) {')).toEqual([])
   })
 })
+
+describe('counts of changed rows', () => {
+  it('allows a test against nought and refuses an exact count', async () => {
+    const { exactChangeCounts } = await import('../../scripts/checks/source')
+    expect(exactChangeCounts([
+      'if (claim.meta.changes !== 1) return',
+      'if (!(claim.meta.changes > 0)) return',
+      'const queued = jobs.filter(j => (results[j.index]?.meta?.changes ?? 0) > 0)',
+      'if (result.meta.changes === 2) ok()',
+      'if (1 === result.meta.changes) ok()',
+      'return { reset: reset.meta.changes ?? 0 }',
+      "'SELECT CASE WHEN changes() = 1 THEN 1 END'",
+      'if (res.changes >= 3) more()',
+    ].join('\n'))).toEqual([1, 4, 5, 8])
+  })
+})
+
+describe('the interface check', () => {
+  it('flags what the kit replaces, and leaves the kit\'s own components alone', async () => {
+    const { interfaceProblems } = await import('../../scripts/checks/interface')
+    const source = [
+      '<form @submit.prevent="save">',
+      '  <UInput',
+      '    v-model="name"',
+      '    class="w-full"',
+      '  />',
+      '  <UInput type="date" />',
+      '  <ul class="divide-y divide-default rounded-lg border border-default">',
+      '  <UButton class="w-full" />',
+      '  <UInput class="w-48" />',
+      '</form>',
+      'const d = new Intl.DateTimeFormat(\'en-GB\')',
+    ].join('\n')
+    expect(interfaceProblems('page.vue', source).map(p => p.line)).toEqual([1, 4, 6, 7, 11])
+    expect(interfaceProblems('PageSettings.vue', '<form>')).toEqual([])
+    expect(interfaceProblems('RecordList.vue', '<ul class="divide-y rounded-lg border">')).toEqual([])
+    expect(interfaceProblems('useDates.ts', 'new Intl.DateTimeFormat(language)')).toEqual([])
+  })
+})
+
+describe('changes() in SQL', () => {
+  it('is found in SQL text and sql templates, and not in a comment', async () => {
+    const { changesInSql } = await import('../../scripts/checks/source')
+    expect(changesInSql([
+      "unit.add({ sql: 'INSERT INTO scans (id, ok) VALUES (?, CASE WHEN changes() > 0 THEN 1 ELSE 0 END)', params })",
+      'const ok = sql`SELECT changes ( ) AS n`',
+      '// never read changes() here',
+      'if (result.meta.changes > 0) done()',
+    ].join('\n'))).toEqual([1, 2])
+  })
+})

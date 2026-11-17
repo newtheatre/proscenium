@@ -15,6 +15,8 @@ import attestPost from '../../server/api/payments/intents/[id]/attest.post'
 import cancelPost from '../../server/api/payments/intents/[id]/cancel.post'
 import intentGet from '../../server/api/payments/intents/[id].get'
 import methodsGet from '../../server/api/payments/methods.get'
+import panelsGet from '../../server/api/payments/till/panels.get'
+import tillMethodsGet from '../../server/api/payments/till/methods.get'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 const NOV_16 = Date.UTC(2026, 10, 16, 12)
@@ -33,6 +35,8 @@ const handle = server({
   'POST /api/payments/intents/:id/cancel': cancelPost,
   'GET /api/payments/intents/:id': intentGet,
   'GET /api/payments/methods': methodsGet,
+  'GET /api/payments/till/panels': panelsGet,
+  'GET /api/payments/till/methods': tillMethodsGet,
 })
 
 const seller = (extra: string[] = ['tickets.orders.sell']) => person(['payments.session.open', 'payments.attempt.attest', ...extra])
@@ -94,7 +98,7 @@ describe('the till', () => {
     const me = seller()
     await post('/api/payments/sessions', me, { pointLabel: 'Foyer', floatMinor: 1000 }, true)
     const panels = [{ basket: 'tickets', input: { amountMinor: 2400 } }, { basket: 'snacks', input: { amountMinor: 350 } }]
-    expect((await post('/api/payments/till/summary', me, { panels })).body).toMatchObject({ amountMinor: 2750, panels: [{ basket: 'tickets', amountMinor: 2400 }, { basket: 'snacks', amountMinor: 350 }] })
+    expect((await post('/api/payments/till/summary', me, { panels })).body).toMatchObject({ amountMinor: 2750, panels: [{ basket: 'tickets', amountMinor: 2400 }, { basket: 'snacks', amountMinor: 350, ranAs: 'snacks' }] })
     expect((await get('/api/payments/methods', me)).body.methods).toContainEqual(expect.objectContaining({ providerAccountId: cash, method: 'cash' }))
     const sale = await post('/api/payments/till/sale', me, { panels }, true)
     expect(sale.body.amountMinor).toBe(2750)
@@ -103,6 +107,30 @@ describe('the till', () => {
     const status = await get(`/api/payments/intents/${sale.body.intentId}`, me)
     expect(status.body).toMatchObject({ state: 'succeeded', paidMinor: 2750 })
     expect((await get('/api/payments/session', me)).body.session.expectedCashMinor).toBe(3750)
+  })
+
+  it('lists the panels the seller may use in order, each with its component', async () => {
+    expect((await get('/api/payments/till/panels', seller())).body.panels).toEqual([
+      { id: 'tickets', label: 'tickets.desk.label', panel: 'TicketsTillPanel' },
+      { id: 'snacks', label: 'snacks.desk.label', panel: 'SnacksTillPanel' },
+    ])
+    expect((await get('/api/payments/till/panels', seller([]))).body.panels.map((p: { id: string }) => p.id)).toEqual(['snacks'])
+  })
+
+  it('offers the desk methods the settings allow', async () => {
+    const me = seller()
+    expect((await get('/api/payments/till/methods', me)).body.methods).toContainEqual(expect.objectContaining({ providerAccountId: cash, method: 'cash' }))
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'payments.cash.enabled', false, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
+    expect((await get('/api/payments/till/methods', me)).body.methods.some((m: { method: string }) => m.method === 'cash')).toBe(false)
+    await inContext(async () => {
+      const unit = createUnit()
+      await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true })
+      await unit.commit()
+    })
   })
 
   it('offers only the panels the seller may use', async () => {

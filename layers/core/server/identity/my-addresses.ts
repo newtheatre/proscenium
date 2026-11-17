@@ -72,7 +72,7 @@ export async function addAddress(unit: UnitView, event: H3Event, accountId: stri
           VALUES (?, 'verify_address', ?, ?, ?, 0, ?, ?)`,
     params: [newId('tok', { random: true }), await digest('link', token), accountId, address, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
-  await queueNotice(unit, 'core.address-verify', [address], { link: `${relyingParty(event).origin}/sign-in/verify-address#${token}` })
+  await queueNotice(unit, 'core.address-verify', [address], { link: `${(await relyingParty(event)).origin}/sign-in/verify-address#${token}` })
   return { id }
 }
 

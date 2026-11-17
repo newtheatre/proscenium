@@ -2,7 +2,7 @@
 // settings and the operating day, files, the brand, sending email, and the public site's points.
 // module.ts spreads each field into the core manifest, beside foundations' and identity's parts.
 import { z } from 'zod'
-import { ability, call, code, defineAbilities, defineRecords, defineSettings, event, job, point, record, secret, setting, task } from '#kit'
+import { ability, call, code, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task } from '#kit'
 import type { SettingRule } from '#kit'
 import { parseDuration } from '#kit/duration'
 
@@ -39,6 +39,8 @@ export const settings = defineSettings('core', {
   'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public' }),
   'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', change: programmeConfigure, audience: 'public' }),
   'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', change: programmeConfigure }),
+  // How long a production's team keeps its standing after the last performance ends (core.production-team).
+  'programme.team-standing-after': setting.duration({ default: '30d', min: '0d', max: '365d', change: programmeConfigure }),
   'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.logo-dark': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
   'brand.revision': setting.integer({ default: 0, min: 0, max: 1_000_000_000, change: branding, audience: 'public', managed: true }), // not-policy: a counter's ceiling
@@ -51,15 +53,16 @@ export const settings = defineSettings('core', {
   'files.upload-timeout': setting.duration({ default: '1h', min: '5m', max: '24h', change: filesConfigure }),
 
   // Sending email (C-27, C-28, C-32). verified-domain is written only by the verify route.
-  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender }),
-  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true }),
+  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender, screen: '/admin/email' }),
+  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true, screen: '/admin/email' }),
   'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
-  // The delivery pipeline (C-29). Each retry waits four times as long as the one before.
-  'notifications.max-attempts': setting.integer({ default: 5, min: 1, max: 10, change: notificationConfigure }),
-  'notifications.first-retry': setting.duration({ default: '2m', min: '1m', max: '1h', change: notificationConfigure }),
-  'notifications.stuck-after': setting.duration({ default: '10m', min: '5m', max: '2h', change: notificationConfigure }),
-  'notifications.log-retention': setting.duration({ default: '400d', min: '30d', max: '2555d', change: notificationConfigure }),
-  'notifications.inbox-retention': setting.duration({ default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in' }),
+  // The delivery pipeline (C-29), renamed from notifications.* so the engineering half sits on the
+  // Advanced page. Each retry waits four times as long as the one before.
+  'delivery.max-attempts': setting.integer({ replaces: 'core.notifications.max-attempts', default: 5, min: 1, max: 10, change: notificationConfigure }),
+  'delivery.first-retry': setting.duration({ replaces: 'core.notifications.first-retry', default: '2m', min: '1m', max: '1h', change: notificationConfigure }),
+  'delivery.stuck-after': setting.duration({ replaces: 'core.notifications.stuck-after', default: '10m', min: '5m', max: '2h', change: notificationConfigure }),
+  'delivery.log-retention': setting.duration({ replaces: 'core.notifications.log-retention', default: '400d', min: '30d', max: '2555d', change: notificationConfigure }),
+  'delivery.inbox-retention': setting.duration({ replaces: 'core.notifications.inbox-retention', default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in' }),
   // C-52: the label put before the site's host when the sending domain is set up automatically.
   'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender }),
 })
@@ -80,7 +83,7 @@ export const settingRules: SettingRule[] = [
   { id: 'contact-email', check: s => s['organisation.contact-email'] === null || z.email().safeParse(s['organisation.contact-email']).success },
   { id: 'year-end', check: s => s['organisation.year-end'] === null || isDayOfYear(s['organisation.year-end']) },
   { id: 'sending-domain', check: s => s['notifications.sending-domain'] === null || /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(s['notifications.sending-domain']) },
-  { id: 'stuck-after', check: s => parseDuration(s['notifications.stuck-after']) > parseDuration(s['notifications.first-retry']) },
+  { id: 'stuck-after', check: s => parseDuration(s['delivery.stuck-after']) > parseDuration(s['delivery.first-retry']) },
   { id: 'sending-label', check: s => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(s['notifications.sending-label']) }, // not-policy: a DNS label
 ]
 
@@ -111,6 +114,7 @@ export const abilities = defineAbilities('core', {
   'production.create': ability({ implies: ['production.view'] }),
   'production.edit': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'production.publish': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.edit'] }),
+  'production.cancel': ability({ risk: 'privileged', on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   // Scheduling and cancelling act on the production, so a grant on it covers all its dates (part 6).
   'performance.schedule': ability({ on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
   'performance.cancel': ability({ risk: 'privileged', on: 'core.production', grantAt: ['site', 'record'], implies: ['production.view'] }),
@@ -240,13 +244,44 @@ export const points = {
   }),
 }
 
+/**
+ * Core's one fact (part 6): the account is credited on the production, from the moment the credit is
+ * linked until core.programme.team-standing-after has passed since its last performance ended. A
+ * standing, so a cast member reaches the members' side; it grants nothing by default.
+ */
+export const facts = defineFacts('core', {
+  'production-team': factDecl({ on: 'core.production', standing: true }),
+})
+
 export const contributes = {
   'core.file-slot': [
     { id: 'core.brand-logo', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
-  'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
-  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
+  'core.erasure-handler': [{ id: 'core.files', file: 'files' }, { id: 'core.credits', file: 'credits' }],
+  // A person told their credit is linked (question 5). Optional, so they can switch it off.
+  'core.notification-topic': [{ id: 'core.credits', side: 'members' as const, order: 50 }],
+  'core.notification-type': [{
+    id: 'core.credit.added',
+    category: 'optional' as const,
+    side: 'members' as const,
+    channels: ['email' as const, 'inbox' as const],
+    topic: 'core.credits',
+    link: '/account/credits',
+    variables: { production: 'text' as const, role: 'text' as const, link: 'url' as const },
+    wording: {
+      'en-GB': {
+        subject: 'You are credited on {{ production }}',
+        body: '{{ theatre }} has credited you as {{ role }} on {{ production }}.\n\nCredits are public unless you choose otherwise. You can make yours members only, or hide it, at any time.\n\n[See your credits]({{ link }})',
+      },
+    },
+  }],
+  // "My credits" on the members' side (part 5): shown to a person with at least one linked credit.
+  'core.count': [{ id: 'core.my-credits', file: 'my-credits' }],
+  'core.account-section': [
+    { id: 'core.credits', target: 'account' as const, side: 'members' as const, ability: 'signed-in', component: 'CoreMyCredits', order: 50, to: '/account/credits', icon: 'i-lucide-scroll-text', count: 'core.my-credits', hideEmpty: true },
+  ],
+  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
@@ -268,7 +303,7 @@ function terms(...list: [slug: string, label: string, icon?: string][]) {
 }
 
 /** The public fields of a production, as core.production.updated names them. */
-export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageGuidance', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories'] as const
+export const PRODUCTION_PUBLIC_FIELDS = ['title', 'subtitle', 'summary', 'description', 'categoryTermId', 'seasonId', 'companyName', 'ageGuidance', 'advisoriesConfirmedNone', 'contentNote', 'runningMinutes', 'intervalCount', 'externalBookingUrl', 'creditsPublic', 'listed', 'slug', 'advisories', 'credits'] as const
 
 export const announces = {
   'core.branding.changed': event({ version: 1, payload: z.object({ revision: z.number().int() }), internal: true }),
@@ -277,6 +312,7 @@ export const announces = {
   'core.production.published': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
   'core.production.updated': event({ version: 1, payload: z.object({ productionId: z.string(), fields: z.array(z.enum(PRODUCTION_PUBLIC_FIELDS)) }), internal: false }),
   'core.production.withdrawn': event({ version: 1, payload: z.object({ productionId: z.string() }), internal: false }),
+  'core.production.cancelled': event({ version: 1, payload: z.object({ productionId: z.string(), reason: code() }), internal: false }),
   'core.performance.scheduled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), reinstated: z.boolean() }), internal: false }),
   'core.performance.rescheduled': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldStartsAt: z.number().int(), oldEndsAt: z.number().int(), startsAt: z.number().int(), endsAt: z.number().int() }), internal: false }),
   'core.performance.moved': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string(), oldVenueId: z.string(), oldSpaceId: z.string(), venueId: z.string(), spaceId: z.string() }), internal: false }),
@@ -285,6 +321,8 @@ export const announces = {
   'core.performance.completed': event({ version: 1, payload: z.object({ performanceId: z.string(), productionId: z.string() }), internal: false }),
   'core.venue.archived': event({ version: 1, payload: z.object({ venueId: z.string() }), internal: false }),
   'core.space.archived': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string() }), internal: false }),
+  // Whether the theatre runs a space changed (R-36): a bar or a hire may care.
+  'core.space.managed-changed': event({ version: 1, payload: z.object({ spaceId: z.string(), venueId: z.string(), managed: z.boolean() }), internal: false }),
   'core.closure.created': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
   'core.closure.removed': event({ version: 1, payload: z.object({ closureId: z.string(), venueId: z.string().nullable(), spaceId: z.string().nullable(), startsAt: z.number().int(), endsAt: z.number().int(), blocksPerformances: z.boolean() }), internal: false }),
   'core.file.ready': event({ version: 1, payload: z.object({ fileId: z.string(), slot: code() }), internal: true }),
@@ -307,6 +345,7 @@ export const jobs = {
   'core.check-file': job({ payload: z.object({ fileId: z.string() }) }),
   'core.recompute-days': job({ payload: z.object({}), lane: 'bulk' }),
   'core.send-notifications': job({ payload: z.object({ deliveryIds: z.array(z.string()).min(1) }) }),
+  'core.create-run': job({ payload: z.object({ runId: z.string() }) }),
   'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
 }
 

@@ -59,6 +59,8 @@ defineSlots<{
   [subcell: `subcell-${string}`]: (props: { row: Row, parent: Row }) => unknown
   /** A free panel under a row, for a few facts that do not merit a page. */
   expanded?: (props: { row: Row }) => unknown
+  /** A line about the answer, such as "4 not yet signed in are not shown", from any extra field the route sends beside the rows. */
+  note?: (props: { result: ListResult<Row> & Record<string, unknown> }) => unknown
 }>()
 const slots = useSlots()
 
@@ -126,6 +128,7 @@ watch(panel, endVisit)
 // A built-in view's own filters count as on, so the panel and the chips tell the truth about the rows.
 const effective = computed(() => ({ ...(state.value.view ? decl.value.views?.[state.value.view]?.filters : undefined), ...state.value.filters }))
 const chips = computed(() => Object.entries(decl.value.filters).flatMap(([name, def]) => {
+  if (data.value?.dropped?.includes(name)) return []
   const value = effective.value[name]
   const text = value ? filterChipText(def, value, { yes: t('core.list.yes'), no: t('core.list.no') }) : null
   return text ? [{ name, text }] : []
@@ -169,6 +172,21 @@ const tableColumns = computed<TableColumn<Row>[]>(() => [
   ...extra.value.map(c => ({ id: c.key, header: c.label, enableSorting: false })),
   ...(props.rowActions ? [{ id: 'actions', enableSorting: false }] : []),
 ])
+
+// What the server could not search, said plainly; and which hidden column a row matched, so a result is never a mystery.
+const searchNote = computed(() => {
+  if (!state.value.search || !data.value) return ''
+  if (data.value.searchTooShort) return t('core.list.search-too-short')
+  const words = data.value.ignoredWords ?? []
+  return words.length ? t('core.list.search-ignored', { words: words.join(', ') }) : ''
+})
+function matchLine(row: Row): string {
+  const column = data.value?.matched?.[rowId(row)]
+  if (!column) return ''
+  const label = decl.value.columns[column]?.label ?? column
+  const value = row[column]
+  return value === undefined || value === null || typeof value === 'object' ? t('core.list.matches', { column: label }) : t('core.list.matches-value', { column: label, value: String(value) })
+}
 
 // Built-in views are tabs above the toolbar; each is a preset of filters and sort kept in the address.
 const viewItems = computed(() => Object.entries(decl.value.views ?? {}).map(([value, v]) => ({ value, label: v.label })))
@@ -328,6 +346,14 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
       />
     </div>
 
+    <p
+      v-if="searchNote"
+      class="text-sm text-muted"
+      role="status"
+    >
+      {{ searchNote }}
+    </p>
+
     <DataBoundary
       :data="data"
       :status="status"
@@ -335,6 +361,16 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
       @retry="refresh()"
     >
       <template #default="{ data: result }">
+        <div
+          v-if="slots.note"
+          class="mb-3 text-sm text-muted"
+          role="status"
+        >
+          <slot
+            name="note"
+            :result="(result as ListResult<Row> & Record<string, unknown>)"
+          />
+        </div>
         <!-- Bulk actions appear only once rows are selected, and say how many they affect. -->
         <UAlert
           v-if="bulkActions && selectedRows.length"
@@ -494,6 +530,10 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                 >
                   {{ row.original[c.key] }}
                 </slot>
+                <span
+                  v-if="i === 0 && matchLine(row.original)"
+                  class="block text-xs text-muted"
+                >{{ matchLine(row.original) }}</span>
                 <ULink
                   v-if="i === 0 && hasMore(row.original) && subRowsAllTo && row.getIsExpanded()"
                   :to="subRowsAllTo(row.original)"
@@ -584,6 +624,12 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
                     />
                   </UDropdownMenu>
                 </div>
+                <p
+                  v-if="matchLine(row)"
+                  class="mt-1 text-xs text-muted"
+                >
+                  {{ matchLine(row) }}
+                </p>
                 <dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                   <template
                     v-for="c in cardColumns"

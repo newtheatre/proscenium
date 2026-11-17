@@ -7,7 +7,7 @@ const props = defineProps<{ accountId: string }>()
 const emit = defineEmits<{ loaded: [readers: Reader[]] }>()
 const { t } = useT()
 const { $api } = useNuxtApp()
-const { day } = await useMoney()
+const { day } = useDates()
 const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
@@ -103,10 +103,11 @@ async function retire(r: Reader) {
       :description="t('payments.screens.readers.pair-help')"
     >
       <template #body>
-        <form
+        <UForm
           :id="`pair-${accountId}`"
           class="space-y-4"
-          @submit.prevent="pair"
+          :state="form"
+          @submit="pair"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -118,7 +119,7 @@ async function retire(r: Reader) {
               v-model="form.pairingCode"
               maxlength="9"
               autocomplete="off"
-              class="w-full font-mono uppercase"
+              class="font-mono uppercase"
             />
           </UFormField>
           <UFormField
@@ -129,10 +130,9 @@ async function retire(r: Reader) {
             <UInput
               v-model="form.label"
               maxlength="80"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

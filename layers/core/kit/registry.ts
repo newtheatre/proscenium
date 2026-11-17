@@ -1,10 +1,11 @@
 // The registry: every module's manifest and handler files, collected by the build into
 // .generated/registry.ts and checked here across modules (F-02).
 import { DeclarationError } from './refusal'
-import { DELIVERABLE, snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
+import { DELIVERABLE, snake, type ModuleManifest, type SettingPlace, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
+import type { ListSource } from './lists'
 import type { SettingEntry, SettingRule } from './settings'
-import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
+import { impliedAbility, type AbilityDecl, type FactDecl, type RecordDecl } from './abilities'
 import type { ModuleHandlers } from './handlers'
 import { setPersonalFields } from './log'
 
@@ -12,7 +13,8 @@ import { setPersonalFields } from './log'
  * Module ids the design has reserved (Formats tab). `uses` may name one before it is written; a
  * `uses` on an absent module contributes nothing.
  */
-export const RESERVED_MODULE_IDS: readonly string[] = ['public-site', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']
+/** Every settled module id, built or not (Foundations part 4, under the module table). A `uses` naming one with no module present is satisfied as absent; a `requires` is not. */
+export const RESERVED_MODULE_IDS: readonly string[] = ['core', 'box-office', 'payments', 'finance', 'forms', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications', 'public-site']
 
 export type Owner = 'upstream' | 'site' | 'fixtures'
 
@@ -28,6 +30,16 @@ export interface Registry {
   modules: Map<string, ModuleEntry>
   settings: Map<string, { module: string, entry: SettingEntry }>
   settingRules: Map<string, SettingRule[]>
+  /**
+   * The generated pages of settings, by id `<module>.<page>`: every declared page, the shared
+   * Advanced page (`core.advanced`), and a module's own page (`<module>.settings` in the console,
+   * `<module>.admin` in Site administration) where one of its groups uses it.
+   */
+  settingPages: Map<string, SettingPage>
+  /** Where each setting is shown: on exactly one generated page, or on one bespoke screen. */
+  settingHomes: Map<string, SettingHome>
+  /** Renamed settings: the old key, which still answers for one major version, to its new key. */
+  settingAliases: Map<string, string>
   abilities: Map<string, { module: string, decl: AbilityDecl }>
   records: Map<string, { module: string, decl: RecordDecl }>
   facts: Map<string, { module: string, decl: FactDecl }>
@@ -41,13 +53,33 @@ export interface Registry {
   points: Map<string, { module: string, decl: PointDecl }>
   /** Signing purposes (F-37), by purpose. */
   signing: Map<string, { module: string, decl: SigningDecl }>
+  /** List sources by list id (server/lists/<name>.ts). */
+  lists: Map<string, { module: string, source: ListSource }>
 }
+
+export interface SettingPage {
+  module: string
+  place: SettingPlace
+  /** The navigation group the page sits in; a module's own console page uses the module's group. */
+  group?: string
+  order: number
+  icon: string
+  to: string
+  /** The translation key of the page's name. */
+  label: string
+}
+export type SettingHome = { page: string, screen?: undefined } | { screen: string, page?: undefined }
+
+/** The shared page of engineering limits, under Upkeep in Site administration. */
+export const ADVANCED_PAGE = 'core.advanced'
+const DEFAULT_PAGE = { console: 'settings', admin: 'admin' } as const
+const SETTINGS_ICON = 'i-lucide-settings-2'
 
 /** The events, jobs and tasks of the core itself are always present, so other modules may name them. */
 export function buildRegistry(entries: ModuleEntry[]): Registry {
   const r: Registry = {
-    modules: new Map(), settings: new Map(), settingRules: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
-    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(),
+    modules: new Map(), settings: new Map(), settingRules: new Map(), settingPages: new Map(), settingHomes: new Map(), settingAliases: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
+    tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(), lists: new Map(),
   }
   const fail = (entry: ModuleEntry, field: string, message: string): never => {
     throw new DeclarationError(field, message, `${entry.root}/module.ts`)
@@ -129,6 +161,14 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
       list.push({ module: m.id, listener })
       r.listeners.set(event, list)
     }
+    for (const [file, value] of Object.entries(entry.handlers.lists ?? {})) {
+      const source = value as ListSource | undefined
+      const where = `${entry.root}/server/lists/${short(file)}.ts`
+      if (!source?.list?.id || !source.table) throw new DeclarationError('default', 'is not a list source made with defineListSource', where)
+      if (!source.list.id.startsWith(`${m.id}.`)) throw new DeclarationError('list', `"${source.list.id}" is not named under ${m.id}.`, where)
+      if (r.lists.has(source.list.id)) throw new DeclarationError('list', `"${source.list.id}" has two sources`, where)
+      r.lists.set(source.list.id, { module: m.id, source })
+    }
     for (const name of Object.keys(m.jobs ?? {})) if (!entry.handlers.jobs?.[name]) fail(entry, `jobs.${name}`, `the handler ${entry.root}/server/jobs/${short(name)}.ts does not exist`)
     for (const name of Object.keys(m.tasks ?? {})) if (!entry.handlers.tasks?.[name]) fail(entry, `tasks.${name}`, `the handler ${entry.root}/server/tasks/${short(name)}.ts does not exist`)
     for (const name of Object.keys(m.facts ?? {})) if (!entry.handlers.facts?.[name]) fail(entry, `facts.${name}`, `the resolver ${entry.root}/server/facts/${short(name)}.ts does not exist`)
@@ -151,12 +191,24 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         }
       }
     }
+    placeSettings(r, entry, fail)
     for (const [key, setting] of Object.entries(m.settings ?? {})) {
       if (!r.abilities.has(setting.change)) fail(entry, `settings.${key}.change`, `"${setting.change}" is not a declared ability`)
       if (setting.kind === 'reference' && !r.records.has(setting.record!)) fail(entry, `settings.${key}.record`, `"${setting.record}" is not a record type`)
     }
     for (const [key, { decl }] of [...r.abilities].filter(([, a]) => a.module === m.id)) {
       if (decl.on && !r.records.has(decl.on)) fail(entry, `abilities.${key}.on`, `"${decl.on}" is not a record type`)
+      // Another module's ability may come with this one only when that module says it may, it is of
+      // risk normal, and its owner is core or a module this one requires, never one it only uses.
+      for (const implied of decl.implies ?? []) {
+        const full = impliedAbility(m.id, implied)
+        if (full === `${m.id}.${implied}`) continue
+        const target = r.abilities.get(full)
+        if (!target) fail(entry, `abilities.${key}.implies`, `"${full}" is not a declared ability`)
+        else if (target.module !== 'core' && !(m.requires ?? []).includes(target.module)) fail(entry, `abilities.${key}.implies`, `${target.module} owns "${full}", so list it in requires (uses is not enough)`)
+        else if (!target.decl.impliable) fail(entry, `abilities.${key}.implies`, `"${full}" does not declare impliable: true`)
+        else if (target.decl.risk === 'privileged') fail(entry, `abilities.${key}.implies`, `"${full}" is privileged, and only an ability of risk normal may be implied by another module`)
+      }
       if (decl.owner && decl.owner !== 'ignored') {
         const rec = decl.on ? r.records.get(decl.on) : undefined
         if (!rec?.decl.owner) fail(entry, `abilities.${key}.owner`, `owner: '${decl.owner}' needs a record type that declares an owner column`)
@@ -186,7 +238,11 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         }
         if (c.erase === 'retain' && !r.settings.has(c.until!)) fail(entry, `tables.${key}.${col}`, `retain until "${c.until}", which is not a setting`)
       }
-      if (meta.options.retention && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+      if (typeof meta.options.retention === 'string' && r.settings.get(meta.options.retention)?.entry.kind !== 'duration') fail(entry, `tables.${key}.retention`, `"${meta.options.retention}" is not a duration setting`)
+      // An internal column that erasure clears needs rows erasure can find: a subject of its own, or
+      // a chain of parents (subject { via }) that ends at an account or an email.
+      const clears = Object.entries(meta.columns).find(([, c]) => c.meta.class === 'internal' && c.meta.erase === 'clear')
+      if (clears && !reachesPerson(meta, r)) fail(entry, `tables.${key}.${clears[0]}`, `erase: 'clear' needs rows that reach a person, and ${meta.name}'s subject does not lead to an account or an email`)
     }
   }
 
@@ -239,3 +295,63 @@ export function useRegistry(): Registry {
 }
 
 export { snake }
+
+/** Whether a table's rows lead to a person: an account or email subject, through any parents. */
+function reachesPerson(meta: TableMeta, r: Registry, seen = new Set<string>()): boolean {
+  if (seen.has(meta.name)) return false
+  seen.add(meta.name)
+  const subject = meta.options.subject
+  if (subject === 'none') return false
+  if (meta.subjects.length || typeof subject === 'string' || Array.isArray(subject)) return true
+  if (subject && typeof subject === 'object' && ('email' in subject || 'account' in subject)) return true
+  if (subject && typeof subject === 'object' && 'via' in subject) {
+    const via = Object.values(meta.columns).find(c => c.sql === subject.via)
+    const parent = via?.meta.ref ? r.tables.get(via.meta.ref.table)?.meta : undefined
+    return !!parent && reachesPerson(parent, r, seen)
+  }
+  return false
+}
+
+/** Declares a module's pages of settings and gives each of its settings its one home. */
+function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntry, field: string, message: string) => never): void {
+  const m = entry.manifest
+  const id = m.id
+  const addPage = (pageId: string, page: SettingPage, field: string) => {
+    if (r.settingPages.has(pageId)) fail(entry, field, `the page ${pageId} is declared twice`)
+    for (const [other, { to }] of r.settingPages) if (to === page.to) fail(entry, field, `${page.to} is already the address of ${other}`)
+    r.settingPages.set(pageId, page)
+  }
+  if (id === 'core') addPage(ADVANCED_PAGE, { module: 'core', place: 'admin', group: 'upkeep', order: 90, icon: 'i-lucide-sliders-horizontal', to: '/admin/advanced', label: 'core.settings-pages.advanced' }, 'settingPages.advanced') // not-policy: last in Upkeep
+  for (const [page, decl] of Object.entries(m.settingPages ?? {})) {
+    if (Object.values(DEFAULT_PAGE).includes(page as never) || (id === 'core' && page === 'advanced')) fail(entry, `settingPages.${page}`, `"${page}" is a page the platform makes itself`)
+    const to = decl.to ?? (id === 'core'
+      ? (decl.place === 'admin' ? `/admin/${page}` : `/console/${page}/settings`)
+      : (decl.place === 'admin' ? `/admin/modules/${id}/${page}` : `/console/${id}/settings/${page}`))
+    addPage(`${id}.${page}`, { module: id, place: decl.place, group: decl.group, order: decl.order ?? 100, icon: decl.icon ?? SETTINGS_ICON, to, label: `${id}.settings-pages.${page}` }, `settingPages.${page}`) // not-policy: sort position
+  }
+  for (const [key, setting] of Object.entries(m.settings ?? {})) {
+    const group = key.slice(id.length + 1).split('.')[0]!
+    const decl = m.settingGroups?.[group]
+    let home: SettingHome
+    if (setting.screen ?? decl?.screen) home = { screen: (setting.screen ?? decl!.screen)! }
+    else if (decl?.advanced) home = { page: ADVANCED_PAGE }
+    else if (decl?.page) home = { page: `${id}.${decl.page}` }
+    else {
+      const place = decl?.place ?? 'console'
+      const pageId = `${id}.${DEFAULT_PAGE[place]}`
+      if (!r.settingPages.has(pageId)) {
+        addPage(pageId, place === 'console'
+          ? { module: id, place, order: 100, icon: SETTINGS_ICON, to: `/console/${id}/settings`, label: `${id}.module.name` } // not-policy: after the module's own entries
+          : { module: id, place, group: 'modules', order: 100, icon: SETTINGS_ICON, to: `/admin/modules/${id}`, label: `${id}.module.name` }, `settingGroups.${group}`) // not-policy: sort position
+      }
+      home = { page: pageId }
+    }
+    r.settingHomes.set(key, home)
+    if (setting.replaces !== undefined) {
+      if (typeof setting.replaces !== 'string' || !setting.replaces.startsWith(`${id}.`) || setting.replaces.split('.').length !== 3) fail(entry, `settings.${key}.replaces`, `names the old key in full, such as ${id}.<group>.<name>`)
+      if (r.settings.has(setting.replaces)) fail(entry, `settings.${key}.replaces`, `${setting.replaces} is still declared; a renamed key is declared only under its new name`)
+      if (r.settingAliases.has(setting.replaces)) fail(entry, `settings.${key}.replaces`, `${setting.replaces} is already replaced by ${r.settingAliases.get(setting.replaces)}`)
+      r.settingAliases.set(setting.replaces, key)
+    }
+  }
+}

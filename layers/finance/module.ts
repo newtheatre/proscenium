@@ -15,10 +15,10 @@ export default defineModule({
   stability: 'experimental',
 
   settings: defineSettings('finance', {
-    'periods.length': setting.choice({ default: 'month', options: ['month', 'quarter'], change, audience: 'staff' }),
+    'periods.length': setting.choice({ default: 'month', options: ['month', 'quarter'], change, audience: 'staff', onChange: 'confirm' }),
     // A month and a day. Days stop at 28 so that every period starts on the same day of the month.
-    'year.starts': setting.custom({ schema: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|1\d|2[0-8])$/), default: '08-01', change, audience: 'staff' }),
-    'tax.registered': setting.boolean({ default: false, change, audience: 'staff' }),
+    'year.starts': setting.custom({ schema: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|1\d|2[0-8])$/), default: '08-01', change, audience: 'staff', onChange: 'confirm' }),
+    'tax.registered': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
   }),
   // Tax on sales is not supported in the first release.
   settingRules: defineSettingRules('finance', [{ id: 'tax-not-yet', check: s => s['tax.registered'] !== true }]),
@@ -29,7 +29,9 @@ export default defineModule({
     period: { table: 'finance_periods' },
   }),
   abilities: defineAbilities('finance', {
-    'ledger.view': ability({}),
+    // Granted on one production, it reads that production's statement only (FIN-04).
+    'ledger.view': ability({ on: 'core.production' }),
+    'ledger.export': ability({ risk: 'privileged', implies: ['ledger.view'] }),
     'posting.correct': ability({ risk: 'privileged', implies: ['ledger.view'] }),
     'account.manage': ability({ risk: 'privileged' }),
     'period.close': ability({ on: 'finance.period', risk: 'privileged', implies: ['ledger.view'] }),
@@ -84,6 +86,9 @@ export default defineModule({
     'core.navigation': [
       { id: 'finance.ledger', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/ledger', icon: 'i-lucide-book-open', ability: 'finance.ledger.view', order: 50 },
       { id: 'finance.periods', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/periods', icon: 'i-lucide-calendar-check', ability: 'finance.period.close', order: 60 },
+      { id: 'finance.productions', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/productions', icon: 'i-lucide-drama', ability: 'finance.ledger.view', order: 70 },
+      { id: 'finance.reconcile', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/reconcile', icon: 'i-lucide-scale', ability: 'finance.ledger.view', order: 80 },
+      { id: 'finance.export', menu: 'console', group: 'money', section: 'everyday', to: '/console/finance/export', icon: 'i-lucide-file-down', ability: 'finance.ledger.export', order: 90 },
       { id: 'finance.accounts', menu: 'console', group: 'money', section: 'setup', to: '/console/finance/accounts', icon: 'i-lucide-list-tree', ability: 'finance.account.manage', order: 20 },
     ],
   },

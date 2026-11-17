@@ -20,8 +20,14 @@ export default defineRoute({ ability: 'gallery.sample.view', rateLimit: 'default
   const listed = q.filters.listed as boolean | undefined
   const opens = q.filters.opens as { from?: string, to?: string } | undefined
   let found = shows.filter(s => (!state || state.includes(s.state)) && (listed === undefined || s.listed === listed) && (!opens || ((!opens.from || s.opens >= opens.from) && (!opens.to || s.opens <= opens.to))))
-  found = found.filter(s => q.words.every(w => `${s.title} ${s.venue} ${s.state}`.toLowerCase().includes(w)))
+  // Words under three letters are not searched, as the kit's reader says.
+  const words = q.words.filter(w => w.length >= 3)
+  const ignoredWords = q.words.filter(w => w.length < 3)
+  const searchTooShort = q.words.length > 0 && words.length === 0
+  found = found.filter(s => words.every(w => `${s.title} ${s.venue} ${s.state}`.toLowerCase().includes(w)))
+  // A match in a column that is not on screen says which.
+  const matched = Object.fromEntries(found.filter(s => words.length && !words.every(w => s.title.toLowerCase().includes(w))).map(s => [s.id, 'venue']))
   const key = q.sort.key === 'title' ? 'title' : q.sort.key === 'opens' ? 'opens' : 'changed'
   found = [...found].sort((a, b) => (a[key] > b[key] ? 1 : -1) * (q.sort.order === 'desc' ? -1 : 1))
-  return { rows: found.slice((q.page - 1) * q.size, q.page * q.size), total: found.length }
+  return { rows: found.slice((q.page - 1) * q.size, q.page * q.size), total: found.length, dropped: read.value.dropped, ignoredWords, searchTooShort, matched, hidden: { cancelled: 2 } }
 })

@@ -16,6 +16,7 @@ import { relyingParty } from './web'
 import { holdersOf } from './holders'
 import { hasStanding } from './standings'
 import { z } from 'zod'
+import { DERIVED, WHEELCHAIR } from '../../shared/access-scheme'
 import type { VERIFIED_METHODS } from '../db/identity'
 
 export const NEEDS_VOCABULARY = 'core.access-need'
@@ -96,7 +97,9 @@ export function companionsInForce(row: ProfileRow, app: Application | null, need
 /** Checks an application against the vocabulary and the settings, and returns it tidied. */
 async function checked(input: Application): Promise<Application> {
   const allowNote = !!(await useSetting('core.access-scheme.allow-note'))
-  const live = new Set((await listTerms(NEEDS_VOCABULARY)).map(t => t.id))
+  const terms = await listTerms(NEEDS_VOCABULARY)
+  const live = new Set(terms.map(t => t.id))
+  const idOf = (slug: string) => terms.find(t => t.slug === slug)?.id
   const seen = new Set<string>()
   const needs: Application['needs'] = []
   for (const need of input.needs) {
@@ -107,9 +110,21 @@ async function checked(input: Application): Promise<Application> {
     if (note && note.length > MAX_NOTE) refuse('core.access.note-too-long', `A note can be at most ${MAX_NOTE} characters.`, { status: 422, fields: { needs: 'invalid' } })
     needs.push(note ? { term: need.term, note } : { term: need.term })
   }
-  if (!needs.length && !input.companions) refuse('core.access.empty', 'Tick at least one need, or ask for a companion.', { status: 422, fields: { needs: 'required' } })
+  const stays = idOf(WHEELCHAIR.stays)
+  const transfers = idOf(WHEELCHAIR.transfers)
+  if (stays && transfers && seen.has(stays) && seen.has(transfers)) refuse('core.access.wheelchair-both', 'Choose whether you stay in your wheelchair or transfer to a seat, not both.', { status: 422, fields: { wheelchair: 'invalid' } })
   const other = input.other?.trim()
   if (other && other.length > MAX_OTHER) refuse('core.access.other-too-long', `This can be at most ${MAX_OTHER} characters.`, { status: 422, fields: { other: 'invalid' } })
+  // The form asks about companions and "anything else" in its own words, not as ticks, so the
+  // entries a purpose reads for them are added here. Nothing the person sent is taken away.
+  for (const [slug, wanted] of [[DERIVED.companion, input.companions > 0], [DERIVED.other, !!other]] as const) {
+    const id = idOf(slug)
+    if (wanted && id && !seen.has(id)) {
+      seen.add(id)
+      needs.push({ term: id })
+    }
+  }
+  if (!needs.length && !input.companions) refuse('core.access.empty', 'Tick at least one need, or ask for a companion.', { status: 422, fields: { needs: 'required' } })
   return { needs, companions: input.companions, ...(other ? { other } : {}) }
 }
 
@@ -438,6 +453,19 @@ async function flagWaiting(unit: UnitView, at: number, replyWithin: number, sche
   }
 }
 
+/**
+ * "Apply for someone" from the queue (ID-42): finds or makes the account for a name and an address,
+ * for a reviewer about to fill the form in with the person on the phone or at the desk. It sends
+ * nothing. Says whether they have applied already, so the page can open their application instead.
+ */
+export async function personToApplyFor(unit: UnitView, actor: Actor, input: { name: string, address: string }): Promise<{ accountId: string, applied: boolean }> {
+  if (!(await schemeEnabled())) NOT_FOUND()
+  const found = await findOrCreateAccount(unit, { address: normaliseAddress(input.address), name: input.name, origin: 'staff' })
+  if (found.accountId === actor.accountId) refuse('core.access.own-record', 'You cannot apply for yourself from here.', { status: 403, remedy: 'Apply from your own account instead.' })
+  const row = found.created ? null : await profileOf(found.accountId)
+  return { accountId: found.accountId, applied: !!row && row.status !== 'rejected' }
+}
+
 /** Where an invitation's link lands once it has signed the person in: the form, open. */
 export const APPLY_PATH = '/account/access/apply'
 
@@ -462,7 +490,7 @@ export async function inviteToApply(unit: UnitView, event: H3Event, actor: Actor
     params: [id, await digest('link', token), found.accountId, address, actor.accountId ?? null, APPLY_PATH, at, at + lifetime * 1000], // not-policy: seconds to milliseconds
   })
   unit.audit({ action: 'create', ability: 'core.access-scheme.review', record: ['core.account', found.accountId], detail: { accessInvitation: true } })
-  const link = `${relyingParty(event).origin}/sign-in/link#${token}`
+  const link = `${(await relyingParty(event)).origin}/sign-in/link#${token}`
   const scheme = await schemeName()
   // Written in this unit and sent after it commits, with the pipeline's retries; the link is sealed.
   await notifyAddress(unit, 'core.access-invitation', { address, variables: { link, scheme }, dedupeKey: id })

@@ -4,7 +4,24 @@ Twenty settings, twenty-five abilities, seven record types, one fact, one secret
 
 ## How to read this part
 
-Written in the Foundations registry formats, in the column layout the Box office specification uses. Settings are site-wide. Where a value varies by outlet it is a field on the outlet, and the table says so. All settings are changed by `bar.settings.manage`. Defaults are proposals for a small theatre.
+Written in the Foundations registry formats, in the column layout the Box office specification uses. A setting has no scope of its own: where it is shown is declared per group in the manifest's `settingGroups`, and every setting has exactly one home. Where a value varies by outlet it is a field on the outlet, and the table says so. Defaults are proposals for a small theatre.
+
+The bar declares nine groups, the first segment of each short key: `age-check`, `sales`, `openings`, `tabs`, `stock`, `stocktake`, `till`, `desk` and `retention`. Each is `{ place: 'console' }` and names no page, so all twenty settings are drawn on the bar's own generated page, whose id is `bar.settings`, at `/console/bar/settings` (screen S16), one section per group. A group carries no ability: every setting names its own, and all twenty name `bar.settings.manage`, so each section shows one "Changed by people who can manage bar settings" line. No group is `advanced` and none has a bespoke `screen`: the two retention periods are a licensing and privacy choice a bar manager makes, not an engineering limit, so they stay on the bar's page. The bar declares no `settingPages` of its own beyond that default.
+
+Eight settings are declared `onChange: 'confirm'`. Only those show what will change and ask again when saved, and only those ask for a fresh sign-in, because on a settings save freshness follows the setting and not the ability. Every other setting saves with no prompt.
+
+| Setting | Why it confirms |
+| --- | --- |
+| `bar.age-check.enabled` | Switching it off stops the age prompt and the refusals register, which a licence may require |
+| `bar.age-check.minimum-age` | It is the legal age the till enforces and a public price list quotes |
+| `bar.age-check.description` | Switching it on starts keeping words about a person; the confirmation says what is kept and for how long |
+| `bar.tabs.self-service-restricted` | Switching it on lets a holder take alcohol on their own attestation, with no member of staff checking |
+| `bar.stock.enabled` | Switching it off stops stock movements, so levels stop being true |
+| `bar.stocktake.self-approve-under` | Raising it removes the second person from stock approvals up to that value |
+| `bar.retention.age-checks` | Shortening it deletes register rows sooner, at the next sweep, and they cannot be brought back |
+| `bar.retention.tab-names` | Shortening it erases names on closed tabs sooner, and they cannot be brought back |
+
+The tab limits, the discount ceiling and the rest are ordinary operating choices and do not confirm; the cash float and variance thresholds are Payments' settings. The five `duration` settings use the kit's `DurationInput`, where a month is 30 days and a year is 365; they are stored as whole seconds as before, and the written defaults below are unchanged.
 
 ## Settings
 
@@ -13,7 +30,7 @@ Written in the Foundations registry formats, in the column layout the Box office
 | `bar.age-check.enabled` | boolean | true |  | staff | No | Prompt on restricted products and keep the register |
 | `bar.age-check.minimum-age` | integer (years) | 18 | 16 to 25 | public | Yes | The legal age, quoted on a public price list |
 | `bar.age-check.challenge-age` | integer (years) | 25 | 18 to 30 | public | Yes | The age in the prompt: "look under 25". Must be at least the minimum age |
-| `bar.age-check.description` | boolean | false |  | staff | No | Offer an optional short description of the person on a refusal. Off unless a licence condition asks for it |
+| `bar.age-check.description` | boolean | false |  | staff | No | Offer an optional short description of the person on a refusal. Off by default. A theatre switches it on when its licence conditions ask for it; the Nottingham New Theatre expects to. Switching it on shows what is kept and for how long |
 | `bar.age-check.review-every` | duration | 7d | 1d to 90d | staff | No | How long the register may go unsigned before the console home says so |
 | `bar.sales.max-discount-percent` | integer (percent) | 100 | 0 to 100 | staff | No | Largest discount on a line; 0 switches discounts off |
 | `bar.sales.reference-prefix` | text | B | 1 to 3 letters | staff | No | Starts a bar sale's reference, so it is not mistaken for a booking reference |

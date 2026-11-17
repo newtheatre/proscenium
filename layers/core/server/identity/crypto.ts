@@ -1,7 +1,7 @@
 // The secrets identity hands out and the hashes it keeps. Every token, code and session id is
 // random, sent to the person once, and stored only as an HMAC keyed with CORE_SESSION_KEY, so a
 // copy of the database signs nobody in (ID-10).
-import { useContext } from '#kit'
+import { useContext } from '#kit/context'
 
 const encoder = new TextEncoder()
 const TOKEN_BYTES = 32 // not-policy: 256 bits of randomness

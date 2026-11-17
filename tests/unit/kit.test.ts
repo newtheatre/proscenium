@@ -11,7 +11,8 @@ import { col, columnMeta, defineTable } from '#kit/db'
 import { latestSlot } from '#kit/jobs'
 import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
-import { buildRegistry, type ModuleEntry } from '#kit/registry'
+import { buildRegistry, installRegistry, type ModuleEntry } from '#kit/registry'
+import { withImplied } from '../../layers/core/server/identity/grants'
 import { points as corePoints } from '../../layers/core/module/points'
 import { points as domainPoints } from '../../layers/core/module/domain'
 
@@ -105,6 +106,15 @@ describe('abilities', () => {
   it('let a privileged ability that only reads, audited, skip freshness', () => {
     expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', fresh: false, audit: 'read' }) })).not.toThrow()
   })
+  it('refuse an impliable ability that is privileged or on a record type', () => {
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', impliable: true }) })).toThrow(/risk normal/)
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ on: 'finance.ledger', impliable: true }) })).toThrow(/record type/)
+  })
+  it('name the module\'s own abilities by short name, and leave another module\'s to the registry', () => {
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ implies: ['ledger.list'] }) })).toThrow(/not an ability of finance/)
+    expect(() => defineAbilities('finance', { 'ledger.list': ability(), 'ledger.read': ability({ implies: ['finance.ledger.list'] }) })).toThrow(/short name/)
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ implies: ['core.account.find'] }) })).not.toThrow()
+  })
 })
 
 describe('manifests', () => {
@@ -175,6 +185,52 @@ describe('tables', () => {
   })
 })
 
+describe('where settings are shown', () => {
+  const lost = (extra: object) => ({ manifest: defineModule({ id: 'lost-property', manifest: 1, since: '0.1.0', settings: defineSettings('lost-property', {
+    'items.keep-for': setting.duration({ default: '30d', change: 'lost-property.items.manage' }),
+    'items.notice': setting.text({ default: 'Ask at the desk', maxLength: 80, change: 'lost-property.items.manage' }),
+    'shelves.count': setting.integer({ default: 3, change: 'lost-property.items.manage' }),
+  }), abilities: defineAbilities('lost-property', { 'items.manage': ability() }), ...extra } as any), root: 'layers/lost-property', owner: 'upstream', handlers: {} }) as unknown as ModuleEntry
+
+  it('refuse scope, naming settingGroups', () => {
+    expect(() => defineSettings('x', { 'a.b': { ...setting.boolean({ default: true, change: 'x.settings.manage' }), scope: 'site' } as any })).toThrow(/settingGroups/)
+  })
+  it('put a group with no declaration on the module\'s own console page', () => {
+    const registry = buildRegistry([lost({})])
+    expect(registry.settingHomes.get('lost-property.items.keep-for')).toEqual({ page: 'lost-property.settings' })
+    expect(registry.settingPages.get('lost-property.settings')).toMatchObject({ place: 'console', to: '/console/lost-property/settings' })
+  })
+  it('give every setting one home: a declared page, Advanced, a screen, or a setting\'s own screen', () => {
+    const registry = buildRegistry([lost({
+      settingPages: { desk: { place: 'admin', group: 'modules' } },
+      settingGroups: { items: { page: 'desk' }, shelves: { advanced: true } },
+    })])
+    expect(registry.settingHomes.get('lost-property.items.notice')).toEqual({ page: 'lost-property.desk' })
+    expect(registry.settingPages.get('lost-property.desk')!.to).toBe('/admin/modules/lost-property/desk')
+    expect(registry.settingHomes.get('lost-property.shelves.count')).toEqual({ page: 'core.advanced' })
+    const screened = buildRegistry([lost({ settingGroups: { items: { screen: '/console/lost-property/desk' } } })])
+    expect(screened.settingHomes.get('lost-property.items.notice')).toEqual({ screen: '/console/lost-property/desk' })
+  })
+  it('refuse a group with two homes, a page of another module, an undeclared group, or a page the platform makes', () => {
+    expect(() => lost({ settingPages: { desk: { place: 'admin', group: 'modules' } }, settingGroups: { items: { page: 'desk', advanced: true } } })).toThrow(/one home/)
+    expect(() => lost({ settingGroups: { items: { page: 'theatre' } } })).toThrow(/not one of lost-property's settingPages/)
+    expect(() => lost({ settingGroups: { raffle: { advanced: true } } })).toThrow(/declares no setting in this group/)
+    expect(() => buildRegistry([lost({ settingPages: { settings: { place: 'console', group: 'people' } } })])).toThrow(/the platform makes itself/)
+  })
+  it('want every group of core to name its home', () => {
+    expect(() => defineModule({ id: 'core', manifest: 1, since: '0.1.0', settings: defineSettings('core', { 'odd.one': setting.boolean({ default: true, change: 'core.settings.manage' }) }) } as any)).toThrow(/core has no settings page of its own/)
+  })
+  it('carry a renamed key, and refuse an old key that is still declared', () => {
+    const renamed = lost({ settings: defineSettings('lost-property', { 'items.kept-for': setting.duration({ default: '30d', change: 'lost-property.items.manage', replaces: 'lost-property.items.keep-for' }) }) })
+    expect(buildRegistry([renamed]).settingAliases.get('lost-property.items.keep-for')).toBe('lost-property.items.kept-for')
+    const both = lost({ settings: defineSettings('lost-property', {
+      'items.keep-for': setting.duration({ default: '30d', change: 'lost-property.items.manage' }),
+      'items.kept-for': setting.duration({ default: '30d', change: 'lost-property.items.manage', replaces: 'lost-property.items.keep-for' }),
+    }) })
+    expect(() => buildRegistry([both])).toThrow(/still declared/)
+  })
+})
+
 describe('task slots', () => {
   const zone = 'Europe/London'
   it('are the latest slot at or before now, in local time', () => {
@@ -214,6 +270,29 @@ describe('the registry', () => {
     expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['bar'] })])).not.toThrow()
     expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['raffle'] })])).toThrow(/reserved/)
   })
+  describe('lets an ability imply another module\'s', () => {
+    const core = (impliable?: boolean, risk: 'normal' | 'privileged' = 'normal') => ({ ...entry({ id: 'core', switchable: false, abilities: defineAbilities('core', { 'account.find': { ...ability(), risk, impliable } }) }), root: 'layers/core' }) as ModuleEntry
+    const desk = (implies: string, link: object = {}) => entry({ id: 'lost-property', ...link, abilities: defineAbilities('lost-property', { 'item.return': ability({ implies: [implies] }) }) })
+    it('when it is core\'s, impliable and of risk normal', () => {
+      const registry = buildRegistry([core(true), desk('core.account.find')])
+      expect(registry.abilities.get('lost-property.item.return')!.decl.implies).toEqual(['core.account.find'])
+      installRegistry(registry)
+      expect(withImplied(['lost-property.item.return'])).toEqual(['core.account.find', 'lost-property.item.return'])
+    })
+    it('and refuses one that is not impliable, or privileged', () => {
+      expect(() => buildRegistry([core(), desk('core.account.find')])).toThrow(/impliable: true/)
+      expect(() => buildRegistry([core(true, 'privileged'), desk('core.account.find')])).toThrow(/risk normal/)
+    })
+    it('and refuses one that does not exist', () => {
+      expect(() => buildRegistry([core(true), desk('core.account.lose')])).toThrow(/not a declared ability/)
+    })
+    it('only from a module it requires, never one it only uses', () => {
+      const tickets = entry({ id: 'tickets', abilities: defineAbilities('tickets', { 'order.find': ability({ impliable: true }) }) })
+      expect(() => buildRegistry([core(true), tickets, desk('tickets.order.find', { requires: ['tickets'] })])).not.toThrow()
+      expect(() => buildRegistry([core(true), tickets, desk('tickets.order.find', { uses: ['tickets'] })])).toThrow(/requires \(uses is not enough\)/)
+      expect(() => buildRegistry([core(true), tickets, desk('tickets.order.find')])).toThrow(/requires/)
+    })
+  })
   it('takes a record type with fixed ids and no table', () => {
     expect(() => buildRegistry([entry({ id: 'lost-property', records: defineRecords('lost-property', { branding: record({ ids: ['site'] }) }) })])).not.toThrow()
     expect(() => buildRegistry([entry({ id: 'lost-property', records: defineRecords('lost-property', { branding: record({ ids: [] }) }) })])).toThrow(/ids/)
@@ -242,5 +321,109 @@ describe('notification types', () => {
     expect(schema.safeParse({ ...base, channels: ['email', 'inbox'] }).success).toBe(false)
     expect(schema.safeParse({ ...base, channels: ['inbox'] }).success).toBe(false)
     expect(schema.safeParse({ ...base, channels: ['email', 'inbox'], variables: { link: 'url' } }).success).toBe(true)
+  })
+})
+
+describe('list search words (S3)', () => {
+  it('folds case and accents, and ignores a word under three letters', async () => {
+    const { searchWords, searchQuery } = await import('../../layers/core/kit/search')
+    expect(searchWords('Zoë  Brontë jo')).toEqual({ words: ['zoe', 'bronte'], ignoredWords: ['jo'], searchTooShort: false })
+    expect(searchWords('jo li')).toEqual({ words: [], ignoredWords: ['jo', 'li'], searchTooShort: true })
+    expect(searchWords('  ')).toEqual({ words: [], ignoredWords: [], searchTooShort: false })
+    expect(searchQuery(['zoe', 'say "hi"'], ['name', 'note'])).toBe('{name note} : ("zoe" AND "say ""hi""")')
+  })
+
+  it('names the hidden field that matched a row (S5)', async () => {
+    const { matchedFields } = await import('../../layers/core/kit/search')
+    const fields = [{ key: 'title', hidden: false }, { key: 'season', hidden: true }]
+    expect(matchedFields([{ title: 'Hamlet', season: 'Autumn 2026' }, { title: 'Autumn Fair', season: 'Autumn 2026' }], ['hamlet', 'autumn'], fields)).toEqual(['season', null])
+  })
+})
+
+describe('list sources (S1, S2)', () => {
+  it('refuse a searched column that is special, encrypted or not a column', async () => {
+    const { text } = await import('drizzle-orm/sqlite-core')
+    const { col, defineTable } = await import('../../layers/core/kit/db')
+    const { defineListSource } = await import('../../layers/core/kit/lists')
+    const { defineList } = await import('../../layers/core/shared/list')
+    const { index } = await import('drizzle-orm/sqlite-core')
+    const table = defineTable('lost_property_items', {
+      id: col.id(),
+      owner: col.account('owner_id', { role: 'subject' }),
+      label: col.public(text('label')),
+      health: col.special('health'),
+      token: col.internal(text('token'), { encrypted: true }),
+    }, { id: 'lpi', realm: 'operational', extra: t => [index('lost_property_items_label').on(t.label, t.id)] })
+    const list = defineList('lost-property.items', {
+      filters: { owner: { kind: 'lookup', label: 'Owner' } },
+      sorts: { label: { label: 'Label', type: 'text' } },
+      columns: { label: { label: 'Label', sort: 'label' } },
+      search: ['notes'],
+    })
+    const bind = (over: Record<string, any> = {}) => defineListSource(list, { table, filters: { owner: { column: 'owner' } }, sorts: { label: { columns: ['label'], index: 'lost_property_items_label' } }, search: { label: 'label', notes: 'label' }, ...over } as any)
+    expect(bind().searchIndex).toBe('lost_property_items_search')
+    expect(bind({ search: { label: 'label', notes: 'label' } }).search).toEqual([{ field: 'label', key: 'label', sql: 'label' }, { field: 'notes', key: 'label', sql: 'label' }])
+    expect(() => bind({ search: { label: 'health', notes: 'label' } })).toThrow(/special data/)
+    expect(() => bind({ search: { label: 'token', notes: 'label' } })).toThrow(/encrypted/)
+    expect(() => bind({ search: { label: 'nothing', notes: 'label' } })).toThrow(/not a column/)
+    expect(() => bind({ search: { label: 'label' } })).toThrow(/search.notes: has no binding/)
+    expect(() => bind({ search: { label: 'label', notes: false } })).toThrow(/searching a child is not yet available/)
+    expect(() => bind({ filters: { owner: { column: 'owner' }, colour: { column: 'label' } } })).toThrow(/not a filter of the list/)
+    expect(() => bind({ filters: { owner: { column: 'token' } } })).toThrow(/encrypted/)
+    // A sort names an index that begins with its columns, or the most rows its scan reads.
+    expect(() => bind({ sorts: { label: { columns: ['label'], index: 'nowhere' } } })).toThrow(/no index named nowhere/)
+    expect(() => bind({ sorts: { label: { columns: ['owner'], index: 'lost_property_items_label' } } })).toThrow(/does not begin with/)
+    expect(() => bind({ sorts: { label: { columns: ['owner'], bounded: 0 } } })).toThrow(/whole number/)
+    expect(() => bind({ sorts: { label: { columns: ['token'], bounded: 10 } } })).toThrow(/encrypted/)
+    expect(bind({ sorts: { label: { columns: ['owner'], bounded: 500 } } }).list.id).toBe('lost-property.items')
+  })
+
+  it('tell the generator which index to make, remake or drop', async () => {
+    const { indexChanges } = await import('../../scripts/lib/lists')
+    const wanted = new Map([['a', ['name']], ['b', ['note', 'title']]])
+    const made = new Map<string, string[] | null>([['a', ['name']], ['b', ['title']], ['c', ['x']], ['d', null]])
+    expect(indexChanges(wanted, made)).toEqual([{ table: 'b', columns: ['note', 'title'] }, { table: 'c', columns: null }])
+  })
+})
+
+describe('format additions of 16 November (fixed retention, erase clear, reserved ids)', () => {
+  it('allows a fixed retention only on a table about nobody', async () => {
+    const { text } = await import('drizzle-orm/sqlite-core')
+    const { col, defineTable } = await import('../../layers/core/kit/db')
+    expect(() => defineTable('lost_property_pings', { id: col.id(), at: col.createdAt() }, { id: 'lpp', realm: 'system', subject: 'none', retention: { fixed: '30d' } })).not.toThrow()
+    expect(() => defineTable('lost_property_pongs', { id: col.id(), at: col.createdAt() }, { id: 'lpq', realm: 'system', subject: 'none', retention: { fixed: 'soon' } })).toThrow(/duration/)
+    expect(() => defineTable('lost_property_notes', { id: col.id(), owner: col.account('owner_id', { role: 'subject' }), body: col.freeText(text('body')) }, { id: 'lpn', realm: 'operational', retention: { fixed: '30d' } })).toThrow(/fixed retention/)
+  })
+
+  it('takes erase: \'clear\' on an internal column only when it may be null and the rows reach a person', async () => {
+    const { text } = await import('drizzle-orm/sqlite-core')
+    const { col, defineTable } = await import('../../layers/core/kit/db')
+    const owner = () => col.account('owner_id', { role: 'subject' })
+    expect(defineTable('lost_property_links', { id: col.id(), owner: owner(), hash: col.internal(text('hash'), { erase: 'clear' }) }, { id: 'lpl', realm: 'audience' })).toBeTruthy()
+    expect(() => defineTable('lost_property_links2', { id: col.id(), owner: owner(), hash: col.internal(text('hash').notNull(), { erase: 'clear' }) }, { id: 'lpm', realm: 'audience' })).toThrow(/nullable/)
+    expect(() => defineTable('lost_property_links3', { id: col.id(), hash: col.internal(text('hash'), { erase: 'clear' }) }, { id: 'lpo', realm: 'system', subject: 'none' })).toThrow(/subject is none/)
+  })
+
+  it('takes erase: \'clear\' on a table that reaches a person through its parents, and refuses a chain that ends nowhere', async () => {
+    const { text } = await import('drizzle-orm/sqlite-core')
+    const { col, defineTable } = await import('../../layers/core/kit/db')
+    const orders = defineTable('lost_property_claims', { id: col.id(), owner: col.account('owner_id', { role: 'subject' }) }, { id: 'lpc', realm: 'audience' })
+    const lines = defineTable('lost_property_claim_lines', { id: col.id(), claimId: col.ref('lost_property_claims') }, { id: 'lpd', realm: 'audience', subject: { via: 'claim_id' } })
+    const passes = defineTable('lost_property_passes', { id: col.id(), lineId: col.ref('lost_property_claim_lines'), code: col.internal(text('code'), { encrypted: true, erase: 'clear' }) }, { id: 'lpe', realm: 'audience', subject: { via: 'line_id' } })
+    const things = defineTable('lost_property_things', { id: col.id() }, { id: 'lpf', realm: 'system', subject: 'none' })
+    const strays = defineTable('lost_property_strays', { id: col.id(), thingId: col.ref('lost_property_things'), code: col.internal(text('code'), { erase: 'clear' }) }, { id: 'lpg', realm: 'audience', subject: { via: 'thing_id' } })
+    const module = (tables: object) => ({ manifest: defineModule({ manifest: 1, since: '0.1.0', id: 'lost-property', tables } as any), root: 'layers/lost-property', owner: 'upstream', handlers: {} } as unknown as ModuleEntry)
+    expect(() => buildRegistry([module({ orders, lines, passes })])).not.toThrow()
+    expect(() => buildRegistry([module({ things, strays })])).toThrow(/does not lead to an account or an email/)
+    // Erasure finds the pass's rows through both parents, and clears its code.
+    const { matchOf } = await import('../../layers/core/server/identity/erasure')
+    const { tableMeta } = await import('../../layers/core/kit/db')
+    const metas = new Map([orders, lines, passes].map(t => [tableMeta(t)!.name, tableMeta(t)!]))
+    expect(matchOf(tableMeta(passes)!, metas)).toMatch(/"line_id" IN \(SELECT id FROM "lost_property_claim_lines" WHERE \("claim_id" IN \(SELECT id FROM "lost_property_claims" WHERE \("owner_id" IN/)
+  })
+
+  it('reserves every settled module id', async () => {
+    const { RESERVED_MODULE_IDS } = await import('../../layers/core/kit/registry')
+    expect(RESERVED_MODULE_IDS).toEqual(expect.arrayContaining(['core', 'box-office', 'payments', 'finance', 'forms', 'front-of-house', 'spaces', 'bar', 'training', 'membership', 'membership-fees', 'communications']))
   })
 })

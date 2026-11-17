@@ -60,6 +60,11 @@ test.describe('a list with views and rows that open', () => {
     await noViolations(page)
   })
 
+  test('a page can say a line about the answer through the note slot', async ({ page }) => {
+    await visit(page, '/console/gallery/shows')
+    await expect(page.getByRole('status').filter({ hasText: '2 cancelled shows are not shown.' })).toBeVisible()
+  })
+
   test('the view that opens its rows starts them open', async ({ page }) => {
     await visit(page, '/console/gallery/shows')
     await expect(page.getByText('2026-11-20 19:30 (1)')).toBeVisible()
@@ -84,6 +89,16 @@ test.describe('a list with views and rows that open', () => {
     await page.setViewportSize({ width: 500, height: 800 })
     await expect(page.getByRole('link', { name: 'Back to Sample list' })).toBeVisible()
     await expect(trail).toBeHidden()
+    await noViolations(page)
+  })
+
+  test('a result that matched in a hidden column says which, and words that are too short are said not to be searched', async ({ page }) => {
+    await visit(page, '/console/gallery/shows?view=all&q=studio')
+    await expect(page.getByText('Matches Venue: Studio').first()).toBeVisible()
+    await visit(page, '/console/gallery/shows?view=all&q=ha')
+    await expect(page.getByRole('status').filter({ hasText: 'Nothing was searched' })).toBeVisible()
+    await visit(page, '/console/gallery/shows?view=all&q=ham+of')
+    await expect(page.getByRole('status').filter({ hasText: 'Words under three letters are not searched: of' })).toBeVisible()
     await noViolations(page)
   })
 

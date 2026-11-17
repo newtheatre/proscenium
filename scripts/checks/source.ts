@@ -6,6 +6,7 @@ import { ROOT, rel } from '../lib/paths.ts'
 import type { Loaded } from '../lib/load.ts'
 import { allRoutes } from './routes.ts'
 import { abilityList, entryLabelKey, groupLabelKey, resolveEntry, SHELL_PREFIXES, shellOf } from '../../layers/core/shared/navigation.ts'
+import { impliedAbility } from '../../layers/core/kit/abilities.ts'
 
 export function walk(dir: string, extensions = ['.ts', '.vue']): string[] {
   if (!existsSync(dir)) return []
@@ -136,7 +137,8 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
     const sections = new Set<string>()
     for (const [key, { module }] of registry.settings as Map<string, any>) if (module === id) sections.add(key.slice(id.length + 1).split('.')[0]!)
     for (const section of sections) need(`${id}.settings-sections.${section}`, 'the heading of a group of settings on the generated settings page')
-    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.quick-actions.`, `${id}.records.`, `${id}.record-tabs.`]
+    for (const page of (registry.settingPages as Map<string, { module: string, label: string }>).values()) if (page.module === id && page.label !== `${id}.module.name`) need(page.label, 'the name of a page of settings')
+    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.settings-pages.`, `${id}.quick-actions.`, `${id}.records.`, `${id}.record-tabs.`]
     for (const key of keys) if (derived.some(p => key.startsWith(p))) problems.push(`${rel(file)}: "${key}" is not used by any declaration`)
   }
   return problems
@@ -147,7 +149,7 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
   const required = new Set<string>()
   for (const route of allRoutes(modules)) if (route.ability) required.add(route.ability)
   for (const { entry } of registry.settings.values()) if (entry.change) required.add(entry.change)
-  for (const [key, { module, decl }] of registry.abilities as Map<string, any>) for (const short of decl.implies ?? []) if (required.has(key)) required.add(`${module}.${short}`)
+  for (const [key, { module, decl }] of registry.abilities as Map<string, any>) for (const entry of decl.implies ?? []) if (required.has(key)) required.add(impliedAbility(module, entry))
   // A navigation entry shows only to people who hold its ability, so that is a requirement too.
   for (const m of modules) {
     for (const entry of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.navigation'] ?? []) for (const name of abilityList(entry.ability)) required.add(name)
@@ -196,7 +198,8 @@ function pageRoute(pagesDir: string, file: string): string {
  * Navigation coverage (UI-08): every page a module puts inside the account, members', console or
  * live shell is reachable from a navigation entry, so nothing is built that nobody can find. A page
  * under an entry's address (or its `match` prefix) is covered; a shell's home page is not an entry.
- * A module's settings page is generated, and the entry for it is too.
+ * A page of settings has a generated entry. Every bespoke screen a setting names as its home is a
+ * page that exists.
  */
 export function checkNavigation(modules: Loaded[], registry: any): string[] {
   const problems: string[] = []
@@ -213,19 +216,18 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
       for (const e of contributes[point] ?? []) if (e.count && !counts.has(e.count)) problems.push(`${m.found.root}: ${point} ${e.id} names the count "${e.count}", which no module registers in core.count`)
     }
   }
-  const withSettings = new Set<string>()
-  let siteSettings = false
-  for (const { module, entry } of registry.settings.values() as Iterable<{ module: string, entry: { scope?: string } }>) {
-    if (entry.scope === 'site') siteSettings = true
-    else withSettings.add(module)
+  const screens = new Map<string, string>()
+  for (const [key, home] of registry.settingHomes as Map<string, { page?: string, screen?: string }>) {
+    if (home.page) entries.push({ to: registry.settingPages.get(home.page).to })
+    else if (!screens.has(home.screen!)) screens.set(home.screen!, key)
   }
-  for (const module of withSettings) entries.push({ to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings` })
-  if (siteSettings) entries.push({ to: '/admin/settings' })
+  const routes = new Set<string>()
   const homes = new Set(Object.values(SHELL_PREFIXES))
   for (const m of modules) {
     const pagesDir = join(ROOT, m.found.root, 'app/pages')
     for (const file of walk(pagesDir, ['.vue'])) {
       const route = pageRoute(pagesDir, file)
+      routes.add(route)
       const shell = shellOf(route)
       if (!shell || homes.has(route)) continue
       const fixed = route.split('/').filter(Boolean)
@@ -236,6 +238,7 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
       if (!resolveEntry(entries, prefix)) problems.push(`${rel(file)}: the page ${route} has no navigation entry; contribute one to core.navigation whose \`to\` or \`match\` covers it`)
     }
   }
+  for (const [screen, key] of screens) if (!routes.has(screen)) problems.push(`settings.${key}: its home is the screen ${screen}, which is not a page`)
   return problems
 }
 
@@ -266,7 +269,7 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
   if (!accountIn.size) return []
   const alt = (names: Iterable<string>) => [...names].sort((a, b) => b.length - a.length).join('|')
   const column = `(?<![\\w])(?:\\w+\\.)?"?(${alt(accountIn.keys())})"?`
-  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope|inAccountScope)\\())'
+  const value = '(?:\\?\\d*|\\$\\{(?!\\s*(?:accountScope(?:Sql)?|inAccountScope)\\())'
   const raw = [
     new RegExp(`${column}\\s*(?:==?|!=|<>)\\s*${value}`, 'gi'),
     new RegExp(`${column}\\s+IS\\s+(?:NOT\\s+)?${value}`, 'gi'),
@@ -306,6 +309,66 @@ export function checkAccountComparisons(modules: Loaded[], registry: any): strin
         if (drizzle?.test(line) || compared.some(name => isAccount(name, near)))
           problems.push(`${at}:${i + 1}: compares an account column to an id; use inAccountScope(column, account) so rows of merged accounts are found, or exactAccount with // exact-account: why`)
       })
+    }
+  }
+  return problems
+}
+
+/**
+ * sealSpecial writes a special or encrypted column and nothing else (Foundations part 4, T5): a
+ * link token is never sealed, it is hashed with linkTokens. Refuses sealSpecial in a module that has
+ * no such column, and a call whose argument names a token or a link.
+ */
+export function checkSealSpecial(modules: Loaded[], registry: any): string[] {
+  const problems: string[] = []
+  for (const m of modules) {
+    const sealsColumns = [...(registry.tables as Map<string, any>).values()].some(t => t.module === m.manifest.id && Object.values(t.meta.columns as Record<string, any>).some(c => c.meta.encrypted))
+    for (const file of moduleFiles(m).filter(f => f.endsWith('.ts') && !rel(f).startsWith('layers/core/kit/'))) {
+      lines(file).forEach((line, i) => {
+        if (!/\b(sealSpecial|sealColumn)\(/.test(line)) return
+        const at = `${rel(file)}:${i + 1}`
+        if (!sealsColumns) problems.push(`${at}: sealSpecial and sealColumn write a special or encrypted column, and this module has none`)
+        for (const [, , argument] of line.matchAll(/\b(sealSpecial|sealColumn)\(([^)]*)\)/g)) {
+          if (/token|link/i.test(argument!)) problems.push(`${at}: seals a link token; a token is never sealed or stored, keep linkTokens.hash(token) instead`)
+        }
+      })
+    }
+  }
+  return problems
+}
+
+// A statement's count of changed rows includes rows its triggers and a search index wrote, so an
+// INSERT into a searched table can count 3 (Foundations part 3, "Counting changed rows"). A count
+// may be tested against nought; a unit that needs an exact count uses the kit's guard.
+const COMPARE = '(===|!==|==|!=|<=|>=|<|>)'
+const CHANGES_AFTER = new RegExp(`\\bchanges\\b(?!\\s*\\()[\\s)?]*(?:\\?\\?\\s*\\d+[\\s)]*)?${COMPARE}\\s*(-?\\d+(?:\\.\\d+)?)`, 'g')
+const CHANGES_BEFORE = new RegExp(`(-?\\d+(?:\\.\\d+)?)\\s*${COMPARE}\\s*\\(?\\s*[\\w.?[\\]]*\\.changes\\b(?!\\s*\\()`, 'g')
+
+/** Lines (1-based) that compare a statement's changed-row count with a number other than nought. */
+export function exactChangeCounts(source: string): number[] {
+  const found: number[] = []
+  source.split('\n').forEach((line, i) => {
+    const numbers = [...line.matchAll(CHANGES_AFTER)].map(m => m[2]!).concat([...line.matchAll(CHANGES_BEFORE)].map(m => m[1]!))
+    if (numbers.some(n => Number(n) !== 0)) found.push(i + 1)
+  })
+  return found
+}
+
+/** Lines (1-based) whose SQL reads SQLite's changes(). */
+export function changesInSql(source: string): number[] {
+  return source.split('\n').flatMap((line, i) => /\bchanges\s*\(\s*\)/.test(line) && !/^\s*(\/\/|\*)/.test(line) ? [i + 1] : [])
+}
+
+export function checkChangeCounts(modules: Loaded[]): string[] {
+  const problems: string[] = []
+  for (const m of modules) {
+    for (const file of moduleFiles(m).filter(f => f.endsWith('.ts'))) {
+      const source = readFileSync(file, 'utf8')
+      for (const line of exactChangeCounts(source)) problems.push(`${rel(file)}:${line}: compares a count of changed rows with a number other than 0; triggers and search indexes add to the count, so test it against 0 or use the unit of work's guard`)
+      // A search index flushes what it holds when the next write opens, so changes() read by a later
+      // statement can be stale (Foundations part 3, "the claim stamp"). Only the kit's guard reads it.
+      if (rel(file).startsWith('layers/core/kit/')) continue
+      for (const line of changesInSql(source)) problems.push(`${rel(file)}:${line}: reads changes() in SQL, which a search index can leave stale; stamp the row in the conditional write and read the stamp back`)
     }
   }
   return problems
