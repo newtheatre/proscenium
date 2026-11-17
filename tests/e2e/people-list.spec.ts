@@ -92,6 +92,22 @@ test.describe('someone who handles data requests', () => {
   })
 })
 
+test.describe('someone who merges accounts', () => {
+  test.use(as(['core.account.merge', 'core.account.create']))
+
+  test('starts a merge from a person\'s page, keeping that person', async ({ page }) => {
+    const made = await page.request.post('/api/core/accounts', { data: { name: `Mira Mergetest ${Date.now()}`, address: `mira.${Date.now()}@example.org` } })
+    const { id } = await made.json() as { id: string }
+    await visit(page, `/console/people/${id}`)
+    await expect(page.getByRole('heading', { name: 'Members\' side' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Emergency contacts' })).toHaveCount(0)
+    await noViolations(page)
+    await page.getByRole('button', { name: /more actions|actions/i }).first().click()
+    await page.getByRole('menuitem', { name: 'Merge with another account' }).click()
+    await expect(page).toHaveURL(new RegExp(`/console/people/merge\\?survivorId=${id}`))
+  })
+})
+
 test.describe('without core.account.read', () => {
   test.use(as(['core.role.read']))
 

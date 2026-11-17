@@ -1,10 +1,14 @@
-// A person's account as staff see it: identity's own facts, addresses, how they sign in, and
-// their roles. Opening it is audited.
+// A person's account as staff see it: identity's own facts, addresses, how they sign in, their
+// roles and standings. Opening it is audited. Emergency contacts and access needs are not here: each
+// is read on its own route, with its own ability and audit, and this answer only says whether the
+// viewer may ask (Identity Doc part 5, "Account").
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { all, can, defineRoute, nowMs, refuse } from '#kit'
+import { all, can, defineRoute, first, nowMs, refuse } from '#kit'
 import { accountById } from '../../../identity/accounts'
 import { liveGrantsOf } from '../../../identity/grants'
+import { standingOf } from '../../../identity/standings'
+import { profileOf } from '../../../identity/access-scheme'
 
 export default defineRoute({
   ability: 'core.account.read',
@@ -31,9 +35,21 @@ export default defineRoute({
     merge: await may('core.account.merge'),
     endSessions: await may('core.session.end'),
     grants: await may('core.grant.read'),
+    emergencyContacts: false,
+    accessNeeds: false,
+    accessScheme: false,
     // Staff ask for their own erasure from their own account, like anybody else.
     erase: actor.accountId !== id && (await can(actor, 'core.data-request.manage')).allowed,
   }
+  const standings = await standingOf(id)
+  // Emergency contacts are offered only for a person with a standing (ID-17).
+  actions.emergencyContacts = standings.length > 0 && await may('core.emergency-contact.read')
+  // Nothing about the access scheme unless the viewer may see it (ID-39, ID-40): the scheme's
+  // readers see where an application stands; the welfare lead sees needs the person shared with them.
+  actions.accessScheme = await may('core.access-scheme.read')
+  const profile = actions.accessScheme ? await profileOf(id) : null
+  actions.accessNeeds = await may('core.access-profile.read')
+    && !!(await first<{ n: number }>('SELECT 1 AS n FROM core_access_shares s JOIN core_access_profiles p ON p.account_id = s.account_id WHERE s.account_id = ? AND s.purpose = \'core.welfare\' AND p.status = \'accepted\'', id)) // exact-account: identity's own table, keyed by the living account
   return {
     id,
     name: account.name,
@@ -50,6 +66,8 @@ export default defineRoute({
     providers: providers.map(p => p.provider),
     liveSessions: sessions[0]?.n ?? 0,
     grants: grants.map(g => ({ id: g.id, roleId: g.role_id, role: g.role_key, scope: g.scope, expiresAt: g.expires_at })),
+    standings,
+    ...(actions.accessScheme ? { accessScheme: profile ? { status: profile.status, submittedAt: profile.submitted_at } : null } : {}),
     actions,
   }
 })

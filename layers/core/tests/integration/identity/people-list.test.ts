@@ -81,3 +81,35 @@ describe('the Accounts list', () => {
     expect((await allowed.get('/api/core/people?state=lost')).status).toBe(422)
   })
 })
+
+describe('a person\'s page', () => {
+  it('names their standings, and offers emergency contacts only for a member, with a reason', async () => {
+    const { browser, accountId } = await staff()
+    await grantDirectly(accountId, ['core.account.read', 'core.emergency-contact.read'])
+    const someone = await person(`Petra ${crypto.randomUUID().slice(0, 6)}`, 'active')
+
+    const before = (await browser.get(`/api/core/accounts/${someone}`)).body
+    expect(before.standings).toEqual([])
+    expect(before.actions).toMatchObject({ emergencyContacts: false, accessScheme: false, accessNeeds: false })
+    expect(before).not.toHaveProperty('accessScheme')
+
+    await grantDirectly(someone, [], { roleKey: 'stage-crew' })
+    const after = (await browser.get(`/api/core/accounts/${someone}`)).body
+    expect(after.standings).toEqual([{ source: 'role:stage-crew', label: 'stage-crew' }])
+    expect(after.actions.emergencyContacts).toBe(true)
+    expect((await browser.get(`/api/core/accounts/${someone}/emergency-contacts`)).status).toBe(422)
+    const read = await browser.get(`/api/core/accounts/${someone}/emergency-contacts?reason=emergency`)
+    expect(read.status).toBe(200)
+    expect(read.body.contacts).toEqual([])
+    expect(await rows('SELECT detail FROM core_audit WHERE record_id = ? AND ability = \'core.emergency-contact.read\'', someone)).toHaveLength(1)
+  })
+
+  it('says where an access application stands to the scheme\'s readers', async () => {
+    const { browser, accountId } = await staff()
+    await grantDirectly(accountId, ['core.account.read', 'core.access-scheme.read'])
+    const someone = await person(`Ines ${crypto.randomUUID().slice(0, 6)}`, 'active')
+    const body = (await browser.get(`/api/core/accounts/${someone}`)).body
+    expect(body.actions.accessScheme).toBe(true)
+    expect(body.accessScheme).toBeNull()
+  })
+})
