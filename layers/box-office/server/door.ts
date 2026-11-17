@@ -4,12 +4,13 @@
 // once however many devices scan it together, and the scan row written next in the same batch takes
 // its result from that stamp: admitted if the stamp is its own id, already admitted otherwise. A desk code or a
 // booking reference admits nobody and writes no scan row.
-import { all, createUnit, first, newId, nowMs, useContext } from '#kit'
+import { all, can, createUnit, first, newId, nowMs, useContext } from '#kit'
 import { signing } from '#kit/signing'
 import { hashOf } from './codes'
+import { doorCodeKind } from './door-codes'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
 
-export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'unknown' | 'bad_signature' | 'not_paid'
+export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed'
 
 export interface ScanOutcome {
   result: ScanResult
@@ -23,6 +24,8 @@ export interface ScanOutcome {
   voidReason?: string
   /** Wrong performance: the one the ticket is for. */
   ticketPerformanceId?: string
+  /** A code of another kind (box-office.door-code), such as a membership card: what it says. */
+  card?: { kind: string, headline: string, line: string, state: 'ok' | 'attention' }
 }
 
 export interface ScanInput { performanceId: string, code: string, deviceLabel?: string | null }
@@ -49,6 +52,16 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
     return { ...outcome, scanId }
   }
 
+  // A code of another kind, such as a membership card, shows what its module says and admits nobody.
+  // Like a desk code, it writes no scan row.
+  const other = parts.length === PARTS ? await doorCodeKind(parts[0]!) : null
+  if (other) {
+    const [kind, keyId, random, signature] = parts as [string, string, string, string]
+    if (!await signing.verify(DOOR_CODE_PURPOSE, keyId, signedPart(kind, keyId, random), signature)) return { result: 'bad_signature', scanId: null }
+    if (!(await can(useContext().actor, other.ability as never)).allowed) return { result: 'card_not_allowed', scanId: null }
+    const said = await other.resolve(random)
+    return said ? { result: 'card', scanId: null, card: { kind, ...said } } : { result: 'unknown', scanId: null }
+  }
   if (parts.length !== PARTS || parts[0] !== TICKET_KIND) {
     // What a reservation's message carries is not a ticket: the desk takes the payment first.
     const reservation = await first<{ id: string }>("SELECT id FROM box_office_orders WHERE state IN ('reserved', 'awaiting_payment') AND (desk_code_hash = ? OR reference = ?)", await hashOf(code.toUpperCase()), code.toUpperCase())

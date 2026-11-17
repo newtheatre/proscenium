@@ -13,6 +13,10 @@ interface Sender {
 
 const { $api } = useNuxtApp()
 const route = useRoute()
+const { data: publicSettings } = usePublicSettings()
+// The footer's preview draws the email's own frame: the theatre's name over a rule in the brand colour.
+const theatreName = computed(() => (publicSettings.value?.['core.site.name']?.value as string | null | undefined) || 'Your theatre')
+const accent = computed(() => (publicSettings.value?.['core.brand.accent']?.value as string | undefined) ?? '#2563eb')
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const { data, status, error, refresh } = useAPI<Sender>('/api/core/notifications/sender')
@@ -147,9 +151,52 @@ async function setUp() {
     </DataBoundary>
     <SettingsSections
       screen="/admin/email"
+      heading="Email settings"
       :omit="['core.notifications.verified-domain']"
       :highlight="typeof route.query.setting === 'string' ? route.query.setting : undefined"
       @saved="refresh()"
-    />
+    >
+      <template #after-field="{ setting, value }">
+        <UAlert
+          v-if="setting.key === 'core.notifications.sending-label' && data?.domain"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          :description="`Email keeps coming from ${data.domain}. A new label only takes effect the next time the domain is set up automatically.`"
+        />
+        <figure
+          v-else-if="setting.key === 'core.notifications.email-footer'"
+          class="space-y-1"
+        >
+          <figcaption class="text-sm text-muted">
+            How the end of every email looks
+          </figcaption>
+          <!-- Email is always white, whatever the screen's mode, so the preview is too. -->
+          <div class="max-w-md rounded-md border border-default bg-white p-4 text-sm text-stone-900">
+            <p
+              class="mb-3 border-b-[3px] pb-2 font-semibold"
+              :style="{ borderColor: accent }"
+            >
+              {{ theatreName }}
+            </p>
+            <p class="mb-3">
+              Thank you for booking with us. Your tickets are attached.
+            </p>
+            <p
+              v-if="typeof value === 'string' && value.trim()"
+              class="mt-4 text-xs whitespace-pre-line text-stone-600"
+            >
+              {{ value }}
+            </p>
+            <p
+              v-else
+              class="mt-4 text-xs text-stone-600 italic"
+            >
+              No footer is added.
+            </p>
+          </div>
+        </figure>
+      </template>
+    </SettingsSections>
   </PageFrame>
 </template>

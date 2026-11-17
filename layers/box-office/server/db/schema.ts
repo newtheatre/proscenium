@@ -431,4 +431,40 @@ export const compRequests = defineTable('box_office_comp_requests', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests }
+/**
+ * An exchange to dearer tickets waiting for the difference (BO-54; part 4, "Cancelling and
+ * exchanging"). The new seats are held under the order while the till takes the payment; when it
+ * settles, the exchange is made in Payments' batch. A payment that ends without the money lets the
+ * held seats go and leaves the booking as it was. The row stays as the record of the payment's owner.
+ */
+export const exchanges = defineTable('box_office_exchanges', {
+  id: col.id(),
+  orderId: col.ref('box_office_orders'),
+  // A JSON array of the order line ids being exchanged.
+  lineIds: col.internal(text('line_ids').notNull()),
+  performanceId: col.internal(text('performance_id').notNull()),
+  bandId: col.ref('box_office_bands'),
+  ticketTypeId: col.ref('box_office_ticket_types'),
+  // The price of each new ticket, and what is to pay on top of the old ones.
+  priceMinor: col.minor('price_minor').notNull(),
+  differenceMinor: col.minor('difference_minor').notNull(),
+  holdId: col.ref('box_office_holds'),
+  intentId: col.ref('payments_intents', { nullable: true }),
+  state: col.internal(text('state', { enum: ['awaiting_payment', 'completed', 'released'] }).notNull().default('awaiting_payment')),
+  cancellationId: col.ref('box_office_cancellations', { nullable: true }),
+  by: col.account('by', { role: 'actor' }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'exch',
+  realm: 'audience',
+  subject: { via: 'order_id' },
+  extra: t => [
+    index('box_office_exchanges_order').on(t.orderId),
+    index('box_office_exchanges_intent').on(t.intentId).where(sql`intent_id IS NOT NULL`),
+    check('box_office_exchanges_state', sql`${t.state} IN ('awaiting_payment', 'completed', 'released')`),
+    check('box_office_exchanges_difference', sql`${t.differenceMinor} > 0 AND ${t.priceMinor} > 0`),
+  ],
+})
+
+export const tables = { performanceSales, bands, ticketTypes, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests, exchanges }

@@ -3,7 +3,7 @@
 // posted. It names no module that provides a member price: that is a requirement reference checked
 // through the kit. This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting, task } from '#kit'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'box-office.settings.manage'
@@ -78,6 +78,12 @@ export default defineModule({
   // longest-lived thing signed under it, and a membership card can run for three years.
   signing: [{ purpose: 'box-office.door-code', rotateEvery: '90d', keepFor: '1460d' }],
 
+  points: {
+    // Another kind of code the door reads, such as a membership card. Signed here, under the same
+    // purpose, so no other module handles a key; a scan of one shows what it says and admits nobody.
+    'box-office.door-code': point({ kind: 'code', contract: 'door-code' }),
+  },
+
   events: {
     announces: {
       // Sale state is public: useful to a website or a listings feed.
@@ -93,6 +99,17 @@ export default defineModule({
       'box-office.comp-request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), state: z.enum(['issued', 'declined', 'withdrawn']) }), internal: true }),
       'box-office.order.cancelled': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
     },
+    // The decision recorded on the Bulk cancellation screen is carried out when the core's change goes through (R-11).
+    listens: {
+      'core.performance.cancelled': 'follow-cancel',
+      'core.performance.rescheduled': 'follow-reschedule',
+      'core.performance.moved': 'follow-move',
+    },
+  },
+
+  jobs: {
+    // One booking of a decision to refund everyone, so a refund that fails is retried and listed without holding up the rest.
+    'box-office.cancel-order': job({ payload: z.object({ orderId: z.string(), performanceId: z.string(), what: z.string() }), retries: 8 }),
   },
 
   tasks: {
@@ -109,6 +126,9 @@ export default defineModule({
     'payments.settlement': [{ id: 'box-office' }],
     // Its panel in the till: a reservation to take payment for, or tickets to sell at the desk.
     'payments.desk-basket': [{ id: 'box-office' }],
+    // A performance with bookings is not cancelled, rescheduled or moved until someone decides what happens to them.
+    'core.change-guard': [{ id: 'box-office' }],
+    'core.change-impact': [{ id: 'box-office' }],
     'core.navigation': [
       { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
       { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
@@ -229,6 +249,34 @@ export default defineModule({
         'en-GB': {
           subject: 'Cancelled: {{ show }}, {{ when }}',
           body: 'We have cancelled {{ cancelled }} on booking **{{ reference }}** for **{{ show }}**, {{ when }}.\n\n{{ remaining }}',
+        },
+      },
+    }, {
+      // A performance cancelled, rescheduled or moved, where the decision was to cancel the bookings.
+      id: 'box-office.performance-cancelled',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'prompt' as const,
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, what: 'text' as const, money: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Cancelled: {{ show }}, {{ when }}',
+          body: 'We are sorry: **{{ show }}**, {{ when }}, {{ what }}.\n\n{{ money }}\n\nBooking reference: **{{ reference }}**',
+        },
+      },
+    }, {
+      // A performance rescheduled or moved with the bookings kept, or cancelled with an exchange offered.
+      id: 'box-office.performance-changed',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'prompt' as const,
+      variables: { reference: 'text' as const, show: 'text' as const, what: 'text' as const, now: 'text' as const, next: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'A change to {{ show }}',
+          body: '**{{ show }}** {{ what }}.\n\n{{ now }}\n\n{{ next }}\n\nBooking reference: **{{ reference }}**',
         },
       },
     }],

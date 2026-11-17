@@ -237,6 +237,11 @@ describe('setting the sending domain up automatically (C-52)', () => {
     expect(cloudflare.calls).toHaveLength(0)
   })
 
+  it('shows the screen however long ago the person confirmed; only the button asks', async () => {
+    const stale = person(['core.sender.manage'], { reassertedAt: Date.now() - 86_400_000 })
+    expect((await request('GET', 'https://example.org', '/api/core/notifications/sender', { actor: stale })).status).toBe(200)
+  })
+
   it('settles a call that got no answer by asking Cloudflare later', async () => {
     cloudflare.hang = true
     await setSettings({ 'core.external.timeout': 1 })

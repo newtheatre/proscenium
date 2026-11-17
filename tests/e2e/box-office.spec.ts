@@ -9,7 +9,7 @@ const person = (accountId: string, name: string, abilities: string[]) => ({ kind
 const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage'])
 const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
-const office = person('acc_officeboss', 'Office Boss', ['box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.order.exchange', 'box-office.report.export'])
+const office = person('acc_officeboss', 'Office Boss', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.order.exchange', 'box-office.report.export'])
 const producer = person('acc_compproducer', 'Pat Producer', ['box-office.comp.request'])
 const approver = person('acc_compapprover', 'Alex Approver', ['box-office.comp.request', 'box-office.comp.approve'])
 const as = (actor: object) => ({ extraHTTPHeaders: { 'x-test-actor': JSON.stringify(actor) } })
@@ -18,6 +18,9 @@ const key = () => ({ 'idempotency-key': crypto.randomUUID() })
 const stamp = Date.now() % 1_000_000
 const typeName = `Desk price ${stamp}`
 let reference = ''
+let swapping = ''
+const premiumName = `Premium ${stamp}`
+let premium = { bandId: '', ticketTypeId: '' }
 let performanceId = ''
 
 async function post(api: APIRequestContext, path: string, data: unknown, headers: Record<string, string> = {}) {
@@ -49,7 +52,9 @@ test.beforeAll(async ({ playwright }) => {
   const type = await post(api, '/api/box-office/ticket-types', { name: typeName })
   const band = await post(api, `/api/box-office/productions/${production.id}/bands`, { name: 'Stalls' })
   expect((await api.put(`/api/box-office/performances/${performance.id}/sales`, { data: { pools: [{ bandId: band.bandId, capacity: 20 }] } })).ok()).toBe(true)
-  await post(api, `/api/box-office/productions/${production.id}/prices`, { prices: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, amountMinor: 1200 }] })
+  const dearer = await post(api, '/api/box-office/ticket-types', { name: premiumName })
+  premium = { bandId: band.bandId, ticketTypeId: dearer.ticketTypeId }
+  await post(api, `/api/box-office/productions/${production.id}/prices`, { prices: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, amountMinor: 1200 }, { bandId: band.bandId, ticketTypeId: dearer.ticketTypeId, amountMinor: 1500 }] })
   await post(api, '/api/payments/providers', { provider: 'cash', label: 'Desk cash', channels: ['desk'], mode: 'live' })
   await post(api, `/api/box-office/performances/${performance.id}/sales/open`, {})
   await api.dispose()
@@ -60,6 +65,9 @@ test.beforeAll(async ({ playwright }) => {
   const reserved = await post(buyer, `/api/box-office/baskets/${basket.orderId}/reserve`, { expectedTotalMinor: 1200, email: 'desk.buyer@example.org', name: 'Desk Buyer' }, { 'x-basket-token': basket.token })
   expect(reserved.state).toBe('reserved')
   reference = reserved.reference
+  // And another, to pay for and then exchange for a dearer ticket.
+  const second = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 1 }] })
+  swapping = (await post(buyer, `/api/box-office/baskets/${second.orderId}/reserve`, { expectedTotalMinor: 1200, email: 'desk.swapper@example.org', name: 'Desk Swapper' }, { 'x-basket-token': second.token })).reference
   await buyer.dispose()
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
@@ -119,6 +127,35 @@ test('Sell finds a reservation by its reference and takes payment for it', async
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
 })
 
+test('Sell takes the difference on an exchange for a dearer ticket', async ({ page, browser, playwright }) => {
+  await visit(page, '/console/box-office/sell')
+  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
+  await page.getByLabel(/^Booking reference or desk code/).fill(swapping)
+  await page.getByRole('button', { name: 'Find' }).click()
+  await payCash(page, '£12.00')
+
+  // Whoever sold a booking does not exchange it themselves: someone else in the office does, at their own till.
+  const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(office) })
+  const found = await (await api.get(`/api/box-office/desk/orders?q=${swapping}`)).json()
+  expect([200, 409]).toContain((await api.post('/api/payments/sessions', { data: { pointLabel: 'Office till' }, headers: key() })).status())
+  await api.dispose()
+  const booking = found.orders[0]
+  const exchange = { orderId: booking.orderId, reference: swapping, lineIds: [booking.lines[0].id], performanceId, ...premium, expectedDifferenceMinor: 300 }
+  const officeContext = await browser.newContext(as(office))
+  page = await officeContext.newPage()
+  await visit(page, `/console/box-office/sell?exchange=${encodeURIComponent(JSON.stringify(exchange))}`)
+  await expect(page.getByRole('heading', { name: `Exchange on booking ${swapping}` })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Take payment of £3.00' })).toBeEnabled()
+  await noViolations(page)
+  await payCash(page, '£3.00')
+
+  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
+  await page.getByLabel(/^Booking reference or desk code/).fill(swapping)
+  await page.getByRole('button', { name: 'Find' }).click()
+  await expect(page.getByText(premiumName)).toBeVisible()
+  await officeContext.close()
+})
+
 test.describe('the box office console', () => {
   test.use(as(office))
 
@@ -143,6 +180,13 @@ test.describe('the box office console', () => {
     await visit(page, `/console/box-office/performances/${performanceId}`)
     await expect(page.getByRole('heading', { name: 'Seats to sell' })).toBeVisible()
     await expect(page.getByText('On sale', { exact: true }).first()).toBeVisible()
+    await noViolations(page)
+
+    // The Bulk cancellation screen, as the core's refusal to cancel links to it.
+    await visit(page, `/console/box-office/performances/${performanceId}/change?for=cancel`)
+    await expect(page.getByRole('heading', { name: 'What happens to them' })).toBeVisible()
+    await expect(page.getByRole('radio', { name: /Refund everyone/ })).toBeVisible()
+    await expect(page.getByRole('radio', { name: /Keep the bookings/ })).toHaveCount(0)
     await noViolations(page)
 
     await visit(page, `/console/box-office/performances/${performanceId}/door`)

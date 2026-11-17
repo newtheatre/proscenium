@@ -405,16 +405,20 @@ test.describe('confirming it is you', () => {
     await context.close()
   })
 
-  test('reloading an admin screen with a stale sign-in renders it and asks in place, not a 403', async ({ browser }) => {
-    // The sending domain's screen loads through routes that need a recent sign-in, which a server render cannot ask for.
-    const stale = { ...person('Stella Stale', [grant('core.sender.manage')]), assurance: 'strong' }
+  test('a stale sign-in still loads admin screens, reloaded or not, with their fields editable; only saving asks', async ({ browser }) => {
+    // Matt, 17 November: confirming it is you guards changes, not reads.
+    const stale = { ...person('Stella Stale', [grant('core.sender.manage'), grant('core.template.edit'), grant('core.settings.manage'), grant('core.organisation.edit')]), assurance: 'strong' }
     const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(stale) })
     const page = await context.newPage()
-    for (let load = 0; load < 2; load++) { // the first visit, then the reload
-      const response = load ? await page.reload() : await page.goto('/admin/email')
-      expect(response?.status()).toBe(200)
-      await expect(page.getByRole('heading', { level: 1, name: 'Email sending' })).toBeVisible()
-      await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
+    for (const [address, heading] of [['/admin/email', 'Email sending'], ['/admin/theatre', 'Theatre']] as const) {
+      for (let load = 0; load < 2; load++) { // the first visit, then the reload
+        const response = load ? await page.reload() : await page.goto(address)
+        expect(response?.status()).toBe(200)
+        await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+        await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
+        await expect(page.getByText('You can read this but not change it')).toHaveCount(0)
+        await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toHaveCount(0)
+      }
     }
     await context.close()
   })
@@ -424,13 +428,16 @@ test.describe('confirming it is you', () => {
     const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(sender) })
     const page = await context.newPage()
     await visit(page, '/admin/email')
-    const section = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Email and notices' }) })
+    const section = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Email settings' }) })
     await expect(section.getByRole('textbox', { name: 'Sending domain' })).toBeVisible()
     await expect(section.getByRole('textbox', { name: 'Sending label' })).toBeVisible()
     // The verified domain is the status at the top, so it is not drawn again.
     await expect(page.getByText('Verified sending domain')).toHaveCount(0)
-    await section.getByRole('textbox', { name: 'Email footer' }).fill(`Registered charity ${Date.now()}`)
-    await section.getByRole('button', { name: 'Save Email and notices settings' }).click()
+    const footer = `Registered charity ${Date.now()}`
+    await section.getByRole('textbox', { name: 'Email footer' }).fill(footer)
+    // The preview beneath the field shows the footer as the email will, before it is saved.
+    await expect(section.getByRole('figure').getByText(footer)).toBeVisible()
+    await section.getByRole('button', { name: 'Save Email settings' }).click()
     await expect(section.getByRole('button', { name: /^Changed by .*Email footer/ })).toBeVisible()
     await expect(section.getByRole('button', { name: 'Reset Email footer to its default' })).toBeVisible()
     await noViolations(page)

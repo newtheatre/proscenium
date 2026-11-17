@@ -37,6 +37,10 @@ interface SettingView {
   min?: number | string
   max?: number | string
   maxLength?: number
+  /** A text of several lines, drawn as a text area. */
+  multiline?: boolean
+  periodMin?: string
+  periodMax?: string
   options?: string[]
   /** Where a choice's options are standard codes from one of the kit's lists, which list. */
   catalogue?: CatalogueName | null
@@ -57,6 +61,12 @@ const props = defineProps<{
   onlyChanged?: boolean
   /** Settings the screen already shows in its own way, left out here. */
   omit?: string[]
+  /** A screen with one section of settings may give it its own heading ("Email settings"). */
+  heading?: string
+}>()
+defineSlots<{
+  /** Beneath one setting's field: a screen's preview or warning, with the value as edited. */
+  'after-field'?: (props: { setting: SettingView, value: unknown }) => unknown
 }>()
 /** After a section saves, with the keys it changed, so a screen can refresh what it draws from them. */
 const emit = defineEmits<{ saved: [keys: string[]] }>()
@@ -208,7 +218,18 @@ function editorOf(s: SettingView) {
   return typeof component === 'string' ? null : component
 }
 const editors = computed(() => Object.fromEntries(shown.value.filter(s => s.kind === 'custom').map(s => [s.key, editorOf(s)])))
-const defaultText = (s: SettingView) => controlText(s.kind, toControl(s, s.default), words())
+/** The default as the control shows it: a choice by its label, and nothing as "not set" rather than a blank. */
+function defaultText(s: SettingView): string {
+  const value = s.default
+  if (value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)) return t('core.settings-page.not-set')
+  const items = itemsOf(s)
+  if (items.length) {
+    const label = (v: unknown) => items.find(i => i.value === v)?.label ?? String(v)
+    if (Array.isArray(value)) return value.map(label).join(', ')
+    return label(value)
+  }
+  return controlText(s.kind, toControl(s, value), words()) || t('core.settings-page.not-set')
+}
 const rate = (s: SettingView) => draft[s.key] as RateControl
 function onRate(s: SettingView, part: Partial<RateControl>) {
   onEdit(s, { ...rate(s), ...part })
@@ -237,7 +258,7 @@ onMounted(() => {
         :key="section.id"
         @submit.prevent="save(section.id, section.settings)"
       >
-        <PageSection :title="sectionTitle(section)">
+        <PageSection :title="heading ?? sectionTitle(section)">
           <p
             v-if="sharedAbility(section.settings)"
             class="mb-4 text-sm text-muted"
@@ -378,6 +399,8 @@ onMounted(() => {
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
                   <DurationInput
                     :model-value="rate(s).per"
+                    :min="s.periodMin"
+                    :max="s.periodMax"
                     :disabled="!s.canChange"
                     :label="t('core.settings-page.rate-period', { setting: t(s.labelKey) })"
                     @update:model-value="onRate(s, { per: $event ?? undefined })"
@@ -389,6 +412,16 @@ onMounted(() => {
                   :disabled="!s.canChange"
                   class="w-48"
                   @update:model-value="onEdit(s, $event ? $event.toString().slice(0, 5) : '')"
+                />
+                <UTextarea
+                  v-else-if="s.kind === 'text' && s.multiline"
+                  :model-value="draft[s.key]"
+                  :disabled="!s.canChange"
+                  :maxlength="s.maxLength"
+                  :rows="3"
+                  autoresize
+                  class="max-w-md"
+                  @update:model-value="onEdit(s, $event)"
                 />
                 <UInput
                   v-else
@@ -415,6 +448,11 @@ onMounted(() => {
                   {{ s.kind === 'rate' ? t('core.settings-page.rate-hint') : unitText(s) }}
                 </template>
               </UFormField>
+              <slot
+                name="after-field"
+                :setting="s"
+                :value="draft[s.key]"
+              />
 
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
                 <span v-if="s.overridden || resets[s.key]">
