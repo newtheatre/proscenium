@@ -41,6 +41,8 @@ export default defineModule({
     'cancellations.until-before': setting.duration({ default: '24h', min: '0m', max: '30d', change, audience: 'public', quotable: true }),
     // Kept from each ticket when staff refund less the fee, and on every buyer's cancellation.
     'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    // Off, a request for complimentary tickets is issued at once, with no approver (Matt, 2026-11-17).
+    'comps.needs-approval': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'comps.per-request': setting.integer({ default: 4, min: 1, max: 50, change, audience: 'staff' }),
     // Unset means no cap on approved complimentary tickets for one performance.
     'comps.per-performance': setting.integer({ unset: true, min: 0, max: 1000, change, audience: 'staff' }),
