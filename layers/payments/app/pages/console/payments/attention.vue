@@ -1,10 +1,12 @@
 <!-- Needs attention (Box office specification, part 5): payments the provider has not answered,
      payments taken that could not be completed and are being returned, and refunds the provider
-     turned down. An unanswered payment is settled here once someone has checked the provider's own
+     turned down, and till sessions that stopped with cash in them and wait to be counted (closed on
+     Sessions). An unanswered payment is settled here once someone has checked the provider's own
      records; settling it is final, so it asks first. -->
 <script setup lang="ts">
 interface Unknown { id: string, intentId: string, method: string, amountMinor: number, currency: string, providerRef: string | null, provider: string, waitingMs: number }
 interface Unfulfilled { id: string, amountMinor: number, currency: string, sinceMs: number }
+interface Awaiting { id: string, place: string | null, pointLabel: string, openedByName: string, openedAt: number, expectedCashMinor: number, currency: string }
 interface FailedRefund { id: string, amountMinor: number, currency: string, method: string, sinceMs: number }
 
 const { t } = useT()
@@ -13,12 +15,14 @@ const { money, waited } = await useMoney()
 const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
-const { data, status, error, refresh } = await useAPI<{ unknown: Unknown[], unfulfilled: Unfulfilled[], failedRefunds: FailedRefund[] }>('/api/payments/attention', { key: 'payments:attention' })
+const { data, status, error, refresh } = await useAPI<{ awaitingCount: Awaiting[], unknown: Unknown[], unfulfilled: Unfulfilled[], failedRefunds: FailedRefund[] }>('/api/payments/attention', { key: 'payments:attention' })
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const references = reactive<Record<string, string>>({})
 const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
-const nothing = computed(() => !!data.value && !data.value.unknown.length && !data.value.unfulfilled.length && !data.value.failedRefunds.length)
+const nothing = computed(() => !!data.value && !data.value.awaitingCount.length && !data.value.unknown.length && !data.value.unfulfilled.length && !data.value.failedRefunds.length)
+const { dateTime: when } = useDates()
+const tillName = (s: Awaiting) => [s.place ?? t('payments.screens.session.unknown-place'), s.pointLabel].filter(Boolean).join(' · ')
 
 async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
   const amount = money(a.amountMinor, a.currency)
@@ -116,6 +120,29 @@ async function settle(a: Unknown, outcome: 'succeeded' | 'failed') {
                 :name="money(i.amountMinor, i.currency)"
               >
                 <span class="text-sm text-muted">{{ t('payments.screens.attention.since', { time: waited(i.sinceMs) }) }}</span>
+              </RecordListItem>
+            </RecordList>
+          </PageSection>
+
+          <PageSection
+            v-if="loaded.awaitingCount.length"
+            :title="t('payments.screens.attention.awaiting-count-title')"
+            :description="t('payments.screens.attention.awaiting-count-help')"
+          >
+            <RecordList :label="t('payments.screens.attention.awaiting-count-title')">
+              <RecordListItem
+                v-for="s in loaded.awaitingCount"
+                :key="s.id"
+                :name="tillName(s)"
+                :description="t('payments.screens.attention.awaiting-count-line', { person: s.openedByName, when: when(s.openedAt), amount: money(s.expectedCashMinor, s.currency) })"
+              >
+                <UButton
+                  :label="t('payments.screens.attention.awaiting-count-open')"
+                  to="/console/payments/sessions?view=counting"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                />
               </RecordListItem>
             </RecordList>
           </PageSection>
