@@ -44,6 +44,6 @@ export interface DeskBasket {
    * before these statements, so a foreign key to it holds.
    */
   attach?: (unit: UnitView, record: string, intentId: string) => Promise<void> | void
-  /** Lines and an amount for display. Reads only. */
-  summary: (context: DeskContext) => Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }>
+  /** Lines and an amount for display. Reads only, and comes before any session is open. */
+  summary: (context: Pick<DeskContext, 'input'>) => Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }>
 }

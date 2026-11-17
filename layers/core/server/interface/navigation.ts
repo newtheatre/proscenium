@@ -60,6 +60,7 @@ export async function declaredEntries(): Promise<DeclaredEntry[]> {
       ...(page.place === 'console' ? { section: 'setup' as const } : {}),
       order: page.order,
       settingsPage: pageId,
+      ...(page.settingsIn ? { settingsIn: [...page.settingsIn] } : {}),
     })
   }
   // Every module's page has an About tab, for a module that is off too (the catalogue opens it).
@@ -170,4 +171,49 @@ export async function moduleTabs(actor: Actor, module: string): Promise<ModuleTa
   // Pages of settings first, then set-up screens, then About.
   const rank = (tab: ModuleTab) => tab.page ? 0 : tab.id.startsWith('core.modules.about.') ? 2 : 1
   return tabs.sort((a, b) => rank(a) - rank(b) || a.order - b.order || a.to.length - b.to.length).map(({ order: _, ...tab }) => tab)
+}
+
+export interface SettingsWindow {
+  /** Translation key of what the window is named after: a module, or a console group. */
+  name: string
+  tabs: ModuleTab[]
+}
+
+/**
+ * The console's settings window for one scope. A console entry id (core.productions) is the cog on
+ * that page: the tabs of modules' pages in Admin that name the entry or its group in settingsIn,
+ * and, where a tab names nowhere (nor does its module), the tabs of the entry's own module. A
+ * module id (an Admin address opened from the console, or a setting found by search) is every tab
+ * of that module. About stays in Admin. The window is named after the module when it holds only
+ * that module's tabs and the module's console pages sit in one group; otherwise after the group.
+ */
+export async function settingsWindow(actor: Actor, scope: string): Promise<SettingsWindow | undefined> {
+  const registry = useRegistry()
+  const notAbout = (tab: ModuleTab) => !tab.id.startsWith('core.modules.about.')
+  if (registry.modules.has(scope)) return { name: `${scope}.module.name`, tabs: (await moduleTabs(actor, scope)).filter(notAbout) }
+  const entries = await declaredEntries()
+  const page = entries.find(e => e.menu === 'console' && e.id === scope)
+  if (!page) return undefined
+  const group = page.group ?? page.module
+  const places = (entry: DeclaredEntry) => entry.settingsIn ?? registry.modules.get(entry.module)?.manifest.settingsIn
+  const shown = (entry: DeclaredEntry) => {
+    const named = places(entry)
+    return named ? named.includes(page.id) || named.includes(group) : entry.module === page.module
+  }
+  const modules = [...new Set(entries.filter(e => moduleTabOf(e) && !e.id.startsWith('core.modules.about.') && shown(e)).map(e => moduleTabOf(e)!))]
+  // The page's own module first, then the others in the order their tabs were declared.
+  modules.sort((a, b) => Number(b === page.module) - Number(a === page.module))
+  const tabs: ModuleTab[] = []
+  for (const module of modules) {
+    for (const tab of await moduleTabs(actor, module)) {
+      const entry = entries.find(e => e.id === tab.id)
+      if (!entry || !notAbout(tab) || !shown(entry)) continue
+      // Another module's own Settings tab is named after that module.
+      tabs.push(module !== page.module && tab.page === `${module}.admin` ? { ...tab, label: `${module}.module.name` } : tab)
+    }
+  }
+  const groupsOfModule = new Set(entries.filter(e => e.module === page.module && e.menu === 'console').map(e => e.group ?? e.module))
+  const own = modules.every(m => m === page.module) && groupsOfModule.size === 1
+  const decl = (await declaredGroups()).find(g => g.id === group && (g.menu ?? 'console') === 'console')
+  return { name: own ? `${page.module}.module.name` : groupLabelKey(decl?.module ?? page.module, group), tabs }
 }

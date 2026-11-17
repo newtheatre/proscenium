@@ -1,7 +1,7 @@
-// What the panels the seller has filled add up to. Reads only.
+// What the panels the seller has filled add up to. Reads only, and needs no open session: the
+// session opens with the first sale.
 import { z } from 'zod'
-import { defineRoute, Refusal } from '#kit'
-import { sessionOf } from '../../../sessions'
+import { defineRoute } from '#kit'
 import { tillSummary } from '../../../till'
 
 export const panels = z.array(z.object({ basket: z.string().min(1).max(80), input: z.unknown() })).max(10) // not-policy: a till has a handful of panels
@@ -11,7 +11,5 @@ export default defineRoute({
   rateLimit: 'default',
   input: z.object({ panels }).strict(),
 }, async (_event, { input, actor }) => {
-  const session = await sessionOf(actor.accountId!)
-  if (!session) throw new Refusal('payments.session.none', 'Open a till session first.', { status: 409 })
-  return tillSummary(actor, session.id, input.panels as { basket: string, input: unknown }[])
+  return tillSummary(actor, input.panels as { basket: string, input: unknown }[])
 })

@@ -53,7 +53,7 @@ async function waiting(chargeId: string): Promise<WaitingFee> {
 }
 
 /** The panel's line, for the till to show. Reads only. */
-export async function deskSummary(context: DeskContext): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
   const fee = await waiting(panelInput(context.input).chargeId)
   return { lines: [{ label: fee.lengthName ? `${fee.schemeName}, ${fee.lengthName}` : fee.schemeName, amountMinor: fee.amountMinor }], amountMinor: fee.amountMinor }
 }
