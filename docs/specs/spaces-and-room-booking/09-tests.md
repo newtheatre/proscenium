@@ -80,6 +80,7 @@ Against local D1, through the routes, with the clock replaced.
 | I-31 | A purpose's tier changed after bookings exist | Existing bookings keep their tier | L6 |
 | I-32 | A grant of `spaces.booking.decide` on one venue | The holder decides for that venue's spaces and no other | part 6 |
 | I-33 | A theatre-wide closure created over more Confirmed bookings than one set may hold, with the set limit lowered for the test | Every booking Bumped across the listener and the spaces.clear-window job; each booker told once; no unit over the statement or set limit; a repeated chunk changes nothing | L2, many bookings at once |
+| I-34 | An own bookable is asked for on a space the theatre does not run, and an external one on a space it runs; then a managed space with a confirmed future booking and an open request becomes unmanaged | Both inserts refused on the write; after the change the bookable is external, the booking is still Confirmed and shows as not yet placed, the request waits for a room manager, and core's confirmation showed the count | C6 |
 
 ## End-to-end tests
 

@@ -6,6 +6,14 @@ Training declares 17 settings, 14 abilities, 4 record types and 2 facts, in the 
 
 Every setting is changed with `training.settings.manage`. None is public, so none is quotable on a content page.
 
+Every setting has one home. A group is the first segment of a setting's short key, and the manifest declares each of Training's groups in `settingGroups` with `place: 'console'` and no `page`, so all 17 settings are drawn on Training's own generated page at `/console/training/settings`, whose page id is `training.settings`. A group carries no ability of its own: every setting names `training.settings.manage`, and because the settings in each section share it, the page shows one ability line per section. No group is marked `advanced`, including `retention`, because these periods are a theatre's policy and not engineering limits. No group or setting names a bespoke `screen`. The page declaration in `settingPages` makes the navigation entry `training.settings` listed in part 5; the manifest does not declare that entry a second time.
+
+On a settings save a fresh sign-in follows the setting and not the ability, so the privileged `training.settings.manage` still needs a strong session but asks for a fresh sign-in only where the setting declares `onChange`. Four settings declare `onChange: 'confirm'`. `training.versions.retrain-grace` does, because lengthening it keeps people competent on training a new version has replaced, and other modules' requirements rest on that answer. `training.retention.records`, `training.retention.evidence` and `training.retention.attendance` do, because shortening one lets the next retention run anonymise or remove rows that cannot be brought back. The other 13 settings declare none. `training.records.default-valid-for` is only the value offered for a new course, and each course's own `valid_for` is changed under `training.course.manage`. The warning, renewal and progress periods change no training record already held, `training.evidence.self-submit` still leaves every certificate to be verified, and the session settings govern booking alone. Who may sign a step off is not a setting: it is the trainers of a course, set on the course.
+
+Every `duration` setting is entered with the kit's `DurationInput`, a number and a unit, where a month is 30 days and a year is 365 days. The value is stored as whole seconds and the written form in the table below (`730d`) is unchanged.
+
+A duration is shown in the largest unit that divides it exactly, so a theatre that sets 730 days sees 2 years. For that reason no duration setting's label or help names a unit: each is worded as "How long" or "When", as in the Purpose column below, and never as a count of days or months.
+
 | Key | Kind | Default | Limits | Audience | Purpose |
 | --- | --- | --- | --- | --- | --- |
 | `training.records.default-valid-for` | duration | 730d | 30d to 3650d | staff | The validity offered when a course is created. The course's own `valid_for` is what counts |
@@ -56,11 +64,11 @@ A trainer is not a kind of account and not a role. A course's trainers are the a
 | `training.course.manage` | `training.course` | normal |  | `course.view` | Create a course, edit steps, publish a version, retire | `technical-manager`, `administrator`; `bar-manager` and `front-of-house-manager` at their department's courses |
 | `training.competency.manage` | site | privileged |  | `course.view` | Create a competency and change its courses. Privileged because it changes who meets every requirement that names it | `technical-manager`, `administrator` |
 | `training.session.manage` | `training.course` | normal |  | `course.view` | Create, change and cancel sessions | `technical-manager`, `administrator`; `bar-manager` and `front-of-house-manager` at their department's courses |
-| `training.session.run` | `training.course` | normal |  | `course.view` | Mark attendance, add a walk-in, close attendance | Fact `training.course-trainer` |
+| `training.session.run` | `training.course` | normal |  | `course.view`, `core.account.find` | Mark attendance, add a walk-in, close attendance | Fact `training.course-trainer` |
 | `training.place.book` | site | normal |  | `course.view` | Take, and cancel, one's own place | Fact `core.member` |
-| `training.place.manage` | `training.course` | normal |  | `course.view` | Give or cancel another person's place | `technical-manager`, `administrator`; `bar-manager` and `front-of-house-manager` at their department's courses |
-| `training.sign-off.record` | `training.course` | normal |  | `course.view` | Sign a person off on a practical step; void one's own sign-off | Fact `training.course-trainer` |
-| `training.record.view` | `training.record` | normal, reads audited | grants | `course.view` | See a person's training records, progress and competencies | `technical-manager`, `administrator`; `bar-manager` and `front-of-house-manager` at their department's courses; whoever plans a rota |
+| `training.place.manage` | `training.course` | normal |  | `course.view`, `core.account.find` | Give or cancel another person's place | `technical-manager`, `administrator`; `bar-manager` and `front-of-house-manager` at their department's courses |
+| `training.sign-off.record` | `training.course` | normal |  | `course.view`, `core.account.find` | Sign a person off on a practical step; void one's own sign-off | Fact `training.course-trainer` |
+| `training.record.view` | `training.record` | normal, reads audited | grants | `course.view`, `core.account.find` | See a person's training records, progress and competencies | `technical-manager`, `administrator`; `bar-manager` and `front-of-house-manager` at their department's courses; whoever plans a rota |
 | `training.record.award` | `training.course` | privileged |  | `record.view` | Award a training record without the steps | `administrator` only. Never a fact |
 | `training.record.revoke` | `training.record` | privileged |  | `record.view` | Revoke a training record; void any sign-off | `administrator` only. Never a fact |
 | `training.evidence.verify` | `training.course` | privileged |  |  | Open evidence and verify or reject it | `technical-manager`, `administrator`; `welfare-lead` at safeguarding courses |
@@ -71,6 +79,8 @@ A trainer is not a kind of account and not a role. A course's trainers are the a
 - **Privileged abilities** need strong assurance and a fresh re-assertion, by Foundations' default. No fact is suggested for one.
 - **`training.record.view` audits reads** (`audit: 'read'`), because the People list shows who is and is not trained. A person's own reads are not audited.
 - **`training.evidence.verify` does not imply `record.view`**, so a welfare officer can check safeguarding evidence without seeing the rest of anybody's training.
+
+  Four abilities imply Identity's `core.account.find`, because their screens find a person by name or email: `training.record.view` (the People list and the matrix), `training.session.run` (adding a walk-in), `training.place.manage` (giving a place) and `training.sign-off.record` (choosing whom to sign off). `training.record.award`, `training.record.revoke` and `training.record.export` reach it through `record.view`. `core.account.find` is declared `impliable: true` at standard risk by core, so no preset has to map it by hand. `training.evidence.verify` does not imply it, since its queue lists evidence and is not searched by person.
 
 ## Guards that are not abilities
 

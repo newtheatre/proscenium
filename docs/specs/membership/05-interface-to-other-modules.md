@@ -149,7 +149,7 @@ No public services. Its whole interface is its two contributions.
 | Module | Service | When |
 | --- | --- | --- |
 | Identity (core) | `findOrCreateAccount` | Staff add a member by address (G1) |
-| Identity (core) | `searchAccounts`, `accountLabel`, `canonicalAccount` | The person picker; showing a holder's name; reading after a merge |
+| Identity (core) | `searchAccounts`, `findAccounts`, `accountLabel`, `canonicalAccount` | The person picker; showing a holder's name; reading after a merge. Finding memberships by a person's name or email, on the members list, in search and at the desk, always goes through `findAccounts(text)`, whose subquery of account ids is passed to `inAccountScope`; Membership never searches accounts itself. The caller needs Identity's core.account.find, which the membership abilities that offer such a search imply (tab 6), and Identity writes one audit read entry per call that does not hold the text typed. Matching against a verification list's own names (rule V19) is Membership's and does not use it |
 | Identity (core) | `addressFor(accountId, side)` | Addressing a notification on the scheme's side |
 | Identity (core) | hasVerifiedAddressAt, verifiedAddressDigests | The email-domain and list verifiers |
 | Core domain | The notify service, inside the unit of work | Welcome, action needed, renewal reminders, lapsed |

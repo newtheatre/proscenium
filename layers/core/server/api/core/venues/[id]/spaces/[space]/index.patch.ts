@@ -1,4 +1,4 @@
-// Changes a space's name, kind, capacity or text.
+// Changes a space's name, kind, capacity, text, or whether the theatre runs it (R-36).
 import { getRouterParam } from 'h3'
 import { defineRoute } from '#kit'
 import { updateSpace } from '../../../../../../places/service'

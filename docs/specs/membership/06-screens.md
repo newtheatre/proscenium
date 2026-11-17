@@ -112,7 +112,7 @@ The wireframe shows steps 1 and 2 on one sheet. The length question belongs to s
 | Schemes | `/console/membership/schemes` | List | `membership.scheme.view` | New scheme |
 | A scheme | `/console/membership/schemes/<scheme id>` | Record with tabs | `membership.scheme.view`; changes need `membership.scheme.manage` | Open, Close or Archive, by state |
 | Verification lists | `/console/membership/lists` | List | `membership.verification-list.manage` | New list |
-| Settings | `/console/system/settings/membership` | Settings | `membership.settings.manage` | Generated from the settings registry |
+| Settings | `/console/membership/settings` | Settings | `membership.settings.manage` | Generated from the settings registry. The fees module's page is /console/membership-fees/settings; the two retention groups are drawn on /admin/advanced instead (tab 6) |
 
 ### Members
 
@@ -201,7 +201,7 @@ A List page: name, key kind, entries, uploaded when and by whom, valid until, an
 | The console page of an account (`core.record-tab`) | A Membership tab: the person's memberships and applications, with Add a member prefilled |
 | My account (`core.account-section`) | The Membership section, which is My membership above |
 | A theatre's content page (`core.public-component`) | `MembershipSchemes`, with props for which schemes to show and whether to show fees |
-| Search (`core.search-source`) | Members by name or number |
+| Search (`core.search-source`) | Members by name or number. A name or email is found through Identity's `findAccounts`, here and in the members list's search box, under core.account.find, which membership.membership.view implies. Membership matches the number itself |
 
 ## States every page handles
 

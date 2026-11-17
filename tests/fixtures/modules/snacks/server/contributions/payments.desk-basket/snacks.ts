@@ -4,6 +4,7 @@ import type { DeskBasket, DeskContext } from '#modules/payments'
 
 export default {
   label: 'snacks.desk.label',
+  panel: 'SnacksTillPanel',
   ability: 'payments.attempt.attest',
   order: 2,
   async prepare(unit: UnitView, context: DeskContext) {
