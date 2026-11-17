@@ -67,6 +67,13 @@ import actionsPost from '../../server/api/front-of-house/incidents/[id]/actions/
 import actionResolve from '../../server/api/front-of-house/incidents/[id]/actions/[actionId]/resolve.post'
 import incidentClose from '../../server/api/front-of-house/incidents/[id]/close.post'
 import incidentReopen from '../../server/api/front-of-house/incidents/[id]/reopen.post'
+import reportGet from '../../server/api/front-of-house/performances/[id]/report/index.get'
+import reportNotes from '../../server/api/front-of-house/performances/[id]/report/notes.post'
+import reportSignOff from '../../server/api/front-of-house/performances/[id]/report/sign-off.post'
+import outcomePost from '../../server/api/front-of-house/assignments/[id]/outcome.post'
+import nightReportsGet from '../../server/api/front-of-house/night-reports.get'
+import hoursGet from '../../server/api/front-of-house/hours/index.get'
+import hoursExport from '../../server/api/front-of-house/hours/export.get'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -121,6 +128,13 @@ export const handle = server({
   'POST /api/front-of-house/checklists/:id/archive': checklistArchive,
   'GET /api/front-of-house/emergency-cards': cardsGet,
   'PUT /api/front-of-house/emergency-cards/:venueId': cardPut,
+  'GET /api/front-of-house/performances/:id/report': reportGet,
+  'POST /api/front-of-house/performances/:id/report/notes': reportNotes,
+  'POST /api/front-of-house/performances/:id/report/sign-off': reportSignOff,
+  'POST /api/front-of-house/assignments/:id/outcome': outcomePost,
+  'GET /api/front-of-house/night-reports': nightReportsGet,
+  'GET /api/front-of-house/hours': hoursGet,
+  'GET /api/front-of-house/hours/export': hoursExport,
   'POST /api/front-of-house/incidents': incidentsPost,
   'GET /api/front-of-house/incidents': incidentsGet,
   'GET /api/front-of-house/incidents/mine': incidentsMine,

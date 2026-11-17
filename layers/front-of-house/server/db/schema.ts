@@ -430,4 +430,56 @@ export const incidentUpdates = defineTable('front_of_house_incident_updates', {
   ],
 })
 
-export const tables = { duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates }
+export const NOTE_TOPICS = ['audience', 'building', 'show', 'staffing', 'other'] as const
+
+/**
+ * The record of one performance. A draft is a live view; sign-off writes the snapshot, which holds no
+ * names and no free text. A trigger (written by hand in the migration) refuses any change to a
+ * signed-off row except setting distributed_at.
+ */
+export const nightReports = defineTable('front_of_house_night_reports', {
+  id: col.id(),
+  performanceId: col.internal(text('performance_id').notNull()),
+  state: col.internal(text('state', { enum: ['draft', 'signed_off'] }).notNull().default('draft')),
+  snapshot: col.internal(text('snapshot', { mode: 'json' })),
+  snapshotVersion: col.internal(integer('snapshot_version').notNull().default(1)),
+  signedOffBy: col.account('signed_off_by', { role: 'actor', nullable: true }),
+  signedOffAt: col.timestamp('signed_off_at'),
+  distributedAt: col.timestamp('distributed_at'),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'nrp',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('front_of_house_night_reports_performance').on(t.performanceId),
+    index('front_of_house_night_reports_state').on(t.state),
+    check('front_of_house_night_reports_state', sql`${t.state} IN ('draft', 'signed_off')`),
+    check('front_of_house_night_reports_signed', sql`${t.state} = 'draft' OR (${t.snapshot} IS NOT NULL AND ${t.signedOffAt} IS NOT NULL)`),
+  ],
+})
+
+/** Notes on the night by topic, and addenda written after sign-off. About the night, never a person. */
+export const nightReportNotes = defineTable('front_of_house_night_report_notes', {
+  id: col.id(),
+  reportId: col.ref('front_of_house_night_reports'),
+  kind: col.internal(text('kind', { enum: ['note', 'addendum'] }).notNull()),
+  topic: col.internal(text('topic', { enum: NOTE_TOPICS }).notNull()),
+  body: col.internal(text('body').notNull()),
+  authorId: col.account('author_id', { role: 'actor' }),
+  createdAt: col.createdAt(),
+}, {
+  id: 'nrn',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('front_of_house_night_report_notes_report').on(t.reportId, t.createdAt),
+    check('front_of_house_night_report_notes_kind', sql`${t.kind} IN ('note', 'addendum')`),
+    check('front_of_house_night_report_notes_topic', sql`${t.topic} IN (${list(NOTE_TOPICS)})`),
+    check('front_of_house_night_report_notes_body', sql`length(${t.body}) BETWEEN 1 AND 2000`),
+  ],
+})
+
+export const tables = { nightReports, nightReportNotes, duties, rotaTemplates, rotaTemplateLines, shifts, assignments, timings, checklists, checklistItems, checklistRuns, checklistEntries, emergencyCards, incidents, incidentPeople, incidentActions, incidentUpdates }

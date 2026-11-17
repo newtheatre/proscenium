@@ -48,3 +48,11 @@ export const personInput = z.object({
   isChild: z.boolean().optional(),
   details: z.string().trim().max(2000).nullish(), // not-policy: shape bound
 }).strict()
+
+// Calls at or after `from` and before `to`, in UTC milliseconds.
+export const hoursQuery = z.object({
+  from: z.coerce.number().int().nonnegative(),
+  to: z.coerce.number().int().positive(),
+  accountId: z.string().min(1).max(40).optional(), // not-policy: shape bound
+  dutyId: z.string().min(1).max(40).optional(), // not-policy: shape bound
+})
