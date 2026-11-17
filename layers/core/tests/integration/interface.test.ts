@@ -12,7 +12,8 @@ import viewer from '../../server/api/core/viewer.get'
 import settingsGet from '../../server/api/core/settings/index.get'
 import settingsPut from '../../server/api/core/settings/index.put'
 import { resetRateLimits } from '#kit/ratelimit'
-import { call, env, person, server, setModule } from '../../../../tests/integration/helpers'
+import { useSetting } from '#kit/settings-store'
+import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
 const handle = server({
   'GET /api/core/access': access,
@@ -134,47 +135,75 @@ describe('the generated settings page (UI-14)', () => {
 })
 
 describe("core's settings", () => {
-  it('have no console page: they are the site\'s, in Site administration only', async () => {
+  it('have no console page of their own: each group is on one page, mostly in Site administration', async () => {
     const organiser = person(['core.organisation.edit', 'core.settings.manage'])
     expect((await decide('/console/system/settings', organiser)).decision).toBe('not-found')
     expect((await decide('/console/core/settings', organiser)).decision).toBe('not-found')
-    expect((await decide('/admin/settings', organiser)).decision).toBe('allow')
+    expect((await decide('/admin/theatre', organiser)).decision).toBe('allow')
+    expect((await decide('/admin/advanced', organiser)).decision).toBe('allow')
+  })
+
+  it('carry a renamed key\'s value, and the old key still answers', async () => {
+    await env.DB.prepare('INSERT INTO core_settings (key, value, updated_at) VALUES (?, ?, 0)').bind('core.notifications.max-attempts', '3').run()
+    try {
+      const actor = person(['core.notification.configure'])
+      const page = await (await call(handle, 'GET', '/api/core/settings?page=core.advanced', { actor })).json() as { settings: { key: string, value: unknown, overridden: boolean }[] }
+      expect(page.settings.find(s => s.key === 'core.delivery.max-attempts')).toMatchObject({ value: 3, overridden: true })
+      expect(page.settings.map(s => s.key)).not.toContain('core.notifications.max-attempts')
+      expect(await inContext(() => useSetting('core.notifications.max-attempts' as never))).toBe(3)
+      // Changing it under the new name settles it: the old key's row goes.
+      expect((await call(handle, 'PUT', '/api/core/settings', { actor, body: { changes: [{ key: 'core.delivery.max-attempts', value: 4 }] } })).status).toBe(200)
+      expect(await env.DB.prepare('SELECT key, value FROM core_settings WHERE key LIKE ?').bind('core.%.max-attempts').all().then(r => r.results)).toEqual([{ key: 'core.delivery.max-attempts', value: '4' }])
+    }
+    finally {
+      await env.DB.prepare('DELETE FROM core_settings WHERE key LIKE ?').bind('core.%.max-attempts').run()
+    }
   })
 })
 
 describe('Site administration (R-33)', () => {
   const admin = () => person(['core.settings.manage'])
-  type Settings = { settings: { key: string, module: string, scope: string }[] }
+  type Settings = { page: { id: string, to: string } | null, settings: { key: string, module: string, page: string | null, screen: string | null, scope: string }[] }
   const settings = async (query: string, actor = admin()) => (await call(handle, 'GET', `/api/core/settings?${query}`, { actor }))
 
   it('opens to a person who holds the ability of an admin entry, and is not found for anyone else', async () => {
     expect((await decide('/admin', admin())).decision).toBe('allow')
-    expect((await decide('/admin/settings', admin())).decision).toBe('allow')
+    expect((await decide('/admin/advanced', admin())).decision).toBe('allow')
     expect((await decide('/admin', staff())).decision).toBe('not-found')
-    expect((await decide('/admin/settings', staff())).decision).toBe('not-found')
+    expect((await decide('/admin/advanced', staff())).decision).toBe('not-found')
     expect((await decide('/admin')).decision).toBe('sign-in')
   })
 
-  it('shows foundations\' settings under /admin/settings in the modules group, and not in the console', async () => {
+  it('gives each page of settings an entry in its group, and nothing in the console', async () => {
     const nav = await (await call(handle, 'GET', '/api/core/navigation?shell=admin', { actor: admin() })).json() as { groups: { id: string, everyday: { id: string, to: string }[] }[] }
-    expect(nav.groups.map(g => g.id)).toEqual(['modules'])
-    expect(nav.groups[0]!.everyday).toEqual([expect.objectContaining({ id: 'core.site-settings', to: '/admin/settings' })])
+    const entries = Object.fromEntries(nav.groups.map(g => [g.id, g.everyday.map(e => `${e.id} ${e.to}`)]))
+    expect(entries.theatre).toEqual(['core.theatre-settings /admin/theatre', 'core.branding-settings /admin/branding'])
+    expect(entries.access).toEqual(['core.sign-in-settings /admin/sign-in'])
+    expect(entries.upkeep).toContain('core.advanced-settings /admin/advanced')
+    expect(Object.values(entries).flat().join(' ')).not.toContain('/admin/settings')
     // Nothing of theirs is left in the console, so it is no business of theirs.
     expect((await call(handle, 'GET', '/api/core/navigation?shell=console', { actor: admin() })).status).toBe(404)
   })
 
-  it('lists the site\'s settings across modules, and narrows a module\'s page to its own', async () => {
-    const site = await (await settings('scope=site')).json() as Settings
-    expect(site.settings.length).toBeGreaterThan(0)
+  it('answers by page and by screen, every item naming its home', async () => {
+    const advanced = await (await settings('page=core.advanced')).json() as Settings
+    expect(advanced.page).toMatchObject({ id: 'core.advanced', to: '/admin/advanced' })
+    expect(advanced.settings.map(s => s.key)).toEqual(expect.arrayContaining(['core.units.set-rows-limit', 'core.rate-limits.sign-in', 'core.delivery.stuck-after']))
+    expect(new Set(advanced.settings.map(s => s.page))).toEqual(new Set(['core.advanced']))
+    const email = await (await settings('screen=/admin/email', person(['core.sender.manage']))).json() as Settings
+    expect(email.settings.map(s => s.key).sort()).toEqual(['core.notifications.email-footer', 'core.notifications.sending-domain', 'core.notifications.sending-label', 'core.notifications.verified-domain'])
+    expect(new Set(email.settings.map(s => s.screen))).toEqual(new Set(['/admin/email']))
+    expect((await settings('page=core.advanced', staff())).status).toBe(404)
+    expect((await settings('page=core.advanced&scope=site')).status).toBe(422) // one page, screen or module at a time
+  })
+
+  it('still answers the older module and scope form, leaving out what a bespoke screen manages', async () => {
+    const site = await (await settings('scope=site', person(['core.settings.manage', 'core.sender.manage']))).json() as Settings
     expect(site.settings.every(s => s.scope === 'site')).toBe(true)
     expect(site.settings.map(s => s.key)).toContain('core.units.set-rows-limit')
-    // Core's own settings are all the site's: a module's settings without a scope say where each belongs.
-    const all = await (await settings('module=core', person(['core.settings.manage', 'core.organisation.edit']))).json() as Settings
-    expect(new Set(all.settings.map(s => s.scope))).toEqual(new Set(['site']))
-    expect(all.settings.map(s => s.key)).toContain('core.organisation.week-start')
-    const own = await settings('module=core&scope=module', person(['core.organisation.edit']))
-    expect(own.status === 404 || ((await own.json()) as Settings).settings.length === 0).toBe(true) // nothing is left at module scope
-    expect((await settings('scope=site', staff())).status).toBe(404)
+    expect(site.settings.map(s => s.key)).not.toContain('core.notifications.sending-domain')
+    const people = await (await settings('module=core&scope=module', person(['core.identity-settings.manage', 'core.programme.configure']))).json() as Settings
+    expect(new Set(people.settings.map(s => s.page))).toEqual(new Set(['core.people', 'core.programme']))
     expect((await settings('scope=module')).status).toBe(422) // a scope of 'module' needs a module
   })
 })

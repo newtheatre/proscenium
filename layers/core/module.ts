@@ -3,7 +3,7 @@
 // module/identity.ts and the core domain's from module/domain.ts and server/db/domain.ts.
 import { z } from 'zod'
 import { code, defineModule, defineSettingRules, event, secret, task } from '#kit'
-import { settings, settingRules } from './module/settings'
+import { settings, settingRules, settingGroups, settingPages } from './module/settings'
 import { abilities, records } from './module/abilities'
 import { points } from './module/points'
 import * as identity from './module/identity'
@@ -20,6 +20,8 @@ export default defineModule({
 
   settings: { ...settings, ...identity.identitySettings, ...domain.settings },
   settingRules: defineSettingRules('core', [...settingRules.rules, ...identity.identitySettingRules, ...domain.settingRules]),
+  settingGroups,
+  settingPages,
   abilities: { ...abilities, ...identity.identityAbilities, ...domain.abilities },
   records: { ...records, ...identity.identityRecords, ...domain.records },
   facts: { ...identity.identityFacts },
@@ -51,7 +53,6 @@ export default defineModule({
       // Identity's site administration (identity spec part 6): defining roles and facts, and how people sign in.
       { id: 'core.roles', menu: 'admin', group: 'access', to: '/admin/roles', match: '/admin/roles', icon: 'i-lucide-shield-user', ability: 'core.role.read', order: 10 },
       { id: 'core.facts', menu: 'admin', group: 'access', to: '/admin/facts', icon: 'i-lucide-badge-check', ability: 'core.role.read', order: 20 },
-      { id: 'core.sign-in-settings', menu: 'admin', group: 'access', to: '/admin/sign-in', icon: 'i-lucide-log-in', ability: 'core.identity-settings.manage', order: 30 },
     ],
     // The console's fixed groups, with their icons; their order is fixed in shared/navigation.ts.
     // System holds core's own screens; each module's settings page sits in the module's own group.

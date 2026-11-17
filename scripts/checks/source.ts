@@ -136,7 +136,8 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
     const sections = new Set<string>()
     for (const [key, { module }] of registry.settings as Map<string, any>) if (module === id) sections.add(key.slice(id.length + 1).split('.')[0]!)
     for (const section of sections) need(`${id}.settings-sections.${section}`, 'the heading of a group of settings on the generated settings page')
-    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.quick-actions.`, `${id}.records.`, `${id}.record-tabs.`]
+    for (const page of (registry.settingPages as Map<string, { module: string, label: string }>).values()) if (page.module === id && page.label !== `${id}.module.name`) need(page.label, 'the name of a page of settings')
+    const derived = [`${id}.settings.`, `${id}.abilities.`, `${id}.module.`, `${id}.navigation.`, `${id}.settings-sections.`, `${id}.settings-pages.`, `${id}.quick-actions.`, `${id}.records.`, `${id}.record-tabs.`]
     for (const key of keys) if (derived.some(p => key.startsWith(p))) problems.push(`${rel(file)}: "${key}" is not used by any declaration`)
   }
   return problems
@@ -196,7 +197,8 @@ function pageRoute(pagesDir: string, file: string): string {
  * Navigation coverage (UI-08): every page a module puts inside the account, members', console or
  * live shell is reachable from a navigation entry, so nothing is built that nobody can find. A page
  * under an entry's address (or its `match` prefix) is covered; a shell's home page is not an entry.
- * A module's settings page is generated, and the entry for it is too.
+ * A page of settings has a generated entry. Every bespoke screen a setting names as its home is a
+ * page that exists.
  */
 export function checkNavigation(modules: Loaded[], registry: any): string[] {
   const problems: string[] = []
@@ -213,19 +215,18 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
       for (const e of contributes[point] ?? []) if (e.count && !counts.has(e.count)) problems.push(`${m.found.root}: ${point} ${e.id} names the count "${e.count}", which no module registers in core.count`)
     }
   }
-  const withSettings = new Set<string>()
-  let siteSettings = false
-  for (const { module, entry } of registry.settings.values() as Iterable<{ module: string, entry: { scope?: string } }>) {
-    if (entry.scope === 'site') siteSettings = true
-    else withSettings.add(module)
+  const screens = new Map<string, string>()
+  for (const [key, home] of registry.settingHomes as Map<string, { page?: string, screen?: string }>) {
+    if (home.page) entries.push({ to: registry.settingPages.get(home.page).to })
+    else if (!screens.has(home.screen!)) screens.set(home.screen!, key)
   }
-  for (const module of withSettings) entries.push({ to: module === 'core' ? '/console/system/settings' : `/console/${module}/settings` })
-  if (siteSettings) entries.push({ to: '/admin/settings' })
+  const routes = new Set<string>()
   const homes = new Set(Object.values(SHELL_PREFIXES))
   for (const m of modules) {
     const pagesDir = join(ROOT, m.found.root, 'app/pages')
     for (const file of walk(pagesDir, ['.vue'])) {
       const route = pageRoute(pagesDir, file)
+      routes.add(route)
       const shell = shellOf(route)
       if (!shell || homes.has(route)) continue
       const fixed = route.split('/').filter(Boolean)
@@ -236,6 +237,7 @@ export function checkNavigation(modules: Loaded[], registry: any): string[] {
       if (!resolveEntry(entries, prefix)) problems.push(`${rel(file)}: the page ${route} has no navigation entry; contribute one to core.navigation whose \`to\` or \`match\` covers it`)
     }
   }
+  for (const [screen, key] of screens) if (!routes.has(screen)) problems.push(`settings.${key}: its home is the screen ${screen}, which is not a page`)
   return problems
 }
 

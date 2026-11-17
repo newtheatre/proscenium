@@ -1,7 +1,7 @@
 // The registry: every module's manifest and handler files, collected by the build into
 // .generated/registry.ts and checked here across modules (F-02).
 import { DeclarationError } from './refusal'
-import { DELIVERABLE, snake, type ModuleManifest, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
+import { DELIVERABLE, snake, type ModuleManifest, type SettingPlace, type EventDecl, type JobDecl, type TaskDecl, type CallDecl, type PointDecl, type SigningDecl } from './manifest'
 import { tableMeta, type TableMeta } from './db'
 import type { SettingEntry, SettingRule } from './settings'
 import type { AbilityDecl, FactDecl, RecordDecl } from './abilities'
@@ -29,6 +29,16 @@ export interface Registry {
   modules: Map<string, ModuleEntry>
   settings: Map<string, { module: string, entry: SettingEntry }>
   settingRules: Map<string, SettingRule[]>
+  /**
+   * The generated pages of settings, by id `<module>.<page>`: every declared page, the shared
+   * Advanced page (`core.advanced`), and a module's own page (`<module>.settings` in the console,
+   * `<module>.admin` in Site administration) where one of its groups uses it.
+   */
+  settingPages: Map<string, SettingPage>
+  /** Where each setting is shown: on exactly one generated page, or on one bespoke screen. */
+  settingHomes: Map<string, SettingHome>
+  /** Renamed settings: the old key, which still answers for one major version, to its new key. */
+  settingAliases: Map<string, string>
   abilities: Map<string, { module: string, decl: AbilityDecl }>
   records: Map<string, { module: string, decl: RecordDecl }>
   facts: Map<string, { module: string, decl: FactDecl }>
@@ -44,10 +54,28 @@ export interface Registry {
   signing: Map<string, { module: string, decl: SigningDecl }>
 }
 
+export interface SettingPage {
+  module: string
+  place: SettingPlace
+  /** The navigation group the page sits in; a module's own console page uses the module's group. */
+  group?: string
+  order: number
+  icon: string
+  to: string
+  /** The translation key of the page's name. */
+  label: string
+}
+export type SettingHome = { page: string, screen?: undefined } | { screen: string, page?: undefined }
+
+/** The shared page of engineering limits, under Upkeep in Site administration. */
+export const ADVANCED_PAGE = 'core.advanced'
+const DEFAULT_PAGE = { console: 'settings', admin: 'admin' } as const
+const SETTINGS_ICON = 'i-lucide-settings-2'
+
 /** The events, jobs and tasks of the core itself are always present, so other modules may name them. */
 export function buildRegistry(entries: ModuleEntry[]): Registry {
   const r: Registry = {
-    modules: new Map(), settings: new Map(), settingRules: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
+    modules: new Map(), settings: new Map(), settingRules: new Map(), settingPages: new Map(), settingHomes: new Map(), settingAliases: new Map(), abilities: new Map(), records: new Map(), facts: new Map(),
     tables: new Map(), prefixes: new Map(), events: new Map(), listeners: new Map(), jobs: new Map(), tasks: new Map(), calls: new Map(), points: new Map(), signing: new Map(),
   }
   const fail = (entry: ModuleEntry, field: string, message: string): never => {
@@ -152,6 +180,7 @@ export function buildRegistry(entries: ModuleEntry[]): Registry {
         }
       }
     }
+    placeSettings(r, entry, fail)
     for (const [key, setting] of Object.entries(m.settings ?? {})) {
       if (!r.abilities.has(setting.change)) fail(entry, `settings.${key}.change`, `"${setting.change}" is not a declared ability`)
       if (setting.kind === 'reference' && !r.records.has(setting.record!)) fail(entry, `settings.${key}.record`, `"${setting.record}" is not a record type`)
@@ -259,4 +288,48 @@ function reachesPerson(meta: TableMeta, r: Registry, seen = new Set<string>()): 
     return !!parent && reachesPerson(parent, r, seen)
   }
   return false
+}
+
+/** Declares a module's pages of settings and gives each of its settings its one home. */
+function placeSettings(r: Registry, entry: ModuleEntry, fail: (entry: ModuleEntry, field: string, message: string) => never): void {
+  const m = entry.manifest
+  const id = m.id
+  const addPage = (pageId: string, page: SettingPage, field: string) => {
+    if (r.settingPages.has(pageId)) fail(entry, field, `the page ${pageId} is declared twice`)
+    for (const [other, { to }] of r.settingPages) if (to === page.to) fail(entry, field, `${page.to} is already the address of ${other}`)
+    r.settingPages.set(pageId, page)
+  }
+  if (id === 'core') addPage(ADVANCED_PAGE, { module: 'core', place: 'admin', group: 'upkeep', order: 90, icon: 'i-lucide-sliders-horizontal', to: '/admin/advanced', label: 'core.settings-pages.advanced' }, 'settingPages.advanced') // not-policy: last in Upkeep
+  for (const [page, decl] of Object.entries(m.settingPages ?? {})) {
+    if (Object.values(DEFAULT_PAGE).includes(page as never) || (id === 'core' && page === 'advanced')) fail(entry, `settingPages.${page}`, `"${page}" is a page the platform makes itself`)
+    const to = decl.to ?? (id === 'core'
+      ? (decl.place === 'admin' ? `/admin/${page}` : `/console/${page}/settings`)
+      : (decl.place === 'admin' ? `/admin/modules/${id}/${page}` : `/console/${id}/settings/${page}`))
+    addPage(`${id}.${page}`, { module: id, place: decl.place, group: decl.group, order: decl.order ?? 100, icon: decl.icon ?? SETTINGS_ICON, to, label: `${id}.settings-pages.${page}` }, `settingPages.${page}`) // not-policy: sort position
+  }
+  for (const [key, setting] of Object.entries(m.settings ?? {})) {
+    const group = key.slice(id.length + 1).split('.')[0]!
+    const decl = m.settingGroups?.[group]
+    let home: SettingHome
+    if (setting.screen ?? decl?.screen) home = { screen: (setting.screen ?? decl!.screen)! }
+    else if (decl?.advanced) home = { page: ADVANCED_PAGE }
+    else if (decl?.page) home = { page: `${id}.${decl.page}` }
+    else {
+      const place = decl?.place ?? 'console'
+      const pageId = `${id}.${DEFAULT_PAGE[place]}`
+      if (!r.settingPages.has(pageId)) {
+        addPage(pageId, place === 'console'
+          ? { module: id, place, order: 100, icon: SETTINGS_ICON, to: `/console/${id}/settings`, label: `${id}.module.name` } // not-policy: after the module's own entries
+          : { module: id, place, group: 'modules', order: 100, icon: SETTINGS_ICON, to: `/admin/modules/${id}`, label: `${id}.module.name` }, `settingGroups.${group}`) // not-policy: sort position
+      }
+      home = { page: pageId }
+    }
+    r.settingHomes.set(key, home)
+    if (setting.replaces !== undefined) {
+      if (typeof setting.replaces !== 'string' || !setting.replaces.startsWith(`${id}.`) || setting.replaces.split('.').length !== 3) fail(entry, `settings.${key}.replaces`, `names the old key in full, such as ${id}.<group>.<name>`)
+      if (r.settings.has(setting.replaces)) fail(entry, `settings.${key}.replaces`, `${setting.replaces} is still declared; a renamed key is declared only under its new name`)
+      if (r.settingAliases.has(setting.replaces)) fail(entry, `settings.${key}.replaces`, `${setting.replaces} is already replaced by ${r.settingAliases.get(setting.replaces)}`)
+      r.settingAliases.set(setting.replaces, key)
+    }
+  }
 }
