@@ -111,6 +111,14 @@ test.describe('a site owner with no console', () => {
     await noViolations(page)
   })
 
+  test('the site address offers the address the page was loaded on, and Use puts it in the box', async ({ page }) => {
+    await visit(page, '/admin/theatre')
+    const use = page.getByRole('button', { name: /^Use http/ })
+    await expect(use).toBeVisible()
+    await use.click()
+    await expect(page.getByRole('textbox', { name: "The site's address" })).toHaveValue(/^http/)
+  })
+
   test('is not offered the console', async ({ page }) => {
     await visit(page, '/admin')
     expect((await page.goto('/console'))?.status()).toBe(404)
