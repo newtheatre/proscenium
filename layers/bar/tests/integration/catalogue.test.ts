@@ -19,7 +19,7 @@ import listsPost from '../../server/api/bar/price-lists/index.post'
 import listPatch from '../../server/api/bar/price-lists/[id].patch'
 import outletsGet from '../../server/api/bar/outlets/index.get'
 import outletsPost from '../../server/api/bar/outlets/index.post'
-import outletPatch from '../../server/api/bar/outlets/[id].patch'
+import outletPatch from '../../server/api/bar/outlets/[id]/index.patch'
 import standardListener from '../../server/listeners/standard-price-list'
 import { menu } from '../../server/catalogue'
 
