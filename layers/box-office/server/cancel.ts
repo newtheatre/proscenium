@@ -8,10 +8,10 @@ import { sql } from 'drizzle-orm'
 import { all, first, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { assertTerm, getPerformance, getTerm, notify } from '#modules/core'
 import { balances, postEntries } from '#modules/finance'
-import { intentStatus, requestRefund } from '#modules/payments'
 import type { OwnerEntry } from '#modules/payments'
 import { cancellations } from './db/schema'
 import { liveLines, ORDER, wordsFor, type OrderRow } from './orders'
+import { refundOrder } from './refunds'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
 const INCOME = { key: 'box-office.ticket-income' }
@@ -134,10 +134,7 @@ export async function cancelLines(unit: UnitView, orderId: string, input: Cancel
 
   let refund: Cancelled['refund'] = null
   if (refundMinor > 0) {
-    const part = order.intent_id ? (await intentStatus(order.intent_id))?.parts.find(p => p.owner.module === 'box-office' && p.owner.record === orderId) : undefined
-    if (!part) refuse('box-office.order.nothing-paid', 'No payment is recorded for this booking, so there is nothing to refund.', { status: 409, remedy: 'Cancel with no refund.' })
-    const asked = await requestRefund(unit, { partId: part.id, amountMinor: refundMinor, requestedBy: input.by })
-    refund = { id: asked.refundId, state: asked.state, amountMinor: refundMinor }
+    refund = await refundOrder(unit, order, refundMinor, input.by, 'Cancel with no refund.')
   }
 
   unit.add(sql`UPDATE box_office_order_lines SET state = 'cancelled', updated_at = ${at}

@@ -1,10 +1,12 @@
-<!-- Box office's panel in the till (R-3, R-4, R-5, BO-30): tickets for somebody at the desk, or a
-     reservation found by its reference or desk code, changed to who actually came, and paid for.
-     The panel only says what is in it; the till adds it up and takes the payment. -->
+<!-- Box office's panel in the till (R-3, R-4, R-5, BO-30, BO-54): tickets for somebody at the desk, a
+     reservation found by its reference or desk code, changed to who actually came, and paid for, or
+     the difference on an exchange to dearer tickets, sent here from the booking's page. The panel
+     only says what is in it; the till adds it up and takes the payment. -->
 <script setup lang="ts">
 interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
+interface PendingExchange { orderId: string, reference: string, lineIds: string[], performanceId: string, bandId: string, ticketTypeId: string, expectedDifferenceMinor: number }
 interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, lines: OrderLine[] }
 
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
@@ -15,6 +17,26 @@ const { $api } = useNuxtApp()
 const { money } = await useMoney()
 const { dateTime } = useDates()
 const { toRefusal } = useRefusal()
+const route = useRoute()
+const router = useRouter()
+
+// An exchange to dearer tickets, from the booking's page: the difference is all this panel holds.
+function readExchange(value: unknown): PendingExchange | null {
+  if (typeof value !== 'string') return null
+  try {
+    const parsed = JSON.parse(value) as PendingExchange
+    return parsed && typeof parsed.orderId === 'string' && Array.isArray(parsed.lineIds) && Number.isInteger(parsed.expectedDifferenceMinor) ? parsed : null
+  }
+  catch {
+    return null
+  }
+}
+const exchange = ref<PendingExchange | null>(readExchange(route.query.exchange))
+function dropExchange() {
+  exchange.value = null
+  const { exchange: _, ...query } = route.query
+  void router.replace({ query })
+}
 
 const { data } = await useAPI<{ performances: Performance[] }>('/api/box-office/desk/performances', { key: 'box-office:desk-performances', default: () => ({ performances: [] }) })
 const performances = computed(() => data.value?.performances ?? [])
@@ -43,6 +65,11 @@ const typesFor = (line: OrderLine) => orderRows.value.filter(r => r.bandId === l
 const addChoices = computed(() => orderRows.value.map(r => ({ value: keyOf(r), label: t('box-office.screens.panel.row', { band: r.band, type: r.ticketType, price: money(r.amountMinor) }) })))
 
 function say() {
+  if (exchange.value) {
+    const { reference: _, ...body } = exchange.value
+    emit('update:modelValue', { exchange: body })
+    return
+  }
   if (mode.value === 'sell') {
     const lines = (performance.value?.rows ?? []).filter(r => (quantities.value[keyOf(r)] ?? 0) > 0).map(r => ({ bandId: r.bandId, ticketTypeId: r.ticketTypeId, quantity: quantities.value[keyOf(r)]! }))
     emit('update:modelValue', lines.length && performance.value ? { performanceId: performance.value.performanceId, lines, admit: admit.value } : null)
@@ -51,11 +78,15 @@ function say() {
     emit('update:modelValue', order.value?.state === 'reserved' && order.value.totalMinor > 0 ? { orderId: order.value.orderId, expectedTotalMinor: order.value.totalMinor, admit: admit.value } : null)
   }
 }
-watch([mode, admit, quantities, order], say, { deep: true })
+watch([mode, admit, quantities, order, exchange], say, { deep: true })
+onMounted(() => {
+  if (exchange.value) say()
+})
 
 // The till empties every panel after a sale.
 watch(() => props.modelValue, (now) => {
   if (now !== null && now !== undefined) return
+  if (exchange.value) dropExchange()
   if (Object.keys(quantities.value).length) quantities.value = {}
   if (order.value && mode.value === 'collect' && order.value.state === 'reserved') void find(order.value.reference)
 })
@@ -104,7 +135,31 @@ function clear() {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div
+    v-if="exchange"
+    class="space-y-3 rounded-lg border border-default p-4"
+  >
+    <h3 class="font-medium">
+      {{ t('box-office.screens.panel.exchange.title', { reference: exchange.reference }) }}
+    </h3>
+    <p class="text-sm">
+      {{ t('box-office.screens.panel.exchange.description', { count: exchange.lineIds.length }) }}
+    </p>
+    <p class="font-medium">
+      {{ t('box-office.screens.panel.due', { amount: money(exchange.expectedDifferenceMinor) }) }}
+    </p>
+    <UButton
+      :label="t('box-office.screens.panel.exchange.cancel')"
+      color="neutral"
+      variant="link"
+      :disabled="locked"
+      @click="dropExchange"
+    />
+  </div>
+  <div
+    v-else
+    class="space-y-4"
+  >
     <UTabs
       v-model="mode"
       :items="modes"
