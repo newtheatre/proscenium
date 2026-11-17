@@ -1,6 +1,8 @@
 // The settings this viewer may open, for finding one by its words (UI-15). Labels and help are
-// translations, which the browser holds, so this answers only where each setting is and which of
-// them the viewer may change; the search itself runs where the words are.
+// translations, which the browser holds, so this answers only where each setting is: its page and
+// that page's address, or the bespoke screen that manages it. The search itself runs where the
+// words are. A setting is found only when the viewer may open its page or screen, which is open to
+// anyone who may change one of the settings on it.
 import { defineRoute } from '#kit'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
@@ -9,22 +11,35 @@ import { holds, mayOpen } from '../../../interface/navigation'
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (_event, { actor }) => {
   const on = await enabledModules()
   const registry = useRegistry()
-  const out: { key: string, module: string, scope: 'module' | 'site', section: string, labelKey: string, helpKey: string }[] = []
-  const pages = new Map<string, boolean>()
-  // A site-scoped setting sits on the one site page (/admin/settings); any other on its module's page.
-  const pageOf = (module: string, scope: 'module' | 'site') => scope === 'site' ? 'site' : `module:${module}`
+  const out: { key: string, module: string, page: string | null, screen: string | null, to: string, scope: 'module' | 'site', section: string, labelKey: string, helpKey: string }[] = []
+  const homeOf = (key: string) => {
+    const home = registry.settingHomes.get(key)!
+    return home.page ?? `screen:${home.screen}`
+  }
+  const changers = new Map<string, Set<string>>()
+  for (const [key, { module, entry }] of registry.settings) {
+    if (on.has(module)) changers.set(homeOf(key), (changers.get(homeOf(key)) ?? new Set()).add(entry.change))
+  }
+  const open = new Map<string, boolean>()
   for (const [key, { module, entry }] of registry.settings) {
     if (!on.has(module) || entry.sensitive) continue
-    const scope = entry.scope ?? 'module'
-    const page = pageOf(module, scope)
-    // A person finds only settings on a page they may open: the page is open to anyone who may change one of its settings.
-    if (!pages.has(page)) {
-      const changers = [...registry.settings.values()].filter(s => on.has(s.module) && pageOf(s.module, s.entry.scope ?? 'module') === page).map(s => s.entry.change)
-      pages.set(page, holds(await mayOpen(actor, { ability: [...new Set(changers)] })))
-    }
-    if (!pages.get(page)) continue
+    const where = homeOf(key)
+    if (!open.has(where)) open.set(where, holds(await mayOpen(actor, { ability: [...changers.get(where)!] })))
+    if (!open.get(where)) continue
+    const home = registry.settingHomes.get(key)!
+    const page = home.page ? registry.settingPages.get(home.page)! : undefined
     const short = key.slice(module.length + 1)
-    out.push({ key, module, scope, section: short.split('.')[0]!, labelKey: `${module}.settings.${short}.label`, helpKey: `${module}.settings.${short}.help` })
+    out.push({
+      key,
+      module,
+      page: home.page ?? null,
+      screen: home.screen ?? null,
+      to: page?.to ?? home.screen!,
+      scope: (page?.place ?? (home.screen!.startsWith('/admin/') ? 'admin' : 'console')) === 'admin' ? 'site' : 'module',
+      section: short.split('.')[0]!,
+      labelKey: `${module}.settings.${short}.label`,
+      helpKey: `${module}.settings.${short}.help`,
+    })
   }
   return { settings: out }
 })

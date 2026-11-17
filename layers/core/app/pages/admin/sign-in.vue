@@ -1,13 +1,14 @@
 <!-- Sign-in settings (identity spec part 6, Site administration): the ways in, managed domains,
-     session times and recovery, drawn from the settings registry. -->
+     session times and recovery, drawn from the settings registry as the page core.sign-in. -->
 <script setup lang="ts">
 const { t } = useT()
+const route = useRoute()
 </script>
 
 <template>
   <PageSettings
-    scope="site"
+    page="core.sign-in"
     :title="t('core.sign-in-settings.title')"
-    :only="['core.sign-in.', 'core.sessions.', 'core.recovery.']"
+    :highlight="typeof route.query.setting === 'string' ? route.query.setting : undefined"
   />
 </template>

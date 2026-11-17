@@ -264,7 +264,7 @@ describe('notify', () => {
 
 describe('sending', () => {
   it('retries a failure that may pass, waiting longer each time, and fails for good after the last try', async () => {
-    await setSetting('core.notifications.max-attempts', 2)
+    await setSetting('core.delivery.max-attempts', 2)
     try {
       const to = await account()
       const { ids } = await send('notify.receipt', { to, variables: { order: 'G1' } })
@@ -284,7 +284,7 @@ describe('sending', () => {
     }
     finally {
       setClock(undefined)
-      await setSetting('core.notifications.max-attempts', null)
+      await setSetting('core.delivery.max-attempts', null)
     }
   })
 

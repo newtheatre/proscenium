@@ -9,49 +9,49 @@ const change = 'core.identity-settings.manage'
 // sit in Site administration (Sign-in at /admin/sign-in), not on the console's settings page.
 
 export const identitySettings = defineSettings('core', {
-  'sign-in.email-link': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
-  'sign-in.link-lifetime': setting.duration({ default: '15m', min: '5m', max: '1h', change, scope: 'site', audience: 'public', quotable: true }),
-  'sign-in.code-attempts': setting.integer({ default: 5, min: 3, max: 10, unit: 'core.units.attempts', change, scope: 'site' }),
-  'sign-in.open-sign-up': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
-  'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, scope: 'site' }),
-  'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, scope: 'site' }),
-  'sign-in.google': setting.boolean({ default: false, change, scope: 'site', audience: 'public' }),
+  'sign-in.email-link': setting.boolean({ default: true, change, audience: 'public' }),
+  'sign-in.link-lifetime': setting.duration({ default: '15m', min: '5m', max: '1h', change, audience: 'public', quotable: true }),
+  'sign-in.code-attempts': setting.integer({ default: 5, min: 3, max: 10, unit: 'core.units.attempts', change }),
+  'sign-in.open-sign-up': setting.boolean({ default: true, change, audience: 'public' }),
+  'sign-in.unverified-address-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
+  'sign-in.invite-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change }),
+  'sign-in.google': setting.boolean({ default: false, change, audience: 'public' }),
   // Not in the specification's list: Google needs a client id as well as the secret, and an id is
   // not a secret, so it is a setting the theatre types in beside the switch.
-  'sign-in.google-client-id': setting.text({ unset: true, maxLength: 200, change, scope: 'site' }),
-  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, scope: 'site' }),
-  'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, scope: 'site', audience: 'public' }),
-  'sign-in.provider-is-strong': setting.boolean({ default: false, change, scope: 'site' }),
+  'sign-in.google-client-id': setting.text({ unset: true, maxLength: 200, change }),
+  'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change }),
+  'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public' }),
+  'sign-in.provider-is-strong': setting.boolean({ default: false, change }),
 
-  'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, scope: 'site', audience: 'public', quotable: true }),
-  'sessions.idle-limit': setting.duration({ default: '14d', min: '1h', max: '90d', change, scope: 'site' }),
+  'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
+  'sessions.idle-limit': setting.duration({ default: '14d', min: '1h', max: '90d', change }),
 
-  'recovery.enrolment-link-lifetime': setting.duration({ default: '24h', min: '1h', max: '7d', change, scope: 'site' }),
-  'recovery.code-count': setting.integer({ default: 10, min: 6, max: 20, unit: 'core.units.codes', change, scope: 'site' }),
+  'recovery.enrolment-link-lifetime': setting.duration({ default: '24h', min: '1h', max: '7d', change }),
+  'recovery.code-count': setting.integer({ default: 10, min: 6, max: 20, unit: 'core.units.codes', change }),
 
-  'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change, scope: 'site' }),
-  'grants.allow-no-expiry': setting.boolean({ default: true, change, scope: 'site' }),
-  'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change, scope: 'site' }),
+  'grants.default-expiry': setting.choice({ default: 'none', options: ['year-end', 'none'], change }),
+  'grants.allow-no-expiry': setting.boolean({ default: true, change }),
+  'grants.expiry-warning': setting.duration({ default: '14d', min: '1d', max: '60d', change }),
 
-  'members-area.enabled': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
-  'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, scope: 'site', audience: 'public', quotable: true }),
-  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change, scope: 'site' }),
+  'members-area.enabled': setting.boolean({ default: true, change, audience: 'public' }),
+  'members-area.name': setting.text({ default: 'Members\' area', maxLength: 40, change, audience: 'public', quotable: true }),
+  'emergency-contacts.keep-after-standing': setting.duration({ default: '30d', min: '0d', max: '365d', change }),
 
-  'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change, scope: 'site' }),
+  'merge.undo-window': setting.duration({ default: '30d', min: '0d', max: '90d', change }),
 
-  'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, scope: 'site', audience: 'public', quotable: true }),
-  'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, scope: 'site', audience: 'public', quotable: true }),
+  'privacy.cooling-off': setting.duration({ default: '7d', min: '0d', max: '30d', change, audience: 'public', quotable: true }),
+  'privacy.respond-within': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   // Erasure and the download are not offered until the theatre says who to contact about personal data.
-  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, scope: 'site', audience: 'public', quotable: true }),
-  'privacy.contact': setting.text({ unset: true, maxLength: 120, change, scope: 'site', audience: 'public', quotable: true }),
+  'privacy.export-lifetime': setting.duration({ default: '7d', min: '1d', max: '30d', change, audience: 'public', quotable: true }),
+  'privacy.contact': setting.text({ unset: true, maxLength: 120, change, audience: 'public', quotable: true }),
 
-  'access-scheme.enabled': setting.boolean({ default: true, change, scope: 'site', audience: 'public' }),
-  'access-scheme.name': setting.text({ default: 'Access scheme', maxLength: 40, change, scope: 'site', audience: 'public', quotable: true }),
-  'access-scheme.allow-note': setting.boolean({ default: true, change, scope: 'site' }),
-  'access-scheme.companions-need-verified': setting.boolean({ default: false, change, scope: 'site' }),
-  'access-scheme.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change, scope: 'site', audience: 'public', quotable: true }),
-  'access-scheme.review-after': setting.duration({ default: '1095d', min: '365d', max: '3650d', change, scope: 'site' }),
-  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change, scope: 'site' }),
+  'access-scheme.enabled': setting.boolean({ default: true, change, audience: 'public' }),
+  'access-scheme.name': setting.text({ default: 'Access scheme', maxLength: 40, change, audience: 'public', quotable: true }),
+  'access-scheme.allow-note': setting.boolean({ default: true, change }),
+  'access-scheme.companions-need-verified': setting.boolean({ default: false, change }),
+  'access-scheme.reply-within': setting.duration({ default: '14d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
+  'access-scheme.review-after': setting.duration({ default: '1095d', min: '365d', max: '3650d', change }),
+  'access-scheme.keep-rejected': setting.duration({ default: '90d', min: '0d', max: '365d', change }),
 })
 
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
@@ -76,7 +76,10 @@ export const identityRecords = defineRecords('core', {
 })
 
 export const identityAbilities = defineAbilities('core', {
-  'account.search': ability({ risk: 'normal', grantAt: ['site'] }),
+  'account.search': ability({ risk: 'normal', implies: ['account.find'], grantAt: ['site'] }),
+  // findAccounts, the filter by a person's name or email on another module's list (part 4, "Finding
+  // rows by a person's name or email"). Every use is audited as a read, naming the list.
+  'account.find': ability({ risk: 'normal', fresh: false, audit: 'read', impliable: true, grantAt: ['site'] }),
   'account.read': ability({ on: 'core.account', risk: 'privileged', fresh: false, audit: 'read', owner: 'grants', implies: ['account.search'], grantAt: ['site'] }),
   'account.create': ability({ risk: 'privileged', implies: ['account.search'], grantAt: ['site'] }),
   'account.disable': ability({ on: 'core.account', risk: 'privileged', owner: 'refuses', implies: ['account.read'], grantAt: ['site'] }),
@@ -121,6 +124,8 @@ export const identityEvents = {
   'core.account.erased': event({ version: 1, payload: account, internal: true }),
   'core.data-request.finished': event({ version: 1, payload: z.object({ requestId: z.string(), kind: z.enum(['export', 'erasure']) }), internal: true }),
   'core.account.merged': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
+  // The two accounts parted again: the last unit of an undo.
+  'core.account.merge-undone': event({ version: 1, payload: z.object({ survivorId: z.string(), mergedAccountId: z.string(), mergeId: z.string() }), internal: true }),
   'core.account-email.verified': event({ version: 1, payload: z.object({ accountId: z.string(), emailId: z.string() }), internal: true }),
   'core.grant.created': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string() }), internal: true }),
   'core.grant.ended': event({ version: 1, payload: z.object({ grantId: z.string(), accountId: z.string(), roleId: z.string(), reason: z.enum(['revoked', 'replaced', 'role_archived', 'account_closed', 'merged', 'given_up']) }), internal: true }),
@@ -138,7 +143,7 @@ export const identityJobs = {
   'core.merge-move': job({
     payload: z.object({
       mergeId: z.string(),
-      stage: z.enum(['start', 'module', 'finish']),
+      stage: z.enum(['start', 'module', 'finish', 'undo-start', 'undo-module', 'undo-finish']),
       module: z.string().optional(),
       step: z.number().int().min(0).optional(),
     }),
@@ -392,6 +397,21 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Your accounts at {{ theatre }} have been joined',
         body: 'Two accounts at {{ theatre }} that belong to you, including the one for this address, have been joined into one, so your bookings and history are now in one place. You sign in as before, with any of your addresses.\n\nIf you did not expect this, contact the theatre soon: for a while it can be undone.',
+      },
+    },
+  }, {
+    // A merge was undone (part 4, Merge, "Say what could not be put back"), to every verified
+    // address of both accounts. `kept` is one of two fixed sentences: everything came back, or all but what a module's undo kept.
+    id: 'core.merge-undone',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { kept: 'text' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Your accounts at {{ theatre }} have been separated again',
+        body: 'Two accounts at {{ theatre }} that had been joined, including the one for this address, are separate again. {{ kept }}\n\nIf you did not expect this, contact the theatre.',
       },
     },
   }, {
