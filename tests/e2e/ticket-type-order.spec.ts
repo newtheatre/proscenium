@@ -21,6 +21,8 @@ test.beforeAll(async ({ playwright }) => {
   const stamp = crypto.randomUUID().slice(0, 8)
   names = [`Order A ${stamp}`, `Order B ${stamp}`, `Order C ${stamp}`]
   const api = await playwright.request.newContext({ ...base, ...as(office) })
+  // Other ticket types, enough to make the page scroll, as it does after other tests have run.
+  for (let i = 0; i < 14; i++) expect((await api.post('/api/box-office/ticket-types', { data: { name: `Filler ${stamp} ${i}` }, headers: key() })).ok()).toBe(true)
   for (const name of names) expect((await api.post('/api/box-office/ticket-types', { data: { name }, headers: key() })).ok()).toBe(true)
   await api.dispose()
 })
@@ -46,31 +48,33 @@ test('a ticket type is dragged by its handle, or moved from the keyboard, and th
   await visit(page)
   expect(await drawn(page)).toEqual(names)
 
-  // With the mouse: the last row goes to the top.
+  // With the mouse: the last row goes up one. The page may hold other ticket types, so the rows are
+  // brought into view first and the drag stays between neighbours.
   const handle = (name: string) => page.getByRole('button', { name: `Move ${name}` })
+  await handle(names[1]!).scrollIntoViewIfNeeded()
   const from = await handle(names[2]!).boundingBox()
-  const to = await handle(names[0]!).boundingBox()
+  const to = await handle(names[1]!).boundingBox()
   expect(from && to).toBeTruthy()
   await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2)
   await page.mouse.down()
   await page.mouse.move(from!.x + from!.width / 2, from!.y - 10, { steps: 5 })
   await page.mouse.move(to!.x + to!.width / 2, to!.y - 4, { steps: 15 })
   await page.mouse.up()
-  await expect.poll(() => drawn(page)).toEqual([names[2], names[0], names[1]])
-  await expect.poll(() => saved(page)).toEqual([names[2], names[0], names[1]])
+  await expect.poll(() => drawn(page)).toEqual([names[0], names[2], names[1]])
+  await expect.poll(() => saved(page)).toEqual([names[0], names[2], names[1]])
 
-  // From the keyboard, lifting with Space: the new top row goes down one.
+  // From the keyboard, lifting with Space: that row goes back down one.
   await handle(names[2]!).focus()
   await page.keyboard.press('Space')
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Space')
-  await expect.poll(() => drawn(page)).toEqual([names[0], names[2], names[1]])
-  await expect.poll(() => saved(page)).toEqual([names[0], names[2], names[1]])
+  await expect.poll(() => drawn(page)).toEqual([names[0], names[1], names[2]])
+  await expect.poll(() => saved(page)).toEqual([names[0], names[1], names[2]])
 
   // The arrow keys on the handle, as before.
   await handle(names[1]!).focus()
   await page.keyboard.press('ArrowUp')
-  await expect.poll(() => drawn(page)).toEqual([names[0], names[1], names[2]])
-  await expect.poll(() => saved(page)).toEqual([names[0], names[1], names[2]])
+  await expect.poll(() => drawn(page)).toEqual([names[1], names[0], names[2]])
+  await expect.poll(() => saved(page)).toEqual([names[1], names[0], names[2]])
   await expect(handle(names[1]!)).toBeFocused()
 })
