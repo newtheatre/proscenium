@@ -90,8 +90,12 @@ describe('opening a session', () => {
     expect((await get('/api/payments/session', me)).body.session.id).toBe(opened.body.session.id)
   })
 
-  it('refuses a sale before a session is open', async () => {
-    const sale = await post('/api/payments/till/sale', seller(), { panels: [{ basket: 'tickets', input: { amountMinor: 100 } }] }, true)
+  it('refuses a sale before a session is open, but sums the panels, so coming to the till opens nothing', async () => {
+    const me = seller()
+    const summary = await post('/api/payments/till/summary', me, { panels: [{ basket: 'tickets', input: { amountMinor: 100 } }] })
+    expect(summary.body).toMatchObject({ amountMinor: 100 })
+    expect((await get('/api/payments/session', me)).body.session).toBeNull()
+    const sale = await post('/api/payments/till/sale', me, { panels: [{ basket: 'tickets', input: { amountMinor: 100 } }] }, true)
     expect(sale).toMatchObject({ status: 409, body: { code: 'payments.session.none' } })
   })
 })

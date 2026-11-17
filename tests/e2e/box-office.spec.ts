@@ -190,7 +190,7 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
   const page = await context.newPage()
   await visit(page, '/live/till')
   await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Tickets' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Tickets', exact: true })).toHaveAttribute('aria-selected', 'true') // the first panel shows until another is picked
   await page.getByRole('tab', { name: 'Gallery programmes' }).click()
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()

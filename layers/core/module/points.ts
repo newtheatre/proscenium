@@ -22,12 +22,15 @@ export const points = {
       hideEmpty: z.boolean().optional(),
       attention: z.string().optional(),
       match: z.string().optional(),
+      // A tab of a module's page in Admin: the console entries or groups whose settings window shows it.
+      settingsIn: z.array(z.string()).min(1).optional(),
     }).strict()
       .refine(e => e.ability !== 'signed-in' || e.menu === 'account', { message: "only an account entry may give ability 'signed-in'", path: ['ability'] })
       .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] })
       .refine(e => e.menu !== 'admin' || e.group !== undefined || e.to === '/admin', { message: 'an admin entry names one of the admin groups; only the Overview, /admin, has none', path: ['group'] })
       .refine(e => e.menu !== 'account' || e.group === undefined || e.group === 'theatre' || e.group === 'account', { message: "an account entry's group is 'theatre' or 'account'", path: ['group'] })
-      .refine(e => e.attention === undefined || e.menu === 'account', { message: 'only an account entry marks things that need the person', path: ['attention'] }),
+      .refine(e => e.attention === undefined || e.menu === 'account', { message: 'only an account entry marks things that need the person', path: ['attention'] })
+      .refine(e => e.settingsIn === undefined || (e.menu === 'admin' && e.to.startsWith('/admin/modules/')), { message: "only a tab of a module's page in Admin names where the settings window shows it", path: ['settingsIn'] }),
   }),
   // A console group is declared once, by the module that owns it. A theatre's own module places its
   // group with `before` or `after`; the platform's own groups keep the fixed order. `menu: 'admin'`

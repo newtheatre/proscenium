@@ -1,8 +1,9 @@
-<!-- The console's settings window: a module's tabs from its page in Admin (pages of settings and
-     set-up screens, record pages included), drawn in a window as wide as the settings cards so
-     console staff use them without Admin. It opens from the cog at the end of a module's navbar, or
-     any console address with ?settings=<module>; ?screen=<address in Admin> names the open tab's
-     screen. The screen is the same page Admin draws, rendered here for that address. -->
+<!-- The console's settings window: tabs from modules' pages in Admin (pages of settings and set-up
+     screens, record pages included), drawn in a window as wide as the settings cards so console
+     staff use them without Admin. The cog at the end of a page's navbar opens the tabs that belong to
+     that page (?settings=<entry id>); an Admin address opened from the console, or a setting found by
+     search, opens its module's (?settings=<module>). ?screen=<address in Admin> names the open
+     tab's screen. The screen is the same page Admin draws, rendered here for that address. -->
 <script setup lang="ts">
 import { loadRouteLocation, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { resolveEntry } from '../../shared/navigation'
@@ -10,13 +11,12 @@ import { resolveEntry } from '../../shared/navigation'
 const { t } = useT()
 const route = useRoute()
 const router = useRouter()
-const { nameOf } = useModuleWords()
-const module = computed(() => typeof route.query.settings === 'string' ? route.query.settings : undefined)
-const { tabs, status } = useModuleSettings(() => module.value)
+const scope = computed(() => typeof route.query.settings === 'string' ? route.query.settings : undefined)
+const { tabs, name, status } = useModuleSettings(() => scope.value)
 
 // The open screen's address: ?screen, or the first tab (with the setting search asked for).
 const screen = computed(() => {
-  if (typeof route.query.screen === 'string' && route.query.screen.startsWith(`/admin/modules/${module.value}`)) return route.query.screen
+  if (typeof route.query.screen === 'string' && route.query.screen.startsWith('/admin/modules/')) return route.query.screen
   const first = tabs.value[0]?.to
   if (!first) return undefined
   return typeof route.query.setting === 'string' ? `${first}?setting=${encodeURIComponent(route.query.setting)}` : first
@@ -32,14 +32,14 @@ const active = computed(() => resolved.value ? resolveEntry(tabs.value, resolved
 const items = computed(() => tabs.value.map(tab => ({ label: t(tab.label), value: tab.to, icon: tab.icon })))
 
 const open = computed({
-  get: () => module.value !== undefined,
+  get: () => scope.value !== undefined,
   set: (value) => {
     if (!value) closeModuleWindow(route.query)
   },
 })
 // The open screen is always named in the address, so a screen that changes its own address keeps its place.
 watch(screen, (value) => {
-  if (import.meta.client && value && module.value && route.query.screen !== value) navigateTo({ query: { ...route.query, screen: value, setting: undefined } }, { replace: true })
+  if (import.meta.client && value && scope.value && route.query.screen !== value) navigateTo({ query: { ...route.query, screen: value, setting: undefined } }, { replace: true })
 }, { immediate: true })
 const choose = (to: string | number) => navigateTo({ query: { ...route.query, screen: String(to), setting: undefined } })
 </script>
@@ -47,7 +47,7 @@ const choose = (to: string | number) => navigateTo({ query: { ...route.query, sc
 <template>
   <UModal
     v-model:open="open"
-    :title="module ? t('core.modules.window.title', { module: nameOf(module) }) : ''"
+    :title="name ? t('core.modules.window.title', { module: t(name) }) : ''"
     :description="t('core.modules.window.description')"
     :ui="{ content: 'sm:max-w-3xl sm:h-[90vh]', body: 'space-y-4' }"
   >
@@ -62,7 +62,7 @@ const choose = (to: string | number) => navigateTo({ query: { ...route.query, sc
         @update:model-value="choose"
       />
       <EmbeddedScreens
-        v-if="resolved && active"
+        v-if="resolved"
         window
       >
         <NuxtPage

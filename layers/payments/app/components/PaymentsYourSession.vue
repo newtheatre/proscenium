@@ -153,7 +153,7 @@ const methodLabel = (method: string) => t(`payments.screens.methods.${method}`)
             color="neutral"
             variant="outline"
             icon="i-lucide-shopping-basket"
-            :label="t('payments.navigation.open-till.label')"
+            :label="t('payments.screens.session.open-till')"
           />
         </div>
       </div>
