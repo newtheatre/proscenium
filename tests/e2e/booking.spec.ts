@@ -99,6 +99,8 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel 1 ticket' }).click()
   await expect(page.getByText('1 ticket cancelled. Its seat is back on sale.')).toBeVisible()
+  // The dialog fades out; checking it half-faded would judge its contrast mid-animation.
+  await expect(page.getByRole('dialog')).toBeHidden()
   await expect(page.getByText('To pay at the box office: £10.00')).toBeVisible()
   await noViolations(page)
 
