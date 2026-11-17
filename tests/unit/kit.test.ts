@@ -136,6 +136,11 @@ describe('settings', () => {
     expect(validateSettingValue(name, '')).toMatchObject({ ok: false, limit: 'minLength' })
     expect(validateSettingValue(name, null)).toEqual({ ok: true, value: null })
   })
+  it('keep the lines of a multiline text, and allow multiline only on text', () => {
+    const { 'x.mail.footer': footer } = defineSettings('x', { 'mail.footer': setting.text({ unset: true, maxLength: 200, multiline: true, change: 'x.settings.manage' }) })
+    expect(validateSettingValue(footer, 'One Street\nTown')).toEqual({ ok: true, value: 'One Street\nTown' })
+    expect(() => defineSettings('x', { 'a.b': { ...setting.integer({ default: 1, change: 'x.settings.manage' }), multiline: true } as never })).toThrow(DeclarationError)
+  })
   it('read a rate as a count in a period', () => {
     const { 'x.limits.sign-in': rate } = defineSettings('x', { 'limits.sign-in': setting.rate({ default: { count: 10, per: '10m' }, change: 'x.settings.manage' }) })
     expect(validateSettingValue(rate, { count: 10, per: '10m' })).toEqual({ ok: true, value: { count: 10, per: 600 } })

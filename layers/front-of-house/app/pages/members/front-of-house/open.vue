@@ -70,24 +70,22 @@ const trail = computed(() => [{ label: t('front-of-house.navigation.shifts.label
     :title="t('front-of-house.open-shifts.title')"
     :trail="trail"
   >
-    <template #toolbar>
-      <div class="flex flex-wrap gap-3">
-        <UFormField :label="t('front-of-house.open-shifts.production')">
-          <USelect
-            v-model="production"
-            :items="productions"
-            value-key="value"
-          />
-        </UFormField>
-        <UFormField :label="t('front-of-house.open-shifts.duty')">
-          <USelect
-            v-model="duty"
-            :items="duties"
-            value-key="value"
-          />
-        </UFormField>
-      </div>
-    </template>
+    <div class="mb-6 flex flex-wrap gap-3">
+      <UFormField :label="t('front-of-house.open-shifts.production')">
+        <USelect
+          v-model="production"
+          :items="productions"
+          value-key="value"
+        />
+      </UFormField>
+      <UFormField :label="t('front-of-house.open-shifts.duty')">
+        <USelect
+          v-model="duty"
+          :items="duties"
+          value-key="value"
+        />
+      </UFormField>
+    </div>
     <DataBoundary
       :data="data"
       :status="status"

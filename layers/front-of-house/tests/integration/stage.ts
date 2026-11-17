@@ -74,6 +74,8 @@ import outcomePost from '../../server/api/front-of-house/assignments/[id]/outcom
 import nightReportsGet from '../../server/api/front-of-house/night-reports.get'
 import hoursGet from '../../server/api/front-of-house/hours/index.get'
 import hoursExport from '../../server/api/front-of-house/hours/export.get'
+import rotaGet from '../../server/api/front-of-house/rota.get'
+import performanceRotaGet from '../../server/api/front-of-house/performances/[id]/rota.get'
 import peopleSearch from '../../server/api/front-of-house/incident-people/index.get'
 import personRedact from '../../server/api/front-of-house/incident-people/[id]/redact.post'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
@@ -137,6 +139,8 @@ export const handle = server({
   'GET /api/front-of-house/night-reports': nightReportsGet,
   'GET /api/front-of-house/hours': hoursGet,
   'GET /api/front-of-house/hours/export': hoursExport,
+  'GET /api/front-of-house/rota': rotaGet,
+  'GET /api/front-of-house/performances/:id/rota': performanceRotaGet,
   'GET /api/front-of-house/incident-people': peopleSearch,
   'POST /api/front-of-house/incident-people/:id/redact': personRedact,
   'POST /api/front-of-house/incidents': incidentsPost,

@@ -1,9 +1,12 @@
 <!-- My membership (MEM-10, MEM-11, MEM-33): what the person holds and until when, their member
      number, and the schemes they can join. A free scheme with nothing to check is joined here in one
      step, as is one that checks a list (a student ID, or a verified address); other schemes say how to
-     join until applications are built. -->
+     join until applications are built. The card (MEM-33, MEM-51) opens full screen with a code that
+     Box office signs each time it is opened; without Box office it shows no code. -->
 <script setup lang="ts">
-interface Mine { applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+import { encode } from 'uqr'
+
+interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
 interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string }[], asksFor: string | null }
 
 const { t } = useT()
@@ -74,6 +77,27 @@ async function renew() {
     renewRefusal.value = toRefusal(e)
   }
 }
+// The card: shown full screen, with a code signed by the current key every time it is opened.
+const { viewer } = useViewer()
+const showing = ref<Mine['memberships'][number] | null>(null)
+const doorCode = ref<string | null>(null)
+async function showCard(m: Mine['memberships'][number]) {
+  showing.value = m
+  doorCode.value = null
+  try {
+    doorCode.value = (await $api<{ doorCode: string }>(`/api/box-office/door-codes/mem/${m.id}` as string)).doorCode
+  }
+  catch {
+    // Box office is off, or the card is no longer offered: the card is shown without a code.
+  }
+}
+// The code as an SVG path, one unit square per dark module, with a quiet border of four.
+const qr = computed(() => {
+  if (!doorCode.value) return null
+  const { size, data } = encode(doorCode.value, { border: 4, ecc: 'M' })
+  const path = data.flatMap((row, y) => row.map((dark, x) => dark ? `M${x} ${y}h1v1h-1z` : '')).join('')
+  return { size, path }
+})
 async function withdraw(a: Mine['applications'][number]) {
   if (!(await confirm({ verb: t('membership.screens.mine.verb-withdraw'), thing: a.schemeName, consequence: t('membership.screens.mine.confirm-withdraw'), button: t('membership.screens.mine.withdraw') }))) return
   try {
@@ -118,6 +142,15 @@ async function withdraw(a: Mine['applications'][number]) {
                 <StatusBadge
                   :tone="TONE[m.status]"
                   :label="t(`membership.screens.derived.${m.status}`)"
+                />
+                <UButton
+                  v-if="mine.data.value.card && m.status !== 'lapsed'"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  icon="i-lucide-qr-code"
+                  :label="t('membership.screens.mine.show-card')"
+                  @click="showCard(m)"
                 />
                 <UButton
                   v-if="m.renewal?.open"
@@ -255,6 +288,48 @@ async function withdraw(a: Mine['applications'][number]) {
           loading-auto
           :label="t('membership.screens.mine.renew')"
         />
+      </template>
+    </UModal>
+    <UModal
+      :open="!!showing"
+      fullscreen
+      :title="showing?.schemeName ?? ''"
+      @update:open="v => { if (!v) showing = null }"
+    >
+      <template #body>
+        <div
+          v-if="showing"
+          class="mx-auto flex max-w-sm flex-col items-center gap-4 text-center"
+        >
+          <p
+            v-if="viewer.name"
+            class="text-2xl font-semibold"
+          >
+            {{ viewer.name }}
+          </p>
+          <FactStrip
+            :facts="[
+              ...(mine.data.value?.number ? [{ label: t('membership.screens.mine.number'), value: mine.data.value.number.label }] : []),
+              { label: t('membership.screens.mine.valid-until'), value: showing.endsOn ? day(showing.endsOn) : t('membership.screens.mine.no-end') },
+            ]"
+          />
+          <svg
+            v-if="qr"
+            :viewBox="`0 0 ${qr.size} ${qr.size}`"
+            class="aspect-square w-72 max-w-full rounded-md bg-white"
+            shape-rendering="crispEdges"
+            role="img"
+            :aria-label="t('membership.screens.mine.card-code')"
+          >
+            <path
+              :d="qr.path"
+              fill="black"
+            />
+          </svg>
+          <p class="text-sm text-muted">
+            {{ t(qr ? 'membership.screens.mine.card-help' : 'membership.screens.mine.card-no-code') }}
+          </p>
+        </div>
       </template>
     </UModal>
   </PageFrame>

@@ -188,3 +188,23 @@ describe('FH-04: the last place', () => {
     expect(await rows('SELECT id FROM front_of_house_assignments WHERE shift_id = ?', id)).toHaveLength(1)
   })
 })
+
+describe('the console\'s rota', () => {
+  it('shows each coming performance with places filled of wanted, and one performance with its people', async () => {
+    const p = await performance()
+    const steward = await duty('Steward')
+    const id = await shift(p.id, steward, 3)
+    const amy = volunteer()
+    const a = (await req('POST', `/api/front-of-house/shifts/${id}/sign-up`, {}, amy)).body.assignmentId
+    const overview = await req('GET', `/api/front-of-house/rota?from=${p.startsAt - MINUTE}`)
+    expect(overview.status, JSON.stringify(overview.body)).toBe(200)
+    const row = overview.body.performances.find((x: any) => x.id === p.id)
+    expect(row).toMatchObject({ show: expect.stringContaining('Front of house show'), startsAt: p.startsAt, managed: true, duties: [{ dutyId: steward, places: 3, taken: 1, drafts: 0 }] })
+    expect((await req('GET', `/api/front-of-house/rota?from=${p.startsAt - MINUTE}&unfilled=1`)).body.performances.some((x: any) => x.id === p.id)).toBe(true)
+    const one = await req('GET', `/api/front-of-house/performances/${p.id}/rota`)
+    expect(one.status, JSON.stringify(one.body)).toBe(200)
+    expect(one.body.performance).toMatchObject({ title: expect.stringContaining('Front of house show'), startsAt: p.startsAt })
+    expect(one.body.shifts).toEqual([expect.objectContaining({ id, places: 3, people: [{ assignmentId: a, accountId: amy.accountId, name: expect.any(String), state: 'confirmed' }] })])
+    expect((await req('GET', `/api/front-of-house/performances/${p.id}/rota`, undefined, volunteer())).status).toBe(403)
+  })
+})

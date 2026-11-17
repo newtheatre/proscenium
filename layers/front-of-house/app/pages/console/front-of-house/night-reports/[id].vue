@@ -83,7 +83,7 @@ const summary = computed(() => {
   ]
 })
 const reason = (code: string | null) => code ? (te(code) ? t(code) : code) : t('front-of-house.report.no-reason')
-const lineValue = (l: { value: string | number, unit?: string }) => l.unit ? `${l.value} ${l.unit}` : String(l.value)
+const figure = useFigureValue()
 const trail = computed(() => [{ label: t('front-of-house.navigation.night-reports.label'), to: '/console/front-of-house/night-reports' }])
 const title = computed(() => data.value?.performance ? t('front-of-house.report.title', { show: data.value.performance.title }) : t('front-of-house.navigation.night-reports.label'))
 </script>
@@ -134,7 +134,7 @@ const title = computed(() => data.value?.performance ? t('front-of-house.report.
           >
             <FactStrip
               v-if="section.lines"
-              :facts="section.lines.map(l => ({ label: l.label, value: lineValue(l) }))"
+              :facts="section.lines.map(l => ({ label: figure.label(l.label), value: figure.value(l.value, l.unit) }))"
             />
             <p
               v-else

@@ -1,7 +1,7 @@
 // The caller's own memberships for My membership (MEM-33): each with its scheme, dates and derived
 // status, their member number, and their open applications with what each is waiting on. Ended,
 // declined and expired rows are left to a later slice.
-import { all, defineRoute } from '#kit'
+import { all, defineRoute, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { derivedStatus } from '../../dates'
 import { memberNumber, todayOrNull } from '../../memberships'
@@ -26,6 +26,8 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
   )
   return {
     number: await memberNumber(accountId),
+    // Whether My membership offers the card (membership.card.show); the code itself comes from Box office.
+    card: await useSetting('membership.card.show') !== false,
     // Only a staff check exists so far, so an open application is waiting on staff.
     applications: pending.map(p => ({ ...p, waiting: 'staff' as const })),
     memberships: rows.map(r => ({
