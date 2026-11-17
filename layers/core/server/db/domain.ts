@@ -147,7 +147,7 @@ export const notifications = defineTable('core_notifications', {
   id: 'ntf',
   realm: { column: 'side' },
   subject: { account: 'account_id', unlinked: 'staff' },
-  retention: 'core.notifications.log-retention',
+  retention: 'core.delivery.log-retention',
   extra: t => [
     // The key leaves the account out so it matches across a merge (R-34); the index keeps one per
     // account, and one for all sends to bare addresses (notifyAddress's keys are its own).
@@ -205,7 +205,7 @@ export const inboxItems = defineTable('core_inbox_items', {
 }, {
   id: 'inb',
   realm: { column: 'side' },
-  retention: 'core.notifications.inbox-retention',
+  retention: 'core.delivery.inbox-retention',
   onErasure: 'delete-row',
   extra: t => [
     index('core_inbox_items_account').on(t.accountId, t.side, t.archivedAt, t.createdAt),
@@ -347,6 +347,33 @@ export const productionAdvisories = defineTable('core_production_advisories', {
 })
 
 /**
+ * Who made the show (C-09): a printed name and a role in a section, linked to an account or not. A
+ * credit with no account is a historical or outside credit, found for a data request by staff
+ * searching the printed name. The linked person may change the visibility of their own.
+ */
+export const productionCredits = defineTable('core_production_credits', {
+  id: col.id(),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  accountId: col.account('account_id', { role: 'subject', onMerge: 'alias', nullable: true }),
+  creditedName: col.public(text('credited_name').notNull()),
+  role: col.public(text('role').notNull()),
+  sectionTermId: col.ref('core_terms'),
+  visibility: col.internal(text('visibility').notNull().default('public')),
+  sort: col.internal(integer('sort').notNull().default(0)),
+}, {
+  id: 'crd',
+  realm: 'members',
+  subject: { account: 'account_id', unlinked: 'staff' },
+  extra: t => [
+    index('core_production_credits_order').on(t.productionId, t.sectionTermId, t.sort),
+    index('core_production_credits_account').on(t.accountId),
+    check('core_production_credits_visibility', sql`${t.visibility} IN ('public', 'members', 'hidden')`),
+    check('core_production_credits_name', sql`length(${t.creditedName}) BETWEEN 1 AND 120`),
+    check('core_production_credits_role', sql`length(${t.role}) BETWEEN 1 AND 120`),
+  ],
+})
+
+/**
  * A building or site (part 2, group 2). A venue the theatre uses but does not run (a hired hall) is
  * the same record with managed false. A venue is never a flagged room.
  */
@@ -354,7 +381,6 @@ export const venues = defineTable('core_venues', {
   id: col.id(),
   slug: col.public(text('slug').notNull().unique()),
   name: col.public(text('name').notNull()),
-  managed: col.internal(integer('managed', { mode: 'boolean' }).notNull().default(true)),
   addressLines: col.public(text('address_lines')),
   locality: col.public(text('locality')),
   postcode: col.public(text('postcode')),
@@ -394,6 +420,12 @@ export const spaces = defineTable('core_spaces', {
   exclusive: col.internal(integer('exclusive', { mode: 'boolean' }).notNull().default(true)),
   description: col.public(text('description')),
   accessInfo: col.public(text('access_info')),
+  // Whether the theatre runs this space (R-36): a theatre may run some rooms in a building another
+  // body manages. Core treats managed and unmanaged spaces alike; other modules may ask.
+  managed: col.internal(integer('managed', { mode: 'boolean' }).notNull().default(true)),
+  // A short public note for finding the space, shown under the venue's directions. At most 200
+  // characters, bounded by the route's input: a CHECK added now would rebuild the table.
+  findingIt: col.public(text('finding_it')),
   state: col.internal(text('state').notNull().default('active')),
   sort: col.internal(integer('sort').notNull().default(0)),
   createdAt: col.createdAt(),
@@ -474,6 +506,39 @@ export const closures = defineTable('core_closures', {
  * One occasion on which a production happens (part 2, group 1). Everything record-like in every
  * other module keys to a row here, never to a date or a room.
  */
+/**
+ * A run of performances too long for one unit (C-04), created by the core.create-run job in chunks.
+ * `items` holds the performances still to make, as the person accepted them from the preview;
+ * `done` counts how many of them the chunks have dealt with, so a repeated chunk does nothing.
+ */
+export const performanceRuns = defineTable('core_performance_runs', {
+  id: col.id(),
+  productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'cascade' })),
+  venueId: col.internal(text('venue_id').notNull()),
+  spaceId: col.internal(text('space_id').notNull()),
+  scheduled: col.internal(integer('scheduled', { mode: 'boolean' }).notNull()),
+  capacity: col.internal(integer('capacity')),
+  intervalCount: col.internal(integer('interval_count')),
+  label: col.internal(text('label')),
+  items: col.internal(text('items').notNull()),
+  total: col.internal(integer('total').notNull()),
+  done: col.internal(integer('done').notNull().default(0)),
+  state: col.internal(text('state').notNull().default('running')),
+  stopReason: col.internal(text('stop_reason')),
+  createdAt: col.createdAt(),
+  updatedAt: col.internal(integer('updated_at').notNull()),
+}, {
+  id: 'run',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('core_performance_runs_production').on(t.productionId, t.createdAt),
+    check('core_performance_runs_state', sql`${t.state} IN ('running', 'stopped', 'done', 'removing', 'removed')`),
+    check('core_performance_runs_done', sql`${t.done} BETWEEN 0 AND ${t.total}`),
+    check('core_performance_runs_stop', sql`${t.stopReason} IS NULL OR length(${t.stopReason}) <= 300`),
+  ],
+})
+
 export const performances = defineTable('core_performances', {
   id: col.id(),
   productionId: col.internal(text('production_id').notNull().references(() => productions.id, { onDelete: 'restrict' })),
@@ -493,6 +558,8 @@ export const performances = defineTable('core_performances', {
   cancelNote: col.public(text('cancel_note')),
   // Set with state completed, so the operating-day recalculation leaves finished nights alone.
   completedAt: col.internal(integer('completed_at')),
+  // The long run that made it, so a chunk repeated makes nothing twice and an unfinished run can be removed.
+  runId: col.internal(text('run_id').references(() => performanceRuns.id, { onDelete: 'set null' })),
   createdAt: col.createdAt(),
 }, {
   id: 'perf',
@@ -506,6 +573,7 @@ export const performances = defineTable('core_performances', {
     index('core_performances_production').on(t.productionId, t.startsAt),
     index('core_performances_venue').on(t.venueId, t.startsAt),
     index('core_performances_space').on(t.spaceId, t.startsAt),
+    uniqueIndex('core_performances_run').on(t.runId, t.startsAt).where(sql`${t.runId} IS NOT NULL`),
     check('core_performances_state', sql`${t.state} IN ('draft', 'scheduled', 'cancelled', 'completed')`),
     check('core_performances_period', sql`${t.endsAt} > ${t.startsAt}`),
     check('core_performances_doors', sql`${t.doorsAt} IS NULL OR ${t.doorsAt} <= ${t.startsAt}`),
@@ -533,4 +601,25 @@ export const performanceAccess = defineTable('core_performance_access', {
   ],
 })
 
-export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions }
+/**
+ * Email outcomes the queue gave up on, unread or unmatched (core part 4), for the health screen. It
+ * holds no text from the message: the queue's own id, one of six known types or null, and why. Kept
+ * 30 days, fixed; the delivery sweep removes older rows.
+ */
+export const emailEventsSetAside = defineTable('core_email_events_set_aside', {
+  queueMessageId: col.internal(text('queue_message_id').primaryKey()),
+  eventType: col.internal(text('event_type')),
+  reason: col.internal(text('reason').notNull()),
+  setAsideAt: col.internal(integer('set_aside_at').notNull()),
+}, {
+  realm: 'system',
+  subject: 'none',
+  retention: { fixed: '30d' },
+  extra: t => [
+    index('core_email_events_set_aside_at').on(t.setAsideAt),
+    check('core_email_events_set_aside_type', sql`${t.eventType} IS NULL OR ${t.eventType} IN ('delivered', 'deferred', 'bounced', 'failed', 'rejected', 'complained')`),
+    check('core_email_events_set_aside_reason', sql`${t.reason} IN ('unreadable', 'unmatched')`),
+  ],
+})
+
+export const tables = { venues, spaces, placeAccess, closures, seasons, productions, productionSlugs, productionAdvisories, productionCredits, performanceRuns, performances, performanceAccess, files, senderIdentities, notificationRouting, vocabularies, terms, notifications, deliveries, inboxItems, notificationPreferences, emailSuppressions, emailEventsSetAside }

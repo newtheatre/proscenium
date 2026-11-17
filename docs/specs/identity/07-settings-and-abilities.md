@@ -1,10 +1,26 @@
 # 6. Settings and abilities
 
-Identity registers 37 settings and 19 abilities, written here in the column layouts of the foundations draft. It also owns the list of preset roles that every other workstream maps its abilities to.
+Identity registers 37 settings and 20 abilities, written here in the column layouts of the foundations draft. It also owns the list of preset roles that every other workstream maps its abilities to.
 
 ## Settings
 
 Every setting is changed by `core.identity-settings.manage` unless the row says otherwise. Audience is staff unless stated.
+
+**Where each setting is shown.** Placement is declared once per group, through `settingGroups` and `settingPages` in the manifest, and every setting has exactly one home (Matt's ruling of 16 November 2026 on settings). No setting carries a scope of its own.
+
+| Groups | Home |
+| --- | --- |
+| `sign-in`, `sessions`, `recovery` | Site administration, Access: Sign-in, `/admin/sign-in` |
+| `privacy` | Site administration, Access: Privacy, `/admin/privacy` |
+| `grants`, `members-area`, `access-scheme`, `emergency-contacts`, `merge` | The console, People: People settings |
+| `retention`, except `core.retention.armed` | Site administration, Upkeep: Advanced, `/admin/advanced` |
+| `core.retention.armed` | Identity's own Retention screen, `/admin/retention`, and nowhere else |
+
+Most settings save with no prompt, in Site administration as in the console. A few are declared `onChange: 'confirm'`, because a slip locks people out or weakens sign-in: `core.sign-in.email-link`, `core.sign-in.google`, `core.sign-in.google-domains`, `core.sign-in.managed-domains`, `core.sign-in.provider-is-strong` and `core.grants.allow-no-expiry`. `core.retention.armed` is declared `onChange: 'reason'`. Saving one of these shows what will change, asks again, and asks the person to confirm it is them in place only if the session is not fresh (`core.access.fresh-within`). The history of every setting, with Revert, is foundations' screen at `/admin/settings-history`. A duration is entered through the kit's `DurationInput`, where a month is 30 days and a year 365; what is stored does not change.
+
+Every setting whose value is a retention period is also `onChange: 'confirm'`, by the platform's rule, because shortening one lets the next sweep delete rows for good. In identity those are `core.retention.unclaimed-after`, `core.retention.dormant-after`, `core.emergency-contacts.keep-after-standing`, `core.access-scheme.keep-rejected`, `core.merge.undo-window` and `core.privacy.export-lifetime`. `core.retention.run-cap` is a count, not a period, and saves with no prompt.
+
+A setting may name a screen of its own only once that screen shows and saves it, so that nothing is reachable through the API alone. The Retention screen is a later release (part 5). Until it is built, `core.retention.armed` sits on `/admin/advanced` with the rest of the retention group, still `onChange: 'reason'` and still changed only by `core.retention.arm`. It moves to `/admin/retention` in the release that ships the screen, and leaves the Advanced page then. In the declaration every setting names its own ability; there is no ability for a whole group. Page ids take the form `core.sign-in`, `core.privacy` and `core.people`.
 
 ### Signing in
 
@@ -156,6 +172,10 @@ Two more abilities run the access scheme, which makes nineteen.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `core.access-scheme.read` | `core.account` | privileged | refuses | `account.search` | See the queue and open an application to the access scheme. Every opening is audited. | Box-office manager, Front-of-house manager, Welfare lead. Not Owner or Administrator by default. | strong | false, with `audit: 'read'` | site |
 | `core.access-scheme.review` | `core.account` | privileged | refuses | `access-scheme.read` | Accept, reject, ask for more, verify; invite a person to apply or apply for them | The same three | strong | default | site |
+
+One more, which makes twenty: `core.account.find`. It lets its holder narrow a list they can already see by a person's name or verified email, through `findAccounts` (part 4). It opens no account and shows no personal detail by itself. Entry fields: `risk: 'standard'`, `assurance: 'basic'`, `fresh: false`, `audit: 'read'`, owner identity. `core.account.search`, the picker's ability, implies it, since somebody who may look a person up by name may filter by one; so every preset role with console work holds it, and so do holders of `core.account.read`. Beyond that no preset role is given it directly: a module whose list needs the search has its own list ability imply it (box office's `box-office.order.view`, for one, which stewards hold by fact on a show night), so whoever may work that list may search it by name and nobody else can.
+
+`core.account.find` is declared `impliable: true`, which is what lets another module's ability imply it under the foundations rule: the implied ability is of standard risk and its owner is core or a module the implying module requires. It is identity's only impliable ability. The audit entry for a call records the grant of the implying ability as what allowed it.
 
 - **"Owner" in the Owner column means the person whose account it is.** `grants` gives everyone these abilities over their own account with no role; `refuses` stops staff disabling, merging or recovering their own.
 - **`core.grant.manage` at a record scope is delegation.** A producer who holds it on one production can add their team to that production and nowhere else. They can give only roles whose abilities they hold there.

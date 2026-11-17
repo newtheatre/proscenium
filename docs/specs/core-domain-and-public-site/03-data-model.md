@@ -1,6 +1,6 @@
 # 2. Data model
 
-Core owns 26 tables in six groups, and the public site module owns none: it only reads. The final list of tables with their id prefixes is at the end of this tab.
+Core owns 27 tables in six groups, and the public site module owns none: it only reads. The final list of tables with their id prefixes is at the end of this tab.
 
 ## Reading the tables
 
@@ -140,14 +140,13 @@ Access features of one performance: captioned, signed, audio described, relaxed.
 
 **`core_venues`**: realm operational; subject none; no retention; not append-only; id prefix `ven`.
 
-A building or site. A venue the theatre does not manage (a union room, a hired hall) is the same record with `managed` set to false.
+A building or site. Whether the theatre runs a place is recorded on each space, not on the venue (Matt's decision of 16 November 2026, integration ruling R-36), because a theatre may run some rooms of a building someone else manages: NNT runs four spaces inside the Portland Building, which the students' union manages. The venue keeps what belongs to the building: its name, address, map pin, how to get there, its access information and any closure of the whole building.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
 | `id` | id | primary key | internal | keep |  |
 | `slug` | text | not null, unique | public | keep |  |
 | `name` | text | not null, unique ignoring case | public | keep |  |
-| `managed` | boolean | not null, default true | internal | keep | False for a venue the theatre uses but does not run |
 | `address_lines` | text | up to four lines | public | keep |  |
 | `locality` | text |  | public | keep |  |
 | `postcode` | text |  | public | keep |  |
@@ -157,6 +156,23 @@ A building or site. A venue the theatre does not manage (a union room, a hired h
 | `access_info` | text | markdown | public | keep | The detail a list cannot say: the route, who to ring, what to expect. The features themselves are in `core_place_access`. |
 | `getting_here` | text | markdown | public | keep |  |
 | `state` | text | not null, default `active`, one of `active`, `archived` | internal | keep |  |
+
+Two columns on `core_spaces` carry the ruling, beside those its own table lists:
+
+| Column | Type | Constraints | Class | On erasure | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `managed` | boolean | not null, default true | internal | keep | False for a space the theatre uses but does not run |
+| `finding_it` | text | nullable, at most 200 characters | public | keep | Which door, which floor. Translatable as the venue's public text is. Shown under the venue's directions |
+
+Rules that follow:
+
+- A space the theatre does not run is optional. It is added only so that a performance can be held there or so that it shows on a calendar, and it may be performable.
+- Core treats a managed and an unmanaged space alike: scheduling, the clash guard between the theatre's own performances, capacity and closures all work the same. What `managed: false` means is each module's to say; the agreed reading is that such a space cannot be booked in Room bookings and gets no front of house or bar defaults.
+- A venue has no stored answer. Where one is wanted it is derived: a venue has managed spaces or it does not.
+- A closure may name the venue, covering every space in it whoever runs it, or single spaces.
+- A place is named "space, venue" on the public site and in messages, for example "Studio Foyer, Portland Building".
+
+Migration of what is built: one migration adds `core_spaces.managed` and `core_spaces.finding_it`, sets each space's `managed` from its venue's value, and drops `core_venues.managed`. A venue marked unmanaged that has no spaces carries nothing across, which is right, since an unmanaged space exists only when it is needed.
 
 A venue is its own record and never a flagged room. Proscenium reached the same rule in its decision 0043, after starting the other way. Latitude and longitude use the type real, which the foundations format added on 16 November 2026 for measurements. It is never used for money, counts or keys.
 
@@ -334,7 +350,7 @@ Notification types are not a table. A module declares each type in its manifest 
 
 The tables about a person carry a `side` column, `audience` or `members`, and declare it as their realm, which the foundations format allows. The side comes from the declared type or topic and never changes on a row.
 
-**`core_notifications`**: realm from `side`; subject `{ account: 'account_id', email: 'address' }`; retention `core.notifications.log-retention`; not append-only; id prefix `ntf`.
+**`core_notifications`**: realm from `side`; subject `{ account: 'account_id', email: 'address' }`; retention `core.delivery.log-retention`; not append-only; id prefix `ntf`.
 
 A row has an account or, for a send before any account exists, an address. The `address` column is an email column, so a data request by email address finds those rows.
 
@@ -379,7 +395,7 @@ Index: `(state, next_attempt_at)`.
 
 The state list also holds `complained`, for a recipient's spam complaint, and `core_notifications` has an index on `(subject_type, subject_id)`. Both were added on 16 November 2026 for the Communications module (part 4), so that no migration is needed when it arrives.
 
-**`core_inbox_items`**: realm from `side`; subject `account_id`; retention `core.notifications.inbox-retention`; not append-only; on erasure the row is deleted; id prefix `inb`.
+**`core_inbox_items`**: realm from `side`; subject `account_id`; retention `core.delivery.inbox-retention`; not append-only; on erasure the row is deleted; id prefix `inb`.
 
 | Column | Type | Constraints | Class | On erasure | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -591,7 +607,7 @@ This specification asked three things of the data-class format. The rulings of 1
 
 Nuxt Content keeps its own tables in the same database, named `_content_*`. The migration journal ignores them and no module may use that prefix.
 
-## All 26 tables and their id prefixes
+## All 27 tables and their id prefixes
 
 The foundations format gives every generated id the shape `<prefix>_<26 characters>`, so an id says what kind of record it is. Each table with an `id` column declares its prefix. Ids sort by creation time unless marked random. Public addresses use slugs, never ids.
 
@@ -624,6 +640,19 @@ The foundations format gives every generated id the shape `<prefix>_<26 characte
 | `core_webhooks` | Webhooks | `whk` |  |
 | `core_webhook_deliveries` | Webhooks | `whd` |  |
 
+The twenty-seventh table was added on 16 November 2026, after Matt decided the complaint half of the email proof would not be run:
+
+**`core_email_events_set_aside`**: realm operational; subject none; retention 30 days; not append-only; keyed by the queue's message id, so no id prefix. It records an email outcome event that could not be read or could not be matched to a delivery, at the moment the queue gives up on it, because a Worker cannot read how many messages sit in a dead-letter queue.
+
+| Column | Type | Constraints | Class | On erasure | Notes |
+| --- | --- | --- | --- | --- | --- |
+| `queue_message_id` | text | primary key | internal | keep | Makes recording safe to repeat |
+| `event_type` | text | nullable | internal | keep | One of the six event names core knows (delivered, deferred, bounced, failed, rejected, complained), or null. Never text copied from the message |
+| `reason` | text | not null, one of `unreadable`, `unmatched` | internal | keep |  |
+| `set_aside_at` | timestamp | not null | internal | keep |  |
+
+It holds no address, subject or message body, so it carries no personal data, and both text columns take only values from a fixed list. That is what lets its retention be declared as a fixed thirty days, written \`{ fixed: '30d' }\`, which the foundations format allows only on a table with no subject and no personal, special or free-text column. The message itself stays in the dead-letter queue. Part 4 gives the consumer's rule and the health line that reads this table.
+
 Eighteen tables have a prefix and eight have a natural key. Three prefixes registered earlier (`psl`, `adv`, `pfa`) are withdrawn, because the tables they were for are keyed by a slug or a pair and generate no id.
 
 ## Later slice: content warnings, staging effects and age
@@ -651,7 +680,7 @@ The one list of advisories becomes three things that behave differently:
 | `core_productions` | `age_guidance` is replaced by `age_min` (integer, nullable, 0 to 21) and `age_restricted` (boolean, not null, default false; true means nobody younger is admitted, false means a recommendation). Gains `effects_confirmed_none` (boolean, not null, default false) beside `advisories_confirmed_none`. |
 | `core_performance_effect_exceptions` (new, later than the slice) | `performance_id`, `term_id`: this effect is not used at this performance. The term must be one of the production's effects. Keyed by performance and term. |
 
-That takes the core domain from 26 tables to 28 with the slice, and to 29 when performance exceptions follow.
+That takes the core domain from 27 tables to 29 with the slice, and to 30 when performance exceptions follow.
 
 ### Rules
 

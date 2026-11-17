@@ -21,13 +21,13 @@ export default defineModule({
   settings: defineSettings('payments', {
     'attempts.answer-within': setting.duration({ default: '3m', min: '1m', max: '30m', change, audience: 'staff' }),
     'attempts.alert-unknown-after': setting.duration({ default: '60m', min: '5m', max: '48h', change, audience: 'staff' }),
-    'refunds.self-approve-up-to': setting.money({ default: 0, min: 0, max: 100000, change, audience: 'staff' }),
-    'refunds.window': setting.duration({ default: '180d', min: '1d', max: '730d', change, audience: 'staff' }),
-    'sessions.variance-needs-second-person': setting.money({ default: 500, min: 0, max: 100000, change, audience: 'staff' }),
+    'refunds.self-approve-up-to': setting.money({ default: 0, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
+    'refunds.window': setting.duration({ default: '180d', min: '1d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
+    'sessions.variance-needs-second-person': setting.money({ default: 500, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
     'sessions.default-float': setting.money({ default: 0, min: 0, max: 100000, change, audience: 'staff' }),
-    'cash.enabled': setting.boolean({ default: true, change, audience: 'staff' }),
-    'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff' }),
-    'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff' }),
+    'cash.enabled': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
+    'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
+    'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('payments', {
@@ -125,6 +125,7 @@ export default defineModule({
     'core.health-check': [{ id: 'payments.unknown-attempts', file: 'unknown-attempts' }],
     // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
     'core.navigation': [
+      { id: 'payments.till', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 5 },
       { id: 'payments.session', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/session', icon: 'i-lucide-calculator', ability: 'payments.session.open', order: 10 },
       { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },
       { id: 'payments.refunds', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/refunds', icon: 'i-lucide-undo-2', ability: 'payments.refund.approve', order: 30, count: 'payments.refunds-waiting' },

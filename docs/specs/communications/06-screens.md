@@ -15,7 +15,7 @@ One console group, "Communications", declared in the manifest's `menu` field as 
 | Mailings | /console/communications/mailings | communications.campaign.read | Scheduled and sending | Later |
 | Mailing templates | /console/communications/templates | communications.template.manage |  | Later |
 
-Settings sit on the foundations Settings screen under the module's name. The account and members' shells gain no entry: the lists appear inside the existing preferences page.
+Settings are drawn on the module's own generated settings page, `/console/communications/settings`, and nowhere else; the kit makes its navigation entry from the settings format in part 6. The account and members' shells gain no entry: the lists appear inside the existing preferences page.
 
 ## Console
 
@@ -31,7 +31,7 @@ Settings sit on the foundations Settings screen under the module's name. The acc
 | S8 | Subscribers | /lists/\<id>/subscribers | List | communications.subscriber.read | First |
 | S9 | Import subscribers | /lists/\<id>/import | Steps | communications.subscriber.import | Later |
 | S10 | Mailing templates | /templates | List, opening an Editor | communications.template.manage | Later |
-| S11 | Communications settings | (foundations Settings screen) | Settings | communications.settings.manage | First |
+| S11 | Communications settings | /settings (the generated settings page) | Settings | communications.settings.manage | First |
 
 ### S1 Mailings (later)
 
@@ -100,6 +100,8 @@ Side and basis cannot be edited after the first subscriber. Archiving a list ask
 
 A List page whose every load is an audited read. Columns: the person's name, or the address for someone who joined signed out, then state, source, since. Filters: state, source, cannot be reached. Row action: open the person's console record at its Mailings tab. Page actions: Add a person (asks for the statement on an open audience list), Export and, later, Import. Export makes the file for the theatre's own newsletter tool: one row for each subscribed person and no other, with the address, the source, the date, the wording version and that person's manage link. There is no "resubscribe" action for an audience list.
 
+**Finding a person.** The search box on S8, and on the Recipients tab of S2, takes a name or an email address and narrows the rows already shown, two ways. Rows that belong to an account are found through identity's `findAccounts(text, list)`, exported from core's services: it answers a subquery of account ids that this module passes to the kit's account scope, it shows no name itself, it is guarded by `core.account.find`, and it writes one read audit entry per call that never holds the text typed. `communications.subscriber.read`, which guards both lists, implies `core.account.find` (part 6), so whoever may see the list may narrow it. This module never searches accounts itself. Rows with no account, which are people who joined signed out, are matched by this module on the address it stores for them, and only on the whole address. Choosing a person who is not yet on the screen, as "Add a person" does, is identity's person picker, `searchAccounts`, under `core.account.search`.
+
 ### S9 Import subscribers (later)
 
 Steps: upload, review the check (rows, new, already on the list, invalid, cannot be reached, with a downloadable list of invalid rows), declare (the statement, and "ask everyone to confirm"), run. Progress is shown live, and the person may leave: a notification arrives when it finishes.
@@ -125,9 +127,9 @@ Each shows the topic's master switch that core already draws, and under it one r
 
 | No. | Screen | Address | Notes |
 | --- | --- | --- | --- |
-| S14 | Confirm | /mailing/confirm/\<token> | One sentence and a button. Expired tokens offer to send a new link |
-| S15 | Manage | /mailing/manage/\<token> | The list named in the email with Unsubscribe; other lists on that side; "Stop all mailings". No name or address is shown |
-| S16 | Done | Inline on S14 and S15 | States what changed and offers to undo it for ten minutes |
+| S14 | Confirm | /mailing/confirm/\<token> | One sentence and a button. A link that no longer works offers to send a new one |
+| S15 | Manage | /mailing/manage/\<token> | The list named in the email with "Leave this list", and "Stop all mailings". Below them, "Email me a link to my lists", which sends a preferences link; that page, /mailing/preferences/\<token>, shows the person's lists on that side and the open ones they could join. No name or address is shown on either |
+| S16 | Done | Inline on S14 and S15 | States what changed. After leaving, it offers "Left by mistake? Email me a link to my lists" |
 
 **`CommunicationsSignup`** is the public component for a content page or the footer: an address box, one tick box per named list with its wording, and a button. It always ends with "Check your email". Signed in, it becomes switches and needs no email.
 
@@ -151,7 +153,7 @@ Loading, empty, refused and error follow the interface conventions. Three are sp
 
 | State | Shown as |
 | --- | --- |
-| Sending domain not verified | A banner on S1, S3 and S5 linking to core's sender screen. Send buttons are disabled |
+| Sending domain not verified | A banner on S1, S3 and S5 linking to core's Email screen in Site administration. Send buttons are disabled |
 | An audience source's module is off | The source shows as unavailable where it was used, and the campaign cannot leave draft |
 | The module is switched off part-way through a campaign | On return, the campaign is still sending and resumes |
 

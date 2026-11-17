@@ -72,3 +72,47 @@ export const cancelInput = z.object({
 export const impactQuery = z.object({
   kind: z.enum(['cancel', 'reschedule', 'move', 'capacity']),
 })
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/ // not-policy: a date's shape
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/ // not-policy: a time's shape
+
+export const runPattern = z.object({
+  venueId: z.string().min(1),
+  spaceId: z.string().min(1),
+  from: z.string().regex(DATE_ONLY),
+  to: z.string().regex(DATE_ONLY),
+  days: z.array(z.number().int().min(1).max(7)).min(1).max(7), // not-policy: ISO weekdays
+  times: z.array(z.string().regex(TIME)).min(1).max(6), // not-policy: a sane ceiling on times a day
+  minutes: z.number().int().min(1).max(1440).nullable().optional(), // not-policy: at most a day long
+})
+
+export const runInput = z.object({
+  venueId: z.string().min(1),
+  spaceId: z.string().min(1),
+  scheduled: z.boolean().default(true),
+  capacity: z.number().int().min(0).max(100_000).nullable().optional(), // not-policy: a sane ceiling on a house
+  intervalCount: z.number().int().min(0).max(10).nullable().optional(), // not-policy: a sane ceiling on intervals
+  label: text(40).optional(), // not-policy: the table's bound on a label
+  performances: z.array(z.object({
+    startsAt: z.number().int().positive(),
+    endsAt: z.number().int().positive(),
+    doorsAt: z.number().int().positive().nullable(),
+  })).min(1).max(5000), // not-policy: a sane ceiling on one run, about two years of daily shows
+})
+
+// Credits (C-09). A credit's printed name and role are each 1 to 120 characters, as the table says.
+const VISIBILITY = z.enum(['public', 'members', 'hidden'])
+const creditFields = z.object({
+  creditedName: z.string().trim().min(1).max(120), // not-policy: the table's bound on a printed name
+  role: z.string().trim().min(1).max(120), // not-policy: the table's bound on a role
+  sectionTermId: z.string().min(1),
+  accountId: z.string().min(1).nullable(),
+  visibility: VISIBILITY,
+})
+export const creditInput = creditFields.partial({ accountId: true, visibility: true })
+export const creditPatch = creditFields.partial()
+export const creditOrderInput = z.object({
+  sectionTermId: z.string().min(1),
+  ids: z.array(z.string().min(1)).min(1).max(500), // not-policy: a section's ceiling
+})
+export const ownCreditInput = z.object({ visibility: VISIBILITY })

@@ -1,6 +1,6 @@
 # 3. Rules and flows
 
-Two records have a life cycle: a subscription and a campaign. Each move is guarded in the statement that makes it, writes an audit entry and announces its event in the same batch, as core domain's part 3 defines a guard.
+Two records have a life cycle: a subscription and a campaign. Each move is made in a unit of work that runs the kit's guard, writes an audit entry and announces its event in the same batch, as core domain's part 3 defines a guard. A move happened when the guard passed. Nothing here tests how many rows a statement changed, because D1's count includes rows written by triggers and search indexes.
 
 **What is built when.** Every rule below about a subscription, consent, unsubscribing by the manage link and a notice is in the first release. A rule that applies only to a mailing (the bulk lane, the throttle, quiet hours, approval, pause and cancel, narrowing, the mail client's unsubscribe button) is in a later release and says "later". In the first release a campaign is always a notice.
 
@@ -76,10 +76,10 @@ Rules:
 
 - **The manage link is the way out in every release.** It is in the confirmation message and in each row of the export, and My account offers the same switches. Later, every mailing carries two routes out: the manage link in its footer, and the List-Unsubscribe and List-Unsubscribe-Post headers that give mail clients a one-click button (RFC 8058). Core adds the headers (request N3).
 - **The one-click request, later, needs nothing but the token.** It is a POST to a public route, takes no cookie, and answers success whether or not the token is known.
-- **The manage link opens a page, not an action.** A GET never unsubscribes, because mail scanners follow links. The page shows the list and one button.
+- **The manage link opens a page, not an action.** A GET never unsubscribes, because mail scanners follow links. The page names the one list and offers two buttons, "Leave this list" and "Stop all mailings". Both are harmless to repeat, which is why a signed token is enough for them.
 - **It takes effect before the next tranche.** A tranche job re-checks subscription state in the statement that hands recipients over.
-- **The page offers the alternatives without getting in the way**: the person's other lists on that side, and "stop all mailings", which switches the topic off.
-- **A token is per subscription and never expires** while the row exists, so a link in a two-year-old email still works.
+- **Anything more needs a preferences link or a sign-in.** Seeing one's other lists, joining one, or rejoining after leaving by mistake reveals or changes more than a signed token may. The page offers "Email me a link to my lists": a preferences link goes to the subscription's own address, works once and for 24 hours, and opens the lists for that subject and side. A signed-in person is sent to My account instead.
+- **The tokens follow Foundations' rules T1 to T4.** The manage link is a signed token (`signing.sign`, purpose `communications.leave`) holding the subscription id and an expiry two years on, and is treated as readable. The export makes fresh ones each time. The confirm and preferences links are random 32-byte tokens stored as a hash with an expiry on the subscription row. Every route declares its token parameter so that it stays out of logs; every landing page sends no-referrer and no-store and gives one answer for a wrong, used or expired link; every link is built with the kit's `siteUrl(path)`.
 
 ## Campaign
 
@@ -114,7 +114,7 @@ The table gives who may make each move and its guard. A draft that was never sch
 | in-review | draft | `communications.campaign.edit` or `.approve` | None. The approver may send it back with a comment |
 | draft or in-review | scheduled | `communications.campaign.send`; from in-review, `communications.campaign.approve` by someone other than the author | The content checks pass. The time is now or later. The sending domain is verified |
 | scheduled | draft | `communications.campaign.send` | Sending has not started |
-| scheduled | preparing | The five-minute task, at `scheduled_for` | Claimed by a conditional write, so two task runs cannot both start it. Not inside quiet hours unless it is a notice |
+| scheduled | preparing | The five-minute task, at `scheduled_for` | The campaign is still scheduled and due: the guard passes for one task run only, so two runs cannot both start it. Not inside quiet hours unless it is a notice |
 | preparing | sending | The prepare job | The snapshot is complete |
 | sending | paused | `communications.campaign.send` | None |
 | paused | sending | `communications.campaign.send` | None |
@@ -172,16 +172,16 @@ flowchart LR
 
 Steps 3 and 4 repeat until every tranche is handed over.
 
-1. **Prepare.** The job resolves the audience page by page and inserts recipient rows, numbering tranches of `communications.sending.tranche-size`. For a mailing: subscribed rows of the list (or the automatic source minus opt-outs), intersected with each include source, minus each exclude source. For a notice: the one source. A recipient is an account or an address, as its subscription or source gave it.
+1. **Prepare.** The job resolves the audience page by page and inserts recipient rows, numbering tranches of `communications.engine.tranche-size`. For a mailing: subscribed rows of the list (or the automatic source minus opt-outs), intersected with each include source, minus each exclude source. For a notice: the one source. A recipient is an account or an address, as its subscription or source gave it.
 2. **Exclude at snapshot.** Each candidate is marked excluded, with its reason, if the topic is off for them or core says the account is unreachable. An address recipient is excluded as duplicate when it equals any verified address of an account recipient, checked with identity's `verifiedAddressesOf`, server side and never shown.
 3. **Hand over.** A tranche job takes one tranche. In one unit of work it re-checks subscription state, passes the whole tranche to core as one set, and marks the rows handed. Both writes are set-wise, from one JSON parameter read with `json_each`, as Foundations requires of every fan-out; nothing loops over recipients. Each recipient carries the dedupe key `communications.campaign:<campaign>:<recipient>`. A tranche is never larger than `core.units.set-rows-limit`. A repeated job does nothing twice: the key and the row state both guard it.
 4. **Throttle (mailings, later).** Tranches are queued with a delay so no more than `communications.sending.per-minute` are handed to core each minute. Core's own job sends each delivery, on the lane the type declares.
-5. **Finish.** The sweep task moves the campaign to sent when nothing is pending, and copies final counts from core's `deliveryCounts` once every delivery has reached an end state or `communications.sending.results-after` has passed.
+5. **Finish.** The sweep task moves the campaign to sent when nothing is pending, and copies final counts from core's `deliveryCounts` once every delivery has reached an end state or `communications.engine.results-after` has passed.
 
 What core does with each notification is core's: the address for the side, the suppression check, the retry, the bounce. A recipient handed over but skipped by core shows in the results under core's reason.
 
 - **Paused (later) means no new tranche starts.** A tranche in flight finishes.
-- **A stuck campaign is found.** The sweep re-queues a tranche whose job died, and the health check reports a campaign in preparing or sending for longer than `communications.sending.stuck-after`.
+- **A stuck campaign is found.** The sweep re-queues a tranche whose job died, and the health check reports a campaign in preparing or sending for longer than `communications.engine.stuck-after`.
 - **The module switched off stops everything.** Scheduled campaigns stay scheduled and do not start. Core already skips deliveries whose type's module is off.
 
 ## Notices

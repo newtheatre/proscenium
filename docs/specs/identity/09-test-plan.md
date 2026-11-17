@@ -46,7 +46,7 @@ Identity is tested mostly at the integration tier, against a real local D1, beca
 | `give only what you hold` | Integration | Role editing and granting both refuse an ability the actor lacks at that scope |
 | `last Owner survives` | Integration | Ending, disabling, merging and erasing, including two concurrent requests |
 | `only an Owner changes an Owner` | Integration |  |
-| `grant is never edited` | Integration | The trigger refuses an update other than setting the end |
+| `grant is never edited` | Integration | The trigger refuses every update and delete on a grant and on a grant's end; ending writes one end row and a second end for the same grant is refused |
 | `expired grant counts for nothing` | Unit and integration | At the instant of expiry, London time, across both clock changes |
 | `pending grant counts for nothing` | Integration | A grant on an unclaimed account allows nothing |
 | `scope does not leak` | Integration | A grant on one production allows nothing on another or at site level |
@@ -68,11 +68,11 @@ Identity is tested mostly at the integration tier, against a real local D1, beca
 
 | Name | Tier | Asserts |
 | --- | --- | --- |
-| `merge misses no reference` | Integration | Built from the registry: seeds a row in every account-referencing column of every enabled module, merges, and finds none pointing at the old account unless declared alias |
-| `merge is all or nothing` | Integration | A failing handler leaves both accounts exactly as they were |
+| `merge misses no reference` | Integration | Built from the registry: seeds a row in every account-referencing column of every enabled module, merges, lets the job finish, and finds none pointing at the old account unless declared alias; before the job runs, every read through the account scope already returns both accounts' rows |
+| `merge is all or nothing` | Integration | Stage one commits whole or not at all. A handler that fails or waits leaves the merge still moving, readers see the whole person meanwhile, and running the job again completes it without moving or listing any row twice |
 | `alias resolves everywhere` | Integration | `canonicalAccount` and every label lookup return the survivor |
 | `merge refuses a tombstone and itself` | Integration |  |
-| `undo restores only what moved` | Integration | Rows written after the merge stay with the survivor |
+| `undo restores only what moved` | Integration | Rows written after the merge stay with the survivor; moves go back before handlers' undo runs; what a handler could not put back is counted and shown |
 | `new account-referencing column must declare its merge rule` | Unit | Schema check; an undeclared column fails the build |
 
 ### Erasure and privacy

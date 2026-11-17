@@ -5,6 +5,7 @@ import type { SQLiteColumnBuilder } from 'drizzle-orm/sqlite-core'
 import { DeclarationError } from './refusal'
 import { ID_PREFIX, newId } from './ids'
 import { nowMs } from './clock'
+import { parseDuration } from './duration'
 
 export type DataClass = 'public' | 'internal' | 'personal' | 'freeText' | 'special' | 'perRow'
 export type Erasure = 'keep' | 'anonymise' | 'redact' | 'clear' | 'retain'
@@ -38,7 +39,11 @@ export interface TableOptions {
   realm: Realm
   subject?: Subject
   /** A duration setting. A scheduled sweep erases or deletes rows older than it. */
-  retention?: string
+  /**
+   * How long rows are kept: a duration setting's key, or a fixed duration `{ fixed: '30d' }` for a
+   * table that holds nothing about a person (subject 'none', no personal, free-text or special column).
+   */
+  retention?: string | { fixed: string }
   appendOnly?: boolean
   onErasure?: 'keep-row' | 'delete-row'
   /** Indexes and other table extras, given the built columns. */
@@ -65,7 +70,7 @@ export const ERASED = { anonymise: 'Former member', redact: '[removed]' } as con
 
 const ALLOWED: Record<DataClass, Erasure[]> = {
   public: ['keep', 'anonymise'],
-  internal: ['keep'],
+  internal: ['keep', 'clear'],
   personal: ['anonymise', 'clear', 'retain'],
   freeText: ['redact', 'clear', 'retain'],
   special: ['clear'],
@@ -141,8 +146,13 @@ export const col = {
   email: (name: string, options: EraseOptions = {}) => tag(email(name), { class: 'personal', helper: 'email', ...options }),
 
   public: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: EraseOptions = {}) => tag(builder, { class: 'public', helper: 'wrapped', ...options }),
-  /** `encrypted: true` seals the value with the core key, as for special data (webhook secrets, push keys). */
-  internal: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: Sealable = {}) => tag(builder, { class: 'internal', helper: 'wrapped', ...options }),
+  /**
+   * `encrypted: true` seals the value with the core key, as for special data (webhook secrets, push keys).
+   * `erase: 'clear'` is for a value that is not personal data but must go when the row is anonymised,
+   * such as a hash of a link token: erasure sets it to null with the row's personal columns, and it is
+   * never in a download and never searched. The column must be nullable.
+   */
+  internal: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: Sealable & { erase?: 'clear' } = {}) => tag(builder, { class: 'internal', helper: 'wrapped', ...options }),
   personal: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: EraseOptions & Sealable = {}) => tag(builder, { class: 'personal', helper: 'wrapped', ...options }),
   freeText: <B extends SQLiteColumnBuilder<any, any, any>>(builder: B, options: EraseOptions = {}) => tag(builder, { class: 'freeText', helper: 'wrapped', ...options }),
   /**
@@ -219,6 +229,20 @@ export function defineTable<TName extends string, TColumns extends Record<string
   for (const c of all) {
     if (c.meta.account?.role === 'subject' && c.meta.account.nullable && unlinked?.account !== c.sql)
       throw new DeclarationError(field('subject'), `the subject column ${c.sql} may be empty: say what happens to rows it cannot link with subject: { account: '${c.sql}', unlinked: 'staff' }`)
+  }
+  const retention = options.retention
+  if (retention !== undefined && typeof retention !== 'string') {
+    if (typeof retention?.fixed !== 'string') throw new DeclarationError(field('retention'), "is a duration setting's key or { fixed: '30d' }")
+    try { parseDuration(retention.fixed) }
+    catch { throw new DeclarationError(field('retention.fixed'), 'is a duration such as 30d or 12h') }
+    if (subject !== 'none' || holdsPersonal) throw new DeclarationError(field('retention'), "a fixed retention is only for a table with subject 'none' and no personal, free-text or special column; anything about a person keeps rows for a setting's duration")
+  }
+  const reachesPerson = subjects.length > 0 || (subject !== undefined && subject !== 'none')
+  for (const [key, builder] of Object.entries(columns)) {
+    const meta = metas[key]!.meta
+    if (meta.class !== 'internal' || meta.erase !== 'clear') continue
+    if ((builder as any).config?.notNull) throw new DeclarationError(field(key), "an internal column with erase: 'clear' is set to null by erasure, so it must be nullable")
+    if (!reachesPerson) throw new DeclarationError(field(key), "erase: 'clear' needs a table whose rows reach a person, so erasure can find them; this table's subject is none")
   }
   if (holdsPersonal && !subjects.length && !subject && !options.retention)
     throw new DeclarationError(field('subject'), 'this table holds personal data but no subject reaches a person and it has no retention. Add a col.account(..., { role: \'subject\' }) column, a subject or a retention setting')

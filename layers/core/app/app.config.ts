@@ -12,8 +12,12 @@ export default defineAppConfig({
     // A select's placeholder is readable text (a filter shows its name there), so it meets 4.5:1.
     select: { slots: { base: 'w-full', placeholder: 'text-muted' } },
     selectMenu: { slots: { base: 'w-full' } },
-    inputDate: { slots: { base: 'w-full' } },
-    inputTime: { slots: { base: 'w-full' } },
+    // An empty part of a date or time (dd, mm) is readable text too, so it meets 4.5:1 as well.
+    inputDate: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted' } },
+    inputTime: { slots: { base: 'w-full', segment: 'data-placeholder:text-muted' } },
+    // A tick box is square whatever the brand's corner radius, so a choice of many never looks like
+    // a choice of one (round is for radio buttons only). A rounder brand can make rounded-sm a circle.
+    checkbox: { slots: { base: 'rounded-[0.1875rem]' } },
     // Tables carry their own frame, so a page needs no wrapping card.
     table: { slots: { root: 'rounded-lg border border-default', thead: 'bg-elevated/50' } },
     // Dialogue actions sit on the right, so a footer takes its buttons directly.

@@ -24,6 +24,9 @@ export default defineNuxtConfig({
   alias: kitAliases(root),
   // Screens that moved to Site administration (R-33): old bookmarks still arrive.
   routeRules: {
+    // The catch-all page of site settings is gone: each group has one page of its own (settings build brief).
+    '/admin/settings': { redirect: { to: '/admin/theatre', statusCode: 301 } },
+    '/console/system/settings': { redirect: { to: '/admin/theatre', statusCode: 301 } },
     '/console/system/email': { redirect: { to: '/admin/email', statusCode: 301 } },
     '/console/system/vocabularies': { redirect: { to: '/admin/vocabularies', statusCode: 301 } },
     '/console/system/vocabularies/**': { redirect: { to: '/admin/vocabularies/**', statusCode: 301 } },

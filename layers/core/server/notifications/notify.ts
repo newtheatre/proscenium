@@ -187,7 +187,7 @@ export async function notify(unit: UnitView, typeKey: string, options: NotifyOpt
     if (delivered.length) {
       const brand = await brandTokens()
       const theatre = await theatreName('')
-      const keepFor = await useSetting('core.notifications.inbox-retention') as number
+      const keepFor = await useSetting('core.delivery.inbox-retention') as number
       unit.insertSet(inboxItems, delivered.map(({ r, i }) => {
         const message = render(type.wording[localeOf(r.accountId)]!, { values: r.values, kinds: type.variables, accent: brand.light.link, theatre })
         return {

@@ -36,6 +36,8 @@ interface SettingView {
 
 const { $api } = useNuxtApp()
 const props = defineProps<{
+  /** The page of settings to draw, by id (`core.sign-in`, `core.advanced`). The older module and scope props are going. */
+  page?: string
   /** The module whose settings these are (its own page in the console). Leave out for the site page. */
   module?: string
   /** 'site' draws every setting declared with scope 'site', whichever module declares it (Site administration). */
@@ -44,13 +46,18 @@ const props = defineProps<{
   trail?: { label: string, to: string }[]
   /** A setting to scroll into view and highlight, from settings search. */
   highlight?: string
+  /** Only settings whose key starts with one of these, for a page of one subject (Sign-in). */
+  only?: string[]
 }>()
 
 const { t } = useT()
 const toast = useToast()
 const { confirm } = useConfirm()
-const site = props.scope === 'site'
-const { data, status, error, refresh } = await useAPI<{ module: string | null, settings: SettingView[] }>('/api/core/settings', { query: site ? { scope: 'site' } : { module: props.module, scope: 'module' }, key: site ? 'core:settings:site' : `core:settings:${props.module}` })
+const site = props.scope === 'site' || !!props.page
+const { data, status, error, refresh } = await useAPI<{ module: string | null, settings: SettingView[] }>('/api/core/settings', {
+  query: props.page ? { page: props.page } : site ? { scope: 'site' } : { module: props.module, scope: 'module' },
+  key: props.page ? `core:settings:page:${props.page}` : site ? 'core:settings:site' : `core:settings:${props.module}`,
+})
 
 // A module whose console page leaves some settings to Site administration says so, when the viewer may open them.
 const { data: alsoSite } = site || !props.module
@@ -68,8 +75,11 @@ const resets = reactive<Record<string, boolean>>({})
 const problems = reactive<Record<string, string>>({})
 const saving = ref<string | null>(null)
 
+// The settings this page draws: all of them, or those of its subject.
+const shown = computed(() => (data.value?.settings ?? []).filter(s => !props.only || props.only.some(prefix => s.key.startsWith(prefix))))
+
 function load() {
-  for (const s of data.value?.settings ?? []) {
+  for (const s of shown.value) {
     draft[s.key] = s.sensitive ? '' : toControl(s)
     resets[s.key] = false
   }
@@ -79,7 +89,7 @@ watch(data, load, { immediate: true })
 const sections = computed(() => {
   // Sections are a module's own groups; on the site page the same group of two modules stays apart.
   const groups = new Map<string, SettingView[]>()
-  for (const s of data.value?.settings ?? []) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
+  for (const s of shown.value) groups.set(`${s.module}:${s.group}`, [...(groups.get(`${s.module}:${s.group}`) ?? []), s])
   return [...groups].map(([id, settings]) => ({ id, module: settings[0]!.module, group: settings[0]!.group, settings }))
 })
 
