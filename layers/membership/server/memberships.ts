@@ -92,6 +92,8 @@ export interface ActiveInput {
   endsOn?: string | null
   addedBy?: string | null
   note?: string | null
+  /** The membership this renews (R1). */
+  renewsId?: string | null
 }
 
 /**
@@ -104,10 +106,10 @@ export async function writeActive(unit: UnitView, input: ActiveInput): Promise<{
   const id = newId('mshp')
   const endsOn = input.endsOn !== undefined ? input.endsOn : endsOnFor(input.scheme, input.startsOn, input.count)
   unit.add({
-    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, starts_on, ends_on,
+    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, renews_id, starts_on, ends_on,
             needs_verification, needs_approval, needs_payment, activated_at, added_by, note, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?)`,
-    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.origin, input.startsOn, endsOn, at, input.addedBy ?? null, input.note ?? null, at, at],
+          VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, 0, 0, 0, ?, ?, ?, ?, ?)`,
+    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.origin, input.renewsId ?? null, input.startsOn, endsOn, at, input.addedBy ?? null, input.note ?? null, at, at],
   }).expect(1)
   writeNumber(unit, input.accountId, input.startsOn, at)
   unit.announce('membership.membership.started', { membershipId: id, schemeId: input.scheme.id, accountId: input.accountId }, { record: ['membership.membership', id] })
@@ -127,13 +129,13 @@ export function writeNumber(unit: UnitView, accountId: string, startsOn: string,
 }
 
 /** An application waiting on staff to check it (V2, V3): pending, with verification outstanding. */
-export function writePending(unit: UnitView, input: { scheme: Scheme, accountId: string, lengthOptionId: string | null }): string {
+export function writePending(unit: UnitView, input: { scheme: Scheme, accountId: string, lengthOptionId: string | null, renewsId?: string | null }): string {
   const at = nowMs()
   const id = newId('mshp')
   unit.add({
-    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, needs_verification, needs_approval, needs_payment, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 'pending', 'applied', 1, 0, 0, ?, ?)`,
-    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, at, at],
+    sql: `INSERT INTO membership_memberships (id, account_id, scheme_id, length_option_id, realm, state, origin, renews_id, needs_verification, needs_approval, needs_payment, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, 1, 0, 0, ?, ?)`,
+    params: [id, input.accountId, input.scheme.id, input.lengthOptionId, input.scheme.side, input.renewsId ? 'renewed' : 'applied', input.renewsId ?? null, at, at],
   }).expect(1)
   return id
 }
