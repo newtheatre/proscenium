@@ -66,7 +66,11 @@ export type RefundAnswer
 /** What the screen needs next after `start`. */
 export type NextStep
   = | { kind: 'redirect', url: string }
-    | { kind: 'client-secret', secret: string }
+    /**
+     * Take the card in the provider's own form on this page (PaymentsCardForm), with the secret for
+     * this one payment and the key that lets the page load the form. Neither can move money alone.
+     */
+    | { kind: 'client-secret', provider: string, secret: string, publishableKey: string }
     | { kind: 'waiting-for-reader' }
     /** Open this address on the device, which hands the payment to the provider's own app. */
     | { kind: 'handoff', url: string }
@@ -82,6 +86,12 @@ export interface PaymentProvider {
   webhookSecret?: string
   /** Begin a payment. Not given for an attested provider: a person records the answer instead. */
   start?: (attempt: ProviderAttempt) => Promise<{ next: NextStep, providerRef?: string, answer?: ProviderAnswer }>
+  /**
+   * For a payment still waiting on the person (a card form not yet filled in, or a card declined),
+   * the step to show them again for the same payment; null when it is no longer theirs to finish. A
+   * page that is reloaded, or a buyer back from a bank that said no, picks the payment up this way.
+   */
+  resume?: (attempt: ProviderAttempt) => Promise<NextStep | null>
   /** Ask the provider for the truth now. Required unless attested. */
   status?: (attempt: ProviderAttempt) => Promise<ProviderAnswer | 'unknown'>
   /**
