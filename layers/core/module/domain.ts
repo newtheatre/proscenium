@@ -247,7 +247,7 @@ export const contributes = {
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
   'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
-  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
+  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
