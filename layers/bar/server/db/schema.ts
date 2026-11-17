@@ -79,6 +79,9 @@ export const variants = defineTable('bar_variants', {
   productId: col.ref('bar_products'),
   name: col.public(text('name').notNull()),
   barcode: col.internal(text('barcode')),
+  // The measure a product gives when it is picked as a mixer ("Can be used as a mixer"). Hidden from
+  // the till's grid; the Mixer choice offers exactly these.
+  mixerMeasure: col.internal(integer('mixer_measure', { mode: 'boolean' }).notNull().default(false)),
   position: col.internal(integer('position').notNull()),
   active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
   createdAt: col.createdAt(),
@@ -90,7 +93,78 @@ export const variants = defineTable('bar_variants', {
   extra: t => [
     uniqueIndex('bar_variants_name').on(t.productId, sql`lower(${t.name})`),
     uniqueIndex('bar_variants_barcode').on(t.barcode).where(sql`barcode IS NOT NULL`),
+    uniqueIndex('bar_variants_one_mixer').on(t.productId).where(sql`mixer_measure = 1`),
   ],
+})
+
+export const CHOICE_SOURCES = ['options', 'mixers'] as const
+export const MIXER_PRICING = ['included', 'fixed', 'own_price'] as const
+
+/**
+ * A choice made on a product at the till, set up once and attached to any number of products: Spirit,
+ * Mixer, Milk. Its options are listed by hand, or (source mixers) are every active product that can be
+ * used as a mixer, each by its mixer measure, priced by the group's rule.
+ */
+export const choiceGroups = defineTable('bar_choice_groups', {
+  id: col.id(),
+  name: col.internal(text('name').notNull()),
+  source: col.internal(text('source', { enum: CHOICE_SOURCES }).notNull()),
+  required: col.internal(integer('required', { mode: 'boolean' }).notNull().default(true)),
+  maxPicks: col.internal(integer('max_picks').notNull().default(1)),
+  // The usual pick, already chosen at the till: an option id, or a mixer measure's variant id.
+  defaultKey: col.internal(text('default_key')),
+  mixerPricing: col.internal(text('mixer_pricing', { enum: MIXER_PRICING })),
+  mixerFixedMinor: col.minor('mixer_fixed_minor'),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bchg',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_choice_groups_name').on(sql`lower(${t.name})`),
+    check('bar_choice_groups_source', sql`${t.source} IN (${inList(CHOICE_SOURCES)})`),
+    check('bar_choice_groups_picks', sql`${t.maxPicks} >= 1`),
+    check('bar_choice_groups_mixers', sql`(${t.source} = 'mixers') = (${t.mixerPricing} IS NOT NULL)`),
+    check('bar_choice_groups_fixed', sql`(${t.mixerPricing} IS 'fixed') = (${t.mixerFixedMinor} IS NOT NULL) AND (${t.mixerFixedMinor} IS NULL OR ${t.mixerFixedMinor} >= 0)`),
+  ],
+})
+
+/** One option of a group listed by hand, with what it adds to the price. */
+export const choiceOptions = defineTable('bar_choice_options', {
+  id: col.id(),
+  groupId: col.ref('bar_choice_groups'),
+  name: col.public(text('name').notNull()),
+  deltaMinor: col.minor('delta_minor').notNull().default(0),
+  // Picking it makes the line need the age check (a whisky shot in a hot chocolate).
+  ageRestricted: col.internal(integer('age_restricted', { mode: 'boolean' }).notNull().default(false)),
+  position: col.internal(integer('position').notNull()),
+  active: col.internal(integer('active', { mode: 'boolean' }).notNull().default(true)),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'bcho',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_choice_options_name').on(t.groupId, sql`lower(${t.name})`),
+    check('bar_choice_options_delta', sql`${t.deltaMinor} >= 0`),
+  ],
+})
+
+/** A group attached to a product, in the order the till asks them. */
+export const productChoiceGroups = defineTable('bar_product_choice_groups', {
+  id: col.id(),
+  productId: col.ref('bar_products'),
+  groupId: col.ref('bar_choice_groups'),
+  position: col.internal(integer('position').notNull()),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bpcg',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [uniqueIndex('bar_product_choice_groups_pair').on(t.productId, t.groupId)],
 })
 
 /**
@@ -229,6 +303,30 @@ export const saleLines = defineTable('bar_sale_lines', {
   ],
 })
 
+/**
+ * What was picked on a sale line: a hand-listed option, or the mixer measure of another product, with
+ * the label and the amount it added fixed when the line was written. Goes with its line.
+ */
+export const saleLineChoices = defineTable('bar_sale_line_choices', {
+  id: col.id(),
+  saleLineId: col.ref('bar_sale_lines'),
+  groupId: col.ref('bar_choice_groups'),
+  optionId: col.ref('bar_choice_options', { nullable: true }),
+  mixerVariantId: col.ref('bar_variants', { nullable: true }),
+  label: col.internal(text('label').notNull()),
+  deltaMinor: col.minor('delta_minor').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bslc',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    index('bar_sale_line_choices_line').on(t.saleLineId),
+    check('bar_sale_line_choices_one', sql`(${t.optionId} IS NULL) <> (${t.mixerVariantId} IS NULL)`),
+    check('bar_sale_line_choices_delta', sql`${t.deltaMinor} >= 0`),
+  ],
+})
+
 export const REVERSAL_STATES = ['requested', 'succeeded', 'failed'] as const
 export const STOCK_OUTCOMES = ['returned', 'wasted', 'none'] as const
 
@@ -264,6 +362,8 @@ export const saleReversals = defineTable('bar_sale_reversals', {
 })
 
 export const AGE_CHECK_OUTCOMES = ['not_needed', 'id_checked', 'self_attested', 'refused'] as const
+export const ID_TYPES = ['passport', 'driving_licence', 'pass_card', 'other_photo'] as const
+export const REFUSAL_SCOPES = ['restricted', 'all'] as const
 export const DESCRIPTION_MAX = 120 // not-policy: the register's description field, fixed by the specification
 
 /**
@@ -281,6 +381,10 @@ export const ageChecks = defineTable('bar_age_checks', {
   // A refusal made while a basket carried on: that basket's key, which its sale takes when payment
   // starts, so the register can show the sale the rest of the basket became.
   basketKey: col.internal(text('basket_key')),
+  // Which ID was shown, when the outcome is id_checked and the seller said.
+  idType: col.internal(text('id_type', { enum: ID_TYPES })),
+  // For a refusal with a basket: whether only the restricted drinks or the whole sale was refused.
+  refusalScope: col.internal(text('refusal_scope', { enum: REFUSAL_SCOPES })),
   // What the person looked like, never who they are; only where the theatre has switched it on.
   description: col.freeText(text('description'), { erase: 'clear' }),
   by: col.account('by', { role: 'actor', onMerge: 'alias' }),
@@ -324,4 +428,4 @@ export const registerReviews = defineTable('bar_register_reviews', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, prices, outlets, openings, sales, saleLines, saleReversals, ageChecks, registerReviews }
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, prices, outlets, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews }

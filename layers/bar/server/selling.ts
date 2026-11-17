@@ -7,22 +7,32 @@ import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, requireAbility, useContext, useSetting, type UnitView } from '#kit'
 import type { DeskContext } from '#modules/payments'
 import { ageCheckSettings, recordSaleCheck } from './age-checks'
-import { pricesFor } from './catalogue'
+import { priceLists, pricesFor } from './catalogue'
+import { choiceGroups, groupsByProduct, pickInput, priceGroups, resolvePicks, type Picked } from './choices'
+import { lessPercent } from './pricing'
 import { ensureOpening } from './openings'
-import { saleLines } from './db/schema'
+import { ID_TYPES, saleLineChoices, saleLines } from './db/schema'
 
 const MAX_LINES = 50 // not-policy: one basket's lines, far beyond a round of drinks
 const MAX_QUANTITY = 99 // not-policy: one line's quantity
+const MAX_PICKS = 10 // not-policy: picks on one line
 
 export const panelInput = z.object({
   outletId: z.string().min(1).max(64), // not-policy: an id's length
   priceListId: z.string().min(1).max(64).optional(), // not-policy: an id's length
   // Made on the device for one basket; a payment tried again for the same basket reuses its sale.
   clientKey: z.string().min(8).max(64), // not-policy: a device key's length
-  lines: z.array(z.object({ variantId: z.string().min(1).max(64), quantity: z.number().int().min(1).max(MAX_QUANTITY) }).strict()).min(1).max(MAX_LINES), // not-policy: an id's length
+  lines: z.array(z.object({
+    variantId: z.string().min(1).max(64), // not-policy: an id's length
+    quantity: z.number().int().min(1).max(MAX_QUANTITY),
+    // What was picked on the line (a mixer, a premium gin). Different picks make different lines.
+    choices: z.array(pickInput).max(MAX_PICKS).optional(),
+  }).strict()).min(1).max(MAX_LINES),
   expectedTotalMinor: z.number().int().min(0),
   // The seller's answer to the age prompt, when a line needs one. A refusal is recorded on its own.
   ageCheck: z.enum(['not_needed', 'id_checked']).optional(),
+  // Which ID was shown, when the seller says.
+  idType: z.enum(ID_TYPES).optional(),
 }).strict()
 export type PanelInput = z.infer<typeof panelInput>
 
@@ -33,7 +43,7 @@ function parse(value: unknown): PanelInput {
 }
 
 interface Outlet { id: string, name: string, price_list_id: string }
-interface Priced { variantId: string, quantity: number, label: string, unitMinor: number, amountMinor: number, priceId: string, categoryId: string, ageRestricted: boolean }
+interface Priced { variantId: string, quantity: number, label: string, unitMinor: number, amountMinor: number, priceId: string, categoryId: string, ageRestricted: boolean, choices: Picked[] }
 
 async function outletFor(id: string): Promise<Outlet> {
   const outlet = await first<Outlet>('SELECT id, name, price_list_id FROM bar_outlets WHERE id = ? AND active = 1', id)
@@ -49,26 +59,53 @@ async function priced(input: PanelInput): Promise<{ outlet: Outlet, priceListId:
     // Choosing another list is the later story BAR-16; only the outlet's own is sold from for now.
     refuse('bar.price-list.not-here', 'This outlet sells from its own price list.', { status: 409 })
   }
-  const merged = new Map<string, number>()
-  for (const l of input.lines) merged.set(l.variantId, (merged.get(l.variantId) ?? 0) + l.quantity)
-  const ids = [...merged.keys()]
-  const named = await all<{ id: string, variant: string, product: string, category_id: string, age_restricted: number, sizes: number }>(
-    `SELECT v.id, v.name AS variant, p.name AS product, p.category_id, p.age_restricted,
-            (SELECT count(*) FROM bar_variants w WHERE w.product_id = p.id AND w.active = 1) AS sizes
+  // Lines with the same size and the same picks are one line.
+  const merged = new Map<string, { variantId: string, quantity: number, choices: PanelInput['lines'][number]['choices'] }>()
+  for (const l of input.lines) {
+    const key = [l.variantId, ...(l.choices ?? []).map(c => `${c.groupId}:${c.key}`).sort()].join('|')
+    const at = merged.get(key)
+    if (at) at.quantity += l.quantity
+    else merged.set(key, { variantId: l.variantId, quantity: l.quantity, choices: l.choices })
+  }
+  const ids = [...new Set([...merged.values()].map(m => m.variantId))]
+  const named = await all<{ id: string, variant: string, product: string, product_id: string, category_id: string, age_restricted: number, sizes: number }>(
+    `SELECT v.id, v.name AS variant, p.name AS product, p.id AS product_id, p.category_id, p.age_restricted,
+            (SELECT count(*) FROM bar_variants w WHERE w.product_id = p.id AND w.active = 1 AND w.mixer_measure = 0) AS sizes
        FROM bar_variants v JOIN bar_products p ON p.id = v.product_id JOIN bar_categories c ON c.id = p.category_id
-      WHERE v.id IN (SELECT value FROM json_each(?)) AND v.active = 1 AND p.active = 1 AND c.active = 1`,
+      WHERE v.id IN (SELECT value FROM json_each(?)) AND v.active = 1 AND v.mixer_measure = 0 AND p.active = 1 AND c.active = 1`,
     JSON.stringify(ids),
   )
   const byId = new Map(named.map(n => [n.id, n]))
-  const prices = await pricesFor(ids, priceListId)
-  const lines = ids.map((variantId): Priced => {
-    const n = byId.get(variantId)
+  const attached = await groupsByProduct([...new Set(named.map(n => n.product_id))])
+  const anyChoices = [...merged.values()].some(m => m.choices?.length) || [...attached.values()].some(g => g.length)
+  // A percentage list rounds once, on the whole unit price: the size and its picks at Standard, less the percentage.
+  const list = (await priceLists()).find(l => l.id === priceListId)
+  const percent = list && !list.standard && list.percentOff !== null ? list.percentOff : null
+  const baseListId = percent !== null ? (await priceLists()).find(l => l.standard)!.id : priceListId
+  const groups = new Map<string, Awaited<ReturnType<typeof choiceGroups>>[number]>()
+  if (anyChoices) {
+    const all = await choiceGroups({ activeOnly: true })
+    const mixerIds = all.filter(g => g.source === 'mixers').flatMap(g => g.options.map(o => o.key))
+    const mixerPrices = mixerIds.length ? await pricesFor(mixerIds, baseListId) : new Map()
+    for (const g of priceGroups(all, v => mixerPrices.get(v)?.amountMinor ?? null)) groups.set(g.id, g)
+  }
+  const prices = await pricesFor(ids, baseListId)
+  const lines = [...merged.values()].map((m): Priced => {
+    const n = byId.get(m.variantId)
     if (!n) refuse('bar.variant.not-on-sale', 'Something in the basket is no longer on sale.', { status: 409, remedy: 'Take it out and add it again.' })
-    const label = n!.sizes === 1 && n!.variant === 'Each' ? n!.product : `${n!.product}, ${n!.variant}`
-    const price = prices.get(variantId)
-    if (!price) refuse('bar.variant.no-price', `${label} has no price on this list.`, { status: 409, remedy: 'Take it out, or ask for a price to be set.' })
-    const quantity = merged.get(variantId)!
-    return { variantId, quantity, label, unitMinor: price!.amountMinor, amountMinor: price!.amountMinor * quantity, priceId: price!.priceId, categoryId: n!.category_id, ageRestricted: !!n!.age_restricted }
+    const sized = n!.sizes === 1 && n!.variant === 'Each' ? n!.product : `${n!.product}, ${n!.variant}`
+    const price = prices.get(m.variantId)
+    if (!price) refuse('bar.variant.no-price', `${sized} has no price on this list.`, { status: 409, remedy: 'Take it out, or ask for a price to be set.' })
+    const choices = resolvePicks(sized, attached.get(n!.product_id) ?? [], groups, m.choices ?? [])
+    const before = price!.amountMinor + choices.reduce((s, c) => s + c.deltaMinor, 0)
+    const unitMinor = percent !== null ? lessPercent(before, percent) : before
+    const label = choices.length ? `${sized} · ${choices.map(c => c.label).join(', ')}` : sized
+    return {
+      variantId: m.variantId, quantity: m.quantity, label, unitMinor, amountMinor: unitMinor * m.quantity, priceId: price!.priceId, categoryId: n!.category_id,
+      // The line needs the age check when the product does, or anything picked on it does.
+      ageRestricted: !!n!.age_restricted || choices.some(c => c.ageRestricted),
+      choices,
+    }
   })
   return { outlet, priceListId, lines, totalMinor: lines.reduce((s, l) => s + l.amountMinor, 0) }
 }
@@ -105,6 +142,7 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   if (existing) {
     if (existing.state !== 'open') refuse(SALE_GONE.code, SALE_GONE.reason, { status: 409, remedy: SALE_GONE.remedy })
     saleId = existing.id
+    unit.add({ sql: 'DELETE FROM bar_sale_line_choices WHERE sale_line_id IN (SELECT id FROM bar_sale_lines WHERE sale_id = ?)', params: [saleId] })
     unit.add({ sql: 'DELETE FROM bar_sale_lines WHERE sale_id = ?', params: [saleId] })
   }
   else {
@@ -117,13 +155,15 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
       params: [saleId, await reference(), priceListId, await useSetting('core.locale.currency') as string, actor.accountId, input.clientKey, at, at, outlet.id],
     }).expect(1, SALE_GONE)
   }
-  unit.insertSet(saleLines, lines.map(l => ({ saleId, variantId: l.variantId, priceId: l.priceId, quantity: l.quantity, unitMinor: l.unitMinor, discountMinor: 0, amountMinor: l.amountMinor })))
+  const lineIds = unit.insertSet(saleLines, lines.map(l => ({ saleId, variantId: l.variantId, priceId: l.priceId, quantity: l.quantity, unitMinor: l.unitMinor, discountMinor: 0, amountMinor: l.amountMinor })))
+  const picks = lines.flatMap((l, i) => l.choices.map(c => ({ saleLineId: lineIds[i]!, groupId: c.groupId, optionId: c.optionId, mixerVariantId: c.mixerVariantId, label: c.label, deltaMinor: c.deltaMinor })))
+  if (picks.length) unit.insertSet(saleLineChoices, picks)
   unit.add({
     sql: "UPDATE bar_sales SET state = 'awaiting_payment', updated_at = ? WHERE id = ? AND state = 'open' AND total_minor = ?",
     params: [at, saleId, totalMinor],
   }).expect(1, SALE_GONE)
   // Once per sale: a payment tried again for the same basket does not log a second check.
-  if (restricted && checks.enabled) recordSaleCheck(unit, saleId, input.ageCheck!, restricted.variantId, actor.accountId ?? null, at)
+  if (restricted && checks.enabled) recordSaleCheck(unit, saleId, input.ageCheck!, restricted.variantId, actor.accountId ?? null, at, input.ageCheck === 'id_checked' ? input.idType ?? null : null)
   unit.audit({ action: 'create', record: ['bar.sale', saleId], detail: { outletId: outlet.id, totalMinor } })
   return { owner: { module: 'bar', record: saleId }, amountMinor: totalMinor }
 }

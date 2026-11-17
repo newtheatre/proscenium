@@ -53,7 +53,7 @@ export async function saleByReference(reference: string): Promise<SaleDetail | n
   )
   if (!sale) return null
   const lines = await all<Omit<SaleLine, 'reversals'>>(
-    `SELECT l.id, ${LABEL} AS label, l.quantity, l.unit_minor AS unitMinor, l.amount_minor AS amountMinor,
+    `SELECT l.id, ${LABEL} || coalesce(' · ' || (SELECT group_concat(c.label, ', ') FROM bar_sale_line_choices c WHERE c.sale_line_id = l.id), '') AS label, l.quantity, l.unit_minor AS unitMinor, l.amount_minor AS amountMinor,
             coalesce((SELECT sum(r.quantity) FROM bar_sale_reversals r WHERE r.sale_line_id = l.id AND r.state <> 'failed'), 0) AS reversedQuantity,
             coalesce((SELECT sum(r.amount_minor) FROM bar_sale_reversals r WHERE r.sale_line_id = l.id AND r.state <> 'failed'), 0) AS reversedMinor
        FROM bar_sale_lines l JOIN bar_variants v ON v.id = l.variant_id JOIN bar_products p ON p.id = v.product_id

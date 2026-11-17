@@ -115,6 +115,7 @@ export default defineModule({
       { id: 'bar.outlet', file: 'outlet' },
       { id: 'bar.product', file: 'product' },
       { id: 'bar.price-list', file: 'price-list' },
+      { id: 'bar.choice-group', file: 'choice-group' },
       { id: 'bar.sale', file: 'sale' },
     ],
     // The console's Bar group: set-up screens first; selling arrives with the till panel.

@@ -4,6 +4,7 @@
 import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
 import { priceOn, nextChange, type ListRule, type PriceRow } from './pricing'
 import type { OUTLET_KINDS } from './db/schema'
+import { choiceGroups, groupsByProduct, priceGroups, type ChoiceGroup } from './choices'
 
 export const STANDARD = 'standard'
 
@@ -31,8 +32,8 @@ const currency = async () => await useSetting('core.locale.currency') as string
 
 export interface PriceList { id: string, name: string, standard: boolean, restricted: boolean, fallsBack: boolean, percentOff: number | null, active: boolean }
 export interface VariantPrice { listId: string, amountMinor: number | null, from: 'list' | 'standard' | 'percent' | null, next: { amountMinor: number | null, from: number } | null }
-export interface Variant { id: string, name: string, barcode: string | null, position: number, active: boolean, prices: VariantPrice[] }
-export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, position: number, active: boolean, variants: Variant[] }
+export interface Variant { id: string, name: string, barcode: string | null, mixerMeasure: boolean, position: number, active: boolean, prices: VariantPrice[] }
+export interface Product { id: string, categoryId: string, name: string, ageRestricted: boolean, position: number, active: boolean, groupIds: string[], variants: Variant[] }
 export interface Category { id: string, name: string, position: number, colour: string | null, active: boolean, products: Product[] }
 
 interface ListRow { id: string, name: string, system_key: string | null, restricted: number, falls_back: number, percent_off: number | null, active: number }
@@ -57,7 +58,8 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
   const active = options.activeOnly ? 'WHERE active = 1' : ''
   const cats = await all<{ id: string, name: string, position: number, colour: string | null, active: number }>(`SELECT id, name, position, colour, active FROM bar_categories ${active} ORDER BY position, lower(name), id`)
   const prods = await all<{ id: string, category_id: string, name: string, age_restricted: number, position: number, active: number }>(`SELECT id, category_id, name, age_restricted, position, active FROM bar_products ${active} ORDER BY position, lower(name), id`)
-  const vars = await all<{ id: string, product_id: string, name: string, barcode: string | null, position: number, active: number }>(`SELECT id, product_id, name, barcode, position, active FROM bar_variants ${active} ORDER BY position, id`)
+  const vars = await all<{ id: string, product_id: string, name: string, barcode: string | null, mixer_measure: number, position: number, active: number }>(`SELECT id, product_id, name, barcode, mixer_measure, position, active FROM bar_variants ${active} ORDER BY position, id`)
+  const attached = await groupsByProduct()
   const lists = await priceLists()
   const std = lists.find(l => l.standard)?.id ?? ''
   const rows = await priceRows()
@@ -70,13 +72,13 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
       return { listId: l.id, amountMinor: priced?.amountMinor ?? null, from: priced?.from ?? null, next: next ? { amountMinor: next.amountMinor, from: next.effectiveFrom } : null }
     })
     const list = variantsOf.get(v.product_id) ?? []
-    list.push({ id: v.id, name: v.name, barcode: v.barcode, position: v.position, active: !!v.active, prices })
+    list.push({ id: v.id, name: v.name, barcode: v.barcode, mixerMeasure: !!v.mixer_measure, position: v.position, active: !!v.active, prices })
     variantsOf.set(v.product_id, list)
   }
   const productsOf = new Map<string, Product[]>()
   for (const p of prods) {
     const list = productsOf.get(p.category_id) ?? []
-    list.push({ id: p.id, categoryId: p.category_id, name: p.name, ageRestricted: !!p.age_restricted, position: p.position, active: !!p.active, variants: variantsOf.get(p.id) ?? [] })
+    list.push({ id: p.id, categoryId: p.category_id, name: p.name, ageRestricted: !!p.age_restricted, position: p.position, active: !!p.active, groupIds: attached.get(p.id) ?? [], variants: variantsOf.get(p.id) ?? [] })
     productsOf.set(p.category_id, list)
   }
   return {
@@ -86,8 +88,8 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
   }
 }
 
-export interface MenuItem { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, priceId: string }
-export interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, currency: string, categories: { id: string, name: string, colour: string | null, items: MenuItem[] }[] }
+export interface MenuItem { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, priceId: string, groupIds: string[], baseMinor: number }
+export interface Menu { outletId: string, outlet: string, priceListId: string, priceList: string, percentOff: number | null, currency: string, categories: { id: string, name: string, colour: string | null, items: MenuItem[] }[], groups: ChoiceGroup[] }
 
 /**
  * What an outlet sells, at a list's prices (the outlet's own when none is named): every active
@@ -100,6 +102,8 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
   const list = lists.find(l => l.id === (priceListId ?? outlet!.price_list_id) && l.active)
   if (!list) refuse('bar.price-list.unknown', 'That price list is not in use.', { status: 404 })
   const std = lists.find(l => l.standard)?.id ?? ''
+  const standardList = lists.find(l => l.standard)
+  const percent = !list!.standard && list!.percentOff !== null
   const { categories } = await catalogue({ activeOnly: true })
   const rows = await priceRows()
   const at = nowMs()
@@ -108,16 +112,27 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
     outlet: outlet!.name,
     priceListId: list!.id,
     priceList: list!.name,
+    percentOff: list!.standard ? null : list!.percentOff,
     currency: await currency(),
     categories: categories.map(c => ({
       id: c.id,
       name: c.name,
       colour: c.colour,
-      items: c.products.flatMap(p => p.variants.flatMap((v) => {
+      // A mixer measure is never on the grid: the Mixer choice offers it.
+      items: c.products.flatMap(p => p.variants.filter(v => !v.mixerMeasure).flatMap((v) => {
         const priced = priceOn(rows, v.id, rule(list!), std, at)
-        return priced ? [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId }] : []
+        if (!priced) return []
+        // The price the picks are added to: Standard's on a percentage list, which then takes its percentage off the whole.
+        const base = percent ? priceOn(rows, v.id, rule(standardList!), std, at)?.amountMinor ?? priced.amountMinor : priced.amountMinor
+        return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base }]
       })),
     })).filter(c => c.items.length),
+    // Each option with what it adds, before any percentage. A line's unit price is its baseMinor plus
+    // its picks, less percentOff when set, rounded once (pricing's lessPercent): the server's sum.
+    groups: priceGroups(await choiceGroups({ activeOnly: true }), (variantId) => {
+      const priced = priceOn(rows, variantId, rule(percent ? standardList! : list!), std, at)
+      return priced ? priced.amountMinor : null
+    }),
   }
 }
 
