@@ -37,6 +37,8 @@ interface SettingView {
   min?: number | string
   max?: number | string
   maxLength?: number
+  periodMin?: string
+  periodMax?: string
   options?: string[]
   /** Where a choice's options are standard codes from one of the kit's lists, which list. */
   catalogue?: CatalogueName | null
@@ -208,7 +210,18 @@ function editorOf(s: SettingView) {
   return typeof component === 'string' ? null : component
 }
 const editors = computed(() => Object.fromEntries(shown.value.filter(s => s.kind === 'custom').map(s => [s.key, editorOf(s)])))
-const defaultText = (s: SettingView) => controlText(s.kind, toControl(s, s.default), words())
+/** The default as the control shows it: a choice by its label, and nothing as "not set" rather than a blank. */
+function defaultText(s: SettingView): string {
+  const value = s.default
+  if (value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length)) return t('core.settings-page.not-set')
+  const items = itemsOf(s)
+  if (items.length) {
+    const label = (v: unknown) => items.find(i => i.value === v)?.label ?? String(v)
+    if (Array.isArray(value)) return value.map(label).join(', ')
+    return label(value)
+  }
+  return controlText(s.kind, toControl(s, value), words()) || t('core.settings-page.not-set')
+}
 const rate = (s: SettingView) => draft[s.key] as RateControl
 function onRate(s: SettingView, part: Partial<RateControl>) {
   onEdit(s, { ...rate(s), ...part })
@@ -378,6 +391,8 @@ onMounted(() => {
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
                   <DurationInput
                     :model-value="rate(s).per"
+                    :min="s.periodMin"
+                    :max="s.periodMax"
                     :disabled="!s.canChange"
                     :label="t('core.settings-page.rate-period', { setting: t(s.labelKey) })"
                     @update:model-value="onRate(s, { per: $event ?? undefined })"
