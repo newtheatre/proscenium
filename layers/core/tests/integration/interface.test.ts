@@ -205,16 +205,15 @@ describe("core's settings", () => {
   it('show in the settings window only where they belong: the cog on a page opens that page\'s tabs', async () => {
     type Window = { name: string, tabs: { id: string, to: string }[] }
     const window = async (scope: string, actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', `/api/core/settings-window?for=${scope}`, { actor })).json()) as Window
-    const everything = person(['core.programme.configure', 'core.identity-settings.manage', 'core.season.manage', 'core.closure.manage'])
-    // Productions: the programme's settings and seasons; the calendar: the programme's settings and closures.
-    expect(await window('core.productions', everything)).toEqual({ name: 'core.navigation.groups.programme.label', tabs: [expect.objectContaining({ to: '/admin/modules/core' }), expect.objectContaining({ to: '/admin/modules/core/seasons' })] })
-    expect((await window('core.calendar', everything)).tabs.map(t => t.to)).toEqual(['/admin/modules/core', '/admin/modules/core/closures'])
+    const everything = person(['core.programme.configure', 'core.identity-settings.manage', 'core.season.manage', 'core.closure.manage', 'core.venue.manage'])
+    // Productions: the programme's settings, seasons and venues; the calendar: the programme's settings, venues and closures.
+    expect(await window('core.productions', everything)).toEqual({ name: 'core.navigation.groups.programme.label', tabs: [expect.objectContaining({ to: '/admin/modules/core' }), expect.objectContaining({ to: '/admin/modules/core/seasons' }), expect.objectContaining({ to: '/admin/modules/core/venues' })] })
+    expect((await window('core.calendar', everything)).tabs.map(t => t.to)).toEqual(['/admin/modules/core', '/admin/modules/core/venues', '/admin/modules/core/closures'])
     expect((await window('core.people', everything)).tabs.map(t => t.to)).toEqual(['/admin/modules/core/people'])
-    expect((await window('core.venues', everything)).tabs).toEqual([])
     // A module that names nowhere shows all its tabs on its own pages, and is named after itself.
     expect(await window('gallery.list', staff())).toEqual({ name: 'gallery.module.name', tabs: [expect.objectContaining({ to: '/admin/modules/gallery' })] })
     // A module id is every tab of that module, for an Admin address opened from the console.
-    expect((await window('core', everything)).tabs.map(t => t.to)).toEqual(['/admin/modules/core', '/admin/modules/core/people', '/admin/modules/core/seasons', '/admin/modules/core/closures'])
+    expect((await window('core', everything)).tabs.map(t => t.to)).toEqual(['/admin/modules/core', '/admin/modules/core/people', '/admin/modules/core/seasons', '/admin/modules/core/venues', '/admin/modules/core/closures'])
     expect((await call(handle, 'GET', '/api/core/settings-window?for=nothing.here', { actor: everything })).status).toBe(404)
   })
 
