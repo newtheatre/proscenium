@@ -208,6 +208,9 @@ describe('who runs a space (R-36)', () => {
     expect(await inContext(() => placeName(studio))).toBe('Studio, Trent Building')
     // The venue's own space, with its name, reads as the venue alone.
     expect(await inContext(() => placeName(spaceId))).toBe('Trent Building')
+    // Case and stray spaces do not make a different name.
+    await inContext(() => useDb().run(sql`UPDATE core_spaces SET name = 'trent building ' WHERE id = ${spaceId}`))
+    expect(await inContext(() => placeName(spaceId))).toBe('Trent Building')
     const managed = (id: string) => inContext(async () => (await useDb().get<{ ok: number }>(sql`SELECT ${assertSpaceManaged(id)} AS ok`))!.ok)
     expect(await managed(spaceId)).toBe(1)
     expect(await managed(studio)).toBe(0)
