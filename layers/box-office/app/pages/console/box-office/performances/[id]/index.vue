@@ -12,7 +12,7 @@ type Sales = 'draft' | 'on_sale' | 'paused' | 'closed'
 interface Band { id: string, name: string, kind: string, sort: number }
 interface Pool { bandId: string, capacity: number, claimed: number }
 interface Price { bandId: string, ticketTypeId: string, amountMinor: number }
-interface TicketType { id: string, name: string, kind: string, active: boolean, available?: boolean }
+interface TicketType { id: string, name: string, kind: string, active: boolean, available?: boolean, managedBy?: string | null }
 interface PriceLayer { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }
 interface ScheduledPrice { bandId: string, ticketTypeId: string, performanceId: string | null, amountMinor: number | null, inherits: boolean, from: number }
 interface Setup {
@@ -40,8 +40,10 @@ const id = computed(() => String(route.params.id))
 
 const { data, status, error, refresh } = await useAPI<Setup>(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/sales`, { key: `box-office:setup:${id.value}` })
 const { data: types } = await useAPI<{ ticketTypes: TicketType[] }>('/api/box-office/ticket-types', { key: 'box-office:ticket-types', default: () => ({ ticketTypes: [] }) })
-// Complimentary tickets are issued by approving a request, never priced; a type whose module is off is not sold.
-const activeTypes = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary'))
+// Complimentary tickets are issued by approving a request, never priced; a type whose module is off is
+// not sold; a Wheelchair space costs the lowest price the buyer can have, so it is not priced here.
+const activeTypes = computed(() => (types.value?.ticketTypes ?? []).filter(type => type.active && type.available !== false && type.kind !== 'complimentary' && type.managedBy !== 'box-office.wheelchair'))
+const wheelchairSold = computed(() => (types.value?.ticketTypes ?? []).some(type => type.active && type.available !== false && type.managedBy === 'box-office.wheelchair'))
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const base = computed(() => `/api/box-office/performances/${encodeURIComponent(id.value)}/sales`)
@@ -449,6 +451,12 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             :title="t('box-office.setup.prices.title')"
             :description="t('box-office.setup.prices.description')"
           >
+            <p
+              v-if="wheelchairSold && activeTypes.length"
+              class="mb-4 text-sm text-muted"
+            >
+              {{ t('box-office.setup.prices.wheelchair') }}
+            </p>
             <p
               v-if="!activeTypes.length"
               class="text-sm text-muted"

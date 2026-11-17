@@ -63,6 +63,8 @@ export async function copySetup(unit: UnitView, targetPerformanceId: string, sou
   let currency = 'GBP'
   for (const price of await pricesFor(source.id)) {
     currency = price.currency
+    // A Wheelchair space's price follows the others and is never set.
+    if (price.derived) continue
     const bandId = map.get(price.bandId)
     if (!bandId) continue
     const layer = layers.find(l => l.bandId === bandId && l.ticketTypeId === price.ticketTypeId)

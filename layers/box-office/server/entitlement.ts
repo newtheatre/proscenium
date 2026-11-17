@@ -12,7 +12,8 @@ import { can, refuse, requirements, useContext, type UnitView } from '#kit'
 import { inAccountScope } from '#kit/accounts'
 import type { TicketType } from './ticket-types'
 
-export interface Requirement { ref: string, accountId: string }
+/** What was met and by whom; evidence is the source's note to keep, such as "pending" for an access application not yet decided. */
+export interface Requirement { ref: string, accountId: string, evidence?: string }
 
 export interface Entitled {
   /** For each line, in the order given: what was met and by whom, or null for none needed or overridden. */
@@ -56,7 +57,7 @@ export async function entitle(performanceId: string, lines: readonly { ticketTyp
     if (count > limit) refuse(tooMany.code, tooMany.reason, { status: 422, remedy: tooMany.remedy })
     const account = buyer.account!
     lines.forEach((l, i) => {
-      if (l.ticketTypeId === type.id) out[i] = { ref: met.ref, accountId: account }
+      if (l.ticketTypeId === type.id) out[i] = { ref: met.ref, accountId: account, ...(met.evidence ? { evidence: met.evidence } : {}) }
     })
     // Live tickets of this type this holder already has for the performance, plus these, within the limit.
     guards.push(unit => unit.add(sql`UPDATE box_office_performance_sales SET updated_at = updated_at WHERE performance_id = ${performanceId}
