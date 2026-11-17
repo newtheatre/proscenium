@@ -168,6 +168,18 @@ export default defineModule({
     }],
     // On the audience side, so anyone can find how to join.
     'core.requirement': [{ id: 'membership', file: 'membership' }],
+    // Members in the command palette, by name, address or number, shown by scheme and number (tab 4).
+    'core.search-source': [{ id: 'membership.members', record: 'membership.membership', ability: 'membership.membership.view', route: '/api/membership/search' }],
+    'core.record-resolver': [
+      { id: 'membership.scheme', file: 'scheme' },
+      { id: 'membership.membership', file: 'membership' },
+      { id: 'membership.verification-list', file: 'verification-list' },
+    ],
+    'core.health-check': [
+      { id: 'membership.applications-waiting', file: 'applications-waiting' },
+      { id: 'membership.open-schemes', file: 'open-schemes' },
+      { id: 'membership.reminders-ran', file: 'reminders-ran' },
+    ],
     // A renewal that is open, kept in sight on My account's overview until it is done (R1).
     'core.account-notice': [{ id: 'membership.renewal-open', file: 'renewal-open' }],
     // The membership card: Box office signs it and its door reads it (MEM-51). Absent while Box office is off.

@@ -10,6 +10,8 @@ import { recordAnswer } from '../../../payments/server/services'
 import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
 import { NOV_17, applicant, req } from '../../../membership/tests/integration/stage'
 import expireApplications from '../../../membership/server/tasks/expire-applications'
+import chargeResolver from '../../server/contributions/core.record-resolver/charge'
+import unpostedCharges from '../../server/contributions/core.health-check/unposted-charges'
 import { charge, fees, income, membership, paid, pay, providers, ready, treasurer } from './stage'
 
 beforeAll(ready)
@@ -71,6 +73,11 @@ describe('paying online', () => {
     expect((await rows('SELECT for_module FROM finance_entries e JOIN finance_accounts a ON a.id = e.account_id WHERE a.system_key = \'membership-fees.income\' AND e.posting_id = (SELECT posting_id FROM finance_entries ORDER BY id DESC LIMIT 1)'))).toEqual([{ for_module: 'membership-fees' }])
     expect((await fees('GET', `/api/membership-fees/mine/${m}`, undefined, who)).body.state).toBe('paid')
     expect((await fees('POST', `/api/membership-fees/mine/${m}/checkout`, {}, who)).body.code).toBe('membership-fees.pay.not-waiting')
+
+    // The fee has its income in the ledger, and is titled by its scheme, never the person.
+    expect((await inContext(() => unpostedCharges.check())).state).toBe('ok')
+    const chargeId = (await rows<{ id: string }>('SELECT id FROM membership_fees_charges WHERE membership_id = ?', m))[0]!.id
+    expect(await inContext(() => chargeResolver.resolve(chargeId))).toMatchObject({ title: expect.stringMatching(/^Fee for Scheme \d+$/), parent: { type: 'membership.membership', id: m } })
   })
 
   it('reuses the open payment on a second press, and opens a fresh one after a declined card', async () => {
