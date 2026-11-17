@@ -404,6 +404,20 @@ test.describe('confirming it is you', () => {
     await noViolations(page)
     await context.close()
   })
+
+  test('reloading an admin screen with a stale sign-in renders it and asks in place, not a 403', async ({ browser }) => {
+    // The sending domain's screen loads through routes that need a recent sign-in, which a server render cannot ask for.
+    const stale = { ...person('Stella Stale', [grant('core.sender.manage')]), assurance: 'strong' }
+    const context = await browser.newContext({ baseURL: 'http://localhost:8788', ...as(stale) })
+    const page = await context.newPage()
+    for (let load = 0; load < 2; load++) { // the first visit, then the reload
+      const response = load ? await page.reload() : await page.goto('/admin/email')
+      expect(response?.status()).toBe(200)
+      await expect(page.getByRole('heading', { level: 1, name: 'Email sending' })).toBeVisible()
+      await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
+    }
+    await context.close()
+  })
 })
 
 test.describe('the access scheme screens', () => {

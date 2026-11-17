@@ -294,12 +294,36 @@ describe('the routes', () => {
     expect(await count('SELECT count(*) AS n FROM finance_postings WHERE reverses_id = ?', posting!.id)).toBe(1)
   })
 
-  it('tell the ledger screen whether the viewer may reverse a posting', async () => {
-    const viewing = await (await call(handle, 'GET', '/api/finance/postings', { actor: person(['finance.ledger.view']) })).json() as { postings: unknown[], canCorrect: boolean }
-    expect(viewing.postings.length).toBeGreaterThan(0)
-    expect(viewing.canCorrect).toBe(false)
-    const correcting = await (await call(handle, 'GET', '/api/finance/postings', { actor: person(['finance.posting.correct']) })).json() as { canCorrect: boolean }
-    expect(correcting.canCorrect).toBe(true)
+  it('tell the ledger screen, row by row, whether the viewer may reverse a posting', async () => {
+    type Page = { rows: { id: string, reversesId: string | null, canReverse: boolean }[], total: number }
+    const viewing = await (await call(handle, 'GET', '/api/finance/postings', { actor: person(['finance.ledger.view']) })).json() as Page
+    expect(viewing.rows.length).toBeGreaterThan(0)
+    expect(viewing.rows.every(r => !r.canReverse)).toBe(true)
+    const correcting = await (await call(handle, 'GET', '/api/finance/postings', { actor: person(['finance.ledger.view', 'finance.posting.correct']) })).json() as Page
+    expect(correcting.rows.filter(r => !r.reversesId).every(r => r.canReverse)).toBe(true)
+    expect(correcting.rows.filter(r => r.reversesId).every(r => !r.canReverse)).toBe(true)
+  })
+
+  it('list the ledger newest first, by kind, by account and by what was searched', async () => {
+    type Page = { rows: { id: string, kind: string, occurredAt: number, source: { id: string }, entries: { accountId: string, code: string }[] }[], total: number, searchTooShort: boolean }
+    const viewer = { actor: person(['finance.ledger.view']) }
+    const get = async (query: string) => await (await call(handle, 'GET', `/api/finance/postings${query}`, viewer)).json() as Page
+    const every = await get('?size=100')
+    expect(every.total).toBe(await count('SELECT count(*) AS n FROM finance_postings p WHERE EXISTS (SELECT 1 FROM finance_seals s WHERE s.posting_id = p.id)'))
+    expect(every.rows.map(r => r.occurredAt)).toEqual([...every.rows.map(r => r.occurredAt)].sort((a, b) => b - a))
+    const sales = await get('?kind=sale&size=100')
+    expect(sales.rows.length).toBeGreaterThan(0)
+    expect(sales.rows.every(r => r.kind === 'sale')).toBe(true)
+    const [cash] = await rows<{ id: string, code: string }>("SELECT id, code FROM finance_accounts WHERE system_key = 'tickets.cash'")
+    const byAccount = await get(`?account=${cash!.id}&size=100`)
+    expect(byAccount.rows.length).toBeGreaterThan(0)
+    expect(byAccount.rows.every(r => r.entries.some(e => e.accountId === cash!.id))).toBe(true)
+    const byReference = await get('?q=order-late')
+    expect(byReference.rows.map(r => r.source.id)).toContain('order-late')
+    expect(byReference.rows.every(r => r.source.id === 'order-late' || r.entries.some(e => e.code.includes('order-late')))).toBe(true)
+    expect((await get(`?q=${encodeURIComponent(cash!.code)}&size=100`)).total).toBe(byAccount.total)
+    expect((await get('?q=nothing-matches-this')).total).toBe(0)
+    expect((await get('?q=a')).searchTooShort).toBe(true)
   })
 
   it('list the modules an account may be given to, and the reasons for reopening', async () => {

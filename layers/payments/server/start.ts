@@ -17,13 +17,18 @@ export interface StartInput {
   amountMinor?: number
   /** The site's address, from the request, so a provider can be told where to send its webhook. */
   origin?: string
+  /** The screen that started the payment, for a provider that sends the person back (RETURN_PATH). */
+  returnTo?: string
 }
+
+/** A screen of this site's console a hand-off may return to: a plain path, never another site. */
+export const RETURN_PATH = /^\/console(?:\/[\w-]+)*$/
 
 export interface StartResult { attemptId: string, next: NextStep, state: string, settled: boolean, unfulfilled: boolean }
 
-async function call(attempt: AttemptRow, origin?: string, retrying = false): Promise<StartResult> {
+async function call(attempt: AttemptRow, origin?: string, retrying = false, returnTo?: string): Promise<StartResult> {
   const { provider, attempt: found } = await forProvider(attempt, origin)
-  const asked = retrying ? { ...found, retrying } : found
+  const asked = { ...found, ...(retrying ? { retrying } : {}), ...(returnTo ? { returnTo } : {}) }
   let next: NextStep = { kind: 'none' }
   let answer: ProviderAnswer | undefined
   const result = await externalCall('payments.start-payment', {
@@ -75,7 +80,7 @@ export async function startAttempt(intentId: string, input: StartInput): Promise
   const unit = createUnit()
   const added = addAttempt(unit.view(), { intentId: intent.id, providerAccountId: account.id, method: input.method, amountMinor: amount, readerId: input.readerId ?? null })
   await unit.commit()
-  return call(added, input.origin)
+  return call(added, input.origin, false, input.returnTo && RETURN_PATH.test(input.returnTo) ? input.returnTo : undefined)
 }
 
 /** Calls the provider again for an attempt whose start had no answer, with the same key. */

@@ -13,7 +13,7 @@ here is stable before 1.0.
 | Members' area | `/members` | people for whom the fact `core.member` is true (false until Identity declares it) |
 | Console | `/console` | people holding any entry ability of a console entry |
 | Site administration | `/admin` | people holding the ability of at least one admin entry; it has no ability of its own, and is not found for anyone else (R-33) |
-| Live mode | `/live` | front-of-house and bar screens (not part of phase 1) |
+| Live mode | `/live` | people holding the ability of at least one live entry (a tile on the Tonight hub); not found for anyone else. A layout, not a shell: see "Live mode" below |
 
 `/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks
@@ -212,6 +212,35 @@ Two rules:
 A chart with one bar says nothing a figure does not, so show one only when there are at least two
 things to compare. Rows that share a name along the bottom are drawn as one: give each its own.
 
+### The calendar
+
+`CalendarBoard` is the shared calendar (UI-35). Every module that shows time draws it, never its own:
+the programme calendar (C-13) first, then Spaces' bookings, the front of house rota and training
+sessions. It takes:
+
+- `view`: `month`, `week`, `day` or `list`.
+- `days`: the operating days drawn, in order (42 for a month, 7 for a week, 1 for a day). The page
+  works them out from the theatre's first day of the week (`core.organisation.week-start`).
+- `items`: `CalendarItem`s. Each names the operating day it belongs to (`day`, and `lastDay` for one
+  over several days), its times or none for all day, the day view's `column`, a colour from 1 to 8,
+  its state as `{ label, edge }`, and where acting on it goes (`to`).
+- `columns`: the day view's columns, such as spaces. An item with no column spans them all.
+
+It emits `day` when a day is chosen, to open the day view.
+
+Four rules:
+
+- **Place by operating day.** Give each item the operating day the server worked out, so a show at
+  00:30 sits with the evening before and is drawn once.
+- **State three ways.** Each block shows its state as a word, an edge (solid, dashed, dotted or
+  double) and a colour, so nothing rests on colour alone.
+- **Name a calendar colour, never a value.** `calendar-1` to `calendar-8` are set in `main.css`,
+  apart from the brand and the status colours, with a fill, text and edge for light and dark.
+- **The list is the equal route.** The List view holds the same items. It is the one shown at phone
+  width for the month and week, and the day view shows one column at a time there, chosen from a
+  menu. It shows the window the calendar is showing, not a paged list: a module that needs filters,
+  sort or export over a longer period adds a `PageList` of its own.
+
 ### Controls for the setting kinds
 
 The generated settings page gives each kind of setting its own control, and the same fields are there
@@ -258,6 +287,28 @@ that starts "Site administration". A page uses it with `definePageMeta({ layout:
 - Moving a screen from the console's System group: give it an admin entry (`menu: 'admin'`, a group
   from `ADMIN_GROUP_ORDER`), move its page under `pages/admin/`, and add a redirect from its old address
   in `layers/core/nuxt.config.ts` `routeRules`.
+
+## Live mode
+
+Live mode is for one job done standing up: the door, the till, the tonight board, a checklist. It is
+a layout, not a shell, and it has no navigation of its own.
+
+- **Entering it.** A module adds a tile to the Tonight hub (`/live`) with a `core.navigation` entry
+  whose `menu` is `live`, and the entry's `ability` decides who sees the tile and who may open the
+  screens under its address, exactly as in the other shells. An ability held through a fact (such as
+  being on shift) counts. Whoever holds the ability of at least one live entry gets the `live` side in
+  the viewer and "Tonight" first in the account menu; for anyone else `/live` does not exist.
+- **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
+  the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
+  pixels) square.
+- **PageLive** is the page type: `title` and `context` (both already translated, for example the
+  screen and the performance), an optional `back` address, the task in the default slot and a sticky
+  `footer` slot. Its status strip shows the title, the context, whether the device is online and the
+  way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
+  or My account.
+- **Not built yet:** the queue of waiting writes and the device copy of data (`useLiveData`). While
+  the device is offline the strip says that changes cannot be sent; a live screen should disable its
+  writes then rather than lose them.
 
 ## Seams for Identity
 

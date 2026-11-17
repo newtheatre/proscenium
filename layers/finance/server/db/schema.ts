@@ -76,6 +76,7 @@ export const postings = defineTable('finance_postings', {
     // A posting is reversed once.
     uniqueIndex('finance_postings_reverses').on(t.reversesId).where(sql`reverses_id IS NOT NULL`),
     index('finance_postings_period').on(t.periodId),
+    index('finance_postings_occurred').on(t.occurredAt),
     index('finance_postings_source').on(t.sourceModule, t.sourceType, t.sourceId),
     check('finance_postings_kind', sql`${t.kind} IN ('sale', 'refund', 'fee', 'payout', 'recognition', 'transfer', 'cash_variance', 'unfulfilled', 'correction', 'opening')`),
   ],
