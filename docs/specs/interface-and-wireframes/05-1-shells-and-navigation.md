@@ -4,13 +4,13 @@ Proscenium has four shells, one per relationship a person has with the theatre, 
 
 ## The four shells
 
-|  | Public | Members' area | Console | Site administration |
+|  | Public | Members' area | Console | Admin |
 | --- | --- | --- | --- | --- |
 | For | Anyone: finding a show, buying, managing their own tickets | A member's own things: shifts, training, rooms, notices | Work done for the theatre: selling, approving, reporting, and each module's own settings | Running the installation: modules, branding, email sending, credentials, updates, health, audit |
 | Who sees it | Everyone, signed in or not | Only a person with a current membership, role, shift or production place | Only a person holding at least one console ability | Only a person holding the ability of at least one site administration entry |
 | Tone | A customer of the theatre | A colleague in the theatre | An operator at a desk | The person who looks after the system |
 | Intensity | Expressive: brand colour, display font, posters | Calm | Calm and dense | Calm and dense |
-| Frame | Header, page, footer | Top bar with section links; bottom tab bar on a phone | Collapsible sidebar, page header, command palette | The console's frame with its own sidebar, a header that reads "Site administration" and a link back to the console |
+| Frame | Header, page, footer | Top bar with section links; bottom tab bar on a phone | Collapsible sidebar, page header, command palette | The console's frame with its own sidebar, a header that reads "Admin" and a link back to the console |
 | Designed for | Phone first | Phone first | Laptop first, usable on a phone | Laptop first, usable on a phone |
 | Rendered | On the server, for search engines and social cards | In the browser | In the browser | In the browser |
 | Who may restyle it | The theatre, in its site folder | Nobody; branding only | Nobody; branding only | Nobody; branding only |
@@ -19,7 +19,7 @@ Proscenium has four shells, one per relationship a person has with the theatre, 
 
 *W1 · the four shells, live mode and the account menu*
 
-Each frame is recognisable at a glance, which matters most for a person who uses more than one. Site administration shares the console's frame on purpose and is told apart by its named strip, its "Back" row and its own sidebar. Larger drawings of each are in the Wireframes sub-tab.
+Each frame is recognisable at a glance, which matters most for a person who uses more than one. Admin shares the console's frame on purpose and is told apart by its named strip, its "Back" row and its own sidebar. Larger drawings of each are in the Wireframes sub-tab.
 
 ### Public shell
 
@@ -46,16 +46,16 @@ Each frame is recognisable at a glance, which matters most for a person who uses
 - **There is no System group.** Screens that run the installation are in site administration, below. The console keeps each module's own settings page at `/console/<module>/settings`, because hold times, prices and rotas are operational.
 - On a phone the sidebar becomes a drawer and tables become stacked cards. Every console screen works on a phone; none is designed there first.
 
-### Site administration
+### Admin
 
 Integration ruling R-33, which replaces R-31. Drawn as W9 in the Wireframes sub-tab.
 
 - **The rule:** the console runs the theatre; site administration runs the installation. A screen belongs here when it changes how the installation is set up and is touched rarely. It stays in the console when someone uses it while running shows. So giving a person a role is console work and deciding what a role contains is here; message wording and the delivery log are console work and the sender and its health are here.
 - **Who may enter:** the shell has no ability of its own. A person sees it when they hold the ability of at least one of its entries, and sees only those entries. Moving a screen here changed no ability. Anyone else who types an `/admin` address gets "page not found", the same guard order as the console.
 - **Frame:** the console's frame, so nothing new is learnt: sidebar, page header with one primary action, command palette, generated settings pages.
-- **Told apart from the console** in five ways, none of which is colour alone: a strip above the page header reads "Site administration" at every width; the top of the sidebar is "Back to console" where the console shows the theatre's mark; the sidebar has its own groups and none of the console's; there is no Tonight and no work queue; and the browser tab's title starts "Site administration". The theatre's brand colour is not used here, so its buttons are neutral.
+- **Told apart from the console** in five ways, none of which is colour alone: a strip above the page header reads "Admin" at every width; the top of the sidebar is "Back to console" where the console shows the theatre's mark; the sidebar has its own groups and none of the console's; there is no Tonight and no work queue; and the browser tab's title starts "Admin". The theatre's brand colour is not used here, so its buttons are neutral.
 - **Home** is Overview at `/admin`: first what needs attention (an update ready to apply, a sending domain not verified, failed jobs, a credential about to lapse), then the state of the installation. Modules contribute its cards through `core.home-card` with `menu: 'admin'`.
-- **Moving between the two:** the account menu's Site administration entry, from anywhere. "Back to console" at the top of the sidebar, shown to a holder of any console ability; anyone else sees "Back to the site". A module's console settings page says "Some of this module's settings are in Site administration" with a link, when it has site-wide settings the viewer may open. The console's sidebar carries no link here. The command palette offers the screens of both to a person entitled to both, each named with its shell.
+- **Moving between the two:** the account menu's Admin entry, from anywhere. "Back to console" at the top of the sidebar, shown to a holder of any console ability; anyone else sees "Back to the site". A module's console settings page says "Some of this module's settings are in Admin" with a link, when it has site-wide settings the viewer may open. The console's sidebar carries no link here. The command palette offers the screens of both to a person entitled to both, each named with its shell.
 - **Narrow layout:** as the console. Below 1024 pixels the sidebar is a drawer and tables are cards; the strip stays and carries the drawer's toggle. Every screen works on a phone; none is designed there first.
 - **Where a setting is shown** (R-37, which withdraws the per-setting `scope` and the `/admin/settings` page). Placement is declared for a group of settings, not for one setting, in the manifest's `settingGroups`, and pages are declared in `settingPages`; the format is foundations' (Settings registry tab). Set once for the install, or touching security or the whole site: site administration. Changed in a normal season by the people running the theatre: the console, beside the work it governs. A module's groups go to its own console page unless it says otherwise. A group managed on a screen of its own (Branding, Senders) is drawn on no generated page. Engineering limits from every module sit together on Advanced. The key and the ability that guards a setting do not change with its place.
 - **Updates and the maintenance state:** foundations' Updates screen is at `/admin/updates`, seen with `core.health.view` and applied with foundations' migrations ability. A newer release shows as a card on Overview that links to it. After a deploy whose database changes are waiting to be applied, only Updates, Health and sign-in answer: every other address, `/admin` and Overview included, shows foundations' plain maintenance page, which links an administrator to `/admin/updates`. **No backups screen:** the platform takes no backups.
@@ -112,7 +112,7 @@ The account menu is the one component every shell renders, so it is the only way
 | My account | Signed in (the menu itself shows only then; a visitor sees "Sign in") | Tickets and orders in the public shell |
 | Members' area | The person is entitled to it | Members' home |
 | Console | The person holds any console ability | Console home |
-| Site administration | The person holds the ability of at least one site administration entry | The first site administration screen they may open |
+| Admin | The person holds the ability of at least one site administration entry | The first site administration screen they may open |
 | Notifications | Signed in | The inbox of the side the person is on: the audience inbox under My account from the public shell, the member inbox in the members' area from there, from the console and from site administration |
 | Appearance, language | Signed in | A small menu |
 | Sign out | Signed in | The public home |

@@ -37,7 +37,7 @@ sequenceDiagram
   T->>C: Updates screen: Apply migrations (if any)
 ```
 
-1. **Notice.** A scheduled workflow in the theatre's repository compares the running version with the newest release on its channel, once a day. The Updates screen in Site administration makes the same comparison and links to the pull request.
+1. **Notice.** A scheduled workflow in the theatre's repository compares the running version with the newest release on its channel, once a day. The Updates screen in Admin makes the same comparison and links to the pull request.
 2. **Merge on a branch.** `git merge <tag>`. By the ownership rule the only possible conflict is the lockfile.
 3. **Lockfile.** Take upstream's `bun.lock`, run `bun install`. The theatre's extra packages, listed in `site/package.json`, are added back. Proved twice.
 4. **Check.** Owned paths, types, build, and the test tiers.
@@ -72,7 +72,7 @@ A major version lists every break with the action to take, ships a check that re
 | The theatre listed a file in `overrides.json` and upstream changed it | A real conflict, expected. The pull request shows both versions; the theatre re-applies its change or drops the override. |
 | A release's migration fails on this theatre's data | Nothing is applied (one batch). The site stays on the maintenance page; the screen names the migration and the error; redeploying the previous version restores service, because the schema has not changed. |
 | The theatre's own module breaks against a new release | Type check or tests fail in the pull request, before anything is live. |
-| GitHub has disabled the scheduled workflow (it does so in forks until enabled, and after long inactivity) | The Updates screen in Site administration still shows that a release is waiting and how to enable the action or merge by hand. |
+| GitHub has disabled the scheduled workflow (it does so in forks until enabled, and after long inactivity) | The Updates screen in Admin still shows that a release is waiting and how to enable the action or merge by hand. |
 | The theatre never updates | Nothing breaks. The Updates screen shows how far behind it is and flags security releases. |
 
 **No backup of its own.** The platform takes no backup, before a migration or at any other time (Matt, 16 November 2026). Cloudflare keeps its own history of the database for up to 30 days, and a theatre that must go back uses that in the Cloudflare dashboard; the platform has no restore feature. One step goes with it: before such a restore the theatre notes, from the data-request queue, the account ids of every erasure completed since the point it is going back to, and runs those erasures again afterwards, because the record of an erasure lives in the same database and is lost with it (Identity, part 3).

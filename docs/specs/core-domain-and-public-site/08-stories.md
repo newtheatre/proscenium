@@ -71,7 +71,7 @@ Each story has an id, who it is for, and acceptance criteria that a test can che
 | --- | --- | --- | --- |
 | C-35 | As an administrator I set the theatre's look. | I pick one colour and see the application, an email and a ticket in light and dark before saving. Whatever colour I pick, text on it meets 4.5 to 1. Saving asks for a fresh passkey check. After saving, every shell, email and PDF uses it within a minute. | First |
 | C-36 | As an administrator I upload a logo safely. | An SVG containing a script, an external reference or a DOCTYPE is cleaned or refused. A raster logo has its metadata removed. A separate logo for dark mode is optional. | First |
-| C-37 | As an administrator I set the time zone and when the day rolls over. | Every time in the application shows in that zone. Changing either setting recalculates the operating day of every performance not yet completed, and says how many first. Both are foundations settings (core.locale.time-zone and core.locale.day-start), shown on the Theatre page in Site administration. | First |
+| C-37 | As an administrator I set the time zone and when the day rolls over. | Every time in the application shows in that zone. Changing either setting recalculates the operating day of every performance not yet completed, and says how many first. Both are foundations settings (core.locale.time-zone and core.locale.day-start), shown on the Theatre page in Admin. | First |
 
 ## Public site
 

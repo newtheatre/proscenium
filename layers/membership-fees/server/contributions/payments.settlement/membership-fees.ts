@@ -19,7 +19,7 @@ export default {
       refuse('membership-fees.charge.not-waiting', 'This fee is no longer waiting for this payment.', { status: 409 })
     const at = nowMs()
     unit.add({
-      sql: "UPDATE membership_fees_charges SET state = 'paid', channel = 'online', paid_at = ?, updated_at = ? WHERE id = ? AND state = 'open' AND intent_id = ?",
+      sql: "UPDATE membership_fees_charges SET state = 'paid', paid_at = ?, updated_at = ? WHERE id = ? AND state = 'open' AND intent_id = ?",
       params: [at, at, charge!.id, part.intentId],
     }).expect(1, { code: 'membership-fees.charge.not-waiting', reason: 'This fee is no longer waiting for this payment.' })
     await markPaid(unit, charge!.membership_id)
@@ -41,8 +41,8 @@ export default {
     return [{ account: INCOME, amountMinor: refund.amountMinor }]
   },
 
-  // The payment did not complete: the charge stays open, with no payment, so "Pay now" opens a fresh one.
+  // The payment did not complete: the charge stays open, with no payment, so "Pay now" or the till opens a fresh one.
   release(unit: UnitView, part: Part) {
-    unit.add({ sql: "UPDATE membership_fees_charges SET intent_id = NULL, updated_at = ? WHERE id = ? AND state = 'open' AND intent_id = ?", params: [nowMs(), part.record, part.intentId] })
+    unit.add({ sql: "UPDATE membership_fees_charges SET intent_id = NULL, channel = NULL, updated_at = ? WHERE id = ? AND state = 'open' AND intent_id = ?", params: [nowMs(), part.record, part.intentId] })
   },
 } satisfies Settlement
