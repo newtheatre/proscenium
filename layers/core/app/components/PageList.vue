@@ -52,6 +52,8 @@ const props = withDefaults(defineProps<{
 
 defineSlots<{
   primary?: () => unknown
+  /** Above the rows: something the page shows first, such as Sessions' "Your session" card. */
+  before?: () => unknown
   /** After the list: a panel or dialog the page opens from it. */
   default?: () => unknown
   [cell: `cell-${string}`]: (props: { row: Row }) => unknown
@@ -353,6 +355,9 @@ watch(() => [status.value, pageLabel.value] as const, ([now, label], [before, ol
     >
       {{ searchNote }}
     </p>
+
+    <!-- Something the page shows above its rows, such as Sessions' "Your session" card. -->
+    <slot name="before" />
 
     <DataBoundary
       :data="data"

@@ -3,13 +3,16 @@
      closed sessions, so a till that is short every Friday shows as a pattern. A session left being
      counted, such as one whose difference needs a second person, can be closed here by someone
      allowed to. Search finds sessions by who opened them. Sessions that handled no cash, as where the
-     theatre takes none, leave the cash columns empty and stay out of the chart. -->
+     theatre takes none, leave the cash columns empty and stay out of the chart. The seller's own
+     session sits above the list ("Your session"); someone who may sell but not see everyone's
+     sessions sees only that. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { sessionsList } from '../../../../shared/lists'
+import type { YourSession } from '../../../../shared/sessions'
 
 type State = 'open' | 'counting' | 'closed'
-interface Row { canClose?: boolean, handlesCash: boolean, id: string, pointLabel: string, openedByName: string, closedByName: string | null, openedAt: number, closedAt: number | null, state: State, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
+interface Row { canClose?: boolean, handlesCash: boolean, id: string, place: string | null, pointLabel: string, closedHow: 'hand' | 'quiet' | null, openedByName: string, closedByName: string | null, openedAt: number, closedAt: number | null, state: State, floatMinor: number, expectedCashMinor: number, countedCashMinor: number | null, varianceMinor: number | null, varianceNote: string | null, currency: string }
 
 const ROUTE = '/api/payments/sessions'
 const TONES = { open: 'success', counting: 'warning', closed: 'neutral' } as const
@@ -17,7 +20,10 @@ const TONES = { open: 'success', counting: 'warning', closed: 'neutral' } as con
 const { t } = useT()
 const { money, signed } = await useMoney()
 const { dateTime: when, brief } = useDates()
-const { data: recent, refresh: refreshRecent } = await useAPI<{ sessions: Row[] }>('/api/payments/sessions/recent', { key: 'payments:sessions-recent', default: () => ({ sessions: [] }) })
+const { data: yours, refresh: refreshYours } = await useAPI<YourSession>('/api/payments/session', { key: 'payments:session' })
+const mayViewAll = computed(() => !!yours.value?.mayViewAll)
+const { data: recent, refresh: refreshRecent } = await useAPI<{ sessions: Row[] }>('/api/payments/sessions/recent', { key: 'payments:sessions-recent', default: () => ({ sessions: [] }), immediate: mayViewAll.value })
+const tillName = (r: Row) => [r.place ?? t('payments.screens.session.unknown-place'), r.pointLabel].filter(Boolean).join(' · ')
 
 const list = computed(() => ({
   ...sessionsList,
@@ -34,10 +40,10 @@ const list = computed(() => ({
 // rows with the same name would be drawn as one, so a repeat is numbered.
 const bars = computed(() => {
   const counted = (recent.value?.sessions ?? []).filter(s => s.handlesCash)
-  const tills = new Set(counted.map(s => s.pointLabel)).size > 1
+  const tills = new Set(counted.map(tillName)).size > 1
   const seen = new Map<string, number>()
   return counted.map((s) => {
-    const name = tills ? `${s.pointLabel}, ${brief(s.openedAt)}` : brief(s.openedAt)
+    const name = tills ? `${tillName(s)}, ${brief(s.openedAt)}` : brief(s.openedAt)
     const times = (seen.get(name) ?? 0) + 1
     seen.set(name, times)
     return { session: times > 1 ? `${name} (${times})` : name, expected: s.expectedCashMinor, counted: s.countedCashMinor ?? 0 }
@@ -52,22 +58,50 @@ const rowActions = (r: Row): DropdownMenuItem[] => (r.canClose
   : [])
 async function closed() {
   closing.value = null
-  await Promise.all([refreshNuxtData(`core:list:${ROUTE}`), refreshRecent()])
+  await Promise.all([refreshNuxtData(`core:list:${ROUTE}`), refreshRecent(), refreshYours()])
+}
+async function changed() {
+  await refreshYours()
+  if (mayViewAll.value) await Promise.all([refreshNuxtData(`core:list:${ROUTE}`), refreshRecent()])
 }
 </script>
 
 <template>
+  <PageFrame
+    v-if="!mayViewAll"
+    :title="t('payments.navigation.sessions.label')"
+    width="reading"
+  >
+    <PaymentsYourSession
+      v-if="yours?.mayOpen"
+      :data="yours"
+      @changed="changed"
+    />
+  </PageFrame>
   <PageList
+    v-else
     :title="t('payments.navigation.sessions.label')"
     :route="ROUTE"
     :list="list"
     width="full"
-    :row-label="(r: Row) => t('payments.screens.sessions.row', { till: r.pointLabel, when: when(r.openedAt) })"
+    :row-label="(r: Row) => t('payments.screens.sessions.row', { till: tillName(r), when: when(r.openedAt) })"
     :row-actions="rowActions"
     :empty="{ title: t('payments.screens.sessions.empty'), description: t('payments.screens.sessions.empty-help'), icon: 'i-lucide-receipt' }"
   >
+    <template #before>
+      <PaymentsYourSession
+        v-if="yours?.mayOpen"
+        class="mb-6"
+        :data="yours"
+        @changed="changed"
+      />
+    </template>
     <template #cell-till="{ row }">
-      <span class="font-medium">{{ row.pointLabel }}</span>
+      <span class="font-medium">{{ tillName(row) }}</span>
+      <span
+        v-if="row.closedHow === 'quiet'"
+        class="block text-sm text-muted"
+      >{{ t('payments.screens.sessions.closed-itself') }}</span>
     </template>
     <template #cell-person="{ row }">
       {{ row.openedByName }}
@@ -115,7 +149,7 @@ async function closed() {
 
     <UModal
       :open="!!closing"
-      :title="t('payments.screens.sessions.close-title', { till: closing?.pointLabel ?? '', person: closing?.openedByName ?? '' })"
+      :title="t('payments.screens.sessions.close-title', { till: closing ? tillName(closing) : '', person: closing?.openedByName ?? '' })"
       @update:open="(open: boolean) => { if (!open) closing = null }"
     >
       <template #body>
