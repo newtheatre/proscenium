@@ -73,6 +73,12 @@ export interface Answer {
   verdict: 'met' | 'not-met'
   /** True when the source was off, absent or failed, and the verdict is the host's whenUnavailable. */
   unavailable: boolean
+  /**
+   * True when the actor may not ask the source about this account (its checkAbility), so nothing
+   * was asked and the verdict is not-met. A host checking on someone's behalf, such as a door, can
+   * tell "not allowed to ask" from "asked, and not met".
+   */
+  notAllowed?: boolean
   until?: number
   reason?: string
   summary?: string
@@ -257,7 +263,7 @@ async function check(request: CheckRequest): Promise<Answer[]> {
     const askable: (string | null)[] = []
     for (const account of accounts) {
       if (account === null || !found.source.checkAbility || await mayAskAbout(found.source.checkAbility, account)) askable.push(account)
-      else for (const ref of refs) if (!answers.has(key(account, ref))) set(account, ref, { verdict: 'not-met', unavailable: false, reason: NOT_ALLOWED })
+      else for (const ref of refs) if (!answers.has(key(account, ref))) set(account, ref, { verdict: 'not-met', unavailable: false, notAllowed: true, reason: NOT_ALLOWED })
     }
     const pending = refs.filter(ref => askable.some(account => !answers.has(key(account, ref))))
     if (!askable.length || !pending.length) continue

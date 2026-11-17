@@ -47,9 +47,7 @@ const SCREENS = [
   ['/console/payments/sessions', 'Till sessions'],
   ['/console/payments/attention', 'Needs attention'],
   ['/console/payments/refunds', 'Refunds'],
-  ['/console/payments/providers', 'Providers and readers'],
   ['/console/finance/ledger', 'Ledger'],
-  ['/console/finance/accounts', 'Ledger accounts'],
   ['/console/finance/periods', 'Periods'],
   ['/console/finance/productions', 'Production statements'],
   ['/console/finance/reconcile', 'Reconciliation'],
@@ -66,7 +64,22 @@ for (const [path, title] of SCREENS) {
   })
 }
 
-for (const [path, title] of [['/console/payments/session', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
+for (const [path, module, title] of [['/admin/modules/payments/providers', 'Payments', 'Providers and readers'], ['/admin/modules/finance/accounts', 'Finance', 'Ledger accounts']] as const) {
+  test(`${title}, a set-up screen, opens for console staff in the console's settings window and has no violations`, async ({ browser }) => {
+    // Someone who may set up payments and the ledger but has no business in Admin.
+    const context = await browser.newContext(as({ ...treasurer, accountId: 'acc_setupstaff', name: 'Sid Setup', grants: ['payments.provider.manage', 'finance.account.manage', 'finance.ledger.view'].map(grant) }))
+    const page = await context.newPage()
+    await visit(page, path)
+    await expect(page).toHaveURL(/\/console\?settings=/)
+    const window = page.getByRole('dialog')
+    await expect(window.getByRole('heading', { name: `${module} settings` })).toBeVisible()
+    await expect(window.getByRole('heading', { level: 2, name: title })).toBeVisible()
+    await noViolations(page)
+    await context.close()
+  })
+}
+
+for (const [path, title] of [['/console/payments/sessions', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
   test(`${title} open from the cog on ${path} and have no violations`, async ({ page }) => {
     await visit(page, path)
     await page.getByRole('link', { name: title }).click()
@@ -209,7 +222,7 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
   const label = `Stripe keys ${Date.now()}`
   expect((await api.post('/api/payments/providers', { data: { provider: 'stripe', label, channels: ['online'], mode: 'test' }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
   await api.dispose()
-  await visit(page, '/console/payments/providers')
+  await visit(page, '/admin/modules/payments/providers')
   const card = page.locator('div').filter({ has: page.getByText(label, { exact: true }) }).filter({ has: page.getByRole('button', { name: 'Save keys' }) }).last()
   await expect(card.getByText('Missing Secret key, Webhook signing secret, Publishable key')).toBeVisible()
   await card.getByLabel('Secret key').fill('sk_test_e2eabcdefghijklm1234')

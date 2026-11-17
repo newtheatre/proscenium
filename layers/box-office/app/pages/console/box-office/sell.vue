@@ -1,5 +1,6 @@
 <!-- Sell (Box office specification, part 5, "Console shell: box office"): the desk. It is Payments'
-     till with Box office's panel first, so tickets and anything else sold at the desk are one payment. -->
+     till narrowed to Box office's panel; the combined till in live mode sells tickets and anything
+     else in one payment. -->
 <script setup lang="ts">
 const { t } = useT()
 const { money } = await useMoney()
@@ -16,6 +17,9 @@ function settled(sale: { intentId: string, amountMinor: number }) {
     :description="t('box-office.screens.sell.description')"
     width="full"
   >
-    <PaymentsTill @settled="settled" />
+    <PaymentsTill
+      :modules="['box-office']"
+      @settled="settled"
+    />
   </PageFrame>
 </template>

@@ -1,11 +1,13 @@
 // The door (BO-40; Box office specification, part 4, "The door"): a valid ticket is admitted once,
 // however many devices scan it together; a second scan says Already in, with when and where; a
 // ticket for another performance, a void ticket and a code that is not ours each say so; and a desk
-// code or a booking reference says Not paid and writes no scan row.
-import { beforeAll, describe, expect, it } from 'vitest'
+// code or a booking reference says Not paid and writes no scan row. A ticket sold on a requirement
+// is checked again before it is admitted (BO-45).
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { advanceClock, changeSetting, createUnit, setClock } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
-import { inContext, person, rows } from '../../../../tests/integration/helpers'
+import { inContext, person, rows, setModule } from '../../../../tests/integration/helpers'
+import { members } from '../../../../tests/fixtures/modules/seats/server/contributions/core.requirement/seats'
 import { buy, house, NOV_16, ready, req, type House } from './stage'
 
 const steward = person(['box-office.ticket.admit'])
@@ -165,5 +167,70 @@ describe('the door list', () => {
     const reference = all.body.rows[0].reference as string
     const found = await req('GET', `/api/box-office/performances/${h.performanceId}/door?view=all&q=${reference}`, undefined, steward)
     expect(found.body.rows.map((r: { reference: string }) => r.reference)).toEqual([reference])
+  })
+})
+
+describe('checking a requirement again at entry', () => {
+  // A steward who may ask the members list about someone else, as Membership's card check allows.
+  const checker = person(['box-office.ticket.admit', 'seats.members.look-up'])
+  afterEach(() => setModule('seats', true))
+
+  /** A free ticket of a type that needs membership, kept as met by `account` or by the typed number's evidence. */
+  async function memberTicket(kept: { account?: string, evidence?: string, ref?: string }, recheckAtEntry = true): Promise<{ h: House, code: string }> {
+    const h = await freeHouse(4)
+    const [code] = await tickets(h, 1)
+    const made = await req('POST', '/api/box-office/ticket-types', { name: `Member ${++guests}`, kind: 'standard', requirementRefs: ['seats:member'], recheckAtEntry })
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    const ref = kept.ref ?? 'seats:member'
+    await rows('UPDATE box_office_order_lines SET ticket_type_id = ?, requirement_ref = ?, requirement_account_id = ?, requirement_evidence_id = ? WHERE performance_id = ?', made.body.ticketTypeId, ref, kept.account ?? null, kept.evidence ?? null, h.performanceId)
+    await rows('UPDATE box_office_tickets SET requirement_ref = ?, requirement_account_id = ?, requirement_evidence_id = ? WHERE performance_id = ?', ref, kept.account ?? null, kept.evidence ?? null, h.performanceId)
+    return { h, code: code! }
+  }
+  const admittedIn = async (h: House) => count('SELECT count(*) AS n FROM box_office_tickets WHERE performance_id = ? AND admitted_at IS NOT NULL', h.performanceId)
+
+  it('admits a current member, and turns away one whose membership has lapsed with the source\'s words', async () => {
+    const holder = person([])
+    members.add(holder.accountId!)
+    const current = await memberTicket({ account: holder.accountId! })
+    expect((await scan(current.h, current.code, undefined, checker)).body).toMatchObject({ result: 'admitted' })
+
+    const lapsed = person([])
+    const turned = await memberTicket({ account: lapsed.accountId! })
+    const out = await scan(turned.h, turned.code, undefined, checker)
+    expect(out.body).toMatchObject({ result: 'requirement_not_met', requirement: { reason: 'We could not find that membership.' } })
+    expect(out.body.requirement.ticketType).toMatch(/^Member /)
+    expect(await admittedIn(turned.h)).toBe(0)
+    expect(await rows('SELECT result, unchecked FROM box_office_scans WHERE performance_id = ?', turned.h.performanceId)).toEqual([{ result: 'requirement_not_met', unchecked: 0 }])
+    // Once sorted at the desk, as a member now, the same ticket goes in.
+    members.add(lapsed.accountId!)
+    expect((await scan(turned.h, turned.code, undefined, checker)).body.result).toBe('admitted')
+  })
+
+  it('does not ask again when the type does not recheck, unless the ticket was met by a typed number', async () => {
+    const nobody = person([])
+    const byAccount = await memberTicket({ account: nobody.accountId! }, false)
+    expect((await scan(byAccount.h, byAccount.code, undefined, checker)).body.result).toBe('admitted')
+
+    const byNumber = await memberTicket({ evidence: 'ev_forged' }, false)
+    expect((await scan(byNumber.h, byNumber.code, undefined, checker)).body.result).toBe('requirement_not_met')
+    const good = await memberTicket({ evidence: 'ev_member' }, false)
+    expect((await scan(good.h, good.code, undefined, checker)).body).toMatchObject({ result: 'admitted' })
+  })
+
+  it('admits and marks the scan unchecked when the source is off, failing, or not open to this steward', async () => {
+    const nobody = person([])
+    const notOpen = await memberTicket({ account: nobody.accountId! })
+    const plain = await scan(notOpen.h, notOpen.code)
+    expect(plain.body).toMatchObject({ result: 'admitted', unchecked: true })
+
+    const broken = await memberTicket({ account: nobody.accountId!, ref: 'seats:broken' })
+    expect((await scan(broken.h, broken.code, undefined, checker)).body).toMatchObject({ result: 'admitted', unchecked: true })
+
+    const off = await memberTicket({ account: nobody.accountId! })
+    await setModule('seats', false)
+    expect((await scan(off.h, off.code, undefined, checker)).body).toMatchObject({ result: 'admitted', unchecked: true })
+    expect(await rows("SELECT unchecked FROM box_office_scans WHERE performance_id = ? AND result = 'admitted'", off.h.performanceId)).toEqual([{ unchecked: 1 }])
+    // A second scan says Already in without asking again.
+    expect((await scan(off.h, off.code, undefined, checker)).body.result).toBe('already_admitted')
   })
 })

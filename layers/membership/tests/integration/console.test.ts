@@ -49,7 +49,7 @@ describe('finding members from the palette', () => {
     expect(resolved!.title).toMatch(/^Scheme \d+, M-\d+$/)
     expect(resolved!.title).not.toContain('Palette')
     expect((await find(resolved!.title.split(', ')[1]!)).body.ids).toContain(m.membershipId)
-    expect(await inContext(() => schemeResolver.resolve(m.schemeId))).toMatchObject({ title: expect.stringMatching(/^Scheme \d+$/), to: `/console/membership/schemes/${m.schemeId}` })
+    expect(await inContext(() => schemeResolver.resolve(m.schemeId))).toMatchObject({ title: expect.stringMatching(/^Scheme \d+$/), to: `/admin/modules/membership/schemes/${m.schemeId}` })
     expect((await find('')).body.ids).toEqual([])
     expect((await find('Palette', person([]))).status).toBe(403)
   })

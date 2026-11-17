@@ -22,6 +22,11 @@ export const identitySettings = defineSettings('core', {
   'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, onChange: 'confirm' }),
   'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm' }),
   'sign-in.provider-is-strong': setting.boolean({ default: false, change, onChange: 'confirm' }),
+  // An authenticator app (TOTP), offered to people whose roles reach the console. Never a way to sign
+  // in on its own: it confirms it is you, and after an email or Google sign-in it can make the session
+  // strong, standing in for a passkey on a shared machine.
+  'sign-in.authenticator': setting.boolean({ default: true, change, onChange: 'confirm' }),
+  'sign-in.authenticator-is-strong': setting.boolean({ default: true, change, onChange: 'confirm' }),
   // The public half of the Turnstile bot check, which the browser draws the check with. Its secret
   // half is a credential on the same page. Unset, NUXT_PUBLIC_TURNSTILE_SITE_KEY is used, if set.
   'sign-in.turnstile-site-key': setting.text({ unset: true, maxLength: 100, change, audience: 'public' }),

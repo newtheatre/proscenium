@@ -1,14 +1,15 @@
 <!-- A module's page in Admin: on a laptop and wider the list of modules down the left (none on a
      phone), then the module's name, its toggle, what it does and its tabs, which scroll sideways on
      a narrow screen. The tabs are the module's pages of settings, its set-up screens and About, as
-     many as the viewer may open; the page draws the open tab in the slot. -->
+     many as the viewer may open. The admin layout draws it round every page under the module's
+     address, and the open tab's page in the slot, as an embedded screen. -->
 <script setup lang="ts">
 import type { NavigationMenuItem } from '@nuxt/ui'
 import type { ModuleTabView, ModuleView } from '../utils/modules'
-import { moduleHome } from '../../shared/navigation'
+import { moduleHome, resolveEntry } from '../../shared/navigation'
 
 const props = defineProps<{ module: string }>()
-defineSlots<{ default?: (props: { tabs: ModuleTabView[], view: ModuleView | undefined }) => unknown }>()
+defineSlots<{ default?: () => unknown }>()
 
 const { t, te } = useT()
 const route = useRoute()
@@ -20,7 +21,8 @@ const { toggle, refusal, busy } = useModuleSwitch(() => data.value?.modules ?? [
 const view = computed(() => data.value?.modules.find(m => m.id === props.module))
 const tabs = computed(() => tabData.value?.tabs ?? [])
 const items = computed(() => tabs.value.map(tab => ({ label: te(tab.label) ? t(tab.label) : tab.label, value: tab.to, icon: tab.icon })))
-const active = computed(() => tabs.value.find(tab => tab.to === route.path)?.to)
+// A record page below a tab's screen keeps that tab open.
+const active = computed(() => resolveEntry(tabs.value, route.path)?.to)
 
 const byName = (a: ModuleView, b: ModuleView) => a.id === 'core' ? -1 : b.id === 'core' ? 1 : nameOf(a.id).localeCompare(nameOf(b.id))
 const side = computed<NavigationMenuItem[][]>(() => {
@@ -112,10 +114,9 @@ const side = computed<NavigationMenuItem[][]>(() => {
         :ui="{ list: 'overflow-x-auto overflow-y-hidden [scrollbar-width:none]', trigger: 'shrink-0', label: 'whitespace-nowrap overflow-visible' }"
         @update:model-value="to => navigateTo(String(to))"
       />
-      <slot
-        :tabs="tabs"
-        :view="view"
-      />
+      <EmbeddedScreens>
+        <slot />
+      </EmbeddedScreens>
     </PageFrame>
   </div>
 </template>
