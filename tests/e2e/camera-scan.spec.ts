@@ -180,6 +180,8 @@ test('the door in live mode opens scanning, admits a ticket, and says Not paid f
     await page.getByRole('dialog').getByRole('button', { name: 'Check' }).click()
     const lapsed = page.getByRole('status').filter({ hasText: 'Does not qualify' })
     await expect(lapsed).toContainText('Member: Membership not current. Send them to the box office to change the ticket.')
+    // Axe reads a dialog still fading out as low contrast, so wait for it to be gone.
+    await expect(page.getByRole('dialog')).toBeHidden()
     await page.unroute('**/scan')
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()
     expect(results.violations.map(v => `${v.id}: ${v.nodes.map(n => n.target.join(' ')).join(' | ')}`)).toEqual([])
