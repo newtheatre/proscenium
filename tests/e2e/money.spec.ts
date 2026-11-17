@@ -92,7 +92,7 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await noViolations(page)
   await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
   await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
-  await page.getByRole('radio', { name: 'Cash' }).check()
+  await page.getByRole('radio', { name: 'Cash' }).first().check() // other browser tests may have added a cash drawer too
   await page.getByLabel(/^Cash handed over/).fill('10')
   await noViolations(page)
   await page.getByRole('button', { name: 'Cash taken' }).click()
