@@ -80,11 +80,17 @@ test.describe('a site owner with no console', () => {
     await expect(period).toHaveValue('2')
     await expect(unit).toContainText('hours')
     await expect(page.getByText('Default: 10 in 1 hour.')).toBeVisible()
+    // A period is 1 minute to 1 day: only seconds to days are offered, and the count stays inside
+    // what the unit allows, so 2 hours switched to days becomes 1 day.
     await unit.click()
+    await expect(page.getByRole('option')).toHaveText(['days', 'hours', 'minutes', 'seconds'])
     await page.getByRole('option', { name: 'days' }).click()
-    await page.locator('form').filter({ has: period }).getByRole('button', { name: /^Save/ }).click()
-    await page.getByRole('dialog').getByRole('button', { name: 'Save the change' }).click()
-    await expect(page.getByText(/period between 1 minute and 1 day/)).toBeVisible()
+    await expect(period).toHaveValue('1')
+    await unit.click()
+    await page.getByRole('option', { name: 'second', exact: true }).click() // named for the count, still 1
+    await period.fill('5')
+    await period.blur()
+    await expect(period).toHaveValue('60')
   })
 
   test('a changed setting shows who changed it, its history opens and Revert puts it back, and Settings history lists the change', async ({ page }) => {

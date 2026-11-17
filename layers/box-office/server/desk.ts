@@ -14,6 +14,7 @@ import { pricedLines, type BasketLineInput } from './baskets'
 import { claimSeats } from './capacity'
 import { hashOf, newReference } from './codes'
 import { cancellations, orderLines } from './db/schema'
+import { attachExchange, exchangeDifference, isExchangeRecord, prepareExchange } from './exchange'
 import { liveLines, ORDER, type LineRow, type OrderRow } from './orders'
 import { pricesFor } from './prices'
 import { availability } from './availability'
@@ -24,15 +25,28 @@ const DESK_HOLD = 30 * 60_000 // not-policy: as long as the till keeps a payment
 const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500) }).strict() // not-policy: the setting's own ceiling
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
 const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional() }).strict() // not-policy: more kinds of ticket than any performance sells
+const id = z.string().min(1).max(64) // not-policy: shape bound
+const exchangeInput = z.object({
+  exchange: z.object({
+    orderId: id,
+    lineIds: z.array(id).min(1).max(50), // not-policy: more lines than any order holds
+    performanceId: id,
+    bandId: id,
+    ticketTypeId: id,
+    expectedDifferenceMinor: z.number().int().min(1),
+  }).strict(),
+}).strict()
 type ReservationInput = z.infer<typeof reservationInput>
 type SaleInput = z.infer<typeof saleInput>
+type ExchangePanelInput = z.infer<typeof exchangeInput>['exchange']
 
-/** What the seller put in Box office's panel: a reservation to pay for, or tickets to sell. */
-export function panelInput(input: unknown): { reservation: ReservationInput } | { sale: SaleInput } {
-  const isReservation = !!input && typeof input === 'object' && 'orderId' in input
-  const parsed = isReservation ? reservationInput.safeParse(input) : saleInput.safeParse(input)
+/** What the seller put in Box office's panel: a reservation to pay for, tickets to sell, or the difference on an exchange. */
+export function panelInput(input: unknown): { reservation: ReservationInput } | { sale: SaleInput } | { exchange: ExchangePanelInput } {
+  const kind = !input || typeof input !== 'object' ? 'sale' : 'exchange' in input ? 'exchange' : 'orderId' in input ? 'reservation' : 'sale'
+  const parsed = kind === 'exchange' ? exchangeInput.safeParse(input) : kind === 'reservation' ? reservationInput.safeParse(input) : saleInput.safeParse(input)
   if (!parsed.success) refuse('box-office.desk.bad-input', 'The box office panel was not filled in properly.', { status: 422 })
-  return isReservation ? { reservation: parsed.data as ReservationInput } : { sale: parsed.data as SaleInput }
+  if (kind === 'exchange') return { exchange: (parsed.data as z.infer<typeof exchangeInput>).exchange }
+  return kind === 'reservation' ? { reservation: parsed.data as ReservationInput } : { sale: parsed.data as SaleInput }
 }
 
 const CHANGED = { code: 'box-office.order.lines-changed', reason: 'This reservation has just changed.', remedy: 'Find it again to see what is reserved.' }
@@ -61,6 +75,10 @@ async function deskSale(input: SaleInput, at: number) {
 /** The panel's lines and amount, for the till to show. Reads only. */
 export async function deskSummary(context: DeskContext): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
   const input = panelInput(context.input)
+  if ('exchange' in input) {
+    const { orderId, expectedDifferenceMinor: _, ...target } = input.exchange
+    return exchangeDifference(orderId, target)
+  }
   let lines: { label: string, amountMinor: number }[]
   if ('reservation' in input) {
     lines = (await reservation(input.reservation.orderId)).lines.map(l => ({ label: l.type_name, amountMinor: l.amount_minor }))
@@ -77,6 +95,13 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   const actor = useContext().actor
   const input = panelInput(context.input)
   const at = nowMs()
+
+  if ('exchange' in input) {
+    const { orderId, ...target } = input.exchange
+    await requireAbility(actor, 'box-office.order.exchange', ['box-office.order', orderId])
+    const { exchangeId, differenceMinor } = await prepareExchange(unit, orderId, target, actor.accountId!)
+    return { owner: { module: 'box-office', record: exchangeId }, amountMinor: differenceMinor }
+  }
 
   if ('reservation' in input) {
     const { order, lines } = await reservation(input.reservation.orderId)
@@ -113,8 +138,9 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   return { owner: { module: 'box-office', record: orderId }, amountMinor: totalMinor }
 }
 
-/** Puts the till's payment on the order just prepared, so settling and releasing know it from any other. */
+/** Puts the till's payment on the order or exchange just prepared, so settling and releasing know it from any other. */
 export function deskAttach(unit: UnitView, orderId: string, intentId: string): void {
+  if (isExchangeRecord(orderId)) return attachExchange(unit, orderId, intentId)
   unit.add(sql`UPDATE box_office_orders SET intent_id = ${intentId} WHERE id = ${orderId} AND state = 'awaiting_payment' AND intent_id IS NULL`).expect(1, CHANGED)
 }
 

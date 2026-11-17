@@ -4,7 +4,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createUnit, setClock } from '#kit'
 import { sendReminders } from '../../server/reminders'
-import { inContext, rows } from '../../../../tests/integration/helpers'
+import { env, inContext, rows } from '../../../../tests/integration/helpers'
 import { duty, notes, performance, ready, req, setting, shift, shiftRow, volunteer, MINUTE } from './stage'
 
 beforeAll(ready)
@@ -189,5 +189,9 @@ describe('FH-09 and FH-17: what members see', () => {
     const view = (await req('GET', `/api/front-of-house/shifts/${id}`, undefined, meg)).body
     expect(view.mine).toEqual({ assignmentId: a, state: 'confirmed' })
     expect(view.people).toHaveLength(1)
+    expect(view).toMatchObject({ productionTitle: expect.stringContaining('Front of house show'), venueName: expect.stringContaining('Front of house venue'), releaseNotice: 172800, coverFor: null })
+    // Once Meg asks for cover inside the notice, another member sees the place to take.
+    await env.DB.prepare('UPDATE front_of_house_assignments SET state = \'release_requested\' WHERE id = ?').bind(a).run()
+    expect((await req('GET', `/api/front-of-house/shifts/${id}`, undefined, volunteer())).body.coverFor).toBe(a)
   })
 })

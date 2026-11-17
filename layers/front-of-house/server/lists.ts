@@ -1,6 +1,6 @@
 // What members read (FH-09, FH-17): open shifts, with why a person cannot take one; their own
 // shifts and hours; and one shift with who else is on it. Reads by account go through the scope.
-import { all, nowMs, theatreTimeZone } from '#kit'
+import { all, first, nowMs, theatreTimeZone, useSetting } from '#kit'
 import { accountScopeSql } from '#kit/accounts'
 import { accountLabel } from '#modules/core'
 import { LIVE_STATES } from './db/schema'
@@ -84,7 +84,17 @@ export async function myShifts(accountId: string): Promise<{ coming: MyShift[], 
   }
 }
 
-export interface ShiftView extends Shift { dutyDescription: string | null, people: { name: string, state: string }[], mine: { assignmentId: string, state: string } | null }
+export interface ShiftView extends Shift {
+  dutyDescription: string | null
+  productionTitle: string | null
+  venueName: string | null
+  /** How long before the call a place can be given up without asking for cover, in seconds. */
+  releaseNotice: number
+  people: { name: string, state: string }[]
+  mine: { assignmentId: string, state: string } | null
+  /** Someone else's place that needs cover, which the person could take. */
+  coverFor: string | null
+}
 
 /** One shift for a member: what it is, who else is on it (names only) and the person's own place. */
 export async function shiftView(id: string, accountId: string): Promise<ShiftView | null> {
@@ -94,12 +104,20 @@ export async function shiftView(id: string, accountId: string): Promise<ShiftVie
     `SELECT a.id, a.account_id, a.state, a.account_id IN (${accountScopeSql('?1')}) AS mine
        FROM front_of_house_assignments a WHERE a.shift_id = ?2 AND a.state IN (${live}) ORDER BY a.created_at`,
     accountId, id)
-  const description = (await all<{ description: string | null }>('SELECT description FROM front_of_house_duties WHERE id = ?', shift.dutyId))[0]?.description ?? null
+  const about = await first<{ description: string | null, production_title: string | null, venue_name: string | null }>(
+    `SELECT d.description, p.title AS production_title, v.name AS venue_name FROM front_of_house_duties d
+       LEFT JOIN core_performances f ON f.id = ?2 LEFT JOIN core_productions p ON p.id = f.production_id
+       LEFT JOIN core_venues v ON v.id = coalesce(?3, f.venue_id) WHERE d.id = ?1 -- not-policy: numbered parameters
+      `, shift.dutyId, shift.performanceId, shift.venueId)
   const mine = people.find(p => p.mine)
   return {
     ...shift,
-    dutyDescription: description,
+    dutyDescription: about?.description ?? null,
+    productionTitle: about?.production_title ?? null,
+    venueName: about?.venue_name ?? null,
+    releaseNotice: await useSetting('front-of-house.shifts.release-notice') as number,
     people: await Promise.all(people.filter(p => p.state !== 'requested').map(async p => ({ name: await accountLabel(p.account_id), state: p.state }))),
     mine: mine ? { assignmentId: mine.id, state: mine.state } : null,
+    coverFor: people.find(p => p.state === 'release_requested' && !p.mine)?.id ?? null,
   }
 }

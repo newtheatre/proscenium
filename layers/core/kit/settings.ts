@@ -56,7 +56,7 @@ const KINDS = ['boolean', 'integer', 'money', 'duration', 'time', 'text', 'choic
 export interface RateInput { count: number, per: string }
 export interface Rate { count: number, per: number }
 export const RATE_COUNT = { min: 1, max: 10_000 }
-const RATE_PERIOD = { min: '1m', max: '1d' }
+export const RATE_PERIOD = { min: '1m', max: '1d' }
 export type SettingKind = typeof KINDS[number]
 
 type Value<V, U> = U extends { unset: true } ? V | null : V

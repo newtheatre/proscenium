@@ -143,5 +143,25 @@ describe('FH-34: volunteer hours', () => {
     expect(csv.headers.get('content-type')).toContain('text/csv')
     expect((await csv.text()).split('\n')[0]).toBe('Name,Shifts worked,Hours,No-shows')
     expect((await req('GET', `/api/front-of-house/hours?from=${from}&to=${to}`, undefined, manager)).status).toBe(403)
+    // The screen asks by the theatre's days, both ends included.
+    const dayOf = new Date(n.callAt).toISOString().slice(0, 10)
+    const byDay = await req('GET', `/api/front-of-house/hours?fromDay=${dayOf}&toDay=${dayOf}&accountId=${n.amy.accountId}`, undefined, viewer)
+    expect(byDay.status, JSON.stringify(byDay.body)).toBe(200)
+    expect(byDay.body.rows).toEqual([expect.objectContaining({ accountId: n.amy.accountId, shiftsWorked: 1 })])
+    expect((await req('GET', '/api/front-of-house/hours', undefined, viewer)).status).toBe(422)
+  })
+})
+
+describe('the console\'s night reports', () => {
+  it('lists each report with its performance and counts, and the report names its people', async () => {
+    const n = await night()
+    await req('POST', `/api/front-of-house/performances/${n.p.id}/report/sign-off`, { noShows: [n.b] }, lead())
+    const reader = person(['front-of-house.night-report.view'])
+    const listed = (await req('GET', '/api/front-of-house/night-reports', undefined, reader)).body.reports.find((r: any) => r.performanceId === n.p.id)
+    expect(listed).toMatchObject({ state: 'signed_off', show: expect.stringContaining('Front of house show'), exceptions: 0, incidents: 0, signedOffByName: expect.any(String) })
+    const report = (await req('GET', `/api/front-of-house/performances/${n.p.id}/report`, undefined, reader)).body
+    expect(report.performance).toEqual({ title: expect.stringContaining('Front of house show'), startsAt: n.p.startsAt })
+    expect(report.can).toEqual({ write: false, signOff: false })
+    expect(Object.keys(report.names)).toContain(report.signedOffBy)
   })
 })

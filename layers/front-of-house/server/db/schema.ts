@@ -140,6 +140,8 @@ export const assignments = defineTable('front_of_house_assignments', {
   id: 'asg',
   realm: 'members',
   subject: 'account_id',
+  // Counted from the shift's end by the module's own sweep.
+  retention: 'front-of-house.retention.assignments',
   extra: t => [
     uniqueIndex('front_of_house_assignments_live').on(t.shiftId, t.accountId).where(sql`state IN (${list(LIVE_STATES)})`),
     index('front_of_house_assignments_account').on(t.accountId, t.state),
@@ -236,6 +238,7 @@ export const checklistRuns = defineTable('front_of_house_checklist_runs', {
   id: 'ckr',
   realm: 'operational',
   subject: 'none',
+  retention: 'front-of-house.retention.checklists',
   extra: t => [
     uniqueIndex('front_of_house_checklist_runs_performance').on(t.checklistId, t.performanceId).where(sql`performance_id IS NOT NULL`),
     uniqueIndex('front_of_house_checklist_runs_day').on(t.checklistId, sql`coalesce(${t.venueId}, '')`, t.localDate).where(sql`performance_id IS NULL`),
@@ -263,6 +266,7 @@ export const checklistEntries = defineTable('front_of_house_checklist_entries', 
   id: 'cke',
   realm: 'operational',
   subject: 'none',
+  retention: 'front-of-house.retention.checklists',
   extra: t => [
     uniqueIndex('front_of_house_checklist_entries_item').on(t.runId, t.itemId),
     check('front_of_house_checklist_entries_outcome', sql`${t.outcome} IN ('done', 'exception', 'not_applicable')`),
