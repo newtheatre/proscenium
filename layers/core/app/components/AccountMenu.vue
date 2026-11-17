@@ -25,6 +25,8 @@ const here = computed(() => shellOf(route.path) ?? 'public')
 const items = computed<DropdownMenuItem[][]>(() => {
   const mark = (on: boolean): Partial<DropdownMenuItem> => on ? { trailingIcon: 'i-lucide-check', active: true, class: 'font-semibold' } : {}
   const where: DropdownMenuItem[] = [
+    // Tonight comes first for anyone who can work tonight (live mode's hub).
+    ...(has('live') ? [{ label: t('core.menu.tonight'), icon: 'i-lucide-radio-tower', to: '/live', ...mark(here.value === 'live') }] : []),
     { label: t('core.menu.my-account'), icon: 'i-lucide-circle-user', to: '/account', ...mark(here.value === 'account') },
   ]
   if (has('members')) where.push({ label: viewer.value.membersName ?? t('core.menu.members'), icon: 'i-lucide-users', to: '/members', ...mark(here.value === 'members') })

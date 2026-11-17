@@ -13,7 +13,7 @@ here is stable before 1.0.
 | Members' area | `/members` | people for whom the fact `core.member` is true (false until Identity declares it) |
 | Console | `/console` | people holding any entry ability of a console entry |
 | Site administration | `/admin` | people holding the ability of at least one admin entry; it has no ability of its own, and is not found for anyone else (R-33) |
-| Live mode | `/live` | front-of-house and bar screens (not part of phase 1) |
+| Live mode | `/live` | people holding the ability of at least one live entry (a tile on the Tonight hub); not found for anyone else. A layout, not a shell: see "Live mode" below |
 
 `/account /members /console /admin /live /book /sign-in /setup /api /files` are reserved. A page under a
 shell prefix is checked before it renders by `middleware/access.global.ts`, which asks
@@ -287,6 +287,28 @@ that starts "Site administration". A page uses it with `definePageMeta({ layout:
 - Moving a screen from the console's System group: give it an admin entry (`menu: 'admin'`, a group
   from `ADMIN_GROUP_ORDER`), move its page under `pages/admin/`, and add a redirect from its old address
   in `layers/core/nuxt.config.ts` `routeRules`.
+
+## Live mode
+
+Live mode is for one job done standing up: the door, the till, the tonight board, a checklist. It is
+a layout, not a shell, and it has no navigation of its own.
+
+- **Entering it.** A module adds a tile to the Tonight hub (`/live`) with a `core.navigation` entry
+  whose `menu` is `live`, and the entry's `ability` decides who sees the tile and who may open the
+  screens under its address, exactly as in the other shells. An ability held through a fact (such as
+  being on shift) counts. Whoever holds the ability of at least one live entry gets the `live` side in
+  the viewer and "Tonight" first in the account menu; for anyone else `/live` does not exist.
+- **The layout** (`layouts/live.vue`, applied to everything under `/live`): full screen, dark unless
+  the person picked a mode themselves, and every button at least `--proscenium-target-live` (48
+  pixels) square.
+- **PageLive** is the page type: `title` and `context` (both already translated, for example the
+  screen and the performance), an optional `back` address, the task in the default slot and a sticky
+  `footer` slot. Its status strip shows the title, the context, whether the device is online and the
+  way out: back to the Tonight hub from a screen, and from the hub back to the console, members' area
+  or My account.
+- **Not built yet:** the queue of waiting writes and the device copy of data (`useLiveData`). While
+  the device is offline the strip says that changes cannot be sent; a live screen should disable its
+  writes then rather than lose them.
 
 ## Seams for Identity
 

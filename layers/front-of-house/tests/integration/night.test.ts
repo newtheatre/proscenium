@@ -160,6 +160,10 @@ describe('FH-24 and FH-25: checklists', () => {
     expect((await req('POST', `${path}/complete`, {}, s.amy)).body).toEqual({ state: 'complete' })
     const run = await req('GET', path, undefined, s.amy)
     expect(run.body.items.map((i: any) => i.entry?.outcome ?? null)).toEqual(['done', 'done', null])
+    // Once the night is signed off its checklists are final.
+    const signer = person(['front-of-house.night-report.sign-off'])
+    expect((await req('POST', `/api/front-of-house/performances/${s.p.id}/report/sign-off`, { noShows: [] }, signer)).status).toBe(200)
+    expect((await req('POST', `${path}/reopen`, {})).body.code).toBe('front-of-house.report-signed-off')
   })
 
   it('keeps a run to the items it started with', async () => {
