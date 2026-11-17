@@ -397,7 +397,6 @@ function ended() {
                     :min="0"
                     :step="0.01"
                     :format-options="{ style: 'currency', currency }"
-                    class="w-full"
                   />
                 </UFormField>
                 <UFormField
@@ -408,7 +407,6 @@ function ended() {
                   <USelect
                     v-model="readerId"
                     :items="(chosen.readers ?? []).map(r => ({ value: r.id, label: r.label }))"
-                    class="w-full"
                   />
                 </UFormField>
 
