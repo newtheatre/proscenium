@@ -47,7 +47,7 @@ let venue: { venueId: string, spaceId: string }
 async function show(title: string, options: { listed?: boolean, company?: string, publish?: boolean } = {}): Promise<string> {
   const { body } = await req('POST', '/api/core/productions', { title, kind: options.company ? 'visiting' : 'own' })
   await req('PATCH', `/api/core/productions/${body.id}`, {
-    summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true,
+    summary: 'A play.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true,
     listed: options.listed ?? true, companyName: options.company ?? null,
   })
   if (options.publish ?? true) expect((await req('POST', `/api/core/productions/${body.id}/publish`, {})).status).toBe(200)

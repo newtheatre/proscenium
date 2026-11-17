@@ -60,7 +60,7 @@ async function ok(method: string, path: string, body: object) {
 }
 async function show(title: string, seasonId: string | null = null): Promise<string> {
   const { id } = await ok('POST', '/api/core/productions', { title, kind: 'own' })
-  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), advisoriesConfirmedNone: true, seasonId })
+  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, seasonId })
   await ok('POST', `/api/core/productions/${id}/publish`, {})
   return id
 }

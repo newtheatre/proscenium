@@ -517,3 +517,24 @@ in the specification's "As built" list; this guide is the reference from here on
   `expect(n)` (U2, U4), so a duplicate written meanwhile rolls the unit back and the job retries.
 - Not yet checked by `bun run check`: the erasure scan, soft-dependency switching and navigation
   coverage, which need the modules they check.
+
+### Content warnings, staging effects and age
+
+Built as the content warnings slice (core spec part 2, "Later slice"). Where it departs from, or is
+narrower than, the specification:
+
+- **Existing sites.** The migration moves the four effect terms out of `core.advisory` into a new
+  `core.staging-effect` vocabulary (ids unchanged), moves their rows to `core_production_effects`,
+  grades every other warning `depicted` with `level_assumed`, and converts numeric `age_guidance`.
+  Text it cannot convert is appended to the content note. The first `ensureVocabularies()` after that
+  adds the headings, the starting terms a site lacks, and an "Other" heading for terms the theatre
+  made itself (`adoptHeadings`).
+- **Reads.** `guidanceFor` and `beforeYouCome` are in `layers/core/server/programme/guidance.ts`.
+  `notAtThisPerformance` is always empty until performance exceptions (story C-55) are built.
+  A merged term is folded in the read, by `merged_into_id`, because term merging has no screen yet.
+- **Event.** `core.production.updated` carries `guidanceAdded: { effectTermIds, warnings }`; the
+  payload rules require ids to be named `...Id`, so the effects list is `effectTermIds`.
+- **Public page.** `ageGuidance` stays as a worded string for older callers; `ageMin`, `ageRestricted`,
+  `effects` and graded `advisories` are new. A warning still `level_assumed` shows no level word.
+- **Tooling.** `bun run db:generate -- --hints '<json>'` passes Drizzle Kit's rename-or-create answers
+  through, which it needs when a column appears and there is no terminal to ask in.

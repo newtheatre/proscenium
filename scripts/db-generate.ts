@@ -1,4 +1,5 @@
-// bun run db:generate -- --name <what> [--owner upstream|site|fixtures]
+// bun run db:generate -- --name <what> [--owner upstream|site|fixtures] [--hints '<json>']
+// --hints answers Drizzle Kit's rename-or-create questions, which it asks when a column appears with no terminal to ask in.
 // Writes a migration from a schema change with Drizzle Kit, then adds the triggers the registry
 // asks for: append-only tables refuse updates and deletes except erasure, and core_guard aborts a
 // unit of work whose expectation fails. A migration that would rebuild an append-only table is
@@ -16,7 +17,7 @@ import { findListSources, indexChanges, journalIndexes, wantedIndexes } from './
 /** The unit of work's guard: a passing expectation is ignored, a failing one aborts the batch. */
 export const GUARD_TRIGGER = "CREATE TRIGGER `core_guard_check` BEFORE INSERT ON `core_guard` BEGIN SELECT CASE WHEN NEW.ok = 1 THEN RAISE(IGNORE) ELSE RAISE(ABORT, 'guard:' || coalesce(NEW.code, '')) END; END;"
 
-const { values } = parseArgs({ args: Bun.argv.slice(2), options: { name: { type: 'string' }, owner: { type: 'string', default: 'upstream' } }, allowPositionals: true })
+const { values } = parseArgs({ args: Bun.argv.slice(2), options: { name: { type: 'string' }, owner: { type: 'string', default: 'upstream' }, hints: { type: 'string' } }, allowPositionals: true })
 const owner = values.owner as Owner
 if (!values.name || !/^[a-z0-9-]+$/.test(values.name)) {
   console.error('Give the migration a name: bun run db:generate -- --name add-orders')
@@ -32,7 +33,7 @@ try {
   const out = join(ROOT, JOURNALS[owner])
   const before = new Set(existsSync(out) ? readdirSync(out) : [])
   const schema = await bundleSchema(modules, owner)
-  const run = drizzleKit(['generate', '--dialect', 'sqlite', '--schema', schema, '--out', JOURNALS[owner], '--name', values.name])
+  const run = drizzleKit(['generate', '--dialect', 'sqlite', '--schema', schema, '--out', JOURNALS[owner], '--name', values.name, ...(values.hints ? ['--hints', values.hints] : [])])
   process.stdout.write(run.output)
   if (run.status !== 0) process.exit(run.status)
   // Search indexes (Foundations part 4, "Lists", S1): Drizzle Kit cannot write a virtual table or a
@@ -41,7 +42,7 @@ try {
   const changes = indexChanges(wanted, await journalIndexes(owner))
   let created = readdirSync(out).filter(name => !before.has(name))
   if (!created.length && changes.length) {
-    const custom = drizzleKit(['generate', '--custom', '--dialect', 'sqlite', '--schema', schema, '--out', JOURNALS[owner], '--name', values.name])
+    const custom = drizzleKit(['generate', '--custom', '--dialect', 'sqlite', '--schema', schema, '--out', JOURNALS[owner], '--name', values.name, ...(values.hints ? ['--hints', values.hints] : [])])
     if (custom.status !== 0) {
       process.stdout.write(custom.output)
       process.exit(custom.status)
