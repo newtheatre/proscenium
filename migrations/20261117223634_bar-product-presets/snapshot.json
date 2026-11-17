@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "37c041f0-9856-4c15-a733-e54dae77fea5",
+  "id": "416a04ee-1c14-4146-9e5c-47146bbbbf52",
   "prevIds": [
-    "d092bf0b-973f-44ea-8ebf-be33b871c95f"
+    "01bbcc41-dd7e-49e2-beff-2196c2a5b11a"
   ],
   "ddl": [
     {
@@ -132,6 +132,14 @@
     },
     {
       "name": "box_office_scans",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_space_ticket_presets",
+      "entityType": "tables"
+    },
+    {
+      "name": "box_office_ticket_presets",
       "entityType": "tables"
     },
     {
@@ -2498,6 +2506,16 @@
     },
     {
       "table": "box_office_bands",
+      "name": "seats",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_bands",
       "name": "sort",
       "type": "integer",
       "notNull": true,
@@ -4053,6 +4071,106 @@
       "notNull": true,
       "autoincrement": false,
       "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "space_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "preset_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_space_ticket_presets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "sections",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "created_by",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -15635,6 +15753,34 @@
       "entityType": "indexes"
     },
     {
+      "table": "box_office_space_ticket_presets",
+      "name": "box_office_space_ticket_presets_space",
+      "columns": [
+        {
+          "value": "space_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "box_office_ticket_presets_name",
+      "columns": [
+        {
+          "value": "lower(\"name\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "box_office_ticket_types",
       "name": "box_office_ticket_types_name",
       "columns": [
@@ -19192,6 +19338,21 @@
       "entityType": "fks"
     },
     {
+      "table": "box_office_space_ticket_presets",
+      "name": "fk_box_office_space_ticket_presets_preset_id_box_office_ticket_presets_id_fk",
+      "columns": [
+        "preset_id"
+      ],
+      "tableTo": "box_office_ticket_presets",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "box_office_tickets",
       "name": "fk_box_office_tickets_order_line_id_box_office_order_lines_id_fk",
       "columns": [
@@ -21015,6 +21176,24 @@
       "entityType": "pks"
     },
     {
+      "table": "box_office_space_ticket_presets",
+      "name": "box_office_space_ticket_presets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "box_office_ticket_presets_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "box_office_ticket_types",
       "name": "box_office_ticket_types_pk",
       "columns": [
@@ -22275,6 +22454,12 @@
       "table": "box_office_scans",
       "name": "box_office_scans_reason",
       "value": "\"result\" NOT IN ('reversed', 'admitted_by_override') OR \"reason_term_id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "box_office_ticket_presets",
+      "name": "box_office_ticket_presets_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
       "entityType": "checks"
     },
     {
