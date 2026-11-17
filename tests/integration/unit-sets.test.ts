@@ -171,3 +171,12 @@ describe('sending job messages', () => {
     expect(calls).toEqual([100, 100, 50])
   })
 })
+
+describe('retention', () => {
+  it('reads a fixed retention as it reads a setting\'s', async () => {
+    const { retentionSeconds } = await import('#kit')
+    const { ticks, ledger } = await import('../fixtures/modules/seats/server/db/schema')
+    expect(await inContext(() => retentionSeconds(ticks))).toBe(30 * 86_400)
+    expect(await inContext(() => retentionSeconds(ledger))).toBeNull()
+  })
+})

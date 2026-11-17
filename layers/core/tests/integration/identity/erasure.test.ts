@@ -7,6 +7,7 @@ import { Browser, deliver, env, goStale, grantDirectly, leaveIdentity, reassert,
 import { inContext, rows } from '../../../../../tests/integration/helpers'
 import { setMailer, useMailer, type OutgoingEmail } from '../../../server/notifications/mailer'
 import { eraseAccount, erasurePlan } from '../../../server/identity/erasure'
+import { exportPlan } from '../../../server/identity/export'
 import review from '../../../server/tasks/review-data-requests'
 
 const sent: OutgoingEmail[] = []
@@ -157,6 +158,21 @@ describe('asking for erasure (ID-16)', () => {
       [survivor, merged].sort().map(id => ({ id, anonymised: 1 })))
   })
 
+  it('clears an internal column declared erase: \'clear\' with the row\'s personal columns, and leaves it out of a download', async () => {
+    const accountId = await unclaimedAccount()
+    const [show] = await rows<{ id: string }>('SELECT id FROM seats_performances LIMIT 1')
+    const performanceId = show?.id ?? 'sp_aaaaaaaaaaaaaaaaaaaaaaaaaa'
+    if (!show) await env.DB.prepare('INSERT INTO seats_performances (id, title, capacity) VALUES (?, \'Hamlet\', 5)').bind(performanceId).run()
+    await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, buyer_name, link_hash, created_at) VALUES (?, ?, 1, ?, \'Pat Person\', \'h4sh\', ?)').bind('sl_aaaaaaaaaaaaaaaaaaaaaaaaab', performanceId, accountId, Date.now()).run()
+    expect(exportPlan().find(t => t.table === 'seats_ledger')?.columns).not.toContain('link_hash')
+    await inContext(async () => {
+      const unit = createUnit()
+      await eraseAccount(unit, accountId)
+      await unit.commit()
+    })
+    expect(await rows('SELECT buyer_name, link_hash FROM seats_ledger WHERE id = ?', 'sl_aaaaaaaaaaaaaaaaaaaaaaaaab')).toEqual([{ buyer_name: 'Former member', link_hash: null }])
+  })
+
   it('ends live grants, keeping them as history', async () => {
     const { browser, accountId, mine } = await person()
     const { grantId } = await grantDirectly(accountId, ['core.account.search'])
@@ -192,7 +208,7 @@ describe('the erasure plan', () => {
   it('reaches every table that holds something personal about a person', () => {
     const planned = new Set(erasurePlan().map(s => s.table))
     for (const [name, { meta }] of useRegistry().tables as Map<string, { meta: TableMeta }>) {
-      const personal = Object.values(meta.columns).some(c => ['clear', 'anonymise', 'redact'].includes(c.meta.erase) && c.meta.class !== 'internal')
+      const personal = Object.values(meta.columns).some(c => ['clear', 'anonymise', 'redact'].includes(c.meta.erase))
       if (!personal || meta.options.subject === 'none') continue
       expect(planned, `${name} holds personal columns but erasure does not reach it`).toContain(name)
     }

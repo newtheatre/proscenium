@@ -49,7 +49,7 @@ contributes: {
 - `section` is `everyday` or `setup`; everyday entries come first in a group.
 - An entry shows only to someone holding one of its abilities (or any signed-in person, for an
   account entry with none). `match` widens the addresses an entry covers.
-- A module with settings gets an entry for its generated settings page without declaring one. It sits in the set-up half of the module's own group (the group of its first console entry, or one named for the module), at `/console/<module>/settings` (core's own is `/console/system/settings`, in System), so a module that is off takes its settings page with it.
+- A module with settings gets an entry for its generated settings page without declaring one. It sits in the set-up half of the module's own group (the group of its first console entry, or one named for the module), at `/console/<module>/settings` (core's own settings are the site's and live only in Site administration at `/admin/settings`; the old `/console/system/settings` redirects there), so a module that is off takes its settings page with it.
 - A setting declared with `scope: 'site'` is shown with the site's own settings at `/admin/settings`
   (the entry `core.site-settings`, in the modules group) instead of on its module's page; nothing
   else about it changes. Every one of foundations' `core.*` settings is site-scoped.
