@@ -26,6 +26,11 @@ export default defineModule({
     'age-check.description': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
     'age-check.review-every': setting.duration({ default: '7d', min: '1d', max: '90d', change, audience: 'staff' }),
     'retention.age-checks': setting.duration({ default: '730d', min: '180d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
+    // Allergens (tab 10, approved 17 November): the till's sheet, the public chart, and how often a label is read again.
+    'allergens.enabled': setting.boolean({ default: true, change, audience: 'staff' }),
+    'allergens.recheck-every': setting.duration({ default: '182d', min: '30d', max: '730d', change, audience: 'staff' }),
+    'allergens.statement': setting.text({ default: '', maxLength: 400, multiline: true, change, audience: 'public' }),
+    'allergens.publish': setting.boolean({ default: true, change, audience: 'staff' }),
   }),
 
   records: defineRecords('bar', {
@@ -56,6 +61,8 @@ export default defineModule({
     'sale.refund': ability({ implies: ['sale.view'] }),
     'age-check.view': ability(),
     'age-check.review': ability({ implies: ['age-check.view'] }),
+    // Record and check allergens against labels. Everyone who sells reads them on the till.
+    'allergens.manage': ability(),
   }),
 
   tables,

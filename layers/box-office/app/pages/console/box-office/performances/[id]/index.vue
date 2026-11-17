@@ -387,10 +387,12 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="flex flex-wrap items-end gap-2"
               :state="band"
+              :validate="() => needs({ name: band.name })"
               novalidate
               @submit="addBand"
             >
               <UFormField
+                name="name"
                 :label="t('box-office.setup.bands.name')"
                 class="grow"
               >
@@ -410,7 +412,6 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
                 :label="t('box-office.setup.bands.add')"
                 color="neutral"
                 variant="outline"
-                :disabled="!band.name.trim()"
               />
             </UForm>
           </PageSection>
@@ -473,6 +474,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               v-else-if="d.bands.length"
               class="space-y-6"
               :state="prices"
+              :validate="() => needs({ from: when === 'later' ? from : true })"
               novalidate
               @submit="savePrices"
             >
@@ -494,6 +496,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               </UFormField>
               <UFormField
                 v-if="when === 'later'"
+                name="from"
                 :label="t('box-office.setup.prices.when.from')"
                 :help="t('box-office.setup.prices.when.from-help')"
                 required
@@ -533,7 +536,6 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               <UButton
                 type="submit"
                 :label="t(when === 'later' ? 'box-office.setup.prices.save-later' : 'box-office.setup.prices.save')"
-                :disabled="when === 'later' && from === null"
               />
             </UForm>
             <div
@@ -623,10 +625,12 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             <UForm
               class="flex items-end gap-2"
               :state="{ newName }"
+              :validate="() => needs({ newName })"
               novalidate
               @submit="rename"
             >
               <UFormField
+                name="newName"
                 :label="t('box-office.setup.bands.name')"
                 class="grow"
               >
@@ -639,7 +643,6 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               <UButton
                 type="submit"
                 :label="t('box-office.setup.bands.rename')"
-                :disabled="!newName.trim()"
               />
             </UForm>
           </template>

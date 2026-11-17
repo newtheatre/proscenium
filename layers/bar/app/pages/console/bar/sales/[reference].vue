@@ -151,6 +151,7 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
           v-if="form && data"
           id="bar-refund"
           :state="form"
+          :validate="() => needs({ reasonTermId: form?.reasonTermId })"
           class="space-y-4"
           novalidate
           @submit="refund"
@@ -218,7 +219,7 @@ const reversalText = (r: Reversal) => t(`bar.screens.sale.reversal.${r.state}`, 
           type="submit"
           form="bar-refund"
           :loading="saving"
-          :disabled="!total || !form?.reasonTermId"
+          :disabled="!total"
           :label="t('bar.screens.sale.refund-amount', { amount: money(total) })"
         />
       </template>
