@@ -175,12 +175,18 @@ describe('FH-24 and FH-25: checklists', () => {
 })
 
 describe('FH-26: the emergency card', () => {
-  it('is written by a manager, marked reviewed, and read by anyone rostered', async () => {
+  it('is written by a manager, marked reviewed only when ticked, and read by anyone rostered', async () => {
     const p = await performance()
     const saved = await req('PUT', `/api/front-of-house/emergency-cards/${p.venueId}`, { body: 'Leave by the nearest exit. Assemble on the green.' })
     expect(saved.status, JSON.stringify(saved.body)).toBe(200)
     const cards = (await req('GET', '/api/front-of-house/emergency-cards', undefined, steward())).body.cards
     expect(cards.find((c: any) => c.venueId === p.venueId)).toMatchObject({ body: 'Leave by the nearest exit. Assemble on the green.', reviewedOn: '2026-11-16' })
+    // A later fix without the review tick leaves the date; with it, the date moves.
+    setClock(Date.UTC(2026, 11, 1, 12))
+    await req('PUT', `/api/front-of-house/emergency-cards/${p.venueId}`, { body: 'Leave by the nearest exit. Assemble on the village green.' })
+    expect((await rows('SELECT reviewed_on FROM front_of_house_emergency_cards WHERE venue_id = ?', p.venueId))[0]).toEqual({ reviewed_on: '2026-11-16' })
+    await req('PUT', `/api/front-of-house/emergency-cards/${p.venueId}`, { body: 'Leave by the nearest exit. Assemble on the village green.', reviewed: true })
+    expect((await rows('SELECT reviewed_on FROM front_of_house_emergency_cards WHERE venue_id = ?', p.venueId))[0]).toEqual({ reviewed_on: '2026-12-01' })
     expect((await req('PUT', '/api/front-of-house/emergency-cards/nowhere', { body: 'x' })).body.code).toBe('core.not-found')
     expect((await req('GET', '/api/front-of-house/emergency-cards', undefined, volunteer())).status).toBe(403)
   })

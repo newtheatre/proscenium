@@ -14,16 +14,19 @@ export async function getCard(venueId: string): Promise<EmergencyCard | null> {
   return (await listCards()).find(c => c.venueId === venueId) ?? null
 }
 
-/** Writes a venue's card. Saving it counts as reviewing it, so the review date becomes today. */
-export async function saveCard(unit: UnitView, input: { venueId: string, body: string, by: string }): Promise<void> {
+/**
+ * Writes a venue's card. The review date becomes today only when the editor says they reviewed the
+ * whole card, or when the card is new; a small fix leaves it as it was.
+ */
+export async function saveCard(unit: UnitView, input: { venueId: string, body: string, reviewed: boolean, by: string }): Promise<void> {
   const at = nowMs()
   const day = await today()
   const existing = await first('SELECT 1 AS one FROM front_of_house_emergency_cards WHERE venue_id = ?', input.venueId)
   unit.add({
     sql: `INSERT INTO front_of_house_emergency_cards (id, venue_id, body, reviewed_on, reviewed_by, created_at, updated_at)
       SELECT ?, v.id, ?, ?, ?, ?, ? FROM core_venues v WHERE v.id = ?
-      ON CONFLICT (venue_id) DO UPDATE SET body = excluded.body, reviewed_on = excluded.reviewed_on, reviewed_by = excluded.reviewed_by, updated_at = excluded.updated_at`,
+      ON CONFLICT (venue_id) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at${input.reviewed ? ', reviewed_on = excluded.reviewed_on, reviewed_by = excluded.reviewed_by' : ''}`,
     params: [newId('emg'), input.body, day, input.by, at, at, input.venueId],
   }).expect(1, { code: 'core.not-found', reason: 'There is no such venue.' })
-  unit.audit({ action: existing ? 'update' : 'create', detail: { emergencyCard: input.venueId, reviewedOn: day } })
+  unit.audit({ action: existing ? 'update' : 'create', detail: { emergencyCard: input.venueId, reviewed: input.reviewed || !existing } })
 }
