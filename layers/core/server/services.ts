@@ -13,6 +13,8 @@ export type { BookingAction, BookingAnswer, BookingState, BookingSubject } from 
 export { bookingActions } from './programme/booking'
 export type { BookingTarget, ShownBooking } from './programme/booking'
 export { publicProduction, currentProductions } from './programme/public'
+export { pastProductions } from './programme/archive'
+export type { Archive, ArchiveEntry, ArchiveYear, ArchiveOptions } from './programme/archive'
 export type { PublicProduction, PublicPerformance, PublicListing, PublicProductionOptions } from './programme/public'
 export type { PublicImage } from './programme/media'
 export type { ChangeImpact, ProposedChange } from './points/change-impact'
