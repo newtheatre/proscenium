@@ -9,7 +9,8 @@ import { themeCss, tokensFor, type BrandChoice } from '../../server/brand/theme'
 import { clean, cleanSvg, sniff, Rejected } from '../../server/files/inspect'
 import { operatingDayAt, operatingDayBounds } from '../../server/calendar'
 import { render, variablesIn, isSafeUrl } from '../../server/notifications/render'
-import { componentProblems, navigationProblems, pagePaths } from '../../../../scripts/checks/site'
+import { appRoutes, componentProblems, navigationProblems, pagePaths, redirectProblems } from '../../../../scripts/checks/site'
+import { findRedirect } from '../../shared/redirects'
 
 const ascii = (s: string) => [...s].map(c => c.charCodeAt(0))
 const u32be = (n: number) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]
@@ -260,6 +261,54 @@ describe('the fork\'s menu and components (C-40)', () => {
     expect(navigationProblems({ sidebar: [] }, pages)[0]).toContain('sidebar')
     expect(navigationProblems({ header: [{ to: '/' }] }, pages)[0]).toContain('label')
     expect(navigationProblems({ header: [{ label: 'x', to: 'about' }] }, pages)[0]).toContain('neither')
+  })
+
+  describe('old addresses (C-45)', () => {
+    const app = mkdtempSync(join(tmpdir(), 'pages-'))
+    for (const file of ['whats-on/index.vue', 'whats-on/[slug].vue', 'shows/[slug].vue', '[...slug].vue', 'console/people/index.vue']) {
+      mkdirSync(join(app, file, '..'), { recursive: true })
+      writeFileSync(join(app, file), '<template />')
+    }
+    const routes = appRoutes([app, join(app, 'missing')])
+
+    it('knows the app\'s own addresses, and the prefixes of record pages, but not the catch-all', () => {
+      expect([...routes.exact].sort()).toEqual(['/console/people', '/whats-on'])
+      expect(routes.prefixes).toEqual(['/shows/', '/whats-on/'])
+    })
+
+    it('passes entries to pages, record pages and https, and fails the rest', () => {
+      const ok = [{ from: '/about-us.html', to: '/about' }, { from: '/show.php?id=12', to: '/whats-on/hamlet' }, { from: '/old-shop/', to: 'https://shop.example.org' }, { from: '/programme', to: '/whats-on' }]
+      expect(redirectProblems({ redirects: ok }, pages, routes)).toEqual([])
+      expect(redirectProblems({ redirects: [] }, pages, routes)).toEqual([])
+      const bad = redirectProblems({ redirects: [
+        { from: '/gone', to: '/history' },
+        { from: '/about', to: '/visit' },
+        { from: 'relative', to: '/' },
+        { from: '/loop/', to: '/loop' },
+        { from: '/x', to: 'about' },
+        { from: '/twice', to: '/' },
+        { from: '/twice/', to: '/about' },
+        { from: '/to-nowhere', to: '/shows/' },
+      ] }, pages, routes)
+      expect(bad).toHaveLength(7)
+      expect(bad[0]).toContain('/history, which is not a page')
+      expect(bad[1]).toContain('/about is a page on this site now')
+      expect(bad[2]).toContain('needs from:')
+      expect(bad[3]).toContain('to itself')
+      expect(bad[4]).toContain('neither')
+      expect(bad[5]).toContain('listed twice')
+      expect(bad[6]).toContain('/shows')
+      expect(redirectProblems({ links: [] }, pages, routes)[0]).toContain('should hold redirects:')
+    })
+
+    it('finds the entry for a request, the one naming its query first', () => {
+      const list = [{ from: '/show.php', to: '/whats-on' }, { from: '/show.php?id=12', to: '/whats-on/hamlet' }, { from: '/about-us/', to: '/about' }]
+      expect(findRedirect(list, '/show.php', '?id=12')?.to).toBe('/whats-on/hamlet')
+      expect(findRedirect(list, '/show.php', '?id=13')?.to).toBe('/whats-on')
+      expect(findRedirect(list, '/about-us')?.to).toBe('/about')
+      expect(findRedirect(list, '/about-us/')?.to).toBe('/about')
+      expect(findRedirect(list, '/about')).toBeUndefined()
+    })
   })
 
   it('fails a component nobody offers, outside code', () => {

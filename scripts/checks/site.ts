@@ -54,6 +54,53 @@ export function navigationProblems(navigation: unknown, pages: Set<string>, file
   return problems
 }
 
+/**
+ * The addresses the app's own pages answer, from every layer's app/pages and site/app/pages: exact
+ * ones (/whats-on, /shows) and the prefixes of those with a part filled in per record
+ * (/whats-on/<slug>), which the check cannot see into. The catch-all for Markdown pages is left out.
+ */
+export function appRoutes(pagesDirs: string[]): { exact: Set<string>, prefixes: string[] } {
+  const exact = new Set<string>()
+  const prefixes = new Set<string>()
+  for (const dir of pagesDirs) {
+    for (const file of walk(dir, '.vue')) {
+      const parts = relative(dir, file).replace(/\\/g, '/').replace(/\.vue$/, '').split('/').filter(p => p !== 'index')
+      const dynamic = parts.findIndex(p => p.startsWith('['))
+      if (dynamic === -1) exact.add(`/${parts.join('/')}`.replace(/\/$/, '') || '/')
+      else if (dynamic > 0 && !parts[dynamic]!.startsWith('[...')) prefixes.add(`/${parts.slice(0, dynamic).join('/')}/`)
+    }
+  }
+  return { exact, prefixes: [...prefixes].sort() }
+}
+
+/** Problems with redirects.yml (C-45): its shape, an old address that is a page now, and a new one that is not a page. */
+export function redirectProblems(file: unknown, pages: Set<string>, routes: { exact: Set<string>, prefixes: string[] }, name = 'site/content/redirects.yml'): string[] {
+  if (!file || typeof file !== 'object' || !('redirects' in file)) return [`${name}: should hold redirects: a list of { from, to }`]
+  const list = (file as { redirects: unknown }).redirects
+  if (list === null || list === undefined) return []
+  if (!Array.isArray(list)) return [`${name}: redirects is a list of { from, to }`]
+  const problems: string[] = []
+  const seen = new Set<string>()
+  const isPage = (path: string) => pages.has(path) || routes.exact.has(path) || routes.prefixes.some(p => path.startsWith(p) && path.length > p.length)
+  list.forEach((entry: any, i) => {
+    const at = `${name}: redirects[${i}]`
+    if (!entry || typeof entry.from !== 'string' || !entry.from.startsWith('/') || entry.from.startsWith('//')) return problems.push(`${at}: needs from:, an old address on this site such as /about-us.html`)
+    if (typeof entry.to !== 'string') return problems.push(`${at}: needs to:, a page such as /about or an https address`)
+    const from = entry.from.length > 1 ? entry.from.split('?')[0]!.replace(/\/+$/, '') : entry.from
+    const key = entry.from.includes('?') ? `${from}?${entry.from.split('?').slice(1).join('?')}` : from
+    if (seen.has(key)) problems.push(`${at}: ${entry.from} is listed twice`)
+    seen.add(key)
+    if (!entry.from.includes('?') && isPage(from)) problems.push(`${at}: ${from} is a page on this site now, so it cannot also redirect`)
+    const to = entry.to as string
+    if (/^https:\/\//.test(to)) return
+    if (!to.startsWith('/') || to.startsWith('//')) return problems.push(`${at}: "${to}" is neither a page on this site (/about) nor an https address`)
+    const path = to.split(/[?#]/)[0]!.replace(/\/$/, '') || '/'
+    if (path === from) return problems.push(`${at}: sends ${from} to itself`)
+    if (!isPage(path)) problems.push(`${at}: sends ${entry.from} to ${path}, which is not a page. Add site/content/pages${path === '/' ? '/index' : path}.md or change the entry`)
+  })
+  return problems
+}
+
 // ::name, :name{...} or :name[...] at the start of a line or after a space.
 const COMPONENT = /(?:^|\s):{1,}([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(?=[{[\s]|$)/g
 
@@ -119,6 +166,14 @@ export function checkSite(registry: any, parseYaml: (source: string) => unknown)
     try { parsed = parseYaml(readFileSync(navFile, 'utf8')) }
     catch (error) { return [`site/content/navigation.yml: is not valid YAML: ${(error as Error).message}`] }
     problems.push(...navigationProblems(parsed, pages))
+  }
+  const redirectsFile = join(content, 'redirects.yml')
+  if (existsSync(redirectsFile)) {
+    let parsed: unknown
+    try { parsed = parseYaml(readFileSync(redirectsFile, 'utf8')) }
+    catch (error) { return [`site/content/redirects.yml: is not valid YAML: ${(error as Error).message}`] }
+    const layers = existsSync(join(ROOT, 'layers')) ? readdirSync(join(ROOT, 'layers')).map(l => join(ROOT, 'layers', l, 'app/pages')) : []
+    problems.push(...redirectProblems(parsed, pages, appRoutes([...layers, join(ROOT, 'site/app/pages')])))
   }
   const files = walk(content, '.md').map(file => ({ file: relative(ROOT, file), source: readFileSync(file, 'utf8') }))
   problems.push(...publicComponentProblems(components))
