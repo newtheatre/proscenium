@@ -23,7 +23,7 @@ interface Person {
   passkeys: { id: string, label: string, addedAt: number, lastUsedAt: number | null }[]
   providers: string[]
   liveSessions: number
-  actions: { recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean }
+  actions: { recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean, erase: boolean }
 }
 interface Grant { id: string, role: string, state: string, scope: { kind: string, module: string | null }, expiresAt: number | null, endedAt: number | null }
 
@@ -99,6 +99,25 @@ async function endSessions() {
   await act(() => $api<unknown>(at('sessions'), { method: 'DELETE' }), t('core.person.sessions.done'))
 }
 
+// Start an erasure for somebody who asked another way (ID-35), saying how staff checked who they
+// were. They still confirm it from the link sent to their address.
+const CHECKS = ['in-person', 'document', 'email-reply', 'known'] as const
+const erasing = ref(false)
+const check = ref<typeof CHECKS[number]>('in-person')
+const DATA_REQUESTS: string = '/api/core/data-requests'
+async function erase() {
+  erasing.value = false
+  refusal.value = null
+  try {
+    const { id: requestId } = await $api<{ id: string }>(DATA_REQUESTS, { method: 'POST', body: { accountId: id.value, kind: 'erasure', identityCheck: check.value } })
+    toast.add({ title: t('core.person.erase.done'), color: 'success' })
+    await navigateTo(`/console/people/data-requests/${encodeURIComponent(requestId)}`)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+
 const actions = computed<DropdownMenuItem[][]>(() => {
   const p = person.value
   if (!p || p.anonymised) return []
@@ -112,6 +131,7 @@ const actions = computed<DropdownMenuItem[][]>(() => {
       : { label: t('core.person.disable.button'), icon: 'i-lucide-user-x', color: 'error', onSelect: () => { disabling.value = true } })
   }
   if (ending.length) groups.push(ending)
+  if (p.actions.erase) groups.push([{ label: t('core.person.erase.button'), icon: 'i-lucide-eraser', color: 'error', onSelect: () => { erasing.value = true } }])
   return groups
 })
 
@@ -262,6 +282,28 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
             color="error"
             :label="t('core.person.disable.button')"
             @click="disable"
+          />
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="erasing"
+        :title="t('core.person.erase.title', { name: title })"
+        :description="t('core.person.erase.description')"
+      >
+        <template #body>
+          <UFormField :label="t('core.person.erase.check')">
+            <URadioGroup
+              v-model="check"
+              :items="CHECKS.map(c => ({ value: c, label: t(`core.data-request.identity-checks.${c}`) }))"
+            />
+          </UFormField>
+        </template>
+        <template #footer>
+          <UButton
+            color="error"
+            :label="t('core.person.erase.button')"
+            @click="erase"
           />
         </template>
       </UModal>

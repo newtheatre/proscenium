@@ -227,10 +227,24 @@ describe('the staff queue (ID-35)', () => {
     const desk = await staff()
     expect((await desk.browser.get('/api/core/data-requests')).status).toBe(403)
     await grantDirectly(desk.accountId, ['core.data-request.manage'])
-    const queue = (await desk.browser.get('/api/core/data-requests')).body.requests
+    const queue = (await desk.browser.get('/api/core/data-requests')).body.rows
     const row = queue.find((r: any) => r.id === id)
-    expect(row).toMatchObject({ kind: 'erasure', state: 'confirmed', overdue: false, name: 'Erin Erased' })
+    expect(row).toMatchObject({ kind: 'erasure', state: 'confirmed', overdue: false, closed: false, person: 'Erin Erased' })
     expect(row.respondBy - Date.now()).toBeGreaterThan(29 * 86400_000)
+  })
+
+  it('finds requests by the person\'s name, and shows those past their respond-by date as overdue', async () => {
+    const { browser, mine } = await person()
+    const id = await askAndConfirm(browser, mine)
+    const desk = await staff()
+    await grantDirectly(desk.accountId, ['core.data-request.manage'])
+    expect((await desk.browser.get('/api/core/data-requests?q=Erin')).body.rows.map((r: any) => r.id)).toContain(id)
+    expect((await desk.browser.get('/api/core/data-requests?q=Nobodyknown')).body.rows.map((r: any) => r.id)).not.toContain(id)
+    expect((await desk.browser.get('/api/core/data-requests?view=overdue')).body.rows.map((r: any) => r.id)).not.toContain(id)
+    await env.DB.prepare('UPDATE core_data_requests SET respond_by = 1 WHERE id = ?').bind(id).run()
+    const overdue = (await desk.browser.get('/api/core/data-requests?view=overdue')).body.rows
+    expect(overdue.find((r: any) => r.id === id)).toMatchObject({ overdue: true })
+    expect((await desk.browser.get('/api/core/data-requests?kind=export')).body.rows.map((r: any) => r.id)).not.toContain(id)
   })
 
   it('staff start a request for somebody, recording how they checked who it was', async () => {
@@ -254,12 +268,15 @@ describe('the staff queue (ID-35)', () => {
     expect((await desk.browser.post(`/api/core/data-requests/${id}/close`)).body.code).toBe('core.data-request.not-finished')
     await env.DB.prepare('UPDATE core_data_requests SET not_before = 1 WHERE id = ?').bind(id).run()
     await runReview()
-    const { checklist } = (await desk.browser.get(`/api/core/data-requests/${id}`)).body
+    const { checklist, actions } = (await desk.browser.get(`/api/core/data-requests/${id}`)).body
+    expect(actions).toEqual({ cancel: false, tick: true, close: false })
     expect(checklist.map((l: any) => l.table)).toEqual(expect.arrayContaining(['core_account_tokens', 'core_files']))
     expect((await desk.browser.post(`/api/core/data-requests/${id}/close`)).body.code).toBe('core.data-request.checklist-open')
     for (const line of checklist) expect((await desk.browser.put(`/api/core/data-requests/${id}/checks`, { table: line.table, outcome: 'nothing-found' })).status).toBe(200)
     expect((await desk.browser.put(`/api/core/data-requests/${id}/checks`, { table: 'core_accounts', outcome: 'handled' })).body.code).toBe('core.data-request.no-such-line')
+    expect((await desk.browser.get(`/api/core/data-requests/${id}`)).body.actions.close).toBe(true)
     expect((await desk.browser.post(`/api/core/data-requests/${id}/close`)).status).toBe(200)
-    expect((await desk.browser.get('/api/core/data-requests')).body.requests.some((r: any) => r.id === id)).toBe(false)
+    expect((await desk.browser.get('/api/core/data-requests')).body.rows.some((r: any) => r.id === id)).toBe(false)
+    expect((await desk.browser.get('/api/core/data-requests?view=closed')).body.rows.map((r: any) => r.id)).toContain(id)
   })
 })

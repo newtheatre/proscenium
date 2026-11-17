@@ -351,7 +351,7 @@ export const dataRequests = defineTable('core_data_requests', {
 }, {
   id: 'dreq',
   realm: 'operational',
-  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore)],
+  extra: t => [index('core_data_requests_account').on(t.accountId, t.kind, t.state), index('core_data_requests_state').on(t.state, t.notBefore), index('core_data_requests_respond_by').on(t.respondBy)],
 })
 
 /** One line of a request's hand-search checklist: a table that may hold rows linked to no account. */

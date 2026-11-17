@@ -31,6 +31,8 @@ export default defineRoute({
     merge: await may('core.account.merge'),
     endSessions: await may('core.session.end'),
     grants: await may('core.grant.read'),
+    // Staff ask for their own erasure from their own account, like anybody else.
+    erase: actor.accountId !== id && (await can(actor, 'core.data-request.manage')).allowed,
   }
   return {
     id,

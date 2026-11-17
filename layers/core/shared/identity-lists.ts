@@ -88,6 +88,58 @@ export const grantsList = defineList('core.grants', {
   defaultSort: { key: 'ends', order: 'asc' },
 })
 
+/**
+ * Data requests (Identity Doc part 5; ID-35): every export and erasure with its state, holds and
+ * respond-by date, the nearest deadline first. A request stays open until staff close it, after it
+ * has run and every hand-search line is ticked. The person is found by name or address through
+ * findAccounts.
+ */
+export const dataRequestsList = defineList('core.data-requests', {
+  filters: {
+    kind: {
+      kind: 'choices',
+      label: 'Kind',
+      options: [
+        { value: 'export', label: 'Copy of their data' },
+        { value: 'erasure', label: 'Erasure' },
+      ],
+    },
+    state: {
+      kind: 'choices',
+      label: 'State',
+      options: [
+        { value: 'requested', label: 'Waiting for the person to confirm' },
+        { value: 'confirmed', label: 'Confirmed' },
+        { value: 'held', label: 'Held' },
+        { value: 'running', label: 'Running' },
+        { value: 'done', label: 'Done' },
+        { value: 'cancelled', label: 'Cancelled' },
+        { value: 'failed', label: 'Failed' },
+      ],
+    },
+    closed: { kind: 'yes-no', label: 'Closed' },
+    overdue: { kind: 'yes-no', label: 'Past its respond-by date' },
+  },
+  sorts: {
+    respondBy: { label: 'Respond by', type: 'date', natural: 'asc' },
+  },
+  columns: {
+    person: { label: 'Person', always: true, card: true },
+    kind: { label: 'Kind', card: true },
+    state: { label: 'State', card: true },
+    requestedAt: { label: 'Asked' },
+    respondBy: { label: 'Respond by', sort: 'respondBy', card: true },
+  },
+  views: {
+    open: { label: 'Open', filters: { closed: 'no' } },
+    overdue: { label: 'Overdue', filters: { overdue: 'yes' } },
+    closed: { label: 'Closed', filters: { closed: 'yes' } },
+    all: { label: 'All' },
+  },
+  defaultView: 'open',
+  defaultSort: { key: 'respondBy', order: 'asc' },
+})
+
 /** Email addresses, searched by the address itself. Only verified ones ever find a person. */
 export const accountEmailsList = defineList('core.account-emails', {
   filters: {},

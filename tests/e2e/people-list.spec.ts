@@ -70,6 +70,28 @@ test.describe('someone who reads grants', () => {
   })
 })
 
+test.describe('someone who handles data requests', () => {
+  test.use(as(['core.data-request.manage', 'core.account.create']))
+
+  test('opens Data requests with its views, and can start an erasure from a person\'s page', async ({ page }) => {
+    await visit(page, '/console/people/data-requests')
+    await expect(page.getByRole('heading', { level: 1, name: 'Data requests' })).toBeVisible()
+    for (const name of ['Open', 'Overdue', 'Closed', 'All']) await expect(page.getByRole('tab', { name })).toBeVisible()
+    await noViolations(page)
+    await page.getByRole('tab', { name: 'Overdue' }).click()
+    await expect(page).toHaveURL(/view=overdue/)
+
+    const name = `Elin Erasetest ${Date.now()}`
+    const made = await page.request.post('/api/core/accounts', { data: { name, address: `elin.${Date.now()}@example.org` } })
+    const { id } = await made.json() as { id: string }
+    await visit(page, `/console/people/${id}`)
+    await page.getByRole('button', { name: /more actions|actions/i }).first().click()
+    await page.getByRole('menuitem', { name: 'Start an erasure' }).click()
+    await expect(page.getByRole('dialog').getByRole('radio', { name: 'Seen in person' })).toBeChecked()
+    await noViolations(page)
+  })
+})
+
 test.describe('without core.account.read', () => {
   test.use(as(['core.role.read']))
 
