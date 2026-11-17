@@ -164,13 +164,15 @@ export interface DeskOrder {
   amountDueMinor: number
   releaseAt: number | null
   keep: boolean
+  /** The payment being taken for it, while one is: it can be cancelled, which puts a reservation back as it was. */
+  intentId: string | null
   lines: { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }[]
 }
 
 /** One order as the desk shows it. Nothing about the buyer: that is the account's, and Identity's to show. */
 export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
-  const order = await first<{ id: string, reference: string, state: string, channel: string, currency: string, total_minor: number, release_at: number | null, keep: number }>(
-    'SELECT id, reference, state, channel, currency, total_minor, release_at, keep FROM box_office_orders WHERE id = ?', orderId)
+  const order = await first<{ id: string, reference: string, state: string, channel: string, currency: string, total_minor: number, release_at: number | null, keep: number, intent_id: string | null }>(
+    'SELECT id, reference, state, channel, currency, total_minor, release_at, keep, intent_id FROM box_office_orders WHERE id = ?', orderId)
   if (!order) return null
   const lines = await all<{ id: string, performance_id: string, band_id: string, ticket_type_id: string, type_name: string, amount_minor: number, admitted_at: number | null }>(
     `SELECT l.id, l.performance_id, l.band_id, l.ticket_type_id, t.name AS type_name, l.amount_minor, k.admitted_at FROM box_office_order_lines l
@@ -186,6 +188,7 @@ export async function deskOrder(orderId: string): Promise<DeskOrder | null> {
     amountDueMinor: order.state === 'reserved' || order.state === 'awaiting_payment' ? order.total_minor : 0,
     releaseAt: order.release_at,
     keep: !!order.keep,
+    intentId: order.state === 'awaiting_payment' ? order.intent_id : null,
     lines: lines.map(l => ({ id: l.id, performanceId: l.performance_id, bandId: l.band_id, ticketTypeId: l.ticket_type_id, ticketType: l.type_name, amountMinor: l.amount_minor, admittedAt: l.admitted_at })),
   }
 }

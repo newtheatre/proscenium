@@ -21,6 +21,7 @@ let reference = ''
 let swapping = ''
 let group = ''
 let amending = ''
+let unfinished = ''
 const premiumName = `Premium ${stamp}`
 let premium = { bandId: '', ticketTypeId: '' }
 let performanceId = ''
@@ -76,6 +77,8 @@ test.beforeAll(async ({ playwright }) => {
   group = (await post(buyer, `/api/box-office/baskets/${third.orderId}/reserve`, { expectedTotalMinor: 3600, email: 'desk.group@example.org', name: 'Desk Group' }, { 'x-basket-token': third.token })).reference
   // And two for a couple who turn up wanting something different.
   const fourth = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 2 }] })
+  const fifth = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 1 }] })
+  unfinished = (await post(buyer, `/api/box-office/baskets/${fifth.orderId}/reserve`, { expectedTotalMinor: 1200, email: 'desk.unfinished@example.org', name: 'Desk Unfinished' }, { 'x-basket-token': fifth.token })).reference
   amending = (await post(buyer, `/api/box-office/baskets/${fourth.orderId}/reserve`, { expectedTotalMinor: 2400, email: 'desk.couple@example.org', name: 'Desk Couple' }, { 'x-basket-token': fourth.token })).reference
   await buyer.dispose()
 
@@ -140,6 +143,34 @@ test('Sell finds a reservation by its reference and takes payment for it', async
   // Found again, it is paid for.
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
+})
+
+test('a payment left by a reload is picked up again, and another till can cancel it to take the booking', async ({ page, browser }) => {
+  await visit(page, '/console/box-office/sell')
+  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
+  await page.getByLabel(/^Booking reference or desk code/).fill(unfinished)
+  await page.getByRole('button', { name: 'Find' }).click()
+  await page.getByRole('button', { name: 'Take payment of £12.00' }).click()
+  await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
+  // Reloaded mid-payment: the till carries on with the same payment.
+  await page.reload()
+  await page.waitForFunction(() => (window as unknown as { useNuxtApp?: () => { isHydrating: boolean } }).useNuxtApp?.().isHydrating === false)
+  await expect(page.getByText('A payment of £12.00 was not finished').first()).toBeVisible()
+  await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
+
+  // Someone at another till finds the booking waiting on it, and cancels that payment to take it themselves.
+  const officeContext = await browser.newContext(as(office))
+  const other = await officeContext.newPage()
+  await visit(other, '/console/box-office/sell')
+  await other.getByRole('tab', { name: 'Collect a reservation' }).click()
+  await other.getByLabel(/^Booking reference or desk code/).fill(unfinished)
+  await other.getByRole('button', { name: 'Find' }).click()
+  await expect(other.getByText('A payment was started and not finished')).toBeVisible()
+  await noViolations(other)
+  await other.getByRole('button', { name: 'Cancel that payment' }).click()
+  await expect(other.getByText('Reserved, not paid')).toBeVisible()
+  await expect(other.getByRole('button', { name: 'Take payment of £12.00' })).toBeEnabled()
+  await officeContext.close()
 })
 
 test('Sell splits a reservation so one of a group pays for their own tickets', async ({ page }) => {

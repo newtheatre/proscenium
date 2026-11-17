@@ -9,7 +9,7 @@ interface PerformanceRow { bandId: string, band: string, ticketTypeId: string, t
 interface Performance { performanceId: string, title: string, startsAt: number, state: string, currency: string | null, rows: PerformanceRow[] }
 interface OrderLine { id: string, performanceId: string, bandId: string, ticketTypeId: string, ticketType: string, amountMinor: number, admittedAt: number | null }
 interface PendingExchange { orderId: string, reference: string, performanceId: string, lines: { lineId: string, bandId: string, ticketTypeId: string }[], expectedDifferenceMinor: number }
-interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, lines: OrderLine[] }
+interface Order { orderId: string, reference: string, state: 'reserved' | 'awaiting_payment' | 'confirmed' | 'cancelled', currency: string, totalMinor: number, amountDueMinor: number, intentId: string | null, lines: OrderLine[] }
 
 const props = defineProps<{ modelValue: unknown, locked: boolean, summary: { lines: { label: string, amountMinor: number }[], amountMinor: number } | null }>()
 const emit = defineEmits<{ 'update:modelValue': [unknown] }>()
@@ -124,6 +124,25 @@ async function amend(body: Record<string, unknown>) {
   try {
     await $api(`/api/box-office/orders/${order.value.orderId}/amend` as string, { method: 'POST', body })
     await find(order.value.reference)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    busy.value = false
+  }
+}
+// A payment started for the booking and never finished, such as at another till or before a reload:
+// cancelling it puts the reservation back, ready to be paid for here. A payment this till is taking
+// is cancelled from the till itself.
+async function cancelPending() {
+  const o = order.value
+  if (!o?.intentId) return
+  busy.value = true
+  refusal.value = null
+  try {
+    await $api(`/api/payments/intents/${o.intentId}/cancel` as string, { method: 'POST', body: {} })
+    await find(o.reference)
   }
   catch (e) {
     refusal.value = toRefusal(e)
@@ -334,6 +353,15 @@ function clear() {
             </span>
           </li>
         </ul>
+        <UAlert
+          v-if="order.state === 'awaiting_payment' && order.intentId && !locked"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-hourglass"
+          :title="t('box-office.screens.panel.pending.title')"
+          :description="t('box-office.screens.panel.pending.description')"
+          :actions="[{ label: t('box-office.screens.panel.pending.cancel'), color: 'neutral', variant: 'outline', loading: busy, onClick: () => { void cancelPending() } }]"
+        />
         <div
           v-if="order.state === 'reserved' && addChoices.length"
           class="flex items-end gap-2"

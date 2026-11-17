@@ -116,6 +116,22 @@ describe('a reservation at the desk', () => {
     expect(await tickets(r.orderId)).toEqual([{ state: 'valid', admitted_at: null, admitted_scan_id: null }])
   })
 
+  it('shows a payment left unfinished, such as by a reload, and cancelling it from the desk puts the reservation back', async () => {
+    const h = await house(4)
+    const r = await reserved(h, 2)
+    const left = await till({ orderId: r.orderId, expectedTotalMinor: r.totalMinor })
+    expect(left.status, JSON.stringify(left.body)).toBe(200)
+    // The page is reloaded: the till picks the sale up from the session, and the desk sees the booking waiting on it.
+    expect((await req('GET', '/api/payments/session', undefined, seller)).body.unfinished).toEqual({ intentId: left.body.intentId, amountMinor: r.totalMinor })
+    const found = await req('GET', `/api/box-office/desk/orders?q=${r.reference}`, undefined, seller)
+    expect(found.body.orders[0]).toMatchObject({ state: 'awaiting_payment', intentId: left.body.intentId })
+    const cancelled = await req('POST', `/api/payments/intents/${left.body.intentId}/cancel`, {}, seller)
+    expect(cancelled.status, JSON.stringify(cancelled.body)).toBe(200)
+    expect((await req('GET', `/api/box-office/desk/orders?q=${r.reference}`, undefined, seller)).body.orders[0]).toMatchObject({ state: 'reserved', intentId: null, amountDueMinor: r.totalMinor })
+    expect((await req('GET', '/api/payments/session', undefined, seller)).body.unfinished).toBeNull()
+    expect(await claimed(h)).toBe(2)
+  })
+
   it('is changed to who actually came: tickets off, on and of another type, with the amount due and the seats together', async () => {
     const h = await house(5)
     const r = await reserved(h, 3)
