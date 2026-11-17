@@ -110,6 +110,7 @@ describe('cancelling tickets on a paid order', () => {
     expect(refused.status).toBe(403)
     expect(await order(o.orderId)).toMatchObject({ state: 'confirmed', total_minor: 2400 })
     expect((await cancel(o.orderId, { refund: 'none', reasonTermId: 'trm_nothing' }, assistant)).body).toMatchObject({ code: 'box-office.order.bad-reason' })
+    expect((await req('POST', `/api/box-office/orders/${o.orderId}/cancel`, { refund: 'none' }, assistant)).body).toMatchObject({ code: 'box-office.order.bad-reason' })
 
     const done = await cancel(o.orderId, { refund: 'none' }, assistant)
     expect(done.status, JSON.stringify(done.body)).toBe(200)
@@ -179,7 +180,8 @@ describe('a seat let go', () => {
     if (!made.ok) throw new Error(made.code)
     const reserved = await req('POST', `/api/box-office/baskets/${made.basket.orderId}/reserve`, { expectedTotalMinor: made.basket.totalMinor, email: `reserve${++guests}@example.org`, name: 'Reserving Guest' }, null, { 'x-basket-token': made.basket.token })
     expect(reserved.body.state, JSON.stringify(reserved.body)).toBe('reserved')
-    const done = await cancel(made.basket.orderId, { refund: 'full' })
+    // A reservation needs no reason; paid tickets do.
+    const done = await req('POST', `/api/box-office/orders/${made.basket.orderId}/cancel`, { refund: 'none' }, boxOfficeManager)
     expect(done.body).toMatchObject({ state: 'cancelled', refund: null, feeMinor: 0 })
     expect(await claimed(h)).toBe(0)
     expect(await count('SELECT count(*) AS n FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id WHERE l.order_id = ?', made.basket.orderId)).toBe(0)
