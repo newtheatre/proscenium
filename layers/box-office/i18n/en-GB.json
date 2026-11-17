@@ -49,5 +49,13 @@
   "box-office.abilities.order.release.label": "Release a reservation, or mark one to keep",
   "box-office.abilities.ticket.admit.label": "Scan and admit at the door",
   "box-office.abilities.settings.manage.label": "Change box office settings",
-  "box-office.abilities.order.exchange.label": "Exchange tickets on an order for another performance or seats"
+  "box-office.abilities.order.exchange.label": "Exchange tickets on an order for another performance or seats",
+  "box-office.settings-sections.comps": "Complimentary tickets",
+  "box-office.settings.comps.per-request.label": "Most complimentary tickets in one request",
+  "box-office.settings.comps.per-request.help": "Anyone asking for more makes a second request.",
+  "box-office.settings.comps.per-performance.label": "Most complimentary tickets for one performance",
+  "box-office.settings.comps.per-performance.help": "Approvals stop once a performance reaches this many. Nothing means no limit.",
+  "box-office.abilities.comp.request.label": "Ask for complimentary tickets",
+  "box-office.abilities.comp.approve.label": "Approve or decline complimentary tickets, never your own",
+  "box-office.navigation.comps.label": "Complimentary tickets"
 }

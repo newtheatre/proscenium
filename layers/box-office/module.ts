@@ -34,12 +34,17 @@ export default defineModule({
     'reservations.release-before': setting.duration({ unset: true, min: '0m', max: '24h', change, audience: 'public', quotable: true, onChange: 'confirm' }),
     // Kept from each ticket when staff refund less the fee.
     'cancellations.fee': setting.money({ default: 0, min: 0, max: 5000, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'comps.per-request': setting.integer({ default: 4, min: 1, max: 50, change, audience: 'staff' }),
+    // Unset means no cap on approved complimentary tickets for one performance.
+    'comps.per-performance': setting.integer({ unset: true, min: 0, max: 1000, change, audience: 'staff' }),
     'retention.holds': setting.duration({ default: '90d', min: '0d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('box-office', {
     'order': { table: 'box_office_orders', owner: 'account_id' },
     'ticket-type': { table: 'box_office_ticket_types' },
+    // The requester owns the request; a grant on a performance or its production reaches it.
+    'comp-request': { table: 'box_office_comp_requests', parent: 'core.performance', owner: 'requested_by' },
   }),
   abilities: defineAbilities('box-office', {
     'performance.manage': ability({ on: 'core.performance' }),
@@ -57,6 +62,10 @@ export default defineModule({
     'order.refund': ability({ on: 'box-office.order', risk: 'privileged', owner: 'refuses', implies: ['order.view'] }),
     // The door finds a booking by the buyer's name as well as by its reference.
     'ticket.admit': ability({ on: 'core.performance', implies: ['core.account.find'] }),
+    // Asking for complimentary tickets names who they are for, by address.
+    'comp.request': ability({ on: 'core.performance' }),
+    // Approving issues the tickets. Never your own request.
+    'comp.approve': ability({ on: 'box-office.comp-request', risk: 'privileged', owner: 'refuses' }),
     'settings.manage': ability({ risk: 'privileged' }),
   }),
 
@@ -77,6 +86,8 @@ export default defineModule({
       // An abandoned basket or an unpaid order is noise outside, and a trace of someone who did not buy.
       'box-office.order.expired': event({ version: 1, payload: z.object({ orderId: z.string() }), internal: true }),
       'box-office.order.exchanged': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
+      'box-office.comp-request.requested': event({ version: 1, payload: z.object({ requestId: z.string() }), internal: true }),
+      'box-office.comp-request.decided': event({ version: 1, payload: z.object({ requestId: z.string(), state: z.enum(['issued', 'declined', 'withdrawn']) }), internal: true }),
       'box-office.order.cancelled': event({ version: 1, payload: z.object({ orderId: z.string(), cancellationId: z.string() }), internal: false }),
     },
   },
@@ -99,6 +110,7 @@ export default defineModule({
       { id: 'box-office.sell', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/sell', icon: 'i-lucide-ticket', ability: 'box-office.order.view', order: 10 },
       { id: 'box-office.orders', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/orders', icon: 'i-lucide-receipt', ability: 'box-office.order.view', order: 20 },
       { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
+      { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
       { id: 'box-office.ticket-types', menu: 'console', group: 'box-office', section: 'setup', to: '/console/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
@@ -108,7 +120,19 @@ export default defineModule({
       // What is kept of a ticket's price when it is cancelled and refunded less the fee.
       { id: 'booking-fee-income', name: 'Booking fee income', kind: 'income' },
     ],
+    'core.record-resolver': [{ id: 'box-office.comp-request', file: 'comp-request' }],
     'core.vocabulary': [{
+      id: 'box-office.comp-reason',
+      label: 'Reasons for complimentary tickets',
+      terms: [
+        { slug: 'cast', label: 'Cast' },
+        { slug: 'crew', label: 'Crew' },
+        { slug: 'press', label: 'Press' },
+        { slug: 'reviewer', label: 'Reviewer' },
+        { slug: 'sponsor', label: 'Sponsor' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }, {
       id: 'box-office.cancellation-reason',
       label: 'Reasons for cancelling tickets',
       terms: [

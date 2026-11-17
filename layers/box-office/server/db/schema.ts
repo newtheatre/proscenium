@@ -397,4 +397,38 @@ export const cancellations = defineTable('box_office_cancellations', {
   ],
 })
 
-export const tables = { performanceSales, bands, ticketTypes, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations }
+/**
+ * A request for complimentary tickets (part 2; BO-62, BO-63): how many, in which band, for whom and
+ * why. Approving issues them at once, as a confirmed order of zero-price tickets on a complimentary
+ * ticket type, so they scan and count like any other ticket. Nobody decides their own request.
+ */
+export const compRequests = defineTable('box_office_comp_requests', {
+  id: col.id(),
+  performanceId: col.internal(text('performance_id').notNull()),
+  bandId: col.ref('box_office_bands'),
+  quantity: col.internal(integer('quantity').notNull()),
+  // Who the tickets are for: when the requester names someone new, an unclaimed account made for them.
+  forAccountId: col.account('for_account_id', { role: 'subject' }),
+  reasonTermId: col.ref('core_terms'),
+  requestedBy: col.account('requested_by', { role: 'actor' }),
+  state: col.internal(text('state', { enum: ['requested', 'approved', 'declined', 'issued', 'withdrawn'] }).notNull().default('requested')),
+  decidedBy: col.account('decided_by', { role: 'actor', nullable: true }),
+  decidedAt: col.timestamp('decided_at'),
+  orderId: col.ref('box_office_orders', { nullable: true }),
+  createdAt: col.createdAt(),
+  updatedAt: col.updatedAt(),
+}, {
+  id: 'comp',
+  realm: 'audience',
+  subject: 'for_account_id',
+  onErasure: 'keep-row',
+  extra: t => [
+    index('box_office_comp_requests_performance').on(t.performanceId, t.state),
+    index('box_office_comp_requests_state').on(t.state, t.createdAt),
+    check('box_office_comp_requests_quantity', sql`${t.quantity} > 0`),
+    check('box_office_comp_requests_state', sql`${t.state} IN ('requested', 'approved', 'declined', 'issued', 'withdrawn')`),
+    check('box_office_comp_requests_not_own', sql`${t.decidedBy} IS NULL OR ${t.decidedBy} <> ${t.requestedBy}`),
+  ],
+})
+
+export const tables = { performanceSales, bands, ticketTypes, prices, pools, orders, holds, claims, orderLines, tickets, scans, cancellations, compRequests }
