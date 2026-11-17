@@ -7,9 +7,27 @@
      (Box office's Sell shows only its own); live mode draws the panels as tabs over the one basket,
      each with its larger live panel where its module has one. Coming to the till opens the seller's
      session if none is open, at the place this device used last; a strip above the panels says which
-     session sales go into and lets the seller move it. -->
+     session sales go into and lets the seller move it.
+
+     The sale is one receipt beside the panels (till proposal, 17 November 2026): grouped by panel,
+     with the ways to pay on it, so paying is one press and not "take payment" and then a choice. A
+     panel may hand the receipt its own lines (the `receipt` event), which then carry steppers and
+     appear at once, before the server has answered with the total. On a narrow screen the receipt
+     is a sheet, and a bar at the foot says what was last added, with an undo, and takes payment. -->
 <script setup lang="ts">
+import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import type { YourSession } from '../../shared/sessions'
+
+/** One line a panel hands the receipt; `more` and `fewer` draw a stepper on it. */
+interface ReceiptLine { key: string, label: string, detail?: string, quantity: number, amountMinor: number, more?: () => void, fewer?: () => void }
+/** What a panel may say about its part of the sale with the `receipt` event. */
+interface PanelReceipt {
+  lines: ReceiptLine[]
+  /** Something about these lines that stays on the receipt, such as the answer to an age check. */
+  note?: { text: string, icon?: string, action?: { label: string, run: () => void } } | null
+  /** What the seller last added, with the way to take it back. */
+  added?: { label: string, undo: () => void } | null
+}
 
 interface Panel { id: string, module: string, label: string, tab: string, icon: string | null, panel: string, livePanel: string | null }
 interface Summary { basket: string, lines: { label: string, amountMinor: number }[], amountMinor: number }
@@ -94,6 +112,7 @@ async function sum() {
   if (!filled.value.length) {
     summary.value = null
     refusal.value = null
+    stale.value = false
     return
   }
   summing.value = true
@@ -109,15 +128,62 @@ async function sum() {
     refusal.value = toRefusal(e)
   }
   finally {
-    if (ask === asked) summing.value = false
+    if (ask === asked) {
+      summing.value = false
+      stale.value = false
+    }
   }
 }
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(filled, () => {
+  stale.value = true
   clearTimeout(timer)
   timer = setTimeout(sum, 300) // not-policy: a pause in typing before the total is asked again
 }, { deep: true })
 const summaryOf = (id: string) => summary.value?.panels.find(p => p.basket === id) ?? null
+
+// What each panel says of its own lines; a panel that says nothing is shown by the server's summary.
+const receipts = reactive<Record<string, PanelReceipt | null>>({})
+// The total is the server's. While it is being asked for again, the panels' own lines stand in for
+// it where every filled panel gives them, so a press shows at once.
+const stale = ref(false)
+const estimate = computed(() => {
+  let total = 0
+  for (const f of filled.value) {
+    const own = receipts[f.basket]
+    if (!own) return null
+    total += own.lines.reduce((sum, l) => sum + l.amountMinor, 0)
+  }
+  return total
+})
+const total = computed(() => ((stale.value || summing.value) ? estimate.value : null) ?? summary.value?.amountMinor ?? 0)
+const groups = computed(() => panels.value.flatMap((p) => {
+  if (inputs[p.id] === null || inputs[p.id] === undefined) return []
+  const own = receipts[p.id]
+  const lines: ReceiptLine[] = own?.lines.length ? own.lines : (summaryOf(p.id)?.lines ?? []).map((l, i) => ({ key: String(i), label: l.label, quantity: 1, amountMinor: l.amountMinor }))
+  return lines.length ? [{ id: p.id, label: t(p.tab), icon: p.icon, lines, note: own?.note ?? null, counted: !!own?.lines.length }] : []
+}))
+const count = computed(() => groups.value.reduce((sum, g) => sum + (g.counted ? g.lines.reduce((n, l) => n + l.quantity, 0) : g.lines.length), 0))
+// The last thing added, by whichever panel said so most recently.
+const added = ref<{ label: string, undo: () => void } | null>(null)
+function said(id: string, receipt: PanelReceipt | null) {
+  receipts[id] = receipt
+  if (receipt && 'added' in receipt) added.value = receipt.added ?? null
+}
+function clearAll() {
+  for (const p of panels.value) inputs[p.id] = null
+  added.value = null
+}
+
+// The receipt is drawn once and shown beside the panels, or in a sheet where there is no room.
+const [DefineReceipt, Receipt] = createReusableTemplate()
+const wide = useMediaQuery(() => (props.live ? '(min-width: 768px)' : '(min-width: 1024px)'))
+const mounted = ref(false)
+onMounted(() => { mounted.value = true })
+const beside = computed(() => !mounted.value || wide.value)
+const sheet = ref(false)
+// Payment can start once the server has agreed the total.
+const payable = computed(() => !stale.value && !summing.value && !!summary.value && summary.value.amountMinor > 0)
 
 // In live mode each panel is a tab once there are two; its badge counts the lines it adds to the sale.
 const tabbed = computed(() => props.live && panels.value.length > 1)
@@ -127,7 +193,8 @@ watch(panels, (now) => {
   if (!now.some(p => p.id === tab.value)) tab.value = now[0]?.id
 }, { immediate: true })
 const tabs = computed(() => panels.value.map((p) => {
-  const lines = summaryOf(p.id)?.lines.length ?? 0
+  const own = receipts[p.id]?.lines
+  const lines = own?.length ? own.reduce((n, l) => n + l.quantity, 0) : summaryOf(p.id)?.lines.length ?? 0
   return { value: p.id, label: t(p.tab), icon: p.icon ?? undefined, badge: lines ? String(lines) : undefined, slot: 'panel' as const }
 }))
 
@@ -139,6 +206,15 @@ const payment = ref<Status | null>(null)
 const result = ref<{ kind: 'declined' | 'waiting' | 'handoff', url?: string } | null>(null)
 const changeMinor = ref(0)
 const offered = ref<{ methods: Offer[] } | null>(null)
+// The ways to pay are asked for on arrival so the receipt can offer them at once. Where they cannot
+// be had yet, the receipt keeps one "take payment" button, which asks again and says why.
+async function loadMethods() {
+  if (offered.value || !usable.value) return
+  try { offered.value = await $api<{ methods: Offer[] }>('/api/payments/till/methods') }
+  catch { /* asked again when a payment is taken, which shows the refusal */ }
+}
+onMounted(loadMethods)
+watch(usable, loadMethods)
 
 async function takePayment() {
   if (!summary.value || summary.value.amountMinor <= 0) return
@@ -174,7 +250,28 @@ async function takePayment() {
 }
 
 const due = computed(() => (payment.value ? payment.value.amountMinor - payment.value.paidMinor : 0))
-const methods = computed(() => offered.value?.methods ?? [])
+// Card first: it is how nearly every sale is paid.
+const RANK = ['card_reader', 'card_attested', 'card_online', 'cash']
+const rank = (m: Offer) => (RANK.includes(m.method) ? RANK.indexOf(m.method) : RANK.length)
+const methods = computed(() => [...(offered.value?.methods ?? [])].sort((a, b) => rank(a) - rank(b)))
+const METHOD_ICONS: Record<string, string> = { card_reader: 'i-lucide-smartphone-nfc', card_attested: 'i-lucide-credit-card', card_online: 'i-lucide-credit-card', cash: 'i-lucide-banknote' }
+const methodIcon = (m: Offer) => METHOD_ICONS[m.method] ?? 'i-lucide-wallet'
+// Taking the total in parts: the amount is asked for before the way to pay.
+const splitting = ref(false)
+// A way to pay that needs nothing more from the seller starts as soon as it is pressed.
+const direct = (m: Offer) => m.method !== 'cash' && !m.method.endsWith('_attested') && (m.method !== 'card_reader' || m.readers?.length === 1)
+async function choose(m: Offer) {
+  choice.value = key(m)
+  await nextTick()
+  if (direct(m) && !partTooMuch.value) await pay()
+}
+/** One press from the receipt: makes the sale, then pays this way, or asks for the parts. */
+async function payWith(m: Offer | null) {
+  await takePayment()
+  if (!sale.value) return
+  splitting.value = !m
+  if (m) await choose(m)
+}
 const choice = ref<string | undefined>(undefined)
 const chosen = computed(() => methods.value.find(m => key(m) === choice.value))
 const key = (m: Offer) => `${m.providerAccountId}:${m.method}`
@@ -372,8 +469,12 @@ async function giveBack() {
   }
 }
 
+watch(sale, (now) => { sheet.value = !!now && !wide.value })
+
 function reset() {
   stopPolling()
+  splitting.value = false
+  added.value = null
   sale.value = null
   payment.value = null
   result.value = null
@@ -452,95 +553,150 @@ function ended() {
         />
         <div
           v-else
-          class="grid gap-6"
-          :class="live ? 'md:grid-cols-[minmax(0,1fr)_22rem] text-lg' : 'lg:grid-cols-[minmax(0,1fr)_20rem]'"
+          :class="live ? 'text-lg' : undefined"
         >
-          <!-- Every panel stays mounted, so a tab keeps what was put in it while another is shown. -->
-          <UTabs
-            v-if="tabbed"
-            v-model="tab"
-            :items="tabs"
-            :unmount-on-hide="false"
-            size="xl"
-            variant="link"
-          >
-            <template #panel="{ item }">
-              <component
-                :is="panels.find(p => p.id === item.value)!.component"
-                v-model="inputs[item.value]"
-                class="pt-4"
-                :locked="!!sale"
-                :summary="summaryOf(item.value)"
-              />
-            </template>
-          </UTabs>
-          <div
-            v-else
-            class="space-y-6"
-          >
-            <PageSection
-              v-for="p in panels"
-              :key="p.id"
-              :title="t(p.label)"
-            >
-              <component
-                :is="p.component"
-                v-model="inputs[p.id]"
-                :locked="!!sale"
-                :summary="summaryOf(p.id)"
-              />
-            </PageSection>
-          </div>
-
-          <aside
-            :class="live ? 'md:sticky md:top-16 md:self-start' : 'lg:sticky lg:top-4 lg:self-start'"
-            :aria-label="t('payments.screens.till.total-label')"
-          >
-            <PageSection :title="t('payments.screens.till.basket')">
-              <ul
-                v-if="summary?.panels.length"
-                class="space-y-1"
-              >
-                <template
-                  v-for="s in summary.panels"
-                  :key="s.basket"
+          <DefineReceipt>
+            <div class="space-y-4">
+              <template v-if="!sale">
+                <div
+                  v-if="groups.length"
+                  class="divide-y divide-default"
                 >
-                  <li
-                    v-for="(line, i) in s.lines"
-                    :key="`${s.basket}-${i}`"
-                    class="flex justify-between gap-3 text-sm"
+                  <section
+                    v-for="g in groups"
+                    :key="g.id"
+                    class="py-3 first:pt-0"
                   >
-                    <span>{{ line.label }}</span>
-                    <span>{{ money(line.amountMinor) }}</span>
-                  </li>
-                </template>
-              </ul>
+                    <h3 class="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
+                      <UIcon
+                        v-if="g.icon"
+                        :name="g.icon"
+                        class="size-4"
+                      />{{ g.label }}
+                    </h3>
+                    <ul class="space-y-2">
+                      <li
+                        v-for="line in g.lines"
+                        :key="line.key"
+                        class="flex items-center gap-3 text-base"
+                      >
+                        <div class="min-w-0 flex-1">
+                          <p>{{ line.label }}</p>
+                          <p
+                            v-if="line.detail"
+                            class="text-sm text-muted"
+                          >
+                            {{ line.detail }}
+                          </p>
+                        </div>
+                        <div
+                          v-if="line.more && line.fewer"
+                          class="flex items-center rounded-lg border border-default"
+                        >
+                          <IconButton
+                            :icon="line.quantity === 1 ? 'i-lucide-trash-2' : 'i-lucide-minus'"
+                            :label="t(line.quantity === 1 ? 'payments.screens.till.remove' : 'payments.screens.till.fewer', { name: line.label })"
+                            @click="line.fewer()"
+                          />
+                          <span class="w-7 text-center font-semibold tabular-nums">{{ line.quantity }}</span>
+                          <IconButton
+                            icon="i-lucide-plus"
+                            :label="t('payments.screens.till.more', { name: line.label })"
+                            @click="line.more()"
+                          />
+                        </div>
+                        <span class="w-16 text-end tabular-nums">{{ money(line.amountMinor) }}</span>
+                      </li>
+                    </ul>
+                    <div
+                      v-if="g.note"
+                      class="mt-3 flex items-center gap-2 rounded-lg bg-elevated px-3 py-1.5 text-sm"
+                    >
+                      <UIcon
+                        v-if="g.note.icon"
+                        :name="g.note.icon"
+                        class="size-4 shrink-0 text-success"
+                      />
+                      <span class="flex-1">{{ g.note.text }}</span>
+                      <UButton
+                        v-if="g.note.action"
+                        size="sm"
+                        color="neutral"
+                        variant="link"
+                        :label="g.note.action.label"
+                        @click="g.note.action.run()"
+                      />
+                    </div>
+                  </section>
+                </div>
+                <p
+                  v-else
+                  class="text-sm text-muted"
+                >
+                  {{ t('payments.screens.till.nothing-yet') }}
+                </p>
+              </template>
+
               <p
-                v-else
-                class="text-sm text-muted"
-              >
-                {{ t('payments.screens.till.nothing-yet') }}
-              </p>
-              <p
-                class="flex justify-between text-lg font-semibold"
+                class="flex items-baseline justify-between"
+                :class="sale ? undefined : 'border-t border-default pt-3'"
                 aria-live="polite"
               >
-                <span>{{ t('payments.screens.till.total') }}</span>
-                <span>{{ money(summary?.amountMinor ?? 0) }}</span>
+                <span class="text-lg font-semibold">{{ t('payments.screens.till.total') }}</span>
+                <span class="text-3xl font-semibold tabular-nums text-highlighted">{{ money(sale ? sale.amountMinor : total) }}</span>
               </p>
 
               <RefusalNotice :refusal="refusal" />
 
-              <UButton
-                v-if="!sale"
-                block
-                size="lg"
-                icon="i-lucide-banknote"
-                :loading="taking"
-                :disabled="summing || !summary || summary.amountMinor <= 0"
-                :label="t('payments.screens.till.take', { amount: money(summary?.amountMinor ?? 0) })"
-                @click="takePayment"
-              />
+              <!-- Nothing being paid yet: the ways to pay, one press each. -->
+              <template v-if="!sale">
+                <template v-if="methods.length">
+                  <UButton
+                    block
+                    size="xl"
+                    class="justify-center py-3"
+                    :icon="methodIcon(methods[0]!)"
+                    :loading="taking"
+                    :disabled="!payable"
+                    :label="t('payments.screens.till.pay-by', { method: methodLabel(methods[0]!), amount: money(total) })"
+                    @click="payWith(methods[0]!)"
+                  />
+                  <div class="grid grid-cols-2 gap-2">
+                    <UButton
+                      v-for="m in methods.slice(1)"
+                      :key="key(m)"
+                      block
+                      size="lg"
+                      color="neutral"
+                      variant="outline"
+                      :icon="methodIcon(m)"
+                      :disabled="!payable || taking"
+                      :label="methodLabel(m)"
+                      @click="payWith(m)"
+                    />
+                    <UButton
+                      block
+                      size="lg"
+                      color="neutral"
+                      variant="outline"
+                      icon="i-lucide-split"
+                      :disabled="!payable || taking"
+                      :label="t('payments.screens.till.split')"
+                      @click="payWith(null)"
+                    />
+                  </div>
+                </template>
+                <UButton
+                  v-else
+                  block
+                  size="lg"
+                  icon="i-lucide-banknote"
+                  :loading="taking"
+                  :disabled="!payable"
+                  :label="t('payments.screens.till.take', { amount: money(total) })"
+                  @click="takePayment"
+                />
+              </template>
 
               <div
                 v-else
@@ -595,17 +751,9 @@ function ended() {
                   >
                     {{ t('payments.screens.till.no-methods') }}
                   </p>
-                  <URadioGroup
-                    v-else
-                    v-model="choice"
-                    :size="live ? 'xl' : undefined"
-                    :variant="live ? 'card' : undefined"
-                    :legend="t('payments.screens.till.how')"
-                    :items="methods.map(m => ({ value: key(m), label: methodLabel(m), description: m.mode === 'test' ? t('payments.screens.providers.test-mode') : undefined }))"
-                  />
 
                   <UFormField
-                    v-if="chosen"
+                    v-if="methods.length && (splitting || paidInPart)"
                     :label="t('payments.screens.till.part')"
                     :hint="t('payments.screens.optional')"
                     :help="t('payments.screens.till.part-help', { amount: money(due) })"
@@ -618,54 +766,104 @@ function ended() {
                       :format-options="{ style: 'currency', currency }"
                     />
                   </UFormField>
-                  <UFormField
-                    v-if="chosen?.method === 'cash'"
-                    :label="t('payments.screens.till.tendered')"
-                    :hint="t('payments.screens.optional')"
-                    :help="t('payments.screens.till.tendered-help')"
-                  >
-                    <UInputNumber
-                      v-model="tendered"
-                      :min="0"
-                      :step="0.01"
-                      :format-options="{ style: 'currency', currency }"
-                    />
-                  </UFormField>
-                  <UFormField
-                    v-if="chosen?.method === 'card_reader'"
-                    :label="t('payments.screens.test.reader')"
-                    required
-                  >
-                    <USelect
-                      v-model="readerId"
-                      :items="(chosen.readers ?? []).map(r => ({ value: r.id, label: r.label }))"
-                    />
-                  </UFormField>
 
+                  <!-- No way picked yet, or the last one is finished with: each is a button. -->
                   <div
-                    v-if="chosen"
-                    class="flex flex-wrap gap-2"
+                    v-if="methods.length && !chosen"
+                    role="group"
+                    :aria-label="t('payments.screens.till.how')"
+                    class="space-y-2"
                   >
+                    <p class="text-sm font-medium">
+                      {{ t('payments.screens.till.how') }}
+                    </p>
                     <UButton
-                      :loading="taking"
-                      :disabled="partTooMuch || (chosen.method === 'card_reader' && !readerId)"
-                      :label="chosen.method.endsWith('_attested') ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
-                      @click="pay()"
-                    />
-                    <UButton
-                      v-if="chosen.method.endsWith('_attested')"
+                      v-for="m in methods"
+                      :key="key(m)"
+                      block
+                      size="lg"
                       color="neutral"
                       variant="outline"
-                      :disabled="taking"
-                      :label="t('payments.screens.till.machine-declined')"
-                      @click="pay(false)"
-                    />
+                      class="justify-start"
+                      :icon="methodIcon(m)"
+                      :disabled="taking || partTooMuch"
+                      @click="choose(m)"
+                    >
+                      <span class="flex-1 text-start">{{ methodLabel(m) }}</span>
+                      <UBadge
+                        v-if="m.mode === 'test'"
+                        color="warning"
+                        variant="subtle"
+                        :label="t('payments.screens.providers.test-mode')"
+                      />
+                    </UButton>
                   </div>
+
+                  <template v-if="chosen">
+                    <p class="flex items-center gap-2 font-medium">
+                      <UIcon
+                        :name="methodIcon(chosen)"
+                        class="size-5"
+                      />{{ methodLabel(chosen) }}
+                    </p>
+                    <UFormField
+                      v-if="chosen.method === 'cash'"
+                      :label="t('payments.screens.till.tendered')"
+                      :hint="t('payments.screens.optional')"
+                      :help="t('payments.screens.till.tendered-help')"
+                    >
+                      <UInputNumber
+                        v-model="tendered"
+                        :min="0"
+                        :step="0.01"
+                        :format-options="{ style: 'currency', currency }"
+                      />
+                    </UFormField>
+                    <UFormField
+                      v-if="chosen.method === 'card_reader' && (chosen.readers ?? []).length !== 1"
+                      :label="t('payments.screens.test.reader')"
+                      required
+                    >
+                      <USelect
+                        v-model="readerId"
+                        :items="(chosen.readers ?? []).map(r => ({ value: r.id, label: r.label }))"
+                      />
+                    </UFormField>
+
+                    <div class="flex flex-wrap gap-2">
+                      <UButton
+                        size="lg"
+                        :loading="taking"
+                        :disabled="partTooMuch || (chosen.method === 'card_reader' && !readerId)"
+                        :label="chosen.method.endsWith('_attested') ? t('payments.screens.till.approved', { amount: money(taken) }) : chosen.method === 'cash' ? t('payments.screens.till.cash-taken', { amount: money(taken) }) : t('payments.screens.till.start', { amount: money(taken) })"
+                        @click="pay()"
+                      />
+                      <UButton
+                        v-if="chosen.method.endsWith('_attested')"
+                        size="lg"
+                        color="neutral"
+                        variant="outline"
+                        :disabled="taking"
+                        :label="t('payments.screens.till.machine-declined')"
+                        @click="pay(false)"
+                      />
+                    </div>
+                    <UButton
+                      v-if="methods.length > 1"
+                      color="neutral"
+                      variant="link"
+                      icon="i-lucide-arrow-left"
+                      :disabled="taking"
+                      :label="t('payments.screens.till.another-way')"
+                      @click="choice = undefined"
+                    />
+                  </template>
                 </template>
 
                 <!-- Money taken for part of the sale stays with it: the rest is taken, or what was taken is given back. -->
                 <UButton
                   v-if="paidInPart"
+                  block
                   color="neutral"
                   variant="ghost"
                   :disabled="taking || waiting"
@@ -674,6 +872,7 @@ function ended() {
                 />
                 <UButton
                   v-else
+                  block
                   color="neutral"
                   variant="ghost"
                   :disabled="taking"
@@ -681,8 +880,149 @@ function ended() {
                   @click="cancel"
                 />
               </div>
-            </PageSection>
-          </aside>
+            </div>
+          </DefineReceipt>
+
+          <div
+            class="grid gap-6"
+            :class="live ? 'md:grid-cols-[minmax(0,1fr)_24rem]' : 'lg:grid-cols-[minmax(0,1fr)_22rem]'"
+          >
+            <!-- Every panel stays mounted, so a tab keeps what was put in it while another is shown. -->
+            <UTabs
+              v-if="tabbed"
+              v-model="tab"
+              :items="tabs"
+              :unmount-on-hide="false"
+              size="xl"
+              variant="link"
+              class="min-w-0"
+            >
+              <template #panel="{ item }">
+                <component
+                  :is="panels.find(p => p.id === item.value)!.component"
+                  v-model="inputs[item.value]"
+                  class="pt-4"
+                  :locked="!!sale"
+                  :summary="summaryOf(item.value)"
+                  @receipt="(r: PanelReceipt | null) => said(item.value, r)"
+                />
+              </template>
+            </UTabs>
+            <div
+              v-else
+              class="min-w-0 space-y-6"
+            >
+              <PageSection
+                v-for="p in panels"
+                :key="p.id"
+                :title="t(p.label)"
+              >
+                <component
+                  :is="p.component"
+                  v-model="inputs[p.id]"
+                  :locked="!!sale"
+                  :summary="summaryOf(p.id)"
+                  @receipt="(r: PanelReceipt | null) => said(p.id, r)"
+                />
+              </PageSection>
+            </div>
+
+            <aside
+              v-if="beside"
+              :class="live ? 'hidden md:sticky md:top-16 md:block md:self-start' : 'hidden lg:sticky lg:top-4 lg:block lg:self-start'"
+              :aria-label="t('payments.screens.till.total-label')"
+            >
+              <PageSection :title="t('payments.screens.till.sale', { count })">
+                <template
+                  v-if="groups.length && !sale"
+                  #actions
+                >
+                  <UButton
+                    color="neutral"
+                    variant="ghost"
+                    icon="i-lucide-trash-2"
+                    :label="t('payments.screens.till.clear')"
+                    @click="clearAll"
+                  />
+                </template>
+                <Receipt />
+              </PageSection>
+            </aside>
+          </div>
+
+          <!-- No room beside the panels: the sale is in reach of a thumb, and opens as a sheet. -->
+          <template v-if="!beside">
+            <div
+              class="sticky bottom-2 z-10 mt-6 space-y-2 rounded-xl border border-default bg-elevated p-3 shadow-lg"
+              :aria-label="t('payments.screens.till.total-label')"
+              role="region"
+            >
+              <p
+                v-if="added && !sale"
+                class="flex min-w-0 items-center gap-1 text-sm"
+                role="status"
+              >
+                <span class="truncate">{{ t('payments.screens.till.added', { name: added.label }) }}</span>
+                <UButton
+                  size="sm"
+                  variant="link"
+                  class="shrink-0"
+                  :label="t('payments.screens.till.undo')"
+                  @click="added.undo(); added = null"
+                />
+              </p>
+              <div class="flex items-stretch gap-2">
+                <UButton
+                  color="neutral"
+                  variant="soft"
+                  size="xl"
+                  class="shrink-0"
+                  trailing-icon="i-lucide-chevron-up"
+                  :label="t('payments.screens.till.sale', { count })"
+                  @click="sheet = true"
+                />
+                <UButton
+                  v-if="sale"
+                  block
+                  size="xl"
+                  class="min-w-0 justify-center"
+                  :label="t('payments.screens.till.due', { amount: money(due) })"
+                  @click="sheet = true"
+                />
+                <UButton
+                  v-else-if="methods.length"
+                  block
+                  size="xl"
+                  class="min-w-0 justify-center"
+                  :icon="methodIcon(methods[0]!)"
+                  :loading="taking"
+                  :disabled="!payable"
+                  :label="t('payments.screens.till.pay-by', { method: methodLabel(methods[0]!), amount: money(total) })"
+                  @click="payWith(methods[0]!)"
+                />
+                <UButton
+                  v-else
+                  block
+                  size="xl"
+                  class="min-w-0 justify-center"
+                  icon="i-lucide-banknote"
+                  :loading="taking"
+                  :disabled="!payable"
+                  :label="t('payments.screens.till.take', { amount: money(total) })"
+                  @click="takePayment"
+                />
+              </div>
+            </div>
+            <UDrawer
+              v-model:open="sheet"
+              :title="t('payments.screens.till.sale', { count })"
+              :description="t('payments.screens.till.sale-help')"
+            >
+              <template #body>
+                <Receipt />
+              </template>
+            </UDrawer>
+          </template>
         </div>
       </template>
     </DataBoundary>
