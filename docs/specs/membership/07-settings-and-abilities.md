@@ -1,6 +1,30 @@
 # 6. Settings and abilities
 
-The two modules register 20 settings, 19 abilities, five record types and four facts, in the Foundations registry layouts. Anything that varies by scheme is a field of the scheme that starts from a setting, following the Foundations ruling that settings are site-wide.
+The two modules register 20 settings, 19 abilities, five record types and four facts, in the Foundations registry layouts. Anything that varies by scheme is a field of the scheme that starts from a setting, because a setting holds one value for the whole theatre.
+
+## Where the settings are shown
+
+Each manifest declares `settingGroups`, and every setting has exactly one home. No setting is managed on a bespoke screen.
+
+| Module | Groups | Home |
+| --- | --- | --- |
+| `membership` | `applications`, `renewal`, `reminders`, `numbers`, `join`, `card`, `voting`, `verification`, `ending`, `help` | The module's own page, `/console/membership/settings`, place console |
+| `membership` | `retention` | Marked `advanced`: drawn on `/admin/advanced` under the module's name |
+| `membership-fees` | `checkout`, `refunds` and its other groups | The module's own page, `/console/membership-fees/settings`, place console |
+| `membership-fees` | `retention` | Marked `advanced`: drawn on `/admin/advanced` under the module's name |
+
+Each group's `change` ability is its module's settings ability, so each page shows one "Changed by people who can..." line. Six settings are declared `onChange: 'confirm'`, so saving one shows what will change, asks again, and asks for a fresh sign-in when the session is not fresh:
+
+| Setting | Why a silent change would matter |
+| --- | --- |
+| `membership.voting.qualifying-period` | Shortening it widens who may vote |
+| `membership.verification.list-keep-for` | Shortening it removes list entries at the next sweep, which changes who is verified and who gets a member price by reference |
+| `membership.retention.ended-after` | Shortening it anonymises ended memberships that cannot be brought back |
+| `membership-fees.refunds.cooling-off` | It is a public promise of a full refund, shown on the join page |
+| `membership-fees.retention.charges` | Shortening it removes charge rows that cannot be brought back |
+| `membership.verification.names-keep-for` | Shortening it erases names from list entries at the next sweep. Every setting whose value is a retention period is confirmed, here as in every module |
+
+No other setting asks for anything extra: the rest are starting values for new schemes, wording, or reminders, and a wrong value is put right by changing it back. Fee amounts and each scheme's verifier are not settings; they are changed on the scheme's own screen under their own abilities and are audited there. None is declared `'reason'`. Every `duration` setting is entered with the kit's `DurationInput` (a number and a unit, a month being 30 days and a year 365); the stored value and the defaults and limits written below are unchanged.
 
 ## Settings of `membership`
 
@@ -69,11 +93,13 @@ A grant on one scheme covers its memberships, in the way the form builder's gran
 
 ## Abilities of `membership`
 
+Two abilities offer a search by person, the members list under `membership.membership.view` and the desk under `membership-fees.payment.take`. Each implies Identity's `core.account.find`, which is impliable and of standard risk, so no preset has to add it by hand. Abilities that imply `membership.membership.view` carry it with them.
+
 | Ability | Acts on | Risk | Owner | Implies | Audit | Purpose | Suggested holders |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `membership.scheme.view` | `membership.scheme` | normal |  |  | No | See schemes, including drafts and closed ones | Membership officer, Administrator, Committee member, Box-office manager |
 | `membership.scheme.manage` | `membership.scheme` | privileged |  | `scheme.view` | Yes | Create, edit, open, close and archive schemes; attach forms to them. Privileged because a scheme decides who gets the members' area | Administrator, Membership officer |
-| `membership.membership.view` | `membership.membership` | normal | grants |  | read | See who holds what, with dates and status. A person always sees their own | Membership officer, Administrator, Committee member, Box-office staff |
+| `membership.membership.view` | `membership.membership` | normal | grants | `core.account.find` | read | See who holds what, with dates and status. A person always sees their own | Membership officer, Administrator, Committee member, Box-office staff |
 | `membership.membership.add` | `membership.scheme` | normal | refuses | `membership.view` | Yes | Add a member directly | Membership officer, Administrator |
 | `membership.membership.verify` | `membership.membership` | normal | refuses | `membership.view` | Yes | Pass or decline an application's verification | Membership officer, Administrator |
 | `membership.membership.update` | `membership.membership` | normal | refuses | `membership.view` | Yes | Change dates and the staff note | Membership officer, Administrator |
@@ -95,7 +121,7 @@ A grant on one scheme covers its memberships, in the way the form builder's gran
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `membership-fees.price.manage` | `membership.scheme` | privileged |  |  | Yes | Set a scheme's price and tax code | Finance officer, Administrator |
 | `membership-fees.charge.view` | `membership-fees.charge` | normal | grants |  | No | See a membership's charge and payment | Membership officer, Finance officer, Administrator, Box-office manager |
-| `membership-fees.payment.take` | `membership-fees.charge` | normal | refuses | `charge.view` | Yes | Take a fee at the desk | Membership officer, Box-office staff, Box-office manager |
+| `membership-fees.payment.take` | `membership-fees.charge` | normal | refuses | charge.view, `core.account.find` | Yes | Take a fee at the desk | Membership officer, Box-office staff, Box-office manager |
 | `membership-fees.charge.waive` | `membership-fees.charge` | privileged | refuses | `charge.view` | Yes | Mark a fee as waived, with a reason | Administrator, Finance officer |
 | `membership-fees.refund.request` | `membership-fees.charge` | normal | refuses | `charge.view` | Yes | Ask for a refund. Approval follows Payments' own rule | Membership officer, Finance officer |
 | `membership-fees.settings.manage` |  | privileged |  |  | Yes | Change the fees settings | Administrator, Finance officer |

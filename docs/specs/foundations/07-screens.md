@@ -48,6 +48,8 @@ A card for each module: name, one sentence on what it does, stability (experimen
 
 One page per module, generated from the settings registry and found at /console/\<module>/settings in that module's own group; /admin/settings is the index and the search across all of them, and the place where every setting declared scope: 'site' is shown and changed; no module writes its own settings screen unless a setting's kind is `custom`.
 
+**Superseded in part on 16 November 2026 (Matt, the settings redesign).** There is no `/admin/settings` and no core settings page. Settings are drawn by page, not by module: each group of settings is placed on one generated page or one bespoke screen through the manifest's `settingGroups` and `settingPages` (Settings registry tab, "groups and pages"). Foundations' own groups go to `/admin/advanced` (units, jobs, external, idempotency, rate-limits, retention, files and the delivery group) and to the Theatre page (site, locale). Two screens are added under Upkeep: Advanced, with a warning at its head, and Settings history (`/admin/settings-history`, with Revert). `/admin/settings` and `/console/system/settings` redirect. The Interface Doc holds the page convention.
+
 - Each setting shows its label, a sentence of help, its current value, its default, its limits, and when and by whom it was last changed.
 - Search across all settings by label, help text or key.
 - A changed value is validated against its limits before save; the refusal names the limit.

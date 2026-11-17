@@ -13,7 +13,7 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ sessions: Session[] }>('/api/core/me/sessions', { key: 'core:my-sessions' })
 
-const when = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(ms)
+const { dateTime: when } = useDates()
 const refusal = ref<RefusalView | null>(null)
 const others = computed(() => (data.value?.sessions ?? []).filter(s => !s.current).length)
 

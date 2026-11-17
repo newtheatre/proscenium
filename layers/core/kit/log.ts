@@ -1,6 +1,7 @@
 // Structured logging with the request id. Fields named after a personal, free-text or special
 // column anywhere in the registry are replaced, so a row passed whole never leaks a person.
 import { currentContext } from './context-store'
+import { withoutTokens } from './tokens'
 
 let personal: Set<string> | undefined
 
@@ -21,7 +22,7 @@ function write(level: 'debug' | 'info' | 'warn' | 'error', message: string, fiel
   const context = currentContext()
   const line = { level, message, requestId: context?.requestId, ...(scrub(fields) as object) }
   const out = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log
-  out(JSON.stringify(line))
+  out(withoutTokens(JSON.stringify(line)))
 }
 
 export const log = {

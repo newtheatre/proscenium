@@ -31,7 +31,7 @@ All five prefixes are time-sorted. None is a secret, and nothing in this module 
 | `space_id` | ref `core_spaces` | unique where set, restrict; set exactly when kind is `space` | internal | keep | A space has at most one bookable |
 | `name` | text | not null when kind is `resource`, unique ignoring case among resources; null for a space | internal | keep | A space's name is always read from core, so a rename shows at once |
 | `home_venue_id` | ref `core_venues` | nullable, restrict; resources only | internal | keep | Where a resource lives. A closure of that venue blocks it |
-| `control` | text | not null, one of `own`, `external` | internal | keep | A space takes its starting value from its venue's `managed` flag |
+| `control` | text | not null, one of `own`, `external` | internal | keep | For a space, not chosen: `own` while core's `managed` flag on the space is true, `external` while it is false, and it follows the flag when that changes (rule C6). Chosen for a resource |
 | `approval` | text | not null, default `by-purpose`, one of `by-purpose`, `always` | internal | keep | An external bookable is always decided by a person, whatever this says |
 | `approval_note` | text | at most 500 characters, markdown | internal | keep | Shown to the booker before they ask: "Requests are placed with the Students' Union on Mondays" |
 | `external_contact` | text | at most 200 characters; external only | internal | keep | Who staff ask. An organisation or a desk, not a private person |
@@ -43,7 +43,7 @@ All five prefixes are time-sorted. None is a secret, and nothing in this module 
 | `state` | text | not null, default `active`, one of `active`, `paused`, `archived` | internal | keep | Paused takes no new requests and keeps what is booked |
 | `sort` | integer | not null, default 0 | internal | keep |  |
 
-A space is not bookable until it has a row here. Turning the module on creates none, so no room becomes bookable by surprise. The setup step offers to create one for each active space in a managed venue.
+A space is not bookable until it has a row here. Turning the module on creates none, so no room becomes bookable by surprise. The setup step offers to create one for each active space the theatre runs (core's managed flag on the space).
 
 **`spaces_opening_hours`**: realm operational; subject none; no retention; not append-only; keyed by (`bookable_id`, `weekday`, `opens_at`).
 

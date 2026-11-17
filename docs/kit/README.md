@@ -104,6 +104,20 @@ A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the 
 handler (`readRawBody(event, false)`) and validates the query against `input` instead. Such a route
 cannot be idempotent.
 
+### Link tokens
+
+A link that opens one thing without signing in (a ticket, a booking) carries a token made by
+`linkTokens.issue()`, which answers `{ token, hash }`. Store the hash and an expiry on the row the link
+opens; pass the token once, straight to the notification that sends the link, as a sealed variable.
+Look a presented token up by `linkTokens.hash(presented)`. A token is never stored, sealed, logged, or
+put in an event, a job's payload or an audit row. A route that takes one in its path declares it,
+`tokens: ['token']` for `[token].get.ts`: the kit then writes `[token]` in its place in the log, error
+reports and the idempotency record, and refuses an audit row, event or job payload that holds it. The
+check refuses `sealSpecial` in a module with no special or encrypted column, and a call that seals a
+token. A column declared `encrypted: true` that is not special (a ticket's code kept to show again) is
+written with `sealColumn` and read with `openColumn`, the same pair under its own name; the check treats
+it as it treats `sealSpecial`.
+
 ## Core's services
 
 Any module may import core's services without listing core: `import { notifyAddress } from
@@ -218,6 +232,15 @@ fact resolver may give the accounts that hold it, `defineFact(resolve, { holders
 names a `menu` (account, members, console or live) and may set `hideEmpty` beside `count`; only an
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
+
+An ability's `implies` names the module's own abilities by short name (`order.view`) and another
+module's by full id (`core.account.find`). Another module's ability may come with one only when it
+declares `impliable: true`, is of risk normal, and is owned by core or by a module the implying
+module lists under `requires`; one it only `uses` is not enough. The registry refuses anything else
+when it reads the manifests. An impliable ability may be neither privileged nor on a record type,
+because it comes with its implier at every reach: whoever holds the implying ability through a
+site-wide, module or record grant, or through a fact, holds the impliable one too, with no record,
+and the audit names the implying grant or fact.
 
 ## Requirements
 

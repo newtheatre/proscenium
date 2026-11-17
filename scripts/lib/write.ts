@@ -27,7 +27,7 @@ export function registrySource(modules: Loaded[], from: string): string {
   modules.forEach((m, i) => {
     const name = `m${i}`
     imports.push(`import ${name} from '${path(m.found.manifestFile.slice(ROOT.length + 1))}'`)
-    const groups: Record<string, string[]> = { listeners: [], jobs: [], tasks: [], facts: [], calls: [] }
+    const groups: Record<string, string[]> = { listeners: [], jobs: [], tasks: [], facts: [], calls: [], lists: [] }
     const contributions: Record<string, string[]> = {}
     for (const h of m.found.handlerFiles) {
       const local = `${name}_${h.kind}_${ident(h.point ?? '')}_${ident(h.name)}`

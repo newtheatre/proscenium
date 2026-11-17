@@ -118,13 +118,13 @@ An ability granted on a production or a performance therefore reaches its shifts
 | `core.search-source` | Incidents by number (for holders of incident.view); people on tonight's rota (for someone leading) |
 | `core.quick-action` | "Report an incident", for anyone who holds the ability |
 | `core.setup-step` | "Set up front of house": duties, a rota template, a pre-show checklist, the emergency card, and confirming what leading a shift may do |
-| `core.health-check` | The close-shifts task ran in the last hour; every venue with performances has an emergency card reviewed within the period; no incident is past its review time |
+| `core.health-check` | The close-shifts task ran in the last hour; every venue with a coming performance in a space the theatre manages (core's managed flag on the space) has an emergency card reviewed within the period; no incident is past its review time |
 | `core.record-resolver` | Titles and addresses for its five record types |
 | `core.change-impact` | For a performance: "6 shifts, 9 people confirmed". Not a change guard: a rota never blocks a change to the programme |
 | `core.notification-type` | See below |
 | `core.notification-topic` | "Shifts open for sign-up", "Cover needed", "Night reports" |
 | `core.vocabulary` | `front-of-house.incident-category` (slip or fall, illness, behaviour, fire alarm, building, lost child, other), `front-of-house.exception-reason` (broken, missing, not safe, no time, other). Theatres edit both |
-| `core.erasure-hold`, `core.erasure-handler`, `core.export-contributor`, `core.merge-handler` | As in part 3. The merge handler keeps one assignment when two accounts on the same shift become one: the other is released and marked freed by that merge. On undo, after Identity has moved the columns back, the freed assignment is restored to the account it came from only if the shift is still to come and a rota place is still free; nothing is taken back from anyone else, and otherwise it stays released and the undo reports it in its count with the reason. Merge and undo are each one unit and safe to repeat |
+| `core.erasure-hold`, `core.erasure-handler`, `core.export-contributor`, `core.merge-handler` | As in part 3. The merge handler keeps one assignment when two accounts on the same shift become one; the rule, its claim stamp and what happens on undo are in part 3, "Account merge and undo" |
 | `core.privacy-record` | Rota and volunteer hours (legitimate interests); incident records (legal obligation and vital interests), with the retention periods |
 | `forms.slot` | `front-of-house.incident-details`, later: a theatre's own extra questions on an incident |
 
