@@ -27,7 +27,7 @@ interface ShiftView {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -49,7 +49,7 @@ onMounted(() => {
 async function act(path: string, body: Record<string, unknown>, done: string) {
   refusal.value = null
   try {
-    await $api(path, { method: 'POST', body })
+    await write(path, { method: 'POST', body })
     toast.add({ title: done, color: 'success' })
     await refresh()
   }

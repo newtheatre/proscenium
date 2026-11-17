@@ -1,7 +1,6 @@
 {
   "box-office.module.name": "Box office",
   "box-office.module.description": "Selling tickets: what is on sale and for how much, seats held and sold, reservations paid for at the desk, orders, tickets and the door.",
-
   "box-office.settings-sections.cancellations": "Cancellations",
   "box-office.settings-sections.baskets": "Baskets",
   "box-office.settings-sections.orders": "Orders",
@@ -9,7 +8,6 @@
   "box-office.settings-sections.checkout": "Checkout",
   "box-office.settings-sections.reservations": "Reservations",
   "box-office.settings-sections.retention": "Keeping records",
-
   "box-office.settings.baskets.hold-for.label": "Hold seats in a basket for",
   "box-office.settings.baskets.hold-for.help": "How long seats are kept for a buyer once they press Hold tickets. Changing the basket does not restart it. A performance can have its own length.",
   "box-office.settings.baskets.pay-within.label": "Hold seats during payment for",
@@ -39,7 +37,6 @@
   "box-office.settings.sales.desk-until-after.help": "How long after the performance starts the desk may still sell, for latecomers.",
   "box-office.settings.retention.holds.label": "Keep the label of a staff hold for",
   "box-office.settings.retention.holds.help": "How long after the performance a hold placed by staff keeps its label, such as the name of the guests it was for.",
-
   "box-office.abilities.performance.manage.label": "Set up sales for a performance",
   "box-office.abilities.performance.exceed-venue.label": "Sell more than the space holds",
   "box-office.abilities.pricing.manage.label": "Manage ticket types and prices",
@@ -51,5 +48,17 @@
   "box-office.abilities.order.refund.label": "Ask for a refund of an order's tickets",
   "box-office.abilities.order.release.label": "Release a reservation, or mark one to keep",
   "box-office.abilities.ticket.admit.label": "Scan and admit at the door",
-  "box-office.abilities.settings.manage.label": "Change box office settings"
+  "box-office.abilities.settings.manage.label": "Change box office settings",
+  "box-office.abilities.order.exchange.label": "Exchange tickets on an order for another performance or seats",
+  "box-office.abilities.report.view.label": "See sales reports",
+  "box-office.abilities.report.export.label": "Download sales reports",
+  "box-office.navigation.reports.label": "Sales report",
+  "box-office.settings-sections.comps": "Complimentary tickets",
+  "box-office.settings.comps.per-request.label": "Most complimentary tickets in one request",
+  "box-office.settings.comps.per-request.help": "Anyone asking for more makes a second request.",
+  "box-office.settings.comps.per-performance.label": "Most complimentary tickets for one performance",
+  "box-office.settings.comps.per-performance.help": "Approvals stop once a performance reaches this many. Nothing means no limit.",
+  "box-office.abilities.comp.request.label": "Ask for complimentary tickets",
+  "box-office.abilities.comp.approve.label": "Approve or decline complimentary tickets, never your own",
+  "box-office.navigation.comps.label": "Complimentary tickets"
 }

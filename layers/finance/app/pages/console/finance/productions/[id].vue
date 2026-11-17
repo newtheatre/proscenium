@@ -54,7 +54,7 @@ const columns = computed<TableColumn<Line>[]>(() => [
       #primary
     >
       <UButton
-        :to="{ path: '/console/finance/ledger', query: { productionId: data.production.id } }"
+        :to="{ path: '/console/finance/ledger', query: { production: data.production.id } }"
         :label="t('finance.screens.statement.postings')"
         icon="i-lucide-book-open"
         color="neutral"

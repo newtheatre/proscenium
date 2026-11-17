@@ -45,7 +45,7 @@ export default defineModule({
       { id: 'core.account-sign-in', menu: 'account', to: '/account/sign-in', match: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 30 },
       { id: 'core.account-sessions', menu: 'account', to: '/account/sessions', icon: 'i-lucide-monitor-smartphone', ability: 'signed-in', order: 35 },
       { id: 'core.account-data', menu: 'account', to: '/account/data', icon: 'i-lucide-download', ability: 'signed-in', order: 50 },
-      { id: 'core.venues', menu: 'admin', group: 'theatre', to: '/admin/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
+      { id: 'core.venues', menu: 'console', group: 'venues', section: 'everyday', to: '/console/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
       { id: 'core.closures', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/closures', icon: 'i-lucide-calendar-x', ability: 'core.closure.manage', order: 35 },
       { id: 'core.email', menu: 'admin', group: 'email', to: '/admin/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
       { id: 'core.credits', menu: 'account', to: '/account/credits', icon: 'i-lucide-scroll-text', ability: 'signed-in', order: 42, count: 'core.my-credits', hideEmpty: true },
@@ -56,6 +56,7 @@ export default defineModule({
       { id: 'core.merges', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/merges', match: '/console/people/merge', icon: 'i-lucide-merge', ability: 'core.account.merge', order: 50 },
       { id: 'core.access-scheme-queue', menu: 'console', group: 'people', section: 'everyday', to: '/console/people/access-scheme', icon: 'i-lucide-accessibility', ability: 'core.access-scheme.read', order: 60, count: 'core.access-scheme-waiting' },
       { id: 'core.productions', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/productions', icon: 'i-lucide-drama', ability: 'core.production.view', order: 10 },
+      { id: 'core.calendar', menu: 'console', group: 'programme', section: 'everyday', to: '/console/programme/calendar', icon: 'i-lucide-calendar-days', ability: 'core.production.view', order: 15 },
       { id: 'core.seasons', menu: 'console', group: 'programme', section: 'setup', to: '/console/programme/seasons', icon: 'i-lucide-calendar-range', ability: 'core.season.manage', order: 20 },
       { id: 'core.vocabularies', menu: 'admin', group: 'theatre', to: '/admin/vocabularies', icon: 'i-lucide-list-tree', ability: 'core.vocabulary.manage', order: 40 },
       // Identity's site administration (identity spec part 6): defining roles and facts, and how people sign in.
@@ -71,6 +72,8 @@ export default defineModule({
       { id: 'box-office', icon: 'i-lucide-ticket' },
       { id: 'front-of-house', icon: 'i-lucide-door-open' },
       { id: 'bar', icon: 'i-lucide-wine' },
+      // Venues and spaces on their own for now, with room for the building's management to join them.
+      { id: 'venues', icon: 'i-lucide-building' },
       { id: 'spaces', icon: 'i-lucide-building-2' },
       { id: 'training', icon: 'i-lucide-graduation-cap' },
       { id: 'membership', icon: 'i-lucide-id-card' },

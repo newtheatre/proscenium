@@ -163,7 +163,7 @@ export async function applyAnswer(unit: UnitView, attempt: AttemptRow, answer: A
  * released): each attempt's money is held in payments.unfulfilled and refunded in full, asked for by
  * the system and so approved at once (Box office specification, part 4, abandoning a reader payment).
  */
-export async function holdAndRefund(unit: UnitView, intent: IntentRow, parts: PartRow[], attempts: AttemptRow[]): Promise<void> {
+export async function holdAndRefund(unit: UnitView, intent: IntentRow, parts: PartRow[], attempts: AttemptRow[]): Promise<string[]> {
   for (const attempt of attempts) {
     if (await isTestMoney(intent.id, attempt)) continue
     await postEntries(unit, {
@@ -175,7 +175,9 @@ export async function holdAndRefund(unit: UnitView, intent: IntentRow, parts: Pa
       entries: [{ account: clearingFor(attempt.method, attempt.provider_account_id), amountMinor: attempt.amount_minor }, { account: { key: 'payments.unfulfilled' }, amountMinor: -attempt.amount_minor }],
     })
   }
-  for (const refundId of await refundInFull(unit, intent, parts, attempts)) unit.enqueue('payments.send-refund', { refundId })
+  const refundIds = await refundInFull(unit, intent, parts, attempts)
+  for (const refundId of refundIds) unit.enqueue('payments.send-refund', { refundId })
+  return refundIds
 }
 
 /** Records an answer on its own: attempt succeeded, intent unfulfilled, the money held to go back. */

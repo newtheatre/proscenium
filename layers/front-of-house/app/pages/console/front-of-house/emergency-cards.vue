@@ -14,7 +14,7 @@ interface Choices {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { day } = useDates()
@@ -34,7 +34,7 @@ function edit(venue: { id: string, name: string, card: Card | null }) {
 async function save() {
   refusal.value = null
   try {
-    await $api(`/api/front-of-house/emergency-cards/${encodeURIComponent(editing.value!.id)}`, { method: 'PUT', body: { body: form.value.body.trim(), reviewed: form.value.reviewed } })
+    await write(`/api/front-of-house/emergency-cards/${encodeURIComponent(editing.value!.id)}`, { method: 'PUT', body: { body: form.value.body.trim(), reviewed: form.value.reviewed } })
     toast.add({ title: t('front-of-house.emergency.saved', { venue: editing.value!.name }), color: 'success' })
     editing.value = null
     await refresh()

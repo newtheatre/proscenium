@@ -47,7 +47,7 @@ export async function sendingDomain(): Promise<string> {
   if (!domain || domain !== verified) {
     refuse('core.notifications.domain-unverified', 'No email can be sent until the sending domain is set and verified.', {
       status: 503,
-      remedy: 'An administrator sets the sending domain in Settings, then sends a test message to verify it.',
+      remedy: 'An administrator sets the sending domain on the Email sending screen, then sends a test message to verify it.',
     })
   }
   return domain

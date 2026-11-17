@@ -29,7 +29,7 @@ interface Choices {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -75,8 +75,8 @@ async function save() {
     items: f.items.filter(i => i.label.trim()).map(i => ({ ...(i.id ? { id: i.id } : {}), label: i.label.trim(), help: i.help?.trim() || null, kind: i.kind, unit: i.kind === 'reading' ? i.unit.trim() || null : null, required: i.required })),
   }
   try {
-    if (editing.value) await $api(`/api/front-of-house/checklists/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
-    else await $api('/api/front-of-house/checklists', { method: 'POST', body })
+    if (editing.value) await write(`/api/front-of-house/checklists/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
+    else await write('/api/front-of-house/checklists', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.checklists.saved' : 'front-of-house.checklists.added', { name: body.name }), color: 'success' })
     stop()
     await refresh()
@@ -90,7 +90,7 @@ async function archive(list: Checklist) {
   if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.checklists.thing', { name: list.name }), consequence: t('front-of-house.checklists.archive-consequence'), button: t('front-of-house.archive.button') })) return
   refusal.value = null
   try {
-    await $api(`/api/front-of-house/checklists/${encodeURIComponent(list.id)}/archive`, { method: 'POST', body: {} })
+    await write(`/api/front-of-house/checklists/${encodeURIComponent(list.id)}/archive`, { method: 'POST', body: {} })
     toast.add({ title: t('front-of-house.checklists.archived', { name: list.name }), color: 'success' })
     await refresh()
   }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-// Email sending (C-32, C-52): the sending domain, whether it is verified, a test message, and,
-// where the site has its own domain and a Cloudflare token is set, setting the domain up for you.
+// Email sending (C-32, C-52, C-59): the sending domain, whether it is verified, a test message,
+// where the site has its own domain and a Cloudflare token is set, setting the domain up for you,
+// and the email settings, saved as any page of settings saves them. The verified domain is the
+// status above, so it is not drawn again among them.
 
 interface Sender {
   domain: string | null
@@ -10,6 +12,7 @@ interface Sender {
 }
 
 const { $api } = useNuxtApp()
+const route = useRoute()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const { data, status, error, refresh } = useAPI<Sender>('/api/core/notifications/sender')
@@ -20,7 +23,7 @@ const toast = useToast()
 const UNAVAILABLE = {
   'workers-dev': 'This site is on workers.dev, which cannot send email from its own address. Add a custom domain to the Worker and open the site there to set email up automatically.',
   'local': 'This site has no public domain yet, so email cannot be set up automatically here.',
-  'no-token': 'To set this up automatically, set the CORE_CLOUDFLARE_TOKEN secret on the Worker with Email Sending edit and Zone read. You can also onboard a domain in the Cloudflare dashboard and enter it in Settings.',
+  'no-token': 'To set this up automatically, set the CORE_CLOUDFLARE_TOKEN secret on the Worker with Email Sending edit and Zone read. You can also onboard a domain in the Cloudflare dashboard and enter it below.',
 } as const
 
 async function act(kind: 'set-up' | 'verify', body: Record<string, unknown> = {}) {
@@ -119,7 +122,7 @@ async function setUp() {
             v-if="data.automatic.unavailable === null || data.automatic.unavailable === 'no-token'"
             class="text-sm text-muted"
           >
-            Proscenium asks Cloudflare to set up <strong class="text-highlighted">{{ data.automatic.proposed }}</strong> for sending and to add its DNS records, then sends a test message once Cloudflare accepts it. The word before the site's address is the sending label in Settings.
+            Proscenium asks Cloudflare to set up <strong class="text-highlighted">{{ data.automatic.proposed }}</strong> for sending and to add its DNS records, then sends a test message once Cloudflare accepts it. The word before the site's address is the sending label, below.
           </p>
           <UAlert
             v-if="data.automatic.unavailable"
@@ -142,5 +145,11 @@ async function setUp() {
         </PageSection>
       </template>
     </DataBoundary>
+    <SettingsSections
+      screen="/admin/email"
+      :omit="['core.notifications.verified-domain']"
+      :highlight="typeof route.query.setting === 'string' ? route.query.setting : undefined"
+      @saved="refresh()"
+    />
   </PageFrame>
 </template>

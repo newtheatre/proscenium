@@ -69,6 +69,15 @@ describe('the guard for addresses under a shell (UI-07, UI-08)', () => {
     expect((await decide('/console', reader())).decision).toBe('allow')
   })
 
+  it('opens a screen for someone who holds its ability but must confirm it is you, so a reload is not refused', async () => {
+    // Site settings are privileged: a strong sign-in, confirmed recently. The API asks for that when
+    // the screen loads or saves, where the browser can confirm in place; a server render cannot.
+    const stale = person(['core.settings.manage'], { reassertedAt: 1 })
+    const basic = person(['core.settings.manage'], { assurance: 'basic' })
+    expect((await decide('/admin/theatre', stale)).decision).toBe('allow')
+    expect((await decide('/admin/theatre', basic)).decision).toBe('allow')
+  })
+
   it('lets any signed-in person open their account', async () => {
     expect((await decide('/account/gallery', audience())).decision).toBe('allow')
   })
@@ -103,7 +112,7 @@ describe('navigation and the viewer', () => {
     const aud = await (await call(handle, 'GET', '/api/core/viewer', { actor: audience() })).json() as { signedIn: boolean, sides: string[] }
     expect(aud).toMatchObject({ signedIn: true, sides: ['audience'] })
     const sam = await (await call(handle, 'GET', '/api/core/viewer', { actor: staff() })).json() as { sides: string[] }
-    expect(sam.sides).toEqual(['audience', 'console'])
+    expect(sam.sides).toEqual(['audience', 'console', 'live'])
   })
 })
 
@@ -191,10 +200,10 @@ describe('Site administration (R-33)', () => {
     expect(advanced.settings.map(s => s.key)).toEqual(expect.arrayContaining(['core.units.set-rows-limit', 'core.rate-limits.sign-in', 'core.delivery.stuck-after']))
     expect(new Set(advanced.settings.map(s => s.page))).toEqual(new Set(['core.advanced']))
     const email = await (await settings('screen=/admin/email', person(['core.sender.manage']))).json() as Settings
-    expect(email.settings.map(s => s.key).sort()).toEqual(['core.notifications.sending-domain', 'core.notifications.verified-domain'])
-    // Until the Email screen draws the footer and the sending label, they are on the Theatre page.
-    const theatre = await (await settings('page=core.theatre', person(['core.sender.manage']))).json() as Settings
-    expect(theatre.settings.map(s => s.key)).toEqual(expect.arrayContaining(['core.notifications.email-footer', 'core.notifications.sending-label']))
+    expect(email.settings.map(s => s.key).sort()).toEqual(['core.notifications.email-footer', 'core.notifications.sending-domain', 'core.notifications.sending-label', 'core.notifications.verified-domain'])
+    // The Email screen draws all of them (C-59), so none is left on the Theatre page.
+    const theatre = await (await settings('page=core.theatre', person(['core.settings.manage', 'core.sender.manage']))).json() as Settings
+    expect(theatre.settings.map(s => s.key).filter(k => k.startsWith('core.notifications.'))).toEqual([])
     expect(new Set(email.settings.map(s => s.screen))).toEqual(new Set(['/admin/email']))
     // Until an address is recorded, the site's address offers the one the page came on.
     const origin = (await (await settings('page=core.theatre')).json() as { settings: { key: string, suggestion: string | null }[] }).settings.find(s => s.key === 'core.site.origin')
@@ -324,5 +333,25 @@ describe('Site administration in the viewer (R-33)', () => {
   it('answers /admin as a missing page to someone with no admin ability', async () => {
     expect((await decide('/admin', staff())).decision).toBe('not-found')
     expect((await decide('/admin', person(['core.settings.manage']))).decision).toBe('allow')
+  })
+})
+
+describe('Live mode', () => {
+  const sides = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/viewer', { actor })).json()).sides as string[]
+
+  it('opens to someone who holds the ability of a live entry, and is not found for anyone else', async () => {
+    expect(await sides(staff())).toContain('live')
+    expect(await sides(reader())).not.toContain('live')
+    expect((await decide('/live', staff())).decision).toBe('allow')
+    expect((await decide('/live/gallery', staff())).decision).toBe('allow')
+    expect((await decide('/live', reader())).decision).toBe('not-found')
+    expect((await decide('/live/gallery', reader())).decision).toBe('not-found')
+    expect((await decide('/live')).decision).toBe('sign-in')
+  })
+
+  it('gives the Tonight hub its tiles from the live menu', async () => {
+    const nav = await (await call(handle, 'GET', '/api/core/navigation?shell=live', { actor: staff() })).json() as { items: { id: string, to: string }[] }
+    expect(nav.items.map(i => `${i.id} ${i.to}`)).toEqual(['gallery.live /live/gallery'])
+    expect((await call(handle, 'GET', '/api/core/navigation?shell=live', { actor: reader() })).status).toBe(404)
   })
 })
