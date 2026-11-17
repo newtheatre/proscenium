@@ -185,6 +185,52 @@ describe('tables', () => {
   })
 })
 
+describe('where settings are shown', () => {
+  const lost = (extra: object) => ({ manifest: defineModule({ id: 'lost-property', manifest: 1, since: '0.1.0', settings: defineSettings('lost-property', {
+    'items.keep-for': setting.duration({ default: '30d', change: 'lost-property.items.manage' }),
+    'items.notice': setting.text({ default: 'Ask at the desk', maxLength: 80, change: 'lost-property.items.manage' }),
+    'shelves.count': setting.integer({ default: 3, change: 'lost-property.items.manage' }),
+  }), abilities: defineAbilities('lost-property', { 'items.manage': ability() }), ...extra } as any), root: 'layers/lost-property', owner: 'upstream', handlers: {} }) as unknown as ModuleEntry
+
+  it('refuse scope, naming settingGroups', () => {
+    expect(() => defineSettings('x', { 'a.b': { ...setting.boolean({ default: true, change: 'x.settings.manage' }), scope: 'site' } as any })).toThrow(/settingGroups/)
+  })
+  it('put a group with no declaration on the module\'s own console page', () => {
+    const registry = buildRegistry([lost({})])
+    expect(registry.settingHomes.get('lost-property.items.keep-for')).toEqual({ page: 'lost-property.settings' })
+    expect(registry.settingPages.get('lost-property.settings')).toMatchObject({ place: 'console', to: '/console/lost-property/settings' })
+  })
+  it('give every setting one home: a declared page, Advanced, a screen, or a setting\'s own screen', () => {
+    const registry = buildRegistry([lost({
+      settingPages: { desk: { place: 'admin', group: 'modules' } },
+      settingGroups: { items: { page: 'desk' }, shelves: { advanced: true } },
+    })])
+    expect(registry.settingHomes.get('lost-property.items.notice')).toEqual({ page: 'lost-property.desk' })
+    expect(registry.settingPages.get('lost-property.desk')!.to).toBe('/admin/modules/lost-property/desk')
+    expect(registry.settingHomes.get('lost-property.shelves.count')).toEqual({ page: 'core.advanced' })
+    const screened = buildRegistry([lost({ settingGroups: { items: { screen: '/console/lost-property/desk' } } })])
+    expect(screened.settingHomes.get('lost-property.items.notice')).toEqual({ screen: '/console/lost-property/desk' })
+  })
+  it('refuse a group with two homes, a page of another module, an undeclared group, or a page the platform makes', () => {
+    expect(() => lost({ settingPages: { desk: { place: 'admin', group: 'modules' } }, settingGroups: { items: { page: 'desk', advanced: true } } })).toThrow(/one home/)
+    expect(() => lost({ settingGroups: { items: { page: 'theatre' } } })).toThrow(/not one of lost-property's settingPages/)
+    expect(() => lost({ settingGroups: { raffle: { advanced: true } } })).toThrow(/declares no setting in this group/)
+    expect(() => buildRegistry([lost({ settingPages: { settings: { place: 'console', group: 'people' } } })])).toThrow(/the platform makes itself/)
+  })
+  it('want every group of core to name its home', () => {
+    expect(() => defineModule({ id: 'core', manifest: 1, since: '0.1.0', settings: defineSettings('core', { 'odd.one': setting.boolean({ default: true, change: 'core.settings.manage' }) }) } as any)).toThrow(/core has no settings page of its own/)
+  })
+  it('carry a renamed key, and refuse an old key that is still declared', () => {
+    const renamed = lost({ settings: defineSettings('lost-property', { 'items.kept-for': setting.duration({ default: '30d', change: 'lost-property.items.manage', replaces: 'lost-property.items.keep-for' }) }) })
+    expect(buildRegistry([renamed]).settingAliases.get('lost-property.items.keep-for')).toBe('lost-property.items.kept-for')
+    const both = lost({ settings: defineSettings('lost-property', {
+      'items.keep-for': setting.duration({ default: '30d', change: 'lost-property.items.manage' }),
+      'items.kept-for': setting.duration({ default: '30d', change: 'lost-property.items.manage', replaces: 'lost-property.items.keep-for' }),
+    }) })
+    expect(() => buildRegistry([both])).toThrow(/still declared/)
+  })
+})
+
 describe('task slots', () => {
   const zone = 'Europe/London'
   it('are the latest slot at or before now, in local time', () => {

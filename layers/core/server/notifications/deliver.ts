@@ -72,9 +72,9 @@ export async function sendDeliveries(deliveryIds: readonly string[], unit: UnitV
 
   // No verified domain: leave every delivery as it is and let the job retry; the sweep re-queues it.
   const domain = await sendingDomain()
-  const maxAttempts = await useSetting('core.notifications.max-attempts') as number
-  const firstRetry = await useSetting('core.notifications.first-retry') as number
-  const stuckAfter = await useSetting('core.notifications.stuck-after') as number
+  const maxAttempts = await useSetting('core.delivery.max-attempts') as number
+  const firstRetry = await useSetting('core.delivery.first-retry') as number
+  const stuckAfter = await useSetting('core.delivery.stuck-after') as number
   const brand = await brandTokens()
   const theatre = await theatreName(domain)
   const footer = await useSetting('core.notifications.email-footer') as string | null

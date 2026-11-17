@@ -9,7 +9,7 @@ export default defineRoute({
   public: true,
   rateLimit: 'write',
   input: z.object({ token: z.string().min(1).max(200) }).strict(), // not-policy: shape bound
-}, (event, { input, unit }) => {
-  fromRequest(event)
+}, async (event, { input, unit }) => {
+  await fromRequest(event)
   return confirmReservation(unit.view(), input.token)
 })
