@@ -5,7 +5,6 @@ const text = (max: number) => z.string().trim().max(max).transform(v => v || nul
 
 const venueFields = z.object({
   name: z.string().trim().min(1).max(120), // not-policy: a place name's bounds
-  managed: z.boolean().optional(),
   addressLines: text(300).optional(), // not-policy: an address's bound
   locality: text(120).optional(), // not-policy: a town's bound
   postcode: text(20).optional(), // not-policy: a postcode's bound
@@ -30,6 +29,8 @@ export const spaceInput = z.object({
   exclusive: z.boolean().optional(),
   description: text(4000).optional(), // not-policy: public text's bound
   accessInfo: text(4000).optional(), // not-policy: access text's bound
+  managed: z.boolean().optional(),
+  findingIt: text(200).optional(), // not-policy: a finding-it note's bound (R-36)
 })
 
 export const placeAccessInput = z.object({
