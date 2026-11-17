@@ -1,7 +1,17 @@
 // Openings (tab 3, "An opening"): an outlet trades from its first sale until it is closed. Closing
 // voids the sales still open or parked, and is refused while one is waiting for its payment, because
 // that payment may still succeed.
-import { all, nowMs, refuse, type UnitView } from '#kit'
+import { all, newId, nowMs, refuse, type UnitView } from '#kit'
+import { operatingDayOf } from '#modules/core'
+
+/** Starts the outlet's opening in the batch, unless one is already trading: an outlet opens with its first sale or refusal. */
+export async function ensureOpening(unit: UnitView, outletId: string, by: string | null, at: number): Promise<void> {
+  unit.add({
+    sql: `INSERT INTO bar_openings (id, outlet_id, performance_id, operating_day, state, opened_by, opened_at, created_at, updated_at)
+          SELECT ?, ?, NULL, ?, 'open', ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bar_openings WHERE outlet_id = ? AND state = 'open')`,
+    params: [newId('bopn'), outletId, await operatingDayOf(at), by, at, at, at, outletId],
+  })
+}
 
 export interface OpeningRow { id: string, outletId: string, outlet: string, operatingDay: string, state: 'open' | 'closed', openedAt: number, closedAt: number | null, paidMinor: number, sales: number, waiting: number, unpaid: number }
 

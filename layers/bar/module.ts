@@ -4,8 +4,10 @@
 // posting. Bar and Box office never import each other; both plug into Payments' till.
 // This file grows with the build; it declares only what the code so far uses.
 import { z } from 'zod'
-import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting } from '#kit'
+import { ability, defineAbilities, defineModule, defineRecords, defineSettings, event, setting, task } from '#kit'
 import { tables } from './server/db/schema'
+
+const change = 'bar.settings.manage'
 
 export default defineModule({
   id: 'bar',
@@ -16,7 +18,14 @@ export default defineModule({
 
   settings: defineSettings('bar', {
     // Starts a bar sale's reference, so it is not mistaken for a booking reference.
-    'sales.reference-prefix': setting.text({ default: 'B', minLength: 1, maxLength: 3, change: 'bar.settings.manage', audience: 'staff' }),
+    'sales.reference-prefix': setting.text({ default: 'B', minLength: 1, maxLength: 3, change, audience: 'staff' }),
+    // The age check and the refusals register (tab 4, "The age check and refusals").
+    'age-check.enabled': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
+    'age-check.minimum-age': setting.integer({ default: 18, min: 16, max: 25, change, audience: 'public', quotable: true, onChange: 'confirm' }),
+    'age-check.challenge-age': setting.integer({ default: 25, min: 18, max: 30, change, audience: 'public', quotable: true }),
+    'age-check.description': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
+    'age-check.review-every': setting.duration({ default: '7d', min: '1d', max: '90d', change, audience: 'staff' }),
+    'retention.age-checks': setting.duration({ default: '730d', min: '180d', max: '3650d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   records: defineRecords('bar', {
@@ -26,6 +35,8 @@ export default defineModule({
     'category': { table: 'bar_categories' },
     'opening': { table: 'bar_openings', owner: 'opened_by' },
     'sale': { table: 'bar_sales', owner: 'sold_by' },
+    'age-check': { table: 'bar_age_checks', owner: 'by' },
+    'register-review': { table: 'bar_register_reviews', owner: 'reviewed_by' },
   }),
   abilities: defineAbilities('bar', {
     // Categories, products and their variants.
@@ -39,6 +50,9 @@ export default defineModule({
     // Close an outlet's opening; the person who opened it may close it.
     'opening.manage': ability({ on: 'bar.outlet' }),
     'settings.manage': ability({ risk: 'privileged' }),
+    // The refusals register: reading it, and signing it as checked (which may erase a description).
+    'age-check.view': ability(),
+    'age-check.review': ability({ implies: ['age-check.view'] }),
   }),
 
   tables,
@@ -48,12 +62,31 @@ export default defineModule({
       // A sales feed for an outside accounts system: a sale and its opening, no person.
       'bar.sale.paid': event({ version: 1, payload: z.object({ saleId: z.string(), openingId: z.string() }), internal: false }),
       'bar.opening.closed': event({ version: 1, payload: z.object({ openingId: z.string(), outletId: z.string() }), internal: false }),
+      // For the duty manager's night report. Never carries the description.
+      'bar.age-check.refused': event({ version: 1, payload: z.object({ ageCheckId: z.string(), openingId: z.string() }), internal: true }),
     },
     // Standard is made when the bar is switched on.
     listens: { 'core.module.enabled': 'standard-price-list' },
   },
 
+  tasks: {
+    // Erases descriptions of people refused once their rows pass the register's retention.
+    'bar.sweep-retention': task({ dailyAt: '04:40' }),
+  },
+
   contributes: {
+    'core.vocabulary': [{
+      id: 'bar.refusal-reason',
+      label: 'Reasons for refusing a sale',
+      terms: [
+        { slug: 'no-id', label: 'No ID' },
+        { slug: 'id-not-accepted', label: 'ID not accepted' },
+        { slug: 'under-age', label: 'Under age' },
+        { slug: 'proxy', label: 'Buying for someone under age' },
+        { slug: 'drunk', label: 'Already drunk' },
+        { slug: 'other', label: 'Other' },
+      ],
+    }],
     // Drinks paid for at the till, alone or on the same payment as tickets (tab 4).
     'payments.settlement': [{ id: 'bar' }],
     'payments.desk-basket': [{ id: 'bar' }],
@@ -71,6 +104,7 @@ export default defineModule({
       { id: 'bar.openings', menu: 'console', group: 'bar', section: 'everyday', to: '/console/bar/openings', icon: 'i-lucide-clock', ability: 'bar.opening.manage', order: 20 },
       { id: 'bar.products', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/products', match: '/console/bar/products', icon: 'i-lucide-beer', ability: 'bar.product.manage', order: 10 },
       { id: 'bar.price-lists', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/price-lists', match: '/console/bar/price-lists', icon: 'i-lucide-tags', ability: 'bar.price.manage', order: 20 },
+      { id: 'bar.age-checks', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/age-checks', icon: 'i-lucide-id-card', ability: 'bar.age-check.view', order: 40 },
       { id: 'bar.outlets', menu: 'console', group: 'bar', section: 'setup', to: '/console/bar/outlets', icon: 'i-lucide-store', ability: 'bar.outlet.manage', order: 30 },
     ],
   },
