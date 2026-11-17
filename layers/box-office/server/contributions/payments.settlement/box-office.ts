@@ -9,12 +9,15 @@ import { first, nowMs, type UnitView } from '#kit'
 import type { Part, Settlement } from '#modules/payments'
 import { refundEntries, tagged } from '../../cancel'
 import { confirmOrder } from '../../confirm'
+import { exchangeOrder, isExchangeRecord, releaseExchange, settleExchange } from '../../exchange'
 import { liveLines, ORDER, type OrderRow } from '../../orders'
 
 const DEFERRED = { key: 'box-office.deferred-ticket-income' }
 
 export default {
   async settle(unit: UnitView, part: Part) {
+    // The difference on an exchange to dearer tickets: the exchange is made now.
+    if (isExchangeRecord(part.record)) return settleExchange(unit, part)
     const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, part.record)
     if (!order) throw new Error(`No order ${part.record} for payment part ${part.id}`)
     const lines = await liveLines(order.id)
@@ -26,11 +29,12 @@ export default {
   },
 
   // The money for cancelled tickets has gone back: it is no longer owed to the audience.
-  refunded(_unit: UnitView, part: Part, refund: { id: string, amountMinor: number }) {
-    return refundEntries(part.record, refund)
+  async refunded(_unit: UnitView, part: Part, refund: { id: string, amountMinor: number }) {
+    return refundEntries(isExchangeRecord(part.record) ? await exchangeOrder(part.record) : part.record, refund)
   },
 
   async release(unit: UnitView, part: Part) {
+    if (isExchangeRecord(part.record)) return releaseExchange(unit, part)
     const order = await first<OrderRow>(`${ORDER} WHERE id = ?`, part.record)
     // Called twice, or after the order moved on: nothing is waiting for this payment.
     if (!order || order.state !== 'awaiting_payment' || order.intent_id !== part.intentId) return

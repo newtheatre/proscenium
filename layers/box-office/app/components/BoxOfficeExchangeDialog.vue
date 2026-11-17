@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Exchanging tickets (BO-54): the chosen tickets move to another performance, seats or ticket type.
 // The new seats are taken before the old ones are let go, so a full house changes nothing. The
-// dialogue shows what it costs or gives back before anything happens; a dearer exchange is not
-// done here yet.
+// dialogue shows what it costs or gives back before anything happens. A dearer exchange of paid
+// tickets goes to the till, which holds the new seats while the difference is paid.
 interface Line { id: string, band: string | null, ticketType: string | null, amountMinor: number }
 interface Offer { performanceId: string, title: string, startsAt: number, currency: string | null, rows: { bandId: string, band: string, ticketTypeId: string, ticketType: string, amountMinor: number, free: number }[] }
-interface Quote { oldMinor: number, newMinor: number, differenceMinor: number }
+interface Quote { oldMinor: number, newMinor: number, differenceMinor: number, paid: boolean }
 
 const props = defineProps<{ orderId: string, reference: string, currency: string, lines: Line[] }>()
 const open = defineModel<boolean>('open', { required: true })
@@ -58,8 +58,13 @@ const words = computed(() => {
   if (!q) return ''
   if (q.differenceMinor === 0) return t('box-office.order.exchange.even')
   if (q.differenceMinor < 0) return t('box-office.order.exchange.refund', { amount: money(-q.differenceMinor, props.currency) })
-  return t('box-office.order.exchange.more', { amount: money(q.differenceMinor, props.currency) })
+  return t(q.paid ? 'box-office.order.exchange.more' : 'box-office.order.exchange.more-unpaid', { amount: money(q.differenceMinor, props.currency) })
 })
+const toTill = computed(() => !!quote.value?.paid && quote.value.differenceMinor > 0)
+const tillLink = computed(() => ({
+  path: '/console/box-office/sell',
+  query: { exchange: JSON.stringify({ orderId: props.orderId, reference: props.reference, ...body.value, expectedDifferenceMinor: quote.value?.differenceMinor ?? 0 }) },
+}))
 
 async function exchange() {
   refusal.value = null
@@ -128,10 +133,17 @@ async function exchange() {
     </template>
     <template #footer>
       <UButton
+        v-if="toTill"
+        :to="tillLink"
+        icon="i-lucide-banknote"
+        :label="t('box-office.order.exchange.to-till')"
+      />
+      <UButton
+        v-else
         type="submit"
         form="box-office-exchange"
         :label="t('box-office.order.exchange.button')"
-        :disabled="!quote || quote.differenceMinor > 0"
+        :disabled="!quote"
       />
     </template>
   </UModal>
