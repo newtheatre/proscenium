@@ -113,6 +113,8 @@ Redesigned on 16 November 2026 (integration ruling R-37, agreed by Matt; brief i
 - **Advanced** (`/admin/advanced`) is a generated page holding every group marked advanced, whichever module declares it, each headed with its module's name, under a warning that these are engineering limits and rarely need changing.
 - **Settings history** (`/admin/settings-history`, seen with `core.audit.view`) lists every change, newest first, filtered by module, page and person. Each row has "Revert", which sets the old value back through the ordinary save: the same ability, rules and confirmation, and its own row with the reason "Reverted". A sensitive setting's values are never shown and it has no Revert.
 
+As built (kit PR 115, 17 November 2026), three details differ from what R-37 first recorded. Every setting names its own ability and a group has none; the one "Changed by people who can..." line still heads a section wherever its settings share an ability. A page's id is `<module>.<page>`, with `core.advanced`, `<module>.settings` and `<module>.admin` reserved. And a setting may name a screen of its own only once that screen shows and saves it; until then it is drawn on a generated page, and Shells and navigation lists which settings that affects for now.
+
 ### Home
 
 - **A home page is a queue, not a menu.** Cards are ordered by urgency: things overdue, things due today, things to know.

@@ -6,9 +6,21 @@ Fourteen settings and fifteen abilities, written as entries for the foundations 
 
 Every setting applies to the whole site. What varies by list is a field on the list that defaults from a setting, as the integration thread recommended for every module.
 
-**Where they are shown.** The manifest declares five groups in `settingGroups`, one for each first segment of a key. Four of them, `consent`, `sending`, `campaigns` and `imports`, have `place: 'console'`, name no page and so are drawn on the module's own generated page, `/console/communications/settings`. The fifth, `engine`, holds the three engineering limits (`tranche-size`, `stuck-after` and `results-after`) and is marked `advanced: true`, so it is drawn on `/admin/advanced` under the module's name and not on the module's page. Every group has `change: 'communications.settings.manage'`, and none names a bespoke `screen`. Each setting therefore has exactly one home.
+**Where they are shown.** The manifest declares five groups in `settingGroups`, one for each first segment of a key. Four of them, `consent`, `sending`, `campaigns` and `imports`, have `place: 'console'`, name no page and so are drawn on the module's own generated page, whose id is `communications.settings` and whose address is `/console/communications/settings`. The fifth, `engine`, holds the three engineering limits (`tranche-size`, `stuck-after` and `results-after`) and is marked `advanced: true`, so it is drawn on the Advanced page, `core.advanced` at `/admin/advanced`, under the module's name and not on the module's page. No group names a bespoke `screen`, so each setting has exactly one home. Every setting names `communications.settings.manage` as the ability that changes it; a group carries no ability of its own, and the page shows one ability line for a section because its settings share one.
 
-**Saving.** Two settings declare `onChange: 'confirm'`, because each changes whom the theatre may write to: `communications.consent.double-opt-in` and `communications.consent.existing-customer`. Saving either shows what will change and asks again, with re-authentication when the session is not fresh. Every other setting saves with no prompt.
+**Saving.** Seven settings declare `onChange: 'confirm'`. Saving one shows what will change, asks again, and asks for a fresh sign-in when the session is not fresh. Freshness follows the setting, not the ability, so every other setting saves with no prompt.
+
+| Setting | Why it confirms |
+| --- | --- |
+| `communications.consent.double-opt-in` | Off, an unproved address joins a list without confirming |
+| `communications.consent.existing-customer` | On, a list may write to people who never ticked a box. Later |
+| `communications.consent.record-retention` | Shortened, the next purge deletes consent evidence that cannot be recovered |
+| `communications.campaigns.recipient-retention` | Shortened, the next purge deletes recipient rows that cannot be recovered |
+| `communications.campaigns.require-approval` | Off, a mailing no longer needs a second person. Later |
+| `communications.sending.per-minute` | Raised, mailings leave faster than the sending account may allow. Later |
+| `communications.sending.daily-limit` | Raised or set to none, the day's cap on mailings goes. Later |
+
+Quiet hours do not confirm: a wrong value sends a mailing at an unsociable hour and to nobody new. Nothing in `imports` confirms either, because the consent an imported address is given comes from the statement made at each import, not from a setting.
 
 **Durations.** Each duration is entered with the kit's `DurationInput`, a number and a unit, and stored as whole seconds. A month is 30 days and a year is 365 days, so the default of 13 months is 390 days and 6 years is 2,190 days. A stored value is shown in the largest unit that divides it exactly, so no label or help text names a unit: "How long consent records are kept", never "Years to keep consent records".
 

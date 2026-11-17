@@ -117,16 +117,26 @@ By ruling R-37 (Matt's settings redesign of 16 November 2026, brief at `/mnt/pro
 
 | Group | Place | Home | Declared as |
 | --- | --- | --- | --- |
-| `site` (foundations' `core.site.name` and `core.site.origin`) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'theatre' }` |
-| `organisation` | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'theatre' }` |
-| `locale` (foundations' keys) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'theatre' }` |
+| `site` (foundations' `core.site.name` and `core.site.origin`) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
+| `organisation` | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
+| `locale` (foundations' keys) | Site administration, Theatre | Theatre page, `/admin/theatre` | `{ place: 'admin', page: 'core.theatre' }` |
 | `brand`, `appearance` | Site administration, Theatre | Branding, the bespoke screen | `{ place: 'admin', screen: '/admin/branding' }` |
 | `notifications` | Site administration, Email | Email, the bespoke screen | `{ place: 'admin', screen: '/admin/email' }` |
 | `delivery` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
 | `files` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` |
 | `webhooks` | Site administration, Upkeep | Advanced page, `/admin/advanced` | `{ place: 'admin', advanced: true }` (ruled by Integration, 16 November 2026) |
-| `programme` | Console, Programme | Programme settings page | `{ place: 'console', page: 'programme' }` |
+| `programme` | Console, Programme | Programme settings page | `{ place: 'console', page: 'core.programme' }` |
 | every `public-site.*` group | Site administration, Modules | the public site module's own settings page | `place: 'admin'`, page left to the module default (ruled by Integration, 16 November 2026) |
+
+**As built, and where it ends.** The table above is the end state. The kit's format as built (kit PR 115, and the foundations specification's Settings registry) differs from the brief in three ways. No group names an ability: every setting names its own, as the tables in this part already do. Page ids take the form `[module].[page]`, so core's pages are `core.theatre`, `core.branding` and `core.programme`, with `core.advanced`, `[module].settings` and `[module].admin` reserved. And a setting may name a bespoke screen only once that screen shows and saves it. Until then it sits on a generated page, so some settings have an interim home:
+
+| Settings | Home now | Home at the end | What moves them |
+| --- | --- | --- | --- |
+| `core.brand.*` and `core.appearance.*` | The generated page `core.branding`, at `/admin/branding` | The bespoke Branding screen, at the same address | The Branding screen of part 5 being built so that it shows and saves every one of them |
+| `core.notifications.sending-domain` and `verified-domain` | The bespoke Email screen, `/admin/email`, which shows and saves them today | The same | Nothing |
+| `core.notifications.sending-label`, `email-footer`, `digest-time` and `digest-day` | The generated Theatre page, `core.theatre` | The bespoke Email screen, `/admin/email` | Story C-59, the Email screen extension in part 5 |
+
+A move is one manifest change, made in the same pull request as the screen that takes the setting, so a setting is never on two homes and never on none. The address `/admin/branding` does not change when the bespoke screen replaces the generated page.
 
 The other core groups in the brief's table (`sign-in`, `sessions`, `recovery`, `access`, `privacy`, `grants`, `members-area`, `access-scheme`, `emergency-contacts`, `merge`, and the kit's `units`, `jobs`, `external`, `idempotency`, `rate-limits`, `retention`) belong to the identity and foundations specifications, which declare them.
 
@@ -149,6 +159,21 @@ The setting group `delivery` and the ability `core.delivery.read` share a word a
 **Durations.** Every duration setting above is entered through the kit's `DurationInput` (a number and a unit, from seconds to years, with a month as 30 days and a year as 365). Storage is unchanged, whole seconds, and the written defaults in this part keep their form.
 
 A stored duration is shown in the largest unit that divides it exactly, so a duration setting's label and help never name a unit (a foundations ruling of 16 November 2026). The labels are written as "How long a sent message is kept", never "Days to keep". The same holds for the catalogue text of every duration setting in this part.
+
+**Settings that ask before they save.** As built (kit PR 117), freshness on a settings save follows the setting, not the ability: a fresh sign-in is asked only where the setting itself declares `onChange: 'confirm'` or `'reason'`, though a strong session is still required where the ability needs one. So each setting whose silent change would matter declares `onChange: 'confirm'`. The save shows what will change and asks again. Core and the public site module declare it on these, and on no others:
+
+| Setting | Why a silent change matters |
+| --- | --- |
+| `core.notifications.sending-domain`, `verified-domain` and `sending-label` | They decide the address every email leaves from. A wrong value stops mail or sends it from a domain nobody verified. |
+| `core.organisation.year-end` | Identity ends grants on it, so moving it ends or extends people's access. |
+| `core.programme.credits-public` | It puts people's names on the public site, or takes them off. |
+| `core.files.deleted-retention`, `core.delivery.log-retention`, `core.delivery.inbox-retention` and `core.webhooks.log-retention` | Shortening one deletes records at the next sweep, and they cannot be brought back. Integration has made this the rule for every retention setting in core and in every module, and the kit checks it. These four are all of core's. |
+| `public-site.search.hidden` | It turns search engines away from the whole site, or lets them in. |
+| `public-site.archive.public`, `public-site.feeds.calendar` and `public-site.data.open` | Each opens or closes a public surface: the archive, the calendar feeds, the open data. |
+
+Webhook endpoints and their secrets are records, not settings, and keep their own checks (part 4). `core.site.origin` is foundations' and already confirms.
+
+**Who sees a setting's history.** The history of one setting is visible to whoever may change that setting. The whole history, at `/admin/settings-history`, needs `core.audit.view`.
 
 ## Abilities
 
