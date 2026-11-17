@@ -1,10 +1,10 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "7c033898-041b-4c7a-b43a-a3ceaa31f9da",
+  "id": "c7bce119-6f63-47ad-8276-5ececc5c019f",
   "prevIds": [
-    "38512e74-67ab-48e0-b5de-5492540b91e5",
-    "54b1034d-a1cf-44b0-9b0f-e0945029fc65"
+    "23d78430-bdb4-4f74-b070-922629269ced",
+    "cf948161-8110-4fcd-9408-3f2fc340efe5"
   ],
   "ddl": [
     {
@@ -321,6 +321,14 @@
     },
     {
       "name": "front_of_house_duties",
+      "entityType": "tables"
+    },
+    {
+      "name": "front_of_house_rota_template_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "front_of_house_rota_templates",
       "entityType": "tables"
     },
     {
@@ -8072,6 +8080,106 @@
       "entityType": "columns"
     },
     {
+      "table": "front_of_house_rota_template_lines",
+      "name": "template_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_template_lines",
+      "name": "duty_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_template_lines",
+      "name": "places",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "venue_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "is_default",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "archived_at",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "id",
       "type": "text",
@@ -12064,6 +12172,34 @@
       "entityType": "indexes"
     },
     {
+      "table": "front_of_house_rota_templates",
+      "name": "front_of_house_rota_templates_name",
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "archived_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "front_of_house_rota_templates_default",
+      "columns": [
+        {
+          "value": "coalesce(\"venue_id\", '')",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": "is_default = 1 AND archived_at IS NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "front_of_house_shifts_duty",
       "columns": [
@@ -12483,6 +12619,20 @@
     },
     {
       "table": "payments_refunds",
+      "name": "payments_refunds_created",
+      "columns": [
+        {
+          "value": "created_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_refunds",
       "name": "payments_refunds_waiting",
       "columns": [
         {
@@ -12506,6 +12656,20 @@
       ],
       "isUnique": true,
       "where": "state <> 'closed'",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "payments_sessions",
+      "name": "payments_sessions_opened",
+      "columns": [
+        {
+          "value": "opened_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
       "origin": "manual",
       "entityType": "indexes"
     },
@@ -13553,6 +13717,36 @@
       "entityType": "fks"
     },
     {
+      "table": "front_of_house_rota_template_lines",
+      "name": "fk_front_of_house_rota_template_lines_template_id_front_of_house_rota_templates_id_fk",
+      "columns": [
+        "template_id"
+      ],
+      "tableTo": "front_of_house_rota_templates",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "front_of_house_rota_template_lines",
+      "name": "fk_front_of_house_rota_template_lines_duty_id_front_of_house_duties_id_fk",
+      "columns": [
+        "duty_id"
+      ],
+      "tableTo": "front_of_house_duties",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "front_of_house_shifts",
       "name": "fk_front_of_house_shifts_duty_id_front_of_house_duties_id_fk",
       "columns": [
@@ -14011,6 +14205,16 @@
       "columns": [
         "task",
         "due_at"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "front_of_house_rota_template_lines",
+      "name": "front_of_house_rota_template_lines_pk",
+      "columns": [
+        "template_id",
+        "duty_id"
       ],
       "nameExplicit": false,
       "entityType": "pks"
@@ -14576,6 +14780,15 @@
     {
       "table": "front_of_house_duties",
       "name": "front_of_house_duties_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "front_of_house_rota_templates_pk",
       "columns": [
         "id"
       ],
@@ -15513,6 +15726,18 @@
       "table": "front_of_house_duties",
       "name": "front_of_house_duties_stay",
       "value": "\"stay_after_minutes\" BETWEEN 0 AND 480",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_rota_template_lines",
+      "name": "front_of_house_rota_template_lines_places",
+      "value": "\"places\" BETWEEN 1 AND 50",
+      "entityType": "checks"
+    },
+    {
+      "table": "front_of_house_rota_templates",
+      "name": "front_of_house_rota_templates_name_length",
+      "value": "length(\"name\") BETWEEN 1 AND 80",
       "entityType": "checks"
     },
     {
