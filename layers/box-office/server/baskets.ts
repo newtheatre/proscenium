@@ -36,6 +36,28 @@ export async function offSaleAt(sales: { offSaleAt: number | null }, startsAt: n
   return sales.offSaleAt ?? startsAt - (await useSetting('box-office.sales.close-before') as number) * 1000 // not-policy: seconds to milliseconds
 }
 
+export interface PricedLine { bandId: string, ticketTypeId: string, amountMinor: number }
+
+/** Each ticket asked for, one line apiece, at the price in force at `at`, with the pools they come from. */
+export async function pricedLines(performanceId: string, asked: BasketLineInput[], at: number): Promise<{ pool: Map<string, { id: string }>, lines: PricedLine[], currency: string }> {
+  const [pools, prices, types] = await Promise.all([
+    poolsOf(performanceId),
+    pricesFor(performanceId, at),
+    all<{ id: string, needs_paid_ticket: number }>('SELECT id, needs_paid_ticket FROM box_office_ticket_types WHERE active = 1'),
+  ])
+  const pool = new Map(pools.map(p => [p.bandId, p]))
+  const price = new Map(prices.map(p => [`${p.bandId} ${p.ticketTypeId}`, p]))
+  const type = new Map(types.map(t => [t.id, t]))
+  for (const line of asked) {
+    if (!pool.has(line.bandId) || !type.has(line.ticketTypeId) || !price.has(`${line.bandId} ${line.ticketTypeId}`))
+      refuse('box-office.price.none', 'One of these tickets is not on sale for this performance.', { status: 422, remedy: 'Reload to see what is on sale.' })
+  }
+  if (asked.some(l => type.get(l.ticketTypeId)!.needs_paid_ticket) && !asked.some(l => !type.get(l.ticketTypeId)!.needs_paid_ticket))
+    refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })
+  const lines = asked.flatMap(l => Array.from({ length: l.quantity }, () => ({ bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: price.get(`${l.bandId} ${l.ticketTypeId}`)!.amountMinor })))
+  return { pool, lines, currency: prices[0]!.currency }
+}
+
 /** Adds an online basket to the unit: every ticket asked for is held together, or nothing is. */
 export async function createBasket(unit: UnitView, input: BasketInput): Promise<Basket> {
   const sales = await salesOf(input.performanceId)
@@ -50,23 +72,8 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const cap = sales.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number
   if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one order.`, { status: 422, remedy: 'For a larger group, ask the box office.' })
 
-  const [pools, prices, types] = await Promise.all([
-    poolsOf(input.performanceId),
-    pricesFor(input.performanceId, at),
-    all<{ id: string, needs_paid_ticket: number }>('SELECT id, needs_paid_ticket FROM box_office_ticket_types WHERE active = 1'),
-  ])
-  const pool = new Map(pools.map(p => [p.bandId, p]))
-  const price = new Map(prices.map(p => [`${p.bandId} ${p.ticketTypeId}`, p]))
-  const type = new Map(types.map(t => [t.id, t]))
-  for (const line of input.lines) {
-    if (!pool.has(line.bandId) || !type.has(line.ticketTypeId) || !price.has(`${line.bandId} ${line.ticketTypeId}`))
-      refuse('box-office.price.none', 'One of these tickets is not on sale for this performance.', { status: 422, remedy: 'Reload to see what is on sale.' })
-  }
-  // A companion ticket needs another ticket for the same performance in the same order.
-  if (input.lines.some(l => type.get(l.ticketTypeId)!.needs_paid_ticket) && !input.lines.some(l => !type.get(l.ticketTypeId)!.needs_paid_ticket))
-    refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })
+  const { pool, lines, currency } = await pricedLines(input.performanceId, input.lines, at)
 
-  // The performance is still on sale when the batch runs, not only when it was read.
   unit.add({ sql: "UPDATE box_office_performance_sales SET updated_at = updated_at WHERE id = ? AND state = 'on_sale' AND (off_sale_at IS NULL OR off_sale_at > ?)", params: [sales.id, at] })
     .expect(1, NOT_ON_SALE.paused)
 
@@ -76,8 +83,6 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const token = randomToken()
   const holdFor = sales.holdMinutes !== null ? sales.holdMinutes * 60 : await useSetting('box-office.baskets.hold-for') as number // not-policy: minutes to seconds
   const expiresAt = at + holdFor * 1000 // not-policy: seconds to milliseconds
-  const currency = prices[0]!.currency
-  const lines = input.lines.flatMap(l => Array.from({ length: l.quantity }, () => ({ bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: price.get(`${l.bandId} ${l.ticketTypeId}`)!.amountMinor })))
   const totalMinor = lines.reduce((sum, l) => sum + l.amountMinor, 0)
 
   unit.add({
