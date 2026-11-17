@@ -95,6 +95,25 @@ describe('a production\'s public page', () => {
     expect(body).not.toHaveProperty('listed')
   })
 
+  it('carries the poster and photos in use, with their descriptions, and nothing waiting or removed', async () => {
+    const s = await show()
+    const image = (id: string, slot: string, state: string, attached: boolean, sort = 0) => env.DB.prepare(
+      `INSERT INTO core_files (id, object_key, owner_type, owner_id, slot, sort, text_class, media_type, byte_size, sha256, access, state, alt_text, width, height, attached_at, created_at)
+       VALUES (?, ?, 'core.production', ?, ?, ?, 'public', 'image/png', 10, 'x', 'public', ?, ?, 600, 900, ?, ?)`,
+    ).bind(id, `k-${id}`, s.id, slot, sort, state, `Image ${id}`, attached ? Date.now() : null, Date.now()).run()
+    await image(`fil_p${n}`, 'core.production-poster', 'ready', true)
+    await image(`fil_a${n}`, 'core.production-photos', 'ready', true, 2)
+    await image(`fil_b${n}`, 'core.production-photos', 'ready', true, 1)
+    await image(`fil_w${n}`, 'core.production-photos', 'ready', false)
+    await image(`fil_d${n}`, 'core.production-photos', 'deleted', true)
+    await date(s.id, '2027-05-05T19:30:00Z')
+    const { body } = await visit(`/api/public-site/productions/${s.slug}`)
+    expect(body.poster).toEqual({ url: `/files/fil_p${n}`, alt: `Image fil_p${n}`, width: 600, height: 900 })
+    expect(body.photos.map((p: { url: string }) => p.url)).toEqual([`/files/fil_b${n}`, `/files/fil_a${n}`])
+    const listed = (await visit('/api/public-site/productions')).body.productions.find((p: { id: string }) => p.id === s.id)
+    expect(listed.poster).toMatchObject({ url: `/files/fil_p${n}` })
+  })
+
   it('points an old address at the current one', async () => {
     const s = await show()
     await req('PATCH', `/api/core/productions/${s.id}`, { slug: `${s.slug}-renamed` })

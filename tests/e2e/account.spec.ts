@@ -51,10 +51,37 @@ test.describe('My account', () => {
     test(`${path} renders under My account and has no violations`, async ({ page }) => {
       await visit(page, path!)
       await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
-      await expect(page.getByRole('link', { name: 'My account' }).first()).toBeVisible()
+      // On a laptop the account's menu stands in for the trail, with this page marked.
+      const menu = page.getByRole('navigation', { name: 'My account' })
+      await expect(menu.getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/account')
+      await expect(menu.getByRole('link', { name: title })).toHaveAttribute('aria-current', 'page')
       await noViolations(page)
     })
   }
+
+  test('greets the person and groups the menu, theatre first', async ({ page }) => {
+    await visit(page, '/account')
+    await expect(page.getByRole('heading', { level: 1, name: 'Hello, Mo Account' })).toBeVisible()
+    const menu = page.getByRole('navigation', { name: 'My account' })
+    await expect(menu.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
+    const labels = await menu.getByText(/^(At the theatre|Your account)$/).allTextContents()
+    expect(labels).toEqual(['At the theatre', 'Your account'])
+    await noViolations(page)
+  })
+
+  test.describe('on a phone', () => {
+    test.use({ viewport: { width: 390, height: 844 } })
+
+    test('the overview lists the account in place of the menu, and each page has its way back', async ({ page }) => {
+      await visit(page, '/account')
+      await expect(page.getByRole('navigation', { name: 'My account' })).toBeHidden()
+      const list = page.getByRole('list', { name: 'Your account' })
+      await expect(list.getByRole('link', { name: /Your details/ })).toHaveAttribute('href', '/account/details')
+      await visit(page, '/account/details')
+      await expect(page.getByRole('link', { name: 'Back to My account' })).toBeVisible()
+      await noViolations(page)
+    })
+  })
 
   test('the forms carry their labels', async ({ page }) => {
     await visit(page, '/account/details')

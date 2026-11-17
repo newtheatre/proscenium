@@ -209,7 +209,7 @@ function clear() {
 
     <template v-else>
       <UForm
-        class="flex items-end gap-2"
+        class="flex flex-wrap items-end gap-2"
         :state="{ query }"
         @submit="find()"
       >
@@ -230,6 +230,10 @@ function clear() {
           icon="i-lucide-search"
           :loading="busy"
           :disabled="locked || !query.trim()"
+        />
+        <CodeScanButton
+          :disabled="locked"
+          @scanned="(code: string) => { query = code; find() }"
         />
       </UForm>
       <p
