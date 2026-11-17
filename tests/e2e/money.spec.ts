@@ -1,6 +1,6 @@
 // The money screens in a real browser: Payments' and Finance's console pages load for someone who
 // holds their abilities, have no accessibility violations, and a till session opens from My session.
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
@@ -104,22 +104,28 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
 })
 
+/** Types an amount into a currency number field, leaves it, and waits for it to show the amount. */
+async function amount(field: Locator, typed: string) {
+  await field.click()
+  await field.press('ControlOrMeta+a')
+  await field.pressSequentially(typed)
+  await field.press('Tab')
+  await expect(field).toHaveValue(`£${Number(typed).toFixed(2)}`)
+}
+
 test('the Till takes part of the total one way and the rest another', async ({ page }) => {
   await visit(page, '/console/payments/till')
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
   await page.getByRole('radio', { name: 'Cash' }).first().check()
-  // The number field formats what was typed once it has committed it, after the blur. Each fill
-  // waits for that, so the next one is not overwritten by the formatting of the one before.
+  // Typed as a seller types it, over the whole of what is there. Playwright's fill() sets the text in
+  // one go, which the number field's own input checks sometimes refuse once it holds a formatted
+  // amount, leaving the old one in place.
   const part = page.getByLabel(/^Amount to take this way/)
-  await part.fill('7')
-  await part.blur()
-  await expect(part).toHaveValue('£7.00')
+  await amount(part, '7')
   await expect(page.getByText('Enter an amount above nothing and no more than £6.00.')).toBeVisible()
-  await part.fill('2.50')
-  await part.blur()
-  await expect(part).toHaveValue('£2.50')
+  await amount(part, '2.50')
   await page.getByRole('button', { name: 'Cash taken: £2.50' }).click()
   await expect(page.getByText('£2.50 taken. Still to pay: £3.50', { exact: true })).toBeVisible()
   await expect(page.getByText('Paid so far: £2.50')).toBeVisible()
@@ -137,9 +143,7 @@ test('the Till gives back what was taken when the customer leaves a sale paid in
   await page.getByLabel('Programmes sold').blur()
   await page.getByRole('button', { name: 'Take payment of £3.00' }).click()
   await page.getByRole('radio', { name: 'Cash' }).first().check()
-  await page.getByLabel(/^Amount to take this way/).fill('2')
-  await page.getByLabel(/^Amount to take this way/).blur()
-  await expect(page.getByLabel(/^Amount to take this way/)).toHaveValue('£2.00')
+  await amount(page.getByLabel(/^Amount to take this way/), '2')
   await page.getByRole('button', { name: 'Cash taken: £2.00' }).click()
   await expect(page.getByText('Paid so far: £2.00')).toBeVisible()
   await page.getByRole('button', { name: 'Give back what was taken' }).click()
