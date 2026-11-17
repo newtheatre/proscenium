@@ -1,11 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "6be738cb-0bdd-4df3-a585-ec6dc99dbfaa",
+  "id": "3c5e84e9-d2bc-4844-87e5-53273e9d3cd8",
   "prevIds": [
-    "0177e452-c8f8-4dc4-8478-74eae15f291d",
-    "b1492d30-138a-499b-91ad-6ac7a68e998a",
-    "fcccfdc0-f3b9-43f6-9729-350f49fb535c"
+    "4b0fed4c-d1de-46c0-a452-8b9b0eb36a8f"
   ],
   "ddl": [
     {
@@ -42,6 +40,10 @@
     },
     {
       "name": "bar_sale_lines",
+      "entityType": "tables"
+    },
+    {
+      "name": "bar_sale_reversals",
       "entityType": "tables"
     },
     {
@@ -277,6 +279,10 @@
       "entityType": "tables"
     },
     {
+      "name": "core_production_effects",
+      "entityType": "tables"
+    },
+    {
       "name": "core_production_slugs",
       "entityType": "tables"
     },
@@ -326,6 +332,10 @@
     },
     {
       "name": "core_task_runs",
+      "entityType": "tables"
+    },
+    {
+      "name": "core_term_groups",
       "entityType": "tables"
     },
     {
@@ -1308,6 +1318,116 @@
     },
     {
       "table": "bar_sale_lines",
+      "name": "updated_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "sale_line_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "refund_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "state",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "quantity",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "amount_minor",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "reason_term",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "stock_outcome",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "requested_by",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "created_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "bar_sale_reversals",
       "name": "updated_at",
       "type": "integer",
       "notNull": true,
@@ -7198,9 +7318,9 @@
     },
     {
       "table": "core_production_advisories",
-      "name": "detail",
+      "name": "level",
       "type": "text",
-      "notNull": false,
+      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -7208,11 +7328,21 @@
     },
     {
       "table": "core_production_advisories",
-      "name": "sort",
+      "name": "level_assumed",
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
-      "default": "0",
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_advisories",
+      "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -7293,6 +7423,36 @@
       "notNull": true,
       "autoincrement": false,
       "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_effects",
+      "name": "production_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_effects",
+      "name": "term_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_production_effects",
+      "name": "detail",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
       "generated": null,
       "entityType": "columns"
     },
@@ -7428,11 +7588,31 @@
     },
     {
       "table": "core_productions",
-      "name": "age_guidance",
-      "type": "text",
+      "name": "age_min",
+      "type": "integer",
       "notNull": false,
       "autoincrement": false,
       "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "age_restricted",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_productions",
+      "name": "effects_confirmed_none",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
@@ -7601,6 +7781,26 @@
       "name": "code_hash",
       "type": "text",
       "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_recovery_codes",
+      "name": "code_sealed",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_recovery_codes",
+      "name": "position",
+      "type": "integer",
+      "notNull": false,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -8427,6 +8627,46 @@
       "entityType": "columns"
     },
     {
+      "table": "core_term_groups",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_term_groups",
+      "name": "vocabulary_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_term_groups",
+      "name": "label",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_term_groups",
+      "name": "sort",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
       "table": "core_terms",
       "name": "id",
       "type": "text",
@@ -8519,6 +8759,16 @@
     {
       "table": "core_terms",
       "name": "merged_into_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_terms",
+      "name": "group_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -8743,6 +8993,16 @@
       "notNull": true,
       "autoincrement": false,
       "default": "'public'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "core_vocabularies",
+      "name": "grouped",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
       "generated": null,
       "entityType": "columns"
     },
@@ -13641,6 +13901,38 @@
       "entityType": "indexes"
     },
     {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_line",
+      "columns": [
+        {
+          "value": "sale_line_id",
+          "isExpression": false
+        },
+        {
+          "value": "state",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_refund",
+      "columns": [
+        {
+          "value": "refund_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "bar_sales",
       "name": "bar_sales_reference",
       "columns": [
@@ -15453,6 +15745,42 @@
       "entityType": "indexes"
     },
     {
+      "table": "core_term_groups",
+      "name": "core_term_groups_label",
+      "columns": [
+        {
+          "value": "vocabulary_key",
+          "isExpression": false
+        },
+        {
+          "value": "lower(\"label\")",
+          "isExpression": true
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_term_groups",
+      "name": "core_term_groups_order",
+      "columns": [
+        {
+          "value": "vocabulary_key",
+          "isExpression": false
+        },
+        {
+          "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
       "table": "core_terms",
       "name": "core_terms_slug",
       "columns": [
@@ -15498,6 +15826,20 @@
         },
         {
           "value": "sort",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "core_terms",
+      "name": "core_terms_group",
+      "columns": [
+        {
+          "value": "group_id",
           "isExpression": false
         }
       ],
@@ -16946,6 +17288,36 @@
       "entityType": "fks"
     },
     {
+      "table": "bar_sale_reversals",
+      "name": "fk_bar_sale_reversals_sale_line_id_bar_sale_lines_id_fk",
+      "columns": [
+        "sale_line_id"
+      ],
+      "tableTo": "bar_sale_lines",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "fk_bar_sale_reversals_reason_term_core_terms_id_fk",
+      "columns": [
+        "reason_term"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "bar_sales",
       "name": "fk_bar_sales_opening_id_bar_openings_id_fk",
       "columns": [
@@ -17867,6 +18239,36 @@
       "entityType": "fks"
     },
     {
+      "table": "core_production_effects",
+      "name": "fk_core_production_effects_production_id_core_productions_id_fk",
+      "columns": [
+        "production_id"
+      ],
+      "tableTo": "core_productions",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_production_effects",
+      "name": "fk_core_production_effects_term_id_core_terms_id_fk",
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "core_terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_production_slugs",
       "name": "fk_core_production_slugs_production_id_core_productions_id_fk",
       "columns": [
@@ -17972,6 +18374,21 @@
       "entityType": "fks"
     },
     {
+      "table": "core_term_groups",
+      "name": "fk_core_term_groups_vocabulary_key_core_vocabularies_key_fk",
+      "columns": [
+        "vocabulary_key"
+      ],
+      "tableTo": "core_vocabularies",
+      "columnsTo": [
+        "key"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "core_terms",
       "name": "fk_core_terms_vocabulary_key_core_vocabularies_key_fk",
       "columns": [
@@ -17998,6 +18415,21 @@
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "core_terms",
+      "name": "fk_core_terms_group_id_core_term_groups_id_fk",
+      "columns": [
+        "group_id"
+      ],
+      "tableTo": "core_term_groups",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
       "nameExplicit": false,
       "entityType": "fks"
     },
@@ -18836,6 +19268,16 @@
       "entityType": "pks"
     },
     {
+      "table": "core_production_effects",
+      "name": "core_production_effects_pk",
+      "columns": [
+        "production_id",
+        "term_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_role_abilities",
       "name": "core_role_abilities_pk",
       "columns": [
@@ -18940,6 +19382,15 @@
     {
       "table": "bar_sale_lines",
       "name": "bar_sale_lines_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_pk",
       "columns": [
         "id"
       ],
@@ -19451,6 +19902,15 @@
       "entityType": "pks"
     },
     {
+      "table": "core_term_groups",
+      "name": "core_term_groups_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
       "table": "core_terms",
       "name": "core_terms_pk",
       "columns": [
@@ -19955,6 +20415,30 @@
       "table": "bar_sale_lines",
       "name": "bar_sale_lines_amount",
       "value": "\"amount_minor\" = \"unit_minor\" * \"quantity\" - \"discount_minor\"",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_state",
+      "value": "\"state\" IN ('requested', 'succeeded', 'failed')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_stock",
+      "value": "\"stock_outcome\" IN ('returned', 'wasted', 'none')",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_quantity",
+      "value": "\"quantity\" >= 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "bar_sale_reversals",
+      "name": "bar_sale_reversals_amount",
+      "value": "\"amount_minor\" > 0",
       "entityType": "checks"
     },
     {
@@ -20510,6 +20994,12 @@
       "entityType": "checks"
     },
     {
+      "table": "core_production_advisories",
+      "name": "core_production_advisories_level",
+      "value": "\"level\" IN ('mentioned', 'discussed', 'depicted')",
+      "entityType": "checks"
+    },
+    {
       "table": "core_production_credits",
       "name": "core_production_credits_visibility",
       "value": "\"visibility\" IN ('public', 'members', 'hidden')",
@@ -20525,6 +21015,12 @@
       "table": "core_production_credits",
       "name": "core_production_credits_role",
       "value": "length(\"role\") BETWEEN 1 AND 120",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_production_effects",
+      "name": "core_production_effects_detail",
+      "value": "\"detail\" IS NULL OR length(\"detail\") <= 300",
       "entityType": "checks"
     },
     {
@@ -20553,8 +21049,14 @@
     },
     {
       "table": "core_productions",
-      "name": "core_productions_age",
-      "value": "\"age_guidance\" IS NULL OR length(\"age_guidance\") <= 40",
+      "name": "core_productions_age_min",
+      "value": "\"age_min\" IS NULL OR \"age_min\" BETWEEN 0 AND 21",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_productions",
+      "name": "core_productions_age_restricted",
+      "value": "\"age_restricted\" = 0 OR \"age_min\" IS NOT NULL",
       "entityType": "checks"
     },
     {
@@ -20609,6 +21111,12 @@
       "table": "core_spaces",
       "name": "core_spaces_capacity",
       "value": "\"default_capacity\" IS NULL OR \"default_capacity\" > 0",
+      "entityType": "checks"
+    },
+    {
+      "table": "core_term_groups",
+      "name": "core_term_groups_label_length",
+      "value": "length(\"label\") BETWEEN 1 AND 80",
       "entityType": "checks"
     },
     {
