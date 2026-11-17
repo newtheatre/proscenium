@@ -6,7 +6,7 @@
 // The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
 // needs no form (tab 7), so forms is only used until the application form is wired in.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, secret, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, credentialDecl, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'membership.settings.manage'
@@ -84,9 +84,11 @@ export default defineModule({
 
   tables,
 
-  secrets: {
-    // The key verification lists are hashed with (V10). Lists cannot be used until it is set.
-    MEMBERSHIP_LIST_KEY: secret({ needed: 'when-used' }),
+  credentials: {
+    // The key verification lists are hashed with (V10). Lists cannot be used until it is set. Typed
+    // on Membership > Lists (Matt, 17 November), or set as a Worker secret of the same name. A new
+    // key leaves every list already loaded unable to match, so the form asks first.
+    MEMBERSHIP_LIST_KEY: credentialDecl({ needed: 'when-used', manage: 'membership.verification-list.manage', confirm: true }),
   },
 
   tasks: {

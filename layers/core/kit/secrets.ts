@@ -6,6 +6,7 @@ import { useContext } from './context'
 import { useRegistry } from './registry'
 import { nowMs } from './clock'
 import type { RecordRef, UnitView } from './unit'
+import type { CredentialDecl } from './manifest'
 
 const IV_BYTES = 12 // not-policy: AES-GCM nonce length
 
@@ -100,6 +101,15 @@ export async function credentialStatus(names: readonly string[], scope = ''): Pr
 // A hint shows the last four characters, and only of a value long enough that four give little away.
 const HINT_CHARS = 4 // not-policy: the hint's length (Foundations, core_credentials)
 const HINT_FROM = 16 // not-policy: shortest value that shows a hint
+
+/** A declared credential and the module that owns it, or null for a name that is not one. */
+export function credentialEntry(name: string): { module: string, decl: CredentialDecl } | null {
+  for (const m of useRegistry().modules.values()) {
+    const decl = m.manifest.credentials?.[name]
+    if (decl) return { module: m.manifest.id, decl }
+  }
+  return null
+}
 
 function credentialOf(name: string) {
   const manifest = ownerOf(name)
