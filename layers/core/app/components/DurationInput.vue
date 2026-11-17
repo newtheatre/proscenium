@@ -17,6 +17,8 @@ const props = defineProps<{
   placeholder?: number | null
   /** Only these units, such as hours and minutes for a running time. */
   units?: DurationUnit[]
+  /** Fill the field's width, as in a grid of fields, instead of the usual fixed width. */
+  block?: boolean
 }>()
 const model = defineModel<number | null | undefined>()
 
@@ -72,7 +74,7 @@ function setUnit(value: DurationUnit) {
 </script>
 
 <template>
-  <UFieldGroup>
+  <UFieldGroup :class="block ? 'flex w-full' : undefined">
     <UInputNumber
       :model-value="count"
       :min="countMin"
@@ -80,7 +82,7 @@ function setUnit(value: DurationUnit) {
       :disabled="disabled"
       :aria-label="named(t('core.duration.amount'))"
       :placeholder="ghost"
-      class="w-32"
+      :class="block ? 'min-w-0 flex-1' : 'w-32'"
       @update:model-value="setCount"
     />
     <USelect
@@ -89,7 +91,7 @@ function setUnit(value: DurationUnit) {
       value-key="value"
       :disabled="disabled"
       :aria-label="named(t('core.duration.unit'))"
-      class="w-32"
+      :class="block ? 'w-28 shrink-0' : 'w-32'"
       @update:model-value="setUnit($event as DurationUnit)"
     />
   </UFieldGroup>

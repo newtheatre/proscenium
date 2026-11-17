@@ -25,5 +25,6 @@ const seconds = computed({
     :placeholder="props.placeholder === null || props.placeholder === undefined ? null : props.placeholder * 60"
     :disabled="disabled"
     :label="label"
+    block
   />
 </template>
