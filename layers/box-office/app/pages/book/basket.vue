@@ -211,6 +211,10 @@ async function reserve() {
               <p class="text-lg">
                 {{ t('box-office.basket.desk-code', { code: outcome.deskCode }) }}
               </p>
+              <QrCode
+                :value="outcome.deskCode"
+                :label="t('box-office.basket.desk-code-qr')"
+              />
               <p class="text-sm text-muted">
                 {{ t('box-office.basket.done.reserved.note') }}
               </p>
