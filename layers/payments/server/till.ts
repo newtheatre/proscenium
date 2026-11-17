@@ -46,9 +46,9 @@ async function chosen(actor: Actor, panels: PanelInput[]) {
 }
 
 /** What the filled panels add up to, for display. Reads only. */
-export async function tillSummary(actor: Actor, sessionId: string, panels: PanelInput[]) {
+export async function tillSummary(actor: Actor, panels: PanelInput[]) {
   const out = []
-  for (const { panel, input } of await chosen(actor, panels)) out.push({ basket: panel.id, ...await panel.value.summary({ sessionId, input }) })
+  for (const { panel, input } of await chosen(actor, panels)) out.push({ basket: panel.id, ...await panel.value.summary({ input }) })
   return { panels: out, amountMinor: out.reduce((s, p) => s + p.amountMinor, 0) }
 }
 

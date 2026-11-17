@@ -15,6 +15,8 @@ import schedule from '../../server/api/core/performances/[id]/schedule.post'
 import cancel from '../../server/api/core/performances/[id]/cancel.post'
 import reinstate from '../../server/api/core/performances/[id]/reinstate.post'
 import setAccess from '../../server/api/core/performances/[id]/access.put'
+import setEffectsOff from '../../server/api/core/performances/[id]/effects.put'
+import setEffects from '../../server/api/core/productions/[id]/effects.put'
 import impact from '../../server/api/core/performances/[id]/impact.get'
 import createVenue from '../../server/api/core/venues/index.post'
 import addSpace from '../../server/api/core/venues/[id]/spaces/index.post'
@@ -27,6 +29,7 @@ import publishProduction from '../../server/api/core/productions/[id]/publish.po
 import cancelProduction from '../../server/api/core/productions/[id]/cancel.post'
 import restoreProduction from '../../server/api/core/productions/[id]/restore.post'
 import productionImpact from '../../server/api/core/productions/[id]/impact.get'
+import { guidanceFor } from '../../server/programme/guidance'
 import { completeEnded } from '../../server/programme/performances'
 import { changeSetting, createUnit } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
@@ -48,6 +51,8 @@ const handle = server({
   'POST /api/core/performances/:id/cancel': cancel,
   'POST /api/core/performances/:id/reinstate': reinstate,
   'PUT /api/core/performances/:id/access': setAccess,
+  'PUT /api/core/performances/:id/effects': setEffectsOff,
+  'PUT /api/core/productions/:id/effects': setEffects,
   'GET /api/core/performances/:id/impact': impact,
   'POST /api/core/venues': createVenue,
   'POST /api/core/venues/:id/spaces': addSpace,
@@ -103,6 +108,29 @@ afterEach(async () => {
     env.DB.prepare('DELETE FROM core_closures'),
     env.DB.prepare("DELETE FROM core_settings WHERE key = 'core.locale.time-zone'"),
   ])
+})
+
+describe('staging effects not used at a performance (C-55)', () => {
+  it('are limited to the production\'s effects, shown as not used, and dropped when the production stops using them', async () => {
+    await inContext(async () => (await import('../../server/vocabularies/service')).ensureVocabularies())
+    const s = await stage()
+    const haze = await term('core.staging-effect', 'haze')
+    const strobe = await term('core.staging-effect', 'strobe')
+    const id = await add(s, '2027-04-01T19:30:00Z')
+    const other = await add(s, '2027-04-02T19:30:00Z')
+    expect((await req('PUT', `/api/core/productions/${s.productionId}/effects`, { effects: [{ termId: haze }, { termId: strobe }] })).status).toBe(200)
+    expect((await req('PUT', `/api/core/performances/${id}/effects`, { termIds: [await term('core.cancel-reason', 'illness')] })).body.code).toBe('core.performance.effects-unknown')
+    expect((await req('PUT', `/api/core/performances/${id}/effects`, { termIds: [haze, haze] })).body.code).toBe('core.performance.effects-repeated')
+    expect((await req('PUT', `/api/core/performances/${id}/effects`, { termIds: [haze] })).status).toBe(200)
+    expect((await req('GET', `/api/core/performances/${id}`)).body.effectsOff).toEqual([haze])
+    const here = await inContext(() => guidanceFor(s.productionId, id))
+    expect(here!.effects.map(e => e.termId)).toEqual([strobe])
+    expect(here!.notAtThisPerformance).toEqual(['Haze or smoke'])
+    expect((await inContext(() => guidanceFor(s.productionId, other)))!.effects).toHaveLength(2)
+    expect((await inContext(() => guidanceFor(s.productionId)))!.effects).toHaveLength(2)
+    await req('PUT', `/api/core/productions/${s.productionId}/effects`, { effects: [{ termId: strobe }] })
+    expect((await req('GET', `/api/core/performances/${id}`)).body.effectsOff).toEqual([])
+  })
 })
 
 describe('performances', () => {

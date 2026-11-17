@@ -371,6 +371,7 @@ export async function setEffects(unit: UnitView, id: string, effects: Effect[]):
     refuse('core.production.effects-needed', 'A published production lists its staging effects or confirms it has none.', { status: 422 })
   const before = new Set((await all<{ term_id: string }>('SELECT term_id FROM core_production_effects WHERE production_id = ?', id)).map(r => r.term_id))
   unit.add(sql`DELETE FROM core_production_effects WHERE production_id = ${id}`)
+  unit.add(sql`DELETE FROM core_performance_effect_exceptions WHERE performance_id IN (SELECT id FROM core_performances WHERE production_id = ${id}) AND term_id NOT IN (SELECT value FROM json_each(${JSON.stringify(effects.map(e => e.termId))}))`)
   for (const e of effects) {
     unit.add(sql`INSERT INTO core_production_effects (production_id, term_id, detail)
       SELECT ${id}, ${e.termId}, ${e.detail} WHERE ${assertTerm(e.termId, 'core.staging-effect')}`)

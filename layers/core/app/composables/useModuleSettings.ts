@@ -1,20 +1,21 @@
-// The tabs of one module's page in Admin that the console's settings window draws: its pages of
-// settings and its set-up screens, as far as the viewer may open them (About stays in Admin).
+// The console's settings window for one scope: the cog on a console page (its navigation entry's
+// id) or one module (an Admin address opened from the console, or a setting found by search). It
+// holds the tabs of modules' pages in Admin that belong there: pages of settings and set-up screens,
+// as far as the viewer may open them (About stays in Admin), and the window's name.
 import type { ModuleTabView } from '../utils/modules'
 
-export function useModuleSettings(module: () => string | undefined) {
+export function useModuleSettings(scope: () => string | undefined) {
   const { $api } = useNuxtApp()
   const { data, status } = useAsyncData(
-    () => `core:module-settings:${module() ?? ''}`,
+    () => `core:settings-window:${scope() ?? ''}`,
     async () => {
-      const id = module()
-      if (!id) return []
-      const { tabs } = await $api<{ tabs: ModuleTabView[] }>(`/api/core/modules/${encodeURIComponent(id)}/tabs` as '/api/core/modules/:id/tabs')
-      return tabs.filter(tab => !tab.id.startsWith('core.modules.about.'))
+      const id = scope()
+      if (!id) return { name: '', tabs: [] as ModuleTabView[] }
+      return await $api<{ name: string, tabs: ModuleTabView[] }>('/api/core/settings-window', { query: { for: id } })
     },
-    { default: () => [] as ModuleTabView[] },
+    { default: () => ({ name: '', tabs: [] as ModuleTabView[] }) },
   )
-  return { tabs: data, status }
+  return { tabs: computed(() => data.value.tabs), name: computed(() => data.value.name), status }
 }
 
 let closing = false

@@ -19,6 +19,7 @@ const stamp = Date.now() % 1_000_000
 const typeName = `Desk price ${stamp}`
 let reference = ''
 let swapping = ''
+let group = ''
 const premiumName = `Premium ${stamp}`
 let premium = { bandId: '', ticketTypeId: '' }
 let performanceId = ''
@@ -69,6 +70,9 @@ test.beforeAll(async ({ playwright }) => {
   // And another, to pay for and then exchange for a dearer ticket.
   const second = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 1 }] })
   swapping = (await post(buyer, `/api/box-office/baskets/${second.orderId}/reserve`, { expectedTotalMinor: 1200, email: 'desk.swapper@example.org', name: 'Desk Swapper' }, { 'x-basket-token': second.token })).reference
+  // And three for a group who will pay separately.
+  const third = await post(buyer, '/api/box-office/baskets', { performanceId: performance.id, lines: [{ bandId: band.bandId, ticketTypeId: type.ticketTypeId, quantity: 3 }] })
+  group = (await post(buyer, `/api/box-office/baskets/${third.orderId}/reserve`, { expectedTotalMinor: 3600, email: 'desk.group@example.org', name: 'Desk Group' }, { 'x-basket-token': third.token })).reference
   await buyer.dispose()
 
   const till = await playwright.request.newContext({ ...base, ...as(seller) })
@@ -128,6 +132,29 @@ test('Sell finds a reservation by its reference and takes payment for it', async
   await expect(page.getByText('Nothing to pay.')).toBeVisible()
 })
 
+test('Sell splits a reservation so one of a group pays for their own tickets', async ({ page }) => {
+  await visit(page, '/console/box-office/sell')
+  await page.getByRole('tab', { name: 'Collect a reservation' }).click()
+  await page.getByLabel(/^Booking reference or desk code/).fill(group)
+  await page.getByRole('button', { name: 'Find' }).click()
+  await expect(page.getByText('To pay: £36.00')).toBeVisible()
+  await page.getByRole('button', { name: 'Pay for some of these' }).click()
+  const boxes = page.getByRole('checkbox', { name: /, £12\.00$/ })
+  await expect(boxes).toHaveCount(3)
+  await boxes.nth(0).check()
+  await expect(page.getByRole('button', { name: 'Pay for 1 separately' })).toBeEnabled()
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Pay for 1 separately' }).click()
+  await expect(page.getByText(`The rest stay reserved on ${group}, £24.00 still to pay.`)).toBeVisible()
+  await expect(page.getByRole('heading', { name: `Booking ${group}` })).toHaveCount(0)
+  await expect(page.getByText('To pay: £12.00')).toBeVisible()
+  await payCash(page, '£12.00')
+
+  await page.getByLabel(/^Booking reference or desk code/).fill(group)
+  await page.getByRole('button', { name: 'Find' }).click()
+  await expect(page.getByText('To pay: £24.00')).toBeVisible()
+})
+
 test('Sell takes the difference on an exchange for a dearer ticket', async ({ page, browser, playwright }) => {
   await visit(page, '/console/box-office/sell')
   await page.getByRole('tab', { name: 'Collect a reservation' }).click()
@@ -163,7 +190,7 @@ test('the till in live mode shows each panel as a tab over one basket', async ({
   const page = await context.newPage()
   await visit(page, '/live/till')
   await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Tickets' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Tickets', exact: true })).toHaveAttribute('aria-selected', 'true') // the first panel shows until another is picked
   await page.getByRole('tab', { name: 'Gallery programmes' }).click()
   await page.getByLabel('Programmes sold').fill('2')
   await page.getByLabel('Programmes sold').blur()

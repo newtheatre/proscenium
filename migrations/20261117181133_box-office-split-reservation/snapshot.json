@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "70d8b516-abed-4fa3-b353-da88a451ac13",
+  "id": "b4322e53-1927-4fe8-a933-f04992fd5fa7",
   "prevIds": [
     "3c5e84e9-d2bc-4844-87e5-53273e9d3cd8"
   ],
@@ -300,10 +300,6 @@
     },
     {
       "name": "core_roles",
-      "entityType": "tables"
-    },
-    {
-      "name": "core_run_presets",
       "entityType": "tables"
     },
     {
@@ -2794,6 +2790,16 @@
       "table": "box_office_orders",
       "name": "reserved_at",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_orders",
+      "name": "split_from_id",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -6972,27 +6978,7 @@
     },
     {
       "table": "core_performance_runs",
-      "name": "interval_minutes",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_performance_runs",
       "name": "label",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_performance_runs",
-      "name": "external_booking_url",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -7153,16 +7139,6 @@
     {
       "table": "core_performances",
       "name": "interval_count",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_performances",
-      "name": "interval_minutes",
       "type": "integer",
       "notNull": false,
       "autoincrement": false,
@@ -7692,36 +7668,6 @@
     },
     {
       "table": "core_productions",
-      "name": "interval_minutes",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "doors_before_minutes",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
-      "name": "capacity",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_productions",
       "name": "external_booking_url",
       "type": "text",
       "notNull": false,
@@ -8025,66 +7971,6 @@
       "name": "archived_at",
       "type": "integer",
       "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_run_presets",
-      "name": "id",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_run_presets",
-      "name": "name",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_run_presets",
-      "name": "slots",
-      "type": "text",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_run_presets",
-      "name": "created_by",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_run_presets",
-      "name": "created_at",
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_run_presets",
-      "name": "updated_at",
-      "type": "integer",
-      "notNull": true,
       "autoincrement": false,
       "default": null,
       "generated": null,
@@ -8653,26 +8539,6 @@
     {
       "table": "core_spaces",
       "name": "finding_it",
-      "type": "text",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_spaces",
-      "name": "doors_before_minutes",
-      "type": "integer",
-      "notNull": false,
-      "autoincrement": false,
-      "default": null,
-      "generated": null,
-      "entityType": "columns"
-    },
-    {
-      "table": "core_spaces",
-      "name": "run_preset_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -15711,20 +15577,6 @@
       "entityType": "indexes"
     },
     {
-      "table": "core_run_presets",
-      "name": "core_run_presets_name",
-      "columns": [
-        {
-          "value": "lower(\"name\")",
-          "isExpression": true
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
       "table": "core_seasons",
       "name": "core_seasons_slug",
       "columns": [
@@ -17896,6 +17748,21 @@
       "entityType": "fks"
     },
     {
+      "table": "box_office_orders",
+      "name": "fk_box_office_orders_split_from_id_box_office_orders_id_fk",
+      "columns": [
+        "split_from_id"
+      ],
+      "tableTo": "box_office_orders",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
       "table": "box_office_pools",
       "name": "fk_box_office_pools_band_id_box_office_bands_id_fk",
       "columns": [
@@ -19997,15 +19864,6 @@
       "entityType": "pks"
     },
     {
-      "table": "core_run_presets",
-      "name": "core_run_presets_pk",
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "entityType": "pks"
-    },
-    {
       "table": "core_seasons",
       "name": "core_seasons_pk",
       "columns": [
@@ -21254,12 +21112,6 @@
       "table": "core_roles",
       "name": "core_roles_expiry_days",
       "value": "(expiry_rule = 'days') = (expiry_days IS NOT NULL)",
-      "entityType": "checks"
-    },
-    {
-      "table": "core_run_presets",
-      "name": "core_run_presets_name_length",
-      "value": "length(\"name\") BETWEEN 1 AND 80",
       "entityType": "checks"
     },
     {

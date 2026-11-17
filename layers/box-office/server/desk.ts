@@ -76,7 +76,7 @@ async function deskSale(input: SaleInput, at: number) {
 }
 
 /** The panel's lines and amount, for the till to show. Reads only. */
-export async function deskSummary(context: DeskContext): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
+export async function deskSummary(context: Pick<DeskContext, 'input'>): Promise<{ lines: { label: string, amountMinor: number }[], amountMinor: number }> {
   const input = panelInput(context.input)
   if ('exchange' in input) {
     const { orderId, expectedDifferenceMinor: _, ...target } = input.exchange
@@ -279,6 +279,60 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
   const totalMinor = after.reduce((sum, l) => sum + l.amountMinor, 0)
   unit.add(sql`UPDATE box_office_orders SET total_minor = ${totalMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
   return { orderId: order.id, totalMinor, amountDueMinor: totalMinor }
+}
+
+/**
+ * Splits tickets off a reservation into a reservation of their own, so one of a group can pay for
+ * theirs while the rest stay reserved (Matt, 2026-11-17). The new one has its own reference, the
+ * same buyer, access note and prices, and the seats go with the tickets in the same batch, so no
+ * one else can take them. Both keep at least one ticket, and neither is left with a companion ticket
+ * alone. Nothing about money moves: neither is paid yet.
+ */
+export async function splitReservation(unit: UnitView, orderId: string, lineIds: string[], by: string): Promise<{ orderId: string, reference: string, totalMinor: number, remainingMinor: number }> {
+  const { order, lines } = await reservation(orderId)
+  const at = nowMs()
+  const byId = new Map(lines.map(l => [l.id, l]))
+  if (!lineIds.length || lineIds.some(id => !byId.has(id)) || new Set(lineIds).size !== lineIds.length)
+    refuse(CHANGED.code, 'Those tickets are not on this reservation any more.', { status: 409, remedy: CHANGED.remedy })
+  const moving = lines.filter(l => lineIds.includes(l.id))
+  const staying = lines.filter(l => !lineIds.includes(l.id))
+  if (!staying.length) refuse('box-office.desk.split-all', 'That is every ticket on the reservation, so there is nothing to split.', { status: 422, remedy: 'Take payment for the whole reservation instead.' })
+  const companions = new Set((await all<{ id: string }>("SELECT id FROM box_office_ticket_types WHERE kind = 'companion' OR needs_paid_ticket = 1")).map(t => t.id))
+  if ([moving, staying].some(part => part.every(l => companions.has(l.ticket_type_id))))
+    refuse('box-office.order.companion-alone', 'A companion ticket cannot stay on a booking without the ticket it accompanies.', { status: 422 })
+
+  const newOrderId = newId('ord')
+  const holdId = newId('hold')
+  const reference = newReference()
+  const movingMinor = moving.reduce((sum, l) => sum + l.amount_minor, 0)
+  const remainingMinor = order.total_minor - movingMinor
+  const ids = JSON.stringify(lineIds)
+  unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, access_note, currency, total_minor, expires_at, release_at, keep, reserved_at, split_from_id, created_at, updated_at)
+    SELECT ${newOrderId}, ${reference}, channel, 'basket', account_id, 0, access_note, currency, ${movingMinor}, expires_at, release_at, keep, reserved_at, id, ${at}, ${at}
+      FROM box_office_orders WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
+  // An order starts as a basket and moves on in the same batch, as every other does.
+  unit.add(sql`UPDATE box_office_orders SET state = 'reserved' WHERE id = ${newOrderId} AND state = 'basket'`).expect(1)
+  unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'reservation', ${newOrderId}, ${by}, ${at}, ${at})`)
+  // A line keeps its order and its claim, so the tickets moving are new lines on the new order, at
+  // the same prices, and the old ones are marked moved on as an exchange's are. Their seats are let go
+  // and taken again in the same batch, so nobody else can take them in between.
+  const pools = new Map((await all<{ line_id: string, pool_id: string }>(
+    `SELECT l.id AS line_id, c.pool_id FROM box_office_order_lines l JOIN box_office_claims c ON c.id = l.claim_id
+      WHERE l.order_id = ? AND l.id IN (SELECT value FROM json_each(?))`, order.id, ids)).map(r => [r.line_id, r.pool_id]))
+  if (pools.size !== lineIds.length) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
+  unit.add(sql`UPDATE box_office_claims SET state = 'released', released_at = ${at}, release_reason = 'exchanged'
+    WHERE state = 'confirmed' AND id IN (SELECT claim_id FROM box_office_order_lines WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids})))`).expect(lineIds.length, CHANGED)
+  unit.add(sql`UPDATE box_office_order_lines SET state = 'exchanged', updated_at = ${at}
+    WHERE order_id = ${order.id} AND state = 'live' AND id IN (SELECT value FROM json_each(${ids}))`).expect(lineIds.length, CHANGED)
+  const claimed = (await claimSeats(unit, { holdId, requests: lineIds.map(id => ({ poolId: pools.get(id)!, quantity: 1 })), state: 'confirmed', expiresAt: null })).flat()
+  lineIds.forEach((id, i) => {
+    unit.add(sql`INSERT INTO box_office_order_lines (id, order_id, kind, performance_id, band_id, ticket_type_id, claim_id, price_id, list_minor, discount_minor, amount_minor, promo_redemption_id, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, state, created_at, updated_at)
+      SELECT ${newId('orl')}, ${newOrderId}, kind, performance_id, band_id, ticket_type_id, ${claimed[i]}, price_id, list_minor, discount_minor, amount_minor, promo_redemption_id, pass_redemption_id, comp_request_id, requirement_ref, requirement_account_id, requirement_evidence_id, 'live', ${at}, ${at}
+        FROM box_office_order_lines WHERE id = ${id}`).expect(1, CHANGED)
+  })
+  unit.add(sql`UPDATE box_office_orders SET total_minor = ${remainingMinor}, updated_at = ${at} WHERE id = ${order.id} AND state = 'reserved' AND total_minor = ${order.total_minor}`).expect(1, CHANGED)
+  unit.audit({ action: 'update', record: ['box-office.order', order.id], detail: { splitTo: newOrderId, tickets: lineIds.length } })
+  return { orderId: newOrderId, reference, totalMinor: movingMinor, remainingMinor }
 }
 
 const AHEAD = 14 * 86_400_000 // not-policy: how far ahead the desk's list of performances looks, in milliseconds

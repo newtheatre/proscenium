@@ -131,11 +131,41 @@ async function amend(body: Record<string, unknown>) {
     busy.value = false
   }
 }
+// Splitting: one of a group pays for their own tickets now, and the rest stay reserved.
+const splitting = ref(false)
+const picked = ref<string[]>([])
+const rest = ref<{ reference: string, amountMinor: number, currency: string } | null>(null)
+function togglePicked(lineId: string, on: boolean | 'indeterminate') {
+  picked.value = on === true ? [...picked.value, lineId] : picked.value.filter(id => id !== lineId)
+}
+async function split() {
+  const from = order.value
+  if (!from || !picked.value.length) return
+  busy.value = true
+  refusal.value = null
+  try {
+    const made = await $api<{ reference: string, remainingMinor: number }>(`/api/box-office/orders/${from.orderId}/split` as string, { method: 'POST', body: { lineIds: picked.value } })
+    rest.value = { reference: from.reference, amountMinor: made.remainingMinor, currency: from.currency }
+    splitting.value = false
+    picked.value = []
+    await find(made.reference)
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+  finally {
+    busy.value = false
+  }
+}
+
 function addTicket() {
   const row = orderRows.value.find(r => keyOf(r) === adding.value)
   if (row) void amend({ add: [{ bandId: row.bandId, ticketTypeId: row.ticketTypeId, quantity: 1 }] })
 }
 function clear() {
+  splitting.value = false
+  picked.value = []
+  rest.value = null
   order.value = null
   searched.value = false
   query.value = ''
@@ -272,8 +302,15 @@ function clear() {
             :key="line.id"
             class="flex flex-wrap items-center justify-between gap-2 text-sm"
           >
+            <UCheckbox
+              v-if="splitting"
+              :model-value="picked.includes(line.id)"
+              :label="`${line.ticketType}, ${money(line.amountMinor, order.currency)}`"
+              :disabled="locked || busy"
+              @update:model-value="(on: boolean | 'indeterminate') => togglePicked(line.id, on)"
+            />
             <USelect
-              v-if="order.state === 'reserved' && typesFor(line).length > 1"
+              v-else-if="order.state === 'reserved' && typesFor(line).length > 1"
               :model-value="line.ticketTypeId"
               :items="typesFor(line)"
               :disabled="locked || busy"
@@ -317,6 +354,47 @@ function clear() {
             @click="addTicket"
           />
         </div>
+        <div
+          v-if="order.state === 'reserved' && order.lines.length > 1"
+          class="flex flex-wrap gap-2"
+        >
+          <UButton
+            v-if="!splitting"
+            icon="i-lucide-split"
+            color="neutral"
+            variant="outline"
+            :label="t('box-office.screens.panel.split')"
+            :disabled="locked || busy"
+            @click="splitting = true"
+          />
+          <template v-else>
+            <UButton
+              :label="t('box-office.screens.panel.split-confirm', { count: picked.length })"
+              :disabled="locked || busy || !picked.length || picked.length === order.lines.length"
+              :loading="busy"
+              @click="split"
+            />
+            <UButton
+              color="neutral"
+              variant="ghost"
+              :label="t('core.form.cancel')"
+              @click="splitting = false; picked = []"
+            />
+          </template>
+        </div>
+        <p
+          v-if="splitting"
+          class="text-sm text-muted"
+        >
+          {{ t('box-office.screens.panel.split-help') }}
+        </p>
+        <UAlert
+          v-if="rest"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-split"
+          :description="t('box-office.screens.panel.split-rest', { reference: rest.reference, amount: money(rest.amountMinor, rest.currency) })"
+        />
         <p class="font-medium">
           {{ order.amountDueMinor > 0 ? t('box-office.screens.panel.due', { amount: money(order.amountDueMinor, order.currency) }) : t('box-office.screens.panel.nothing-due') }}
         </p>

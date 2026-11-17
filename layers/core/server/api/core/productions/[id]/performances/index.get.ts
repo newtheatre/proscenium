@@ -1,6 +1,6 @@
 // A production's performances, in time order (C-03), and long runs still being made (C-04), with
 // the lists the console's pickers offer: venues and the spaces in them that can hold performances,
-// access features and cancel reasons. With them, what a new performance takes when it says nothing
+// access features, cancel reasons and the production's staging effects. With them, what a new performance takes when it says nothing
 // (the production's defaults over the theatre's, each space's doors and capacity over those), the
 // run presets and which one each space starts from, and whether anything here sells tickets.
 import { z } from 'zod'
@@ -11,6 +11,7 @@ import { listRunPresets, theatreRunPreset } from '../../../../../programme/run-p
 import { sellsHere } from '../../../../../programme/booking'
 import { listVenues } from '../../../../../places/service'
 import { openRuns } from '../../../../../programme/runs'
+import { productionEffects } from '../../../../../programme/guidance'
 import { listTerms } from '../../../../../vocabularies/service'
 
 export default defineRoute({
@@ -20,12 +21,13 @@ export default defineRoute({
   input: z.object({}),
 }, async (_event, { record }) => {
   const option = (t: { id: string, label: string, retired: boolean }) => ({ id: t.id, label: t.label, retired: t.retired })
-  const [performances, runs, venues, access, reasons, defaults, theatre, presets, usualPreset, scheduleRuns, sells] = await Promise.all([
+  const [performances, runs, venues, access, reasons, effects, defaults, theatre, presets, usualPreset, scheduleRuns, sells] = await Promise.all([
     listPerformances({ productionId: record!.id }),
     openRuns(record!.id),
     listVenues({ archived: true }),
     listTerms('core.access-feature', { includeRetired: true }),
     listTerms('core.cancel-reason'),
+    productionEffects(record!.id),
     performanceDefaults(record!.id, null),
     theatreDefaults(),
     listRunPresets(),
@@ -44,6 +46,7 @@ export default defineRoute({
         .filter(v => (!v.archived && v.spaces.length) || used.has(v.id)),
       access: access.map(option),
       reasons: reasons.map(option),
+      effects: effects.map(e => ({ id: e.termId, label: e.label })),
       presets: presets.map(({ id, name, slots }) => ({ id, name, slots })),
     },
     // The production's own (null where it has none) beside the theatre's, so a screen can say where a value comes from.

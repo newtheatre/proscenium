@@ -28,6 +28,8 @@ export interface PublicPerformance {
   venue: { id: string, slug: string, name: string }
   space: { id: string, name: string }
   access: PublicNote[]
+  /** Labels of the staging effects this performance does not use (C-55). */
+  effectsOff: string[]
   /** The booking button, or null where there is none (C-39: "where one exists"). */
   booking: ShownBooking | null
 }
@@ -175,6 +177,9 @@ export interface PublicListing {
   subtitle: string | null
   summary: string | null
   category: PublicTerm | null
+  /** The age in words, and whether the show uses staging effects: the compact form of its guidance, for cards. */
+  age: string | null
+  hasEffects: boolean
   /** The next scheduled performance to start, or the one running now. */
   nextStartsAt: number
   /** The last scheduled performance's end. */
@@ -236,8 +241,9 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
   const where = conditions.map(([c]) => c)
   const params = [now, ...conditions.flatMap(([, p]) => p)]
   const limit = options.limit ? ` LIMIT ${Math.max(1, Math.floor(options.limit))}` : ''
-  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, next_starts_at: number, last_ends_at: number, venues: string }>(
+  const rows = await all<{ id: string, slug: string, title: string, subtitle: string | null, summary: string | null, category_id: string | null, category_slug: string | null, category_label: string | null, next_starts_at: number, last_ends_at: number, venues: string, age_min: number | null, age_restricted: number, has_effects: number }>(
     `SELECT p.id, p.slug, p.title, p.subtitle, p.summary, c.id AS category_id, c.slug AS category_slug, c.label AS category_label,
+        p.age_min, p.age_restricted, EXISTS (SELECT 1 FROM core_production_effects e WHERE e.production_id = p.id) AS has_effects,
         min(f.starts_at) AS next_starts_at, max(f.ends_at) AS last_ends_at,
         json_group_array(DISTINCT v.name) AS venues
        ${UPCOMING}${where.map(w => ` AND ${w}`).join('')}
@@ -253,6 +259,8 @@ export async function currentProductions(options: WhatsOnOptions = {}): Promise<
     subtitle: r.subtitle,
     summary: r.summary,
     category: r.category_id ? { id: r.category_id, slug: r.category_slug!, label: r.category_label! } : null,
+    age: ageWording(r.age_min, !!r.age_restricted),
+    hasEffects: !!r.has_effects,
     nextStartsAt: r.next_starts_at,
     lastEndsAt: r.last_ends_at,
     venues: (JSON.parse(r.venues) as string[]).sort(),
@@ -310,6 +318,14 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
       JSON.stringify(rows.map(r => r.id)),
     )) access.set(a.performance_id, [...(access.get(a.performance_id) ?? []), { termId: a.term_id, label: a.label, detail: a.detail }])
   }
+  const effectsOff = new Map<string, string[]>()
+  if (rows.length) {
+    for (const e of await all<{ performance_id: string, label: string }>(
+      `SELECT x.performance_id, s.label FROM core_performance_effect_exceptions x JOIN core_terms t ON t.id = x.term_id JOIN core_terms s ON s.id = coalesce(t.merged_into_id, t.id)
+        WHERE x.performance_id IN (SELECT value FROM json_each(?)) ORDER BY s.sort, lower(s.label)`,
+      JSON.stringify(rows.map(r => r.id)),
+    )) effectsOff.set(e.performance_id, [...(effectsOff.get(e.performance_id) ?? []), e.label])
+  }
   // A cancelled production books nothing; otherwise only a scheduled performance not yet over.
   const bookable = rows.filter(r => r.state === 'scheduled' && r.ends_at > now && byId.get(r.production_id)!.state === 'published')
   const booking = await bookingActions(bookable.map(r => ({
@@ -331,6 +347,7 @@ async function publicPerformances(productions: ProductionRow[], now: number, can
     venue: { id: r.venue_id, slug: r.venue_slug, name: r.venue_name },
     space: { id: r.space_id, name: r.space_name },
     access: access.get(r.id) ?? [],
+    effectsOff: effectsOff.get(r.id) ?? [],
     booking: booking[r.id] ?? null,
   }))
 }

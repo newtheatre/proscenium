@@ -78,6 +78,10 @@ export const accessInput = z.object({
   features: z.array(z.object({ termId: z.string().min(1), detail: text(200).default(null) })).max(20), // not-policy: the table's bound on a detail; a list's ceiling
 })
 
+export const effectExceptionsInput = z.object({
+  termIds: z.array(z.string().min(1)).max(20), // not-policy: a list's ceiling
+})
+
 export const cancelInput = z.object({
   reasonTermId: z.string().min(1),
   note: text(200).optional(), // not-policy: the table's bound on a note

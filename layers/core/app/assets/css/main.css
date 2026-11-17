@@ -61,10 +61,14 @@
 .admin-shell .admin-main > .module-frame > div { height: 100%; }
 
 /* Live mode: every button and link-button is at least the live target, so a control is hit
-   first time with a thumb, in the dark, on the move. */
-.live-shell :where(button, a[role='button'], [role='tab'], [role='radio']) {
+   first time with a thumb, in the dark, on the move. A text field is as tall, so it lines up with
+   the button beside it. A checkbox or switch keeps its own size: its label is part of its target. */
+.live-shell :where(button:not([role='checkbox'], [role='switch']), a[role='button'], [role='tab'], [role='radio']) {
   min-height: var(--proscenium-target-live);
   min-width: var(--proscenium-target-live);
+}
+.live-shell :where(input:not([type='checkbox'], [type='radio'], [type='hidden'], [type='range'])) {
+  min-height: var(--proscenium-target-live);
 }
 
 /* The eight calendar colours (UI-35), apart from the brand and the status colours so no brand can

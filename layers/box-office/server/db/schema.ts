@@ -190,8 +190,10 @@ export const orders = defineTable('box_office_orders', {
   keep: col.internal(integer('keep', { mode: 'boolean' }).notNull().default(false)),
   // Set by the desk when the buyer is standing there: the tickets are admitted as they are issued.
   admitOnPayment: col.internal(integer('admit_on_payment', { mode: 'boolean' }).notNull().default(false)),
-  // Set by the reserve batch and by nothing else: a change of ticket type is priced as of then.
+  // Set by the reserve batch, and copied to a part split off: a change of ticket type is priced as of then.
   reservedAt: col.timestamp('reserved_at'),
+  // The reservation this one was split off at the desk, so one of a group can pay for their own.
+  splitFromId: col.ref('box_office_orders', { nullable: true }),
   confirmedAt: col.timestamp('confirmed_at'),
   cancelledAt: col.timestamp('cancelled_at'),
   createdAt: col.createdAt(),
