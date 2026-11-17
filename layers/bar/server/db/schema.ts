@@ -426,6 +426,62 @@ export const ageChecks = defineTable('bar_age_checks', {
   ],
 })
 
+// The 14 allergens UK food law names, by key; their names are translations (bar.allergen.<key>).
+export const ALLERGENS = ['gluten', 'crustaceans', 'eggs', 'fish', 'peanuts', 'soya', 'milk', 'nuts', 'celery', 'mustard', 'sesame', 'sulphites', 'lupin', 'molluscs'] as const
+export const ALLERGEN_LEVELS = ['contains', 'may_contain'] as const
+export const ALLERGEN_SOURCES = ['label', 'supplier', 'other'] as const
+
+/**
+ * What a product, or a choice option, contains or may contain, as last recorded from its label. One
+ * row per allergen named; an allergen with no row is not listed. Whether anything was checked at all is
+ * bar_allergen_checks', so "nothing listed" and "not checked" never look the same. With stock, entries
+ * move to stock items and products work theirs out; a product with no recipe keeps its own.
+ */
+export const allergenEntries = defineTable('bar_allergen_entries', {
+  id: col.id(),
+  productId: col.ref('bar_products', { nullable: true }),
+  optionId: col.ref('bar_choice_options', { nullable: true }),
+  allergen: col.public(text('allergen', { enum: ALLERGENS }).notNull()),
+  level: col.public(text('level', { enum: ALLERGEN_LEVELS }).notNull()),
+  createdAt: col.createdAt(),
+}, {
+  id: 'bale',
+  realm: 'operational',
+  subject: 'none',
+  extra: t => [
+    uniqueIndex('bar_allergen_entries_product').on(t.productId, t.allergen).where(sql`product_id IS NOT NULL`),
+    uniqueIndex('bar_allergen_entries_option').on(t.optionId, t.allergen).where(sql`option_id IS NOT NULL`),
+    check('bar_allergen_entries_one', sql`(${t.productId} IS NULL) <> (${t.optionId} IS NULL)`),
+    check('bar_allergen_entries_allergen', sql`${t.allergen} IN (${inList(ALLERGENS)})`),
+    check('bar_allergen_entries_level', sql`${t.level} IN (${inList(ALLERGEN_LEVELS)})`),
+  ],
+})
+
+/** Each time someone checked a product's or option's allergens against its label: who, when, from what, and what they recorded. */
+export const allergenChecks = defineTable('bar_allergen_checks', {
+  id: col.id(),
+  productId: col.ref('bar_products', { nullable: true }),
+  optionId: col.ref('bar_choice_options', { nullable: true }),
+  source: col.internal(text('source', { enum: ALLERGEN_SOURCES }).notNull()),
+  // What was recorded, as allergen keys joined by commas, so the history reads without the entries.
+  contains: col.internal(text('contains').notNull()),
+  mayContain: col.internal(text('may_contain').notNull()),
+  by: col.account('by', { role: 'actor', onMerge: 'alias' }),
+  at: col.timestamp('at').notNull(),
+  createdAt: col.createdAt(),
+}, {
+  id: 'balc',
+  realm: 'operational',
+  subject: 'none',
+  appendOnly: true,
+  extra: t => [
+    index('bar_allergen_checks_product').on(t.productId, t.at),
+    index('bar_allergen_checks_option').on(t.optionId, t.at),
+    check('bar_allergen_checks_one', sql`(${t.productId} IS NULL) <> (${t.optionId} IS NULL)`),
+    check('bar_allergen_checks_source', sql`${t.source} IN (${inList(ALLERGEN_SOURCES)})`),
+  ],
+})
+
 /** A manager's signature on the register for a range of operating days, with the refusals it covered. */
 export const registerReviews = defineTable('bar_register_reviews', {
   id: col.id(),
@@ -448,4 +504,4 @@ export const registerReviews = defineTable('bar_register_reviews', {
   ],
 })
 
-export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews }
+export const tables = { priceLists, categories, products, variants, choiceGroups, choiceOptions, productChoiceGroups, prices, outlets, outletFavourites, openings, sales, saleLines, saleLineChoices, saleReversals, ageChecks, registerReviews, allergenEntries, allergenChecks }
