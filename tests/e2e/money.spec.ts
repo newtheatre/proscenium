@@ -48,9 +48,7 @@ const SCREENS = [
   ['/console/payments/sessions', 'Till sessions'],
   ['/console/payments/attention', 'Needs attention'],
   ['/console/payments/refunds', 'Refunds'],
-  ['/console/payments/providers', 'Providers and readers'],
   ['/console/finance/ledger', 'Ledger'],
-  ['/console/finance/accounts', 'Ledger accounts'],
   ['/console/finance/periods', 'Periods'],
   ['/console/finance/productions', 'Production statements'],
   ['/console/finance/reconcile', 'Reconciliation'],
@@ -63,6 +61,18 @@ for (const [path, title] of SCREENS) {
     expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
     await expect(page.getByRole('link', { name: title }).first()).toBeVisible()
+    await noViolations(page)
+  })
+}
+
+for (const [path, module, title] of [['/admin/modules/payments/providers', 'Payments', 'Providers and readers'], ['/admin/modules/finance/accounts', 'Finance', 'Ledger accounts']] as const) {
+  test(`${title}, a set-up screen, opens for console staff in the console's settings window and has no violations`, async ({ page }) => {
+    await visit(page, path)
+    await expect(page).toHaveURL(/\/console\?settings=/)
+    const window = page.getByRole('dialog')
+    await expect(window.getByRole('heading', { name: `${module} settings` })).toBeVisible()
+    await expect(window.getByRole('heading', { level: 2, name: title })).toBeVisible()
+    await expect(window.getByRole('tab', { name: title })).toHaveAttribute('aria-selected', 'true')
     await noViolations(page)
   })
 }
@@ -210,7 +220,7 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
   const label = `Stripe keys ${Date.now()}`
   expect((await api.post('/api/payments/providers', { data: { provider: 'stripe', label, channels: ['online'], mode: 'test' }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
   await api.dispose()
-  await visit(page, '/console/payments/providers')
+  await visit(page, '/admin/modules/payments/providers')
   const card = page.locator('div').filter({ has: page.getByText(label, { exact: true }) }).filter({ has: page.getByRole('button', { name: 'Save keys' }) }).last()
   await expect(card.getByText('Missing Secret key, Webhook signing secret, Publishable key')).toBeVisible()
   await card.getByLabel('Secret key').fill('sk_test_e2eabcdefghijklm1234')

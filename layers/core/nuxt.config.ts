@@ -24,6 +24,9 @@ export default defineNuxtConfig({
   alias: kitAliases(root),
   // Screens that moved to Admin (R-33): old bookmarks still arrive.
   routeRules: {
+    // Set-up screens are tabs of the module's page in Admin; console staff are sent on to the console's settings window.
+    '/console/programme/closures': { redirect: { to: '/admin/modules/core/closures', statusCode: 301 } },
+    '/console/programme/seasons': { redirect: { to: '/admin/modules/core/seasons', statusCode: 301 } },
     // The catch-all page of site settings is gone: each group has one page of its own (settings build brief).
     '/admin/settings': { redirect: { to: '/admin/theatre', statusCode: 301 } },
     '/console/system/settings': { redirect: { to: '/admin/theatre', statusCode: 301 } },

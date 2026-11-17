@@ -176,7 +176,9 @@ describe("a module's page in Admin", () => {
     const nav = await (await call(handle, 'GET', '/api/core/navigation?shell=admin', { actor: admin })).json() as { groups: { id: string, everyday: { to: string }[] }[] }
     expect(nav.groups.find(g => g.id === 'modules')?.everyday.map(e => e.to)).toEqual(['/admin/modules'])
     expect((await decide('/admin/modules/gallery', admin)).decision).toBe('allow')
-    expect((await decide('/admin/modules/gallery', staff())).decision).toBe('not-found')
+    // Console staff are sent to the same screen in the console's settings window; anyone else finds nothing.
+    expect(await decide('/admin/modules/gallery?setting=gallery.demo.title', staff())).toEqual({ decision: 'redirect', to: `/console?settings=gallery&screen=${encodeURIComponent('/admin/modules/gallery?setting=gallery.demo.title')}` })
+    expect((await decide('/admin/modules/gallery', audience())).decision).toBe('not-found')
     expect((await decide('/admin/modules/gallery/about', viewerOf())).decision).toBe('allow')
     expect((await decide('/admin/modules/gallery', viewerOf())).decision).toBe('refused')
   })

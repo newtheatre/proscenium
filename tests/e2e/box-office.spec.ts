@@ -219,7 +219,7 @@ test.describe('the box office console', () => {
     await expect(page.getByRole('link', { name: 'Download as CSV' })).toBeVisible()
     await noViolations(page)
 
-    await visit(page, '/console/box-office/ticket-types')
+    await visit(page, '/admin/modules/box-office/ticket-types')
     await expect(page.getByText(typeName)).toBeVisible()
     await noViolations(page)
   })

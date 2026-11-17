@@ -289,7 +289,7 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               class="text-sm text-muted"
             >
               {{ t('box-office.setup.prices.no-types') }}
-              <ULink to="/console/box-office/ticket-types">
+              <ULink to="/admin/modules/box-office/ticket-types">
                 {{ t('box-office.navigation.ticket-types.label') }}
               </ULink>
             </p>

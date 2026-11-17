@@ -110,7 +110,7 @@ async function remove() {
   if (!(await confirm({ verb: t('membership.screens.list.verb-delete'), thing: list.value!.name, consequence: t('membership.screens.list.confirm-delete'), button: t('membership.screens.list.delete') }))) return
   try {
     await $api(base.value as string, { method: 'DELETE', body: {} })
-    await navigateTo('/console/membership/lists')
+    await navigateTo('/admin/modules/membership/lists')
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, description: toRefusal(e).remedy, color: 'error' })

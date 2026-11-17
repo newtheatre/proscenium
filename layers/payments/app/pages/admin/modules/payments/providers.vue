@@ -74,7 +74,7 @@ async function testPayment(a: Account) {
   }
 }
 // Where a test card that needs its bank's page comes back to: this screen.
-const returnUrl = `${useRequestURL().origin}/console/payments/providers`
+const returnUrl = `${useRequestURL().origin}/admin/modules/payments/providers`
 async function checkTest(a: Account) {
   const run = testing[a.id]
   if (!run?.intentId) return

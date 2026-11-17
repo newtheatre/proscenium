@@ -142,7 +142,7 @@ export default defineModule({
       { id: 'box-office.performances', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/performances', icon: 'i-lucide-calendar', ability: 'box-office.performance.manage', order: 30 },
       { id: 'box-office.reports', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/reports/sales', icon: 'i-lucide-chart-column', ability: 'box-office.report.view', order: 38 },
       { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
-      { id: 'box-office.ticket-types', menu: 'console', group: 'box-office', section: 'setup', to: '/console/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
+      { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [

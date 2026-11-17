@@ -109,10 +109,10 @@ export default defineModule({
 
   contributes: {
     'core.navigation': [
-      { id: 'membership.schemes', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/schemes', match: '/console/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
+      { id: 'membership.schemes', menu: 'admin', group: 'modules', to: '/admin/modules/membership/schemes', match: '/admin/modules/membership/schemes', icon: 'i-lucide-id-card', ability: 'membership.scheme.view', order: 10 },
       { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
       { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5 },
-      { id: 'membership.lists', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/lists', match: '/console/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
+      { id: 'membership.lists', menu: 'admin', group: 'modules', to: '/admin/modules/membership/lists', match: '/admin/modules/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
       { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
     ],
     // Renewal reminders (R7 to R9): service messages about something the person holds.
