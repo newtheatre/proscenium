@@ -7,6 +7,7 @@ import { all, first, nowMs } from '#kit'
 import { productionBySlug } from './service'
 import { shownCredits, type ShownCredit } from './credits'
 import { bookingActions, type ShownBooking } from './booking'
+import { publicImages, type PublicImage } from './media'
 
 export interface PublicTerm { id: string, slug: string, label: string }
 export interface PublicNote { termId: string, label: string, detail: string | null }
@@ -45,6 +46,8 @@ export interface PublicProduction {
   /** Worked out, not stored (part 3): cancelled, or its last performance not cancelled has ended. */
   past: boolean
   credits: ShownCredit[]
+  poster: PublicImage | null
+  photos: PublicImage[]
   performances: PublicPerformance[]
 }
 
@@ -141,6 +144,7 @@ export async function publicProduction(slug: string, options: PublicProductionOp
     state: row.state,
     past: isPast(row.state, performances, now),
     credits: await shownCredits(row.id, options.members ?? false),
+    ...(await publicImages([row.id])).get(row.id)!,
     performances,
   }
 }
@@ -157,6 +161,7 @@ export interface PublicListing {
   /** The last scheduled performance's end. */
   lastEndsAt: number
   venues: string[]
+  poster: PublicImage | null
 }
 
 /**
@@ -178,6 +183,7 @@ export async function currentProductions(options: { now?: number } = {}): Promis
       ORDER BY next_starts_at, p.id`,
     now,
   )
+  const images = await publicImages(rows.map(r => r.id))
   return rows.map(r => ({
     id: r.id,
     slug: r.slug,
@@ -188,6 +194,7 @@ export async function currentProductions(options: { now?: number } = {}): Promis
     nextStartsAt: r.next_starts_at,
     lastEndsAt: r.last_ends_at,
     venues: (JSON.parse(r.venues) as string[]).sort(),
+    poster: images.get(r.id)!.poster,
   }))
 }
 
