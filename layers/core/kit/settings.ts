@@ -79,6 +79,8 @@ export const setting = {
 }
 
 const KEBAB = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/
+/** A choice's option may also be a number, such as a page size of 25. */
+const OPTION = /^[a-z0-9]+(-[a-z0-9]+)*$/
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/
 const COLOUR = /^#[0-9a-f]{6}$/i
 const SCREEN = /^\/(admin|console)(\/[a-z0-9-]+)+$/
@@ -123,8 +125,8 @@ function checkEntry(key: string, entry: SettingEntry) {
   if (entry.kind === 'reference' && entry.default !== undefined) throw new DeclarationError(f('default'), 'a reference setting always starts unset')
   if (!entry.unset && entry.default === undefined) throw new DeclarationError(f('default'), 'give a default, or `unset: true` if the theatre must choose')
   if (entry.kind === 'text' && !(typeof entry.maxLength === 'number' && entry.maxLength > 0)) throw new DeclarationError(f('maxLength'), 'a text setting declares maxLength')
-  if ((entry.kind === 'choice' || (entry.kind === 'list' && entry.of === 'choice')) && !(Array.isArray(entry.options) && entry.options.length && entry.options.every(o => KEBAB.test(o))))
-    throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case')
+  if ((entry.kind === 'choice' || (entry.kind === 'list' && entry.of === 'choice')) && !(Array.isArray(entry.options) && entry.options.length && entry.options.every(o => OPTION.test(o))))
+    throw new DeclarationError(f('options'), 'a choice lists its options, each kebab-case or a number')
   if (entry.onChange !== undefined && !['reason', 'confirm'].includes(entry.onChange)) throw new DeclarationError(f('onChange'), "is 'reason' or 'confirm'")
   if ('scope' in entry) throw new DeclarationError(f('scope'), 'is gone: say where a group of settings is shown in the manifest\'s settingGroups')
   if (entry.screen !== undefined && !(typeof entry.screen === 'string' && SCREEN.test(entry.screen))) throw new DeclarationError(f('screen'), 'is the address of a page, such as /admin/email')
