@@ -3,7 +3,7 @@
 // Declining is final; the person may apply again. Every decision is a verification row.
 import { getRouterParam } from 'h3'
 import { z } from 'zod'
-import { defineRoute, first, nowMs, refuse, today } from '#kit'
+import { defineRoute, first, nowMs, refuse, today, useSetting } from '#kit'
 import { activatePending } from '../../../../memberships'
 import { requireScheme } from '../../../../schemes'
 import { recordOutcome } from '../../../../verify'
@@ -17,8 +17,8 @@ export default defineRoute({
     note: z.string().trim().max(500).nullish(), // not-policy: the bound of a staff note
   }),
 }, async (_event, { input, actor, record, unit }) => {
-  const row = await first<{ account_id: string, scheme_id: string, state: string, needs_approval: number, needs_payment: number, count: number | null, entry_ends: string | null, verifier: string | null }>(
-    `SELECT m.account_id, m.scheme_id, m.state, m.needs_approval, m.needs_payment, o.count,
+  const row = await first<{ account_id: string, scheme_id: string, state: string, needs_approval: number, needs_payment: number, paid_at: number | null, count: number | null, entry_ends: string | null, verifier: string | null }>(
+    `SELECT m.account_id, m.scheme_id, m.state, m.needs_approval, m.needs_payment, m.paid_at, o.count,
             (SELECT e.ends_on FROM membership_verifications v JOIN membership_verification_entries e ON e.id = v.entry_id WHERE v.membership_id = m.id ORDER BY v.created_at DESC LIMIT 1) AS entry_ends,
             (SELECT v.verifier FROM membership_verifications v WHERE v.membership_id = m.id ORDER BY v.created_at DESC LIMIT 1) AS verifier
        FROM membership_memberships m LEFT JOIN membership_length_options o ON o.id = m.length_option_id WHERE m.id = ?`,
@@ -36,10 +36,14 @@ export default defineRoute({
     return { state: 'declined' }
   }
   recordOutcome(unit, record!.id, { outcome: 'passed', verifier }, actor.accountId, note)
-  // Approval and payment are not built yet, so a passed check is the last requirement.
-  if (row!.needs_approval || row!.needs_payment) {
-    unit.add({ sql: 'UPDATE membership_memberships SET verified_at = ?, updated_at = ? WHERE id = ? AND state = \'pending\'', params: [nowMs(), nowMs(), record!.id] }).expect(1)
-    return { state: 'pending' }
+  // A2: with the fee still to pay, the applicant is now asked to pay, and the application expires if
+  // they do not (J5). Approval is not built yet.
+  const unpaid = !!row!.needs_payment && row!.paid_at === null
+  if (row!.needs_approval || unpaid) {
+    const at = nowMs()
+    const expiresAt = unpaid ? at + (await useSetting('membership.applications.expire-after') as number) * 1000 : null // not-policy: seconds to milliseconds
+    unit.add({ sql: 'UPDATE membership_memberships SET verified_at = ?, expires_at = ?, updated_at = ? WHERE id = ? AND state = \'pending\'', params: [at, expiresAt, at, record!.id] }).expect(1)
+    return { state: 'pending', waiting: unpaid ? 'payment' : 'approval' }
   }
   const scheme = await requireScheme(row!.scheme_id)
   const dates = activatePending(unit, {

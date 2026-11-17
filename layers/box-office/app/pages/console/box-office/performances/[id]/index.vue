@@ -1,7 +1,9 @@
 <!-- A performance's sales set-up (Box office specification, part 6, "Performance set-up"; BO-01,
      BO-04): what is still missing before it can go on sale, how many of each band to sell, what each
-     ticket type costs in each band, and when sales open and close. A production's bands and prices
-     are shared by all its performances; capacity and the sale window are this performance's own. -->
+     ticket type costs in each band, and when sales open and close. A production's bands are shared
+     by all its performances, and so are its prices unless this performance is given its own, which
+     can be handed back to the production's at any time; capacity and the sale window are this
+     performance's own. -->
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
@@ -10,11 +12,13 @@ interface Band { id: string, name: string, kind: string, sort: number }
 interface Pool { bandId: string, capacity: number, claimed: number }
 interface Price { bandId: string, ticketTypeId: string, amountMinor: number }
 interface TicketType { id: string, name: string, kind: string, active: boolean, available?: boolean }
+interface PriceLayer { bandId: string, ticketTypeId: string, production: number | null, own: { amountMinor: number | null } | null }
 interface Setup {
   sales: { state: Sales, onSaleAt: number | null, offSaleAt: number | null, maxPerOrder: number | null, holdMinutes: number | null } | null
   houseCapacity: number | null
   pools: Pool[]
   prices: Price[]
+  priceLayers: PriceLayer[]
   checklist: { code: string, done: boolean }[]
   performance: { id: string, productionId: string, title: string, label: string | null, startsAt: number, state: string }
   bands: Band[]
@@ -26,6 +30,7 @@ const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 const { dateTime } = useDates()
+const { money } = await useMoney()
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 
@@ -52,15 +57,18 @@ async function act(run: () => Promise<unknown>, done: string): Promise<boolean> 
 
 // Capacity: one number for each band of the production.
 const capacity = ref<Record<string, number>>({})
-// Prices: one amount for each band and ticket type, in the minor unit; null is not sold.
+// Prices: one amount for each band and ticket type, in the minor unit; null is not sold. They are
+// edited for every performance of the production, or for this one alone.
 const prices = ref<Record<string, number | null>>({})
+const scope = ref<'all' | 'this'>('all')
+const scopes = computed(() => (['all', 'this'] as const).map(value => ({ value, label: t(`box-office.setup.prices.scope.${value}`) })))
 // The sale window and limits.
 const windowForm = ref({ onSaleAt: null as number | null, offSaleAt: null as number | null, maxPerOrder: null as number | null, holdMinutes: null as number | null })
 const cell = (bandId: string, typeId: string) => `${bandId} ${typeId}`
 watch(data, (d) => {
   if (!d) return
   capacity.value = Object.fromEntries(d.bands.map(b => [b.id, d.pools.find(p => p.bandId === b.id)?.capacity ?? 0]))
-  prices.value = Object.fromEntries(d.prices.map(p => [cell(p.bandId, p.ticketTypeId), p.amountMinor]))
+  seedPrices()
   windowForm.value = { onSaleAt: d.sales?.onSaleAt ?? null, offSaleAt: d.sales?.offSaleAt ?? null, maxPerOrder: d.sales?.maxPerOrder ?? null, holdMinutes: d.sales?.holdMinutes ?? null }
 }, { immediate: true })
 
@@ -81,12 +89,45 @@ async function saveCapacity(confirmOverVenue = false) {
 async function saveWindow() {
   await act(() => $api(base.value, { method: 'PUT', body: windowForm.value }), t('box-office.setup.window.saved'))
 }
+function layer(bandId: string, typeId: string): PriceLayer {
+  return data.value?.priceLayers.find(l => l.bandId === bandId && l.ticketTypeId === typeId) ?? { bandId, ticketTypeId: typeId, production: null, own: null }
+}
+// What the box shows: the production's price, or, for this performance only, its own or else the production's.
+function shown(l: PriceLayer): number | null {
+  return scope.value === 'this' && l.own ? l.own.amountMinor : l.production
+}
+function seedPrices() {
+  const d = data.value
+  if (!d) return
+  prices.value = Object.fromEntries(d.bands.flatMap(b => activeTypes.value.map(type => [cell(b.id, type.id), shown(layer(b.id, type.id))])))
+}
+watch([scope, activeTypes], seedPrices)
+
+function priceHelp(bandId: string, typeId: string): string | undefined {
+  const l = layer(bandId, typeId)
+  if (scope.value === 'all') {
+    if (!l.own) return undefined
+    return l.own.amountMinor === null ? t('box-office.setup.prices.own-elsewhere-unsold') : t('box-office.setup.prices.own-elsewhere', { amount: money(l.own.amountMinor) })
+  }
+  if (!l.own) return l.production === null ? t('box-office.setup.prices.inherited-none') : t('box-office.setup.prices.inherited')
+  return l.production === null ? t('box-office.setup.prices.own-none') : t('box-office.setup.prices.own', { amount: money(l.production) })
+}
+
 async function savePrices() {
   const d = data.value!
-  const rows = d.bands.flatMap(b => activeTypes.value.map(type => ({ bandId: b.id, ticketTypeId: type.id, amountMinor: prices.value[cell(b.id, type.id)] ?? null })))
-    .filter(p => p.amountMinor !== null || d.prices.some(old => old.bandId === p.bandId && old.ticketTypeId === p.ticketTypeId))
-  if (!rows.length) return
+  const performanceId = scope.value === 'this' ? d.performance.id : null
+  // Only what changed is sent, so a performance's own price is made only where it differs.
+  const rows = d.bands.flatMap(b => activeTypes.value.map(type => ({ bandId: b.id, ticketTypeId: type.id, performanceId, amountMinor: prices.value[cell(b.id, type.id)] ?? null })))
+    .filter(p => p.amountMinor !== shown(layer(p.bandId, p.ticketTypeId)))
+  if (!rows.length) {
+    toast.add({ title: t('box-office.setup.prices.unchanged'), color: 'neutral' })
+    return
+  }
   await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`, { method: 'POST', body: { prices: rows } }), t('box-office.setup.prices.saved'))
+}
+async function inherit(bandId: string, typeId: string) {
+  const d = data.value!
+  await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/prices`, { method: 'POST', body: { prices: [{ bandId, ticketTypeId: typeId, performanceId: d.performance.id, amountMinor: null, inherit: true }] } }), t('box-office.setup.prices.reverted'))
 }
 
 const band = ref({ name: '', kind: 'standard' as 'standard' | 'wheelchair' | 'restricted_view' })
@@ -259,6 +300,14 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
               :state="prices"
               @submit="savePrices"
             >
+              <UFormField :label="t('box-office.setup.prices.scope.label')">
+                <URadioGroup
+                  v-model="scope"
+                  orientation="horizontal"
+                  variant="table"
+                  :items="scopes"
+                />
+              </UFormField>
               <fieldset
                 v-for="b in d.bands"
                 :key="b.id"
@@ -271,8 +320,19 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
                   v-for="type in activeTypes"
                   :key="type.id"
                   :label="type.name"
+                  :help="priceHelp(b.id, type.id)"
                 >
-                  <FieldMoney v-model="prices[cell(b.id, type.id)]" />
+                  <div class="flex flex-wrap items-center gap-2">
+                    <FieldMoney v-model="prices[cell(b.id, type.id)]" />
+                    <UButton
+                      v-if="scope === 'this' && layer(b.id, type.id).own"
+                      color="neutral"
+                      variant="link"
+                      icon="i-lucide-undo-2"
+                      :label="t('box-office.setup.prices.revert')"
+                      @click="inherit(b.id, type.id)"
+                    />
+                  </div>
                 </UFormField>
               </fieldset>
               <UButton

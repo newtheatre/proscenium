@@ -5,6 +5,9 @@ import type { DeskBasket, DeskContext } from '#modules/payments'
 export default {
   label: 'snacks.desk.label',
   panel: 'SnacksTillPanel',
+  tab: 'snacks.desk.tab',
+  icon: 'i-lucide-cookie',
+  livePanel: 'SnacksLiveTillPanel',
   ability: 'payments.attempt.attest',
   order: 2,
   async prepare(unit: UnitView, context: DeskContext) {

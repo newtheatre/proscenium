@@ -1,7 +1,9 @@
 // Schemes and their length options (Membership specification, tab 2 and tab 3, S1 to S5).
 import { z } from 'zod'
 import { all, first, refuse, useSetting } from '#kit'
+import { charger } from './charge'
 import { endsOnFor } from './dates'
+import { todayOrNull } from './memberships'
 import { hasListKey, schemeList } from './lists'
 import { JOIN_MODES, LENGTH_RULES, SIDES } from './db/schema'
 
@@ -133,8 +135,9 @@ export interface ChecklistItem { code: string, done: boolean }
 
 /**
  * What opening a scheme needs (rule S4, and the rule that a members' scheme needs the members'
- * area). Application forms and fees are later slices: until they exist, a scheme that asks for
- * either cannot be opened, and the checklist says why.
+ * area). Application forms are a later slice: until they exist, a scheme that asks for one cannot
+ * be opened, and the checklist says why. A scheme that requires payment needs the fees module on and
+ * a price in force today for joining at every length offered (S5).
  */
 export async function openChecklist(scheme: Scheme): Promise<ChecklistItem[]> {
   const options = (await lengthOptions([scheme.id], true)).get(scheme.id)!
@@ -145,7 +148,14 @@ export async function openChecklist(scheme: Scheme): Promise<ChecklistItem[]> {
   if (scheme.verifier === 'membership.list') items.push({ code: 'verifier', done: !!(await schemeList(scheme)) && await hasListKey() })
   if (scheme.verifier === 'membership.email-domain') items.push({ code: 'verifier-domains', done: !!verifierConfig(scheme).domains?.length })
   if (scheme.needsApproval) items.push({ code: 'application-form', done: false })
-  if (scheme.requiresPayment) items.push({ code: 'price', done: false })
+  if (scheme.requiresPayment) {
+    const fees = await charger()
+    const day = await todayOrNull()
+    const lengths = scheme.lengthRule === 'indefinite' ? [null] : options.filter(o => o.state === 'offered').map(o => o.id)
+    let priced = !!fees && !!day && lengths.length > 0
+    for (const length of lengths) if (priced) priced = !!(await fees!.priceFor(scheme.id, length, 'join', day!))
+    items.push({ code: 'price', done: priced })
+  }
   return items
 }
 

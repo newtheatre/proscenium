@@ -87,6 +87,40 @@ describe('setting a performance up for sale', () => {
     expect(await buy(h, 1)).toMatchObject({ ok: true, basket: { totalMinor: 500 } })
     setClock(NOV_16)
   })
+
+  it('shows where each price comes from, and hands a performance\'s own price back to the production\'s', async () => {
+    const h = await house(10)
+    const price = (body: Record<string, unknown>) => req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: h.fullId, ...body }] })
+    const layer = async () => (await sales(h.performanceId)).body.priceLayers.find((l: any) => l.ticketTypeId === h.fullId)
+    // The house already charges 1200 for every performance.
+    expect(await layer()).toEqual({ bandId: h.bandId, ticketTypeId: h.fullId, production: 1200, own: null })
+
+    setClock(NOV_16 + 1000)
+    expect((await price({ performanceId: h.performanceId, amountMinor: 800 })).status).toBe(200)
+    expect(await layer()).toMatchObject({ production: 1200, own: { amountMinor: 800 } })
+    expect(await buy(h, 1)).toMatchObject({ ok: true, basket: { totalMinor: 800 } })
+
+    // Not sold at this performance only: the rest still sell it.
+    setClock(NOV_16 + 2000)
+    await price({ performanceId: h.performanceId, amountMinor: null })
+    expect(await layer()).toMatchObject({ production: 1200, own: { amountMinor: null } })
+    expect((await sales(h.performanceId)).body.prices.find((p: any) => p.ticketTypeId === h.fullId)).toBeUndefined()
+
+    // Back to the production's, which then follows the production's later changes.
+    setClock(NOV_16 + 3000)
+    expect((await price({ performanceId: h.performanceId, amountMinor: null, inherit: true })).status).toBe(200)
+    expect(await layer()).toMatchObject({ production: 1200, own: null })
+    setClock(NOV_16 + 4000)
+    await price({ amountMinor: 1500 })
+    expect(await layer()).toMatchObject({ production: 1500, own: null })
+    expect(await buy(h, 1)).toMatchObject({ ok: true, basket: { totalMinor: 1500 } })
+
+    // Going back needs a performance, and the performance must be this production's.
+    expect((await price({ amountMinor: null, inherit: true })).body).toMatchObject({ code: 'box-office.price.inherit-needs-performance' })
+    const other = await house(5)
+    expect((await price({ performanceId: other.performanceId, amountMinor: 100 })).body).toMatchObject({ code: 'box-office.performance.not-found' })
+    setClock(NOV_16)
+  })
 })
 
 describe('capacity', () => {

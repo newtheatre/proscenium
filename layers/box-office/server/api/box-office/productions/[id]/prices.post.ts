@@ -3,7 +3,7 @@
 import { z } from 'zod'
 import { getRouterParam } from 'h3'
 import { all, defineRoute, idSchema, refuse, useSetting } from '#kit'
-import { getProduction } from '#modules/core'
+import { getPerformance, getProduction } from '#modules/core'
 import { setPrices } from '../../../../prices'
 
 export default defineRoute({
@@ -18,6 +18,8 @@ export default defineRoute({
       performanceId: idSchema('perf').nullish(),
       // Nothing withdraws the price.
       amountMinor: z.number().int().min(0).nullable(),
+      // With a performance: follow the production's price again.
+      inherit: z.boolean().optional(),
     }).strict()).min(1).max(200), // not-policy: a price grid's bound, bands by ticket types
   }).strict(),
 }, async (_event, { input, record, actor, unit }) => {
@@ -28,6 +30,11 @@ export default defineRoute({
   const comps = new Set((await all<{ id: string }>("SELECT id FROM box_office_ticket_types WHERE kind = 'complimentary'")).map(t => t.id))
   if (input.prices.some(p => comps.has(p.ticketTypeId) && p.amountMinor !== null))
     refuse('box-office.price.complimentary', 'Complimentary tickets are not priced: they are issued by approving a request for them.', { status: 422, remedy: 'Leave the Complimentary column out.' })
+  if (input.prices.some(p => p.inherit && !p.performanceId)) refuse('box-office.price.inherit-needs-performance', 'Only one performance\'s own price can go back to the production\'s.', { status: 422 })
+  const performanceIds = [...new Set(input.prices.map(p => p.performanceId).filter((x): x is string => !!x))]
+  for (const performanceId of performanceIds) {
+    if ((await getPerformance(performanceId)).productionId !== record!.id) refuse('box-office.performance.not-found', 'One of these performances is not of this production.', { status: 422 })
+  }
   const priceIds = setPrices(unit.view(), record!.id, await useSetting('core.locale.currency') as string, input.prices, actor.accountId ?? null)
   unit.audit({ action: 'update', record: ['core.production', record!.id], detail: { prices: priceIds.length } })
   return { priceIds }

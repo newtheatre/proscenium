@@ -1,10 +1,11 @@
 <!-- Manage booking (Box office specification, part 6; R-2): the page the link in every booking
      message opens, with no sign-in. It shows the reference, the performance, the tickets and what is
      still to pay. A reservation can be cancelled here, whole or some of its tickets, and the seats go
-     back on sale at once; a paid booking is changed by the box office. Nothing about the buyer is
-     shown, since anyone holding the link sees this page. -->
+     back on sale at once. A paid booking can be cancelled here too when the theatre allows it and the
+     cut-off has not passed, and the price less the fee goes back to the card; otherwise the box
+     office changes it. Nothing about the buyer is shown, since anyone holding the link sees this page. -->
 <script setup lang="ts">
-interface Order { orderId: string, reference: string, state: string, currency: string, totalMinor: number, amountDueMinor: number, releaseAt: number | null, lines: { id: string, performanceId: string, ticketType: string, amountMinor: number }[] }
+interface Order { orderId: string, reference: string, state: string, currency: string, totalMinor: number, amountDueMinor: number, releaseAt: number | null, lines: { id: string, performanceId: string, ticketType: string, amountMinor: number }[], buyerCancel: { feeMinor: number, until: number } | null }
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string } }
 
 definePageMeta({ key: 'box-office-manage-booking' })
@@ -35,6 +36,16 @@ const lines = computed(() => {
   return [...grouped.values()]
 })
 const reserved = computed(() => order.value?.state === 'reserved')
+// The buyer's own cancellation of what they paid for, on the theatre's terms.
+const terms = computed(() => order.value?.state === 'confirmed' ? order.value.buyerCancel : null)
+const cancellable = computed(() => !!order.value?.lines.length && (reserved.value || !!terms.value))
+const words = computed(() => terms.value ? 'refund' : 'cancel')
+const refunded = ref<number | null>(null)
+
+function refundFor(ids: string[]) {
+  const fee = terms.value?.feeMinor ?? 0
+  return (order.value?.lines ?? []).filter(l => ids.includes(l.id)).reduce((sum, l) => sum + l.amountMinor - Math.min(fee, l.amountMinor), 0)
+}
 const chosen = ref<string[]>([])
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
@@ -46,11 +57,16 @@ function toggle(id: string, on: boolean | 'indeterminate') {
 
 async function cancel(all: boolean) {
   if (!order.value) return
-  const count = all ? order.value.lines.length : chosen.value.length
+  const ids = all ? order.value.lines.map(l => l.id) : chosen.value
+  const count = ids.length
+  const paid = !!terms.value
+  const back = paid ? refundFor(ids) : 0
   const ok = await confirm({
     verb: t('box-office.manage.cancel.verb'),
-    thing: t('box-office.manage.cancel.thing', { count }),
-    consequence: t('box-office.manage.cancel.consequence'),
+    thing: t(`box-office.manage.${words.value}.thing`, { count }),
+    consequence: paid
+      ? t('box-office.manage.refund.consequence', { amount: money(back, order.value.currency) })
+      : t('box-office.manage.cancel.consequence'),
     button: t('box-office.manage.cancel.button', { count }),
   })
   if (!ok) return
@@ -59,6 +75,7 @@ async function cancel(all: boolean) {
   try {
     order.value = await $api<Order>('/api/box-office/orders/link/cancel', { method: 'POST', body: all ? {} : { lineIds: chosen.value }, headers: { ...headers.value, 'idempotency-key': crypto.randomUUID() } })
     cancelled.value = count
+    refunded.value = back > 0 ? back : null
     chosen.value = []
   }
   catch (e) {
@@ -90,6 +107,7 @@ async function cancel(all: boolean) {
               icon="i-lucide-check"
               role="status"
               :title="t('box-office.manage.cancelled', { count: cancelled })"
+              :description="refunded ? t('box-office.manage.refunded', { amount: money(refunded, order.currency) }) : undefined"
             />
             <section class="space-y-2">
               <h2
@@ -134,19 +152,27 @@ async function cancel(all: boolean) {
             </section>
 
             <section
-              v-if="reserved && order.lines.length"
+              v-if="cancellable"
               class="space-y-4"
             >
               <h2 class="text-lg font-semibold">
                 {{ t('box-office.manage.cancel.title') }}
               </h2>
+              <p
+                v-if="terms"
+                class="text-sm text-muted"
+              >
+                {{ terms.feeMinor > 0
+                  ? t('box-office.manage.refund.terms', { until: dateTime(terms.until), fee: money(terms.feeMinor, order.currency) })
+                  : t('box-office.manage.refund.terms-free', { until: dateTime(terms.until) }) }}
+              </p>
               <RefusalNotice :refusal="refusal" />
               <fieldset
                 v-if="order.lines.length > 1"
                 class="space-y-2"
               >
                 <legend class="mb-2 text-sm">
-                  {{ t('box-office.manage.cancel.some') }}
+                  {{ t(`box-office.manage.${words}.some`) }}
                 </legend>
                 <UCheckbox
                   v-for="(line, i) in order.lines"
@@ -170,7 +196,7 @@ async function cancel(all: boolean) {
                   color="error"
                   variant="outline"
                   :loading="busy"
-                  :label="t('box-office.manage.cancel.all')"
+                  :label="t(`box-office.manage.${words}.all`)"
                   @click="cancel(true)"
                 />
               </div>

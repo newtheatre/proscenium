@@ -6,7 +6,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 const grant = (ability: string) => ({ ability, via: 'test' })
 const person = (accountId: string, name: string, abilities: string[]) => ({ kind: 'person', accountId, name, assurance: 'strong', reassertedAt: Date.now(), grants: abilities.map(grant) })
-const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage'])
+const owner = person('acc_deskowner', 'Desk Owner', ['core.settings.manage', 'core.modules.manage', 'box-office.settings.manage', 'payments.settings.manage'])
 const manager = person('acc_deskmanager', 'Desk Manager', ['core.production.create', 'core.production.edit', 'core.performance.schedule', 'core.venue.manage', 'box-office.performance.manage', 'box-office.pricing.manage', 'payments.provider.manage'])
 const seller = person('acc_sallyseller', 'Sally Seller', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.order.sell', 'box-office.order.take-payment'])
 const office = person('acc_officeboss', 'Office Boss', ['payments.session.open', 'payments.attempt.attest', 'box-office.order.view', 'box-office.performance.manage', 'box-office.pricing.manage', 'box-office.ticket.admit', 'box-office.order.exchange', 'box-office.report.export'])
@@ -41,6 +41,7 @@ test.beforeAll(async ({ playwright }) => {
   await set([{ key: 'core.locale.time-zone', value: 'Europe/London' }])
   for (const id of ['finance', 'payments', 'box-office']) expect((await settings.put(`/api/core/modules/${id}`, { data: { on: true } })).ok()).toBe(true)
   await set([{ key: 'box-office.reservations.confirm-email', value: false }, { key: 'box-office.checkout.payment-timing', value: 'buyer-chooses' }])
+  await set([{ key: 'payments.cash.enabled', value: true }]) // these sell for cash, which a theatre turns on
   await settings.dispose()
 
   const api = await playwright.request.newContext({ ...base, ...as(manager) })
@@ -154,6 +155,22 @@ test('Sell takes the difference on an exchange for a dearer ticket', async ({ pa
   await page.getByRole('button', { name: 'Find' }).click()
   await expect(page.getByText(premiumName)).toBeVisible()
   await officeContext.close()
+})
+
+test('the till in live mode shows each panel as a tab over one basket', async ({ browser }) => {
+  // The gallery's sample panel stands in for the bar, so this seller has two panels.
+  const context = await browser.newContext(as({ ...seller, grants: [...seller.grants, grant('gallery.sample.view')] }))
+  const page = await context.newPage()
+  await visit(page, '/live/till')
+  await expect(page.getByRole('heading', { level: 1, name: 'Till' })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Tickets' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Gallery programmes' }).click()
+  await page.getByLabel('Programmes sold').fill('2')
+  await page.getByLabel('Programmes sold').blur()
+  await expect(page.getByRole('button', { name: 'Take payment of £6.00' })).toBeEnabled()
+  await expect(page.getByRole('tab', { name: /^Gallery programmes/ })).toContainText('1')
+  await noViolations(page)
+  await context.close()
 })
 
 test.describe('the box office console', () => {

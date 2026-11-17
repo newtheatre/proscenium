@@ -3,7 +3,7 @@
 // through the point payments.settlement, so it never imports Box office, a bar or anything else that
 // sells. Cash and attested card ship with it, so a desk works on day one with no account anywhere.
 import { z } from 'zod'
-import { ability, call, code, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, secret, setting, task } from '#kit'
+import { ability, call, code, credentialDecl, defineAbilities, defineModule, defineRecords, defineSettings, event, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'payments.settings.manage'
@@ -25,15 +25,19 @@ export default defineModule({
     'refunds.window': setting.duration({ default: '180d', min: '1d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
     'sessions.variance-needs-second-person': setting.money({ default: 500, min: 0, max: 100000, change, audience: 'staff', onChange: 'confirm' }),
     'sessions.default-float': setting.money({ default: 0, min: 0, max: 100000, change, audience: 'staff' }),
-    'cash.enabled': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
+    'cash.enabled': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
     'desk.attested-card': setting.boolean({ default: true, change, audience: 'staff', onChange: 'confirm' }),
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
+    // For a test instance only: a provider account in test mode takes payment for real sales, which
+    // then post to the ledger as live money would, so the whole journey can be tried with test cards.
+    'test-mode.takes-sales': setting.boolean({ default: false, change, audience: 'staff', onChange: 'confirm' }),
   }),
 
   // R-37: every other group sits on /console/payments/settings, the module's own page; how long
   // webhook bodies are kept is upkeep, on the shared Advanced page.
   settingGroups: {
-    retention: { advanced: true },
+    'retention': { advanced: true },
+    'test-mode': { advanced: true },
   },
 
   records: defineRecords('payments', {
@@ -99,17 +103,19 @@ export default defineModule({
     'payments.send-refund': job({ payload: z.object({ refundId: z.string() }), retries: 8 }),
   },
 
-  // Provider keys are Worker secrets in the first release (Matt's question 3). Stripe's are needed
-  // only once a Stripe account is added, and SumUp's once a SumUp account is.
-  secrets: {
-    PAYMENTS_STRIPE_SECRET_KEY: secret({ needed: 'when-used' }),
-    PAYMENTS_STRIPE_WEBHOOK_SECRET: secret({ needed: 'when-used' }),
-    PAYMENTS_STRIPE_PUBLISHABLE_KEY: secret({ needed: 'when-used' }),
+  // Provider keys are credentials (Matt, 17 November: keys are managed in the app, not in Cloudflare),
+  // typed into each provider account on the Providers screen. A Worker secret of the same name is
+  // used where none is saved. Stripe's are needed only once a Stripe account is added, SumUp's once a
+  // SumUp account is.
+  credentials: {
+    PAYMENTS_STRIPE_SECRET_KEY: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_STRIPE_WEBHOOK_SECRET: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_STRIPE_PUBLISHABLE_KEY: credentialDecl({ needed: 'when-used' }),
     // SumUp's API key (the Cloud API only), and the affiliate app id and key that both the Cloud API's
     // reader checkout and the hand-off to the SumUp app carry.
-    PAYMENTS_SUMUP_API_KEY: secret({ needed: 'when-used' }),
-    PAYMENTS_SUMUP_AFFILIATE_KEY: secret({ needed: 'when-used' }),
-    PAYMENTS_SUMUP_APP_ID: secret({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_API_KEY: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_AFFILIATE_KEY: credentialDecl({ needed: 'when-used' }),
+    PAYMENTS_SUMUP_APP_ID: credentialDecl({ needed: 'when-used' }),
   },
 
   // The return address of a hand-off to the SumUp app is signed for its attempt. A key checks for a
@@ -135,12 +141,15 @@ export default defineModule({
     'front-of-house.report-section': [{ id: 'payments.tills', file: 'tills' }],
     // The console's Money group (Box office specification, part 5). Finance adds its own screens there.
     'core.navigation': [
-      { id: 'payments.till', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 5 },
+      // The till is a live screen (selling proposal); the Money group links to it.
+      { id: 'payments.open-till', menu: 'console', group: 'money', section: 'everyday', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 5 },
       { id: 'payments.session', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/session', icon: 'i-lucide-calculator', ability: 'payments.session.open', order: 10 },
       { id: 'payments.attention', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/attention', icon: 'i-lucide-bell-ring', ability: 'payments.attempt.reconcile', order: 20, count: 'payments.attention' },
       { id: 'payments.refunds', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/refunds', icon: 'i-lucide-undo-2', ability: 'payments.refund.approve', order: 30, count: 'payments.refunds-waiting' },
       { id: 'payments.sessions', menu: 'console', group: 'money', section: 'everyday', to: '/console/payments/sessions', icon: 'i-lucide-receipt', ability: 'payments.session.view', order: 40 },
       { id: 'payments.providers', menu: 'console', group: 'money', section: 'setup', to: '/console/payments/providers', icon: 'i-lucide-credit-card', ability: 'payments.provider.manage', order: 10 },
+      // The combined till's tile on the Tonight hub.
+      { id: 'payments.live-till', menu: 'live', to: '/live/till', icon: 'i-lucide-shopping-basket', ability: 'payments.session.open', order: 20 },
     ],
     'core.count': [
       { id: 'payments.attention', file: 'attention' },

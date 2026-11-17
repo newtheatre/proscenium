@@ -1,4 +1,4 @@
-<!-- Site administration's Overview (R-33): a queue of what needs attention at the site level, from
+<!-- Admin's Overview (R-33): a queue of what needs attention at the site level, from
      home cards with home 'admin' (needs attention first, then state). -->
 <script setup lang="ts">
 const { t } = useT()

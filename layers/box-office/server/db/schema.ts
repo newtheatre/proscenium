@@ -111,6 +111,8 @@ export const prices = defineTable('box_office_prices', {
   ticketTypeId: col.ref('box_office_ticket_types'),
   // Null withdraws the price.
   amountMinor: col.minor('amount_minor'),
+  // On a performance's own row: from now on it follows the production's price again. Its amount is null.
+  inherits: col.internal(integer('inherits', { mode: 'boolean' }).notNull().default(false)),
   currency: col.currency('currency').notNull(),
   effectiveFrom: col.timestamp('effective_from').notNull(),
   setBy: col.account('set_by', { role: 'actor', nullable: true }),

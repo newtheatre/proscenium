@@ -298,7 +298,7 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
               </UFormField>
               <UFormField
                 label="About the production"
-                help="Shown on its public page. Markdown is allowed."
+                help="Shown on its public page. You can use **bold**, *italic*, lists, headings and links that start with https."
               >
                 <UTextarea
                   v-model="details.description"

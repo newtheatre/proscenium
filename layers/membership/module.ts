@@ -6,7 +6,7 @@
 // The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
 // needs no form (tab 7), so forms is only used until the application form is wired in.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, secret, setting, task } from '#kit'
+import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, point, secret, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'membership.settings.manage'
@@ -84,6 +84,12 @@ export default defineModule({
 
   tables,
 
+  points: {
+    // The fee collector (rules S5, P1). The membership-fees module answers it; while nothing does,
+    // a scheme that requires payment cannot be joined online.
+    'membership.charge': point({ kind: 'code', contract: 'charge' }),
+  },
+
   secrets: {
     // The key verification lists are hashed with (V10). Lists cannot be used until it is set.
     MEMBERSHIP_LIST_KEY: secret({ needed: 'when-used' }),
@@ -111,6 +117,19 @@ export default defineModule({
     ],
     // Renewal reminders (R7 to R9): service messages about something the person holds.
     'core.notification-type': [{
+      // P9: staff added the person to a scheme that requires payment and chose to send a link.
+      id: 'membership.pay-link',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      variables: { scheme: 'text' as const, amount: 'text' as const, link: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Pay for your membership: {{ scheme }}',
+          body: 'The theatre has added you as a member of **{{ scheme }}**. Your membership starts once the fee of {{ amount }} is paid.\n\nSign in to pay: [Pay for my membership]({{ link }})',
+        },
+      },
+    }, {
       id: 'membership.renewal-open',
       category: 'transactional' as const,
       side: 'audience' as const,

@@ -51,7 +51,7 @@ export interface Preset {
   facts?: Record<string, string[]>
 }
 
-/** Where a page of settings is: the console, beside the work it governs, or Site administration. */
+/** Where a page of settings is: the console, beside the work it governs, or Admin. */
 export type SettingPlace = 'console' | 'admin'
 /**
  * Where a group of settings (the first part of a short key, such as `sign-in`) is shown. Exactly one

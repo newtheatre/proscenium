@@ -1,4 +1,4 @@
-<!-- Sign-in settings (identity spec part 6, Site administration): the ways in, managed domains,
+<!-- Sign-in settings (identity spec part 6, Admin): the ways in, managed domains,
      session times and recovery, drawn from the settings registry as the page core.sign-in. -->
 <script setup lang="ts">
 const { t } = useT()

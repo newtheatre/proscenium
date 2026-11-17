@@ -31,7 +31,7 @@ export const points = {
   }),
   // A console group is declared once, by the module that owns it. A theatre's own module places its
   // group with `before` or `after`; the platform's own groups keep the fixed order. `menu: 'admin'`
-  // declares one of Site administration's groups instead (R-33).
+  // declares one of Admin's groups instead (R-33).
   'core.navigation-group': point({
     kind: 'data',
     schema: z.object({
