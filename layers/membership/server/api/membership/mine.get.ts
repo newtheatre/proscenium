@@ -9,8 +9,8 @@ import { memberNumber, todayOrNull } from '../../memberships'
 export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async (_event, { actor }) => {
   const accountId = actor.accountId!
   const day = await todayOrNull()
-  const rows = await all<{ id: string, scheme_id: string, scheme_name: string, side: 'members' | 'audience', starts_on: string, ends_on: string | null, grace_days: number, option_name: string | null }>(
-    `SELECT m.id, m.scheme_id, s.name AS scheme_name, s.side, m.starts_on, m.ends_on, s.grace_days, o.name AS option_name
+  const rows = await all<{ id: string, scheme_id: string, scheme_name: string, side: 'members' | 'audience', starts_on: string, ends_on: string | null, grace_days: number, option_name: string | null, holder_may_end: number }>(
+    `SELECT m.id, m.scheme_id, s.name AS scheme_name, s.side, m.starts_on, m.ends_on, s.grace_days, o.name AS option_name, s.holder_may_end
        FROM membership_memberships m JOIN membership_schemes s ON s.id = m.scheme_id
        LEFT JOIN membership_length_options o ON o.id = m.length_option_id
       WHERE m.account_id IN (${accountScopeSql('?1')}) AND m.state = 'active'
@@ -27,7 +27,7 @@ export default defineRoute({ ability: 'signed-in', rateLimit: 'default' }, async
     // Only a staff check exists so far, so an open application is waiting on staff.
     applications: pending.map(p => ({ ...p, waiting: 'staff' as const })),
     memberships: rows.map(r => ({
-      id: r.id, schemeId: r.scheme_id, schemeName: r.scheme_name, side: r.side, length: r.option_name, startsOn: r.starts_on, endsOn: r.ends_on,
+      id: r.id, schemeId: r.scheme_id, schemeName: r.scheme_name, side: r.side, length: r.option_name, startsOn: r.starts_on, endsOn: r.ends_on, mayEnd: !!r.holder_may_end,
       status: day ? derivedStatus({ startsOn: r.starts_on, endsOn: r.ends_on }, r.grace_days, day) : 'upcoming',
     })),
   }
