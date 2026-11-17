@@ -1,7 +1,7 @@
 // A basket, for whoever holds its token. A lapsed basket holds nothing and says so.
 import { getHeader, getRouterParam } from 'h3'
 import { defineRoute, refuse } from '#kit'
-import { basketByToken } from '../../../baskets'
+import { basketByToken } from '../../../../baskets'
 
 export default defineRoute({ public: true, rateLimit: 'default' }, async (event) => {
   const basket = await basketByToken(getRouterParam(event, 'id')!, getHeader(event, 'x-basket-token') ?? '')

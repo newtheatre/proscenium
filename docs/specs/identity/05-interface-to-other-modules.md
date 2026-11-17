@@ -65,6 +65,23 @@ The public page `/access` is a seeded content page that core domain lists (`site
 
 One more service, `accessPurposesFor(accountId)`, lists the purposes a person can be offered now, for the My account screen. There is deliberately no service that says whether a person has recorded needs: that is itself sensitive, so a module learns it only by a successful read.
 
+## Finding rows by a person's name or email
+
+A module's list may not search the accounts table, yet a desk must find an order by its buyer. Identity offers `findAccounts(text, list)`, exported from core's services. It answers an SQL subquery of account ids, never a list of ids, which the calling module passes to the kit's `inAccountScope` in its own list's condition. The lookup is therefore one statement, follows merges, and shows the caller nothing but rows of its own list that its own ability already allows.
+
+It only ever narrows a list the caller may already see. It grants sight of nothing: finding an unclaimed or a disabled account means only that the rows of the caller's own list which belong to it are kept in the result. `list` must be a registered list id, and the service refuses one it does not know, so the audit entry is never free text.
+
+That is the condition `core.account.find` rests on. Because the service shows and changes nothing by itself, the ability is declared on no record type and comes with the implying ability at any reach: a person who holds a module's list ability through a site-wide, module or record grant, or through a fact, holds `core.account.find` with it. If the service were ever made to return a name or a count, that would no longer be safe, and the ability would have to stop being impliable. Other modules' implications are written by full id, for example `box-office.order.view` implies `core.account.find`.
+
+- **Guard.** The actor must hold `core.account.find` (part 6). Without it the service refuses; it does not answer an empty subquery, so a list cannot quietly find nothing.
+- **What it searches.** The name, the preferred name, and verified email addresses in their normalised form. Nothing else: no phone, no unverified address, no special or encrypted column, no access or emergency detail.
+- **Whom it finds.** Claimed and unclaimed accounts (a guest buyer is unclaimed) and disabled ones, since their orders still need finding. An account merged away is found as its survivor. A tombstone has no name or address left and is never found.
+- **How it matches.** By the list search rules: at least three letters, case and accents folded, no ranking. It runs on a search index identity declares on its own table through the kit's search source.
+- **Audit.** One entry per call, as a read, naming the caller and the list it was called for (`list` is the calling list's registered id). The text typed is never recorded, in audit, in logs or in an event.
+- **Limits.** It is counted against the caller in the ordinary read class. It returns no count and no names, so it cannot be used to test whether somebody has an account.
+
+This is a different thing from the person picker. `searchAccounts`, above, is for choosing a person who is not yet on the screen (adding somebody to a shift, opening a tab for somebody): it shows up to twenty names under `core.account.search`. `findAccounts` is for narrowing a list the module already shows, and shows no name of its own. A module uses the picker to choose and `findAccounts` to filter, and never queries the accounts table itself for either. Both read the same search index.
+
 Identity declares the vocabulary `core.access-need` through core domain's point `core.vocabulary`, not locked, so a theatre can add, rename, reorder and retire entries on core's Vocabularies screen; a retired entry still shows on a profile that ticked it. The notes are identity's own data inside the special column. Access needs say what a person requires; the access features of a venue, a space or a performance say what the theatre offers and are core domain's. Neither list refers to the other, and matching them is for box office and front of house. Core domain declares no purpose in the first release, so a production team does not read access needs; the welfare lead is the route.
 
 ### People without a sign-in

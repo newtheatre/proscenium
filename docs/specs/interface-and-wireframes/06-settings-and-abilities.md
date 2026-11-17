@@ -6,6 +6,18 @@ The interface layer registers 15 settings and 3 abilities, all under the module 
 
 "Site owner" in the tables means identity's preset role `owner`, or whoever holds foundations' ability `core.setting.change` for the group; a theatre can map that to any role.
 
+**Where these are shown** (integration ruling R-37, 16 November 2026). Placement is by group, and core has no settings page of its own, so each group below needs a named home. `appearance` is on the Branding screen, as the settings brief rules. The other five are not in the brief's table; Integration ruled these homes the same evening:
+
+| Group | Home | Why |
+| --- | --- | --- |
+| `shells` | Theatre (`/admin/theatre`) | How the whole site behaves for members; set once |
+| `language` | Theatre, beside foundations' `locale` | The same subject |
+| `help` | Theatre | Set once for the install |
+| `lists` | Advanced (`/admin/advanced`) | Limits, rarely changed |
+| `live` | Advanced | Engineering limits for offline working |
+
+`core.lists.page-size` is a choice of 25, 50 or 100 (ruled with the homes), the sizes foundations' `readList` accepts, in place of any whole number from 10 to 100.
+
 ### Shells
 
 | Key | Type | Default | Who changes it | Quoted publicly |
@@ -35,7 +47,7 @@ Brand colour, logo, fonts and name are workstream 3's settings; they are not rep
 
 | Key | Type | Default | Who changes it | Quoted publicly |
 | --- | --- | --- | --- | --- |
-| `core.lists.page-size` | Whole number, 10 to 100 | 25 | Site owner | No |
+| `core.lists.page-size` | 25, 50 or 100 | 25 | Site owner | No |
 | `core.lists.export-max-rows` | Whole number, 100 to 50,000 | 10,000 | Site owner | No |
 | `core.lists.shared-views` | On or off | On | Site owner | No |
 
@@ -69,7 +81,7 @@ Time zone, currency, language and the operating day's rollover hour are foundati
 | `core.saved-view.share` | Share a saved view with everyone who may open the list, and edit or remove shared views | Site or module | Each module's manager role, as the theatre maps it |
 | `core.practice.use` | Open live screens in practice mode | Site | Every member |
 
-Two abilities the interface uses are foundations' and are not declared here. `core.setting.change` guards the settings pages, a module's in the console and the site-wide ones in site administration. `core.audit.view` guards the Activity list and a record's full history: the Activity list is foundations' Audit screen drawn with the List page, one screen and not two.
+Two abilities the interface uses are foundations' and are not declared here. `core.setting.change` guards the settings pages in both shells, unless a group or a setting names its own ability. `core.audit.view` guards the Activity list and a record's full history: the Activity list is foundations' Audit screen drawn with the List page, one screen and not two.
 
 Export is not one ability. Each module declares `<module>.<record>.export`, and the list page shows Export only to a holder, so a training officer cannot export orders by holding a general export right.
 

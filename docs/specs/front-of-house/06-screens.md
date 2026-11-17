@@ -34,8 +34,8 @@ Group "Front of house", in the place the conventions fix for it.
 
 | Screen | Address | Type | What it shows and does |
 | --- | --- | --- | --- |
-| Rota | `/console/front-of-house/rota` | List | Performances by date with a bar per duty: places filled of places wanted. Filters: production, venue, "unfilled only". Saved views. Bulk action "Apply rota template" and "Publish" |
-| Performance rota | Tab "Rota" on the performance record | Record tab | Each shift with its people and their states. Add a person (search by name, eligibility shown), confirm or decline requests, approve a release, remove, change places and times. "Publish all" |
+| Rota | `/console/front-of-house/rota` | List | Performances by date with a bar per duty: places filled of places wanted. Filters: production, venue, "unfilled only". Saved views. Bulk action "Apply rota template" and "Publish". A performance in a space the theatre does not manage is marked "Not our space" and skipped by the bulk action; shifts can still be added to it from its own Rota tab |
+| Performance rota | Tab "Rota" on the performance record | Record tab | Each shift with its people and their states. Add a person (search by name or email with identity's person picker, searchAccounts, eligibility shown), confirm or decline requests, approve a release, remove, change places and times. "Publish all" |
 | Incidents | `/console/front-of-house/incidents` | List | Number, date, kind, severity, state, venue. Default view "Awaiting review". Filters: state, severity, category, venue, date. No free text in the list |
 | Incident | `/console/front-of-house/incidents/[id]` | Record | Sections: what happened; people (welfare details behind a "Show" that is audited); actions; log. Primary action "Close"; "Change severity"; "Add action" |
 | Night reports | `/console/front-of-house/night-reports` | List | Performance, state, signed off by, exceptions count, incidents count |
