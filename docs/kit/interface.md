@@ -50,10 +50,23 @@ contributes: {
 - An entry shows only to someone holding one of its abilities (or any signed-in person, for an
   account entry with none). `match` widens the addresses an entry covers.
 - Every page of settings gets an entry without declaring one (see "Pages of settings" in the kit
-  README). A module's own console page sits in the set-up half of the module's own group (the group
-  of its first console entry, or one named for the module), at `/console/<module>/settings`, so a
-  module that is off takes its settings page with it. A declared page's entry sits in the group
-  its `settingPages` entry names. The entry is open to anyone who may change one of its settings.
+  README). A module's own page of settings is the Settings tab of its page in Admin
+  (`/admin/modules/<module>`), so a module that is off takes its settings with it. A page placed in
+  the console sits in the set-up half of the module's own group. A declared page's entry sits in
+  the group its `settingPages` entry names. The entry is open to anyone who may change one of its
+  settings.
+- **A module's page in Admin.** Any admin entry at or below `/admin/modules/<module>` is a tab of
+  that module's page (`moduleTabOf` in `shared/navigation.ts`), never a sidebar entry: its pages of
+  settings, set-up screens a module puts there, and About (generated for every module, open to
+  `core.modules.manage` and `core.health.view`). The tabs do not entitle anyone to Admin, so console
+  staff stay out of it. `GET /api/core/modules/:id/tabs` lists the tabs the viewer may open.
+  `ModuleFrame` draws the page: the list of modules on the left at 1024 pixels and wider, the
+  module's toggle, and the tabs, which scroll sideways on a phone.
+- **The console's cog.** The console layout works out the module of the current page from its
+  navigation entry; when the viewer may change any of that module's settings, `ShellTools` shows a
+  cog that adds `?settings=<module>` to the address, and `ModuleSettingsWindow` (in the console
+  layout) draws the module's pages of settings in a window as wide as the settings cards. Settings
+  search sends console staff to `/console?settings=<module>` and administrators to the page in Admin.
 - `GET /api/core/settings?page=<id>` gives one page's settings and `?screen=<address>` the ones a
   bespoke screen manages; each item names its `page` or `screen`. The older `?module=x` and
   `?scope=site` answer for one release, `scope` now meaning where the setting's page is.

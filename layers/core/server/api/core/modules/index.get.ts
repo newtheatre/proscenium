@@ -3,11 +3,11 @@
 // adds. Names and descriptions are the client's, from each module's catalogue. Secret values never
 // leave the server; only whether each is set.
 import { can, defineRoute } from '#kit'
-import { holds } from '../../../interface/navigation'
+import { declaredGroups, holds, moduleTabs } from '../../../interface/navigation'
 import { enabledModules, missingSecrets, requiredOff } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
 import { useContext } from '#kit/context'
-import type { NavigationEntry } from '../../../../shared/navigation'
+import { moduleHome, type NavigationEntry } from '../../../../shared/navigation'
 
 export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }, async (_event, { actor }) => {
   const registry = useRegistry()
@@ -19,6 +19,7 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
   const rows = await env.DB.prepare('SELECT module_id, enabled_at, disabled_at FROM core_modules').all<{ module_id: string, enabled_at: number | null, disabled_at: number | null }>()
     .then(r => new Map(r.results.map(m => [m.module_id, m])))
     .catch(() => new Map<string, { enabled_at: number | null, disabled_at: number | null }>())
+  const groups = await declaredGroups()
   const modules = []
   for (const [id, entry] of registry.modules) {
     const m = entry.manifest
@@ -26,6 +27,8 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
     const screens = ((m.contributes?.['core.navigation'] ?? []) as unknown as NavigationEntry[])
       .filter(e => e.menu !== 'account')
       .map(e => ({ id: e.id, menu: e.menu ?? 'console' }))
+    const tabs = await moduleTabs(actor, id)
+    const home = moduleHome(id)
     modules.push({
       id,
       owner: entry.owner,
@@ -41,6 +44,12 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
       credentials: Object.entries(m.credentials ?? {}).map(([name, decl]) => ({ name, needed: decl.needed, set: stored.has(`${id} ${name}`) || isSet(env, name) })),
       missingSecrets: missingSecrets(id),
       screens,
+      // The module's own console group's icon, else its first screen's.
+      icon: groups.find(g => g.module === id)?.icon ?? (m.contributes?.['core.navigation'] as unknown as NavigationEntry[] | undefined)?.find(e => e.menu !== 'account')?.icon ?? 'i-lucide-blocks',
+      /** How many of its settings are on its page here. */
+      settings: [...registry.settings].filter(([key, s]) => s.module === id && onPage(registry.settingPages.get(registry.settingHomes.get(key)?.page ?? '')?.to, home)).length,
+      /** Where the catalogue opens the module for this viewer: its first tab they may open. */
+      open: tabs[0]?.to ?? null,
       changedAt: (on.has(id) ? rows.get(id)?.enabled_at : rows.get(id)?.disabled_at) ?? null,
     })
   }
@@ -48,6 +57,8 @@ export default defineRoute({ ability: 'core.health.view', rateLimit: 'default' }
   const manage = holds(await can(actor, 'core.modules.manage'))
   return { modules, manage }
 })
+
+const onPage = (to: string | undefined, home: string) => to === home || !!to?.startsWith(`${home}/`)
 
 function isSet(env: object, name: string): boolean {
   const value = (env as Record<string, unknown>)[name]

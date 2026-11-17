@@ -67,7 +67,8 @@ export type SettingPlace = 'console' | 'admin'
  * Where a group of settings (the first part of a short key, such as `sign-in`) is shown. Exactly one
  * home: a page of the module's own (`page`), the shared Advanced page (`advanced`), or a bespoke
  * screen that manages it (`screen`, left off every generated page). With none, the group is on the
- * module's own page in its `place`. Core has no page of its own, so each of its groups names one.
+ * module's own page in its `place`, Admin's page for the module (/admin/modules/<module>) unless it
+ * says 'console'. Core has no page of its own, so each of its groups names one.
  */
 export interface SettingGroupDecl { place?: SettingPlace, page?: string, advanced?: boolean, screen?: string }
 /**
