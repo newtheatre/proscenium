@@ -22,6 +22,7 @@ async function post(api: APIRequestContext, url: string, data: object) {
 const run = Date.now().toString(36)
 const lager = `Lager ${run}`
 const cola = `Cola ${run}`
+const mixed = `Spirit and mixer ${run}`
 
 test.beforeAll(async ({ playwright }) => {
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(owner) })
@@ -34,7 +35,18 @@ test.beforeAll(async ({ playwright }) => {
   const soft = await post(api, '/api/bar/categories', { name: `Soft ${run}`, colour: 'info' })
   const beer = await post(api, '/api/bar/products', { categoryId: draught.categoryId, name: lager, ageRestricted: true, variantName: 'Pint', amountMinor: 420 })
   await post(api, `/api/bar/products/${beer.productId}/variants`, { name: 'Half', amountMinor: 230 })
-  await post(api, '/api/bar/products', { categoryId: soft.categoryId, name: cola, amountMinor: 200 })
+  const fizz = await post(api, '/api/bar/products', { categoryId: soft.categoryId, name: cola, amountMinor: 200 })
+  // A drink with choices: which spirit (listed by hand, some age-restricted) and any mixer.
+  await post(api, `/api/bar/products/${fizz.productId}/mixer`, { on: true })
+  const spirits = await post(api, '/api/bar/choices', { name: `Spirit ${run}`, source: 'options' })
+  const gin = await post(api, `/api/bar/choices/${spirits.id}/options`, { name: 'House gin', ageRestricted: true })
+  await post(api, `/api/bar/choices/${spirits.id}/options`, { name: 'Premium gin', deltaMinor: 100, ageRestricted: true })
+  await post(api, `/api/bar/choices/${spirits.id}/options`, { name: 'Alcohol-free gin' })
+  expect((await api.patch(`/api/bar/choices/${spirits.id}`, { data: { defaultKey: gin.id }, headers: key() })).ok()).toBe(true)
+  const mixers = await post(api, '/api/bar/choices', { name: `Mixer ${run}`, source: 'mixers' })
+  const drink = await post(api, '/api/bar/products', { categoryId: draught.categoryId, name: mixed, variantName: 'Single', amountMinor: 450 })
+  await post(api, `/api/bar/products/${drink.productId}/variants`, { name: 'Double', amountMinor: 650 })
+  await post(api, `/api/bar/products/${drink.productId}/choices`, { groupIds: [spirits.id, mixers.id] })
   const outlets = await (await api.get('/api/bar/outlets')).json()
   if (!outlets.outlets?.length) await post(api, '/api/bar/outlets', { name: `Foyer bar ${run}`, kind: 'bar' })
   await api.dispose()
@@ -134,4 +146,35 @@ test('on a phone the sale is a bar at the foot with an undo, and opens as a shee
   await expect(sheet.getByText(cola)).toBeVisible()
   await sheet.getByRole('button', { name: `Remove ${cola}` }).click()
   await expect(sheet.getByText('Nothing added yet.')).toBeVisible()
+})
+
+test('a drink with choices opens one window: size, the usual spirit already picked, any mixer, and the age check follows what is picked', async ({ page }) => {
+  await visit(page, '/live/till')
+  const receipt = page.getByRole('complementary', { name: 'Total to pay' })
+  await tile(page, mixed).click()
+  const window = page.getByRole('dialog', { name: mixed })
+  await expect(window.getByRole('button', { name: /^House gin/ })).toHaveAttribute('aria-pressed', 'true')
+  // The mixer has no usual choice, so it must be picked before the drink can be added.
+  await expect(window.getByRole('button', { name: /^Add/ })).toBeDisabled()
+  await window.getByRole('button', { name: /^Double/ }).click()
+  await window.getByRole('button', { name: /^Premium gin/ }).click()
+  await window.getByRole('group', { name: `Mixer ${run}` }).getByRole('button', { name: cola }).click()
+  await noViolations(page)
+  await window.getByRole('button', { name: 'Add · £7.50' }).click()
+  // The product is not age-restricted; the gin picked on it is.
+  await page.getByRole('dialog', { name: /Does the customer look under/ }).getByRole('button', { name: 'No, clearly over' }).click()
+  await expect(receipt.getByText(`Double · Premium gin · ${cola}`)).toBeVisible()
+
+  // The alcohol-free one asks nothing, and is a line of its own.
+  await tile(page, mixed).click()
+  await window.getByRole('button', { name: /^Alcohol-free gin/ }).click()
+  await window.getByRole('group', { name: `Mixer ${run}` }).getByRole('button', { name: cola }).click()
+  await window.getByRole('button', { name: 'Add · £4.50' }).click()
+  await expect(receipt.getByText(`Single · Alcohol-free gin · ${cola}`)).toBeVisible()
+  await expect(receipt.getByText('£12.00', { exact: true })).toBeVisible()
+
+  await cash(page).click()
+  await expect(page.getByText('Still to pay: £12.00')).toBeVisible()
+  await page.getByRole('button', { name: 'Cash taken' }).click()
+  await expect(page.getByText('Paid £12.00', { exact: true })).toBeVisible()
 })
