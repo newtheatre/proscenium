@@ -62,6 +62,24 @@ function kept() {
   codes.value = null
   toast.add({ title: t('core.me.sign-in.codes-kept'), color: 'success' })
 }
+
+// The current set shown again, used ones struck through. Asks to confirm it is you in place.
+const shown = ref<{ codes: string[], used: boolean[] } | null>(null)
+
+async function showCodes() {
+  refusal.value = null
+  try {
+    const answer = await $api<{ codes: { code: string | null, used: boolean }[] }>('/api/core/me/recovery-codes/show', { method: 'POST', body: {} })
+    if (answer.codes.some(c => c.code === null)) {
+      toast.add({ title: t('core.me.sign-in.codes-not-kept'), color: 'warning' })
+      return
+    }
+    shown.value = { codes: answer.codes.map(c => c.code!), used: answer.codes.map(c => c.used) }
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
 </script>
 
 <template>
@@ -75,6 +93,14 @@ function kept() {
         :codes="codes"
         check-path="/api/core/me/recovery-codes/check"
         @kept="kept()"
+      />
+    </UCard>
+    <UCard v-else-if="shown">
+      <RecoveryCodes
+        :codes="shown.codes"
+        :used="shown.used"
+        review
+        @kept="shown = null"
       />
     </UCard>
     <div
@@ -148,6 +174,14 @@ function kept() {
               v-if="data.passkeys.length"
               #footer
             >
+              <UButton
+                v-if="data.recoveryCodesLeft"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-eye"
+                :label="t('core.me.sign-in.show-codes')"
+                @click="showCodes()"
+              />
               <UButton
                 color="neutral"
                 variant="outline"

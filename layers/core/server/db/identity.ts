@@ -108,6 +108,11 @@ export const recoveryCodes = defineTable('core_recovery_codes', {
   id: col.id(),
   accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
   codeHash: col.internal(text('code_hash').notNull()),
+  // The code itself, sealed with the core key, so the person can see their set again (used ones
+  // struck through) after confirming it is them. Null for sets made before it was kept.
+  codeSealed: col.internal(text('code_sealed'), { encrypted: true }),
+  // Where the code sits in its set, so it is shown in the order it was first shown.
+  position: col.internal(integer('position')),
   createdAt: col.createdAt(),
   usedAt: col.timestamp('used_at'),
 }, {
