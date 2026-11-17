@@ -49,12 +49,14 @@ contributes: {
 - `section` is `everyday` or `setup`; everyday entries come first in a group.
 - An entry shows only to someone holding one of its abilities (or any signed-in person, for an
   account entry with none). `match` widens the addresses an entry covers.
-- A module with settings gets an entry for its generated settings page without declaring one. It sits in the set-up half of the module's own group (the group of its first console entry, or one named for the module), at `/console/<module>/settings` (core's own settings are the site's and live only in Site administration at `/admin/settings`; the old `/console/system/settings` redirects there), so a module that is off takes its settings page with it.
-- A setting declared with `scope: 'site'` is shown with the site's own settings at `/admin/settings`
-  (the entry `core.site-settings`, in the modules group) instead of on its module's page; nothing
-  else about it changes. Every one of foundations' `core.*` settings is site-scoped.
-  `GET /api/core/settings?module=x` gives all of a module's settings, each with its `scope`;
-  `&scope=module` narrows it to the module's own page and `?scope=site` gives the site page.
+- Every page of settings gets an entry without declaring one (see "Pages of settings" in the kit
+  README). A module's own console page sits in the set-up half of the module's own group (the group
+  of its first console entry, or one named for the module), at `/console/<module>/settings`, so a
+  module that is off takes its settings page with it. A declared page's entry sits in the group
+  its `settingPages` entry names. The entry is open to anyone who may change one of its settings.
+- `GET /api/core/settings?page=<id>` gives one page's settings and `?screen=<address>` the ones a
+  bespoke screen manages; each item names its `page` or `screen`. The older `?module=x` and
+  `?scope=site` answer for one release, `scope` now meaning where the setting's page is.
 - Labels are translated: `<module>.navigation.<name>.label` for an entry,
   `<module>.navigation.groups.<id>.label` for a group, `<module>.settings-sections.<group>` for a
   heading on the settings page. `bun run check:conformance` fails for a missing key, an unused one,
@@ -199,9 +201,9 @@ neutral buttons (the `admin-shell` class on `body` swaps the brand colour out), 
 that starts "Site administration". A page uses it with `definePageMeta({ layout: 'admin' })`.
 
 - **Overview** at `/admin`: `PageHome` with `home="admin"`, cards from `core.home-card` with `home: 'admin'`.
-- **Site settings** at `/admin/settings`: `PageSettings scope="site"` shows every setting declared
-  with `scope: 'site'`, grouped by module; a module's console settings page links to it when some of
-  that module's settings are there. Settings search and the palette link to the right page.
+- **Pages of settings**: Theatre, Branding, Sign-in, Privacy and Advanced, each `PageSettings
+  page="core.<page>"`. There is no catch-all page; `/admin/settings` redirects to Theatre. Settings
+  search and the palette link to each setting's own page or screen.
 - The palette offers both shells' screens to someone entitled to both, each named with its shell.
 - Moving a screen from the console's System group: give it an admin entry (`menu: 'admin'`, a group
   from `ADMIN_GROUP_ORDER`), move its page under `pages/admin/`, and add a redirect from its old address
@@ -322,3 +324,7 @@ the console a worded back link sits above the title. A link to a list returns th
 `PageList` reads four optional fields of the data route's answer: `dropped` (its chips go), `ignoredWords` and
 `searchTooShort` ("Words under three letters are not searched"; "Nothing was searched"), and `matched`
 (row id to the hidden column that matched, shown under the row's first cell as "Matches Venue: Studio").
+
+A page can say one more line about the answer through the `#note="{ result }"` slot, drawn above the rows with
+`role="status"`. `result` is the whole answer, so any extra field the route sends beside the rows is there: Accounts
+sends `hidden: { unclaimed, anonymised }` and says "4 not yet signed in and 2 erased are not shown".

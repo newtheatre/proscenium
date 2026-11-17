@@ -1,7 +1,6 @@
 {
   "core.navigation.roles.label": "Roles",
   "core.navigation.facts.label": "Facts",
-  "core.navigation.sign-in-settings.label": "Sign-in",
   "core.roles.title": "Roles",
   "core.roles.description": "What each role lets its holders do. Give a role to a person from Who holds what, in the console.",
   "core.roles.new": "New role",
