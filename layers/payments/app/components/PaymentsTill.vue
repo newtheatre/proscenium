@@ -293,6 +293,7 @@ async function resume(intentId: string, said: string) {
       result.value = { kind: 'waiting' }
       poll()
     }
+    else if (said === 'reload') toast.add({ title: t('payments.screens.till.picked-up', { amount: money(now.amountMinor - now.paidMinor) }), description: t('payments.screens.till.picked-up-help'), color: 'warning' })
     else if (said === 'succeeded') toast.add({ title: t('payments.screens.session.handoff.succeeded'), description: t('payments.screens.till.due', { amount: money(now.amountMinor - now.paidMinor) }), color: 'success' })
     else if (said === 'failed') result.value = { kind: 'declined' }
     else toast.add({ title: t('payments.screens.session.handoff.unknown'), description: t('payments.screens.session.handoff.unknown-help'), color: 'warning' })
@@ -303,9 +304,15 @@ async function resume(intentId: string, said: string) {
 }
 onMounted(() => {
   const { intent, result: said, attempt, ...rest } = route.query
-  if (typeof intent !== 'string' || typeof said !== 'string' || !attempt) return
-  void router.replace({ query: rest })
-  if (session.value?.session) void resume(intent, said)
+  if (typeof intent === 'string' && typeof said === 'string' && attempt) {
+    void router.replace({ query: rest })
+    if (session.value?.session) void resume(intent, said)
+    return
+  }
+  // A sale left open, such as by reloading the page while taking it, is picked up again so it can be
+  // taken or cancelled; otherwise what it holds, such as a reservation, stays waiting for it.
+  const left = session.value?.unfinished
+  if (left) void resume(left.intentId, 'reload')
 })
 
 const waiting = computed(() => result.value?.kind === 'waiting' || result.value?.kind === 'handoff' || !!payment.value?.waiting)

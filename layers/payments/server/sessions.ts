@@ -221,6 +221,12 @@ export async function waitingIn(sessionId: string): Promise<WaitingAttempt[]> {
   return rows.map(r => ({ id: r.id, method: r.method, amountMinor: r.amount_minor, currency: r.currency, state: r.state, provider: r.label, startedAt: r.started_at, unknownAt: r.state === 'unknown' ? null : r.started_at + answerWithin * SECOND }))
 }
 
+/** The newest sale in a session that is still open: started, and neither paid nor cancelled. */
+export async function unfinishedIn(sessionId: string): Promise<{ intentId: string, amountMinor: number } | null> {
+  const row = await first<{ id: string, amount_minor: number }>("SELECT id, amount_minor FROM payments_intents WHERE session_id = ? AND state = 'open' ORDER BY created_at DESC LIMIT 1", sessionId)
+  return row ? { intentId: row.id, amountMinor: row.amount_minor } : null
+}
+
 /** When a sale was last made in the session, or when it opened if none was. */
 export async function lastSaleIn(session: SessionRow): Promise<number> {
   const row = await first<{ at: number | null }>('SELECT max(created_at) AS at FROM payments_intents WHERE session_id = ?', session.id)
