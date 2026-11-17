@@ -95,7 +95,8 @@ export const settings = defineSettings('core', {
 
   'retention.audit': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
   // How many rows a list shows when its address names no size (Foundations, 16 November).
-  'lists.page-size': setting.choice({ default: '25', options: ['25', '50', '100'], change }),
+  // Public so a list page knows the size an address without one means, as the server does.
+  'lists.page-size': setting.choice({ default: '25', options: ['25', '50', '100'], change, audience: 'public' }),
 
   'retention.setting-changes': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
 })

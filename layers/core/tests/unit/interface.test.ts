@@ -82,6 +82,11 @@ describe('list state in the address (UI-11)', () => {
     expect(decodeList({ status: 'gone' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'status' })
     expect(decodeList({ sort: 'x' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'sort' })
     expect(decodeList({ size: '30' }, list, { today: '2026-11-16' })).toMatchObject({ ok: false, key: 'size' })
+    // The site's page size stands in when the address names none, and the address still wins.
+    expect(decodeList({}, list, { today: '2026-11-16', defaultSize: 50 })).toMatchObject({ ok: true, value: { size: 50 } })
+    expect(decodeList({ size: '100' }, list, { today: '2026-11-16', defaultSize: 50 })).toMatchObject({ ok: true, value: { size: 100 } })
+    expect(serialiseList(parseList({}, list, 50), list, 50)).toEqual({})
+    expect(serialiseList(parseList({ size: '25' }, list, 50), list, 50)).toEqual({ size: '25' })
   })
 
   it('drops a filter the viewer may not use, and words directions by type', () => {
