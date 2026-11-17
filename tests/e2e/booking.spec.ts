@@ -2,7 +2,7 @@
 // published production's performance, sees them held with a countdown on Check and pay, gives their
 // name and address and reserves them to pay for at the box office, and each screen has no
 // accessibility violations on the way. Then they open their booking from its link and cancel one
-// of the two tickets.
+// of the two tickets. A buyer with paid tickets cancels one and is told what comes back.
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
@@ -121,4 +121,37 @@ test('a link that opens no booking says so, and a used confirmation link explain
 test('a production that is not published has no booking page', async ({ page }) => {
   const response = await visit(page, '/book/nothing/perf_nothing')
   expect(response?.status()).toBe(404)
+})
+
+test('a buyer cancels paid tickets from their link when the theatre allows it, and sees what comes back', async ({ page }) => {
+  // A paid online booking needs a card provider, which this build has not got; the server's side is
+  // covered by the integration tests. Here the page is given the booking, as the server sends it.
+  const line = (n: number) => ({ id: `orl_e2e${n}`, performanceId, bandId: 'bnd_e2e', ticketTypeId: 'tty_e2e', ticketType: `Online price ${stamp}`, amountMinor: 1000 })
+  const until = Date.now() + 86_400_000
+  const booking = { orderId: 'ord_e2e', reference: 'E2E-PAID', state: 'confirmed', currency: 'GBP', totalMinor: 2000, amountDueMinor: 0, releaseAt: null, lines: [line(1), line(2)], buyerCancel: { feeMinor: 150, until } }
+  let asked: unknown = null
+  await page.route('**/api/box-office/orders/link', route => route.fulfill({ json: booking }))
+  await page.route('**/api/box-office/orders/link/cancel', (route) => {
+    asked = route.request().postDataJSON()
+    return route.fulfill({ json: { ...booking, totalMinor: 1000, lines: [line(2)] } })
+  })
+  // Opened inside the app, so the browser asks for the booking and the stand-in answers.
+  await visit(page, '/book/basket')
+  await page.evaluate(() => (window as unknown as { useNuxtApp: () => { $router: { push: (to: string) => Promise<void> } } }).useNuxtApp().$router.push('/book/order/paid-link'))
+  await expect(page.getByRole('heading', { name: 'Your booking' })).toBeVisible()
+  await expect(page.getByText('Paid', { exact: true })).toBeVisible()
+  await expect(page.getByText(/You can cancel until .+ Each ticket is refunded less a fee of £1\.50\./)).toBeVisible()
+  await expect(page.getByText('To change or cancel a paid booking, contact the box office.')).toHaveCount(0)
+  await noViolations(page)
+
+  await page.getByRole('checkbox', { name: /^Ticket 1:/ }).check()
+  await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('£8.50 goes back to the card you paid with.', { exact: false })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Cancel 1 ticket' }).click()
+  await expect(page.getByText('1 ticket cancelled. Its seat is back on sale.')).toBeVisible()
+  await expect(page.getByText('A refund of £8.50 is on its way to the card you paid with.', { exact: false })).toBeVisible()
+  expect(asked).toEqual({ lineIds: ['orl_e2e1'] })
+  await expect(dialog).toBeHidden()
+  await noViolations(page)
 })

@@ -63,6 +63,7 @@ beforeAll(async () => {
   await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'cardco', 'CardCo', '[\"online\"]', 'live', 1, ?, ?)").bind(card, NOV_16, NOV_16).run()
   await commit(async (unit) => {
     await changeSetting(unit.view(), 'box-office.reservations.confirm-email', false, { reason: 'test', confirm: true })
+    await changeSetting(unit.view(), 'payments.cash.enabled', true, { reason: 'test', confirm: true }) // these take cash
     await changeSetting(unit.view(), 'payments.refunds.self-approve-up-to', 5000, { reason: 'test', confirm: true })
   })
   world.refundAnswer = { state: 'succeeded', providerRef: 're_exchange' }

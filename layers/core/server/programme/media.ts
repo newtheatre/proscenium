@@ -101,3 +101,25 @@ export async function orderPhotos(unit: UnitView, productionId: string, fileIds:
   })
   unit.audit({ action: 'update', record: [OWNER, productionId], detail: { photos: 'ordered' } })
 }
+
+/** An image as the public sees it: only its address, description and size. */
+export interface PublicImage { url: string, alt: string, width: number | null, height: number | null }
+
+/** The posters and photos in use on several productions at once, for the public pages. */
+export async function publicImages(productionIds: string[]): Promise<Map<string, { poster: PublicImage | null, photos: PublicImage[] }>> {
+  const out = new Map(productionIds.map(id => [id, { poster: null as PublicImage | null, photos: [] as PublicImage[] }]))
+  if (!productionIds.length) return out
+  const rows = await all<{ id: string, owner_id: string, slot: string, alt_text: string | null, width: number | null, height: number | null }>(
+    `SELECT id, owner_id, slot, alt_text, width, height FROM core_files
+      WHERE owner_type = ? AND owner_id IN (SELECT value FROM json_each(?)) AND slot IN (?, ?) AND state = 'ready' AND attached_at IS NOT NULL
+      ORDER BY sort, attached_at, created_at`,
+    OWNER, JSON.stringify(productionIds), POSTER, PHOTOS,
+  )
+  for (const r of rows) {
+    const entry = out.get(r.owner_id)!
+    const image = { url: fileUrl(r.id), alt: r.alt_text ?? '', width: r.width, height: r.height }
+    if (r.slot === POSTER) entry.poster ??= image
+    else entry.photos.push(image)
+  }
+  return out
+}

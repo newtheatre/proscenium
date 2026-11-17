@@ -16,6 +16,7 @@ import optionPatch from '../../server/api/membership/schemes/[id]/options/[optio
 import membersPost from '../../server/api/membership/schemes/[id]/members.post'
 import joinPost from '../../server/api/membership/schemes/[id]/join.post'
 import mineGet from '../../server/api/membership/mine.get'
+import accountNotices from '../../../core/server/api/core/account-notices.get'
 import listsGet from '../../server/api/membership/lists/index.get'
 import listsPost from '../../server/api/membership/lists/index.post'
 import listGet from '../../server/api/membership/lists/[id].get'
@@ -51,6 +52,7 @@ export const handle = server({
   'POST /api/membership/schemes/:id/members': membersPost,
   'POST /api/membership/schemes/:id/join': joinPost,
   'GET /api/membership/mine': mineGet,
+  'GET /api/core/account-notices': accountNotices,
   'GET /api/membership/lists': listsGet,
   'POST /api/membership/lists': listsPost,
   'GET /api/membership/lists/:id': listGet,
