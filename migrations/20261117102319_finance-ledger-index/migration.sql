@@ -1,0 +1,1 @@
+CREATE INDEX `finance_postings_occurred` ON `finance_postings` (`occurred_at`);

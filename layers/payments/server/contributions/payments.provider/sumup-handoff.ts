@@ -15,8 +15,21 @@ const AFFILIATE_KEY = 'PAYMENTS_SUMUP_AFFILIATE_KEY'
 const APP_ID = 'PAYMENTS_SUMUP_APP_ID'
 export const HANDOFF_PURPOSE = 'payments.handoff'
 
-/** What is signed for an attempt's return address. */
-export const handoffData = (attemptId: string) => `payments.handoff:${attemptId}`
+/**
+ * What is signed for an attempt's return address: the attempt, and the screen to send the seller
+ * back to when the till named one. The screen rides in the address as a third part of the proof,
+ * base64url, so SumUp's own query is left alone.
+ */
+export const handoffData = (attemptId: string, returnTo?: string) => returnTo ? `payments.handoff:${attemptId}:${returnTo}` : `payments.handoff:${attemptId}`
+export const encodeReturn = (path: string) => btoa(path).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+export const decodeReturn = (text: string) => {
+  try {
+    return atob(text.replace(/-/g, '+').replace(/_/g, '/'))
+  }
+  catch {
+    return null
+  }
+}
 
 export default {
   capabilities: ['reader', 'attested'],
@@ -27,8 +40,8 @@ export default {
     if (!attempt.origin) return { next: { kind: 'none' }, answer: { state: 'failed', failureCode: 'no-return-address' } }
     const [key, appId] = [await credential(AFFILIATE_KEY), await credential(APP_ID)]
     if (!key || !appId) throw new Error('The SumUp affiliate key or app id is not set')
-    const { keyId, signature } = await signing.sign(HANDOFF_PURPOSE, handoffData(attempt.id))
-    const back = `${attempt.origin}/api/payments/handoff/${attempt.id}/${keyId}.${signature}`
+    const { keyId, signature } = await signing.sign(HANDOFF_PURPOSE, handoffData(attempt.id, attempt.returnTo))
+    const back = `${attempt.origin}/api/payments/handoff/${attempt.id}/${keyId}.${signature}${attempt.returnTo ? `.${encodeReturn(attempt.returnTo)}` : ''}`
     const digits = minorDigits(attempt.currency)
     const params = new URLSearchParams({
       'affiliate-key': key,

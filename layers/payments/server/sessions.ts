@@ -130,8 +130,12 @@ export async function summarise(session: SessionRow, names?: Map<string, string>
   }
 }
 
-export async function listSessions(limit: number): Promise<SessionSummary[]> {
-  const rows = await all<SessionRow>('SELECT * FROM payments_sessions ORDER BY opened_at DESC LIMIT ?', limit)
+/** The sessions with these ids, as Sessions shows them, in the order given. */
+export async function describeSessions(ids: string[]): Promise<SessionSummary[]> {
+  if (!ids.length) return []
+  const found = await all<SessionRow>('SELECT * FROM payments_sessions WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(ids))
+  const byId = new Map(found.map(r => [r.id, r]))
+  const rows = ids.flatMap(id => byId.get(id) ?? [])
   const names = await labelsOf(rows.flatMap(r => [r.opened_by, r.closed_by]))
   return Promise.all(rows.map(r => summarise(r, names)))
 }

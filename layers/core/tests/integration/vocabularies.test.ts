@@ -205,7 +205,7 @@ describe('the organisation\'s year end', () => {
   async function setYearEnd(value: string | null) {
     return inContext(async () => {
       const unit = createUnit()
-      await changeSetting(unit.view(), 'core.organisation.year-end', value, value === null ? { reset: true } : {})
+      await changeSetting(unit.view(), 'core.organisation.year-end', value, { reset: value === null, confirm: true })
       await unit.commit()
       return 'saved'
     }).catch(e => (isRefusal(e) ? e.code : String(e)))

@@ -212,6 +212,35 @@ Two rules:
 A chart with one bar says nothing a figure does not, so show one only when there are at least two
 things to compare. Rows that share a name along the bottom are drawn as one: give each its own.
 
+### The calendar
+
+`CalendarBoard` is the shared calendar (UI-35). Every module that shows time draws it, never its own:
+the programme calendar (C-13) first, then Spaces' bookings, the front of house rota and training
+sessions. It takes:
+
+- `view`: `month`, `week`, `day` or `list`.
+- `days`: the operating days drawn, in order (42 for a month, 7 for a week, 1 for a day). The page
+  works them out from the theatre's first day of the week (`core.organisation.week-start`).
+- `items`: `CalendarItem`s. Each names the operating day it belongs to (`day`, and `lastDay` for one
+  over several days), its times or none for all day, the day view's `column`, a colour from 1 to 8,
+  its state as `{ label, edge }`, and where acting on it goes (`to`).
+- `columns`: the day view's columns, such as spaces. An item with no column spans them all.
+
+It emits `day` when a day is chosen, to open the day view.
+
+Four rules:
+
+- **Place by operating day.** Give each item the operating day the server worked out, so a show at
+  00:30 sits with the evening before and is drawn once.
+- **State three ways.** Each block shows its state as a word, an edge (solid, dashed, dotted or
+  double) and a colour, so nothing rests on colour alone.
+- **Name a calendar colour, never a value.** `calendar-1` to `calendar-8` are set in `main.css`,
+  apart from the brand and the status colours, with a fill, text and edge for light and dark.
+- **The list is the equal route.** The List view holds the same items. It is the one shown at phone
+  width for the month and week, and the day view shows one column at a time there, chosen from a
+  menu. It shows the window the calendar is showing, not a paged list: a module that needs filters,
+  sort or export over a longer period adds a `PageList` of its own.
+
 ### Controls for the setting kinds
 
 The generated settings page gives each kind of setting its own control, and the same fields are there
