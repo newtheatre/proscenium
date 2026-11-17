@@ -219,8 +219,9 @@ for any other screen:
 
 - `integer`: a number box with steppers, kept inside the setting's `min` and `max`.
 - `money`: `FieldMoney`.
-- `duration`, and the period of a `rate`: `FieldDuration`, a number and a unit. It takes and gives the
-  text the server keeps (`30m`, `2h`, `14d`), so nobody types that by hand.
+- `duration`, and the period of a `rate`: the kit's `DurationInput`, a number and a unit from seconds
+  to years. It takes and gives whole seconds and offers only the units the setting's limits allow, so
+  nobody types `30m` by hand.
 - `colour`: `FieldColour`, a swatch that opens a picker beside the hex value.
 - `reference`: `FieldRecord`, which searches the record type's `core.search-source` and keeps the
   record's id. A record type nothing searches falls back to the id as text.

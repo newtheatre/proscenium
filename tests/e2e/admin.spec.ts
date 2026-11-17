@@ -60,7 +60,7 @@ test.describe('a site owner with no console', () => {
     const unit = page.getByRole('combobox', { name: 'Rate limit: exports: in what period: Unit of time' })
     await expect(count).toHaveValue('10')
     await expect(period).toHaveValue('1')
-    await expect(unit).toContainText('hours')
+    await expect(unit).toContainText('hour')
     await count.fill('12')
     await count.blur()
     await period.fill('2')
