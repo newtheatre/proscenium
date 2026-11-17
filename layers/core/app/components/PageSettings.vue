@@ -29,6 +29,8 @@ interface SettingView {
   canChange: boolean
   /** The latest change, for "Changed by <name>, <date>". */
   lastChange?: { at: number, by: string | null } | null
+  /** A value the server suggests while none is set (the address this page was loaded on). */
+  suggestion?: string | null
   min?: number | string
   max?: number | string
   maxLength?: number
@@ -158,6 +160,8 @@ const resettable = (settings: SettingView[]) => settings.filter(s => s.canChange
 function resetSection(settings: SettingView[]) {
   for (const s of resettable(settings)) resetToDefault(s)
 }
+/** Offered while nothing is entered and the viewer may change it. */
+const suggests = (s: SettingView) => !!s.suggestion && s.canChange && !draft[s.key]
 const unitText = (s: SettingView) => s.unitKey ? t(s.unitKey) : undefined
 const optionItems = (s: SettingView) => (s.options ?? []).map(o => ({ value: o, label: t(`${s.module}.settings.${s.group}.${s.name}.options.${o}`) }))
 const words = () => ({
@@ -352,14 +356,22 @@ onMounted(() => {
                   :type="s.sensitive ? 'password' : 'text'"
                   :disabled="!s.canChange"
                   :maxlength="s.maxLength"
-                  :placeholder="s.sensitive ? t('core.settings-page.hidden') : undefined"
+                  :placeholder="s.sensitive ? t('core.settings-page.hidden') : s.suggestion ?? undefined"
                   class="max-w-md"
                   @update:model-value="onEdit(s, $event)"
                 />
                 <template
-                  v-if="unitText(s) || s.kind === 'rate'"
+                  v-if="unitText(s) || s.kind === 'rate' || suggests(s)"
                   #hint
                 >
+                  <UButton
+                    v-if="suggests(s)"
+                    color="neutral"
+                    variant="link"
+                    size="sm"
+                    :label="t('core.settings-page.use-suggestion', { value: s.suggestion ?? '' })"
+                    @click="onEdit(s, s.suggestion)"
+                  />
                   {{ s.kind === 'rate' ? t('core.settings-page.rate-hint') : unitText(s) }}
                 </template>
               </UFormField>

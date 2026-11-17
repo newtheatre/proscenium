@@ -341,6 +341,7 @@
   "core.settings-history.open-named": "Show the history of {setting}",
   "core.settings-history.drawer-title": "History of {setting}",
   "core.settings-history.drawer-description": "Who changed this setting, when, and what it was before.",
+  "core.settings-page.use-suggestion": "Use {value}",
   "core.settings-page.who": "Changed by people who can: {ability}.",
   "core.settings-page.read-only": "You can read this but not change it. Ask someone who can: {ability}.",
   "core.settings-page.managed": "The system keeps this up to date, so it cannot be changed here.",
