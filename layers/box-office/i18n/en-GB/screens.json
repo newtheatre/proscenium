@@ -504,5 +504,9 @@
   "box-office.live-door.override.reason": "Reason",
   "box-office.live-door.override.confirm": "Admit anyway",
   "box-office.live-door.result.admitted_by_override": "Admitted anyway",
-  "box-office.live-door.line.admitted_by_override": "{type} · {reason}"
+  "box-office.live-door.line.admitted_by_override": "{type} · {reason}",
+  "box-office.screens.panel.split": "Pay for some of these",
+  "box-office.screens.panel.split-confirm": "Pay for {count} separately",
+  "box-office.screens.panel.split-help": "Tick the tickets this person is paying for. They become a booking of their own; the rest stay reserved.",
+  "box-office.screens.panel.split-rest": "The rest stay reserved on {reference}, {amount} still to pay."
 }

@@ -31,6 +31,7 @@ import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
 import orderLinkGet from '../../server/api/box-office/orders/link/index.get'
 import cancelPost from '../../server/api/box-office/orders/[id]/cancel.post'
 import amendPost from '../../server/api/box-office/orders/[id]/amend.post'
+import splitPost from '../../server/api/box-office/orders/[id]/split.post'
 import performancesGet from '../../server/api/box-office/performances/index.get'
 import doorGet from '../../server/api/box-office/performances/[id]/door.get'
 import doorAdmit from '../../server/api/box-office/performances/[id]/door/admit.post'
@@ -107,6 +108,7 @@ export const handle = server({
   'POST /api/box-office/orders/link/cancel': orderCancelPost,
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
+  'POST /api/box-office/orders/:id/split': splitPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
   'GET /api/box-office/desk/performances': deskPerformancesGet,
   'GET /api/box-office/desk/buyers': deskBuyersGet,
