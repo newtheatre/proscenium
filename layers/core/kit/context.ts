@@ -69,6 +69,11 @@ export interface KitContext {
   requestOrigin?: string
   /** Link tokens in the request's address (path parameters the route declares as tokens). */
   tokens?: readonly string[]
+  /**
+   * Set by a route answering a GET or HEAD. A read never asks to confirm it is you, whatever the
+   * ability says; only a change does (Matt, 17 November). See `can`.
+   */
+  reads?: boolean
 }
 
 export function runInContext<T>(context: Partial<KitContext> & { env: KitEnv }, fn: () => T): T {
