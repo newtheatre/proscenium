@@ -133,6 +133,7 @@ export default defineModule({
       'core.performance.cancelled': 'follow-cancel',
       'core.performance.rescheduled': 'follow-reschedule',
       'core.performance.moved': 'follow-move',
+      'core.production.updated': 'follow-guidance',
     },
   },
 
@@ -340,6 +341,20 @@ export default defineModule({
         'en-GB': {
           subject: 'A change to {{ show }}',
           body: '**{{ show }}** {{ what }}.\n\n{{ now }}\n\n{{ next }}\n\nBooking reference: **{{ reference }}**',
+        },
+      },
+    }, {
+      // Staging effects, or a depicted content warning, added to a show someone has already booked (C-57).
+      id: 'box-office.guidance-added',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const, 'inbox' as const],
+      lane: 'prompt' as const,
+      variables: { reference: 'text' as const, show: 'text' as const, what: 'text' as const, pageUrl: 'text' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Something to know before you see {{ show }}',
+          body: 'We have added information about **{{ show }}** that you may want to read before you come.\n\n{{ what }}\n\nYou can read it all on the show\'s page: {{ pageUrl }}\n\nNothing is needed from you. If you cannot come now, contact the box office to exchange your tickets or to have them refunded.\n\nBooking reference: **{{ reference }}**',
         },
       },
     }],
