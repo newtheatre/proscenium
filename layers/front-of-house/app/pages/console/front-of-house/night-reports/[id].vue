@@ -25,7 +25,7 @@ interface Report {
 }
 
 const { t, te } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const { dateTime, time } = useDates()
@@ -44,11 +44,11 @@ async function submit() {
   refusal.value = null
   try {
     if (dialog.value === 'note') {
-      await $api(`${base.value}/notes`, { method: 'POST', body: { topic: noteForm.value.topic, body: noteForm.value.body.trim() } })
+      await write(`${base.value}/notes`, { method: 'POST', body: { topic: noteForm.value.topic, body: noteForm.value.body.trim() } })
       toast.add({ title: t(data.value?.state === 'signed_off' ? 'front-of-house.report.addendum-added' : 'front-of-house.report.note-added'), color: 'success' })
     }
     else {
-      await $api(`${base.value}/sign-off`, { method: 'POST', body: { noShows: noShows.value } })
+      await write(`${base.value}/sign-off`, { method: 'POST', body: { noShows: noShows.value } })
       toast.add({ title: t('front-of-house.report.signed'), color: 'success' })
     }
     dialog.value = null

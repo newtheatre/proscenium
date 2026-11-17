@@ -17,7 +17,7 @@ interface Duty {
 }
 
 const { t } = useT()
-const { $api } = useNuxtApp()
+const write = useAct()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -41,8 +41,8 @@ async function save() {
   refusal.value = null
   const body = { ...form.value, name: form.value.name.trim(), description: form.value.description.trim() || null, ...(editing.value ? { requirements: editing.value.requirements } : {}) }
   try {
-    if (editing.value) await $api(`/api/front-of-house/duties/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
-    else await $api('/api/front-of-house/duties', { method: 'POST', body })
+    if (editing.value) await write(`/api/front-of-house/duties/${encodeURIComponent(editing.value.id)}`, { method: 'PUT', body })
+    else await write('/api/front-of-house/duties', { method: 'POST', body })
     toast.add({ title: t(editing.value ? 'front-of-house.duties.saved' : 'front-of-house.duties.added', { name: body.name }), color: 'success' })
     stop()
     await refresh()
@@ -56,7 +56,7 @@ async function archive(duty: Duty) {
   if (!await confirm({ verb: t('front-of-house.archive.verb'), thing: t('front-of-house.duties.thing', { name: duty.name }), consequence: t('front-of-house.duties.archive-consequence'), button: t('front-of-house.archive.button') })) return
   refusal.value = null
   try {
-    await $api(`/api/front-of-house/duties/${encodeURIComponent(duty.id)}/archive`, { method: 'POST', body: {} })
+    await write(`/api/front-of-house/duties/${encodeURIComponent(duty.id)}/archive`, { method: 'POST', body: {} })
     toast.add({ title: t('front-of-house.duties.archived', { name: duty.name }), color: 'success' })
     await refresh()
   }
