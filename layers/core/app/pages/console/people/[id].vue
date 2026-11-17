@@ -1,7 +1,8 @@
 <!-- One person in the console (Identity Doc part 5, "Account"): who they are and their addresses
-     beside the sections, how they sign in, their roles and their sessions. Every action the viewer
-     may take is offered and asks for confirmation; the server says which those are. Opening the page
-     is audited. -->
+     beside the sections, how they sign in, their roles, standings and sessions. Every action the
+     viewer may take is offered and asks for confirmation; the server says which those are. Opening
+     the page is audited. Emergency contacts and access needs stay closed until asked for, and each
+     read is recorded; a section the viewer may not open is absent, not empty. -->
 <script setup lang="ts">
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { RefusalView } from '../../../utils/refusal'
@@ -23,11 +24,15 @@ interface Person {
   passkeys: { id: string, label: string, addedAt: number, lastUsedAt: number | null }[]
   providers: string[]
   liveSessions: number
-  actions: { recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean, erase: boolean }
+  standings: { source: string, label?: string }[]
+  accessScheme?: { status: 'submitted' | 'more-info' | 'accepted' | 'rejected', submittedAt: number } | null
+  actions: { recover: boolean, disable: boolean, merge: boolean, endSessions: boolean, grants: boolean, erase: boolean, emergencyContacts: boolean, accessNeeds: boolean, accessScheme: boolean }
 }
+interface Contact { name: string, relationship: string | null, phone: string }
+interface Needs { shared: boolean, needs?: { key: string, label: string, note?: string }[], companions?: number }
 interface Grant { id: string, role: string, state: string, scope: { kind: string, module: string | null }, expiresAt: number | null, endedAt: number | null }
 
-const { t } = useT()
+const { t, te } = useT()
 const { $api } = useNuxtApp()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
@@ -118,11 +123,49 @@ async function erase() {
   }
 }
 
+// A standing is a role that opens the members' area, named by the server, or a fact, named here.
+function standingLabel(s: { source: string, label?: string }) {
+  if (s.label) return s.label
+  const dot = s.source.indexOf('.')
+  const key = `${s.source.slice(0, dot)}.facts.${s.source.slice(dot + 1)}.label`
+  return te(key) ? t(key) : s.source
+}
+
+// Emergency contacts (ID-17): read only with a reason, which is recorded and shown to the person.
+const READ_REASONS = ['emergency', 'incident', 'welfare-follow-up', 'activity-check'] as const
+const askingWhy = ref(false)
+const why = ref<typeof READ_REASONS[number]>('emergency')
+const contacts = ref<Contact[] | null>(null)
+async function readContacts() {
+  askingWhy.value = false
+  refusal.value = null
+  try {
+    contacts.value = (await $api<{ contacts: Contact[] }>(at('emergency-contacts'), { query: { reason: why.value } })).contacts
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+
+// Access needs the person shared with the welfare lead (ID-39). Each read is recorded.
+const needs = ref<Needs | null>(null)
+async function readNeeds() {
+  refusal.value = null
+  try {
+    needs.value = await $api<Needs>(at('access-needs'), { query: { purpose: 'core.welfare' } })
+  }
+  catch (e) {
+    refusal.value = toRefusal(e)
+  }
+}
+const SCHEME_TONES = { 'submitted': 'info', 'more-info': 'warning', 'accepted': 'success', 'rejected': 'neutral' } as const
+
 const actions = computed<DropdownMenuItem[][]>(() => {
   const p = person.value
   if (!p || p.anonymised) return []
   const groups: DropdownMenuItem[][] = []
   if (p.actions.recover) groups.push([{ label: t('core.person.recover.button'), icon: 'i-lucide-key-round', onSelect: () => { void issueLink() } }])
+  if (p.actions.merge && !p.mergedInto) groups.push([{ label: t('core.person.merge'), icon: 'i-lucide-merge', to: `/console/people/merge?survivorId=${encodeURIComponent(p.id)}` }])
   const ending: DropdownMenuItem[] = []
   if (p.actions.endSessions && p.liveSessions) ending.push({ label: t('core.person.sessions.button'), icon: 'i-lucide-log-out', onSelect: () => { void endSessions() } })
   if (p.actions.disable) {
@@ -255,6 +298,120 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
               </RecordList>
             </PageSection>
 
+            <PageSection :title="t('core.person.standings.title')">
+              <p
+                v-if="!p.standings.length"
+                class="text-sm text-muted"
+              >
+                {{ t('core.person.standings.none') }}
+              </p>
+              <template v-else>
+                <p class="text-sm">
+                  {{ t('core.person.standings.member') }}
+                </p>
+                <ul class="mt-2 list-disc space-y-1 ps-5 text-sm">
+                  <li
+                    v-for="s in p.standings"
+                    :key="s.source"
+                  >
+                    {{ standingLabel(s) }}
+                  </li>
+                </ul>
+              </template>
+            </PageSection>
+
+            <PageSection
+              v-if="p.actions.emergencyContacts"
+              :title="t('core.person.contacts.title')"
+              :description="t('core.person.contacts.description')"
+            >
+              <UButton
+                v-if="!contacts"
+                color="neutral"
+                variant="outline"
+                icon="i-lucide-phone"
+                :label="t('core.person.contacts.read')"
+                @click="askingWhy = true"
+              />
+              <p
+                v-else-if="!contacts.length"
+                class="text-sm text-muted"
+              >
+                {{ t('core.person.contacts.none') }}
+              </p>
+              <RecordList
+                v-else
+                :label="t('core.person.contacts.title')"
+              >
+                <RecordListItem
+                  v-for="(c, n) in contacts"
+                  :key="n"
+                  :name="c.relationship ? t('core.person.contacts.who', { name: c.name, relationship: c.relationship }) : c.name"
+                  :description="c.phone"
+                />
+              </RecordList>
+            </PageSection>
+
+            <PageSection
+              v-if="p.actions.accessScheme || p.actions.accessNeeds"
+              :title="t('core.person.access.title')"
+            >
+              <div class="space-y-3">
+                <div
+                  v-if="p.actions.accessScheme"
+                  class="flex flex-wrap items-center gap-3 text-sm"
+                >
+                  <StatusBadge
+                    v-if="p.accessScheme"
+                    :tone="SCHEME_TONES[p.accessScheme.status]"
+                    :label="t(`core.person.access.status.${p.accessScheme.status}`)"
+                  />
+                  <span
+                    v-else
+                    class="text-muted"
+                  >{{ t('core.person.access.not-applied') }}</span>
+                  <ULink :to="`/console/people/access-scheme/${encodeURIComponent(p.id)}`">
+                    {{ t('core.person.access.open') }}
+                  </ULink>
+                </div>
+                <template v-if="p.actions.accessNeeds">
+                  <UButton
+                    v-if="!needs"
+                    color="neutral"
+                    variant="outline"
+                    icon="i-lucide-accessibility"
+                    :label="t('core.person.access.read')"
+                    @click="readNeeds"
+                  />
+                  <p
+                    v-else-if="!needs.shared || !needs.needs?.length"
+                    class="text-sm text-muted"
+                  >
+                    {{ t('core.person.access.none') }}
+                  </p>
+                  <ul
+                    v-else
+                    class="list-disc space-y-1 ps-5 text-sm"
+                  >
+                    <li
+                      v-for="need in needs.needs"
+                      :key="need.key"
+                    >
+                      {{ need.label }}<template v-if="need.note">
+                        : {{ need.note }}
+                      </template>
+                    </li>
+                    <li v-if="needs.companions">
+                      {{ t('core.person.access.companions', { count: needs.companions }) }}
+                    </li>
+                  </ul>
+                  <p class="text-xs text-muted">
+                    {{ t('core.person.access.recorded') }}
+                  </p>
+                </template>
+              </div>
+            </PageSection>
+
             <PageSection :title="t('core.person.sessions.title')">
               <p class="text-sm">
                 {{ t('core.person.sessions.count', { count: p.liveSessions }) }}
@@ -282,6 +439,27 @@ const trail = computed(() => [{ label: t('core.navigation.people.label'), to: '/
             color="error"
             :label="t('core.person.disable.button')"
             @click="disable"
+          />
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="askingWhy"
+        :title="t('core.person.contacts.why-title', { name: title })"
+        :description="t('core.person.contacts.why-description')"
+      >
+        <template #body>
+          <UFormField :label="t('core.person.contacts.why')">
+            <URadioGroup
+              v-model="why"
+              :items="READ_REASONS.map(r => ({ value: r, label: t(`core.person.contacts.reasons.${r}`) }))"
+            />
+          </UFormField>
+        </template>
+        <template #footer>
+          <UButton
+            :label="t('core.person.contacts.read')"
+            @click="readContacts"
           />
         </template>
       </UModal>
