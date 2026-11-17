@@ -34,6 +34,9 @@ const { data: accounts } = await useAPI<{ accounts: { id: string, code: string, 
 const { data: periods } = await useAPI<{ periods: { id: string, label: string }[] }>('/api/finance/periods', { key: 'finance:periods' })
 const accountItems = computed(() => [{ value: ANY, label: t('finance.screens.ledger.any-account') }, ...(accounts.value?.accounts ?? []).map(a => ({ value: a.id, label: `${a.code} · ${a.name}` }))])
 const periodItems = computed(() => [{ value: ANY, label: t('finance.screens.ledger.any-period') }, ...(periods.value?.periods ?? []).map(p => ({ value: p.id, label: p.label }))])
+// A searchable select is a button showing its choice, so its name must hold the words on it:
+// "Account: Any account".
+const named = (what: string, items: { value: string, label: string }[], chosen: string) => `${what}: ${items.find(item => item.value === chosen)?.label ?? ''}`
 
 // Older pages are kept below the first; a new filter starts again from the newest.
 const older = ref<Posting[]>([])
@@ -42,10 +45,9 @@ watch(data, (value) => {
   older.value = []
   next.value = value?.next ?? null
 }, { immediate: true })
-const loadingMore = ref(false)
+// The button shows its own spinner while this runs (loading-auto).
 async function more() {
   if (!next.value) return
-  loadingMore.value = true
   try {
     const page = await $api<Page>('/api/finance/postings', { query: { ...query.value, before: next.value } })
     older.value.push(...page.postings)
@@ -53,9 +55,6 @@ async function more() {
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
-  }
-  finally {
-    loadingMore.value = false
   }
 }
 const postings = computed(() => [...(data.value?.postings ?? []), ...older.value])
@@ -108,16 +107,18 @@ async function reverse(p: Posting) {
   <PageFrame :title="t('finance.navigation.ledger.label')">
     <template #toolbar>
       <div class="flex flex-wrap gap-2">
-        <USelect
+        <USelectMenu
           v-model="accountId"
+          value-key="value"
           :items="accountItems"
-          :aria-label="t('finance.screens.ledger.account')"
+          :aria-label="named(t('finance.screens.ledger.account'), accountItems, accountId)"
           class="w-64"
         />
-        <USelect
+        <USelectMenu
           v-model="periodId"
+          value-key="value"
           :items="periodItems"
-          :aria-label="t('finance.screens.ledger.period')"
+          :aria-label="named(t('finance.screens.ledger.period'), periodItems, periodId)"
           class="w-48"
         />
         <UButton
@@ -154,13 +155,11 @@ async function reverse(p: Posting) {
           :caption="t('finance.navigation.ledger.label')"
         >
           <template #open-cell="{ row }">
-            <UButton
+            <IconButton
               :icon="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-              color="neutral"
-              variant="ghost"
               size="xs"
               :aria-expanded="row.getIsExpanded()"
-              :aria-label="t('finance.screens.ledger.entries-of', { kind: kindLabel(row.original.kind), day: day(row.original.occurredAt) })"
+              :label="t('finance.screens.ledger.entries-of', { kind: kindLabel(row.original.kind), day: day(row.original.occurredAt) })"
               @click="row.toggleExpanded()"
             />
           </template>
@@ -203,7 +202,7 @@ async function reverse(p: Posting) {
           :label="t('finance.screens.ledger.more')"
           color="neutral"
           variant="outline"
-          :loading="loadingMore"
+          loading-auto
           block
           @click="more"
         />

@@ -43,6 +43,7 @@ export const settingGroups: Record<string, SettingGroupDecl> = {
   'retention': advanced,
   'files': advanced,
   'delivery': advanced,
+  'lists': advanced,
   'programme': on('programme'),
   'grants': on('people'),
   'members-area': on('people'),
@@ -93,6 +94,9 @@ export const settings = defineSettings('core', {
   'rate-limits.presented-value': setting.rate({ default: { count: 10, per: '10m' }, change, onChange: 'confirm' }),
 
   'retention.audit': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
+  // How many rows a list shows when its address names no size (Foundations, 16 November).
+  'lists.page-size': setting.choice({ default: '25', options: ['25', '50', '100'], change }),
+
   'retention.setting-changes': setting.duration({ default: '2555d', min: '365d', max: '3650d', change }),
 })
 

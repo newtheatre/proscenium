@@ -35,6 +35,7 @@
     "@nuxtjs/turnstile": "^1.1.3",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.1.0",
+    "@tanstack/charts": "^1.5.0",
     "@vueuse/core": "^15.0.0",
     "drizzle-orm": "1.0.0-rc.5",
     "h3": "1.15.11",

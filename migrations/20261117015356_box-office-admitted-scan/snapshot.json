@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "572697f2-9dc5-4b5e-8535-bacca2bea27b",
+  "id": "fb6ed0e5-3e6b-4b4b-b546-d6e8fa0bb8b5",
   "prevIds": [
     "c064beca-8ec3-47a7-8918-c4d448cfa716",
     "efe53ead-5807-4117-a31b-5da52c95dbdf"
@@ -1791,6 +1791,16 @@
       "table": "box_office_tickets",
       "name": "admitted_at",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "admitted_scan_id",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -9443,20 +9453,6 @@
       "columns": [
         {
           "value": "role_id",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "entityType": "indexes"
-    },
-    {
-      "table": "core_grants",
-      "name": "core_grants_expiry",
-      "columns": [
-        {
-          "value": "expires_at",
           "isExpression": false
         }
       ],

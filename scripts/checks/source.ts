@@ -90,6 +90,14 @@ export function checkContentTokens(registry: any): string[] {
   return problems
 }
 
+// "second" alone is too often the ordinal ("its second attempt"), so it counts only after a number.
+const DURATION_WORD = /\b(seconds|minutes?|hours?|days?|weeks?|months?|years?)\b|\b\d+\s+second\b/i
+
+/** The unit a duration setting's label or help names, which it should leave to the control. */
+export function namedDurationUnit(text: string): string | undefined {
+  return DURATION_WORD.exec(text)?.[0]
+}
+
 export function checkTranslations(modules: Loaded[], registry: any): string[] {
   const problems: string[] = []
   for (const m of modules) {
@@ -103,7 +111,8 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
     // (core's foundations, identity and domain) can keep their strings apart.
     const partsDir = join(ROOT, m.found.root, 'i18n/en-GB')
     const parts = existsSync(partsDir) ? readdirSync(partsDir).filter(f => f.endsWith('.json')).map(f => join(partsDir, f)) : []
-    const all = new Set([file, ...parts].flatMap(f => Object.keys(JSON.parse(readFileSync(f, 'utf8')))))
+    const text: Record<string, string> = Object.assign({}, ...[file, ...parts].map(f => JSON.parse(readFileSync(f, 'utf8'))))
+    const all = new Set(Object.keys(text))
     const keys = new Set(all)
     const need = (key: string, what: string) => {
       if (!all.has(key)) problems.push(`${rel(file)}: needs "${key}" (${what})`)
@@ -117,6 +126,13 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
       need(`${id}.settings.${rest}.label`, 'the setting\'s label')
       need(`${id}.settings.${rest}.help`, 'the setting\'s help text')
       if (entry.unit) need(entry.unit, 'the setting\'s unit')
+      // The duration control names the unit, so the words around it must not: "Keep for", not "Days to keep".
+      if (entry.kind === 'duration' || entry.kind === 'rate') {
+        for (const part of ['label', 'help']) {
+          const unit = namedDurationUnit(text[`${id}.settings.${rest}.${part}`] ?? '')
+          if (unit) problems.push(`${rel(file)}: "${id}.settings.${rest}.${part}" names a unit ("${unit}"), but the control chooses the unit; say what the time is for instead`)
+        }
+      }
       for (const option of entry.options ?? []) need(`${id}.settings.${rest}.options.${option}`, 'a choice\'s label')
     }
     for (const rule of registry.settingRules.get(id) ?? []) need(`${id}.settings.rules.${rule.id}`, 'what a setting rule says when it fails')
@@ -144,6 +160,16 @@ export function checkTranslations(modules: Loaded[], registry: any): string[] {
   return problems
 }
 
+/** Where a check may pass `fresh` to can() or requireAbility(): the settings saves, history and Revert. */
+const FRESH_OVERRIDE_HOMES = ['layers/core/server/settings/', 'layers/core/server/api/core/settings/', 'layers/core/kit/']
+
+/** The lines that pass `fresh` to can() or requireAbility(). */
+export function freshOverrides(source: string): number[] {
+  const out: number[] = []
+  for (const match of source.matchAll(/\b(?:can|requireAbility)\((?:[^()]|\([^()]*\))*\bfresh\s*:/g)) out.push(source.slice(0, match.index).split('\n').length)
+  return out
+}
+
 export function checkAbilities(modules: Loaded[], registry: any): string[] {
   const problems: string[] = []
   const required = new Set<string>()
@@ -160,6 +186,13 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
     }
   }
   for (const [key] of registry.abilities as Map<string, any>) if (!required.has(key)) problems.push(`abilities.${key}: is declared but nothing requires it`)
+  // Overriding an ability's freshness is for the kit's own settings saves alone (Foundations, 17 November).
+  for (const m of modules) {
+    for (const file of moduleFiles(m)) {
+      if (FRESH_OVERRIDE_HOMES.some(home => rel(file).startsWith(home))) continue
+      for (const line of freshOverrides(readFileSync(file, 'utf8'))) problems.push(`${rel(file)}:${line}: overrides an ability's freshness, which only the kit's settings saves may do`)
+    }
+  }
   for (const route of allRoutes(modules)) {
     const decl = route.ability && registry.abilities.get(route.ability)?.decl
     if (decl?.risk === 'privileged' && decl.fresh === false && route.method !== 'get' && route.method !== 'head') problems.push(`${route.file}: requires ${route.ability}, which skips freshness because it only reads, but this route changes something`)

@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "0eeb3b81-1a41-4625-8502-cb373dcf5a19",
+  "id": "ba4b3f94-f26c-4bbb-8ff7-d65f507add85",
   "prevIds": [
-    "572697f2-9dc5-4b5e-8535-bacca2bea27b"
+    "fb6ed0e5-3e6b-4b4b-b546-d6e8fa0bb8b5"
   ],
   "ddl": [
     {
@@ -1790,6 +1790,16 @@
       "table": "box_office_tickets",
       "name": "admitted_at",
       "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_tickets",
+      "name": "admitted_scan_id",
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,

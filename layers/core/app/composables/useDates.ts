@@ -15,6 +15,8 @@ const SHAPES = {
   dayNamed: { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' },
   /** Wed 1 Sept 2027, 19:30 */
   dateTime: { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+  /** 1 Sept, 19:30: for a chart's axis and other tight places, where the year is plain from what is around it. */
+  brief: { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' },
   /** September 2027: since when, where the day does not matter. */
   monthYear: { month: 'long', year: 'numeric' },
   /** 19:30 */
@@ -46,6 +48,7 @@ export function useDates() {
   const dayLong = (value: DateInput) => format('dayLong', value)
   const dayNamed = (value: DateInput) => format('dayNamed', value)
   const dateTime = (value: number | Date) => format('dateTime', value)
+  const brief = (value: number | Date) => format('brief', value)
   const monthYear = (value: DateInput) => format('monthYear', value)
   const time = (value: number | Date) => format('time', value)
   /** "1 Sept 2027 to 4 Sept 2027", or one day when both ends fall on the same one. */
@@ -53,6 +56,9 @@ export function useDates() {
     const [first, last] = [format(shape, from), format(shape, to)]
     return first === last ? first : t('core.dates.range', { from: first, to: last })
   }
+
+  /** A month's name from its number, 1 to 12: "August". */
+  const monthName = (month: number) => new Intl.DateTimeFormat(language.value, { month: 'long', timeZone: 'UTC' }).format(Date.UTC(2001, month - 1, 1)) // not-policy: any year, to name a month
 
   /** The zone the date-time fields work in. */
   const zone = computed(() => timeZone.value ?? getLocalTimeZone())
@@ -62,5 +68,5 @@ export function useDates() {
     return toCalendarDateTime(fromAbsolute(ms, zone.value)).toString().slice(0, 16) // not-policy: the length of a date and time to the minute
   }
 
-  return { language, timeZone, zone, day, dayLong, dayNamed, dateTime, monthYear, time, range, toLocal }
+  return { language, timeZone, zone, monthName, day, dayLong, dayNamed, dateTime, brief, monthYear, time, range, toLocal }
 }

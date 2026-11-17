@@ -16,6 +16,7 @@ import salesPut from '../../server/api/box-office/performances/[id]/sales/index.
 import salesGet from '../../server/api/box-office/performances/[id]/sales/index.get'
 import openPost from '../../server/api/box-office/performances/[id]/sales/open.post'
 import pausePost from '../../server/api/box-office/performances/[id]/sales/pause.post'
+import scanPost from '../../server/api/box-office/performances/[id]/scan.post'
 import availabilityGet from '../../server/api/box-office/availability/[id].get'
 import basketsPost from '../../server/api/box-office/baskets/index.post'
 import basketGet from '../../server/api/box-office/baskets/[id]/index.get'
@@ -46,6 +47,7 @@ export const handle = server({
   'GET /api/box-office/performances/:id/sales': salesGet,
   'POST /api/box-office/performances/:id/sales/open': openPost,
   'POST /api/box-office/performances/:id/sales/pause': pausePost,
+  'POST /api/box-office/performances/:id/scan': scanPost,
   'GET /api/box-office/availability/:id': availabilityGet,
   'POST /api/box-office/baskets': basketsPost,
   'GET /api/box-office/baskets/:id': basketGet,

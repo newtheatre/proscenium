@@ -30,6 +30,7 @@ interface Answer {
 type Kind = 'cancel' | 'reschedule' | 'move' | 'capacity'
 interface Reach { lines: string[], refusal: { code: string, reason: string, link: string | null } | null }
 
+const { t } = useT()
 const props = defineProps<{ productionId: string, title: string, intervalCount: number }>()
 const emit = defineEmits<{ changed: [] }>()
 
@@ -308,19 +309,13 @@ function actions(p: Performance) {
           </template>
           <StatusBadge
             :tone="TONES[p.state]"
-            :label="p.state.charAt(0).toUpperCase() + p.state.slice(1)"
+            :label="t(`core.states.${p.state}`)"
           />
-          <UDropdownMenu
-            v-if="actions(p).length"
+          <RowActions
             :items="actions(p)"
-          >
-            <UButton
-              icon="i-lucide-ellipsis"
-              color="neutral"
-              variant="ghost"
-              :aria-label="`Actions for ${dates.dateTime(p.startsAt)}`"
-            />
-          </UDropdownMenu>
+            :label="`Actions for ${dates.dateTime(p.startsAt)}`"
+            size="md"
+          />
         </RecordListItem>
       </RecordList>
     </DataBoundary>
@@ -342,8 +337,9 @@ function actions(p: Performance) {
             label="Space"
             required
           >
-            <USelect
+            <USelectMenu
               v-model="form.spaceId"
+              value-key="value"
               :items="spaces"
             />
           </UFormField>

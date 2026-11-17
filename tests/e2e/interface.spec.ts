@@ -290,6 +290,36 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
     })
 
+    test('a length of time is a number and a unit, and a whole number has steppers', async ({ page }) => {
+      await visit(page, '/console/gallery/settings')
+      const amount = page.getByRole('spinbutton', { name: 'How long seats are held: How many' })
+      await expect(amount).toHaveValue('15')
+      await expect(page.getByRole('combobox', { name: 'How long seats are held: Unit of time' })).toContainText('minutes')
+      await amount.fill('20')
+      await amount.blur()
+      await expect(page.getByText('1 change')).toBeVisible()
+      await page.getByRole('button', { name: 'Save Sample show settings' }).click()
+      await expect(page.getByText('Saved 1 change').first()).toBeVisible()
+      await visit(page, '/console/gallery/settings')
+      await expect(page.getByRole('spinbutton', { name: 'How long seats are held: How many' })).toHaveValue('20')
+      await expect(page.getByText('Default: 15 minutes.')).toBeVisible()
+      await noViolations(page)
+      await page.getByRole('button', { name: /Reset How long seats are held to its default/ }).click()
+      await page.getByRole('button', { name: 'Save Sample show settings' }).click()
+      await expect(page.getByText('Saved 1 change').first()).toBeVisible()
+    })
+
+    test('a chart has a name, a sentence that says what it shows, and no violations', async ({ page }) => {
+      await visit(page, '/console/gallery/drafts')
+      const chart = page.getByRole('figure', { name: 'Drafts written and sent' })
+      await expect(chart).toBeVisible()
+      // Said once to a screen reader, by the chart, and shown once beneath it.
+      await expect(chart.locator('p[aria-hidden="true"]')).toHaveText('Thirteen drafts written and ten sent over three weeks.')
+      await expect(chart.getByRole('img', { name: 'Drafts written and sent' }).or(chart.locator('[aria-label="Drafts written and sent"]')).first()).toBeVisible()
+      await expect(chart.locator('svg').first()).toBeVisible()
+      await noViolations(page)
+    })
+
     test('the account menu marks the current shell and offers the console', async ({ page }) => {
       await visit(page, '/console/gallery/list')
       await page.getByRole('button', { name: /Open the menu for Sam Staff/ }).first().click()
@@ -363,10 +393,11 @@ test.describe('confirming it is you', () => {
     const page = await context.newPage()
     await visit(page, '/console')
     const at = page.url()
-    // Sent and not awaited: the request waits on the dialogue, as a save button's would.
+    // Sent and not awaited: the request waits on the dialogue, as a save button's would. Only a
+    // setting with onChange asks for a fresh sign-in (Foundations' settings rulings), so this is one.
     await page.evaluate(() => {
       void (globalThis as unknown as { useNuxtApp: () => { $api: (url: string, options: object) => Promise<unknown> } })
-        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.appearance.default', value: 'dark' }] } }).catch(() => null)
+        .useNuxtApp().$api('/api/core/settings', { method: 'PUT', body: { changes: [{ key: 'core.locale.day-start', value: '05:00' }] } }).catch(() => null)
     })
     await expect(page.getByRole('dialog', { name: 'Confirm it is you' })).toBeVisible()
     expect(page.url()).toBe(at)

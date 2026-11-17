@@ -179,6 +179,55 @@ One language and one time zone, set once: `UApp` takes its `locale` from `core.l
   `type="date"` or `type="datetime-local"`: a native picker ignores the locale and works in the
   viewer's zone.
 - `PageForm` has the kinds `date`, `daterange`, `datetime` and `money` for them.
+
+### Small parts
+
+- `IconButton`: a button that is only an icon. Its one `label` is the accessible name and a tooltip,
+  so a person with a pointer is told what the arrow or the bin does. `bun run check:conformance`
+  refuses an icon-only `UButton`.
+- `RowActions`: the ellipsis menu a row or a record ends with. It takes `items` and a `label`
+  ("Actions for Hamlet") and draws nothing when there are no items.
+- A status is named by the catalogue (`core.states.draft`), never by capitalising its key, and a
+  count comes from the catalogue's plural (`core.counts.records` with `count`).
+- A select whose list grows with the theatre's data (accounts, periods, spaces, seasons) is a
+  `USelectMenu` with `value-key="value"`, which can be searched. A short fixed list stays a `USelect`.
+- A button whose click handler is `async` takes `loading-auto` in place of a flag of its own.
+- History is a `UTimeline`.
+
+### Charts
+
+`ChartFigure` wraps Nuxt UI's `UChart` (TanStack Charts, drawn as SVG on the server, so there is no
+client-only wrapper). It takes a `title`, which is the caption and the chart's accessible name, and a
+`summary`, one sentence that says what the chart shows and is read out in place of it. Both are
+required. Then `data`, `index`, `categories`, and a `format` for values, such as `money` from
+`useMoney`.
+
+Two rules:
+
+- **A chart never replaces a figure.** The numbers stay in text beside it, in a `FactStrip`, a table
+  or a list, because a chart cannot be read by a screen reader or copied into an email.
+- **Status colours stay status colours.** A chart uses the chart colours `ChartFigure` sets. Sold and
+  free are not green and red unless something is wrong.
+
+A chart with one bar says nothing a figure does not, so show one only when there are at least two
+things to compare. Rows that share a name along the bottom are drawn as one: give each its own.
+
+### Controls for the setting kinds
+
+The generated settings page gives each kind of setting its own control, and the same fields are there
+for any other screen:
+
+- `integer`: a number box with steppers, kept inside the setting's `min` and `max`.
+- `money`: `FieldMoney`.
+- `duration`, and the period of a `rate`: `FieldDuration`, a number and a unit. It takes and gives the
+  text the server keeps (`30m`, `2h`, `14d`), so nobody types that by hand.
+- `colour`: `FieldColour`, a swatch that opens a picker beside the hex value.
+- `reference`: `FieldRecord`, which searches the record type's `core.search-source` and keeps the
+  record's id. A record type nothing searches falls back to the id as text.
+- `custom`: a component in the module's `app/setting-editors` folder named for the key, so
+  `finance.year.starts` is `SettingFinanceYearStarts.vue`. It takes `modelValue` and `disabled` and
+  emits `update:modelValue` with a value the setting's schema accepts. Without one the value is typed
+  as text.
 - A date control is typed part by part, so a browser test focuses its first part and types the digits
   (`tests/e2e/date-fields.spec.ts` covers the kit fields; a module need not test them again).
 

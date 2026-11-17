@@ -1,5 +1,5 @@
 // The settings on one page of settings, as the generated page draws them (UI-14): value, default,
-// whether it has been changed, who may change it and whether the viewer is one of them.
+// whether it has been changed and by whom last, who may change it and whether the viewer is one of them.
 // `?page=<id>` gives a generated page (`core.sign-in`, `core.advanced`, `box-office.settings`), and
 // `?screen=<address>` the settings a bespoke screen manages (`/admin/email`). Every item names its
 // page or screen. `?module` and `?scope` are the older form and answer for one release, until the
@@ -12,6 +12,7 @@ import { useRegistry } from '#kit/registry'
 import { defaultValue, RATE_COUNT } from '#kit/settings'
 import { isOverridden, useSetting } from '#kit/settings-store'
 import { holds, mayOpen } from '../../../interface/navigation'
+import { lastChanges } from '../../../settings/history'
 
 const ID = /^[a-z][a-z0-9-]*$/ // not-policy: the pattern of a module id
 
@@ -41,6 +42,7 @@ export default defineRoute({
   const page = await mayOpen(actor, { ability: [...new Set(mine.map(([, s]) => s.entry.change))] })
   if (!holds(page)) return refuse('core.not-found', 'There is nothing here.', { status: 404 })
 
+  const changed = await lastChanges(mine.map(([key]) => key))
   const out = []
   for (const [key, { module, entry }] of mine) {
     const home = registry.settingHomes.get(key)!
@@ -63,6 +65,8 @@ export default defineRoute({
       value: entry.sensitive ? null : await useSetting(key as never),
       default: entry.sensitive ? null : defaultValue(entry),
       overridden: await isOverridden(key),
+      /** The latest change, for "Changed by <name>, <date>" under the setting. */
+      lastChange: changed.get(key) ?? null,
       unset: entry.unset === true,
       sensitive: entry.sensitive === true,
       managed: entry.managed === true,
@@ -76,6 +80,7 @@ export default defineRoute({
       maxLength: entry.maxLength,
       options: entry.options,
       of: entry.of,
+      record: entry.record,
     })
   }
   const declared = input.page ? registry.settingPages.get(input.page) : undefined

@@ -4,17 +4,23 @@
 <script setup lang="ts">
 interface Period { id: string, label: string, startsOn: string, endsOn: string, closed: boolean, debitsMinor: number, creditsMinor: number }
 interface Blocker { sentence: string, to?: string, module: string }
+interface Movement { accountId: string, code: string, name: string, kind: 'income' | 'expense', currency: string, amountMinor: number }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
-const { money } = await useMoney()
+const { money, currency } = await useMoney()
 const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
-const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
+const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], movement: Movement[], canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
 const { dayLong: dateOf } = useDates()
+
+// The chart is in the theatre's own currency; anything in another stays in the list beneath it.
+const moved = computed(() => (data.value?.movement ?? []).filter(m => m.currency === currency.value))
+const bars = computed(() => moved.value.map(m => ({ account: m.name, income: m.kind === 'income' ? m.amountMinor : 0, expense: m.kind === 'expense' ? m.amountMinor : 0 })))
+const total = (kind: Movement['kind']) => moved.value.filter(m => m.kind === kind).reduce((sum, m) => sum + m.amountMinor, 0)
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
@@ -129,6 +135,35 @@ async function reopen() {
             <UIcon name="i-lucide-book-open" />
             {{ t('finance.screens.period.postings') }}
           </ULink>
+
+          <PageSection
+            v-if="loaded.movement.length"
+            :title="t('finance.screens.period.movement')"
+            :description="t('finance.screens.period.movement-help')"
+          >
+            <div class="space-y-4">
+              <ChartFigure
+                v-if="bars.length > 1"
+                :title="t('finance.screens.period.movement-chart')"
+                :summary="t('finance.screens.period.movement-summary', { income: money(total('income')), expense: money(total('expense')) })"
+                :data="bars"
+                index="account"
+                :categories="[{ key: 'income', label: t('finance.screens.accounts.kinds.income') }, { key: 'expense', label: t('finance.screens.accounts.kinds.expense') }]"
+                :format="(value: number) => money(value)"
+                stacked
+              />
+              <RecordList>
+                <RecordListItem
+                  v-for="m in loaded.movement"
+                  :key="`${m.accountId}:${m.currency}`"
+                  :name="m.name"
+                  :description="`${m.code} · ${t(`finance.screens.accounts.kinds.${m.kind}`)}`"
+                >
+                  <span class="font-medium tabular-nums">{{ money(m.amountMinor, m.currency) }}</span>
+                </RecordListItem>
+              </RecordList>
+            </div>
+          </PageSection>
 
           <PageSection
             v-if="!loaded.period.closed"

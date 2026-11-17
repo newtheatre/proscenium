@@ -16,15 +16,12 @@ const { data, status, error, refresh } = await useAPI<{ passkeys: Passkey[], rec
 
 const { dayLong: day } = useDates()
 const refusal = ref<RefusalView | null>(null)
-const busy = ref(false)
 // New codes, shown once until the person types one back.
 const codes = ref<string[] | null>(null)
 
 async function add() {
-  busy.value = true
   refusal.value = null
   const answer = await addMyPasskey()
-  busy.value = false
   if (!answer.ok) {
     refusal.value = { status: 0, ...answer.refusal }
     return
@@ -132,7 +129,7 @@ function kept() {
             <template #footer>
               <UButton
                 icon="i-lucide-key-round"
-                :loading="busy"
+                loading-auto
                 :label="t('core.me.sign-in.add')"
                 @click="add()"
               />
