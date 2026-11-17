@@ -147,8 +147,8 @@ describe('own-refund-not-approved', () => {
     const alice = person(['payments.refund.approve'])
     const asked = await commit(unit => requestRefund(unit.view(), { partId: paid.ticketsPart, amountMinor: 700, requestedBy: alice.accountId! }))
     expect((await call(handle, 'POST', `/api/payments/refunds/${asked.refundId}/approve`, { actor: alice, body: {} })).status).toBe(403)
-    const listed = await (await call(handle, 'GET', '/api/payments/refunds?state=requested', { actor: alice })).json() as { refunds: { id: string }[] }
-    expect(listed.refunds.map(r => r.id)).toContain(asked.refundId)
+    const listed = await (await call(handle, 'GET', '/api/payments/refunds?state=requested', { actor: alice })).json() as { rows: { id: string }[] }
+    expect(listed.rows.map(r => r.id)).toContain(asked.refundId)
   })
 })
 
@@ -278,8 +278,14 @@ describe('the Refunds screen', () => {
     const cardRefund = await commit(unit => requestRefund(unit.view(), { partId: byCard.ticketsPart, amountMinor: 900, requestedBy: asker }))
     const approver = person(['payments.refund.approve'])
     const listed = await (await call(handle, 'GET', '/api/payments/refunds?state=requested', { actor: approver })).json() as any
-    expect(listed.refunds.find((r: any) => r.id === cashRefund.refundId)).toMatchObject({ requestedByName: 'Alex Asker', handBack: true, method: 'cash' })
-    expect(listed.refunds.find((r: any) => r.id === cardRefund.refundId)).toMatchObject({ requestedByName: 'Alex Asker', handBack: false })
+    expect(listed.rows.find((r: any) => r.id === cashRefund.refundId)).toMatchObject({ requestedByName: 'Alex Asker', handBack: true, method: 'cash' })
+    expect(listed.rows.find((r: any) => r.id === cardRefund.refundId)).toMatchObject({ requestedByName: 'Alex Asker', handBack: false })
+    // Found by who asked; nobody else's refunds come back.
+    const found = await (await call(handle, 'GET', '/api/payments/refunds?q=Asker&view=all', { actor: approver })).json() as any
+    expect(found.rows.map((r: any) => r.id).sort()).toEqual([cashRefund.refundId, cardRefund.refundId].sort())
+    expect(found.total).toBe(2)
+    const nobody = await (await call(handle, 'GET', '/api/payments/refunds?q=Zebedee&view=all', { actor: approver })).json() as any
+    expect(nobody).toMatchObject({ rows: [], total: 0 })
     expect(await inContext(() => waitingCount.value(approver))).toBeGreaterThanOrEqual(2)
     expect(await inContext(() => waitingCount.value(person(['payments.refund.request'])))).toBe(0)
   })

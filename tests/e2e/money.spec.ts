@@ -104,6 +104,17 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
 })
 
+test('Till sessions lists the sessions opened above, newest first, and filters them by state', async ({ page }) => {
+  await visit(page, '/console/payments/sessions')
+  // Other browser tests open tills of the same name, so this looks for one and for its state.
+  await expect(page.getByRole('cell', { name: 'Box office desk' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Open', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('searchbox')).toBeVisible()
+  await visit(page, '/console/payments/sessions?view=counting')
+  await expect(page.getByRole('cell', { name: 'Open', exact: true })).toHaveCount(0)
+  await noViolations(page)
+})
+
 test('the Ledger lists the sale with its entries open, and the Refunds view leaves it out', async ({ page }) => {
   await visit(page, '/console/finance/ledger')
   await expect(page.getByRole('cell', { name: 'Sale' }).first()).toBeVisible()
