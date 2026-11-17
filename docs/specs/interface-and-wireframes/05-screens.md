@@ -47,11 +47,11 @@ The interface layer itself owns 34 screens: the frames, the homes, and the scree
 | Module setup | A module's guided setup | Site owner or the module's manager | Steps | Yes |
 | Saved views manager | Rename, share and delete saved views | Anyone with a saved view | List | Later |
 
-### Site administration
+### Admin
 
 | Screen | Purpose | Who sees it | Type | First |
 | --- | --- | --- | --- | --- |
-| Site administration layout | The console's frame with the named strip, "Back to console" and its own sidebar | Anyone holding the ability of a site administration entry | Frame | Yes |
+| Admin layout | The console's frame with the named strip, "Back to console" and its own sidebar | Anyone holding the ability of a site administration entry | Frame | Yes |
 | Overview | What needs attention, then the state of the installation, at `/admin` | Anyone holding the ability of a site administration entry | Home | Yes |
 | Advanced, and Settings history (two screens) | Engineering limits from every module, under a warning, at `/admin/advanced`; every settings change, with Revert, at `/admin/settings-history`. The old `/admin/settings` redirects | Per setting's ability on Advanced; `core.audit.view` for the history | List and Settings | Yes |
 | Modules (foundations' screen, drawn here) | Switch on and off, with dependencies and setup state, at `/admin/modules` | Site owner | List | Yes |

@@ -3,8 +3,8 @@
      and shows their life at the theatre as cards, one per `core.account-section` a module adds, each
      saying in a line how it stands. A section is shown only to those who hold its ability and, with
      hideEmpty, only while it has something to show; a module that is off leaves nothing behind.
-     On a phone the menu is folded away, so the account's own upkeep, and any entry no card leads
-     to, are listed here instead. -->
+     Below the cards, the account's own upkeep and any entry no card leads to are listed, on a
+     laptop as on a phone (Matt, 2026-11-17), where they stand in for the folded-away menu. -->
 <script setup lang="ts">
 import { ACCOUNT_GROUP_ORDER, type NavItem } from '../../../shared/navigation'
 
@@ -30,7 +30,7 @@ const sections = computed(() => data.value.sections.flatMap((s) => {
   return typeof component === 'string' ? [] : [{ ...s, component }]
 }))
 
-// What the phone lists in place of the menu: every entry no card already leads to, by group.
+// What the overview lists below the cards: every entry no card already leads to, by group.
 const listed = computed(() => {
   const carded = new Set(sections.value.map(s => s.to).filter(Boolean))
   const entries = (navigation.value?.items ?? []).filter(e => !carded.has(e.to))
@@ -98,7 +98,7 @@ const listed = computed(() => {
         v-for="g in listed"
         :key="g.group"
         :aria-labelledby="`account-list-${g.group}`"
-        class="space-y-4 lg:hidden"
+        class="space-y-4"
       >
         <h2
           :id="`account-list-${g.group}`"

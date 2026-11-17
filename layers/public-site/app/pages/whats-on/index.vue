@@ -115,7 +115,7 @@ const groups = computed(() => {
             <PublicSiteShowCard
               :to="`/whats-on/${p.slug}`"
               :title="p.title"
-              :description="p.summary ?? p.subtitle"
+              :description="markdownText(p.summary) || p.subtitle"
               :poster="p.poster"
               :when="range(p.nextStartsAt, p.lastEndsAt)"
               :details="[p.venues.join(', '), p.category?.label].filter(Boolean).join(' · ')"

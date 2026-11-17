@@ -1,4 +1,4 @@
-<!-- Roles (ID-22; identity spec part 6, Site administration): every role, how many hold it now and
+<!-- Roles (ID-22; identity spec part 6, Admin): every role, how many hold it now and
      what it brings. Defining a role is here; giving one to a person stays in the console. -->
 <script setup lang="ts">
 interface Role { id: string, key: string, name: string, description: string | null, fixed: boolean, expiryRule: 'year_end' | 'days' | 'none', expiryDays: number | null, archived: boolean, holders: number, abilities: string[] }

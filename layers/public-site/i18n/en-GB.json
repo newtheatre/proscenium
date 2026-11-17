@@ -69,5 +69,16 @@
   "public-site.booking.waiting-list": "Join the waiting list",
   "public-site.booking.opens": "On sale {when}",
   "public-site.booking.not-yet": "Not on sale yet",
-  "public-site.booking.closed": "Booking has closed"
+  "public-site.booking.closed": "Booking has closed",
+  "public-site.venue.not-found": "There is no such venue.",
+  "public-site.venue.map": "Open in a map",
+  "public-site.venue.getting-here": "Getting here",
+  "public-site.venue.access": "Access",
+  "public-site.venue.no-access": "The theatre has not yet described the access here. Please get in touch to ask.",
+  "public-site.venue.on-here": "On here",
+  "public-site.venue.nothing-on": "Nothing is on here at the moment.",
+  "public-site.season.not-found": "There is no such season.",
+  "public-site.season.dates-soon": "Dates to be announced",
+  "public-site.season.empty": "Nothing announced yet",
+  "public-site.season.empty-description": "Productions appear here as soon as they are announced."
 }

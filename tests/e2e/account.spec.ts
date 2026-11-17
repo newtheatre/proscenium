@@ -36,7 +36,6 @@ test.describe('My account', () => {
       ['Your details', '/account/details'],
       ['Email addresses', '/account/email'],
       ['Signing in', '/account/sign-in'],
-      ['Where you are signed in', '/account/sessions'],
       ['Your data', '/account/data'],
     ]) await expect(page.getByRole('link', { name }).first()).toHaveAttribute('href', href)
   })
@@ -45,7 +44,6 @@ test.describe('My account', () => {
     ['/account/details', 'Your details'],
     ['/account/email', 'Email addresses'],
     ['/account/sign-in', 'Signing in'],
-    ['/account/sessions', 'Where you are signed in'],
     ['/account/data', 'Your data'],
   ]) {
     test(`${path} renders under My account and has no violations`, async ({ page }) => {
@@ -66,6 +64,20 @@ test.describe('My account', () => {
     await expect(menu.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
     const labels = await menu.getByText(/^(At the theatre|Your account)$/).allTextContents()
     expect(labels).toEqual(['At the theatre', 'Your account'])
+    await noViolations(page)
+  })
+
+  test('the overview lists the account\'s own pages on a laptop too', async ({ page }) => {
+    await visit(page, '/account')
+    const list = page.getByRole('list', { name: 'Your account' })
+    await expect(list).toBeVisible()
+    await expect(list.getByRole('link', { name: /Signing in/ })).toHaveAttribute('href', '/account/sign-in')
+  })
+
+  test('Signing in shows where the person is signed in', async ({ page }) => {
+    await visit(page, '/account/sign-in')
+    await expect(page.getByRole('heading', { level: 2, name: 'Where you are signed in' })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'My account' }).getByRole('link', { name: 'Where you are signed in' })).toHaveCount(0)
     await noViolations(page)
   })
 

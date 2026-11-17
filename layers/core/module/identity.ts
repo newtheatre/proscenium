@@ -6,7 +6,7 @@ import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, e
 
 const change = 'core.identity-settings.manage'
 // How people sign in, how long sessions last and recovery are set once for the installation, so they
-// sit in Site administration (Sign-in at /admin/sign-in), not on the console's settings page.
+// sit in Admin (Sign-in at /admin/sign-in), not on the console's settings page.
 
 export const identitySettings = defineSettings('core', {
   'sign-in.email-link': setting.boolean({ default: true, change, audience: 'public', onChange: 'confirm' }),
