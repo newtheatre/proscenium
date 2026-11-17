@@ -20,11 +20,14 @@ export const points = {
       section: z.enum(['everyday', 'setup']).optional(),
       count: z.string().optional(),
       hideEmpty: z.boolean().optional(),
+      attention: z.string().optional(),
       match: z.string().optional(),
     }).strict()
       .refine(e => e.ability !== 'signed-in' || e.menu === 'account', { message: "only an account entry may give ability 'signed-in'", path: ['ability'] })
       .refine(e => !e.hideEmpty || e.count !== undefined, { message: 'hideEmpty needs a count', path: ['hideEmpty'] })
-      .refine(e => e.menu !== 'admin' || e.group !== undefined || e.to === '/admin', { message: 'an admin entry names one of the admin groups; only the Overview, /admin, has none', path: ['group'] }),
+      .refine(e => e.menu !== 'admin' || e.group !== undefined || e.to === '/admin', { message: 'an admin entry names one of the admin groups; only the Overview, /admin, has none', path: ['group'] })
+      .refine(e => e.menu !== 'account' || e.group === undefined || e.group === 'theatre' || e.group === 'account', { message: "an account entry's group is 'theatre' or 'account'", path: ['group'] })
+      .refine(e => e.attention === undefined || e.menu === 'account', { message: 'only an account entry marks things that need the person', path: ['attention'] }),
   }),
   // A console group is declared once, by the module that owns it. A theatre's own module places its
   // group with `before` or `after`; the platform's own groups keep the fixed order. `menu: 'admin'`
@@ -127,6 +130,9 @@ export const points = {
   // A registered count, shown beside a menu entry or on a card. A module registers its own; another
   // module's is named by it. The contribution says how to count for the person asking.
   'core.count': point({ kind: 'code', contract: 'count' }),
+  // Something on My account's overview that needs the person (an address to confirm, a renewal
+  // that is open), for the person asking. A notice that fails is left out, never the page.
+  'core.account-notice': point({ kind: 'code', contract: 'account-notice' }),
   'core.setup-step': point({
     kind: 'data',
     schema: z.object({ id: z.string(), required: z.boolean(), to: z.string().startsWith('/'), order: z.number().int().optional() }).strict(),

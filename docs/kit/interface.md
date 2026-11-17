@@ -148,11 +148,23 @@ the server for actions and sources when it is first opened, not on every page.
   `menu: 'members'`. With `core.members-area.enabled` off, or for anyone for whom the fact
   `core.member` is not true, every `/members` address answers "not found". The name shown is
   `core.members-area.name`.
-- **My account** (`/account`): the same page for everyone signed in. A module adds a section through
-  `core.account-section` (`target`, `side`, `ability`, `component`, `order`, optional `to`, `icon`,
-  `count`, `hideEmpty`). The `component` is the file name of a component in the module's
-  `app/account-sections/` folder; it receives `headingId` for its heading. A module that is off
-  leaves nothing behind.
+- **My account** (`/account`): the same pages for everyone signed in. On a laptop every account page
+  sits beside the account's menu (`AccountNavigation`, drawn by `PageFrame` for any address under
+  `/account`): an Overview, then the `core.navigation` entries with `menu: 'account'` in two groups,
+  `group: 'theatre'` (the person's life at the theatre, and the default) and `group: 'account'` (the
+  account's upkeep), in that order (`ACCOUNT_GROUP_ORDER`). An entry may name an `attention` count:
+  above zero the entry carries a warning badge on every account page. A page's trail back to My
+  account shows only on a phone, where the menu is folded away.
+- **The overview** greets the person, then shows what needs them, then their life at the theatre
+  as cards. What needs them comes from `core.account-notice` (a code point; each source's
+  `notices(actor)` returns notices with a tone, an icon, title and description by translation key
+  with `params`, and an optional `to` with an `action` label; a source that fails is left out).
+  The cards are `core.account-section` contributions (`target`, `side`, `ability`, `component`,
+  `order`, optional `to`, `icon`, `count`, `hideEmpty`): the `component` is the file name of a
+  component in the module's `app/account-sections/` folder; it receives `headingId` and draws itself
+  with the kit's `AccountCard` (title, a one-line description of how it stands, an optional status
+  word, the way in). On a phone the overview also lists, by group, every account entry no card
+  already leads to, since the menu is not there. A module that is off leaves nothing behind.
 - **Counts**: a module registers one through `core.count` (a code point; the contribution's `value(actor)`
   returns a number; a count that fails reads as zero). An entry or section names it with `count`, and
   with `hideEmpty` it is left out while the count is zero. The address of a hidden entry still opens.

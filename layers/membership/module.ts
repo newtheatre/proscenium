@@ -107,7 +107,7 @@ export default defineModule({
       { id: 'membership.members', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership', match: '/console/membership/memberships', icon: 'i-lucide-users', ability: 'membership.membership.view', order: 1 },
       { id: 'membership.applications', menu: 'console', group: 'membership', section: 'everyday', to: '/console/membership/applications', match: '/console/membership/applications', icon: 'i-lucide-inbox', ability: 'membership.membership.view', order: 5 },
       { id: 'membership.lists', menu: 'console', group: 'membership', section: 'setup', to: '/console/membership/lists', match: '/console/membership/lists', icon: 'i-lucide-list-checks', ability: 'membership.verification-list.manage', order: 20 },
-      { id: 'membership.mine', menu: 'account', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
+      { id: 'membership.mine', menu: 'account', group: 'theatre', to: '/account/membership', icon: 'i-lucide-id-card', ability: 'signed-in', order: 35 },
     ],
     // Renewal reminders (R7 to R9): service messages about something the person holds.
     'core.notification-type': [{
@@ -149,6 +149,8 @@ export default defineModule({
     }],
     // On the audience side, so anyone can find how to join.
     'core.requirement': [{ id: 'membership', file: 'membership' }],
+    // A renewal that is open, kept in sight on My account's overview until it is done (R1).
+    'core.account-notice': [{ id: 'membership.renewal-open', file: 'renewal-open' }],
     // The membership card: Box office signs it and its door reads it (MEM-51). Absent while Box office is off.
     // Ends live memberships in the erasure batch (X4); claimed list entries are let go and emptied.
     'core.erasure-handler': [{ id: 'membership', file: 'membership' }],

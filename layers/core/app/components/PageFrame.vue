@@ -4,8 +4,13 @@
      In the console (and any shell built on Nuxt UI's dashboard) the page owns its panel: the title
      and primary action sit in the panel's navbar and stay put as the page scrolls, `toolbar` is the
      bar under it (a list's filters) and `footer` the bar at the foot (a form's buttons). In the
-     public and members' shells the same slots sit in the page itself. -->
+     public and members' shells the same slots sit in the page itself. Under /account the page sits
+     beside My account's menu on a laptop, and its way back to the overview shows only on a phone,
+     where the menu is folded away. -->
 <script setup lang="ts">
+import { createReusableTemplate } from '@vueuse/core'
+import { shellOf } from '../../shared/navigation'
+
 const props = withDefaults(defineProps<{
   title: string
   /** reading (forms, settings), standard (lists, records) or full (calendars, seating plans). */
@@ -21,6 +26,8 @@ defineSlots<{
   status?: () => unknown
   /** One primary action per view. A second competing button is a sign the page does two jobs. */
   primary?: () => unknown
+  /** In place of the title's words, inside the heading (My account's greeting). Phrasing content only. */
+  title?: () => unknown
   toolbar?: () => unknown
   footer?: () => unknown
 }>()
@@ -33,6 +40,11 @@ const parents = computed(() => (props.trail ?? []).map(c => ({ label: c.label, t
 const nearest = computed(() => parents.value.at(-1))
 const dashboard = inject(DASHBOARD_SHELL, false)
 const widths = { reading: 'width-reading', standard: 'width-standard', full: 'width-full' } as const
+const route = useRoute()
+const account = computed(() => shellOf(route.path) === 'account')
+// Beside the menu a page starts at the column's edge rather than centring in it.
+const accountWidths = { reading: 'max-w-2xl', standard: 'max-w-5xl', full: '' } as const
+const [DefineBody, ReuseBody] = createReusableTemplate()
 </script>
 
 <template>
@@ -96,8 +108,8 @@ const widths = { reading: 'width-reading', standard: 'width-standard', full: 'wi
     </template>
   </UDashboardPanel>
 
-  <UContainer v-else>
-    <div :class="widths[width]">
+  <template v-else>
+    <DefineBody>
       <UPageHeader
         :title="title"
         :description="description"
@@ -114,7 +126,14 @@ const widths = { reading: 'width-reading', standard: 'width-standard', full: 'wi
             :label="nearest.label"
             :aria-label="t('core.trail.back-to', { where: nearest.label })"
             class="-ms-2.5"
+            :class="account && 'lg:hidden'"
           />
+        </template>
+        <template
+          v-if="$slots.title"
+          #title
+        >
+          <slot name="title" />
         </template>
         <template #links>
           <slot name="primary" />
@@ -131,6 +150,24 @@ const widths = { reading: 'width-reading', standard: 'width-standard', full: 'wi
           <slot name="footer" />
         </div>
       </div>
-    </div>
-  </UContainer>
+    </DefineBody>
+    <UContainer>
+      <UPage v-if="account">
+        <template #left>
+          <UPageAside>
+            <AccountNavigation />
+          </UPageAside>
+        </template>
+        <div :class="accountWidths[width]">
+          <ReuseBody />
+        </div>
+      </UPage>
+      <div
+        v-else
+        :class="widths[width]"
+      >
+        <ReuseBody />
+      </div>
+    </UContainer>
+  </template>
 </template>

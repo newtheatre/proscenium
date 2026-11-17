@@ -21,6 +21,14 @@ export const CONSOLE_GROUP_ORDER = [
 /** Site administration's groups (R-33), in their fixed order. Every admin entry but the Overview names one. */
 export const ADMIN_GROUP_ORDER = ['theatre', 'modules', 'access', 'email', 'connections', 'upkeep'] as const
 
+/**
+ * My account's groups, in their fixed order: the person's life at the theatre (bookings,
+ * membership, the access scheme, credits) before the account's own upkeep. An account entry that
+ * names no group sits at the theatre, since that is what a module adds.
+ */
+export const ACCOUNT_GROUP_ORDER = ['theatre', 'account'] as const
+export type AccountGroup = typeof ACCOUNT_GROUP_ORDER[number]
+
 export interface NavigationEntry {
   id: string
   /** Which of the four shells, or live mode, shows it. */
@@ -34,6 +42,8 @@ export interface NavigationEntry {
   count?: string
   /** Hide the entry while its count is zero (needs count; a count not yet loaded counts as zero). */
   hideEmpty?: boolean
+  /** A count of things that need the person (an address to confirm): above zero, the entry is marked. */
+  attention?: string
   match?: string
 }
 
@@ -56,6 +66,10 @@ export interface NavItem {
   match?: string
   /** The number shown beside the label: the count for this viewer. */
   count?: number
+  /** How many things under the entry need the person; shown as a warning, not a tally. */
+  attention?: number
+  /** The entry's group, for a flat menu drawn in groups (My account's). */
+  group?: string
   order: number
   /** The module the entry belongs to: the console's cog opens that module's settings. */
   module?: string
