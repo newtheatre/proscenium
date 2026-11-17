@@ -1,0 +1,7 @@
+{
+  "bar.module.name": "Bar",
+  "bar.module.description": "Drinks, snacks and merchandise: products and their sizes, price lists, the places that sell, and a panel in the till so drinks can go on the same payment as tickets. Needs Payments and Finance.",
+  "bar.abilities.product.manage.label": "Set up the bar's categories, products and sizes",
+  "bar.abilities.price.manage.label": "Set bar prices and price lists",
+  "bar.abilities.outlet.manage.label": "Set up the places that sell from the bar"
+}
