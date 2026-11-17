@@ -84,7 +84,7 @@ export default defineModule({
       { id: 'forms', icon: 'i-lucide-file-text' },
       { id: 'reports', icon: 'i-lucide-chart-column' },
       { id: 'system', icon: 'i-lucide-settings' },
-      // Site administration's groups (R-33); their order is fixed in shared/navigation.ts.
+      // Admin's groups (R-33); their order is fixed in shared/navigation.ts.
       { id: 'theatre', menu: 'admin', icon: 'i-lucide-theater' },
       { id: 'modules', menu: 'admin', icon: 'i-lucide-blocks' },
       { id: 'access', menu: 'admin', icon: 'i-lucide-shield-check' },

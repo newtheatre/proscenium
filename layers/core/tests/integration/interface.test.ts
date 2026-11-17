@@ -149,7 +149,7 @@ describe('the generated settings page (UI-14)', () => {
 })
 
 describe("core's settings", () => {
-  it('have no console page of their own: each group is on one page, mostly in Site administration', async () => {
+  it('have no console page of their own: each group is on one page, mostly in Admin', async () => {
     const organiser = person(['core.organisation.edit', 'core.settings.manage'])
     expect((await decide('/console/system/settings', organiser)).decision).toBe('not-found')
     expect((await decide('/console/core/settings', organiser)).decision).toBe('not-found')
@@ -175,7 +175,7 @@ describe("core's settings", () => {
   })
 })
 
-describe('Site administration (R-33)', () => {
+describe('Admin (R-33)', () => {
   const admin = () => person(['core.settings.manage'])
   type Settings = { page: { id: string, to: string } | null, settings: { key: string, module: string, page: string | null, screen: string | null, scope: string }[] }
   const settings = async (query: string, actor = admin()) => (await call(handle, 'GET', `/api/core/settings?${query}`, { actor }))
@@ -326,7 +326,7 @@ describe('home cards, record tabs and history (UI-12, UI-16)', () => {
   })
 })
 
-describe('Site administration in the viewer (R-33)', () => {
+describe('Admin in the viewer (R-33)', () => {
   const sides = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/viewer', { actor })).json()).sides as string[]
 
   it('offers the admin side to someone who holds an admin entry\'s ability, and only them', async () => {
