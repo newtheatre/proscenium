@@ -217,6 +217,32 @@ async function addBand() {
   if (await act(() => $api(`/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/bands`, { method: 'POST', body: { name: band.value.name.trim(), kind: band.value.kind, sort: d.bands.length } }), t('box-office.setup.bands.added'))) band.value = { name: '', kind: 'standard' }
 }
 
+// The production's bands: renamed in a dialogue, removed while nothing is priced or sold in them.
+const bandsUrl = (d: Setup) => `/api/box-office/productions/${encodeURIComponent(d.performance.productionId)}/bands`
+const renaming = ref<Band | null>(null)
+const newName = ref('')
+const renameOpen = computed({ get: () => !!renaming.value, set: (v) => { if (!v) renaming.value = null } })
+function startRename(b: Band) {
+  newName.value = b.name
+  renaming.value = b
+}
+async function rename() {
+  const d = data.value!
+  const b = renaming.value
+  if (!b || !newName.value.trim()) return
+  const url = `${bandsUrl(d)}/${encodeURIComponent(b.id)}`
+  if (await act(() => $api(url, { method: 'PATCH', body: { name: newName.value.trim() } }), t('box-office.setup.bands.renamed'), () => $api(url, { method: 'PATCH', body: { name: b.name } }))) renaming.value = null
+}
+async function removeBand(b: Band) {
+  const d = data.value!
+  await act(() => $api(`${bandsUrl(d)}/${encodeURIComponent(b.id)}`, { method: 'DELETE' }), t('box-office.setup.bands.removed', { name: b.name }),
+    () => $api(bandsUrl(d), { method: 'POST', body: { name: b.name, kind: b.kind, sort: b.sort } }))
+}
+const bandActions = (b: Band) => [[
+  { label: t('box-office.setup.bands.rename'), icon: 'i-lucide-pencil', onSelect: () => startRename(b) },
+  { label: t('box-office.setup.bands.remove'), icon: 'i-lucide-trash-2', color: 'error' as const, onSelect: () => { void removeBand(b) } },
+]]
+
 // Opening and pausing undo each other. Opening for the first time has no Undo: a draft cannot be
 // put back, only paused.
 const opening = () => $api(`${base.value}/open`, { method: 'POST', body: {} })
@@ -229,7 +255,9 @@ async function pause() {
 }
 
 const TONES = { draft: 'neutral', on_sale: 'success', paused: 'warning', closed: 'neutral' } as const
-const checks = computed(() => (data.value?.checklist ?? []).map(c => ({ id: c.code, done: c.done, sentence: t(`box-office.setup.check.${c.code}`) })))
+// A missing way to pay is fixed under Payments, so that line links there.
+const CHECK_LINKS: Record<string, string> = { payment: '/admin/modules/payments/providers' }
+const checks = computed(() => (data.value?.checklist ?? []).map(c => ({ id: c.code, done: c.done, sentence: t(`box-office.setup.check.${c.code}`), link: CHECK_LINKS[c.code] })))
 const trail = computed(() => [{ label: t('box-office.navigation.performances.label'), to: '/console/box-office/performances' }])
 const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, n) => sum + (n ?? 0), 0))
 </script>
@@ -333,6 +361,57 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
           </PageSection>
 
           <PageSection
+            :title="t('box-office.setup.bands.title')"
+            :description="t('box-office.setup.bands.description')"
+          >
+            <RecordList
+              v-if="d.bands.length"
+              class="mb-4"
+              :label="t('box-office.setup.bands.title')"
+            >
+              <RecordListItem
+                v-for="b in d.bands"
+                :key="b.id"
+                :name="b.name"
+                :description="t(`box-office.setup.bands.kind.${b.kind}`)"
+              >
+                <RowActions
+                  :items="bandActions(b)"
+                  :label="t('box-office.setup.bands.actions', { name: b.name })"
+                />
+              </RecordListItem>
+            </RecordList>
+            <UForm
+              class="flex flex-wrap items-end gap-2"
+              :state="band"
+              @submit="addBand"
+            >
+              <UFormField
+                :label="t('box-office.setup.bands.name')"
+                class="grow"
+              >
+                <UInput
+                  v-model="band.name"
+                  maxlength="60"
+                />
+              </UFormField>
+              <UFormField :label="t('box-office.setup.bands.kind.label')">
+                <USelect
+                  v-model="band.kind"
+                  :items="bandKinds"
+                />
+              </UFormField>
+              <UButton
+                type="submit"
+                :label="t('box-office.setup.bands.add')"
+                color="neutral"
+                variant="outline"
+                :disabled="!band.name.trim()"
+              />
+            </UForm>
+          </PageSection>
+
+          <PageSection
             :title="t('box-office.setup.capacity.title')"
             :description="d.houseCapacity ? t('box-office.setup.capacity.house', { capacity: d.houseCapacity, total: totalCapacity }) : t('box-office.setup.capacity.description')"
           >
@@ -362,40 +441,6 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
                 v-if="d.bands.length"
                 type="submit"
                 :label="t('box-office.setup.capacity.save')"
-              />
-            </UForm>
-          </PageSection>
-
-          <PageSection
-            :title="t('box-office.setup.bands.title')"
-            :description="t('box-office.setup.bands.description')"
-          >
-            <UForm
-              class="flex flex-wrap items-end gap-2"
-              :state="band"
-              @submit="addBand"
-            >
-              <UFormField
-                :label="t('box-office.setup.bands.name')"
-                class="grow"
-              >
-                <UInput
-                  v-model="band.name"
-                  maxlength="60"
-                />
-              </UFormField>
-              <UFormField :label="t('box-office.setup.bands.kind.label')">
-                <USelect
-                  v-model="band.kind"
-                  :items="bandKinds"
-                />
-              </UFormField>
-              <UButton
-                type="submit"
-                :label="t('box-office.setup.bands.add')"
-                color="neutral"
-                variant="outline"
-                :disabled="!band.name.trim()"
               />
             </UForm>
           </PageSection>
@@ -557,6 +602,34 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
             </UForm>
           </PageSection>
         </div>
+        <UModal
+          v-model:open="renameOpen"
+          :title="t('box-office.setup.bands.rename')"
+        >
+          <template #body>
+            <UForm
+              class="flex items-end gap-2"
+              :state="{ newName }"
+              @submit="rename"
+            >
+              <UFormField
+                :label="t('box-office.setup.bands.name')"
+                class="grow"
+              >
+                <UInput
+                  v-model="newName"
+                  maxlength="60"
+                  autofocus
+                />
+              </UFormField>
+              <UButton
+                type="submit"
+                :label="t('box-office.setup.bands.rename')"
+                :disabled="!newName.trim()"
+              />
+            </UForm>
+          </template>
+        </UModal>
       </PageFrame>
     </template>
   </DataBoundary>

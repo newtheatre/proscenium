@@ -16,7 +16,8 @@ import variantPatch from '../../server/api/bar/variants/[id].patch'
 import pricesPost from '../../server/api/bar/prices.post'
 import listsGet from '../../server/api/bar/price-lists/index.get'
 import listsPost from '../../server/api/bar/price-lists/index.post'
-import listPatch from '../../server/api/bar/price-lists/[id].patch'
+import listPatch from '../../server/api/bar/price-lists/[id]/index.patch'
+import listRaise from '../../server/api/bar/price-lists/[id]/raise.post'
 import outletsGet from '../../server/api/bar/outlets/index.get'
 import outletsPost from '../../server/api/bar/outlets/index.post'
 import outletPatch from '../../server/api/bar/outlets/[id].patch'
@@ -37,6 +38,7 @@ const handle = server({
   'GET /api/bar/price-lists': listsGet,
   'POST /api/bar/price-lists': listsPost,
   'PATCH /api/bar/price-lists/:id': listPatch,
+  'POST /api/bar/price-lists/:id/raise': listRaise,
   'GET /api/bar/outlets': outletsGet,
   'POST /api/bar/outlets': outletsPost,
   'PATCH /api/bar/outlets/:id': outletPatch,
@@ -106,6 +108,21 @@ describe('the catalogue', () => {
 })
 
 describe('prices and price lists', () => {
+  it('raises a list\'s prices together, previewing old and new before writing (BAR-04)', async () => {
+    const { categoryId } = ok(await bar('POST', '/api/bar/categories', { name: 'Raise spirits' }))
+    const gin = ok(await bar('POST', '/api/bar/products', { categoryId, name: 'Raise gin', variantName: 'Single', amountMinor: 333 }))
+    const rum = ok(await bar('POST', '/api/bar/products', { categoryId, name: 'Raise rum', variantName: 'Single', amountMinor: 400 }))
+    const list = await standard()
+    expect((await bar('POST', `/api/bar/price-lists/${list}/raise`, { categoryIds: [categoryId], preview: true })).body).toMatchObject({ code: 'bar.price.raise-how' })
+    const shown = ok(await bar('POST', `/api/bar/price-lists/${list}/raise`, { categoryIds: [categoryId], percent: 10, preview: true }))
+    expect(shown.rows).toEqual(expect.arrayContaining([{ variantId: gin.variantId, oldMinor: 333, newMinor: 366 }, { variantId: rum.variantId, oldMinor: 400, newMinor: 440 }]))
+    expect(shown.rows.length).toBe(2)
+    expect(await rows('SELECT count(*) AS n FROM bar_prices WHERE variant_id IN (?, ?)', gin.variantId, rum.variantId)).toEqual([{ n: 2 }])
+    ok(await bar('POST', `/api/bar/price-lists/${list}/raise`, { categoryIds: [categoryId], amountMinor: 50, preview: false }))
+    expect(await rows('SELECT amount_minor FROM bar_prices WHERE variant_id = ? ORDER BY created_at, id', rum.variantId)).toEqual([{ amount_minor: 400 }, { amount_minor: 450 }])
+    expect((await bar('POST', `/api/bar/price-lists/${list}/raise`, { percent: 5, preview: true }, stocker)).status).toBe(403)
+  })
+
   it('writes a new price row for each change, takes a future price at its time, and never edits the old one', async () => {
     const { categoryId } = ok(await bar('POST', '/api/bar/categories', { name: 'Wine' }))
     const red = ok(await bar('POST', '/api/bar/products', { categoryId, name: 'House red', variantName: '175 ml', amountMinor: 500 }))
