@@ -111,7 +111,7 @@ test('the till opens a session by itself, shown as Your session above Till sessi
 test('the Till sells from a panel and takes cash for the total', async ({ page, playwright }) => {
   const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(treasurer) })
   const key = () => ({ 'idempotency-key': crypto.randomUUID() })
-  expect((await api.post('/api/payments/providers', { data: { provider: 'cash', label: 'Cash drawer', channels: ['desk'], mode: 'live' }, headers: key() })).ok()).toBe(true)
+  expect((await api.post('/api/payments/providers', { data: { provider: 'cash', label: 'Cash', channels: ['desk'], mode: 'live' }, headers: key() })).ok()).toBe(true)
   const opened = await api.post('/api/payments/sessions', { data: { pointLabel: 'Foyer desk' }, headers: key() })
   expect([200, 409]).toContain(opened.status())
   await api.dispose()
@@ -124,7 +124,7 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await noViolations(page)
   await page.getByRole('button', { name: 'Take payment of £6.00' }).click()
   await expect(page.getByText('Still to pay: £6.00')).toBeVisible()
-  await page.getByRole('radio', { name: 'Cash' }).first().check() // other browser tests may have added a cash drawer too
+  await page.getByRole('radio', { name: 'Cash' }).first().check() // other browser tests may have added a cash account too
   await page.getByLabel(/^Cash handed over/).fill('10')
   await noViolations(page)
   await page.getByRole('button', { name: 'Cash taken' }).click()
@@ -223,7 +223,9 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
   expect((await api.post('/api/payments/providers', { data: { provider: 'stripe', label, channels: ['online'], mode: 'test' }, headers: { 'idempotency-key': crypto.randomUUID() } })).ok()).toBe(true)
   await api.dispose()
   await visit(page, '/admin/modules/payments/providers')
-  const card = page.locator('div').filter({ has: page.getByText(label, { exact: true }) }).filter({ has: page.getByRole('button', { name: 'Save keys' }) }).last()
+  // Every account is a small card; its keys open in a slide-over.
+  await page.getByRole('button', { name: `Manage ${label}` }).click()
+  const card = page.getByRole('dialog', { name: label })
   await expect(card.getByText('Missing Secret key, Webhook signing secret, Publishable key')).toBeVisible()
   await card.getByLabel('Secret key').fill('sk_test_e2eabcdefghijklm1234')
   await card.getByLabel('Webhook signing secret').fill('whsec_e2eabcdefghijklm5678')
@@ -235,7 +237,7 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
   await expect(card.getByText('Missing', { exact: false })).toHaveCount(0)
   await noViolations(page)
   await card.getByRole('button', { name: 'Remove' }).first().click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Remove key' }).click()
+  await page.getByRole('button', { name: 'Remove key' }).click()
   await expect(page.getByText('Key removed', { exact: true }).first()).toBeVisible()
   await expect(card.getByText('Missing Secret key')).toBeVisible()
 })
