@@ -53,6 +53,33 @@ async function save() {
   }
 }
 
+// An award recorded by name alone can be given its account later.
+const linking = ref(false)
+const link = reactive({ how: 'person' as 'person' | 'address', accountId: undefined as string | undefined, address: '' })
+const linkEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('linkEl')
+const linkRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+let linkKey = ''
+const linkHow = computed(() => (['person', 'address'] as const).map(v => ({ value: v, label: t(`awards.screens.link.how-${v}`) })))
+function openLink() {
+  Object.assign(link, { how: 'person', accountId: undefined, address: '' })
+  linkRefusal.value = null
+  linkKey = crypto.randomUUID()
+  linking.value = true
+}
+async function saveLink() {
+  linkRefusal.value = null
+  try {
+    await $api(`/api/awards/awards/${id.value}/link` as string, { method: 'POST', headers: { 'idempotency-key': linkKey }, body: link.how === 'person' ? { accountId: link.accountId } : { address: link.address.trim() } })
+    linking.value = false
+    toast.add({ title: t('awards.screens.link.linked-toast'), color: 'success' })
+    await Promise.all([refresh(), refreshNuxtData('awards:list')])
+  }
+  catch (e) {
+    linkRefusal.value = toRefusal(e)
+    linkEl.value?.setErrors(fieldErrors(linkRefusal.value))
+  }
+}
+
 const revoking = ref(false)
 const reason = ref('')
 const revokeEl = useTemplateRef<{ setErrors: (errors: { name: string, message: string }[]) => void }>('revokeEl')
@@ -132,6 +159,7 @@ async function revoke() {
           icon="i-lucide-info"
           :title="t('awards.screens.award.not-linked')"
           :description="t('awards.screens.award.not-linked-help')"
+          :actions="data.canUpdate ? [{ label: t('awards.screens.link.title'), color: 'neutral', variant: 'outline', onClick: openLink }] : undefined"
         />
         <FactStrip :facts="facts" />
         <PageSection
@@ -245,6 +273,64 @@ async function revoke() {
           form="awards-correct"
           loading-auto
           :label="t('awards.screens.award.save')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="linking"
+      :title="t('awards.screens.link.title')"
+      :description="t('awards.screens.link.help')"
+    >
+      <template #body>
+        <UForm
+          id="awards-link"
+          ref="linkEl"
+          :state="link"
+          :validate="() => needs(link.how === 'person' ? { accountId: link.accountId } : { address: link.address })"
+          class="space-y-4"
+          novalidate
+          @submit="saveLink"
+        >
+          <RefusalNotice :refusal="linkRefusal" />
+          <UFormField
+            name="how"
+            :label="t('awards.screens.issue.who')"
+          >
+            <URadioGroup
+              v-model="link.how"
+              :items="linkHow"
+            />
+          </UFormField>
+          <UFormField
+            v-if="link.how === 'person'"
+            name="accountId"
+            :label="t('awards.screens.issue.person')"
+            required
+          >
+            <PersonPicker v-model="link.accountId" />
+          </UFormField>
+          <UFormField
+            v-else
+            name="address"
+            :label="t('awards.screens.issue.address')"
+            :help="t('awards.screens.issue.address-help')"
+            required
+          >
+            <UInput
+              v-model="link.address"
+              type="email"
+              maxlength="254"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="awards-link"
+          loading-auto
+          :label="t('awards.screens.link.submit')"
         />
       </template>
     </UModal>

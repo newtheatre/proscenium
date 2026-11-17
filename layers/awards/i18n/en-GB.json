@@ -3,6 +3,9 @@
   "awards.module.description": "The honours the theatre gives, such as fellowships and commendations, who holds them, and the ticket price an award may carry.",
 
   "awards.settings-sections.issuing": "Issuing an award",
+  "awards.settings-sections.roll": "Roll of honour",
+  "awards.settings.roll.public.label": "Show the roll of honour on the public site",
+  "awards.settings.roll.public.help": "The page at /awards and the roll in the theatre's own pages. Each holder still chooses whether their own award is listed.",
   "awards.settings.issuing.tell-recipient.label": "Tell somebody when they are given an award",
   "awards.settings.issuing.tell-recipient.help": "Sends the recipient a message with a link to their awards when one is issued to their account.",
 
@@ -133,5 +136,17 @@
   "awards.screens.mine.card-help": "Show this at the box office or the door.",
   "awards.screens.mine.card-no-code": "Show this at the box office or the door. No code is available at the moment.",
 
-  "awards.screens.account-tab.none": "No awards"
+  "awards.screens.link.title": "Link an account",
+  "awards.screens.link.help": "The holder then sees the award in My awards, and it carries its ticket price if it has one.",
+  "awards.screens.link.how-person": "Somebody with an account",
+  "awards.screens.link.how-address": "By email address",
+  "awards.screens.link.submit": "Link account",
+  "awards.screens.link.linked-toast": "Account linked",
+
+  "awards.screens.account-tab.none": "No awards",
+
+  "awards.roll.title": "Roll of honour",
+  "awards.roll.description": "The people the theatre has honoured.",
+  "awards.roll.empty": "No awards are listed yet.",
+  "awards.roll.not-found": "There is nothing here."
 }

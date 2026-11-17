@@ -21,6 +21,8 @@ export default defineModule({
   settings: defineSettings('awards', {
     // Whether the person is told by email when an award is issued to their account.
     'issuing.tell-recipient': setting.boolean({ default: true, change, audience: 'staff' }),
+    // Whether the roll of honour is shown at /awards and through ::awards-roll.
+    'roll.public': setting.boolean({ default: true, change, audience: 'staff' }),
   }),
 
   records: defineRecords('awards', {
@@ -86,6 +88,10 @@ export default defineModule({
     // An erased person's awards leave the roll in the erasure's own batch.
     'core.erasure-handler': [{ id: 'awards', file: 'awards' }],
     'core.requirement': [{ id: 'awards', file: 'awards' }],
+    // ::awards-roll in a theatre's own page.
+    'core.public-component': [
+      { id: 'awards-roll', component: 'AwardsRoll', alias: 'awards-roll', description: 'The roll of honour: everybody holding a listed award, by award type, or one type alone (type, its short code).' },
+    ],
     // The holder's card, read by the door and the desk.
     'box-office.door-code': [{ id: 'awards.card', file: 'card' }],
     // The fellow's price: a ticket type Box office keeps for anyone holding a current award that

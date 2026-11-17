@@ -17,6 +17,8 @@ import revokePost from '../../server/api/awards/awards/[id]/revoke.post'
 import accountAwards from '../../server/api/awards/accounts/[id]/awards.get'
 import mineGet from '../../server/api/awards/mine.get'
 import visibilityPost from '../../server/api/awards/mine/[id]/visibility.post'
+import rollGet from '../../server/api/awards/roll.get'
+import linkPost from '../../server/api/awards/awards/[id]/link.post'
 
 export const handle = server({
   'GET /api/awards/types': typesGet,
@@ -32,6 +34,8 @@ export const handle = server({
   'GET /api/awards/accounts/:id/awards': accountAwards,
   'GET /api/awards/mine': mineGet,
   'POST /api/awards/mine/:id/visibility': visibilityPost,
+  'GET /api/awards/roll': rollGet,
+  'POST /api/awards/awards/:id/link': linkPost,
 })
 
 export const NOV_17 = Date.UTC(2026, 10, 17, 12)
