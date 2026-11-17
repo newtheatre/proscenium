@@ -29,6 +29,16 @@ import publishPost from '../../server/api/front-of-house/shifts/[id]/publish.pos
 import unpublishPost from '../../server/api/front-of-house/shifts/[id]/unpublish.post'
 import cancelPost from '../../server/api/front-of-house/shifts/[id]/cancel.post'
 import signUpPost from '../../server/api/front-of-house/shifts/[id]/sign-up.post'
+import shiftGet from '../../server/api/front-of-house/shifts/[id]/index.get'
+import assignPost from '../../server/api/front-of-house/shifts/[id]/assign.post'
+import confirmPost from '../../server/api/front-of-house/assignments/[id]/confirm.post'
+import declinePost from '../../server/api/front-of-house/assignments/[id]/decline.post'
+import removePost from '../../server/api/front-of-house/assignments/[id]/remove.post'
+import releasePost from '../../server/api/front-of-house/assignments/[id]/release.post'
+import keepPost from '../../server/api/front-of-house/assignments/[id]/keep.post'
+import coverPost from '../../server/api/front-of-house/assignments/[id]/cover.post'
+import openShiftsGet from '../../server/api/front-of-house/open-shifts.get'
+import myShiftsGet from '../../server/api/front-of-house/me/shifts.get'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
 export const handle = server({
@@ -58,6 +68,16 @@ export const handle = server({
   'POST /api/front-of-house/shifts/:id/unpublish': unpublishPost,
   'POST /api/front-of-house/shifts/:id/cancel': cancelPost,
   'POST /api/front-of-house/shifts/:id/sign-up': signUpPost,
+  'GET /api/front-of-house/shifts/:id': shiftGet,
+  'POST /api/front-of-house/shifts/:id/assign': assignPost,
+  'POST /api/front-of-house/assignments/:id/confirm': confirmPost,
+  'POST /api/front-of-house/assignments/:id/decline': declinePost,
+  'POST /api/front-of-house/assignments/:id/remove': removePost,
+  'POST /api/front-of-house/assignments/:id/release': releasePost,
+  'POST /api/front-of-house/assignments/:id/keep': keepPost,
+  'POST /api/front-of-house/assignments/:id/cover': coverPost,
+  'GET /api/front-of-house/open-shifts': openShiftsGet,
+  'GET /api/front-of-house/me/shifts': myShiftsGet,
 })
 
 export type Person = ReturnType<typeof person>
@@ -121,6 +141,8 @@ export async function shift(performanceId: string, dutyId: string, places = 2, p
   if (publish) expect((await req('POST', `/api/front-of-house/shifts/${made.body.shiftId}/publish`, {})).status).toBe(200)
   return made.body.shiftId
 }
+
+export const notes = (type: string, accountId: string) => rows<{ id: string }>('SELECT id FROM core_notifications WHERE type_key = ? AND account_id = ?', type, accountId)
 
 export const shiftRow = async (id: string) => (await rows<Record<string, number | string | null>>('SELECT * FROM front_of_house_shifts WHERE id = ?', id))[0]!
 
