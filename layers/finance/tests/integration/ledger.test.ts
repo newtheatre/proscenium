@@ -265,6 +265,25 @@ describe('the routes', () => {
     expect(refused.status).toBe(403)
   })
 
+  it('give a period\'s income and expenses by account, each a positive figure that agrees with the ledger', async () => {
+    const periods = await rows<{ id: string }>('SELECT id FROM finance_periods')
+    let seen = 0
+    for (const period of periods) {
+      const body = await (await call(handle, 'GET', `/api/finance/periods/${period.id}`, { actor: person(['finance.ledger.view']) })).json() as { movement: { accountId: string, kind: string, currency: string, amountMinor: number }[] }
+      const ledger = await inContext(() => balances({ periodId: period.id }))
+      for (const m of body.movement) {
+        expect(['income', 'expense']).toContain(m.kind)
+        const b = ledger.find(l => l.accountId === m.accountId && l.currency === m.currency)!
+        expect(m.amountMinor).toBe(m.kind === 'income' ? -b.balanceMinor : b.balanceMinor)
+        expect(m.amountMinor).not.toBe(0)
+        seen++
+      }
+      // Assets and liabilities are not movement: they are where the money sits.
+      expect(body.movement.length).toBe(ledger.filter(l => (l.kind === 'income' || l.kind === 'expense') && l.balanceMinor !== 0).length)
+    }
+    expect(seen).toBeGreaterThan(0)
+  })
+
   it('reverses a posting once through the route, replaying a repeated request', async () => {
     const [posting] = await rows<{ id: string }>("SELECT id FROM finance_postings WHERE idempotency_key = 'order-late'")
     const treasurer = person(['finance.posting.correct'])

@@ -305,6 +305,17 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
     })
 
+    test('a chart has a name, a sentence that says what it shows, and no violations', async ({ page }) => {
+      await visit(page, '/console/gallery/drafts')
+      const chart = page.getByRole('figure', { name: 'Drafts written and sent' })
+      await expect(chart).toBeVisible()
+      // Said once to a screen reader, by the chart, and shown once beneath it.
+      await expect(chart.locator('p[aria-hidden="true"]')).toHaveText('Thirteen drafts written and ten sent over three weeks.')
+      await expect(chart.getByRole('img', { name: 'Drafts written and sent' }).or(chart.locator('[aria-label="Drafts written and sent"]')).first()).toBeVisible()
+      await expect(chart.locator('svg').first()).toBeVisible()
+      await noViolations(page)
+    })
+
     test('the account menu marks the current shell and offers the console', async ({ page }) => {
       await visit(page, '/console/gallery/list')
       await page.getByRole('button', { name: /Open the menu for Sam Staff/ }).first().click()

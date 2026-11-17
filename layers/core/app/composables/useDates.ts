@@ -15,6 +15,8 @@ const SHAPES = {
   dayNamed: { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' },
   /** Wed 1 Sept 2027, 19:30 */
   dateTime: { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+  /** 1 Sept, 19:30: for a chart's axis and other tight places, where the year is plain from what is around it. */
+  brief: { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' },
   /** 19:30 */
   time: { hour: '2-digit', minute: '2-digit' },
 } as const satisfies Record<string, Intl.DateTimeFormatOptions>
@@ -44,6 +46,7 @@ export function useDates() {
   const dayLong = (value: DateInput) => format('dayLong', value)
   const dayNamed = (value: DateInput) => format('dayNamed', value)
   const dateTime = (value: number | Date) => format('dateTime', value)
+  const brief = (value: number | Date) => format('brief', value)
   const time = (value: number | Date) => format('time', value)
   /** "1 Sept 2027 to 4 Sept 2027", or one day when both ends fall on the same one. */
   function range(from: DateInput, to: DateInput, shape: 'day' | 'dayLong' | 'dayNamed' | 'dateTime' = 'day'): string {
@@ -62,5 +65,5 @@ export function useDates() {
     return toCalendarDateTime(fromAbsolute(ms, zone.value)).toString().slice(0, 16) // not-policy: the length of a date and time to the minute
   }
 
-  return { language, timeZone, zone, monthName, day, dayLong, dayNamed, dateTime, time, range, toLocal }
+  return { language, timeZone, zone, monthName, day, dayLong, dayNamed, dateTime, brief, time, range, toLocal }
 }
