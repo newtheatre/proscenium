@@ -3,11 +3,12 @@
 // person or the system. When an answer makes the intent whole, every part's owner settles in the same
 // batch and Payments writes one sealed posting: the money received, plus each owner's entries. If an
 // owner refuses after the money was taken, nothing settles and the intent becomes unfulfilled.
-import { all, createUnit, first, isRefusal, log, newId, nowMs, Refusal, useContext, type UnitView } from '#kit'
+import { all, createUnit, isRefusal, log, newId, nowMs, Refusal, useContext, type UnitView } from '#kit'
 import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, ownersOf, partsOf, releaseParts, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor } from './providers'
 import { refundInFull } from './refunds'
+import { isTestMoney } from './test-money'
 import type { Method, ProviderAnswer } from './points/provider'
 
 export type AttemptState = 'started' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
@@ -36,6 +37,8 @@ function eventKind(answer: Answer, source: Source): string {
 }
 
 /** Thrown when an owner refused to settle its part after the money was taken. */
+export { isTestMoney, paysForSales, testMoneyTakesSales } from './test-money'
+
 export class SettlementRefused extends Error {
   constructor(readonly module: string, override readonly cause: unknown) {
     super(`${module} could not settle its part: ${String((cause as Error)?.message ?? cause)}`)
@@ -57,13 +60,6 @@ function recordMove(unit: UnitView, attempt: AttemptRow, answer: Answer, source:
     sql: 'INSERT INTO payments_attempt_events (id, attempt_id, kind, source, webhook_event_id, by, at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     params: [newId('ate'), attempt.id, eventKind(answer, source), source.kind, source.kind === 'webhook' ? source.webhookEventId : null, by, at],
   })
-}
-
-/** Whether any payment on the intent, or this one, was taken on a test-mode account. Test money posts nothing. */
-export async function isTestMoney(intentId: string, including?: AttemptRow): Promise<boolean> {
-  const row = await first<{ n: number }>(`SELECT count(*) AS n FROM payments_attempts a JOIN payments_provider_accounts p ON p.id = a.provider_account_id
-    WHERE p.mode = 'test' AND (a.id = ? OR (a.intent_id = ? AND a.state = 'succeeded'))`, including?.id ?? '', intentId)
-  return (row?.n ?? 0) > 0
 }
 
 /** A fee the provider reported with its answer: an expense, out of the clearing account. */

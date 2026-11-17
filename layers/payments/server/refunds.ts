@@ -11,6 +11,7 @@ import { postEntries, type EntryInput } from '#modules/finance'
 import { asPart, getIntent, settlements, type IntentRow, type PartRow } from './intents'
 import { clearingFor, forProvider, providerAccount, providers } from './providers'
 import { labelsOf } from './people'
+import { isTestMoney } from './test-money'
 import type { AttemptRow } from './answers'
 import type { RefundAnswer } from './points/provider'
 
@@ -115,7 +116,7 @@ async function succeed(unit: UnitView, refund: RefundRow, providerRef?: string) 
     .expect(1, { code: 'payments.refund.already-answered', reason: 'This refund already has its answer.' })
   unit.announce('payments.refund.succeeded', { refundId: refund.id, partId: part.id, owner: ownerOf(part) }, { record: ['payments.refund', refund.id] })
   // Test money posts nothing, going out as coming in.
-  if ((await providerAccount(attempt.provider_account_id))?.mode === 'test') return
+  if (await isTestMoney(intent.id, attempt)) return
   let back: EntryInput[]
   if (part.settled_at === null) {
     // An unfulfilled payment: the money was held in payments.unfulfilled, never the owner's.
