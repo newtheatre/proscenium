@@ -56,7 +56,7 @@ async function spendChallenge(unit: UnitView, id: string, purpose: ChallengePurp
 
 /** Options for making a new passkey. `userId` is the account id, or a fresh one during setup. */
 export async function registrationOptions(unit: UnitView, event: H3Event, input: { purpose: ChallengePurpose, accountId: string | null, userId: string, userName: string, displayName: string }) {
-  const rp = relyingParty(event)
+  const rp = await relyingParty(event)
   const existing = input.accountId ? await all<{ credential_id: string, transports: string | null }>('SELECT credential_id, transports FROM core_passkeys WHERE account_id = ?', input.accountId) : []
   const options = await generateRegistrationOptions({
     // The theatre's name arrives with the core domain's site settings; until then, the host.
@@ -76,7 +76,7 @@ export async function registrationOptions(unit: UnitView, event: H3Event, input:
 /** Checks a new passkey against its challenge and spends the challenge in the caller's unit. */
 export async function verifyRegistration(unit: UnitView, event: H3Event, input: { challengeId: string, purpose: ChallengePurpose, response: RegistrationResponseJSON }): Promise<NewCredential & { accountId: string | null }> {
   const { challenge, accountId } = await spendChallenge(unit, input.challengeId, input.purpose)
-  const rp = relyingParty(event)
+  const rp = await relyingParty(event)
   let result
   try {
     result = await verifyRegistrationResponse({ response: input.response, expectedChallenge: challenge, expectedOrigin: rp.origin, expectedRPID: rp.id, requireUserVerification: true })
@@ -105,7 +105,7 @@ export function addPasskey(unit: UnitView, accountId: string, credential: NewCre
  * site (ID-02: no address typed); with one, only that account's.
  */
 export async function authenticationOptions(unit: UnitView, event: H3Event, input: { purpose: ChallengePurpose, accountId: string | null }) {
-  const rp = relyingParty(event)
+  const rp = await relyingParty(event)
   const allow = input.accountId ? await all<{ credential_id: string, transports: string | null }>('SELECT credential_id, transports FROM core_passkeys WHERE account_id = ?', input.accountId) : []
   if (input.accountId && !allow.length) refuse('core.passkey.none', 'There is no passkey on this account.', { status: 409, remedy: 'Add a passkey first.' })
   const options = await generateAuthenticationOptions({
@@ -126,7 +126,7 @@ export async function verifyAuthentication(unit: UnitView, event: H3Event, input
   const passkey = await first<PasskeyRow>('SELECT * FROM core_passkeys WHERE credential_id = ?', input.response?.id)
   const failed: () => never = () => refuse('core.passkey.not-verified', 'That passkey could not be checked.', { status: 422, remedy: 'Try again, or sign in another way.' })
   if (!passkey || (accountId && passkey.account_id !== accountId)) failed()
-  const rp = relyingParty(event)
+  const rp = await relyingParty(event)
   let result
   try {
     result = await verifyAuthenticationResponse({

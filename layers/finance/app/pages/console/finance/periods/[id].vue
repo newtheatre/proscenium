@@ -4,17 +4,23 @@
 <script setup lang="ts">
 interface Period { id: string, label: string, startsOn: string, endsOn: string, closed: boolean, debitsMinor: number, creditsMinor: number }
 interface Blocker { sentence: string, to?: string, module: string }
+interface Movement { accountId: string, code: string, name: string, kind: 'income' | 'expense', currency: string, amountMinor: number }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
 const route = useRoute()
-const { money } = await useMoney()
+const { money, currency } = await useMoney()
 const { confirm } = useConfirm()
 const { toRefusal } = useRefusal()
 const toast = useToast()
 const id = computed(() => String(route.params.id))
-const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
-const dateOf = (iso: string) => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`))
+const { data, status, error, refresh } = await useAPI<{ period: Period, blockers: Blocker[], movement: Movement[], canClose: boolean, canReopen: boolean }>(() => `/api/finance/periods/${id.value}`, { key: `finance:period:${id.value}` })
+const { dayLong: dateOf } = useDates()
+
+// The chart is in the theatre's own currency; anything in another stays in the list beneath it.
+const moved = computed(() => (data.value?.movement ?? []).filter(m => m.currency === currency.value))
+const bars = computed(() => moved.value.map(m => ({ account: m.name, income: m.kind === 'income' ? m.amountMinor : 0, expense: m.kind === 'expense' ? m.amountMinor : 0 })))
+const total = (kind: Movement['kind']) => moved.value.filter(m => m.kind === kind).reduce((sum, m) => sum + m.amountMinor, 0)
 
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 const busy = ref(false)
@@ -115,38 +121,49 @@ async function reopen() {
             v-if="!reopening"
             :refusal="refusal"
           />
-          <dl class="grid gap-4 sm:grid-cols-3">
-            <div>
-              <dt class="text-sm text-muted">
-                {{ t('finance.screens.period.dates') }}
-              </dt>
-              <dd>{{ t('finance.screens.periods.range', { from: dateOf(loaded.period.startsOn), to: dateOf(loaded.period.endsOn) }) }}</dd>
-            </div>
-            <div>
-              <dt class="text-sm text-muted">
-                {{ t('finance.screens.period.debits') }}
-              </dt>
-              <dd class="tabular-nums">
-                {{ money(loaded.period.debitsMinor) }}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm text-muted">
-                {{ t('finance.screens.period.credits') }}
-              </dt>
-              <dd class="tabular-nums">
-                {{ money(loaded.period.creditsMinor) }}
-              </dd>
-            </div>
-          </dl>
-          <UButton
-            :to="{ path: '/console/finance/ledger', query: { periodId: loaded.period.id } }"
-            :label="t('finance.screens.period.postings')"
-            icon="i-lucide-book-open"
-            color="neutral"
-            variant="link"
-            class="px-0"
+          <FactStrip
+            :facts="[
+              { label: t('finance.screens.period.dates'), value: t('finance.screens.periods.range', { from: dateOf(loaded.period.startsOn), to: dateOf(loaded.period.endsOn) }), strong: false },
+              { label: t('finance.screens.period.debits'), value: money(loaded.period.debitsMinor) },
+              { label: t('finance.screens.period.credits'), value: money(loaded.period.creditsMinor) },
+            ]"
           />
+          <ULink
+            :to="{ path: '/console/finance/ledger', query: { periodId: loaded.period.id } }"
+            class="inline-flex items-center gap-1.5"
+          >
+            <UIcon name="i-lucide-book-open" />
+            {{ t('finance.screens.period.postings') }}
+          </ULink>
+
+          <PageSection
+            v-if="loaded.movement.length"
+            :title="t('finance.screens.period.movement')"
+            :description="t('finance.screens.period.movement-help')"
+          >
+            <div class="space-y-4">
+              <ChartFigure
+                v-if="bars.length > 1"
+                :title="t('finance.screens.period.movement-chart')"
+                :summary="t('finance.screens.period.movement-summary', { income: money(total('income')), expense: money(total('expense')) })"
+                :data="bars"
+                index="account"
+                :categories="[{ key: 'income', label: t('finance.screens.accounts.kinds.income') }, { key: 'expense', label: t('finance.screens.accounts.kinds.expense') }]"
+                :format="(value: number) => money(value)"
+                stacked
+              />
+              <RecordList>
+                <RecordListItem
+                  v-for="m in loaded.movement"
+                  :key="`${m.accountId}:${m.currency}`"
+                  :name="m.name"
+                  :description="`${m.code} · ${t(`finance.screens.accounts.kinds.${m.kind}`)}`"
+                >
+                  <span class="font-medium tabular-nums">{{ money(m.amountMinor, m.currency) }}</span>
+                </RecordListItem>
+              </RecordList>
+            </div>
+          </PageSection>
 
           <PageSection
             v-if="!loaded.period.closed"
@@ -176,11 +193,13 @@ async function reopen() {
                   name="i-lucide-circle-alert"
                   class="mt-0.5 shrink-0 text-warning"
                 />
-                <NuxtLink
+                <ULink
                   v-if="b.to"
                   :to="b.to"
                   class="underline"
-                >{{ b.sentence }}</NuxtLink>
+                >
+                  {{ b.sentence }}
+                </ULink>
                 <span v-else>{{ b.sentence }}</span>
               </li>
             </ul>
@@ -195,10 +214,11 @@ async function reopen() {
       :description="t('finance.screens.period.reopen-help')"
     >
       <template #body>
-        <form
+        <UForm
           id="reopen-period"
+          :state="{ reason }"
           class="space-y-4"
-          @submit.prevent="reopen"
+          @submit="reopen"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -208,10 +228,9 @@ async function reopen() {
             <USelect
               v-model="reason"
               :items="reasons?.reasons.map(r => ({ value: r.id, label: r.label })) ?? []"
-              class="w-full"
             />
           </UFormField>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <UButton

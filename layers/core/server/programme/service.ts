@@ -15,8 +15,6 @@ export function slugFrom(text: string, fallback: string): string {
   return text.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || fallback // not-policy: a slug's pattern and length
 }
 
-export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/ // not-policy: a slug's pattern
-
 async function freeSlug(base: string, taken: (candidate: string) => Promise<boolean>): Promise<string> {
   let slug = base
   for (let n = 2; await taken(slug); n++) slug = `${base}-${n}`

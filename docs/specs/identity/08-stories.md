@@ -141,7 +141,7 @@ As a member, I record who to ring for me, so that the theatre can reach them if 
 As somebody who faces barriers at the theatre, I apply once and say what I need, so that I am not asked every time I book.
 
 - The "Apply" button on the public page `/access` and the one in My account both open the application form. A signed-out person signs in or signs up first and lands on the form, not on the home page.
-- The form offers the access-needs list as ticks, each with an optional note, asks how many essential companions are needed (none, one or two), and asks for no diagnosis and no upload.
+- The form offers the access-needs list as square tick boxes, each with a plain description and an optional note; asks "I use a wheelchair" separately and, once ticked, whether the person would rather stay in it or move to a seat; asks how many companions are needed (none, one or two); and asks for no diagnosis and no upload.
 - Before sending, the form says who will read the application and that the box office will use it for the person's bookings.
 - Sending makes the application Submitted, emails the person a confirmation, and puts it in the reviewers' queue. A second application cannot be started while one is open.
 - My account shows the application's state in plain words at every stage.
@@ -161,7 +161,8 @@ As a module that seats, hosts or teaches people, I declare why I need access nee
 
 As the person who runs the access scheme, I read each application and accept it, reject it or ask for more, so that people get an answer.
 
-- The queue lists open applications oldest first, with the person's name and how long each has waited, to a holder of `core.access-scheme.re`ad and nobody else; deciding needs core.access-scheme.review. It shows no needs until an application is opened.
+- The queue lists open applications oldest first, with the person's name and how long each has waited, to a holder of `core.access-scheme.read` and nobody else; deciding needs `core.access-scheme.review`. It shows no needs until an application is opened.
+- An opened application starts with where it stands and what the reviewer should do next, in plain words, then what the person is asking for (or the change they are asking for) beside what is accepted now.
 - Accepting may grant fewer companions than were asked for, with a message saying why.
 - Rejecting needs a message to the person. Asking for more needs a question; the person's answer returns the application to the queue.
 - Each decision emails the person and shows in My account. The email names no need and says only that there is news about their application.
@@ -184,7 +185,8 @@ As a reviewer, I mark an application verified when I have seen evidence, so that
 As a reviewer answering an email or a phone call, I get the person to the form or fill it in with them.
 
 - "Invite to apply" takes a name and an address, finds or makes the account, and emails a single-use link that signs the person in and opens the form. The link lapses after `core.sign-in.invite-lifetime`; after that, signing in and pressing "Apply" does the same.
-- "Apply on their behalf" lets a reviewer complete the form for a named account. The application is marked as made by staff with the reviewer's name, and the person is emailed that it was made and how to correct it.
+- "Apply for someone" on the queue takes a name and an address, finds or makes the account without emailing anybody, and opens the form to fill in with them; if they have applied already it opens their application instead. On an application, filling the form in for them is offered only when nothing is waiting for a decision (to answer a question, change accepted details or apply again), never while their own application is waiting.
+- Filling the form in for them The application is marked as made by staff with the reviewer's name, and the person is emailed that it was made and how to correct it.
 - An application made by staff is still decided by a reviewer, and not by the one who entered it when another reviewer exists.
 
 ### ID-43 Book as somebody on the scheme (first release)

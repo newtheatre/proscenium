@@ -22,27 +22,19 @@ const { data, status, error, refresh } = await useAPI<{ productions: Row[] }>('/
         :description="t('finance.screens.productions.empty-help')"
         icon="i-lucide-drama"
       />
-      <ul
+      <RecordList
         v-else
-        class="divide-y divide-default rounded-lg border border-default"
+        :label="t('finance.navigation.productions.label')"
       >
-        <li
+        <RecordListItem
           v-for="p in data.productions"
           :key="`${p.productionId}:${p.currency}`"
+          :to="`/console/finance/productions/${p.productionId}`"
+          :name="p.title"
         >
-          <NuxtLink
-            :to="`/console/finance/productions/${p.productionId}`"
-            class="flex items-center gap-3 px-3 py-2 hover:bg-elevated/50"
-          >
-            <span class="flex-1 font-medium">{{ p.title }}</span>
-            <span class="tabular-nums">{{ money(p.netMinor, p.currency) }}</span>
-            <UIcon
-              name="i-lucide-chevron-right"
-              class="text-muted"
-            />
-          </NuxtLink>
-        </li>
-      </ul>
+          <span class="tabular-nums">{{ money(p.netMinor, p.currency) }}</span>
+        </RecordListItem>
+      </RecordList>
     </DataBoundary>
   </PageFrame>
 </template>

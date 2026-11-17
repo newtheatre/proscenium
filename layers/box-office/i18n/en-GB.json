@@ -12,6 +12,8 @@
 
   "box-office.settings.baskets.hold-for.label": "Hold seats in a basket for",
   "box-office.settings.baskets.hold-for.help": "How long seats are kept for a buyer once they press Hold tickets. Changing the basket does not restart it. A performance can have its own length.",
+  "box-office.settings.baskets.pay-within.label": "Hold seats during payment for",
+  "box-office.settings.baskets.pay-within.help": "How long seats are kept once the buyer goes on to pay. It starts afresh when payment starts, whatever was left on the basket.",
   "box-office.settings.orders.seat-cap.label": "Most tickets in one online order",
   "box-office.settings.orders.seat-cap.help": "The most tickets one person can book online in a single order. A performance can have its own limit.",
   "box-office.settings.sales.close-before.label": "Close online sales before the start",
@@ -35,5 +37,7 @@
   "box-office.abilities.performance.manage.label": "Set up sales for a performance",
   "box-office.abilities.performance.exceed-venue.label": "Sell more than the space holds",
   "box-office.abilities.pricing.manage.label": "Manage ticket types and prices",
+  "box-office.abilities.order.release.label": "Release a reservation, or mark one to keep",
+  "box-office.abilities.ticket.admit.label": "Scan and admit at the door",
   "box-office.abilities.settings.manage.label": "Change box office settings"
 }

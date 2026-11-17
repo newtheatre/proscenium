@@ -309,6 +309,8 @@ export const tickets = defineTable('box_office_tickets', {
   voidReason: col.internal(text('void_reason', { enum: ['cancelled', 'exchanged', 'reissued', 'performance_cancelled'] })),
   attendeeName: col.personal(text('attendee_name'), { erase: 'clear' }),
   admittedAt: col.timestamp('admitted_at'),
+  // The scan that admitted it, stamped by the same update as admitted_at: how a scan knows it was the one.
+  admittedScanId: col.internal(text('admitted_scan_id')),
   requirementRef: col.internal(text('requirement_ref')),
   requirementAccountId: col.account('requirement_account_id', { role: 'actor', nullable: true }),
   requirementEvidenceId: col.internal(text('requirement_evidence_id')),

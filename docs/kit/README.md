@@ -104,6 +104,17 @@ A route that takes a file's bytes declares `body: 'binary'`: the kit leaves the 
 handler (`readRawBody(event, false)`) and validates the query against `input` instead. Such a route
 cannot be idempotent.
 
+### The site's address
+
+Build an absolute address with `await siteUrl('/tickets/abc')` (or `siteOrigin()`), never from a request
+header. It answers from the Worker variable `CORE_SITE_ORIGIN` when set, else the setting
+`core.site.origin`, which first-run setup records from the address it ran on. Until either is set, a
+route answers from its own request; outside a request it refuses with `core.site.origin-unset`, and a
+job that meets that refusal is put back unrun, without spending an attempt. Once an origin is
+recorded, a read on any other host is redirected to it (307) and a change there is refused, except the
+health probe, a provider's webhook (`/api/<module>/webhooks/...`) and first-run setup. The Health
+screen shows whether the address is recorded and when the variable is in force.
+
 ### Link tokens
 
 A link that opens one thing without signing in (a ticket, a booking) carries a token made by
@@ -233,6 +244,15 @@ names a `menu` (account, members, console or live) and may set `hideEmpty` besid
 account entry may use the ability `'signed-in'`. A theatre's page may not sit under a reserved
 address prefix (`RESERVED_PREFIXES` in `scripts/checks/routes.ts`) or start with an underscore.
 
+An ability's `implies` names the module's own abilities by short name (`order.view`) and another
+module's by full id (`core.account.find`). Another module's ability may come with one only when it
+declares `impliable: true`, is of risk normal, and is owned by core or by a module the implying
+module lists under `requires`; one it only `uses` is not enough. The registry refuses anything else
+when it reads the manifests. An impliable ability may be neither privileged nor on a record type,
+because it comes with its implier at every reach: whoever holds the implying ability through a
+site-wide, module or record grant, or through a fact, holds the impliable one too, with no record,
+and the audit names the implying grant or fact.
+
 ## Requirements
 
 A module that can judge a condition contributes a source to `core.requirement` under its own id,
@@ -332,6 +352,31 @@ components use `usePublicSettings()`, which sees only public settings. A value o
 cannot be saved. A quotable public setting can be quoted in content as
 `:setting{name="box-office.fees.booking"}`. `onChange: 'reason'` makes a change need a written
 reason and `onChange: 'confirm'` a second confirmation; the `change` ability still decides who may.
+
+### Pages of settings
+
+Where settings are shown is declared per group (the first part of a short key), never per setting;
+`scope` is refused. Every setting has exactly one home, a generated page or a bespoke screen:
+
+```ts
+settingPages: { desk: { place: 'admin', group: 'modules', order: 20 } },   // makes the page and its entry
+settingGroups: {
+  'items': { page: 'desk' },                // a page of the module's own
+  'retention': { advanced: true },          // the shared Advanced page, under Upkeep
+  'sending': { screen: '/admin/email' },    // a bespoke screen manages it; no generated page draws it
+},
+```
+
+A group not named is on the module's own page in its `place` (`console` by default:
+`/console/<module>/settings`; `admin`: `/admin/modules/<module>`). Core has no page of its own, so
+each of its groups names a home; the table is `layers/core/module/settings.ts`. A single setting may
+carry `screen` where only part of its group is bespoke. A setting or group names a screen only once that screen shows and saves it: no setting may be reachable only through the API. Page ids are `<module>.<page>`, plus
+`core.advanced` and each module's `<module>.settings` and `<module>.admin`. A page's name is
+`<module>.settings-pages.<page>`. The conformance run fails for a screen that is not a page. In
+code, `useRegistry().settingPages` and `.settingHomes` say where everything is.
+
+A renamed setting carries `replaces: '<old full key>'`: the old key's stored value is carried over,
+`useSetting` still answers to the old key, and the old row goes when the setting is next changed.
 
 The core's locale settings are `core.site.name` and `core.locale.time-zone` (both unset until
 setup), `core.locale.currency` (GBP), `core.locale.language` (en-GB) and `core.locale.day-start`

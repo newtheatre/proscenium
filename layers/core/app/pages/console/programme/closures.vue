@@ -8,22 +8,14 @@ interface Place { id: string, name: string, spaces: { id: string, name: string }
 
 const { $api } = useNuxtApp()
 const { data, status, error, refresh } = await useAPI<{ rows: Closure[], places: Place[] }>('/api/core/closures', { key: 'core:closures' })
-const { data: settings } = await usePublicSettings()
+const dates = useDates()
 const { toRefusal } = useRefusal()
 const { confirm } = useConfirm()
 const toast = useToast()
 const refusal = ref<ReturnType<typeof toRefusal> | null>(null)
 
-const timeZone = computed(() => (settings.value?.['core.locale.time-zone']?.value as string | undefined) ?? undefined)
-const dateOnly = computed(() => new Intl.DateTimeFormat('en-GB', { timeZone: timeZone.value, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))
-const dateTime = computed(() => new Intl.DateTimeFormat('en-GB', { timeZone: timeZone.value, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
-function when(c: Closure): string {
-  if (!c.allDay) return `${dateTime.value.format(c.startsAt)} to ${dateTime.value.format(c.endsAt)}`
-  // An all-day closure ends at the start of the day after its last; show the last day itself.
-  const first = dateOnly.value.format(c.startsAt)
-  const last = dateOnly.value.format(c.endsAt - 1)
-  return first === last ? first : `${first} to ${last}`
-}
+// An all-day closure ends at the start of the day after its last; show the last day itself.
+const when = (c: Closure) => c.allDay ? dates.range(c.startsAt, c.endsAt - 1, 'dayNamed') : dates.range(c.startsAt, c.endsAt, 'dateTime')
 function where(c: Closure): string {
   if (!c.venueId) return 'The whole theatre'
   const venue = data.value?.places.find(p => p.id === c.venueId)
@@ -34,7 +26,7 @@ function where(c: Closure): string {
 
 const WHOLE = 'theatre'
 const adding = ref(false)
-const form = reactive({ scope: WHOLE, title: '', allDay: true, from: '', to: '', blocksPerformances: true })
+const form = reactive({ scope: WHOLE, title: '', allDay: true, days: { start: '', end: '' }, from: null as number | null, to: null as number | null, blocksPerformances: true })
 const scopes = computed(() => [
   { value: WHOLE, label: 'The whole theatre' },
   ...(data.value?.places ?? []).flatMap(v => [
@@ -42,20 +34,18 @@ const scopes = computed(() => [
     ...(v.spaces.length > 1 ? v.spaces.map(s => ({ value: `${v.id}/${s.id}`, label: `${v.name}: ${s.name}` })) : []),
   ]),
 ])
-watch(() => form.allDay, () => {
-  form.from = ''
-  form.to = ''
-})
 function openAdd() {
-  Object.assign(form, { scope: WHOLE, title: '', allDay: true, from: '', to: '', blocksPerformances: true })
+  Object.assign(form, { scope: WHOLE, title: '', allDay: true, days: { start: '', end: '' }, from: null, to: null, blocksPerformances: true })
   refusal.value = null
   adding.value = true
 }
 async function add() {
   refusal.value = null
   const [venueId, spaceId] = form.scope === WHOLE ? [null, null] : [form.scope.split('/')[0]!, form.scope.split('/')[1] ?? null]
+  // The route takes days, or local dates and times in the theatre's time zone.
+  const [from, to] = form.allDay ? [form.days.start, form.days.end || form.days.start] : [dates.toLocal(form.from), dates.toLocal(form.to)]
   try {
-    await $api('/api/core/closures', { method: 'POST', body: { venueId, spaceId, title: form.title, allDay: form.allDay, from: form.from, to: form.to || form.from, blocksPerformances: form.blocksPerformances } })
+    await $api('/api/core/closures', { method: 'POST', body: { venueId, spaceId, title: form.title, allDay: form.allDay, from, to, blocksPerformances: form.blocksPerformances } })
     adding.value = false
     await refresh()
     toast.add({ title: 'Closure recorded', color: 'success' })
@@ -128,13 +118,11 @@ async function remove(c: Closure) {
               tone="warning"
               label="Blocks performances"
             />
-            <UButton
+            <IconButton
               v-if="c.source === 'manual'"
               icon="i-lucide-trash-2"
-              color="neutral"
-              variant="ghost"
               size="sm"
-              :aria-label="`Delete ${c.title}`"
+              :label="`Delete ${c.title}`"
               @click="remove(c)"
             />
           </RecordListItem>
@@ -165,8 +153,9 @@ async function remove(c: Closure) {
             />
           </UFormField>
           <UFormField label="Where">
-            <USelect
+            <USelectMenu
               v-model="form.scope"
+              value-key="value"
               :items="scopes"
             />
           </UFormField>
@@ -174,24 +163,31 @@ async function remove(c: Closure) {
             v-model="form.allDay"
             label="Whole days"
           />
-          <div class="grid gap-4 sm:grid-cols-2">
+          <UFormField
+            v-if="form.allDay"
+            label="First and last day"
+            help="For a single day, choose it twice."
+            required
+          >
+            <FieldDateRange v-model="form.days" />
+          </UFormField>
+          <div
+            v-else
+            class="grid gap-4 sm:grid-cols-2"
+          >
             <UFormField
-              :label="form.allDay ? 'First day' : 'From'"
+              label="From"
               required
             >
-              <UInput
-                v-model="form.from"
-                :type="form.allDay ? 'date' : 'datetime-local'"
-              />
+              <FieldDateTime v-model="form.from" />
             </UFormField>
             <UFormField
-              :label="form.allDay ? 'Last day' : 'Until'"
-              :hint="form.allDay ? 'Optional' : undefined"
-              :required="!form.allDay"
+              label="Until"
+              required
             >
-              <UInput
+              <FieldDateTime
                 v-model="form.to"
-                :type="form.allDay ? 'date' : 'datetime-local'"
+                :min="form.from ?? undefined"
               />
             </UFormField>
           </div>
@@ -207,7 +203,7 @@ async function remove(c: Closure) {
           type="submit"
           form="new-closure"
           label="Record closure"
-          :disabled="!form.title.trim() || !form.from || (!form.allDay && !form.to)"
+          :disabled="!form.title.trim() || (form.allDay ? !form.days.start : !form.from || !form.to)"
         />
       </template>
     </UModal>

@@ -74,7 +74,6 @@ async function save() {
             v-model="form.name"
             autocomplete="name"
             maxlength="120"
-            class="w-full"
           />
         </UFormField>
         <UFormField
@@ -86,7 +85,6 @@ async function save() {
             v-model="form.preferredName"
             autocomplete="nickname"
             maxlength="60"
-            class="w-full"
           />
         </UFormField>
         <UFormField
@@ -97,7 +95,6 @@ async function save() {
           <UInput
             v-model="form.pronouns"
             maxlength="40"
-            class="w-full"
           />
         </UFormField>
         <UButton

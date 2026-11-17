@@ -2,19 +2,23 @@
 // builds one. It stands in for the kit's siteUrl(path) (Foundations part 4, "The site's public
 // address"), which reads the setting core.site.origin: when the kit has it, this file goes, its
 // callers import the kit's, and no route calls fromRequest. Until then the address is the one the
-// request came to, which a route notes before its service runs.
+// request came to, which a route notes before its service runs. A payment is settled by a job with
+// no request to take it from, so the first address noted is remembered for that, and never
+// replaced: a later request on another host cannot change where those messages point.
 import type { H3Event } from 'h3'
-import { useContext } from '#kit'
+import { cache, useContext } from '#kit'
 import { relyingParty } from '#modules/core'
 
-const KEY = 'box-office.site-origin'
+const KEY = 'box-office:site-origin'
 
-export function fromRequest(event: H3Event): void {
-  useContext().cache[KEY] = relyingParty(event).origin
+export async function fromRequest(event: H3Event): Promise<void> {
+  const origin = (await relyingParty(event)).origin
+  useContext().cache[KEY] = origin
+  if (await cache.get<string>(KEY) === null) await cache.put(KEY, origin)
 }
 
-export function siteUrl(path: string): string {
-  const origin = useContext().cache[KEY]
-  if (typeof origin !== 'string') throw new Error('No site address: the route did not note the request')
+export async function siteUrl(path: string): Promise<string> {
+  const origin = useContext().cache[KEY] ?? await cache.get<string>(KEY)
+  if (typeof origin !== 'string') throw new Error('No site address: no request has been noted yet')
   return `${origin}${path}`
 }

@@ -189,21 +189,17 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
                   :tone="TONES[c.visibility]"
                   :label="visibilityLabel(c.visibility)"
                 />
-                <UButton
+                <IconButton
                   size="sm"
-                  color="neutral"
-                  variant="ghost"
                   icon="i-lucide-arrow-up"
-                  :aria-label="`Move ${c.creditedName} up`"
+                  :label="`Move ${c.creditedName} up`"
                   :disabled="i === 0"
                   @click="move(section, i, -1)"
                 />
-                <UButton
+                <IconButton
                   size="sm"
-                  color="neutral"
-                  variant="ghost"
                   icon="i-lucide-arrow-down"
-                  :aria-label="`Move ${c.creditedName} down`"
+                  :label="`Move ${c.creditedName} down`"
                   :disabled="i === section.credits.length - 1"
                   @click="move(section, i, 1)"
                 />
@@ -215,12 +211,12 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
                   :aria-label="`Edit ${c.creditedName}`"
                   @click="start(c)"
                 />
-                <UButton
+                <IconButton
                   size="sm"
                   color="error"
                   variant="ghost"
                   icon="i-lucide-trash-2"
-                  :aria-label="`Remove ${c.creditedName}`"
+                  :label="`Remove ${c.creditedName}`"
                   @click="remove(c)"
                 />
               </div>
@@ -236,10 +232,11 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
       description="The printed name and role appear as they would in a printed programme."
     >
       <template #body>
-        <form
+        <UForm
           id="credit-form"
+          :state="form"
           class="space-y-4"
-          @submit.prevent="save"
+          @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -263,7 +260,6 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             <UInput
               v-model="form.creditedName"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -274,7 +270,6 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             <UInput
               v-model="form.role"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -282,18 +277,16 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
               <USelect
                 v-model="form.sectionTermId"
                 :items="sectionItems"
-                class="w-full"
               />
             </UFormField>
             <UFormField label="Who sees it">
               <USelect
                 v-model="form.visibility"
                 :items="[...VISIBILITY]"
-                class="w-full"
               />
             </UFormField>
           </div>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">

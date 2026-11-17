@@ -104,6 +104,40 @@ describe('counts of changed rows', () => {
   })
 })
 
+describe('the interface check', () => {
+  it('flags what the kit replaces, and leaves the kit\'s own components alone', async () => {
+    const { interfaceProblems } = await import('../../scripts/checks/interface')
+    const source = [
+      '<form @submit.prevent="save">',
+      '  <UInput',
+      '    v-model="name"',
+      '    class="w-full"',
+      '  />',
+      '  <UInput type="date" />',
+      '  <ul class="divide-y divide-default rounded-lg border border-default">',
+      '  <UButton class="w-full" />',
+      '  <UInput class="w-48" />',
+      '</form>',
+      'const d = new Intl.DateTimeFormat(\'en-GB\')',
+    ].join('\n')
+    expect(interfaceProblems('page.vue', source).map(p => p.line)).toEqual([1, 4, 6, 7, 11])
+    expect(interfaceProblems('PageSettings.vue', '<form>')).toEqual([])
+    expect(interfaceProblems('RecordList.vue', '<ul class="divide-y rounded-lg border">')).toEqual([])
+    expect(interfaceProblems('useDates.ts', 'new Intl.DateTimeFormat(language)')).toEqual([])
+    // An icon-only button is IconButton's job; one with a label, or with content of its own, is not.
+    const buttons = [
+      '<UButton',
+      '  icon="i-lucide-trash-2"',
+      '  :aria-label="`Delete ${name}`"',
+      '/>',
+      '<UButton icon="i-lucide-plus" label="Add" aria-label="Add a venue" />',
+      '<UButton :aria-label="pick"><span /></UButton>',
+    ].join('\n')
+    expect(interfaceProblems('page.vue', buttons).map(p => p.line)).toEqual([1])
+    expect(interfaceProblems('IconButton.vue', buttons)).toEqual([])
+  })
+})
+
 describe('changes() in SQL', () => {
   it('is found in SQL text and sql templates, and not in a comment', async () => {
     const { changesInSql } = await import('../../scripts/checks/source')

@@ -113,6 +113,8 @@ Redesigned on 16 November 2026 (integration ruling R-37, agreed by Matt; brief i
 - **Advanced** (`/admin/advanced`) is a generated page holding every group marked advanced, whichever module declares it, each headed with its module's name, under a warning that these are engineering limits and rarely need changing.
 - **Settings history** (`/admin/settings-history`, seen with `core.audit.view`) lists every change, newest first, filtered by module, page and person. Each row has "Revert", which sets the old value back through the ordinary save: the same ability, rules and confirmation, and its own row with the reason "Reverted". A sensitive setting's values are never shown and it has no Revert.
 
+As built (kit PR 115, 17 November 2026), three details differ from what R-37 first recorded. Every setting names its own ability and a group has none; the one "Changed by people who can..." line still heads a section wherever its settings share an ability. A page's id is `<module>.<page>`, with `core.advanced`, `<module>.settings` and `<module>.admin` reserved. And a setting may name a screen of its own only once that screen shows and saves it; until then it is drawn on a generated page, and Shells and navigation lists which settings that affects for now.
+
 ### Home
 
 - **A home page is a queue, not a menu.** Cards are ordered by urgency: things overdue, things due today, things to know.
@@ -192,6 +194,13 @@ One `LiveKeypad` component serves any live screen that takes a number: the bar t
 - **A confirmation dialog** is for acts that cannot be undone. It names the thing ("Cancel the 19:30 performance of Hamlet?"), states the consequence ("84 ticket holders will be emailed"), and its button repeats the verb. No browser prompts.
 - **Undo beats confirm.** Where an act can be reversed, do it at once and offer Undo for ten seconds.
 - **Money:** any screen that takes or returns money shows the total it expects. If the server's total differs, the action is refused and both figures are shown.
+
+### Choices in forms
+
+- **A choice of many is square tick boxes.** Where a person may pick more than one option, the options are tick boxes (Nuxt UI `UCheckboxGroup`, or one `UCheckbox` per option when each ticked option opens its own field, such as a note). A tick box stays square whatever the brand's corner radius: the kit pins its corners, because a large radius would otherwise turn it into a circle.
+- **A choice of one is round radio buttons** (`URadioGroup`), or a select when there are more than about six options. A radio button is never used where more than one answer can be true, and a tick box is never used for "pick one".
+- **A yes or no on its own is one tick box** with a label that reads as a statement ("I use a wheelchair"). A follow-up question appears beneath it only once it is ticked, and is not asked otherwise (`showIf` on a `PageForm` field).
+- **Each option can carry a line of explanation** beneath its label, in plain words, when the label alone could be read two ways.
 
 ### Acting for someone, and modes
 

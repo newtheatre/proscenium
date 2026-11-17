@@ -1,5 +1,6 @@
 // How a setting's stored value becomes what a control shows and back (UI-14). Durations are stored
-// in seconds and typed as 30m, 2h or 14d; money is stored in pence and typed in pounds.
+// in seconds and sent as 30m, 2h or 14d (FieldDuration shows a number and a unit); money stays in
+// pence, which FieldMoney shows in pounds.
 
 const UNITS: [number, string][] = [[604800, 'w'], [86400, 'd'], [3600, 'h'], [60, 'm'], [1, 's']] // not-policy: units of time
 
@@ -21,7 +22,6 @@ export function toControl(setting: ControlSetting, value: unknown = setting.valu
   if (value === null || value === undefined) return setting.kind === 'boolean' ? false : setting.kind === 'list' ? [] : setting.kind === 'rate' ? { count: undefined, per: '' } : ''
   switch (setting.kind) {
     case 'duration': return durationText(value as number)
-    case 'money': return (value as number) / 100 // not-policy: pence to pounds
     // Stored with the period in seconds; shown as two controls.
     case 'rate': {
       const { count, per } = value as { count: number, per: number }
@@ -37,7 +37,6 @@ export function toControl(setting: ControlSetting, value: unknown = setting.valu
 export function fromControl(kind: string, control: unknown, unset = false, like?: unknown): unknown {
   if ((control === '' || control === undefined) && unset) return null
   switch (kind) {
-    case 'money': return typeof control === 'number' ? Math.round(control * 100) : control // not-policy: pounds to pence
     case 'rate': {
       const { count, per } = (control ?? {}) as Partial<RateControl>
       return { count: count ?? null, per: (per ?? '').trim() }
@@ -51,12 +50,14 @@ export function fromControl(kind: string, control: unknown, unset = false, like?
 }
 
 /** How a value reads in a sentence, such as the default beside a changed setting. */
-export function controlText(kind: string, control: unknown, words: { on: string, off: string, rate: (count: number, per: string) => string }): string {
+export function controlText(kind: string, control: unknown, words: { on: string, off: string, rate: (count: number, per: string) => string, duration?: (text: string) => string, money?: (minor: number) => string }): string {
   if (kind === 'boolean') return control ? words.on : words.off
   if (kind === 'rate') {
     const { count, per } = control as RateControl
-    return count === undefined ? '' : words.rate(count, per)
+    return count === undefined ? '' : words.rate(count, words.duration?.(per) ?? per)
   }
+  if (kind === 'duration' && words.duration) return words.duration(String(control))
+  if (kind === 'money' && words.money && typeof control === 'number') return words.money(control)
   return String(Array.isArray(control) ? control.join(', ') : control)
 }
 

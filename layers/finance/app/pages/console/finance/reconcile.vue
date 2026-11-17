@@ -5,7 +5,8 @@
 interface Line { accountId: string, code: string, name: string, currency: string, balanceMinor: number, paidOutMinor: number, lastPayoutAt: number | null }
 
 const { t } = useT()
-const { money, day } = await useMoney()
+const { money } = await useMoney()
+const { day } = useDates()
 const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/api/finance/reconcile', { key: 'finance:reconcile' })
 </script>
 
@@ -26,26 +27,20 @@ const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/ap
         :description="t('finance.screens.reconcile.empty-help')"
         icon="i-lucide-scale"
       />
-      <ul
+      <RecordList
         v-else
-        class="divide-y divide-default rounded-lg border border-default"
+        :label="t('finance.navigation.reconcile.label')"
       >
-        <li
+        <RecordListItem
           v-for="a in data.accounts"
           :key="`${a.accountId}:${a.currency}`"
-          class="flex flex-wrap items-center gap-3 px-3 py-3"
+          :description="a.lastPayoutAt ? t('finance.screens.reconcile.last-payout', { day: day(a.lastPayoutAt), total: money(a.paidOutMinor, a.currency) }) : t('finance.screens.reconcile.no-payout')"
         >
-          <div class="min-w-0 flex-1">
-            <NuxtLink
-              :to="{ path: '/console/finance/ledger', query: { accountId: a.accountId } }"
-              class="font-medium hover:underline"
-            >
+          <template #name>
+            <ULink :to="{ path: '/console/finance/ledger', query: { accountId: a.accountId } }">
               <span class="text-muted">{{ a.code }}</span> {{ a.name }}
-            </NuxtLink>
-            <p class="text-sm text-muted">
-              {{ a.lastPayoutAt ? t('finance.screens.reconcile.last-payout', { day: day(a.lastPayoutAt), total: money(a.paidOutMinor, a.currency) }) : t('finance.screens.reconcile.no-payout') }}
-            </p>
-          </div>
+            </ULink>
+          </template>
           <div class="text-right">
             <p class="text-sm text-muted">
               {{ t('finance.screens.reconcile.awaiting') }}
@@ -54,8 +49,8 @@ const { data, status, error, refresh } = await useAPI<{ accounts: Line[] }>('/ap
               {{ money(a.balanceMinor, a.currency) }}
             </p>
           </div>
-        </li>
-      </ul>
+        </RecordListItem>
+      </RecordList>
     </DataBoundary>
   </PageFrame>
 </template>
