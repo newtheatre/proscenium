@@ -143,7 +143,7 @@ export async function capacityOf(performanceId: string): Promise<number | null> 
  * No other scheduled performance overlaps [from, to) in this space, if the space is exclusive.
  * `except` leaves out the performance being moved. A statement predicate.
  */
-function noClash(spaceId: string | SQL, from: number | SQL, to: number | SQL, except: string | null = null): SQL {
+export function noClash(spaceId: string | SQL, from: number | SQL, to: number | SQL, except: string | null = null): SQL {
   return sql`((SELECT exclusive FROM core_spaces WHERE id = ${spaceId}) = 0 OR NOT EXISTS (SELECT 1 FROM core_performances o
     WHERE o.space_id = ${spaceId} AND o.state = 'scheduled' AND o.starts_at < ${to} AND o.ends_at > ${from} AND o.id IS NOT ${except}))`
 }
@@ -163,7 +163,7 @@ export async function isSpaceFree(spaceId: string, from: number, to: number): Pr
 }
 
 /** The space belongs to the venue, can hold performances and is not archived. */
-const spaceFits = (venueId: string, spaceId: string): SQL =>
+export const spaceFits = (venueId: string, spaceId: string): SQL =>
   sql`EXISTS (SELECT 1 FROM core_spaces WHERE id = ${spaceId} AND venue_id = ${venueId} AND performable = 1 AND state = 'active')`
 
 const SPACE_UNSUITABLE = { code: 'core.performance.space-unsuitable', reason: 'Choose a space in that venue that is in use and can hold performances.' }
@@ -173,7 +173,7 @@ const CHANGED = { code: 'core.performance.changed', reason: 'The space was taken
  * Why [from, to) cannot be scheduled in this space, in the words the person sees, or null. A read:
  * it chooses the refusal, and the statement's predicate decides.
  */
-async function whyNotFree(spaceId: string, from: number, to: number, except: string | null): Promise<{ code: string, reason: string } | null> {
+export async function whyNotFree(spaceId: string, from: number, to: number, except: string | null): Promise<{ code: string, reason: string } | null> {
   const space = await first<{ exclusive: number }>('SELECT exclusive FROM core_spaces WHERE id = ?', spaceId)
   if (space?.exclusive) {
     const clash = await first<{ title: string, starts_at: number }>(`SELECT p.title, o.starts_at FROM core_performances o JOIN core_productions p ON p.id = o.production_id
@@ -186,7 +186,7 @@ async function whyNotFree(spaceId: string, from: number, to: number, except: str
 }
 
 /** Public holidays and other closures that do not block, for a warning the person can accept. */
-async function warningsFor(spaceId: string, from: number, to: number): Promise<string[]> {
+export async function warningsFor(spaceId: string, from: number, to: number): Promise<string[]> {
   return (await closuresBetween(from, to, { spaceId })).filter(c => !c.blocksPerformances).map(c => c.title)
 }
 

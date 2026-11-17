@@ -16,52 +16,52 @@ const programmeConfigure = 'core.programme.configure'
 export const settings = defineSettings('core', {
   // Organisation. The theatre's name, time zone, currency, language and day start are foundations'
   // (core.site.name, core.locale.*); the operating day (C-37) reads core.locale.day-start.
-  'organisation.short-name': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
-  'organisation.week-start': setting.choice({ default: 'monday', options: ['monday', 'sunday', 'saturday'], change: organisation, audience: 'public' }),
-  'organisation.country': setting.text({ default: 'GB', maxLength: 2, change: organisation }),
-  'organisation.contact-email': setting.text({ unset: true, maxLength: 254, change: organisation, audience: 'public', quotable: true }),
-  'organisation.contact-phone': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
-  'organisation.address': setting.text({ unset: true, maxLength: 300, change: organisation, audience: 'public', quotable: true }),
-  'organisation.legal-name': setting.text({ unset: true, maxLength: 120, change: organisation, audience: 'public', quotable: true }),
-  'organisation.charity-number': setting.text({ unset: true, maxLength: 30, change: organisation, audience: 'public', quotable: true }),
+  'organisation.short-name': setting.text({ unset: true, maxLength: 30, scope: 'site', change: organisation, audience: 'public', quotable: true }),
+  'organisation.week-start': setting.choice({ default: 'monday', options: ['monday', 'sunday', 'saturday'], scope: 'site', change: organisation, audience: 'public' }),
+  'organisation.country': setting.text({ default: 'GB', maxLength: 2, scope: 'site', change: organisation }),
+  'organisation.contact-email': setting.text({ unset: true, maxLength: 254, scope: 'site', change: organisation, audience: 'public', quotable: true }),
+  'organisation.contact-phone': setting.text({ unset: true, maxLength: 30, scope: 'site', change: organisation, audience: 'public', quotable: true }),
+  'organisation.address': setting.text({ unset: true, maxLength: 300, scope: 'site', change: organisation, audience: 'public', quotable: true }),
+  'organisation.legal-name': setting.text({ unset: true, maxLength: 120, scope: 'site', change: organisation, audience: 'public', quotable: true }),
+  'organisation.charity-number': setting.text({ unset: true, maxLength: 30, scope: 'site', change: organisation, audience: 'public', quotable: true }),
   // The day the theatre's own year ends, as MM-DD (31 July is 07-31). Identity's year-end expiry
   // of roles reads it; while it is unset, year end cannot be chosen as an expiry.
-  'organisation.year-end': setting.text({ unset: true, maxLength: 5, change: organisation }),
+  'organisation.year-end': setting.text({ unset: true, maxLength: 5, scope: 'site', change: organisation }),
 
   // Brand (C-35, C-36). Saved together through PUT /api/core/branding, which raises the revision.
   // Light or dark is the interface's (core.appearance.*), not the brand's.
-  'brand.accent': setting.colour({ default: '#2563eb', change: branding, audience: 'public' }),
-  'brand.neutral': setting.choice({ default: 'slate', options: ['slate', 'stone', 'zinc', 'neutral'], change: branding, audience: 'public' }),
-  'brand.display-font': setting.choice({ default: 'system', options: ['system', 'serif', 'rounded'], change: branding, audience: 'public' }),
-  'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], change: branding, audience: 'public' }),
-  'brand.credit-line': setting.boolean({ default: true, change: branding, audience: 'public' }),
+  'brand.accent': setting.colour({ default: '#2563eb', scope: 'site', change: branding, audience: 'public' }),
+  'brand.neutral': setting.choice({ default: 'slate', options: ['slate', 'stone', 'zinc', 'neutral'], scope: 'site', change: branding, audience: 'public' }),
+  'brand.display-font': setting.choice({ default: 'system', options: ['system', 'serif', 'rounded'], scope: 'site', change: branding, audience: 'public' }),
+  'brand.radius': setting.choice({ default: 'medium', options: ['none', 'small', 'medium', 'large'], scope: 'site', change: branding, audience: 'public' }),
+  'brand.credit-line': setting.boolean({ default: true, scope: 'site', change: branding, audience: 'public' }),
   // Programme (part 6). The other programme settings arrive with the screens they shape.
-  'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public' }),
-  'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', change: programmeConfigure, audience: 'public' }),
-  'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', change: programmeConfigure }),
-  'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
-  'brand.logo-dark': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
-  'brand.revision': setting.integer({ default: 0, min: 0, max: 1_000_000_000, change: branding, audience: 'public', managed: true }), // not-policy: a counter's ceiling
+  'programme.credits-public': setting.boolean({ default: true, scope: 'site', change: programmeConfigure, audience: 'public' }),
+  'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', scope: 'site', change: programmeConfigure, audience: 'public' }),
+  'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', scope: 'site', change: programmeConfigure }),
+  'brand.logo': setting.reference({ record: 'core.file', scope: 'site', change: branding, audience: 'public', managed: true }),
+  'brand.logo-dark': setting.reference({ record: 'core.file', scope: 'site', change: branding, audience: 'public', managed: true }),
+  'brand.revision': setting.integer({ default: 0, min: 0, max: 1_000_000_000, scope: 'site', change: branding, audience: 'public', managed: true }), // not-policy: a counter's ceiling
 
   // Files (C-23, C-36).
-  'files.image-limit': setting.integer({ default: 10, min: 1, max: 50, unit: 'core.units.megabytes', change: filesConfigure, audience: 'signed-in' }),
-  'files.document-limit': setting.integer({ default: 25, min: 1, max: 100, unit: 'core.units.megabytes', change: filesConfigure, audience: 'signed-in' }),
-  'files.brand-limit': setting.integer({ default: 1, min: 1, max: 5, unit: 'core.units.megabytes', change: filesConfigure }),
-  'files.deleted-retention': setting.duration({ default: '30d', min: '0d', max: '365d', change: filesConfigure }),
-  'files.upload-timeout': setting.duration({ default: '1h', min: '5m', max: '24h', change: filesConfigure }),
+  'files.image-limit': setting.integer({ default: 10, min: 1, max: 50, unit: 'core.units.megabytes', scope: 'site', change: filesConfigure, audience: 'signed-in' }),
+  'files.document-limit': setting.integer({ default: 25, min: 1, max: 100, unit: 'core.units.megabytes', scope: 'site', change: filesConfigure, audience: 'signed-in' }),
+  'files.brand-limit': setting.integer({ default: 1, min: 1, max: 5, unit: 'core.units.megabytes', scope: 'site', change: filesConfigure }),
+  'files.deleted-retention': setting.duration({ default: '30d', min: '0d', max: '365d', scope: 'site', change: filesConfigure }),
+  'files.upload-timeout': setting.duration({ default: '1h', min: '5m', max: '24h', scope: 'site', change: filesConfigure }),
 
   // Sending email (C-27, C-28, C-32). verified-domain is written only by the verify route.
-  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender }),
-  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true }),
-  'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
+  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, scope: 'site', change: sender }),
+  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, scope: 'site', change: sender, managed: true }),
+  'notifications.email-footer': setting.text({ unset: true, maxLength: 500, scope: 'site', change: 'core.template.edit' }),
   // The delivery pipeline (C-29). Each retry waits four times as long as the one before.
-  'notifications.max-attempts': setting.integer({ default: 5, min: 1, max: 10, change: notificationConfigure }),
-  'notifications.first-retry': setting.duration({ default: '2m', min: '1m', max: '1h', change: notificationConfigure }),
-  'notifications.stuck-after': setting.duration({ default: '10m', min: '5m', max: '2h', change: notificationConfigure }),
-  'notifications.log-retention': setting.duration({ default: '400d', min: '30d', max: '2555d', change: notificationConfigure }),
-  'notifications.inbox-retention': setting.duration({ default: '180d', min: '30d', max: '730d', change: notificationConfigure, audience: 'signed-in' }),
+  'notifications.max-attempts': setting.integer({ default: 5, min: 1, max: 10, scope: 'site', change: notificationConfigure }),
+  'notifications.first-retry': setting.duration({ default: '2m', min: '1m', max: '1h', scope: 'site', change: notificationConfigure }),
+  'notifications.stuck-after': setting.duration({ default: '10m', min: '5m', max: '2h', scope: 'site', change: notificationConfigure }),
+  'notifications.log-retention': setting.duration({ default: '400d', min: '30d', max: '2555d', scope: 'site', change: notificationConfigure }),
+  'notifications.inbox-retention': setting.duration({ default: '180d', min: '30d', max: '730d', scope: 'site', change: notificationConfigure, audience: 'signed-in' }),
   // C-52: the label put before the site's host when the sending domain is set up automatically.
-  'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, change: sender }),
+  'notifications.sending-label': setting.text({ default: 'mail', maxLength: 63, scope: 'site', change: sender }),
 })
 
 const MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] // not-policy: the calendar; 29 February is not every year's end
@@ -247,7 +247,7 @@ export const contributes = {
     { id: 'core.brand-logo-dark', owner: 'site', ability: 'core.branding.edit', accepts: ['png', 'jpeg', 'webp', 'svg'], limit: 'core.files.brand-limit', access: 'public', textClass: 'public', clean: true },
   ],
   'core.erasure-handler': [{ id: 'core.files', file: 'files' }],
-  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }],
+  'core.health-check': [{ id: 'core.sending-domain', file: 'sending-domain' }, { id: 'core.cloudflare-token', file: 'cloudflare-token' }, { id: 'core.email-events', file: 'email-events' }],
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
@@ -309,6 +309,7 @@ export const jobs = {
   'core.check-file': job({ payload: z.object({ fileId: z.string() }) }),
   'core.recompute-days': job({ payload: z.object({}), lane: 'bulk' }),
   'core.send-notifications': job({ payload: z.object({ deliveryIds: z.array(z.string()).min(1) }) }),
+  'core.create-run': job({ payload: z.object({ runId: z.string() }) }),
   'core.verify-sending-domain': job({ payload: z.object({ domain: z.string(), tries: z.number().int().min(1) }) }),
 }
 

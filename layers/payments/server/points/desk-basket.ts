@@ -15,6 +15,13 @@ export interface DeskBasket {
   label: string
   /** The ability a seller needs to see and use the panel. */
   ability: string
+  /**
+   * The panel's component, by name: a file in the contributing layer's `app/till-panels/` folder,
+   * which Payments registers globally. It takes `modelValue` (the input, or null for nothing in the
+   * panel), `locked` (a payment is being taken) and `summary` (what `summary` last said, or null),
+   * and emits `update:modelValue`.
+   */
+  panel: string
   /** Its place among the panels; Box office's comes first. */
   order?: number
   /**
