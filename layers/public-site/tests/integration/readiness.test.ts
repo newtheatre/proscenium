@@ -36,7 +36,7 @@ const setting = (key: string, value: unknown) => inContext(async () => {
 })
 async function published(title: string): Promise<string> {
   const { id } = await ok('POST', '/api/core/productions', { title, kind: 'own' })
-  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true })
+  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: 'https://tickets.example/readiness' })
   await ok('POST', `/api/core/productions/${id}/publish`, {})
   return id
 }
