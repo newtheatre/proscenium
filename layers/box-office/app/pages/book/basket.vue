@@ -9,7 +9,7 @@ interface Basket { orderId: string, reference: string, state: string, expiresAt:
 interface Page { performance: { startsAt: number, venue: string }, production: { title: string }, timing: Timing, bands: { bandId: string, name: string, types: { ticketTypeId: string, name: string }[] }[] }
 type Outcome
   = | { state: 'confirmed', reference: string, totalMinor: number }
-    | { state: 'reserved', reference: string, deskCode: string, amountDueMinor: number }
+    | { state: 'reserved', reference: string, token: string, deskCode: string, amountDueMinor: number }
     | { state: 'confirm-email' }
 
 definePageMeta({ key: 'box-office-basket' })
@@ -169,6 +169,12 @@ async function reserve() {
               <p class="text-sm text-muted">
                 {{ t('box-office.basket.done.reserved.note') }}
               </p>
+              <UButton
+                :to="`/book/order/${outcome.token}`"
+                variant="outline"
+                color="neutral"
+                :label="t('box-office.manage.open')"
+              />
             </template>
             <p v-else>
               {{ t('box-office.basket.done.confirm-email.body') }}

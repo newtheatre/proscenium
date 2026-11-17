@@ -1,7 +1,8 @@
 // Booking online in a real browser: somebody who is not signed in chooses two tickets for a
 // published production's performance, sees them held with a countdown on Check and pay, gives their
 // name and address and reserves them to pay for at the box office, and each screen has no
-// accessibility violations on the way.
+// accessibility violations on the way. Then they open their booking from its link and cancel one
+// of the two tickets.
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
@@ -89,9 +90,32 @@ test('a buyer chooses tickets, sees them held, and reserves them to pay at the b
   await expect(page.getByText(/Box office code: \S+/)).toBeVisible()
   await noViolations(page)
 
+  // Manage booking, from the link: one of the two tickets is cancelled, and its seat goes back on sale.
+  await page.getByRole('link', { name: 'Manage your booking' }).click()
+  await expect(page.getByRole('heading', { name: 'Your booking' })).toBeVisible()
+  await expect(page.getByText('To pay at the box office: £20.00')).toBeVisible()
+  await noViolations(page)
+  await page.getByRole('checkbox', { name: /^Ticket 1:/ }).check()
+  await page.getByRole('button', { name: 'Cancel 1 ticket' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel 1 ticket' }).click()
+  await expect(page.getByText('1 ticket cancelled. Its seat is back on sale.')).toBeVisible()
+  // The dialog fades out; checking it half-faded would judge its contrast mid-animation.
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(page.getByText('To pay at the box office: £10.00')).toBeVisible()
+  await noViolations(page)
+
   // The basket is spent: coming back shows nothing held.
   await visit(page, '/book/basket')
   await expect(page.getByRole('heading', { name: 'Your basket is empty' })).toBeVisible()
+})
+
+test('a link that opens no booking says so, and a used confirmation link explains itself', async ({ page }) => {
+  await visit(page, '/book/order/not-a-real-link')
+  await expect(page.getByRole('heading', { name: 'This link does not open a booking' })).toBeVisible()
+  await visit(page, '/book/confirm/not-a-real-link')
+  await noViolations(page)
+  await page.getByRole('button', { name: 'Confirm my reservation' }).click()
+  await expect(page.getByText(/This link does not confirm a reservation/)).toBeVisible()
 })
 
 test('a production that is not published has no booking page', async ({ page }) => {
