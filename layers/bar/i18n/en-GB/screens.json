@@ -233,5 +233,20 @@
   "bar.screens.sale.reversal.requested": "{amount} refund waiting ({reason})",
   "bar.screens.sale.reversal.succeeded": "{amount} refunded ({reason})",
   "bar.screens.sale.reversal.failed": "{amount} refund did not go through",
-  "bar.navigation.sales.label": "Bar sales"
+  "bar.navigation.sales.label": "Bar sales",
+  "bar.screens.lists.raise.title": "Raise prices",
+  "bar.screens.lists.raise.help": "Every size priced on this list, or only those in the categories you choose, goes up together. Check the new prices before saving.",
+  "bar.screens.lists.raise.how": "Raise by",
+  "bar.screens.lists.raise.by-percent": "A percentage",
+  "bar.screens.lists.raise.by-amount": "An amount",
+  "bar.screens.lists.raise.percent": "Percentage",
+  "bar.screens.lists.raise.amount": "Amount",
+  "bar.screens.lists.raise.categories": "Categories",
+  "bar.screens.lists.raise.categories-help": "Leave all unticked to raise every category.",
+  "bar.screens.lists.raise.nothing": "Nothing would change.",
+  "bar.screens.lists.raise.preview": "Old and new prices",
+  "bar.screens.lists.raise.old-new": "{old} to {new}",
+  "bar.screens.lists.raise.show-preview": "Show new prices",
+  "bar.screens.lists.raise.save": "Save {count} new prices",
+  "bar.screens.lists.raise.done": "{count} prices raised"
 }

@@ -359,3 +359,31 @@ export async function updateOutlet(unit: UnitView, id: string, input: Partial<Ou
   }).expect(1, OUTLET_REFUSED)
   unit.audit({ action: 'update', record: ['bar.outlet', id] })
 }
+
+export interface RaiseInput { categoryIds?: string[], percent?: number, amountMinor?: number, effectiveFrom?: number }
+export interface RaiseRow { variantId: string, oldMinor: number, newMinor: number }
+
+/**
+ * A bulk raise on a list priced by hand (BAR-04): every size priced on the list, or only those in the
+ * chosen categories, goes up by a percentage (to the nearest minor unit) or a fixed amount. With
+ * `unit` null it only works out the old and new prices, for the preview.
+ */
+export async function raisePrices(unit: UnitView | null, listId: string, input: RaiseInput, by: string): Promise<RaiseRow[]> {
+  const list = (await priceLists()).find(l => l.id === listId && l.active)
+  if (!list) refuse(GONE('price list').code, GONE('price list').reason, { status: 404 })
+  if (list!.percentOff !== null) refuse('bar.price.not-settable', 'A percentage list follows Standard and has no prices of its own.', { status: 409 })
+  if ((input.percent === undefined) === (input.amountMinor === undefined)) refuse('bar.price.raise-how', 'Raise by a percentage or by an amount.', { status: 422 })
+  const variants = await all<{ id: string }>(
+    `SELECT v.id FROM bar_variants v JOIN bar_products p ON p.id = v.product_id
+      WHERE v.active = 1 AND p.active = 1 AND (? IS NULL OR p.category_id IN (SELECT value FROM json_each(?)))`,
+    input.categoryIds?.length ? 1 : null, JSON.stringify(input.categoryIds ?? []),
+  )
+  const prices = await pricesFor(variants.map(v => v.id), listId)
+  const rows = [...prices].map(([variantId, p]) => ({
+    variantId,
+    oldMinor: p.amountMinor,
+    newMinor: input.percent !== undefined ? Math.round(p.amountMinor * (100 + input.percent) / 100) : p.amountMinor + input.amountMinor!, // not-policy: a percentage
+  })).filter(r => r.newMinor !== r.oldMinor && r.newMinor >= 0)
+  if (unit) for (const r of rows) await setPrice(unit, { variantId: r.variantId, priceListId: list!.standard ? null : listId, amountMinor: r.newMinor, effectiveFrom: input.effectiveFrom }, by)
+  return rows
+}
