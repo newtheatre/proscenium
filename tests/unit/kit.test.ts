@@ -11,7 +11,8 @@ import { col, columnMeta, defineTable } from '#kit/db'
 import { latestSlot } from '#kit/jobs'
 import { instantOfLocal } from '#kit/clock'
 import { DeclarationError } from '#kit/refusal'
-import { buildRegistry, type ModuleEntry } from '#kit/registry'
+import { buildRegistry, installRegistry, type ModuleEntry } from '#kit/registry'
+import { withImplied } from '../../layers/core/server/identity/grants'
 import { points as corePoints } from '../../layers/core/module/points'
 import { points as domainPoints } from '../../layers/core/module/domain'
 
@@ -104,6 +105,14 @@ describe('abilities', () => {
   })
   it('let a privileged ability that only reads, audited, skip freshness', () => {
     expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', fresh: false, audit: 'read' }) })).not.toThrow()
+  })
+  it('refuse a privileged ability that says it is impliable', () => {
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', impliable: true }) })).toThrow(/risk normal/)
+  })
+  it('name the module\'s own abilities by short name, and leave another module\'s to the registry', () => {
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ implies: ['ledger.list'] }) })).toThrow(/not an ability of finance/)
+    expect(() => defineAbilities('finance', { 'ledger.list': ability(), 'ledger.read': ability({ implies: ['finance.ledger.list'] }) })).toThrow(/short name/)
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ implies: ['core.account.find'] }) })).not.toThrow()
   })
 })
 
@@ -213,6 +222,29 @@ describe('the registry', () => {
   it('lets uses name a reserved module that is not written yet, and nothing else', () => {
     expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['bar'] })])).not.toThrow()
     expect(() => buildRegistry([entry({ id: 'lost-property', uses: ['raffle'] })])).toThrow(/reserved/)
+  })
+  describe('lets an ability imply another module\'s', () => {
+    const core = (impliable?: boolean, risk: 'normal' | 'privileged' = 'normal') => ({ ...entry({ id: 'core', switchable: false, abilities: defineAbilities('core', { 'account.find': { ...ability(), risk, impliable } }) }), root: 'layers/core' }) as ModuleEntry
+    const desk = (implies: string, link: object = {}) => entry({ id: 'lost-property', ...link, abilities: defineAbilities('lost-property', { 'item.return': ability({ implies: [implies] }) }) })
+    it('when it is core\'s, impliable and of risk normal', () => {
+      const registry = buildRegistry([core(true), desk('core.account.find')])
+      expect(registry.abilities.get('lost-property.item.return')!.decl.implies).toEqual(['core.account.find'])
+      installRegistry(registry)
+      expect(withImplied(['lost-property.item.return'])).toEqual(['core.account.find', 'lost-property.item.return'])
+    })
+    it('and refuses one that is not impliable, or privileged', () => {
+      expect(() => buildRegistry([core(), desk('core.account.find')])).toThrow(/impliable: true/)
+      expect(() => buildRegistry([core(true, 'privileged'), desk('core.account.find')])).toThrow(/risk normal/)
+    })
+    it('and refuses one that does not exist', () => {
+      expect(() => buildRegistry([core(true), desk('core.account.lose')])).toThrow(/not a declared ability/)
+    })
+    it('only from a module it requires, never one it only uses', () => {
+      const tickets = entry({ id: 'tickets', abilities: defineAbilities('tickets', { 'order.find': ability({ impliable: true }) }) })
+      expect(() => buildRegistry([core(true), tickets, desk('tickets.order.find', { requires: ['tickets'] })])).not.toThrow()
+      expect(() => buildRegistry([core(true), tickets, desk('tickets.order.find', { uses: ['tickets'] })])).toThrow(/requires \(uses is not enough\)/)
+      expect(() => buildRegistry([core(true), tickets, desk('tickets.order.find')])).toThrow(/requires/)
+    })
   })
   it('takes a record type with fixed ids and no table', () => {
     expect(() => buildRegistry([entry({ id: 'lost-property', records: defineRecords('lost-property', { branding: record({ ids: ['site'] }) }) })])).not.toThrow()

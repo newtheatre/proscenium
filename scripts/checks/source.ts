@@ -6,6 +6,7 @@ import { ROOT, rel } from '../lib/paths.ts'
 import type { Loaded } from '../lib/load.ts'
 import { allRoutes } from './routes.ts'
 import { abilityList, entryLabelKey, groupLabelKey, resolveEntry, SHELL_PREFIXES, shellOf } from '../../layers/core/shared/navigation.ts'
+import { impliedAbility } from '../../layers/core/kit/abilities.ts'
 
 export function walk(dir: string, extensions = ['.ts', '.vue']): string[] {
   if (!existsSync(dir)) return []
@@ -147,7 +148,7 @@ export function checkAbilities(modules: Loaded[], registry: any): string[] {
   const required = new Set<string>()
   for (const route of allRoutes(modules)) if (route.ability) required.add(route.ability)
   for (const { entry } of registry.settings.values()) if (entry.change) required.add(entry.change)
-  for (const [key, { module, decl }] of registry.abilities as Map<string, any>) for (const short of decl.implies ?? []) if (required.has(key)) required.add(`${module}.${short}`)
+  for (const [key, { module, decl }] of registry.abilities as Map<string, any>) for (const entry of decl.implies ?? []) if (required.has(key)) required.add(impliedAbility(module, entry))
   // A navigation entry shows only to people who hold its ability, so that is a requirement too.
   for (const m of modules) {
     for (const entry of ((m.manifest.contributes ?? {}) as Record<string, any[]>)['core.navigation'] ?? []) for (const name of abilityList(entry.ability)) required.add(name)

@@ -2,6 +2,7 @@
 // declarative refusal is owner: 'refuses'. Where grants come from is identity's business: it
 // installs an access provider. Until then the provider reads grants from the actor itself.
 import { useRegistry } from './registry'
+import { impliedAbility } from './abilities'
 import { isEnabled } from './modules-store'
 import { useSetting } from './settings-store'
 import { nowMs } from './clock'
@@ -52,7 +53,7 @@ function grantingAbilities(ability: string): Set<string> {
     grew = false
     for (const [name, { module, decl }] of registry.abilities) {
       if (out.has(name)) continue
-      if ((decl.implies ?? []).some(short => out.has(`${module}.${short}`))) {
+      if ((decl.implies ?? []).some(entry => out.has(impliedAbility(module, entry)))) {
         out.add(name)
         grew = true
       }

@@ -3,6 +3,7 @@
 // unclaimed or unusable account count for nothing, because such an account is never an actor.
 import { all, first, nowMs, useContext, type Grant, type UnitView } from '#kit'
 import { useRegistry } from '#kit/registry'
+import { impliedAbility } from '#kit/abilities'
 
 export const OWNER = 'owner'
 
@@ -71,7 +72,7 @@ export function withImplied(abilities: Iterable<string>): string[] {
     const declared = registry.abilities.get(name)
     if (!declared) continue
     out.add(name)
-    for (const short of declared.decl.implies ?? []) queue.push(`${declared.module}.${short}`)
+    for (const entry of declared.decl.implies ?? []) queue.push(impliedAbility(declared.module, entry))
   }
   return [...out].sort()
 }
