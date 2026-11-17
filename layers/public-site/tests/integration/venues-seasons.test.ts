@@ -22,6 +22,9 @@ import { publicProgrammePaths } from '#modules/core'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, env, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
+
 const handle = server({
   'POST /api/core/productions': createProduction,
   'PATCH /api/core/productions/:id': patchProduction,
@@ -60,7 +63,7 @@ async function ok(method: string, path: string, body: object) {
 }
 async function show(title: string, seasonId: string | null = null): Promise<string> {
   const { id } = await ok('POST', '/api/core/productions', { title, kind: 'own' })
-  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, seasonId })
+  await ok('PATCH', `/api/core/productions/${id}`, { summary: 'A show.', categoryTermId: await term('core.production-category', 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING, seasonId })
   await ok('POST', `/api/core/productions/${id}/publish`, {})
   return id
 }

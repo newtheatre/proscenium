@@ -16,6 +16,9 @@ import { changeSetting, createUnit } from '#kit'
 import { resetRateLimits } from '#kit/ratelimit'
 import { call, inContext, person, rows, server, setModule } from '../../../../tests/integration/helpers'
 
+// Nothing in these tests sells tickets, so a production needs a booking link to publish (Matt, 2026-11-17).
+const BOOKING = 'https://tickets.example/book'
+
 const handle = server({
   'POST /api/core/productions': createProduction,
   'PATCH /api/core/productions/:id': patchProduction,
@@ -58,7 +61,7 @@ async function season(name: string, state: 'draft' | 'published'): Promise<{ id:
 async function show(title: string, options: { category?: string, seasonId?: string } = {}): Promise<string> {
   const { body } = await req('POST', '/api/core/productions', { title, kind: 'own' })
   await req('PATCH', `/api/core/productions/${body.id}`, {
-    summary: 'A show.', categoryTermId: await term('core.production-category', options.category ?? 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, seasonId: options.seasonId ?? null,
+    summary: 'A show.', categoryTermId: await term('core.production-category', options.category ?? 'play'), effectsConfirmedNone: true, advisoriesConfirmedNone: true, externalBookingUrl: BOOKING, seasonId: options.seasonId ?? null,
   })
   expect((await req('POST', `/api/core/productions/${body.id}/publish`, {})).status).toBe(200)
   return body.id
