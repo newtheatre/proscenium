@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { text } from 'drizzle-orm/sqlite-core'
 import { newId, isId, idTime, idSchema } from '#kit/ids'
 import { parseDuration, formatDuration, unitsWithin, durationParts } from '#kit/duration'
-import { setting, defineSettings, validateSettingValue, formatSetting } from '#kit/settings'
+import { setting, defineSettings, validateSettingValue, formatSetting, optionsOf } from '#kit/settings'
+import { catalogueLabel, searchable } from '../../layers/core/shared/choices'
 import { ability, defineAbilities, record, defineRecords } from '#kit/abilities'
 import { code, defineModule, event, job, task } from '#kit/manifest'
 import { col, columnMeta, defineTable } from '#kit/db'
@@ -83,6 +84,37 @@ describe('settings', () => {
     expect(result.ok).toBe(false)
     expect(validateSettingValue(entries['box-office.holds.length'], '2h')).toMatchObject({ ok: false })
     expect(validateSettingValue(entries['box-office.holds.length'], '30m')).toEqual({ ok: true, value: 1800 })
+  })
+  it('take a choice from one of the kit\'s catalogues, checked against it', () => {
+    const local = defineSettings('core', {
+      'locale.time-zone': setting.choice({ unset: true, catalogue: 'time-zone', change: 'core.settings.manage' }),
+      'locale.currency': setting.choice({ default: 'GBP', catalogue: 'currency', change: 'core.settings.manage' }),
+      'locale.language': setting.choice({ default: 'en-GB', catalogue: 'language', change: 'core.settings.manage' }),
+      'organisation.country': setting.choice({ default: 'GB', catalogue: 'country', change: 'core.settings.manage' }),
+    })
+    expect(validateSettingValue(local['core.locale.time-zone'], 'Europe/London')).toEqual({ ok: true, value: 'Europe/London' })
+    expect(validateSettingValue(local['core.locale.time-zone'], 'UTC')).toMatchObject({ ok: true })
+    expect(validateSettingValue(local['core.locale.time-zone'], 'Mars/Olympus')).toMatchObject({ ok: false, limit: 'options' })
+    expect(validateSettingValue(local['core.locale.currency'], 'EUR')).toMatchObject({ ok: true })
+    expect(validateSettingValue(local['core.locale.currency'], 'gbp')).toMatchObject({ ok: false })
+    expect(validateSettingValue(local['core.locale.language'], 'fr-FR')).toMatchObject({ ok: false })
+    expect(optionsOf(local['core.locale.language'])).toEqual(['en-GB'])
+    expect(validateSettingValue(local['core.organisation.country'], 'XK')).toMatchObject({ ok: false })
+    expect(optionsOf(local['core.organisation.country'])).toHaveLength(249)
+  })
+  it('refuse a choice with both options and a catalogue, an unknown catalogue, or a catalogue on text', () => {
+    expect(() => defineSettings('core', { 'a.b': setting.choice({ default: 'x', options: ['x'], catalogue: 'currency', change: 'c' } as never) })).toThrow(DeclarationError)
+    expect(() => defineSettings('core', { 'a.b': setting.choice({ default: 'x', catalogue: 'planets', change: 'c' } as never) })).toThrow(DeclarationError)
+    expect(() => defineSettings('core', { 'a.b': setting.text({ default: 'x', maxLength: 3, catalogue: 'currency', change: 'c' } as never) })).toThrow(DeclarationError)
+  })
+  it('draw a long choice with a search box and label catalogue values by name', () => {
+    expect(searchable(['system', 'light', 'dark'])).toBe(false)
+    expect(searchable(optionsOf(setting.choice({ default: 'GBP', catalogue: 'currency', change: 'c' })))).toBe(true)
+    expect(catalogueLabel('currency', 'GBP', 'en-GB')).toBe('GBP: British Pound')
+    expect(catalogueLabel('country', 'GB', 'en-GB')).toBe('United Kingdom')
+    expect(catalogueLabel('language', 'en-GB', 'en-GB')).toBe('British English')
+    expect(catalogueLabel('time-zone', 'Europe/London', 'en-GB', new Date('2026-07-01T12:00:00Z'))).toBe('Europe/London (GMT+1)')
+    expect(catalogueLabel('time-zone', 'America/New_York', 'en-GB', new Date('2026-01-01T12:00:00Z'))).toBe('America/New York (GMT-5)')
   })
   it('format a quotable value for a page', () => {
     expect(formatSetting(entries['box-office.fees.booking'], 150, { currency: 'GBP' })).toBe('£1.50')

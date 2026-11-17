@@ -66,9 +66,9 @@ export const settings = defineSettings('core', {
   'site.origin': setting.text({ unset: true, maxLength: 200, change, onChange: 'confirm' }),
 
   // Unset until setup: until then scheduled tasks run on UTC and no theatre date is computed.
-  'locale.time-zone': setting.text({ unset: true, maxLength: 64, change, audience: 'public', onChange: 'confirm' }),
-  'locale.currency': setting.text({ default: 'GBP', maxLength: 3, change, audience: 'public', quotable: true }),
-  'locale.language': setting.text({ default: 'en-GB', maxLength: 35, change, audience: 'public' }),
+  'locale.time-zone': setting.choice({ unset: true, catalogue: 'time-zone', change, audience: 'public', onChange: 'confirm' }),
+  'locale.currency': setting.choice({ default: 'GBP', catalogue: 'currency', change, audience: 'public', quotable: true }),
+  'locale.language': setting.choice({ default: 'en-GB', catalogue: 'language', change, audience: 'public' }),
   'locale.day-start': setting.time({ default: '04:00', min: '00:00', max: '08:00', change, onChange: 'confirm' }),
 
   'units.statement-limit': setting.integer({ default: 50, min: 10, max: 1000, unit: 'core.units.statements', change }),
@@ -102,30 +102,5 @@ export const settings = defineSettings('core', {
 })
 
 export const settingRules = defineSettingRules('core', [
-  {
-    id: 'time-zone-known',
-    check: (s) => {
-      if (s['locale.time-zone'] === null) return true
-      try {
-        new Intl.DateTimeFormat('en-GB', { timeZone: s['locale.time-zone'] })
-        return true
-      }
-      catch {
-        return false
-      }
-    },
-  },
-  { id: 'currency-code', check: s => /^[A-Z]{3}$/.test(s['locale.currency']) },
   { id: 'site-origin-shape', check: s => s['site.origin'] === null || normaliseOrigin(s['site.origin']) === s['site.origin'] },
-  {
-    id: 'language-known',
-    check: (s) => {
-      try {
-        return Intl.getCanonicalLocales(s['locale.language'])[0] === s['locale.language']
-      }
-      catch {
-        return false
-      }
-    },
-  },
 ])
