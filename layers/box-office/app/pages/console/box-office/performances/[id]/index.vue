@@ -147,14 +147,25 @@ const totalCapacity = computed(() => Object.values(capacity.value).reduce((sum, 
 
         <div class="space-y-8">
           <RefusalNotice :refusal="refusal" />
-          <ULink
+          <div
             v-if="d.sales && d.sales.state !== 'draft'"
-            :to="`/console/box-office/performances/${encodeURIComponent(d.performance.id)}/door`"
-            class="inline-flex items-center gap-1 text-sm"
+            class="flex flex-wrap gap-4"
           >
-            <UIcon name="i-lucide-door-open" />
-            {{ t('box-office.door.title') }}
-          </ULink>
+            <ULink
+              :to="`/console/box-office/performances/${encodeURIComponent(d.performance.id)}/door`"
+              class="inline-flex items-center gap-1 text-sm"
+            >
+              <UIcon name="i-lucide-door-open" />
+              {{ t('box-office.door.title') }}
+            </ULink>
+            <ULink
+              :to="`/console/box-office/performances/${encodeURIComponent(d.performance.id)}/change`"
+              class="inline-flex items-center gap-1 text-sm"
+            >
+              <UIcon name="i-lucide-calendar-x" />
+              {{ t('box-office.change.link') }}
+            </ULink>
+          </div>
           <RecordChecks
             :title="t('box-office.setup.checklist')"
             :checks="checks"

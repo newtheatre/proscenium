@@ -32,7 +32,7 @@ export async function orderPayments(order: Pick<OrderRow, 'id' | 'intent_id'>): 
 }
 
 /** Asks for a refund of an order in the caller's unit, from as many of its payments as it takes. */
-export async function refundOrder(unit: UnitView, order: Pick<OrderRow, 'id' | 'intent_id'>, amountMinor: number, by: string, remedy: string): Promise<OrderRefund> {
+export async function refundOrder(unit: UnitView, order: Pick<OrderRow, 'id' | 'intent_id'>, amountMinor: number, by: string | null, remedy: string): Promise<OrderRefund> {
   const payable = await orderPayments(order)
   if (payable.reduce((sum, p) => sum + p.leftMinor, 0) < amountMinor)
     refuse('box-office.order.nothing-paid', 'Not enough of what was paid for this booking is left to refund that amount.', { status: 409, remedy })
