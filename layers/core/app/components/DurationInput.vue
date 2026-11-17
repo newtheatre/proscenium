@@ -11,6 +11,8 @@ const props = defineProps<{
   /** The most it may be: seconds, or written like 1h or 365d. */
   max?: number | string
   disabled?: boolean
+  /** Names the two controls for a screen reader when the field's label does not, as "Hold for". */
+  label?: string
 }>()
 const model = defineModel<number | null | undefined>()
 
@@ -33,6 +35,7 @@ watch(model, (value) => {
 }, { immediate: true })
 
 const items = computed(() => offered.value.map(value => ({ value, label: t(`core.duration.${value}`, { count: count.value ?? 2 }) }))) // not-policy: the plural when empty
+const named = (part: string) => props.label ? `${props.label}: ${part}` : part
 const longUnits = computed(() => offered.value.includes('month') || offered.value.includes('year'))
 
 function setCount(value: number | null | undefined) {
@@ -52,6 +55,7 @@ function setUnit(value: DurationUnit) {
         :model-value="count"
         :min="0"
         :disabled="disabled"
+        :aria-label="named(t('core.duration.amount'))"
         class="w-32"
         @update:model-value="setCount"
       />
@@ -60,7 +64,7 @@ function setUnit(value: DurationUnit) {
         :items="items"
         value-key="value"
         :disabled="disabled"
-        :aria-label="t('core.duration.unit')"
+        :aria-label="named(t('core.duration.unit'))"
         class="w-32"
         @update:model-value="setUnit($event as DurationUnit)"
       />

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { entryLabelKey, groupLabelKey, orderGroups, resolveEntry, shellOf } from '../../shared/navigation'
 import { activeFilterCount, decodeList, defineList, directionWords, filterChipText, filterCount, parseList, serialiseList, toCsv } from '../../shared/list'
 import { isConflict, mergeConflict } from '../../shared/form'
-import { controlText, durationText, fromControl, toControl } from '../../shared/controls'
+import { controlText, fromControl, toControl } from '../../shared/controls'
 
 describe('shells and entries (UI-08)', () => {
   it('knows which shell an address belongs to', () => {
@@ -129,14 +129,10 @@ describe('a stale save (UI-13)', () => {
 })
 
 describe('setting controls (UI-14)', () => {
-  it('writes durations the way people type them', () => {
-    expect(durationText(1800)).toBe('30m')
-    expect(durationText(86400 * 14)).toBe('2w')
-    expect(durationText(90)).toBe('90s')
-  })
-
   it('turns a stored value into a control value and back', () => {
-    expect(toControl({ kind: 'duration', value: 900 })).toBe('15m')
+    expect(toControl({ kind: 'duration', value: 900 })).toBe(900)
+    expect(toControl({ kind: 'duration', value: null })).toBeNull()
+    expect(fromControl('duration', null, true)).toBeNull()
     expect(toControl({ kind: 'money', value: 1250 })).toBe(1250)
     expect(toControl({ kind: 'boolean', value: null })).toBe(false)
     expect(fromControl('money', 1250)).toBe(1250)
@@ -144,15 +140,15 @@ describe('setting controls (UI-14)', () => {
     expect(fromControl('text', '', true)).toBeNull()
   })
   it('edits a rate as a count and a period, and a text custom value as text', () => {
-    expect(toControl({ kind: 'rate', value: { count: 600, per: 60 } })).toEqual({ count: 600, per: '1m' })
-    expect(toControl({ kind: 'rate', value: null })).toEqual({ count: undefined, per: '' })
-    expect(fromControl('rate', { count: 20, per: ' 10m ' })).toEqual({ count: 20, per: '10m' })
-    expect(fromControl('rate', { count: undefined, per: '' })).toEqual({ count: null, per: '' })
+    expect(toControl({ kind: 'rate', value: { count: 600, per: 60 } })).toEqual({ count: 600, per: 60 })
+    expect(toControl({ kind: 'rate', value: null })).toEqual({ count: undefined, per: undefined })
+    expect(fromControl('rate', { count: 20, per: 600 })).toEqual({ count: 20, per: 600 })
+    expect(fromControl('rate', { count: undefined, per: undefined })).toEqual({ count: null, per: null })
     const words = { on: 'on', off: 'off', rate: (count: number, per: string) => `${count} in ${per}` }
-    expect(controlText('rate', { count: 10, per: '10m' }, words)).toBe('10 in 10m')
-    const spoken = { ...words, duration: (text: string) => text.replace('m', ' minutes'), money: (minor: number) => `£${minor / 100}` }
-    expect(controlText('rate', { count: 10, per: '10m' }, spoken)).toBe('10 in 10 minutes')
-    expect(controlText('duration', '30m', spoken)).toBe('30 minutes')
+    expect(controlText('rate', { count: 10, per: 600 }, words)).toBe('10 in 600')
+    const spoken = { ...words, duration: (seconds: number) => `${seconds / 60} minutes`, money: (minor: number) => `£${minor / 100}` }
+    expect(controlText('rate', { count: 10, per: 600 }, spoken)).toBe('10 in 10 minutes')
+    expect(controlText('duration', 1800, spoken)).toBe('30 minutes')
     expect(controlText('money', 1250, spoken)).toBe('£12.5')
     expect(toControl({ kind: 'custom', value: '08-01' })).toBe('08-01')
     expect(fromControl('custom', '08-01', false, '08-01')).toBe('08-01')
