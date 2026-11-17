@@ -58,6 +58,13 @@
 /* Site administration: the strip above each page's panel takes 2.25rem off the panel's full height. */
 .admin-shell .admin-main > div { height: calc(100svh - 2.25rem); }
 
+/* Live mode: every button and link-button is at least the live target, so a control is hit
+   first time with a thumb, in the dark, on the move. */
+.live-shell :where(button, a[role='button'], [role='tab'], [role='radio']) {
+  min-height: var(--proscenium-target-live);
+  min-width: var(--proscenium-target-live);
+}
+
 /* The eight calendar colours (UI-35), apart from the brand and the status colours so no brand can
    make them unreadable. Each sets a fill, its text (over 7:1 on the fill) and an edge that keeps 3:1
    against the page, light and dark. A module names a colour, calendar-1 to calendar-8, never a value. */

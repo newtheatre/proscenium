@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { can, defineRoute, refuse } from '#kit'
 import { enabledModules } from '#kit/modules-store'
 import { useRegistry } from '#kit/registry'
-import { defaultValue, optionsOf, RATE_COUNT } from '#kit/settings'
+import { defaultValue, optionsOf, RATE_COUNT, RATE_PERIOD } from '#kit/settings'
 import { isOverridden, useSetting } from '#kit/settings-store'
 import { configuredOrigin, requestUrl } from '#kit/origin'
 import { holds, mayOpen } from '../../../interface/navigation'
@@ -83,6 +83,9 @@ export default defineRoute({
       min: entry.kind === 'rate' ? RATE_COUNT.min : entry.min,
       max: entry.kind === 'rate' ? RATE_COUNT.max : entry.max,
       maxLength: entry.maxLength,
+      /** A rate's period limits, written like 1m and 1d, for the period control. */
+      periodMin: entry.kind === 'rate' ? RATE_PERIOD.min : undefined,
+      periodMax: entry.kind === 'rate' ? RATE_PERIOD.max : undefined,
       /** A choice's values; where they come from a catalogue the screen labels them itself. */
       options: entry.kind === 'choice' || entry.of === 'choice' ? optionsOf(entry) : undefined,
       catalogue: entry.catalogue ?? null,

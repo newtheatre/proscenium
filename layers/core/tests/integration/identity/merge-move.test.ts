@@ -6,12 +6,20 @@ import { NOT_YET, createUnit, inAccountScope, newId, recordMergeItems, useDb, ty
 import { useRegistry } from '#kit/registry'
 import { sessions } from '../../../../payments/server/db/schema'
 import { Browser, deliver, env, grantDirectly, leaveIdentity, mailbox, reset, signInByEmail, staff, useIdentity } from './helpers'
-import { inContext, rows, sent } from '../../../../../tests/integration/helpers'
+import { inContext, rows, sent, setModule } from '../../../../../tests/integration/helpers'
 import { restartStalledMerges } from '../../../server/identity/merge-move'
 import { closeMerges } from '../../../server/identity/merge-undo'
 
-beforeAll(useIdentity)
-afterAll(leaveIdentity)
+// Front of house brings a real merge handler. A switched-off module's chain waits for it to come
+// back, so it is on here, as it would be on any theatre whose rows it holds.
+beforeAll(async () => {
+  await useIdentity()
+  await setModule('front-of-house', true)
+})
+afterAll(async () => {
+  await setModule('front-of-house', false)
+  leaveIdentity()
+})
 beforeEach(reset)
 
 async function tillSession(accountId: string): Promise<string> {
@@ -123,6 +131,45 @@ describe('stage two of a merge', () => {
       expect(await rows('SELECT opened_by FROM payments_sessions WHERE id = ?', till)).toEqual([{ opened_by: survivorId }])
       expect((await mergeOf(mergedAccountId)).completed_at).not.toBeNull()
       expect(calls).toHaveLength(1)
+    })
+
+    describe('while its module is switched off', () => {
+      // seats_ledger.buyer_id stands in for a handler column here, and seats is switched off.
+      let column: { meta: { account: { onMerge: string } } } | undefined
+      beforeEach(async () => {
+        const table = (useRegistry().tables as Map<string, any>).get('seats_ledger')
+        column = Object.values(table.meta.columns as Record<string, any>).find(c => c.sql === 'buyer_id')
+        column!.meta.account.onMerge = 'handler'
+        await setModule('seats', false)
+      })
+      afterEach(async () => {
+        column!.meta.account.onMerge = 'alias'
+        await setModule('seats', true)
+      })
+      async function ledgerRow(buyerId: string) {
+        const performanceId = newId('perf')
+        await env.DB.prepare('INSERT INTO seats_performances (id, title, capacity, sold) VALUES (?, ?, 10, 0)').bind(performanceId, 'Hamlet').run()
+        await env.DB.prepare('INSERT INTO seats_ledger (id, performance_id, quantity, buyer_id, created_at) VALUES (?, ?, 1, ?, ?)').bind(newId('led'), performanceId, buyerId, Date.now()).run()
+      }
+
+      it('does not wait for it when none of its handler columns names the merged-away account', async () => {
+        const { admin, survivorId, mergedAccountId } = await twoAccounts()
+        await ledgerRow(survivorId) // a row of someone else's is no reason to wait
+        expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+        expect(await deliver()).not.toContain('deferred')
+        expect(calls).toEqual([])
+        expect((await mergeOf(mergedAccountId)).completed_at).not.toBeNull()
+      })
+
+      it('waits for it while a handler column still names the merged-away account', async () => {
+        const { admin, survivorId, mergedAccountId } = await twoAccounts()
+        await ledgerRow(mergedAccountId)
+        expect((await admin.browser.post('/api/core/accounts/merge', { survivorId, mergedAccountId })).status).toBe(200)
+        expect(await deliver()).toContain('deferred')
+        expect(calls).toEqual([])
+        expect((await mergeOf(mergedAccountId)).completed_at).toBeNull()
+        expect(await rows('SELECT last_error FROM core_jobs WHERE name = \'core.merge-move\' AND state = \'queued\'')).toEqual([{ last_error: 'deferred: core.merge.module-off' }])
+      })
     })
   })
 })

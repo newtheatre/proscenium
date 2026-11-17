@@ -355,7 +355,10 @@ reason and `onChange: 'confirm'` a second confirmation; the `change` ability sti
 Saving a setting asks for a fresh sign-in (`core.access.fresh-within`) only when it declares
 `onChange`, whatever the ability's own `fresh` says (Matt, 16 November); `can(..., { fresh })`
 is the override, and only the kit's settings code may pass it (the conformance run checks). It
-changes freshness alone: a privileged ability still needs a strong sign-in. A setting that a table's
+changes freshness alone: a privileged ability still needs a strong sign-in. Reads never ask for a
+fresh sign-in (Matt, 17 November): a route answering a GET or HEAD sets `reads` on the context and
+`can` then skips freshness, so a screen loads, and flags such as `canChange` hold, however long ago
+the person confirmed; the save or action asks. A setting that a table's
 `retention`, or a column's `retain until`, names is a retention period and always confirms: the
 registry makes it `onChange: 'confirm'` unless it asks for a reason. A section is reset by saving it with
 `reset: true` on each of its settings.

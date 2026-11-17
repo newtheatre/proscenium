@@ -76,6 +76,11 @@ describe('the guard for addresses under a shell (UI-07, UI-08)', () => {
     const basic = person(['core.settings.manage'], { assurance: 'basic' })
     expect((await decide('/admin/theatre', stale)).decision).toBe('allow')
     expect((await decide('/admin/theatre', basic)).decision).toBe('allow')
+    // And its fields are editable: confirming is asked when saving, not when loading.
+    const loaded = (await (await call(handle, 'GET', '/api/core/settings?page=core.theatre', { actor: stale })).json()) as { settings: { key: string, managed: boolean, canChange: boolean, changeAbility: string }[] }
+    const held = loaded.settings.filter(s => !s.managed && s.changeAbility === 'core.settings.manage')
+    expect(held.length).toBeGreaterThan(0)
+    expect(held.every(s => s.canChange)).toBe(true)
   })
 
   it('lets any signed-in person open their account', async () => {
@@ -112,7 +117,7 @@ describe('navigation and the viewer', () => {
     const aud = await (await call(handle, 'GET', '/api/core/viewer', { actor: audience() })).json() as { signedIn: boolean, sides: string[] }
     expect(aud).toMatchObject({ signedIn: true, sides: ['audience'] })
     const sam = await (await call(handle, 'GET', '/api/core/viewer', { actor: staff() })).json() as { sides: string[] }
-    expect(sam.sides).toEqual(['audience', 'console'])
+    expect(sam.sides).toEqual(['audience', 'console', 'live'])
   })
 })
 
@@ -333,5 +338,25 @@ describe('Site administration in the viewer (R-33)', () => {
   it('answers /admin as a missing page to someone with no admin ability', async () => {
     expect((await decide('/admin', staff())).decision).toBe('not-found')
     expect((await decide('/admin', person(['core.settings.manage']))).decision).toBe('allow')
+  })
+})
+
+describe('Live mode', () => {
+  const sides = async (actor: ReturnType<typeof person>) => (await (await call(handle, 'GET', '/api/core/viewer', { actor })).json()).sides as string[]
+
+  it('opens to someone who holds the ability of a live entry, and is not found for anyone else', async () => {
+    expect(await sides(staff())).toContain('live')
+    expect(await sides(reader())).not.toContain('live')
+    expect((await decide('/live', staff())).decision).toBe('allow')
+    expect((await decide('/live/gallery', staff())).decision).toBe('allow')
+    expect((await decide('/live', reader())).decision).toBe('not-found')
+    expect((await decide('/live/gallery', reader())).decision).toBe('not-found')
+    expect((await decide('/live')).decision).toBe('sign-in')
+  })
+
+  it('gives the Tonight hub its tiles from the live menu', async () => {
+    const nav = await (await call(handle, 'GET', '/api/core/navigation?shell=live', { actor: staff() })).json() as { items: { id: string, to: string }[] }
+    expect(nav.items.map(i => `${i.id} ${i.to}`)).toEqual(['gallery.live /live/gallery'])
+    expect((await call(handle, 'GET', '/api/core/navigation?shell=live', { actor: reader() })).status).toBe(404)
   })
 })

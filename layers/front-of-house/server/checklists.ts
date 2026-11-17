@@ -257,8 +257,12 @@ export async function reopenRun(unit: UnitView, input: { checklistId: string, pe
   const run = await first<{ id: string, state: string }>('SELECT id, state FROM front_of_house_checklist_runs WHERE checklist_id = ? AND performance_id = ?', input.checklistId, input.performanceId)
   if (!run) refuse('core.not-found', 'This checklist has not been started.', { status: 404 })
   const at = nowMs()
-  // The night report arrives in a later part of the build; its sign-off will add the second condition.
-  unit.add({ sql: 'UPDATE front_of_house_checklist_runs SET state = \'open\', completed_by = NULL, completed_at = NULL, updated_at = ? WHERE id = ? AND state <> \'open\'', params: [at, run.id] })
+  unit.add({
+    sql: `UPDATE front_of_house_checklist_runs SET state = 'open', completed_by = NULL, completed_at = NULL, updated_at = ?
+      WHERE id = ? AND NOT EXISTS (SELECT 1 FROM front_of_house_night_reports n WHERE n.performance_id = ? AND n.state = 'signed_off')`,
+    params: [at, run.id, input.performanceId],
+  }).expect(1, { code: 'front-of-house.report-signed-off', reason: 'The night is signed off, so its checklists are final.', remedy: 'Add an addendum to the night report instead.' })
+  unit.add({ sql: 'UPDATE front_of_house_checklist_runs SET updated_at = updated_at WHERE id = ? AND ? <> \'open\'', params: [run.id, run.state] })
     .expect(1, { code: 'front-of-house.checklist-open', reason: 'This checklist is not complete.' })
   unit.audit({ action: 'state', record: ['front-of-house.checklist-run', run.id], detail: { from: run.state, to: 'open' } })
 }

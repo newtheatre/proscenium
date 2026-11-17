@@ -39,6 +39,8 @@ export interface MoveModule {
   module: string
   handlers: { id: string, handler: MergeHandler }[]
   moves: { table: string, column: string }[]
+  /** Its `handler` columns, which its handlers settle. */
+  handled: { table: string, column: string }[]
 }
 
 /**
@@ -61,7 +63,8 @@ export function moveModules(): MoveModule[] {
     const unhandled = own.find(c => c.onMerge === 'handler')
     if (unhandled && !handlers.length) throw new Error(`${unhandled.table}.${unhandled.column} declares onMerge: 'handler' but ${id} contributes no core.merge-handler`)
     for (const h of handlers) if (typeof h.handler?.merge !== 'function') throw new Error(`${id}'s merge handler ${h.id} has no merge()`)
-    if (moves.length || handlers.length) out.push({ module: id, handlers, moves })
+    const handled = own.filter(c => c.onMerge === 'handler').map(({ table, column }) => ({ table, column }))
+    if (moves.length || handlers.length) out.push({ module: id, handlers, moves, handled })
   }
   return out
 }
@@ -77,6 +80,12 @@ async function shares(moves: MoveModule['moves']): Promise<MoveModule['moves'][]
 /** SQL that is true while none of `moves` names the account bound to each `?`. */
 function noneLeft(moves: MoveModule['moves']): string {
   return moves.map(m => `NOT EXISTS (SELECT 1 FROM "${m.table}" WHERE "${m.column}" = ?)`).join(' AND ') || '1'
+}
+
+/** Whether any of `columns` still names the account. */
+async function stillNamed(columns: MoveModule['moves'], accountId: string): Promise<boolean> {
+  const row = await first<{ clear: number }>(`SELECT ${noneLeft(columns)} AS clear`, ...columns.map(() => accountId))
+  return !row?.clear
 }
 
 interface MergeRow { id: string, survivor_id: string, merged_account_id: string, completed_at: number | null, undone_at: number | null }
@@ -117,13 +126,19 @@ export async function runMergeMove(unit: UnitView, payload: MergeMovePayload, jo
     unit.enqueue('core.merge-move', { mergeId: merge.id, stage: 'finish' })
     return
   }
-  // A switched-off module's handler is not run for it; its chain waits until the module is back.
-  if (module.handlers.length && !(await isEnabled(module.module))) {
-    job.defer('core.merge.module-off')
-    return
+  // A switched-off module's handlers are not run. While one of its handler columns names the
+  // merged-away account its chain waits until the module is back; where none does there is nothing
+  // for them to settle, so the chain goes straight on to its move columns. A module that was never
+  // switched on holds no rows, so it never holds a merge up.
+  let step = payload.step ?? 0
+  if (step < module.handlers.length && !(await isEnabled(module.module))) {
+    if (!module.handled.length || await stillNamed(module.handled, ref.mergedAccountId)) {
+      job.defer('core.merge.module-off')
+      return
+    }
+    step = module.handlers.length
   }
   const parts = await shares(module.moves)
-  const step = payload.step ?? 0
   const steps = module.handlers.length + parts.length
   if (step < module.handlers.length) {
     const answer = await module.handlers[step]!.handler.merge(unit, ref)
