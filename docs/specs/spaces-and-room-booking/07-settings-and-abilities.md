@@ -1,6 +1,6 @@
 # 6. Settings and abilities
 
-Spaces declares 17 settings, 10 abilities and no facts. Every setting holds one value for the whole theatre and is shown in one place, the module's own settings page in the console (part 5); a value that varies by purpose or by bookable is a column on that record that falls back to the setting.
+Spaces declares 17 settings, 10 abilities and no facts. Every setting holds one value for the whole theatre and is shown in one place, the module's own settings page in the console (part 5); a value that varies by purpose or by bookable is a column on that record that falls back to the setting. Each of the 17 settings names spaces.settings.manage as the ability that changes it. One declares onChange confirm: spaces.bookings.keep-for, because shortening it lets the next retention sweep remove bookings that would otherwise have been kept, so saving it asks for confirmation and a fresh sign-in. The other 16 declare nothing and are saved without either: a changed limit applies only to bookings made afterwards.
 
 ## Settings
 
