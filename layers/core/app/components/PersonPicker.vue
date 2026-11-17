@@ -19,7 +19,7 @@ const chosen = ref<PickedPerson | undefined>()
 const loading = ref(false)
 const failed = ref(false)
 
-const year = (ms: number) => new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(ms)
+const { monthYear: year } = useDates()
 const describe = (p: PickedPerson) => [
   p.claimed ? t('core.picker.since', { date: year(p.since) }) : t('core.picker.unclaimed'),
   p.disabled ? t('core.picker.disabled') : null,
@@ -75,7 +75,6 @@ watch(model, (id) => {
     :search-input="{ placeholder: t('core.picker.search'), icon: 'i-lucide-search' }"
     icon="i-lucide-user-round"
     :ui="{ placeholder: 'text-muted' }"
-    class="w-full"
   >
     <template #empty>
       {{ failed ? t('core.picker.failed') : term.trim().length < 3 ? t('core.picker.type-more') : t('core.picker.none') }}

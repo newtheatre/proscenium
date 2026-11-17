@@ -4,8 +4,6 @@
 <script setup lang="ts">
 import type { AccessApplicationValue } from '../../../../../composables/useAccessApplicationForm'
 
-definePageMeta({ layout: 'console' })
-
 interface Opened {
   name: string
   application: { status: string, inForce: AccessApplicationValue | null, pending: AccessApplicationValue | null } | null

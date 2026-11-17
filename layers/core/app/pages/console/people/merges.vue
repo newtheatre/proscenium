@@ -28,7 +28,7 @@ const { confirm } = useConfirm()
 const toast = useToast()
 const { data, status, error, refresh } = await useAPI<{ merges: Merge[] }>('/api/core/accounts/merges', { key: 'core:merges' })
 
-const when = (ms: number) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(ms)
+const { dateTime: when } = useDates()
 const nameOf = (a: { name: string | null }) => a.name ?? t('core.merges.unnamed')
 const TONE: Record<State, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = { moving: 'info', complete: 'success', undoing: 'info', undone: 'neutral', closed: 'neutral' }
 const refusal = ref<RefusalView | null>(null)

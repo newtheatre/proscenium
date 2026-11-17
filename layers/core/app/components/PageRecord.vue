@@ -130,28 +130,19 @@ const { te } = useT()
       </UDropdownMenu>
     </template>
 
-    <dl
+    <FactStrip
       v-if="summary.length || facts.length"
-      class="mb-6 grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-default p-4 sm:grid-cols-3 lg:grid-cols-6"
+      :facts="summary"
+      framed
+      class="mb-6 lg:grid-cols-6"
     >
-      <div
-        v-for="fact in summary"
-        :key="fact.label"
-      >
-        <dt class="text-xs text-muted">
-          {{ fact.label }}
-        </dt>
-        <dd class="font-medium text-highlighted">
-          {{ fact.value }}
-        </dd>
-      </div>
       <component
         :is="f.component"
         v-for="f in facts"
         :key="f.id"
         :record-id="recordId"
       />
-    </dl>
+    </FactStrip>
 
     <div :class="hasAside ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8' : ''">
       <!-- On a phone the side panel folds to one line above the tabs, so the poster does not push the work down. -->

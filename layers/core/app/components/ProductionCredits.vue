@@ -236,10 +236,11 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
       description="The printed name and role appear as they would in a printed programme."
     >
       <template #body>
-        <form
+        <UForm
           id="credit-form"
+          :state="form"
           class="space-y-4"
-          @submit.prevent="save"
+          @submit="save"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
@@ -263,7 +264,6 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             <UInput
               v-model="form.creditedName"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <UFormField
@@ -274,7 +274,6 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             <UInput
               v-model="form.role"
               maxlength="120"
-              class="w-full"
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
@@ -282,18 +281,16 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
               <USelect
                 v-model="form.sectionTermId"
                 :items="sectionItems"
-                class="w-full"
               />
             </UFormField>
             <UFormField label="Who sees it">
               <USelect
                 v-model="form.visibility"
                 :items="[...VISIBILITY]"
-                class="w-full"
               />
             </UFormField>
           </div>
-        </form>
+        </UForm>
       </template>
       <template #footer>
         <div class="flex w-full justify-end gap-2">
