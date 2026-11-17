@@ -1,0 +1,25 @@
+{
+  "front-of-house.module.name": "Front of house",
+  "front-of-house.module.description": "The people on each night: duties, the rota, sign-up, the authority a shift gives, and the record of how the night went.",
+
+  "front-of-house.navigation.groups.front-of-house.label": "Front of house",
+
+  "front-of-house.settings-sections.shifts": "Shifts",
+
+  "front-of-house.settings.shifts.window-before.label": "Shifts start to count before the call time",
+  "front-of-house.settings.shifts.window-before.help": "How long before their call time people on a shift can use what the shift lets them do, such as scanning tickets. Changing this does not move shifts that already exist.",
+  "front-of-house.settings.shifts.window-after.label": "Shifts keep counting after they end",
+  "front-of-house.settings.shifts.window-after.help": "How long after a shift ends people on it can still use what it lets them do. Someone leading the night can extend it if the show runs late. Changing this does not move shifts that already exist.",
+  "front-of-house.settings.shifts.sign-up-closes.label": "Close sign-up before the call time",
+  "front-of-house.settings.shifts.sign-up-closes.help": "How long before a shift's call time members can no longer sign up for it. A manager can still put someone on the shift.",
+  "front-of-house.settings.shifts.confirmation.label": "When someone signs up",
+  "front-of-house.settings.shifts.confirmation.help": "Whether a sign-up is confirmed straight away or waits for a front-of-house manager to confirm it. Only a confirmed place lets someone work the night.",
+  "front-of-house.settings.shifts.confirmation.options.automatic": "Confirm them straight away",
+  "front-of-house.settings.shifts.confirmation.options.manager": "A manager confirms each one",
+
+  "front-of-house.abilities.shift.sign-up.label": "Sign up for shifts",
+  "front-of-house.abilities.shift.view.label": "See the rota for a performance",
+  "front-of-house.abilities.shift.manage.label": "Manage the rota",
+  "front-of-house.abilities.duty.manage.label": "Manage duties",
+  "front-of-house.abilities.settings.manage.label": "Change front of house settings"
+}
