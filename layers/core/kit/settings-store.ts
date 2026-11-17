@@ -90,7 +90,7 @@ export async function changeSetting(unit: UnitView, asked: string, raw: unknown,
     const values = await moduleValues(module, { key, value: after })
     let passes: boolean
     try {
-      passes = rule.check(values)
+      passes = await rule.check(values)
     }
     catch {
       passes = false

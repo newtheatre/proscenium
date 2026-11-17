@@ -4,7 +4,7 @@
      hand from the provider's statement. Secrets are set on the Worker, never typed here. -->
 <script setup lang="ts">
 interface Provider { id: string, capabilities: string[], methods: { method: string, channels: string[] }[], pairsReaders: boolean }
-interface Key { name: string, source: 'saved' | 'saved-for-module' | 'worker-secret' | null, hint: string | null }
+interface Key { name: string, source: 'saved' | 'saved-for-module' | 'worker-secret' | null, hint: string | null, start?: string | null }
 interface Account { id: string, provider: string, label: string, channels: string[], mode: 'live' | 'test', externalRef: string | null, active: boolean, keys: Key[], missingKeys: string[] }
 type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secret', provider: string, secret: string, publishableKey: string } | { kind: 'waiting-for-reader' } | { kind: 'none' }
 

@@ -62,7 +62,7 @@ describe('credential()', () => {
     const [row] = await rows<{ ciphertext: string, hint: string }>("SELECT ciphertext, hint FROM core_credentials WHERE module_id = 'payments' AND name = ? AND scope = ?", SECRET, account)
     expect(row!.ciphertext.startsWith('v1.')).toBe(true)
     expect(row!.ciphertext).not.toContain('never_in_the_clear')
-    expect(row!.hint).toBe('9876')
+    expect(row!.hint).toBe('sk_test_…9876')
   })
 })
 
@@ -73,9 +73,9 @@ describe('POST /api/payments/providers/:id/keys', () => {
     const text = await res.text()
     expect(text).not.toContain('abcdefghijklmnop')
     expect(JSON.parse(text).keys).toEqual([
-      { name: 'PAYMENTS_STRIPE_SECRET_KEY', source: 'saved', hint: '1234' },
-      { name: 'PAYMENTS_STRIPE_WEBHOOK_SECRET', source: 'saved', hint: '5678' },
-      { name: 'PAYMENTS_STRIPE_PUBLISHABLE_KEY', source: 'saved', hint: '9012' },
+      { name: 'PAYMENTS_STRIPE_SECRET_KEY', source: 'saved', hint: '1234', start: 'sk_test_' },
+      { name: 'PAYMENTS_STRIPE_WEBHOOK_SECRET', source: 'saved', hint: '5678', start: 'whsec_' },
+      { name: 'PAYMENTS_STRIPE_PUBLISHABLE_KEY', source: 'saved', hint: '9012', start: 'pk_test_' },
     ])
     const offered = await inContext(() => methodsFor('online'))
     expect(offered.some(m => m.providerAccountId === account)).toBe(true)

@@ -11,6 +11,10 @@ const props = defineProps<{
   /** A setting to scroll into view and highlight, from settings search. */
   highlight?: string
 }>()
+defineSlots<{
+  /** Beneath the settings: what the page manages besides them, such as its KeysCard. */
+  default?: () => unknown
+}>()
 
 const { t } = useT()
 const advanced = computed(() => props.page === 'core.advanced')
@@ -43,5 +47,11 @@ const onlyChanged = ref(false)
       :highlight="highlight"
       :only-changed="onlyChanged"
     />
+    <div
+      v-if="$slots.default"
+      class="mt-6 space-y-6"
+    >
+      <slot />
+    </div>
   </PageFrame>
 </template>
