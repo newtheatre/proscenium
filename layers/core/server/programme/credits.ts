@@ -7,6 +7,7 @@ import type { UnitView } from '#kit'
 import { inAccountScope } from '#kit/accounts'
 import { assertTerm } from '../vocabularies/service'
 import { notify } from '../notifications/notify'
+import { accountById, accountLabel, canonicalAccount } from '../identity/accounts'
 
 export type CreditVisibility = 'public' | 'members' | 'hidden'
 
@@ -52,21 +53,26 @@ const toCredit = (r: CreditRow): Credit => ({
   role: r.role, sectionTermId: r.section_term_id, visibility: r.visibility, sort: r.sort,
 })
 
-// The linked account's label is the survivor's, so a merged account reads as the person it became.
-const SELECT = `SELECT c.id, c.production_id, c.account_id, c.credited_name, c.role, c.section_term_id, c.visibility, c.sort,
-    (SELECT coalesce(s.preferred_name, s.name, 'Unnamed person') FROM core_accounts a JOIN core_accounts s ON s.id = coalesce(a.merged_into_id, a.id) WHERE a.id = c.account_id) AS account_label
+const SELECT = `SELECT c.id, c.production_id, c.account_id, c.credited_name, c.role, c.section_term_id, c.visibility, c.sort
   FROM core_production_credits c JOIN core_terms t ON t.id = c.section_term_id`
+
+// Identity labels each linked person, as the survivor of any merge; core reads no account rows itself.
+async function labelled(rows: Omit<CreditRow, 'account_label'>[]): Promise<CreditRow[]> {
+  const ids = [...new Set(rows.flatMap(r => r.account_id ? [r.account_id] : []))]
+  const labels = new Map(await Promise.all(ids.map(async id => [id, await accountLabel(id)] as const)))
+  return rows.map(r => ({ ...r, account_label: r.account_id ? labels.get(r.account_id)! : null }))
+}
 
 /** A production's credits, by section in the vocabulary's order, then in their own order. */
 export async function listCredits(productionId: string): Promise<Credit[]> {
   const rows = await all<CreditRow>(`${SELECT} WHERE c.production_id = ? ORDER BY t.sort, t.id, c.sort, c.id`, productionId)
-  return rows.map(toCredit)
+  return (await labelled(rows)).map(toCredit)
 }
 
 async function creditRow(productionId: string, creditId: string): Promise<CreditRow> {
   const row = await first<CreditRow>(`${SELECT} WHERE c.id = ? AND c.production_id = ?`, creditId, productionId)
   if (!row) refuse('core.not-found', 'There is no such credit.', { status: 404 })
-  return row!
+  return (await labelled([row!]))[0]!
 }
 
 async function productionOf(productionId: string): Promise<{ title: string, state: string }> {
@@ -77,8 +83,8 @@ async function productionOf(productionId: string): Promise<{ title: string, stat
 
 /** An account a credit may name: one that exists, has not been merged away and has not been erased. */
 async function checkAccount(accountId: string): Promise<void> {
-  const ok = await first('SELECT 1 FROM core_accounts WHERE id = ? AND merged_into_id IS NULL AND anonymised_at IS NULL', accountId)
-  if (!ok) refuse('core.credit.account-unknown', 'Choose a person from the list, or leave the credit unlinked.', { status: 422 })
+  const row = await accountById(accountId)
+  if (!row || row.merged_into_id || row.anonymised_at) refuse('core.credit.account-unknown', 'Choose a person from the list, or leave the credit unlinked.', { status: 422 })
 }
 
 function changed(unit: UnitView, productionId: string, state: string) {
@@ -230,10 +236,9 @@ export async function onProductionTeam(accountId: string, productionId?: string)
 export async function productionTeamHolders(productionId?: string): Promise<string[]> {
   const standing = (await useSetting('core.programme.team-standing-after') as number) * 1000 // not-policy: seconds to milliseconds
   const rows = await useDb().all<{ id: string }>(
-    sql`SELECT DISTINCT coalesce(a.merged_into_id, c.account_id) AS id
-       FROM core_production_credits c JOIN core_productions p ON p.id = c.production_id LEFT JOIN core_accounts a ON a.id = c.account_id
-      WHERE c.account_id IS NOT NULL AND ${current(standing, nowMs())}${onProduction(productionId)}
-      ORDER BY id`,
+    sql`SELECT DISTINCT c.account_id AS id
+       FROM core_production_credits c JOIN core_productions p ON p.id = c.production_id
+      WHERE c.account_id IS NOT NULL AND ${current(standing, nowMs())}${onProduction(productionId)}`,
   )
-  return rows.map(r => r.id)
+  return [...new Set(await Promise.all(rows.map(r => canonicalAccount(r.id))))].sort()
 }
