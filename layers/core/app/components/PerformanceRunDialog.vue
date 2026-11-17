@@ -168,7 +168,7 @@ async function savePreset() {
       <UForm
         id="performance-run"
         :state="form"
-        :validate="() => overrideErrors(overrides, shown, defaults.sellsHere)"
+        :validate="() => [...needs({ spaceId: form.spaceId, dates: form.dates.start, slots: slots.length > 0 }), ...overrideErrors(overrides, shown, defaults.sellsHere)]"
         class="space-y-4"
         novalidate
         @submit="planned ? add() : preview()"
@@ -190,6 +190,7 @@ async function savePreset() {
           </UFormField>
           <UFormField
             label="Space"
+            name="spaceId"
             required
           >
             <USelect
@@ -199,6 +200,7 @@ async function savePreset() {
           </UFormField>
           <UFormField
             label="First and last date"
+            name="dates"
             required
           >
             <FieldDateRange v-model="form.dates" />
@@ -279,7 +281,6 @@ async function savePreset() {
           form="performance-run"
           label="Show the dates"
           :loading="busy"
-          :disabled="!form.spaceId || !form.dates.start || !slots.length"
         />
         <div
           v-else
@@ -312,6 +313,7 @@ async function savePreset() {
       <UForm
         id="run-preset-save"
         :state="{ name: presetName }"
+        :validate="() => needs({ name: presetName })"
         class="space-y-4"
         novalidate
         @submit="savePreset"
@@ -346,7 +348,6 @@ async function savePreset() {
         type="submit"
         form="run-preset-save"
         label="Save preset"
-        :disabled="!presetName.trim()"
       />
     </template>
   </UModal>

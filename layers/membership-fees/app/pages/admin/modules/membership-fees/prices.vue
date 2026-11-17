@@ -110,6 +110,7 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
         <UForm
           id="membership-fees-price"
           :state="form"
+          :validate="() => needs({ amountMinor: form.amountMinor, fromDate: form.fromDate })"
           class="space-y-4"
           novalidate
           @submit="save"
@@ -131,6 +132,7 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
             />
           </UFormField>
           <UFormField
+            name="amountMinor"
             :label="t('membership-fees.prices.amount')"
             required
           >
@@ -140,6 +142,7 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
             />
           </UFormField>
           <UFormField
+            name="fromDate"
             :label="t('membership-fees.prices.from')"
             :help="t('membership-fees.prices.from-help')"
             required
@@ -156,7 +159,6 @@ const shown = (minor: number | null) => minor === null ? t('membership-fees.pric
           type="submit"
           form="membership-fees-price"
           loading-auto
-          :disabled="!form.amountMinor || !form.fromDate"
           :label="t('membership-fees.prices.save')"
         />
       </template>

@@ -456,6 +456,7 @@ function actions(p: Performance) {
           id="cancel-performance"
           class="space-y-4"
           :state="cancelForm"
+          :validate="() => needs({ reasonTermId: cancelForm.reasonTermId })"
           novalidate
           @submit="cancel"
         >
@@ -487,6 +488,7 @@ function actions(p: Performance) {
             </li>
           </ul>
           <UFormField
+            name="reasonTermId"
             label="Reason"
             required
           >
@@ -514,7 +516,7 @@ function actions(p: Performance) {
           form="cancel-performance"
           label="Cancel performance"
           color="error"
-          :disabled="!cancelForm.reasonTermId || !!cancelReach?.refusal"
+          :disabled="!!cancelReach?.refusal"
         />
       </template>
     </UModal>

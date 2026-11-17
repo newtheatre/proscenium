@@ -235,6 +235,7 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
         <UForm
           id="credit-form"
           :state="form"
+          :validate="() => needs({ creditedName: form.creditedName, role: form.role, sectionTermId: form.sectionTermId })"
           class="space-y-4"
           novalidate
           @submit="save"
@@ -255,6 +256,7 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             />
           </UFormField>
           <UFormField
+            name="creditedName"
             label="Printed name"
             required
           >
@@ -264,6 +266,7 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             />
           </UFormField>
           <UFormField
+            name="role"
             label="Role"
             help="Such as Director or Ophelia."
             required
@@ -274,7 +277,10 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             />
           </UFormField>
           <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="Section">
+            <UFormField
+              name="sectionTermId"
+              label="Section"
+            >
               <USelect
                 v-model="form.sectionTermId"
                 :items="sectionItems"
@@ -301,7 +307,6 @@ async function move(section: { id: string, credits: Credit[] }, index: number, b
             type="submit"
             form="credit-form"
             :label="editing ? 'Save credit' : 'Add credit'"
-            :disabled="!form.creditedName.trim() || !form.role.trim() || !form.sectionTermId"
           />
         </div>
       </template>
