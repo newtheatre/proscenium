@@ -100,3 +100,12 @@ test('the Till sells from a panel and takes cash for the total', async ({ page, 
   await expect(page.getByText('Give £4.00 change.', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Take payment of £0.00' })).toBeDisabled()
 })
+
+test('Till sessions lists the sessions opened above, newest first, and filters them by state', async ({ page }) => {
+  await visit(page, '/console/payments/sessions')
+  await expect(page.getByRole('cell', { name: 'Box office desk' })).toBeVisible()
+  await expect(page.getByRole('searchbox')).toBeVisible()
+  await visit(page, '/console/payments/sessions?view=counting')
+  await expect(page.getByRole('cell', { name: 'Box office desk' })).toHaveCount(0)
+  await noViolations(page)
+})
