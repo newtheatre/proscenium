@@ -30,7 +30,10 @@ import decidePost from '../../server/api/membership/applications/[id]/decide.pos
 import withdrawPost from '../../server/api/membership/mine/[id]/withdraw.post'
 import mineEnd from '../../server/api/membership/mine/[id]/end.post'
 import mineRenew from '../../server/api/membership/mine/[id]/renew.post'
-import membersGet from '../../server/api/membership/members.get'
+import membersGet from '../../server/api/membership/members/index.get'
+import membersExport from '../../server/api/membership/members/export.get'
+import membersAccess from '../../server/api/membership/members/access.get'
+import membershipDates from '../../server/api/membership/memberships/[id]/dates.post'
 import membershipGet from '../../server/api/membership/memberships/[id].get'
 import membershipEnd from '../../server/api/membership/memberships/[id]/end.post'
 import schemesLookup from '../../server/api/membership/schemes/lookup.get'
@@ -63,6 +66,9 @@ export const handle = server({
   'POST /api/membership/mine/:id/end': mineEnd,
   'POST /api/membership/mine/:id/renew': mineRenew,
   'GET /api/membership/members': membersGet,
+  'GET /api/membership/members/export': membersExport,
+  'GET /api/membership/members/access': membersAccess,
+  'POST /api/membership/memberships/:id/dates': membershipDates,
   'GET /api/membership/memberships/:id': membershipGet,
   'POST /api/membership/memberships/:id/end': membershipEnd,
   'GET /api/membership/schemes/lookup': schemesLookup,

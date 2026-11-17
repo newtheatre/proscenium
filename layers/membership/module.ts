@@ -61,6 +61,10 @@ export default defineModule({
     // Ending a membership (tab 4, "Ending"). A holder ends their own through My membership instead.
     'membership.end': ability({ on: 'membership.membership', implies: ['membership.view'] }),
     'membership.add': ability({ on: 'membership.scheme', implies: ['membership.view'] }),
+    // Correcting a membership's dates (D7, MEM-28). Nobody corrects their own.
+    'membership.update': ability({ on: 'membership.membership', owner: 'refuses', implies: ['membership.view'] }),
+    // Exporting the members list (MEM-27): a file of people, so privileged.
+    'membership.export': ability({ risk: 'privileged', implies: ['membership.view'] }),
     // Asking whether somebody else holds a membership: a seller checking a customer's member price,
     // a steward at the door. The requirement source's checkAbility.
     'card.check': ability({ on: 'membership.membership', audit: 'read' }),
@@ -86,10 +90,15 @@ export default defineModule({
   },
 
   tasks: {
-    // Erases names on list entries once they have been kept long enough after their end (V18).
+    // Names on list entries kept long enough after their end (V18), and entries past their list's
+    // date or membership.verification.list-keep-for.
     'membership.sweep-lists': task({ dailyAt: '03:40' }),
     // Renewal is open, the last reminder, and lapsed (R8).
     'membership.send-reminders': task({ dailyAt: '09:00' }),
+    // Applications not finished in time (J5).
+    'membership.expire-applications': task({ dailyAt: '03:30' }),
+    // Free text on memberships past membership.retention.ended-after.
+    'membership.sweep-memberships': task({ dailyAt: '03:50' }),
   },
 
   contributes: {
@@ -141,6 +150,8 @@ export default defineModule({
     // On the audience side, so anyone can find how to join.
     'core.requirement': [{ id: 'membership', file: 'membership' }],
     // The membership card: Box office signs it and its door reads it (MEM-51). Absent while Box office is off.
+    // Ends live memberships in the erasure batch (X4); claimed list entries are let go and emptied.
+    'core.erasure-handler': [{ id: 'membership', file: 'membership' }],
     'box-office.door-code': [{ id: 'membership.card', file: 'card' }],
     'core.account-section': [
       { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
