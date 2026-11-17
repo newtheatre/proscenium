@@ -8,7 +8,7 @@
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, requireAbility, useContext, useSetting, type UnitView } from '#kit'
-import { getPerformance, getProduction, listPerformances } from '#modules/core'
+import { findOrCreateAccount, getPerformance, getProduction, listPerformances } from '#modules/core'
 import type { DeskContext } from '#modules/payments'
 import { pricedLines, type BasketLineInput } from './baskets'
 import { entitle } from './entitlement'
@@ -26,15 +26,14 @@ const DESK_HOLD = 30 * 60_000 // not-policy: as long as the till keeps a payment
 
 const line = z.object({ bandId: z.string(), ticketTypeId: z.string(), quantity: z.number().int().min(1).max(500) }).strict() // not-policy: the setting's own ceiling
 const reservationInput = z.object({ orderId: z.string(), expectedTotalMinor: z.number().int().min(0), admit: z.boolean().optional() }).strict()
-const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional() }).strict() // not-policy: more kinds of ticket than any performance sells
+// `email`, if the buyer wants their tickets sent: the order then belongs to the account for that address.
+const saleInput = z.object({ performanceId: z.string(), lines: z.array(line).min(1).max(50), admit: z.boolean().optional(), email: z.email().max(254).optional() }).strict() // not-policy: more kinds of ticket than any performance sells; the longest address
 const id = z.string().min(1).max(64) // not-policy: shape bound
 const exchangeInput = z.object({
   exchange: z.object({
     orderId: id,
-    lineIds: z.array(id).min(1).max(50), // not-policy: more lines than any order holds
     performanceId: id,
-    bandId: id,
-    ticketTypeId: id,
+    lines: z.array(z.object({ lineId: id, bandId: id, ticketTypeId: id }).strict()).min(1).max(50), // not-policy: more lines than any order holds
     expectedDifferenceMinor: z.number().int().min(1),
   }).strict(),
 }).strict()
@@ -124,15 +123,18 @@ export async function deskPrepare(unit: UnitView, context: DeskContext): Promise
   const orderId = newId('ord')
   const holdId = newId('hold')
   const expiresAt = at + DESK_HOLD
-  // An anonymous sale: nobody's details are taken unless the buyer wants the tickets sent. An order
-  // starts as a basket and moves on in the same batch, as one bought online does.
-  unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, signed_in, currency, total_minor, expires_at, keep, created_at, updated_at)
-    VALUES (${orderId}, ${newReference()}, 'desk', 'basket', 0, ${currency}, ${totalMinor}, ${expiresAt}, 0, ${at}, ${at})`)
+  // An anonymous sale: nobody's details are taken unless the buyer wants the tickets sent. Then the
+  // order belongs to the account for that address, made unclaimed if there is none, exactly as a
+  // phone reservation does, and the confirmation goes there. The till is told nothing about them. An
+  // order starts as a basket and moves on in the same batch, as one bought online does.
+  const accountId = input.sale.email ? (await findOrCreateAccount(unit, { address: input.sale.email, origin: 'guest' })).accountId : null
+  unit.add(sql`INSERT INTO box_office_orders (id, reference, channel, state, account_id, signed_in, currency, total_minor, expires_at, keep, created_at, updated_at)
+    VALUES (${orderId}, ${newReference()}, 'desk', 'basket', ${accountId}, 0, ${currency}, ${totalMinor}, ${expiresAt}, 0, ${at}, ${at})`)
   unit.add(sql`INSERT INTO box_office_holds (id, kind, order_id, held_by, created_at, updated_at) VALUES (${holdId}, 'basket', ${orderId}, ${actor.accountId ?? null}, ${at}, ${at})`)
   const claimed = (await claimSeats(unit, { holdId, requests: input.sale.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
   guard(unit)
   unit.insertSet(orderLines, lines.map((l, i) => ({
-    orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
+    orderId, kind: 'ticket', performanceId: input.sale.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
   })))
   unit.expect(lines.length)
   unit.add(sql`UPDATE box_office_orders SET state = 'awaiting_payment', session_id = ${context.sessionId}, sold_by = ${actor.accountId ?? null}, admit_on_payment = ${input.sale.admit ? 1 : 0}, updated_at = ${at}
@@ -266,7 +268,7 @@ export async function amendReservation(unit: UnitView, orderId: string, input: A
     if (!hold) refuse(CHANGED.code, CHANGED.reason, { status: 409, remedy: CHANGED.remedy })
     const claimed = (await claimSeats(unit, { holdId: hold.id, requests: add.map(l => ({ poolId: added.pool.get(l.bandId)!.id, quantity: l.quantity })), state: 'confirmed', expiresAt: null })).flat()
     unit.insertSet(orderLines, added.lines.map((l, i) => ({
-      orderId: order.id, kind: 'ticket', performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
+      orderId: order.id, kind: 'ticket', performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], priceId: l.priceId, listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
     })))
     unit.expect(added.lines.length)
   }

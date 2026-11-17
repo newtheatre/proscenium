@@ -155,6 +155,9 @@ describe('selling at the desk', () => {
     expect(sale.status, JSON.stringify(sale.body)).toBe(200)
     const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
     expect(made).toMatchObject({ channel: 'desk', state: 'awaiting_payment', account_id: null, total_minor: 2400, sold_by: seller.accountId })
+    // Each line records the price row it was sold at.
+    const price = (await rows<{ id: string }>('SELECT id FROM box_office_prices WHERE band_id = ? AND ticket_type_id = ?', h.bandId, h.fullId))[0]!.id
+    expect(await rows('SELECT price_id FROM box_office_order_lines WHERE order_id = ?', made!.id)).toEqual([{ price_id: price }, { price_id: price }])
     expect(await claimed(h)).toBe(2)
     // The seats are the desk's while it takes the money: one is left for anybody else.
     expect((await buy(h, 2)).ok).toBe(false)
@@ -166,6 +169,18 @@ describe('selling at the desk', () => {
     for (const t of issued) expect(t.admitted_at).toBe(NOV_16)
     expect(await deferred(h)).toBe(-2400)
     expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ?', made!.id)).toBe(0)
+  })
+
+  it('emails the tickets to an address the buyer gives, and the order joins that account', async () => {
+    const h = await house(3)
+    const sale = await till({ performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId: h.fullId, quantity: 1 }], email: 'Desk.Buyer@Example.org' })
+    expect(sale.status, JSON.stringify(sale.body)).toBe(200)
+    const [made] = await rows<Record<string, any>>('SELECT * FROM box_office_orders WHERE intent_id = ?', sale.body.intentId)
+    expect(made!.account_id).toBeTruthy()
+    const [owner] = await rows<{ address: string }>('SELECT address FROM core_account_emails WHERE account_id = ?', made!.account_id)
+    expect(owner!.address).toBe('desk.buyer@example.org')
+    expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
+    expect(await count('SELECT count(*) AS n FROM core_notifications WHERE subject_id = ? AND type_key LIKE \'box-office.order-confirmed%\'', made!.id)).toBe(1)
   })
 
   it('lets the seats go when the payment is cancelled, and never sells more than the house has', async () => {

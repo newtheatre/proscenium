@@ -281,7 +281,10 @@ export const orderLines = defineTable('box_office_order_lines', {
   bandId: col.ref('box_office_bands', { nullable: true }),
   ticketTypeId: col.ref('box_office_ticket_types', { nullable: true }),
   claimId: col.ref('box_office_claims', { nullable: true }),
-  // The price copied at the moment the line was added.
+  // The price copied at the moment the line was added, and the price row it came from, so a report
+  // can tell a performance's own price from the production's, and a sale before a price change from
+  // one after it. Null for a complimentary ticket, and for a line from before this was kept.
+  priceId: col.ref('box_office_prices', { nullable: true }),
   listMinor: col.minor('list_minor').notNull(),
   discountMinor: col.minor('discount_minor').notNull().default(0),
   amountMinor: col.minor('amount_minor').notNull(),
@@ -461,6 +464,10 @@ export const exchanges = defineTable('box_office_exchanges', {
   ticketTypeId: col.ref('box_office_ticket_types'),
   // The price of each new ticket, and what is to pay on top of the old ones.
   priceMinor: col.minor('price_minor').notNull(),
+  // A JSON array of each line's new seats, ticket type and price ({ lineId, bandId, ticketTypeId,
+  // priceId, priceMinor }); band, ticket type and price above are then the first line's. Null on an exchange
+  // made before lines could differ, which gives every line those three.
+  moves: col.internal(text('moves')),
   differenceMinor: col.minor('difference_minor').notNull(),
   holdId: col.ref('box_office_holds'),
   intentId: col.ref('payments_intents', { nullable: true }),

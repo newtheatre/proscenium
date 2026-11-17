@@ -59,7 +59,7 @@ describe('confirming it is you (ID-28)', () => {
   it('a strong session confirms with a passkey only, never by email', async () => {
     const { browser, accountId } = await staff()
     await goStale(accountId)
-    expect((await browser.get('/api/core/me/reassert')).body).toEqual({ ways: ['passkey'], address: null })
+    expect((await browser.get('/api/core/me/reassert')).body).toEqual({ ways: ['passkey'], address: null, authenticatorStrong: false })
     expect((await browser.post('/api/core/me/reassert/code')).body.code).toBe('core.reassert.code-not-offered')
     expect(await rows('SELECT count(*) AS n FROM core_account_tokens WHERE purpose = \'reassert\' AND account_id = ?', accountId)).toEqual([{ n: 0 }])
   })

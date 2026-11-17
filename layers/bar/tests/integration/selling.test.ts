@@ -40,7 +40,7 @@ const cash = newId('ppa')
 const stock = { outlet: '', pint: '', crisps: '' }
 const income = async () => (await rows<{ total: number | null }>("SELECT sum(e.amount_minor) AS total FROM finance_entries e JOIN finance_accounts a ON a.id = e.account_id WHERE a.system_key = 'bar.income'"))[0]!.total ?? 0
 const sale = async (key: string) => (await rows<{ id: string, state: string, total_minor: number, opening_id: string, reference: string }>('SELECT id, state, total_minor, opening_id, reference FROM bar_sales WHERE client_key = ?', key))[0]
-const basket = (key: string, lines: [string, number][], expectedTotalMinor: number) => ({ outletId: stock.outlet, clientKey: key, lines: lines.map(([variantId, quantity]) => ({ variantId, quantity })), expectedTotalMinor })
+const basket = (key: string, lines: [string, number][], expectedTotalMinor: number) => ({ outletId: stock.outlet, clientKey: key, lines: lines.map(([variantId, quantity]) => ({ variantId, quantity })), expectedTotalMinor, ageCheck: 'id_checked' })
 
 beforeAll(async () => {
   setClock(NOW)

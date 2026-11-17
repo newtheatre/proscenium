@@ -47,7 +47,7 @@ async function visit(page: Page, url: string) {
 }
 
 test('Add a ticket type, then a band and its prices on a performance, all from the console forms', async ({ page }) => {
-  await visit(page, '/console/box-office/ticket-types')
+  await visit(page, '/admin/modules/box-office/ticket-types')
   await page.getByLabel(/^Name/).fill(typeName)
   await page.getByRole('button', { name: 'Add ticket type' }).click()
   await expect(page.getByText(`${typeName} added`).first()).toBeVisible()

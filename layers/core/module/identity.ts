@@ -22,6 +22,11 @@ export const identitySettings = defineSettings('core', {
   'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, onChange: 'confirm' }),
   'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm' }),
   'sign-in.provider-is-strong': setting.boolean({ default: false, change, onChange: 'confirm' }),
+  // An authenticator app (TOTP), offered to people whose roles reach the console. Never a way to sign
+  // in on its own: it confirms it is you, and after an email or Google sign-in it can make the session
+  // strong, standing in for a passkey on a shared machine.
+  'sign-in.authenticator': setting.boolean({ default: true, change, onChange: 'confirm' }),
+  'sign-in.authenticator-is-strong': setting.boolean({ default: true, change, onChange: 'confirm' }),
   // The public half of the Turnstile bot check, which the browser draws the check with. Its secret
   // half is a credential on the same page. Unset, NUXT_PUBLIC_TURNSTILE_SITE_KEY is used, if set.
   'sign-in.turnstile-site-key': setting.text({ unset: true, maxLength: 100, change, audience: 'public' }),
@@ -368,6 +373,20 @@ export const identityContributions = {
       'en-GB': {
         subject: 'Are your details for the {{ scheme }} still right?',
         body: 'It has been a while since {{ theatre }} accepted your application to the {{ scheme }}. Please check your details in your account and confirm they are still right, or change them.\n\nYour arrangements stay in place meanwhile.',
+      },
+    },
+  }, {
+    // A guest buyer asking again for the link that opens their account. The link signs them in, so it is sealed.
+    id: 'core.account-claim',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'sealed' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Open your account at {{ theatre }}',
+        body: 'Here is the link to open your account at {{ theatre }}. You will see all your bookings in one place, and book faster next time. There is no password: the link signs you in, once, and you can add a passkey afterwards if you like.\n\n[Open your account]({{ link }})\n\nIf you did not ask for this, you can ignore this email.',
       },
     },
   }, {
