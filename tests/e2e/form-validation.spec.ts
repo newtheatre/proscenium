@@ -47,7 +47,7 @@ test('a booking link that is not a web address is explained beside the field, no
   await page.getByRole('textbox', { name: /^Title/ }).fill('The Checked Play')
   await link.fill('https://tickets.example.org/checked')
   await page.getByRole('button', { name: 'Save production' }).click()
-  await expect(page.getByText('Production saved')).toBeVisible()
+  await expect(page.getByText('Production saved', { exact: true })).toBeVisible()
 })
 
 test('the server says the same thing in the same words', async ({ request }) => {
