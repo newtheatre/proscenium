@@ -1,11 +1,12 @@
 <!-- One membership (tab 5, "A membership"): the person, scheme, number and status, its dates and how
-     it started, every check made on it, and ending it with a note. -->
+     it started, every check made on it, ending it with a note, and correcting its dates (MEM-28). -->
 <script setup lang="ts">
 definePageMeta({ layout: 'console' })
 
 interface Detail {
-  membership: { id: string, accountId: string, name: string, schemeId: string, schemeName: string, side: string, state: string, status: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number }
+  membership: { id: string, accountId: string, name: string, schemeId: string, schemeName: string, side: string, lengthRule: string, state: string, status: string, origin: string, lengthName: string | null, startsOn: string | null, endsOn: string | null, endedAt: number | null, endReason: string | null, note: string | null, createdAt: number }
   number: string | null
+  canChangeDates: boolean
   checks: { verifier: string, outcome: string, reason: string | null, note: string | null, decidedBy: string | null, createdAt: number }[]
 }
 
@@ -49,6 +50,30 @@ async function end() {
     refusal.value = toRefusal(e)
   }
 }
+
+const dating = ref(false)
+const dates = reactive({ startsOn: '', endsOn: '', note: '' })
+const datesRefusal = ref<ReturnType<typeof toRefusal> | null>(null)
+const indefinite = computed(() => m.value?.lengthRule === 'indefinite')
+function openDates() {
+  dates.startsOn = m.value?.startsOn ?? ''
+  dates.endsOn = m.value?.endsOn ?? ''
+  dates.note = ''
+  datesRefusal.value = null
+  dating.value = true
+}
+async function saveDates() {
+  datesRefusal.value = null
+  try {
+    await $api(`/api/membership/memberships/${id.value}/dates` as string, { method: 'POST', body: { startsOn: dates.startsOn, endsOn: dates.endsOn || null, note: dates.note } })
+    dating.value = false
+    toast.add({ title: t('membership.membership.dates-toast'), color: 'success' })
+    await refresh()
+  }
+  catch (e) {
+    datesRefusal.value = toRefusal(e)
+  }
+}
 </script>
 
 <template>
@@ -66,6 +91,14 @@ async function end() {
       v-if="m && (m.state === 'active' || m.state === 'pending')"
       #primary
     >
+      <UButton
+        v-if="data?.canChangeDates"
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-calendar-cog"
+        :label="t('membership.membership.change-dates')"
+        @click="openDates()"
+      />
       <UButton
         color="neutral"
         variant="outline"
@@ -151,6 +184,61 @@ async function end() {
           loading-auto
           :disabled="!note.trim()"
           :label="t('membership.membership.end')"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="dating"
+      :title="t('membership.membership.dates-title', { name: m?.name ?? '' })"
+    >
+      <template #body>
+        <UForm
+          id="membership-dates"
+          :state="dates"
+          class="space-y-4"
+          @submit="saveDates"
+        >
+          <RefusalNotice :refusal="datesRefusal" />
+          <p class="text-sm text-muted">
+            {{ t('membership.membership.dates-consequence') }}
+          </p>
+          <UFormField
+            :label="t('membership.membership.starts')"
+            required
+          >
+            <FieldDate v-model="dates.startsOn" />
+          </UFormField>
+          <UFormField
+            :label="t('membership.membership.ends')"
+            :help="indefinite ? t('membership.membership.dates-end-help') : undefined"
+            :required="!indefinite"
+          >
+            <FieldDate
+              v-model="dates.endsOn"
+              :min="dates.startsOn || undefined"
+            />
+          </UFormField>
+          <UFormField
+            :label="t('membership.membership.end-note')"
+            :help="t('membership.membership.end-note-help')"
+            required
+          >
+            <UTextarea
+              v-model="dates.note"
+              maxlength="500"
+              :rows="2"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+      <template #footer>
+        <UButton
+          type="submit"
+          form="membership-dates"
+          loading-auto
+          :disabled="!dates.note.trim() || !dates.startsOn || (!indefinite && !dates.endsOn)"
+          :label="t('membership.membership.dates-save')"
         />
       </template>
     </UModal>
