@@ -1,13 +1,15 @@
 <!-- My membership (MEM-10, MEM-11, MEM-33): what the person holds and until when, their member
      number, and the schemes they can join. A free scheme with nothing to check is joined here in one
      step, as is one that checks a list (a student ID, or a verified address); other schemes say how to
-     join until applications are built. The card (MEM-33, MEM-51) opens full screen with a code that
+     join until applications are built. A scheme that requires payment shows its fee, and joining it
+     goes on to the Pay page; an application waiting for its fee offers Pay from here. The card (MEM-33, MEM-51) opens full screen with a code that
      Box office signs each time it is opened; without Box office it shows no code. -->
 <script setup lang="ts">
 import { encode } from 'uqr'
 
-interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
-interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string }[], asksFor: string | null }
+interface Mine { card: boolean, applications: { id: string, schemeId: string, schemeName: string, appliedAt: number, waiting: 'staff' | 'payment', charge: { state: string, amountMinor: number, currency: string } | null }[], number: { label: string, since: string } | null, memberships: { id: string, schemeId: string, schemeName: string, side: string, length: string | null, startsOn: string, endsOn: string | null, mayEnd: boolean, renewal: { opensOn: string, closesOn: string, open: boolean } | null, renewed: boolean, status: 'upcoming' | 'current' | 'in-grace' | 'lapsed' }[] }
+interface Fee { amountMinor: number, currency: string }
+interface Offered { id: string, name: string, summary: string | null, joinMode: string, options: { id: string, name: string, fee: Fee | null }[], fee: Fee | null, requiresPayment: boolean, online: boolean, asksFor: string | null }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -21,11 +23,21 @@ const TONE = { 'upcoming': 'info', 'current': 'success', 'in-grace': 'warning', 
 const held = computed(() => new Set([...(mine.data.value?.memberships ?? []).filter(m => m.status !== 'lapsed').map(m => m.schemeId), ...(mine.data.value?.applications ?? []).map(a => a.schemeId)]))
 const joinable = computed(() => (offered.data.value?.schemes ?? []).filter(s => !held.value.has(s.id)))
 const chosen = reactive<Record<string, string | undefined>>({})
+const money = (fee: Fee) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: fee.currency }).format(fee.amountMinor / 100) // not-policy: minor units to units
+/** The fee line under a paid scheme: one price, or the price of each length. */
+function feeLine(s: Offered): string | undefined {
+  if (!s.requiresPayment) return undefined
+  if (s.fee) return t('membership.screens.mine.fee', { amount: money(s.fee) })
+  const priced = s.options.filter(o => o.fee)
+  if (!priced.length) return undefined
+  return priced.length === 1 ? t('membership.screens.mine.fee', { amount: money(priced[0]!.fee!) }) : priced.map(o => `${o.name}: ${money(o.fee!)}`).join(' · ')
+}
 const references = reactive<Record<string, string>>({})
 
 async function join(s: Offered) {
   try {
-    const joined = await $api<{ pending: boolean }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: chosen[s.id] ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? references[s.id]?.trim() : undefined } })
+    const joined = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/schemes/${s.id}/join` as string, { method: 'POST', headers: { 'idempotency-key': crypto.randomUUID() }, body: { lengthOptionId: chosen[s.id] ?? (s.options.length === 1 ? s.options[0]!.id : null), reference: s.asksFor ? references[s.id]?.trim() : undefined } })
+    if (joined.waiting === 'payment') return navigateTo(`/account/membership/${joined.membershipId}/pay`)
     if (joined.pending) {
       toast.add({ title: t('membership.screens.mine.applied', { scheme: s.name }), description: t('membership.screens.mine.waiting-staff'), color: 'success' })
       await mine.refresh()
@@ -64,11 +76,12 @@ function openRenew(m: Mine['memberships'][number]) {
 async function renew() {
   renewRefusal.value = null
   try {
-    const done = await $api<{ pending: boolean }>(`/api/membership/mine/${renewing.value!.id}/renew` as string, {
+    const done = await $api<{ pending: boolean, membershipId: string, waiting?: string }>(`/api/membership/mine/${renewing.value!.id}/renew` as string, {
       method: 'POST',
       headers: { 'idempotency-key': crypto.randomUUID() },
       body: { lengthOptionId: renewChoice.lengthOptionId ?? null, reference: renewChoice.reference.trim() || undefined },
     })
+    if (done.waiting === 'payment') return navigateTo(`/account/membership/${done.membershipId}/pay`)
     toast.add({ title: t(done.pending ? 'membership.screens.mine.renew-pending' : 'membership.screens.mine.renewed', { scheme: renewing.value!.schemeName }), color: 'success' })
     renewing.value = null
     await mine.refresh()
@@ -180,8 +193,14 @@ async function withdraw(a: Mine['applications'][number]) {
               v-for="a in mine.data.value.applications"
               :key="a.id"
               :name="a.schemeName"
-              :description="t('membership.screens.mine.waiting-staff')"
+              :description="a.waiting === 'payment' && a.charge ? t('membership.screens.mine.waiting-payment', { amount: money(a.charge) }) : t('membership.screens.mine.waiting-staff')"
             >
+              <UButton
+                v-if="a.waiting === 'payment' && a.charge"
+                size="sm"
+                :to="`/account/membership/${a.id}/pay`"
+                :label="t('membership.screens.mine.pay', { amount: money(a.charge) })"
+              />
               <UButton
                 color="neutral"
                 variant="ghost"
@@ -210,17 +229,21 @@ async function withdraw(a: Mine['applications'][number]) {
               v-for="s in joinable"
               :key="s.id"
               :name="s.name"
-              :description="s.summary ?? undefined"
+              :description="[s.summary, feeLine(s)].filter(Boolean).join(' · ') || undefined"
             >
               <span
                 v-if="s.joinMode === 'staff-only'"
                 class="text-sm text-muted"
               >{{ t('membership.screens.mine.staff-only') }}</span>
+              <span
+                v-else-if="!s.online"
+                class="text-sm text-muted"
+              >{{ t('membership.screens.mine.not-online') }}</span>
               <template v-else>
                 <USelect
                   v-if="s.options.length > 1"
                   v-model="chosen[s.id]"
-                  :items="s.options.map(o => ({ value: o.id, label: o.name }))"
+                  :items="s.options.map(o => ({ value: o.id, label: o.fee ? `${o.name}, ${money(o.fee)}` : o.name }))"
                   :placeholder="t('membership.screens.mine.choose-length')"
                   :aria-label="t('membership.screens.mine.length-for', { scheme: s.name })"
                 />
