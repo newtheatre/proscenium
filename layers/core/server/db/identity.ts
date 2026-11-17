@@ -12,7 +12,7 @@ import { defineTable, col } from '#kit/db'
 
 export const ACCOUNT_ORIGINS = ['setup', 'self', 'guest', 'named-by-other', 'invite', 'staff'] as const
 export const DISABLED_REASONS = ['security', 'conduct', 'requested', 'duplicate'] as const
-export const TOKEN_PURPOSES = ['sign_in', 'verify_address', 'invite', 'enrol_passkey', 'owner_recovery', 'confirm_merge', 'confirm_erasure', 'reassert'] as const
+export const TOKEN_PURPOSES = ['sign_in', 'verify_address', 'invite', 'enrol_passkey', 'owner_recovery', 'confirm_merge', 'confirm_erasure', 'reassert', 'claim'] as const
 export const SESSION_END_REASONS = ['signed_out', 'ended_by_person', 'ended_by_staff', 'credential_changed', 'disabled', 'merged', 'erased'] as const
 export const GRANT_END_REASONS = ['revoked', 'replaced', 'role_archived', 'account_closed', 'merged', 'given_up'] as const
 
@@ -130,6 +130,11 @@ export const recoveryCodes = defineTable('core_recovery_codes', {
   id: col.id(),
   accountId: col.account('account_id', { role: 'subject', onMerge: 'handler' }),
   codeHash: col.internal(text('code_hash').notNull()),
+  // The code itself, sealed with the core key, so the person can see their set again (used ones
+  // struck through) after confirming it is them. Null for sets made before it was kept.
+  codeSealed: col.internal(text('code_sealed'), { encrypted: true }),
+  // Where the code sits in its set, so it is shown in the order it was first shown.
+  position: col.internal(integer('position')),
   createdAt: col.createdAt(),
   usedAt: col.timestamp('used_at'),
 }, {

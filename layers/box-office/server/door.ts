@@ -4,13 +4,19 @@
 // once however many devices scan it together, and the scan row written next in the same batch takes
 // its result from that stamp: admitted if the stamp is its own id, already admitted otherwise. A desk code or a
 // booking reference admits nobody and writes no scan row.
-import { all, can, createUnit, first, newId, nowMs, useContext } from '#kit'
+//
+// A ticket sold on a requirement, such as a member's price, is checked again before it is admitted
+// (part 5, "Checking again at entry"): when its type rechecks, and always when it was met by a typed
+// reference. Not met turns the person away to the desk; a source that is off, failing or that this
+// steward may not ask admits them and marks the scan unchecked, so a source being down never holds
+// the queue.
+import { all, can, createUnit, first, newId, nowMs, requirements, useContext } from '#kit'
 import { signing } from '#kit/signing'
 import { hashOf } from './codes'
 import { doorCodeKind } from './door-codes'
 import { DOOR_CODE_PURPOSE, signedPart, TICKET_KIND } from './tickets'
 
-export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed'
+export type ScanResult = 'admitted' | 'already_admitted' | 'void' | 'wrong_performance' | 'requirement_not_met' | 'unknown' | 'bad_signature' | 'not_paid' | 'card' | 'card_not_allowed'
 
 export interface ScanOutcome {
   result: ScanResult
@@ -30,6 +36,33 @@ export interface ScanOutcome {
   booking?: { reference: string, ticketType: string, admitted: number, tickets: number }
   /** Not paid: the reservation the door sends to the box office or the bar, and what is owed. */
   reservation?: { reference: string, tickets: number, amountDueMinor: number, currency: string }
+  /** Requirement not met: the source's words, such as "Membership not current", and the ticket's type. */
+  requirement?: { reason: string | null, ticketType: string }
+  /** Admitted without its requirement being checked again: the source was off, failing or not open to this steward. */
+  unchecked?: boolean
+}
+
+// Sources checked once, when the ticket is sold, and never at the door, whatever the ticket type's
+// recheck setting: the access scheme is guarded by an ability a steward does not hold (part 5,
+// "What Box office names from the scheme").
+const SOLD_ONCE = ['core.access-scheme:']
+
+interface Kept { ref: string | null, account: string | null, evidence: string | null, recheck: number, type_name: string }
+
+/** Checks a ticket's requirement again at the door: met, not met (with the source's words), or unchecked. */
+async function recheck(ticketId: string, performanceId: string): Promise<{ verdict: 'met' | 'unchecked' } | { verdict: 'not-met', reason: string | null, ticketType: string }> {
+  const kept = await first<Kept>(
+    `SELECT t.requirement_ref AS ref, t.requirement_account_id AS account, t.requirement_evidence_id AS evidence, y.recheck_at_entry AS recheck, y.name AS type_name
+      FROM box_office_tickets t JOIN box_office_order_lines l ON l.id = t.order_line_id JOIN box_office_ticket_types y ON y.id = l.ticket_type_id WHERE t.id = ?`, ticketId)
+  if (!kept?.ref || SOLD_ONCE.some(prefix => kept.ref!.startsWith(prefix))) return { verdict: 'met' }
+  // A typed reference is always checked again; a ticket met by the buyer's account only when its type says so.
+  if (!kept.evidence && !kept.recheck) return { verdict: 'met' }
+  const [answer] = kept.evidence
+    ? await requirements.check({ accounts: [null], refs: [kept.ref], presented: [{ ref: kept.ref, evidence: kept.evidence }], record: ['core.performance', performanceId], whenUnavailable: 'met' })
+    : await requirements.check({ accounts: [kept.account], refs: [kept.ref], record: ['core.performance', performanceId], whenUnavailable: 'met' })
+  if (!answer || answer.unavailable || answer.notAllowed) return { verdict: 'unchecked' }
+  if (answer.verdict === 'met') return { verdict: 'met' }
+  return { verdict: 'not-met', reason: answer.summary ?? answer.reason ?? null, ticketType: kept.type_name }
 }
 
 /** The booking a ticket belongs to, at this performance: its reference, the ticket's type, and how many are in. */
@@ -96,18 +129,22 @@ export async function scan(input: ScanInput): Promise<ScanOutcome> {
   if (!ticket) return recorded({ result: 'unknown' })
   if (ticket.state === 'void') return recorded({ result: 'void', ticketId: ticket.id, voidReason: ticket.void_reason ?? undefined }, ticket.id)
   if (ticket.performance_id !== input.performanceId) return recorded({ result: 'wrong_performance', ticketId: ticket.id, ticketPerformanceId: ticket.performance_id }, ticket.id)
+  // A ticket already in is said so without asking again; one not yet in is checked before it is admitted.
+  const checked = ticket.admitted_at === null ? await recheck(ticket.id, input.performanceId) : { verdict: 'met' as const }
+  if (checked.verdict === 'not-met') return recorded({ result: 'requirement_not_met', ticketId: ticket.id, requirement: { reason: checked.reason, ticketType: checked.ticketType } }, ticket.id)
+  const unchecked = checked.verdict === 'unchecked' ? 1 : 0
 
   // One conditional update admits and stamps; the scan row reads the stamp to say whether it was the one.
   unit.view().add({ sql: "UPDATE box_office_tickets SET admitted_at = ?, admitted_scan_id = ?, updated_at = ? WHERE id = ? AND state = 'valid' AND admitted_at IS NULL AND performance_id = ?", params: [at, scanId, at, ticket.id, input.performanceId] })
   unit.view().add({
     sql: `INSERT INTO box_office_scans (id, ticket_id, performance_id, result, unchecked, scanned_by, device_label, scanned_at, received_at, offline)
-      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, 0, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
-    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id],
+      SELECT ?1, t.id, ?2, CASE WHEN t.admitted_scan_id = ?1 THEN 'admitted' ELSE 'already_admitted' END, CASE WHEN t.admitted_scan_id = ?1 THEN ?7 ELSE 0 END, ?3, ?4, ?5, ?5, 0 FROM box_office_tickets t WHERE t.id = ?6`, // not-policy: numbered parameters
+    params: [scanId, input.performanceId, actor, input.deviceLabel ?? null, at, ticket.id, unchecked],
   })
   await unit.commit()
   const written = await first<{ result: 'admitted' | 'already_admitted' }>('SELECT result FROM box_office_scans WHERE id = ?', scanId)
   const booking = await bookingOf(ticket.id, input.performanceId)
-  if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id, booking }
+  if (written?.result === 'admitted') return { result: 'admitted', scanId, ticketId: ticket.id, booking, ...unchecked ? { unchecked: true } : {} }
   const earlier = await first<{ scanned_at: number, device_label: string | null }>('SELECT s.scanned_at, s.device_label FROM box_office_tickets t JOIN box_office_scans s ON s.id = t.admitted_scan_id WHERE t.id = ?', ticket.id)
   return { result: 'already_admitted', scanId, ticketId: ticket.id, admittedAt: earlier?.scanned_at, admittedAtDoor: earlier?.device_label ?? null, booking }
 }

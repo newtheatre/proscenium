@@ -32,7 +32,10 @@ defineSlots<{
   footer?: () => unknown
 }>()
 
-useHead({ title: () => props.title })
+const embedded = inject(EMBEDDED_FRAME, false)
+const window = inject(CONSOLE_WINDOW, false)
+// In the console's settings window the page behind keeps its title.
+if (!window) useHead({ title: () => props.title })
 const { t } = useT()
 // A link to a list returns it as it was left (the same view, filters, search, sort and page).
 const { recall } = useListMemory()
@@ -48,8 +51,49 @@ const [DefineBody, ReuseBody] = createReusableTemplate()
 </script>
 
 <template>
+  <div
+    v-if="embedded"
+    class="space-y-4"
+  >
+    <div class="flex flex-wrap items-center gap-2">
+      <IconButton
+        v-if="nearest"
+        :to="nearest.to"
+        icon="i-lucide-chevron-left"
+        :label="t('core.trail.back-to', { where: nearest.label })"
+        class="-ms-2"
+      />
+      <h2 class="text-lg font-semibold text-highlighted">
+        {{ title }}
+      </h2>
+      <slot name="status" />
+      <div class="ms-auto flex items-center gap-2">
+        <slot name="primary" />
+      </div>
+    </div>
+    <p
+      v-if="description"
+      class="text-sm text-muted"
+    >
+      {{ description }}
+    </p>
+    <div
+      v-if="$slots.toolbar"
+      class="flex flex-wrap items-center gap-2"
+    >
+      <slot name="toolbar" />
+    </div>
+    <slot />
+    <div
+      v-if="$slots.footer"
+      class="sticky bottom-0 flex justify-end gap-2 border-t border-default bg-default py-3"
+    >
+      <slot name="footer" />
+    </div>
+  </div>
+
   <UDashboardPanel
-    v-if="dashboard"
+    v-else-if="dashboard"
     :ui="{ root: 'h-svh' }"
   >
     <template #header>

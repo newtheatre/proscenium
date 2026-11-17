@@ -26,5 +26,7 @@
   "bar.settings.age-check.review-every.help": "How long the refusals register may go without a manager signing it as checked.",
   "bar.settings.retention.age-checks.label": "Keep the refusals register for",
   "bar.settings.retention.age-checks.help": "After this, descriptions of people refused are erased from the register.",
-  "bar.navigation.age-checks.label": "Refusals register"
+  "bar.navigation.age-checks.label": "Refusals register",
+  "bar.abilities.sale.view.label": "See bar sales",
+  "bar.abilities.sale.refund.label": "Ask for a refund of a bar sale"
 }

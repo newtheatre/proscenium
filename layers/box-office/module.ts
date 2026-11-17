@@ -173,7 +173,7 @@ export default defineModule({
       { id: 'box-office.comps', menu: 'console', group: 'box-office', section: 'everyday', to: '/console/box-office/comps', icon: 'i-lucide-gift', ability: 'box-office.comp.request', order: 35 },
       // The door in live mode: the camera reads tickets one after another (Matt's option B, 2026-11-17).
       { id: 'box-office.door', menu: 'live', to: '/live/door', icon: 'i-lucide-scan-qr-code', ability: 'box-office.ticket.admit', order: 15 },
-      { id: 'box-office.ticket-types', menu: 'console', group: 'box-office', section: 'setup', to: '/console/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
+      { id: 'box-office.ticket-types', menu: 'admin', group: 'modules', to: '/admin/modules/box-office/ticket-types', icon: 'i-lucide-tags', ability: 'box-office.pricing.manage', order: 40 },
     ],
     // Ticket money is owed to the audience until the performance has taken place.
     'finance.system-account': [
@@ -261,6 +261,20 @@ export default defineModule({
         'en-GB': {
           subject: 'Your tickets: {{ show }}, {{ when }}',
           body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nPaid: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nEach ticket has its own code, which is scanned at the door:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.',
+        },
+      },
+    }, {
+      id: 'box-office.order-confirmed-guest',
+      category: 'transactional' as const,
+      side: 'audience' as const,
+      channels: ['email' as const],
+      lane: 'prompt' as const,
+      // The confirmation for a buyer who has never signed in: the same, with core's link that opens their account.
+      variables: { reference: 'text' as const, show: 'text' as const, when: 'text' as const, tickets: 'text' as const, paid: 'text' as const, codes: 'sealed' as const, link: 'sealed' as const, account: 'sealed' as const },
+      wording: {
+        'en-GB': {
+          subject: 'Your tickets: {{ show }}, {{ when }}',
+          body: 'You are booked.\n\n**{{ show }}**, {{ when }}\n\nTickets: {{ tickets }}\n\nPaid: **{{ paid }}**\n\nBooking reference: **{{ reference }}**\n\n[Show my tickets]({{ link }})\n\nEach ticket has its own code, which is scanned at the door:\n\n{{ codes }}\n\nAnyone with a code can use that ticket, so only pass this email on to the people you are bringing.\n\nWant to see all your bookings in one place? [Open your account]({{ account }}). There is no password: the link signs you in, once, and works until you first sign in.',
         },
       },
     }, {

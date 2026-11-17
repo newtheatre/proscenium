@@ -202,6 +202,7 @@ async function reserve() {
               <p class="text-lg">
                 {{ t('box-office.basket.reference', { reference: outcome.reference }) }}
               </p>
+              <BoxOfficeAccountCard v-if="!viewer.signedIn" />
             </template>
             <template v-else-if="outcome.state === 'reserved'">
               <p>{{ t('box-office.basket.done.reserved.body', { amount: money(outcome.amountDueMinor, basket?.currency) }) }}</p>

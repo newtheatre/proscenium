@@ -1,0 +1,1 @@
+ALTER TABLE `box_office_order_lines` ADD `price_id` text REFERENCES box_office_prices(id);

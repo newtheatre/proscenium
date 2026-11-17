@@ -37,7 +37,7 @@ function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Pro
 }
 
 async function codesSent(orderId: string, type: string): Promise<string[]> {
-  const found = await rows<{ sealed_variables: string }>('SELECT sealed_variables FROM core_notifications WHERE type_key = ? AND subject_id = ? ORDER BY created_at DESC', type, orderId)
+  const found = await rows<{ sealed_variables: string }>('SELECT sealed_variables FROM core_notifications WHERE type_key IN (?, ? || \'-guest\') AND subject_id = ? ORDER BY created_at DESC', type, type, orderId)
   return (JSON.parse((await inContext(() => openSpecial(found[0]!.sealed_variables)))!).codes as string).split('\n\n')
 }
 
@@ -175,6 +175,12 @@ describe('exchanging tickets', () => {
     const moved = await rows<{ ticket_type_id: string, amount_minor: number, replaces_line_id: string }>("SELECT ticket_type_id, amount_minor, replaces_line_id FROM box_office_order_lines WHERE order_id = ? AND state = 'live'", o.orderId)
     expect(moved.find(l => l.replaces_line_id === o.lines[0])).toMatchObject({ ticket_type_id: to.fullId, amount_minor: 1200 })
     expect(moved.find(l => l.replaces_line_id === o.lines[1])).toMatchObject({ ticket_type_id: to.concessionId, amount_minor: 800 })
+    // Each line records the price row it was sold at: the basket's from the first performance, the exchange's from the second.
+    const priced = async (performanceId: string, ticketTypeId: string) => (await rows<{ id: string }>('SELECT p.id FROM box_office_prices p JOIN box_office_pools o ON o.band_id = p.band_id WHERE o.performance_id = ? AND p.ticket_type_id = ? ORDER BY p.effective_from DESC LIMIT 1', performanceId, ticketTypeId))[0]!.id
+    const sold = await rows<{ id: string, price_id: string }>('SELECT id, price_id FROM box_office_order_lines WHERE order_id = ? ORDER BY id', o.orderId)
+    expect(sold.find(l => l.id === o.lines[0])!.price_id).toBe(await priced(from.performanceId, from.fullId))
+    const pricedNow = await rows<{ ticket_type_id: string, price_id: string }>("SELECT ticket_type_id, price_id FROM box_office_order_lines WHERE order_id = ? AND state = 'live'", o.orderId)
+    expect(pricedNow.find(l => l.ticket_type_id === to.concessionId)!.price_id).toBe(await priced(to.performanceId, to.concessionId))
     expect(await claimed(to)).toBe(2)
     await deliver()
 
@@ -187,6 +193,8 @@ describe('exchanging tickets', () => {
     expect(await payCash(sale.body.intentId)).toMatchObject({ settled: true })
     const after = await rows<{ ticket_type_id: string, amount_minor: number }>("SELECT ticket_type_id, amount_minor FROM box_office_order_lines WHERE order_id = ? AND state = 'live'", o.orderId)
     expect(after.map(l => [l.ticket_type_id, l.amount_minor])).toEqual([[to.fullId, 1200], [to.fullId, 1200]])
+    // The till's exchange keeps the price row too, through the payment.
+    expect((await rows<{ n: number }>("SELECT count(*) AS n FROM box_office_order_lines WHERE order_id = ? AND state = 'live' AND price_id = ?", o.orderId, await priced(to.performanceId, to.fullId)))[0]!.n).toBe(2)
     expect(await claimed(to)).toBe(2)
   })
 

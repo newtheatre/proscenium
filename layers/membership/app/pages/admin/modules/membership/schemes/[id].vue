@@ -83,7 +83,7 @@ async function remove() {
   if (!(await confirm({ verb: t('membership.screens.scheme.verb-delete'), thing: scheme.value!.name, consequence: t('membership.screens.scheme.confirm-delete'), button: t('membership.screens.scheme.delete') }))) return
   try {
     await $api(`/api/membership/schemes/${id.value}` as string, { method: 'DELETE', body: {} })
-    await navigateTo('/console/membership/schemes')
+    await navigateTo('/admin/modules/membership/schemes')
   }
   catch (e) {
     toast.add({ title: toRefusal(e).reason, color: 'error' })
@@ -472,7 +472,7 @@ async function addMember() {
               />
               <template #help>
                 <ULink
-                  to="/console/membership/lists"
+                  to="/admin/modules/membership/lists"
                   class="underline"
                 >
                   {{ t('membership.screens.scheme.list-manage') }}
