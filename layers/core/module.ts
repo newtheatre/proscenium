@@ -45,7 +45,8 @@ export default defineModule({
       { id: 'core.account-email', menu: 'account', group: 'account', to: '/account/email', icon: 'i-lucide-mail', ability: 'signed-in', order: 20, attention: 'core.unconfirmed-addresses' },
       { id: 'core.account-sign-in', menu: 'account', group: 'account', to: '/account/sign-in', match: '/account/passkey', icon: 'i-lucide-key-round', ability: 'signed-in', order: 30 },
       { id: 'core.account-data', menu: 'account', group: 'account', to: '/account/data', icon: 'i-lucide-download', ability: 'signed-in', order: 50 },
-      { id: 'core.venues', menu: 'console', group: 'venues', section: 'everyday', to: '/console/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30 },
+      // Venues and their spaces are set up once, so they are a tab of Core's page, opened from the programme's cog.
+      { id: 'core.venues', menu: 'admin', group: 'modules', to: '/admin/modules/core/venues', icon: 'i-lucide-building', ability: 'core.venue.manage', order: 30, settingsIn: ['programme'] },
       { id: 'core.closures', menu: 'admin', group: 'modules', to: '/admin/modules/core/closures', icon: 'i-lucide-calendar-x', ability: 'core.closure.manage', order: 35, settingsIn: ['core.calendar'] },
       { id: 'core.email', menu: 'admin', group: 'email', to: '/admin/email', icon: 'i-lucide-mail-check', ability: 'core.sender.manage', order: 30 },
       { id: 'core.credits', menu: 'account', group: 'theatre', to: '/account/credits', icon: 'i-lucide-scroll-text', ability: 'signed-in', order: 42, count: 'core.my-credits', hideEmpty: true },
