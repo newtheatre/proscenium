@@ -5,6 +5,7 @@ import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#ki
 import { priceOn, nextChange, type ListRule, type PriceRow } from './pricing'
 import type { OUTLET_KINDS, TILL_LAYOUTS } from './db/schema'
 import { choiceGroups, groupsByProduct, priceGroups, type ChoiceGroup } from './choices'
+import { allergenAnswers, allergenSettings, tillAllergens, type ItemAllergens, type OptionAllergens } from './allergens'
 
 export const STANDARD = 'standard'
 
@@ -88,7 +89,7 @@ export async function catalogue(options: { activeOnly?: boolean } = {}): Promise
   }
 }
 
-export interface MenuItem { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, priceId: string, groupIds: string[], baseMinor: number }
+export interface MenuItem { variantId: string, productId: string, product: string, variant: string, ageRestricted: boolean, amountMinor: number, priceId: string, groupIds: string[], baseMinor: number, allergens?: ItemAllergens }
 export interface Menu {
   outletId: string
   outlet: string
@@ -100,7 +101,10 @@ export interface Menu {
   percentOff: number | null
   currency: string
   categories: { id: string, name: string, colour: string | null, parentId: string | null, items: MenuItem[] }[]
-  groups: ChoiceGroup[]
+  // Each option carries allergens too while they are switched on.
+  groups: (ChoiceGroup & { options: (ChoiceGroup['options'][number] & { allergens?: OptionAllergens })[] })[]
+  // The theatre's statement about shared equipment; null when it has none or allergens are off.
+  allergenStatement: string | null
 }
 
 /**
@@ -119,6 +123,16 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
   const { categories } = await catalogue({ activeOnly: true })
   const rows = await priceRows()
   const at = nowMs()
+  // Each option with what it adds, before any percentage. A line's unit price is its baseMinor plus
+  // its picks, less percentOff when set, rounded once (pricing's lessPercent): the server's sum.
+  const priced = priceGroups(await choiceGroups({ activeOnly: true }), (variantId) => {
+    const found = priceOn(rows, variantId, rule(percent ? standardList! : list!), std, at)
+    return found ? found.amountMinor : null
+  })
+  // Allergens ride on the menu, so the till's sheet works from what it loaded. Left off when switched off.
+  const allergenSet = await allergenSettings()
+  const productOfVariant = new Map(categories.flatMap(c => c.products.flatMap(p => p.variants.map(v => [v.id, p.id] as const))))
+  const al = allergenSet.enabled ? tillAllergens(await allergenAnswers(), priced, productOfVariant) : null
   return {
     outletId: outlet!.id,
     outlet: outlet!.name,
@@ -139,15 +153,11 @@ export async function menu(outletId: string, priceListId?: string): Promise<Menu
         if (!priced) return []
         // The price the picks are added to: Standard's on a percentage list, which then takes its percentage off the whole.
         const base = percent ? priceOn(rows, v.id, rule(standardList!), std, at)?.amountMinor ?? priced.amountMinor : priced.amountMinor
-        return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base }]
+        return [{ variantId: v.id, productId: p.id, product: p.name, variant: v.name, ageRestricted: p.ageRestricted, amountMinor: priced.amountMinor, priceId: priced.priceId, groupIds: p.groupIds, baseMinor: base, ...(al ? { allergens: al.product(p.id, p.groupIds) } : {}) }]
       })),
     }))),
-    // Each option with what it adds, before any percentage. A line's unit price is its baseMinor plus
-    // its picks, less percentOff when set, rounded once (pricing's lessPercent): the server's sum.
-    groups: priceGroups(await choiceGroups({ activeOnly: true }), (variantId) => {
-      const priced = priceOn(rows, variantId, rule(percent ? standardList! : list!), std, at)
-      return priced ? priced.amountMinor : null
-    }),
+    groups: al ? priced.map(g => ({ ...g, options: g.options.map(o => ({ ...o, allergens: al.option(g.id, o.key) })) })) : priced,
+    allergenStatement: al ? allergenSet.statement : null,
   }
 }
 

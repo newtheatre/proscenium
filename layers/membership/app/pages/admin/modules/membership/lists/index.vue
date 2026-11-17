@@ -100,12 +100,14 @@ const describe = (l: List) => [
         <UForm
           id="membership-new-list"
           :state="form"
+          :validate="() => needs({ name: form.name })"
           class="space-y-4"
           novalidate
           @submit="create"
         >
           <RefusalNotice :refusal="refusal" />
           <UFormField
+            name="name"
             :label="t('membership.screens.list.name')"
             :help="t('membership.screens.list.name-help')"
             required
@@ -139,7 +141,6 @@ const describe = (l: List) => [
           type="submit"
           form="membership-new-list"
           loading-auto
-          :disabled="!form.name.trim()"
           :label="t('membership.screens.lists.create')"
         />
       </template>
