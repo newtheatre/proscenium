@@ -30,5 +30,6 @@
   "gallery.record-tabs.tickets.label": "Tickets",
   "gallery.navigation.choices.label": "Sample choices",
   "gallery.desk.label": "Gallery programmes",
-  "gallery.desk.amount": "Programmes sold"
+  "gallery.desk.amount": "Programmes sold",
+  "gallery.navigation.live.label": "Sample door"
 }
