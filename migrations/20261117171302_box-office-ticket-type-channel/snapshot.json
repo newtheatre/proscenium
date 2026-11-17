@@ -1,9 +1,9 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "d5cb8e42-5cab-4893-b252-f7ec89f20e04",
+  "id": "6be738cb-0bdd-4df3-a585-ec6dc99dbfaa",
   "prevIds": [
-    "63f5dd4c-b125-4799-90fe-7f897b3ad140",
+    "0177e452-c8f8-4dc4-8478-74eae15f291d",
     "b1492d30-138a-499b-91ad-6ac7a68e998a",
     "fcccfdc0-f3b9-43f6-9729-350f49fb535c"
   ],
@@ -2269,6 +2269,16 @@
     {
       "table": "box_office_order_lines",
       "name": "claim_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "price_id",
       "type": "text",
       "notNull": false,
       "autoincrement": false,
@@ -17287,6 +17297,21 @@
         "claim_id"
       ],
       "tableTo": "box_office_claims",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "box_office_order_lines",
+      "name": "fk_box_office_order_lines_price_id_box_office_prices_id_fk",
+      "columns": [
+        "price_id"
+      ],
+      "tableTo": "box_office_prices",
       "columnsTo": [
         "id"
       ],
