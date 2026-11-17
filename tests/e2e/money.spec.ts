@@ -114,3 +114,12 @@ test('Till sessions lists the sessions opened above, newest first, and filters t
   await expect(page.getByRole('cell', { name: 'Open', exact: true })).toHaveCount(0)
   await noViolations(page)
 })
+
+test('the Ledger lists the sale with its entries open, and the Refunds view leaves it out', async ({ page }) => {
+  await visit(page, '/console/finance/ledger')
+  await expect(page.getByRole('cell', { name: 'Sale' }).first()).toBeVisible()
+  await expect(page.getByRole('cell', { name: '£6.00' }).first()).toBeVisible()
+  await noViolations(page)
+  await visit(page, '/console/finance/ledger?view=refunds')
+  await expect(page.getByRole('cell', { name: 'Sale' })).toHaveCount(0)
+})
