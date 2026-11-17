@@ -371,6 +371,20 @@ export const identityContributions = {
       },
     },
   }, {
+    // A guest buyer asking again for the link that opens their account. The link signs them in, so it is sealed.
+    id: 'core.account-claim',
+    category: 'transactional' as const,
+    side: 'audience' as const,
+    channels: ['email' as const],
+    lane: 'prompt' as const,
+    variables: { link: 'sealed' as const },
+    wording: {
+      'en-GB': {
+        subject: 'Open your account at {{ theatre }}',
+        body: 'Here is the link to open your account at {{ theatre }}. You will see all your bookings in one place, and book faster next time. There is no password: the link signs you in, once, and you can add a passkey afterwards if you like.\n\n[Open your account]({{ link }})\n\nIf you did not ask for this, you can ignore this email.',
+      },
+    },
+  }, {
     // The link signs the person in, so it is sealed: never stored in clear in core_notifications.
     id: 'core.invitation',
     category: 'transactional' as const,

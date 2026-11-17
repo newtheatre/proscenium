@@ -35,7 +35,7 @@ function commit<T>(fn: (unit: ReturnType<typeof createUnit>) => Promise<T>): Pro
 }
 
 async function codesSent(orderId: string, type: string): Promise<string[]> {
-  const found = await rows<{ sealed_variables: string }>('SELECT sealed_variables FROM core_notifications WHERE type_key = ? AND subject_id = ? ORDER BY created_at DESC', type, orderId)
+  const found = await rows<{ sealed_variables: string }>('SELECT sealed_variables FROM core_notifications WHERE type_key IN (?, ? || \'-guest\') AND subject_id = ? ORDER BY created_at DESC', type, type, orderId)
   return (JSON.parse((await inContext(() => openSpecial(found[0]!.sealed_variables)))!).codes as string).split('\n\n')
 }
 
