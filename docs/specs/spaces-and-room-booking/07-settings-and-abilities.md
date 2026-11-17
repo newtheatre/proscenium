@@ -1,6 +1,6 @@
 # 6. Settings and abilities
 
-Spaces declares 17 settings, 10 abilities and no facts. Every setting is site-wide; a value that varies by purpose or by bookable is a column on that record that falls back to the setting.
+Spaces declares 17 settings, 10 abilities and no facts. Every setting holds one value for the whole theatre and is shown in one place, the module's own settings page in the console (part 5); a value that varies by purpose or by bookable is a column on that record that falls back to the setting.
 
 ## Settings
 
@@ -40,7 +40,7 @@ Changing the slot size, the time zone or the limits never rewrites a booking. A 
 | --- | --- | --- | --- | --- | --- | --- |
 | `spaces.calendar.view` | `spaces.bookable` | normal |  |  | See a bookable's calendar, shaped by rule K2. Not audited | Fact `core.member` |
 | `spaces.booking.request` | `spaces.bookable` | normal |  | `calendar.view` | Ask for a booking, and manage one's own | Fact `core.member` |
-| `spaces.booking.view` | `spaces.booking` | normal | grants | `calendar.view` | See any booking in full, with its booker and notes. Audited as a read | `technical-manager`, `committee-member` |
+| `spaces.booking.view` | `spaces.booking` | normal | grants | `calendar.view`; `core.account.find`, so the All bookings list can be searched by booker | See any booking in full, with its booker and notes. Audited as a read | `technical-manager`, `committee-member` |
 | `spaces.booking.decide` | `spaces.booking` | normal | refuses | `booking.view` | Confirm or decline a request, and record an outside owner's answer | `technical-manager`; or a grant scoped to one venue or bookable |
 | `spaces.booking.manage` | `spaces.booking` | normal |  | `booking.view`, `booking.request` | Book on someone's behalf, change or cancel anyone's booking, mark a no-show, use staff-only purposes | `technical-manager`; in `small-venue`, `front-of-house-manager` |
 | `spaces.booking.override` | `spaces.bookable` | privileged |  | `booking.manage` | Book outside the limits and hours, and bump inside the notice period, each with a reason | `administrator` |

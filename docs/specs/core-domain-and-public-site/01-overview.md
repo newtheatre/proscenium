@@ -32,7 +32,7 @@ It is aligned with the platform foundations draft: its names, its four ways for 
 ```mermaid
 flowchart LR
     PS["<b>Public site</b><br/>module, can be off<br/><br/>What is on, productions<br/>Seasons, archive, venues<br/>Pages from the fork<br/>Content components<br/><br/>Owns no tables"]
-    CORE["<b>Core</b><br/>always on, 26 tables<br/><br/>Programme: seasons, productions, performances<br/>Places: venues, spaces, closures<br/>Vocabularies<br/>Files<br/>Notifications<br/>Brand and organisation<br/><br/>One D1 database, R2, one queue"]
+    CORE["<b>Core</b><br/>always on, 27 tables<br/><br/>Programme: seasons, productions, performances<br/>Places: venues, spaces, closures<br/>Vocabularies<br/>Files<br/>Notifications<br/>Brand and organisation<br/><br/>One D1 database, R2, one queue"]
     OM["<b>Other modules</b><br/>each can be off<br/><br/>Box office<br/>Front of house<br/>Form builder<br/>Spaces, communications<br/><br/>Core never imports them"]
     PS -->|reads| CORE
     CORE -->|events| PS

@@ -27,10 +27,10 @@ Tests use the stack Foundations proved: Vitest in workerd with a local D1 for se
 | Eligibility | No requirement means eligible; an unmet one shows the provider's reason; unavailable is not enforced and the screen says so; a person with no account is unmet; a manager's override is audited |
 | Release | Outside notice frees the place; inside keeps it; cover swaps both in one batch; a failed batch changes neither |
 | Confirmation mode | Requested takes a place; decline frees it |
-| Template | Applying twice is idempotent; an archived duty is skipped |
+| Template | Applying twice is idempotent; an archived duty is skipped; the bulk action skips a performance in an unmanaged space, which can still be given shifts by hand |
 | Rescheduled and cancelled | Times recomputed by the same offsets; one notification per person; cancelled releases all |
 | Reminders | Two at most; a re-run of the task sends none; zero turns one off |
-| Merge | Two accounts on one shift merge into one assignment and `places_taken` drops by one |
+| Merge | Two accounts on one shift merge into one assignment and `places_taken` drops by one; running the merge again changes nothing; undo restores the freed assignment only while the shift's call time is ahead and a place is free, and reports the rest with a reason |
 | Hours | Scheduled and checked modes; a correction is audited |
 
 ## The night
