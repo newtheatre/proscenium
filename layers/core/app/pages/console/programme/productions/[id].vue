@@ -24,6 +24,9 @@ interface Production {
   contentNote: string | null
   runningMinutes: number | null
   intervalCount: number
+  intervalMinutes: number | null
+  doorsBeforeMinutes: number | null
+  capacity: number | null
   externalBookingUrl: string | null
   creditsPublic: boolean
   listed: boolean
@@ -32,7 +35,7 @@ interface Production {
   advisories: { termId: string, level: 'mentioned' | 'discussed' | 'depicted', levelAssumed: boolean, detail: string | null }[]
   effects: { termId: string, detail: string | null }[]
 }
-interface Answer { production: Production, needs: string[], options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[] } }
+interface Answer { production: Production, needs: string[], theatre: { runningMinutes: number, doorsBeforeMinutes: number, intervalMinutes: number }, sellsHere: boolean, options: { categories: Option[], advisories: { id: string, label: string, description: string | null, groupId: string | null, retired: boolean }[], advisoryGroups: { id: string, label: string }[], effects: { id: string, label: string, description: string | null, icon: string | null, retired: boolean }[], reasons: Option[], seasons: { id: string, name: string }[] } }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -75,21 +78,26 @@ const seasons = computed(() => [{ value: NONE, label: 'No season' }, ...(data.va
 // Details
 const details = reactive({
   title: '', slug: '', subtitle: '', summary: '', description: '', kind: 'own' as Production['kind'], categoryTermId: '', seasonId: NONE, companyName: '',
-  contentNote: '', runningMinutes: null as number | null, intervalCount: 0, externalBookingUrl: '', creditsPublic: true, listed: true,
+  contentNote: '', runningMinutes: null as number | null, intervalCount: 0, intervalMinutes: null as number | null, doorsBeforeMinutes: null as number | null,
+  capacity: null as number | null, bookedElsewhere: false, externalBookingUrl: '', creditsPublic: true, listed: true,
 })
+// With nothing here selling tickets, every production is booked elsewhere (Matt, 2026-11-17).
+const sellsHere = computed(() => data.value?.sellsHere ?? true)
+const elsewhere = computed(() => !sellsHere.value || details.bookedElsewhere)
 watch(production, (p) => {
   if (!p) return
   Object.assign(details, {
     title: p.title, slug: p.slug, subtitle: p.subtitle ?? '', summary: p.summary ?? '', description: p.description ?? '', kind: p.kind, categoryTermId: p.categoryTermId ?? '',
     seasonId: p.seasonId ?? NONE, companyName: p.companyName ?? '', contentNote: p.contentNote ?? '', runningMinutes: p.runningMinutes,
-    intervalCount: p.intervalCount, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
+    intervalCount: p.intervalCount, intervalMinutes: p.intervalMinutes, doorsBeforeMinutes: p.doorsBeforeMinutes, capacity: p.capacity,
+    bookedElsewhere: !!p.externalBookingUrl, externalBookingUrl: p.externalBookingUrl ?? '', creditsPublic: p.creditsPublic, listed: p.listed,
   })
 }, { immediate: true })
 const saveDetails = () => run(() => api('', 'PATCH', {
-  ...details,
+  ...(({ bookedElsewhere: _, ...rest }) => rest)(details),
   categoryTermId: details.categoryTermId || null,
   seasonId: details.seasonId === NONE ? null : details.seasonId,
-  externalBookingUrl: details.externalBookingUrl.trim() || null,
+  externalBookingUrl: elsewhere.value ? details.externalBookingUrl.trim() || null : null,
   runningMinutes: details.runningMinutes || null,
 }), 'Production saved')
 
@@ -323,19 +331,67 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                     maxlength="200"
                   />
                 </UFormField>
-                <UFormField label="Running time in minutes">
-                  <UInputNumber
+                <UFormField
+                  label="Running time"
+                  help="Including the intervals."
+                  name="runningMinutes"
+                >
+                  <MinutesInput
                     v-model="details.runningMinutes"
+                    :placeholder="data?.theatre.runningMinutes"
                     :min="1"
+                    label="Running time"
                   />
                 </UFormField>
-                <UFormField label="Intervals">
+                <UFormField
+                  label="Doors open before"
+                  name="doorsBeforeMinutes"
+                >
+                  <MinutesInput
+                    v-model="details.doorsBeforeMinutes"
+                    :placeholder="data?.theatre.doorsBeforeMinutes"
+                    :max="180"
+                    label="Doors open before"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Intervals"
+                  name="intervalCount"
+                >
                   <UInputNumber
                     v-model="details.intervalCount"
                     :min="0"
                     :max="10"
                   />
                 </UFormField>
+                <UFormField
+                  label="Each interval"
+                  name="intervalMinutes"
+                >
+                  <MinutesInput
+                    v-model="details.intervalMinutes"
+                    :placeholder="data?.theatre.intervalMinutes"
+                    :max="120"
+                    label="Each interval"
+                  />
+                </UFormField>
+                <UFormField
+                  label="Capacity"
+                  name="capacity"
+                >
+                  <UInputNumber
+                    v-model="details.capacity"
+                    placeholder="Each space's own"
+                    :min="1"
+                  />
+                </UFormField>
+                <UCheckbox
+                  :model-value="elsewhere"
+                  :disabled="!sellsHere"
+                  label="Booked elsewhere"
+                  :description="sellsHere ? 'Tickets are sold on another website, not here.' : 'Nothing here sells tickets, so every production is booked on another website.'"
+                  @update:model-value="details.bookedElsewhere = !!$event"
+                />
                 <UFormField
                   label="Web address"
                   help="An old address keeps working once the production has been public."
@@ -347,12 +403,15 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
                 </UFormField>
               </div>
               <UFormField
+                v-if="elsewhere"
                 label="Booking link"
-                help="Used when no booking module sells this production. Must start https://."
+                name="externalBookingUrl"
+                required
               >
                 <UInput
                   v-model="details.externalBookingUrl"
                   type="url"
+                  placeholder="https://"
                 />
               </UFormField>
               <UCheckbox
@@ -383,7 +442,6 @@ const openTab = (tab: string) => navigateTo({ query: { ...route.query, tab } }, 
           <ProductionPerformances
             :production-id="production!.id"
             :title="production!.title"
-            :interval-count="production!.intervalCount"
             @changed="reload()"
           />
         </div>

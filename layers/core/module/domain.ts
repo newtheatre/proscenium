@@ -39,6 +39,17 @@ export const settings = defineSettings('core', {
   'programme.credits-public': setting.boolean({ default: true, change: programmeConfigure, audience: 'public', onChange: 'confirm' }),
   'programme.doors-before': setting.duration({ default: '30m', min: '0m', max: '3h', change: programmeConfigure, audience: 'public' }),
   'programme.default-running-time': setting.duration({ default: '2h', min: '10m', max: '8h', change: programmeConfigure }),
+  // A performance's defaults (run presets concept, Matt 2026-11-17). Each is the theatre's; a space or
+  // a production may set its own, and one performance may change it. Running time includes intervals.
+  'programme.intervals': setting.integer({ default: 1, min: 0, max: 10, change: programmeConfigure }),
+  'programme.interval-length': setting.duration({ default: '20m', min: '0m', max: '2h', change: programmeConfigure, audience: 'public' }),
+  // The turnaround: a performance that starts sooner than this after another in the same exclusive
+  // space ends counts as a clash. None by default.
+  'programme.turnaround': setting.duration({ default: '0m', min: '0m', max: '12h', change: programmeConfigure }),
+  // Whether the Add a run window starts with "Schedule them now" ticked.
+  'programme.schedule-runs': setting.boolean({ default: true, change: programmeConfigure }),
+  // The run preset the Add a run window starts from in a space without its own (core_run_presets).
+  'programme.run-preset': setting.custom({ schema: z.string().regex(/^rps_[2-7a-z]{26}$/), unset: true, change: programmeConfigure }),
   // How long a production's team keeps its standing after the last performance ends (core.production-team).
   'programme.team-standing-after': setting.duration({ default: '30d', min: '0d', max: '365d', change: programmeConfigure }),
   'brand.logo': setting.reference({ record: 'core.file', change: branding, audience: 'public', managed: true }),
@@ -93,17 +104,18 @@ export const settingRules: SettingRule[] = [
 ]
 
 export const records = defineRecords('core', {
-  file: record({ table: 'core_files' }),
-  sender: record({ table: 'core_sender_identities' }),
-  vocabulary: record({ table: 'core_vocabularies' }),
-  season: record({ table: 'core_seasons' }),
-  production: record({ table: 'core_productions' }),
+  'file': record({ table: 'core_files' }),
+  'sender': record({ table: 'core_sender_identities' }),
+  'vocabulary': record({ table: 'core_vocabularies' }),
+  'season': record({ table: 'core_seasons' }),
+  'production': record({ table: 'core_productions' }),
   // A grant on a production covers its performances.
-  performance: record({ table: 'core_performances', parent: 'core.production' }),
-  venue: record({ table: 'core_venues' }),
-  space: record({ table: 'core_spaces', parent: 'core.venue' }),
-  closure: record({ table: 'core_closures' }),
-  webhook: record({ table: 'core_webhooks' }),
+  'performance': record({ table: 'core_performances', parent: 'core.production' }),
+  'venue': record({ table: 'core_venues' }),
+  'space': record({ table: 'core_spaces', parent: 'core.venue' }),
+  'closure': record({ table: 'core_closures' }),
+  'run-preset': record({ table: 'core_run_presets' }),
+  'webhook': record({ table: 'core_webhooks' }),
 })
 
 export const abilities = defineAbilities('core', {

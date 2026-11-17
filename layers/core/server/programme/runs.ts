@@ -11,7 +11,7 @@ import type { UnitView } from '#kit'
 import { instantOfLocal } from '#kit/clock'
 import { assertNoBlockingClosure, closuresBetween } from '../places/closures'
 import { dayRule, operatingDayAt, type DayRule } from '../calendar'
-import { firstRefusal, noClash, spaceFits, syncProductionDates, whyNotFree } from './performances'
+import { firstRefusal, noClash, performanceDefaults, spaceFits, syncProductionDates, turnaroundMs, whyNotFree } from './performances'
 
 export interface RunPattern {
   venueId: string
@@ -19,13 +19,20 @@ export interface RunPattern {
   /** The first and last local dates, YYYY-MM-DD. */
   from: string
   to: string
-  /** ISO weekdays: 1 is Monday, 7 is Sunday. */
-  days: number[]
+  /** Each start time with the days it runs on (run presets). */
+  slots?: RunSlot[]
+  /** ISO weekdays: 1 is Monday, 7 is Sunday. One list for every time, as before slots. */
+  days?: number[]
   /** Local start times, HH:mm. */
-  times: string[]
-  /** How long each lasts; left out, the production's running time or the setting. */
+  times?: string[]
+  /** How long each lasts, intervals included; left out, the production's running time or the setting. */
   minutes?: number | null
+  /** How many minutes before each start the doors open; left out, the production's, space's or setting. */
+  doorsBeforeMinutes?: number | null
 }
+
+/** Local start times, HH:mm, on ISO weekdays (1 is Monday, 7 is Sunday). */
+export interface RunSlot { days: number[], times: string[] }
 
 export type Problem = 'past' | 'clash' | 'closed'
 export interface PlannedPerformance { startsAt: number, endsAt: number, doorsAt: number | null, operatingDay: string, problem: Problem | null, reason: string | null }
@@ -37,7 +44,9 @@ export interface RunInput {
   scheduled: boolean
   capacity?: number | null
   intervalCount?: number | null
+  intervalMinutes?: number | null
   label?: string | null
+  externalBookingUrl?: string | null
   performances: RunItem[]
 }
 
@@ -51,7 +60,9 @@ interface RunRow {
   scheduled: number
   capacity: number | null
   interval_count: number | null
+  interval_minutes: number | null
   label: string | null
+  external_booking_url: string | null
   items: string
   total: number
   done: number
@@ -84,20 +95,23 @@ function* dates(from: string, to: string): Generator<{ date: string, weekday: nu
 
 /** The performances a pattern would make, each marked with what stands in its way. */
 export async function planRun(productionId: string, pattern: RunPattern): Promise<{ performances: PlannedPerformance[], limit: number }> {
-  const production = await first<{ state: string, running_minutes: number | null }>('SELECT state, running_minutes FROM core_productions WHERE id = ?', productionId)
+  const production = await first<{ state: string }>('SELECT state FROM core_productions WHERE id = ?', productionId)
   if (!production) refuse('core.production.not-found', 'There is no such production.', { status: 404 })
   const space = await first<{ exclusive: number }>("SELECT exclusive FROM core_spaces WHERE id = ? AND venue_id = ? AND performable = 1 AND state = 'active'", pattern.spaceId, pattern.venueId)
   if (!space) refuse('core.performance.space-unsuitable', 'Choose a space in that venue that is in use and can hold performances.', { status: 409 })
   const day = await rule()
-  const minutes = pattern.minutes ?? production.running_minutes ?? (await useSetting('core.programme.default-running-time') as number) / 60 // not-policy: seconds to minutes
-  const doors = (await useSetting('core.programme.doors-before') as number) * 1000 // not-policy: seconds to milliseconds
-  const days = new Set(pattern.days)
-  const times = [...new Set(pattern.times)].sort()
+  const defaults = await performanceDefaults(productionId, pattern.spaceId)
+  const minutes = pattern.minutes ?? defaults.runningMinutes
+  const doors = (pattern.doorsBeforeMinutes ?? defaults.doorsBeforeMinutes) * MINUTE
+  const gap = await turnaroundMs()
+  // The times each weekday has, from every slot that names it.
+  const slots = pattern.slots ?? [{ days: pattern.days ?? [], times: pattern.times ?? [] }]
+  const byDay = new Map<number, Set<string>>()
+  for (const slot of slots) for (const d of slot.days) for (const time of slot.times) byDay.set(d, (byDay.get(d) ?? new Set()).add(time))
 
   const planned: PlannedPerformance[] = []
   for (const { date, weekday } of dates(pattern.from, pattern.to)) {
-    if (!days.has(weekday)) continue
-    for (const time of times) {
+    for (const time of [...byDay.get(weekday) ?? []].sort()) {
       const startsAt = instantOfLocal(date, time, day.timeZone)
       planned.push({ startsAt, endsAt: startsAt + minutes * MINUTE, doorsAt: startsAt - doors, operatingDay: operatingDayAt(startsAt, day), problem: null, reason: null })
     }
@@ -109,15 +123,15 @@ export async function planRun(productionId: string, pattern: RunPattern): Promis
   const to = Math.max(...planned.map(p => p.endsAt))
   const taken = space.exclusive
     ? await all<{ title: string, starts_at: number, ends_at: number }>(`SELECT p.title, o.starts_at, o.ends_at FROM core_performances o JOIN core_productions p ON p.id = o.production_id
-        WHERE o.space_id = ? AND o.state = 'scheduled' AND o.starts_at < ? AND o.ends_at > ?`, pattern.spaceId, to, from)
+        WHERE o.space_id = ? AND o.state = 'scheduled' AND o.starts_at < ? AND o.ends_at > ?`, pattern.spaceId, to + gap, from - gap)
     : []
   const closures = (await closuresBetween(from, to, { spaceId: pattern.spaceId })).filter(c => c.blocksPerformances)
   const at = nowMs()
   planned.forEach((p, i) => {
-    const overlaps = (s: number, e: number) => s < p.endsAt && e > p.startsAt
-    const clash = taken.find(t => overlaps(t.starts_at, t.ends_at))
+    const overlaps = (s: number, e: number, turnaround = 0) => s < p.endsAt + turnaround && e + turnaround > p.startsAt
+    const clash = taken.find(t => overlaps(t.starts_at, t.ends_at, gap))
     const closure = closures.find(c => overlaps(c.startsAt, c.endsAt))
-    const sibling = space.exclusive && planned.slice(0, i).some(o => !o.problem && overlaps(o.startsAt, o.endsAt))
+    const sibling = space.exclusive && planned.slice(0, i).some(o => !o.problem && overlaps(o.startsAt, o.endsAt, gap))
     if (p.startsAt <= at) Object.assign(p, { problem: 'past', reason: 'This time has passed.' })
     else if (clash) Object.assign(p, { problem: 'clash', reason: `${clash.title} is already scheduled in this space then.` })
     else if (sibling) Object.assign(p, { problem: 'clash', reason: 'Another performance of this run is in the space then.' })
@@ -141,16 +155,16 @@ function checkItems(items: RunItem[]) {
  * to go in. With a run id, an item the run already made is left alone, so a chunk can repeat.
  * Returns the new performances' ids.
  */
-function insertItems(unit: UnitView, productionId: string, input: Omit<RunInput, 'performances'>, items: RunItem[], day: DayRule, runId: string | null): string[] {
+function insertItems(unit: UnitView, productionId: string, input: Omit<RunInput, 'performances'>, items: RunItem[], day: DayRule, runId: string | null, gap: number): string[] {
   const made = items.map(i => ({ id: newId('perf'), s: i.startsAt, e: i.endsAt, d: i.doorsAt, o: operatingDayAt(i.startsAt, day) }))
   const s = sql`json_extract(r.value, '$.s')`
   const e = sql`json_extract(r.value, '$.e')`
   const guards: SQL[] = [spaceFits(input.venueId, input.spaceId), sql`EXISTS (SELECT 1 FROM core_productions WHERE id = ${productionId} AND state <> 'cancelled')`]
-  if (input.scheduled) guards.push(noClash(input.spaceId, s, e), assertNoBlockingClosure(input.spaceId, s, e))
+  if (input.scheduled) guards.push(noClash(input.spaceId, s, e, null, gap), assertNoBlockingClosure(input.spaceId, s, e))
   if (runId) guards.push(sql`NOT EXISTS (SELECT 1 FROM core_performances x WHERE x.run_id = ${runId} AND x.starts_at = ${s})`)
-  unit.add(sql`INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, doors_at, ends_at, operating_day, interval_count, capacity, label, state, run_id, created_at)
+  unit.add(sql`INSERT INTO core_performances (id, production_id, venue_id, space_id, starts_at, doors_at, ends_at, operating_day, interval_count, interval_minutes, capacity, label, external_booking_url, state, run_id, created_at)
     SELECT json_extract(r.value, '$.id'), ${productionId}, ${input.venueId}, ${input.spaceId}, ${s}, json_extract(r.value, '$.d'), ${e}, json_extract(r.value, '$.o'),
-      ${input.intervalCount ?? null}, ${input.capacity ?? null}, ${input.label ?? null}, ${input.scheduled ? 'scheduled' : 'draft'}, ${runId}, ${nowMs()}
+      ${input.intervalCount ?? null}, ${input.intervalMinutes ?? null}, ${input.capacity ?? null}, ${input.label ?? null}, ${input.externalBookingUrl ?? null}, ${input.scheduled ? 'scheduled' : 'draft'}, ${runId}, ${nowMs()}
     FROM json_each(${JSON.stringify(made)}) r
     WHERE ${sql.join(guards, sql` AND `)}`)
   return made.map(m => m.id)
@@ -170,7 +184,7 @@ export async function createRun(unit: UnitView, productionId: string, input: Run
   const day = await rule()
   const limit = await rows()
   if (items.length <= limit) {
-    const ids = insertItems(unit, productionId, input, items, day, null)
+    const ids = insertItems(unit, productionId, input, items, day, null, await turnaroundMs())
     unit.expect(items.length, CHANGED)
     if (input.scheduled) {
       syncProductionDates(unit, productionId)
@@ -181,8 +195,8 @@ export async function createRun(unit: UnitView, productionId: string, input: Run
   }
   const id = newId('run')
   const at = nowMs()
-  unit.add(sql`INSERT INTO core_performance_runs (id, production_id, venue_id, space_id, scheduled, capacity, interval_count, label, items, total, done, state, created_at, updated_at)
-    SELECT ${id}, ${productionId}, ${input.venueId}, ${input.spaceId}, ${input.scheduled ? 1 : 0}, ${input.capacity ?? null}, ${input.intervalCount ?? null}, ${input.label ?? null},
+  unit.add(sql`INSERT INTO core_performance_runs (id, production_id, venue_id, space_id, scheduled, capacity, interval_count, interval_minutes, label, external_booking_url, items, total, done, state, created_at, updated_at)
+    SELECT ${id}, ${productionId}, ${input.venueId}, ${input.spaceId}, ${input.scheduled ? 1 : 0}, ${input.capacity ?? null}, ${input.intervalCount ?? null}, ${input.intervalMinutes ?? null}, ${input.label ?? null}, ${input.externalBookingUrl ?? null},
       ${JSON.stringify(items)}, ${items.length}, 0, 'running', ${at}, ${at}
     WHERE ${spaceFits(input.venueId, input.spaceId)}`).expect(1, { code: 'core.performance.space-unsuitable', reason: 'Choose a space in that venue that is in use and can hold performances.' })
   unit.audit({ action: 'create', record: ['core.production', productionId], detail: { run: id, performances: items.length, scheduled: input.scheduled } })
@@ -238,11 +252,11 @@ async function makeChunk(unit: UnitView, row: RunRow): Promise<void> {
   const limit = await rows()
   const items = (JSON.parse(row.items) as RunItem[]).slice(row.done, row.done + limit)
   const next = row.done + items.length
-  const input = { venueId: row.venue_id, spaceId: row.space_id, scheduled: !!row.scheduled, capacity: row.capacity, intervalCount: row.interval_count, label: row.label }
+  const input = { venueId: row.venue_id, spaceId: row.space_id, scheduled: !!row.scheduled, capacity: row.capacity, intervalCount: row.interval_count, intervalMinutes: row.interval_minutes, label: row.label, externalBookingUrl: row.external_booking_url }
 
   // The chunk is its own unit, so a refusal can still be recorded in the job's.
   const chunk = createUnit()
-  const ids = items.length ? insertItems(chunk, row.production_id, input, items, await rule(), row.id) : []
+  const ids = items.length ? insertItems(chunk, row.production_id, input, items, await rule(), row.id, await turnaroundMs()) : []
   const starts = JSON.stringify(items.map(i => i.startsAt))
   chunk.add(sql`UPDATE core_performance_runs SET done = ${next}, state = ${next >= row.total ? 'done' : 'running'}, updated_at = ${nowMs()}
     WHERE id = ${row.id} AND state = 'running' AND done = ${row.done}

@@ -12,6 +12,11 @@ export interface BookingTarget extends BookingSubject {
 /** An answer, marked `external` where it is the theatre's own link rather than a module's. */
 export type ShownBooking = BookingAnswer & { external?: true }
 
+/** Whether a switched-on module sells tickets here. With none, each production needs its own booking link. */
+export async function sellsHere(): Promise<boolean> {
+  return (await usePoint<BookingAction>('core.booking-action')).length > 0
+}
+
 /** Booking actions for performances the caller has already judged bookable: scheduled and not yet over. */
 export async function bookingActions(performances: BookingTarget[]): Promise<Record<string, ShownBooking>> {
   const out: Record<string, ShownBooking> = {}
