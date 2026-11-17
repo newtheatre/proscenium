@@ -37,6 +37,11 @@ import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
+import compsGet from '../../server/api/box-office/comps/index.get'
+import compsPost from '../../server/api/box-office/comps/index.post'
+import compApprove from '../../server/api/box-office/comps/[id]/approve.post'
+import compDecline from '../../server/api/box-office/comps/[id]/decline.post'
+import compWithdraw from '../../server/api/box-office/comps/[id]/withdraw.post'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -75,6 +80,11 @@ export const handle = server({
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'GET /api/box-office/comps': compsGet,
+  'POST /api/box-office/comps': compsPost,
+  'POST /api/box-office/comps/:id/approve': compApprove,
+  'POST /api/box-office/comps/:id/decline': compDecline,
+  'POST /api/box-office/comps/:id/withdraw': compWithdraw,
   'POST /api/payments/till/sale': tillSalePost,
   'POST /api/payments/till/summary': tillSummaryPost,
 })
