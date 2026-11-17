@@ -16,6 +16,9 @@ import checkPost from '../../server/api/membership-fees/mine/[id]/check.post'
 import chargeGet from '../../server/api/membership-fees/memberships/[id]/charge.get'
 import waivePost from '../../server/api/membership-fees/charges/[id]/waive.post'
 import refundPost from '../../server/api/membership-fees/charges/[id]/refund.post'
+import waitingGet from '../../server/api/membership-fees/desk/waiting.get'
+import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
+import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 
 export const handle = server({
   'GET /api/membership-fees/schemes': schemesGet,
@@ -27,6 +30,9 @@ export const handle = server({
   'GET /api/membership-fees/memberships/:id/charge': chargeGet,
   'POST /api/membership-fees/charges/:id/waive': waivePost,
   'POST /api/membership-fees/charges/:id/refund': refundPost,
+  'GET /api/membership-fees/desk/waiting': waitingGet,
+  'POST /api/payments/till/sale': tillSalePost,
+  'POST /api/payments/till/summary': tillSummaryPost,
 })
 export const treasurer = person(['membership-fees.price.manage'], { reassertedAt: NOV_17 })
 export async function fees<T = any>(method: string, path: string, body: unknown, actor: ReturnType<typeof person>): Promise<{ status: number, body: T }> {
@@ -34,13 +40,15 @@ export async function fees<T = any>(method: string, path: string, body: unknown,
   return { status: response.status, body: await response.json() as T }
 }
 
-export const providers = { card: '' }
+export const providers = { card: '', cash: '' }
 export async function ready(): Promise<void> {
   await membershipReady()
   for (const id of ['finance', 'payments', 'membership-fees', 'cardco']) await setModule(id, true)
   if (providers.card) return
   providers.card = newId('ppa')
+  providers.cash = newId('ppa')
   await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'cardco', 'CardCo', '[\"online\"]', 'live', 1, ?, ?)").bind(providers.card, NOV_17, NOV_17).run()
+  await env.DB.prepare("INSERT INTO payments_provider_accounts (id, provider, label, channels, mode, active, created_at, updated_at) VALUES (?, 'cash', 'Cash', '[\"desk\"]', 'live', 1, ?, ?)").bind(providers.cash, NOV_17, NOV_17).run()
 }
 
 /** An open scheme that requires payment, with its lengths (12 months, and 36 if asked) and a join price for every length. */
