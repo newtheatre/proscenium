@@ -102,6 +102,7 @@ describe('the menu', () => {
     expect(mixer.options.map((o: any) => o.label)).toEqual(['Choices cola', 'Choices tonic'])
     expect(mixer).toMatchObject({ defaultKey: s.tonicMix, required: true })
     expect(menu.groups.find((g: any) => g.id === s.spirit).options).toMatchObject([{ key: s.gin, deltaMinor: 0 }, { key: s.hendricks, deltaMinor: 100 }])
+    expect(menu.ageCheck).toMatchObject({ idTypes: ['passport', 'driving_licence', 'pass_card', 'other_photo'], refusalScope: true })
   })
 })
 

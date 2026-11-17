@@ -8,16 +8,19 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { all, first, newId, nowMs, refuse, retentionSeconds, useSetting, type UnitView } from '#kit'
 import { accountLabel, assertTerm, operatingDayOf } from '#modules/core'
-import { ageChecks, DESCRIPTION_MAX, REFUSAL_SCOPES } from './db/schema'
+import { ageChecks, DESCRIPTION_MAX, ID_TYPES, REFUSAL_SCOPES } from './db/schema'
 import { ensureOpening } from './openings'
 
 export const REASONS = 'bar.refusal-reason'
 
-export async function ageCheckSettings(): Promise<{ enabled: boolean, challengeAge: number, description: boolean }> {
+export async function ageCheckSettings(): Promise<{ enabled: boolean, challengeAge: number, description: boolean, idTypes: readonly string[], refusalScope: true }> {
   return {
     enabled: await useSetting('bar.age-check.enabled') as boolean,
     challengeAge: await useSetting('bar.age-check.challenge-age') as number,
     description: await useSetting('bar.age-check.description') as boolean,
+    // The ID types the till may send with an ID check, and that a refusal takes a scope.
+    idTypes: ID_TYPES,
+    refusalScope: true,
   }
 }
 
