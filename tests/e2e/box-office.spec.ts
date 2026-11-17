@@ -226,11 +226,8 @@ test.describe('the box office console', () => {
 })
 
 test.describe('complimentary tickets', () => {
-  test('a producer asks for tickets and an approver approves and sends them, with no accessibility violations', async ({ browser, playwright }) => {
-    const api = await playwright.request.newContext({ baseURL: 'http://localhost:8788', ...as(manager) })
-    expect([200, 409]).toContain((await api.post('/api/box-office/ticket-types', { data: { name: `Comp ${stamp}`, kind: 'complimentary' }, headers: key() })).status())
-    await api.dispose()
-
+  // Box office keeps its own Complimentary ticket type, so nothing has to be added first.
+  test('a producer asks for tickets and an approver approves and sends them, with no accessibility violations', async ({ browser }) => {
     const askingContext = await browser.newContext(as(producer))
     const asking = await askingContext.newPage()
     await visit(asking, '/console/box-office/comps')

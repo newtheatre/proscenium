@@ -61,7 +61,7 @@ let keyCache: { secret: string, key: CryptoKey } | undefined
 /** Refuses while the list key is not set: the list verifier stays unavailable until then. */
 async function hmacKey(): Promise<CryptoKey> {
   const secret = await credential(LIST_KEY)
-  if (!secret) refuse('membership.list.no-key', 'Verification lists need the MEMBERSHIP_LIST_KEY secret, which has not been set.', { status: 409, remedy: 'Ask the site administrator to add it as a Worker secret (any long random string).' })
+  if (!secret) refuse('membership.list.no-key', 'Verification lists need a list key, which has not been set.', { status: 409, remedy: 'Save a list key under Keys on Membership > Lists (any long random string).' })
   if (keyCache?.secret !== secret) keyCache = { secret: secret!, key: await crypto.subtle.importKey('raw', new TextEncoder().encode(secret!), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']) }
   return keyCache.key
 }

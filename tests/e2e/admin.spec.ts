@@ -191,3 +191,28 @@ test.describe('on a phone, in dark mode', () => {
     await noViolations(page)
   })
 })
+
+test.describe('keys typed into the app', () => {
+  test.use(as(siteOwner('Kit Keys', ['core.identity-settings.manage'])))
+
+  test('Sign-in takes the Turnstile secret key, shows it as dots and its last four characters, replaces and removes it', async ({ page }) => {
+    await visit(page, '/admin/sign-in')
+    const card = page.locator('form').filter({ has: page.getByRole('heading', { level: 2, name: 'Keys' }) })
+    await expect(card.getByLabel('Turnstile secret key')).toBeVisible()
+    await expect(card.getByLabel('Google client secret')).toBeVisible()
+    await card.getByLabel('Turnstile secret key').fill('0x4AAAAAAAe2eabcdefghij4321')
+    await card.getByRole('button', { name: 'Save keys' }).click()
+    await expect(page.getByText('Keys saved', { exact: true }).first()).toBeVisible()
+    await expect(card.getByLabel('Turnstile secret key')).toHaveValue('••••••••••••4321')
+    await noViolations(page)
+    await card.getByRole('button', { name: 'Replace' }).click()
+    await expect(card.getByLabel('Turnstile secret key')).toHaveValue('')
+    await card.getByRole('button', { name: 'Cancel' }).click()
+    await expect(card.getByLabel('Turnstile secret key')).toHaveValue('••••••••••••4321')
+    await card.getByRole('button', { name: 'Remove' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Remove key' }).click()
+    await expect(page.getByText('Key removed', { exact: true }).first()).toBeVisible()
+    await expect(card.getByLabel('Turnstile secret key')).toHaveValue('')
+    await expect(card.getByText('Not set').first()).toBeVisible()
+  })
+})

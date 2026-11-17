@@ -55,8 +55,6 @@ const SCREENS = [
   ['/console/finance/productions', 'Production statements'],
   ['/console/finance/reconcile', 'Reconciliation'],
   ['/console/finance/export', 'Export'],
-  ['/console/payments/settings', 'Payments'],
-  ['/console/finance/settings', 'Finance'],
 ] as const
 
 for (const [path, title] of SCREENS) {
@@ -65,6 +63,15 @@ for (const [path, title] of SCREENS) {
     expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
     await expect(page.getByRole('link', { name: title }).first()).toBeVisible()
+    await noViolations(page)
+  })
+}
+
+for (const [path, title] of [['/console/payments/session', 'Payments settings'], ['/console/finance/ledger', 'Finance settings']] as const) {
+  test(`${title} open from the cog on ${path} and have no violations`, async ({ page }) => {
+    await visit(page, path)
+    await page.getByRole('link', { name: title }).click()
+    await expect(page.getByRole('dialog').getByRole('heading', { name: title })).toBeVisible()
     await noViolations(page)
   })
 }
@@ -211,9 +218,9 @@ test('Providers takes a Stripe account\'s keys, shows only their last four chara
   await card.getByLabel('Publishable key').fill('pk_test_e2eabcdefghijklm9012')
   await card.getByRole('button', { name: 'Save keys' }).click()
   await expect(page.getByText('Keys saved', { exact: true }).first()).toBeVisible()
-  await expect(card.getByText('Saved, ending 1234')).toBeVisible()
+  // A saved key fills its field with dots between its prefix and its last four characters.
+  await expect(card.getByLabel('Secret key')).toHaveValue('sk_test_••••••••••••1234')
   await expect(card.getByText('Missing', { exact: false })).toHaveCount(0)
-  await expect(card.getByLabel('Secret key')).toHaveValue('')
   await noViolations(page)
   await card.getByRole('button', { name: 'Remove' }).first().click()
   await page.getByRole('dialog').getByRole('button', { name: 'Remove key' }).click()

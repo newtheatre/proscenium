@@ -2,7 +2,7 @@
 // rules, abilities, record types, events, background work, secrets and health checks. Phase 1
 // declares what the first stories use; the rest arrives with the stories that need it.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task, useContext, type SettingRule } from '#kit'
+import { ability, defineAbilities, defineFacts, defineRecords, defineSettings, event, factDecl, job, point, record, secret, setting, task, credentialDecl, credential, type SettingRule } from '#kit'
 
 const change = 'core.identity-settings.manage'
 // How people sign in, how long sessions last and recovery are set once for the installation, so they
@@ -22,6 +22,9 @@ export const identitySettings = defineSettings('core', {
   'sign-in.google-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, onChange: 'confirm' }),
   'sign-in.managed-domains': setting.list({ default: [], of: 'text', maxLength: 253, change, audience: 'public', onChange: 'confirm' }),
   'sign-in.provider-is-strong': setting.boolean({ default: false, change, onChange: 'confirm' }),
+  // The public half of the Turnstile bot check, which the browser draws the check with. Its secret
+  // half is a credential on the same page. Unset, NUXT_PUBLIC_TURNSTILE_SITE_KEY is used, if set.
+  'sign-in.turnstile-site-key': setting.text({ unset: true, maxLength: 100, change, audience: 'public' }),
 
   'sessions.lifetime': setting.duration({ default: '30d', min: '1d', max: '90d', change, audience: 'public', quotable: true }),
   'sessions.idle-limit': setting.duration({ default: '14d', min: '1h', max: '90d', change }),
@@ -70,8 +73,9 @@ export const identitySettingRules: SettingRule[] = [
   // Ruling R-09: year-end expiry reads core.organisation.year-end, and cannot be chosen while it is unset.
   { id: 'default-expiry-needs-year-end', check: s => s['grants.default-expiry'] !== 'year-end' || !!s['organisation.year-end'] },
   { id: 'google-needs-client-id', check: s => !s['sign-in.google'] || !!s['sign-in.google-client-id'] },
-  // Rules run while a setting is saved, inside the request, so the Worker secret can be read here.
-  { id: 'google-needs-client-secret', check: s => !s['sign-in.google'] || !!useContext().env.CORE_GOOGLE_CLIENT_SECRET },
+  // Rules run while a setting is saved, inside the request, so the key can be read here: saved on
+  // Admin > Sign-in, or a Worker secret of the same name.
+  { id: 'google-needs-client-secret', check: async s => !s['sign-in.google'] || !!(await credential('CORE_GOOGLE_CLIENT_SECRET')) },
   { id: 'domains-are-domains', check: s => [...s['sign-in.google-domains'], ...s['sign-in.managed-domains']].every((d: string) => DOMAIN.test(d)) },
 ]
 
@@ -169,10 +173,18 @@ export const identityTasks = {
   'core.review-data-requests': task({ every: '1h' }),
 }
 
+// CORE_SESSION_KEY protects every session, and CORE_OWNER_RECOVERY is for when no Owner can sign
+// in to the app at all, so both stay Worker secrets.
 export const identitySecrets = {
   CORE_SESSION_KEY: secret({ needed: 'always' }),
-  CORE_GOOGLE_CLIENT_SECRET: secret({ needed: 'when-used' }),
   CORE_OWNER_RECOVERY: secret({ needed: 'optional' }),
+}
+
+// Keys typed on Admin > Sign-in (Matt, 17 November), each falling back to a Worker secret of the
+// same name: Google's client secret, and the secret half of the Turnstile bot check.
+export const identityCredentials = {
+  CORE_GOOGLE_CLIENT_SECRET: credentialDecl({ needed: 'when-used', manage: 'core.identity-settings.manage' }),
+  CORE_TURNSTILE_SECRET_KEY: credentialDecl({ needed: 'optional', manage: 'core.identity-settings.manage' }),
 }
 
 /** Points identity offers other modules (spec part 5). */

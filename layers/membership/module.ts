@@ -6,7 +6,7 @@
 // The specification has `requires: ['forms']`. The form builder is not built yet, and the gate
 // needs no form (tab 7), so forms is only used until the application form is wired in.
 import { z } from 'zod'
-import { ability, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, job, point, secret, setting, task } from '#kit'
+import { ability, credentialDecl, defineAbilities, defineFacts, defineModule, defineRecords, defineSettingRules, defineSettings, event, factDecl, job, point, setting, task } from '#kit'
 import { tables } from './server/db/schema'
 
 const change = 'membership.settings.manage'
@@ -94,9 +94,11 @@ export default defineModule({
     'membership.charge': point({ kind: 'code', contract: 'charge' }),
   },
 
-  secrets: {
-    // The key verification lists are hashed with (V10). Lists cannot be used until it is set.
-    MEMBERSHIP_LIST_KEY: secret({ needed: 'when-used' }),
+  credentials: {
+    // The key verification lists are hashed with (V10). Lists cannot be used until it is set. Typed
+    // on Membership > Lists (Matt, 17 November), or set as a Worker secret of the same name. A new
+    // key leaves every list already loaded unable to match, so the form asks first.
+    MEMBERSHIP_LIST_KEY: credentialDecl({ needed: 'when-used', manage: 'membership.verification-list.manage', confirm: true }),
   },
 
   jobs: {
@@ -216,6 +218,9 @@ export default defineModule({
     // X2, X3: a duplicate open application is superseded before the memberships move.
     'core.merge-handler': [{ id: 'membership', file: 'membership' }],
     'box-office.door-code': [{ id: 'membership.card', file: 'card' }],
+    // The member price: a ticket type Box office keeps for anyone with a current membership of any
+    // scheme, checked when bought and again at the door. The theatre prices it per band.
+    'box-office.ticket-type': [{ id: 'member', name: 'Member', kind: 'standard', requirementRefs: ['membership:any'], sort: 10 }],
     'core.account-section': [
       { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
     ],

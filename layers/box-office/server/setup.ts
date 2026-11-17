@@ -41,23 +41,7 @@ export async function poolsOf(performanceId: string): Promise<Pool[]> {
 // ---------------------------------------------------------------------------------------------
 // Ticket types and bands
 
-export interface TicketTypeInput { name: string, kind?: 'standard' | 'concession' | 'companion' | 'complimentary', proofNote?: string | null, needsPaidTicket?: boolean }
-
-export function createTicketType(unit: UnitView, input: TicketTypeInput): string {
-  const id = newId('tty')
-  const at = nowMs()
-  unit.add({
-    sql: 'INSERT INTO box_office_ticket_types (id, name, kind, proof_note, needs_paid_ticket, created_at, updated_at) SELECT ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM box_office_ticket_types WHERE name = ?)',
-    params: [id, input.name, input.kind ?? 'standard', input.proofNote ?? null, input.needsPaidTicket ?? input.kind === 'companion', at, at, input.name],
-  }).expect(1, { code: 'box-office.ticket-type.name-taken', reason: 'There is already a ticket type with that name.' })
-  unit.audit({ action: 'create', record: ['box-office.ticket-type', id] })
-  return id
-}
-
-export async function listTicketTypes(): Promise<{ id: string, name: string, kind: string, proofNote: string | null, needsPaidTicket: boolean, active: boolean }[]> {
-  const rows = await all<{ id: string, name: string, kind: string, proof_note: string | null, needs_paid_ticket: number, active: number }>('SELECT * FROM box_office_ticket_types ORDER BY name')
-  return rows.map(r => ({ id: r.id, name: r.name, kind: r.kind, proofNote: r.proof_note, needsPaidTicket: !!r.needs_paid_ticket, active: !!r.active }))
-}
+export { createTicketType, listTicketTypes, type TicketTypeInput } from './ticket-types'
 
 export interface BandInput { name: string, kind?: 'standard' | 'wheelchair' | 'restricted_view', sort?: number }
 

@@ -1,0 +1,181 @@
+// Ticket types (Box office specification, part 2; BO-18, BO-20, BO-62): a module declares the types
+// it needs and Box office keeps them, locked to their rules; people make ordinary types, edit, retire,
+// order and delete unused ones; complimentary tickets are never priced or sold; and a type with
+// requirements is sold only to someone who meets them, within the holder's limit, online and at the desk.
+import { beforeAll, describe, expect, it } from 'vitest'
+import { createUnit, setClock } from '#kit'
+import { resetRateLimits } from '#kit/ratelimit'
+import { inContext, person, rows, server, call, setModule } from '../../../../tests/integration/helpers'
+import ticketTypesGet from '../../server/api/box-office/ticket-types/index.get'
+import ticketTypesPost from '../../server/api/box-office/ticket-types/index.post'
+import ticketTypePatch from '../../server/api/box-office/ticket-types/[id].patch'
+import ticketTypeDelete from '../../server/api/box-office/ticket-types/[id].delete'
+import bookGet from '../../server/api/box-office/book/performances/[id].get'
+import { createBasket } from '../../server/baskets'
+import { scheme as memberScheme, req as membershipReq } from '../../../membership/tests/integration/stage'
+import { house, manager, NOV_16, ready, req, type House } from './stage'
+
+const handle = server({
+  'GET /api/box-office/ticket-types': ticketTypesGet,
+  'POST /api/box-office/ticket-types': ticketTypesPost,
+  'PATCH /api/box-office/ticket-types/:id': ticketTypePatch,
+  'DELETE /api/box-office/ticket-types/:id': ticketTypeDelete,
+  'GET /api/box-office/book/performances/:id': bookGet,
+})
+let keys = 0
+async function api<T = any>(method: string, path: string, body?: unknown, actor: ReturnType<typeof person> | null = manager): Promise<{ status: number, body: T }> {
+  const headers = method === 'GET' ? {} : { 'idempotency-key': `tt${++keys}` }
+  const response = await call(handle, method, path, { actor: actor ?? undefined, body, headers })
+  return { status: response.status, body: await response.json() as T }
+}
+
+interface Listed { id: string, name: string, kind: string, managedBy: string | null, available: boolean, active: boolean, used: boolean, requirementRefs: string[] }
+const publisher = person(['core.production.edit', 'core.production.publish'])
+/** Gives the production what publishing asks for, then publishes it. */
+async function publish(h: House) {
+  await inContext(async () => (await import('../../../core/server/vocabularies/service')).ensureVocabularies())
+  const category = (await rows<{ id: string }>("SELECT id FROM core_terms WHERE vocabulary_key = 'core.production-category' AND slug = 'play'"))[0]!.id
+  expect((await req('PATCH', `/api/core/productions/${h.productionId}`, { summary: 'A play to book for.', categoryTermId: category, advisoriesConfirmedNone: true }, publisher)).status).toBe(200)
+  expect((await req('POST', `/api/core/productions/${h.productionId}/publish`, {}, publisher)).status).toBe(200)
+}
+
+const list = async () => (await api<{ ticketTypes: Listed[] }>('GET', '/api/box-office/ticket-types')).body.ticketTypes
+const managed = async (key: string) => (await list()).find(t => t.managedBy === key)!
+
+/** One buyer's basket, as `actor`, straight through the service. */
+async function buy(h: House, ticketTypeId: string, quantity: number, actor?: ReturnType<typeof person>, extra: { ticketTypeId: string, quantity: number }[] = []) {
+  try {
+    return await inContext(async () => {
+      const unit = createUnit()
+      const made = await createBasket(unit.view(), { performanceId: h.performanceId, lines: [{ bandId: h.bandId, ticketTypeId, quantity }, ...extra.map(e => ({ bandId: h.bandId, ...e }))] })
+      await unit.commit()
+      return { ok: true as const, orderId: made.orderId }
+    }, actor)
+  }
+  catch (error: any) {
+    if (error?.name !== 'Refusal') throw error
+    return { ok: false as const, code: error.code as string, reason: error.reason as string }
+  }
+}
+
+async function member(): Promise<ReturnType<typeof person>> {
+  const id = await memberScheme()
+  expect((await membershipReq('POST', `/api/membership/schemes/${id}/state`, { to: 'open' })).status).toBe(200)
+  const added = await membershipReq('POST', `/api/membership/schemes/${id}/members`, { address: `m${Math.random().toString(36).slice(2)}@example.org`, name: 'Grace Hopper' })
+  expect(added.status, JSON.stringify(added.body)).toBe(200)
+  return person([], { accountId: added.body.accountId })
+}
+
+beforeAll(async () => {
+  setClock(NOV_16)
+  resetRateLimits()
+  await ready()
+  await setModule('membership', true)
+  // Makes the shared Full price and Concession types first.
+  await house(1)
+})
+
+describe('ticket types a module keeps', () => {
+  it('are made for the modules that are on, locked to their rules, and cannot be made by hand', async () => {
+    const types = await list()
+    expect(types.find(t => t.managedBy === 'box-office.companion')).toMatchObject({ kind: 'companion', requirementRefs: ['core.access-scheme:companions'], available: true })
+    expect(types.find(t => t.managedBy === 'box-office.complimentary')).toMatchObject({ kind: 'complimentary' })
+    expect(types.find(t => t.managedBy === 'membership.member')).toMatchObject({ name: 'Member', requirementRefs: ['membership:any'] })
+    expect((await api('POST', '/api/box-office/ticket-types', { name: 'My comps', kind: 'complimentary' })).status).toBe(422)
+
+    const companion = await managed('box-office.companion')
+    expect((await api('PATCH', `/api/box-office/ticket-types/${companion.id}`, { requirementRefs: [] })).body).toMatchObject({ code: 'box-office.ticket-type.managed' })
+    expect((await api('PATCH', `/api/box-office/ticket-types/${companion.id}`, { name: 'Essential companion', sort: 5 })).status).toBe(200)
+    expect((await managed('box-office.companion')).name).toBe('Essential companion')
+    expect((await api('DELETE', `/api/box-office/ticket-types/${companion.id}`, {})).body).toMatchObject({ code: 'box-office.ticket-type.in-use' })
+  })
+
+  it('are listed as not sold while their module is off', async () => {
+    await setModule('membership', false)
+    const types = await list()
+    expect(types.find(t => t.managedBy === 'membership.member')).toMatchObject({ available: false })
+    await setModule('membership', true)
+  })
+})
+
+describe('ticket types a person makes', () => {
+  it('can be renamed, retired, brought back, and deleted only while unused', async () => {
+    const made = await api('POST', '/api/box-office/ticket-types', { name: 'Under 16', kind: 'concession', sort: 3 })
+    expect(made.status, JSON.stringify(made.body)).toBe(200)
+    const id = made.body.ticketTypeId as string
+    expect((await api('PATCH', `/api/box-office/ticket-types/${id}`, { name: 'Under 18' })).status).toBe(200)
+    expect((await api('PATCH', `/api/box-office/ticket-types/${id}`, { active: false })).status).toBe(200)
+    expect((await list()).find(t => t.id === id)).toMatchObject({ name: 'Under 18', active: false, used: false })
+    expect((await api('PATCH', `/api/box-office/ticket-types/${id}`, { requirementRefs: ['nothing:here'] })).body).toMatchObject({ code: 'box-office.ticket-type.unknown-requirement' })
+    expect((await api('DELETE', `/api/box-office/ticket-types/${id}`, {})).status).toBe(200)
+    expect((await list()).some(t => t.id === id)).toBe(false)
+  })
+
+  it('refuses a name another type has, whatever its capitals', async () => {
+    expect((await api('POST', '/api/box-office/ticket-types', { name: 'full PRICE' })).body).toMatchObject({ code: 'box-office.ticket-type.name-taken' })
+  })
+})
+
+describe('complimentary tickets', () => {
+  it('are never priced, so they cannot be bought', async () => {
+    const h = await house(10)
+    const comp = await managed('box-office.complimentary')
+    const priced = await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: comp.id, amountMinor: 0 }] })
+    expect(priced.body).toMatchObject({ code: 'box-office.price.complimentary' })
+    // Even a price row left from before this rule does not make them sellable.
+    await rows('INSERT INTO box_office_prices (id, production_id, band_id, ticket_type_id, amount_minor, currency, effective_from, created_at) VALUES (?, ?, ?, ?, 0, \'GBP\', ?, ?) RETURNING id', `prc_${'a'.repeat(26)}`, h.productionId, h.bandId, comp.id, NOV_16 - 1, NOV_16)
+    expect(await buy(h, comp.id, 2)).toMatchObject({ ok: false, code: 'box-office.price.none' })
+  })
+})
+
+describe('a member price', () => {
+  async function memberHouse() {
+    const h = await house(20)
+    const type = await managed('membership.member')
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: type.id, amountMinor: 500 }] })).status).toBe(200)
+    return { h, type }
+  }
+
+  it('is sold to a current member, one per performance, and kept on the line', async () => {
+    const { h, type } = await memberHouse()
+    const holder = await member()
+    const first = await buy(h, type.id, 1, holder)
+    expect(first.ok, JSON.stringify(first)).toBe(true)
+    const [line] = await rows<{ requirement_ref: string, requirement_account_id: string }>('SELECT requirement_ref, requirement_account_id FROM box_office_order_lines WHERE order_id = ?', (first as { orderId: string }).orderId)
+    expect(line).toEqual({ requirement_ref: 'membership:any', requirement_account_id: holder.accountId })
+    expect(await buy(h, type.id, 1, holder)).toMatchObject({ ok: false, code: 'box-office.requirement.limit' })
+    expect(await buy(h, type.id, 2, await member())).toMatchObject({ ok: false, code: 'box-office.requirement.limit' })
+  })
+
+  it('is refused to someone who is not a member or not signed in, and offered to them as not met', async () => {
+    const { h, type } = await memberHouse()
+    expect(await buy(h, type.id, 1, person([]))).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
+    expect(await buy(h, type.id, 1)).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
+    await publish(h)
+    const page = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, person([]))
+    expect(page.status, JSON.stringify(page.body)).toBe(200)
+    expect(page.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ unmet: 'This price is for members.' })
+    const mine = await api('GET', `/api/box-office/book/performances/${h.performanceId}`, undefined, await member())
+    expect(mine.body.bands[0].types.find((t: { ticketTypeId: string }) => t.ticketTypeId === type.id)).toMatchObject({ most: 1 })
+    expect(mine.body.bands[0].types.find((t: { unmet?: string }) => t.unmet)).toBeUndefined()
+  })
+
+  it('is withheld while Membership is off', async () => {
+    const { h, type } = await memberHouse()
+    const holder = await member()
+    await setModule('membership', false)
+    expect(await buy(h, type.id, 1, holder)).toMatchObject({ ok: false, code: 'box-office.price.none' })
+    await setModule('membership', true)
+  })
+})
+
+describe('a companion ticket', () => {
+  it('is refused to someone not on the access scheme, even beside a paid ticket', async () => {
+    const h = await house(20)
+    const companion = await managed('box-office.companion')
+    expect((await req('POST', `/api/box-office/productions/${h.productionId}/prices`, { prices: [{ bandId: h.bandId, ticketTypeId: companion.id, amountMinor: 0 }] })).status).toBe(200)
+    const buyer = person([])
+    expect(await buy(h, h.fullId, 1, buyer, [{ ticketTypeId: companion.id, quantity: 1 }])).toMatchObject({ ok: false, code: 'box-office.requirement.not-met' })
+    expect((await buy(h, h.fullId, 1, buyer)).ok).toBe(true)
+  })
+})

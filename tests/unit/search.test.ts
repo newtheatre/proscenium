@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { matchSettings } from '../../layers/core/shared/search'
 
 const index = [
-  { key: 'seats.hold.duration', module: 'seats', to: '/console/seats/settings', section: 'hold', labelKey: 'a.label', helpKey: 'a.help' },
+  { key: 'seats.hold.duration', module: 'seats', to: '/console?settings=seats', section: 'hold', labelKey: 'a.label', helpKey: 'a.help' },
   { key: 'core.brand.name', module: 'core', to: '/admin/branding', section: 'brand', labelKey: 'b.label', helpKey: 'b.help' },
 ]
 const words: Record<string, string> = {
@@ -27,5 +27,7 @@ describe('matchSettings (UI-15)', () => {
   it('returns nothing for an empty term and links to the setting on its own page', () => {
     expect(matchSettings(index, '  ', t)).toEqual([])
     expect(matchSettings(index, 'theatre', t)[0]!.to).toBe('/admin/branding?setting=core.brand.name')
+    // The console's settings window is an address with a query already.
+    expect(matchSettings(index, 'hold', t)[0]!.to).toBe('/console?settings=seats&setting=seats.hold.duration')
   })
 })

@@ -26,8 +26,13 @@ export interface FormField {
   options?: { value: string | number, label: string, description?: string }[]
   /** ticks only: each ticked option opens a short note of at most `max` characters; leave out for no notes. */
   notes?: { max: number, label: string }
-  /** Shows the field only while this answers true for the form's values, as a follow-up question. */
+  /** Shows the field only while this answers true for the form's values, as a follow-up question,
+   *  set in under the question it follows. */
   showIf?: (values: Record<string, any>) => boolean
+  /** radio and ticks: the question is the heading of its part of a long form, drawn at heading size. */
+  heading?: boolean
+  /** Starts a new part of a long form: a divider, then this heading, above the field. */
+  section?: string
   /** Sits beside the next field: only when the two are one thought (start and end). */
   pairWithNext?: boolean
 }
@@ -84,7 +89,9 @@ function setTick(g: FormField, value: string | number, on: boolean | 'indetermin
   state[g.name] = (g.options ?? []).flatMap(o => next.filter(x => x.value === o.value))
 }
 // A checkbox, a radio group and a checkbox group carry their own label (a group's is its legend).
-const ownsLabel = (g: FormField) => g.kind === 'checkbox' || g.kind === 'radio' || (g.kind === 'ticks' && !g.notes)
+const ownsLabel = (g: FormField) => g.kind === 'checkbox' || g.kind === 'radio' || (g.kind === 'ticks' && (!g.notes || !!g.heading))
+// A question that heads its part of the form, and a part's own heading, are one size.
+const headingClass = 'text-lg font-semibold text-highlighted'
 function setTicks(g: FormField, values: string[]) {
   state[g.name] = (g.options ?? []).filter(o => values.includes(String(o.value))).map(o => tickOf(g.name, o.value) ?? { value: o.value })
 }
@@ -321,112 +328,155 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
           @submit="onSubmit"
           @error="onError"
         >
-          <div
+          <template
             v-for="row in rows"
             :key="row[0]!.name"
-            :class="row.length > 1 ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : ''"
           >
-            <UFormField
-              v-for="g in row"
-              :key="g.name"
-              :name="g.name"
-              :label="ownsLabel(g) ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
-              :help="g.help"
+            <div
+              v-if="row[0]!.section"
+              class="space-y-6 pt-2"
             >
-              <UTextarea
-                v-if="g.kind === 'textarea'"
-                v-model="state[g.name]"
-              />
-              <URadioGroup
-                v-else-if="g.kind === 'radio'"
-                v-model="state[g.name]"
-                :items="(g.options ?? []).map(o => ({ value: o.value, label: o.label, description: o.description }))"
-                value-key="value"
-                :legend="g.label"
-                :orientation="(g.options ?? []).some(o => o.description) ? 'vertical' : 'horizontal'"
-              />
-              <!-- A choice of many is square ticks (UCheckboxGroup), never a radio-like control.
-                   Only when each tick opens its own note is it a list of single checkboxes. -->
-              <UCheckboxGroup
-                v-else-if="g.kind === 'ticks' && !g.notes"
-                :model-value="((state[g.name] ?? []) as { value: string | number }[]).map(x => String(x.value))"
-                :items="(g.options ?? []).map(o => ({ value: String(o.value), label: o.label, description: o.description }))"
-                value-key="value"
-                :legend="g.label"
-                @update:model-value="(v: unknown) => setTicks(g, v as string[])"
-              />
-              <fieldset
-                v-else-if="g.kind === 'ticks'"
-                class="space-y-3"
+              <USeparator />
+              <h2 :class="headingClass">
+                {{ row[0]!.section }}
+              </h2>
+            </div>
+            <div :class="row.length > 1 ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : ''">
+              <UFormField
+                v-for="g in row"
+                :key="g.name"
+                :name="g.name"
+                :label="ownsLabel(g) ? undefined : g.optional ? `${g.label} ${t('core.form.optional')}` : g.label"
+                :help="g.kind === 'checkbox' ? undefined : g.help"
+                :class="g.showIf && 'ms-7'"
               >
-                <legend class="sr-only">
-                  {{ g.label }}
-                </legend>
-                <div
-                  v-for="o in g.options ?? []"
-                  :key="String(o.value)"
-                  class="space-y-2"
+                <UTextarea
+                  v-if="g.kind === 'textarea'"
+                  v-model="state[g.name]"
+                />
+                <URadioGroup
+                  v-else-if="g.kind === 'radio'"
+                  v-model="state[g.name]"
+                  :items="(g.options ?? []).map(o => ({ value: o.value, label: o.label, description: o.description }))"
+                  value-key="value"
+                  :legend="g.label"
+                  :orientation="(g.options ?? []).some(o => o.description) ? 'vertical' : 'horizontal'"
+                  :ui="g.heading ? { legend: 'mb-4' } : undefined"
                 >
-                  <UCheckbox
-                    :id="`${g.name}-${o.value}`"
-                    :model-value="!!tickOf(g.name, o.value)"
-                    :label="o.label"
-                    :description="o.description"
-                    @update:model-value="setTick(g, o.value, $event)"
-                  />
-                  <UFormField
-                    v-if="g.notes && tickOf(g.name, o.value)"
-                    :label="g.notes.label"
-                    :hint="`${(tickOf(g.name, o.value)?.note ?? '').length}/${g.notes.max}`"
-                    class="ms-7"
+                  <template
+                    v-if="g.heading"
+                    #legend
                   >
-                    <UInput
-                      :model-value="tickOf(g.name, o.value)?.note ?? ''"
-                      :maxlength="g.notes.max"
-                      @update:model-value="setNote(g, o.value, String($event))"
+                    <h2 :class="headingClass">
+                      {{ g.label }}
+                    </h2>
+                  </template>
+                </URadioGroup>
+                <!-- A choice of many is square ticks (UCheckboxGroup), never a radio-like control.
+                   Only when each tick opens its own note is it a list of single checkboxes. -->
+                <UCheckboxGroup
+                  v-else-if="g.kind === 'ticks' && !g.notes"
+                  :model-value="((state[g.name] ?? []) as { value: string | number }[]).map(x => String(x.value))"
+                  :items="(g.options ?? []).map(o => ({ value: String(o.value), label: o.label, description: o.description }))"
+                  value-key="value"
+                  :legend="g.label"
+                  :ui="g.heading ? { legend: 'mb-4' } : undefined"
+                  @update:model-value="(v: unknown) => setTicks(g, v as string[])"
+                >
+                  <template
+                    v-if="g.heading"
+                    #legend
+                  >
+                    <h2 :class="headingClass">
+                      {{ g.label }}
+                    </h2>
+                  </template>
+                </UCheckboxGroup>
+                <fieldset
+                  v-else-if="g.kind === 'ticks'"
+                  class="space-y-3"
+                >
+                  <legend
+                    v-if="g.heading"
+                    class="mb-4"
+                  >
+                    <h2 :class="headingClass">
+                      {{ g.label }}
+                    </h2>
+                  </legend>
+                  <legend
+                    v-else
+                    class="sr-only"
+                  >
+                    {{ g.label }}
+                  </legend>
+                  <div
+                    v-for="o in g.options ?? []"
+                    :key="String(o.value)"
+                    class="space-y-2"
+                  >
+                    <UCheckbox
+                      :id="`${g.name}-${o.value}`"
+                      :model-value="!!tickOf(g.name, o.value)"
+                      :label="o.label"
+                      :description="o.description"
+                      @update:model-value="setTick(g, o.value, $event)"
                     />
-                  </UFormField>
-                </div>
-              </fieldset>
-              <USelect
-                v-else-if="g.kind === 'select'"
-                v-model="state[g.name]"
-                :items="g.options ?? []"
-                value-key="value"
-              />
-              <UCheckbox
-                v-else-if="g.kind === 'checkbox'"
-                v-model="state[g.name]"
-                :label="g.label"
-              />
-              <UInputNumber
-                v-else-if="g.kind === 'number'"
-                v-model="state[g.name]"
-              />
-              <FieldMoney
-                v-else-if="g.kind === 'money'"
-                v-model="state[g.name]"
-              />
-              <FieldDate
-                v-else-if="g.kind === 'date'"
-                v-model="state[g.name]"
-              />
-              <FieldDateRange
-                v-else-if="g.kind === 'daterange'"
-                v-model="state[g.name]"
-              />
-              <FieldDateTime
-                v-else-if="g.kind === 'datetime'"
-                v-model="state[g.name]"
-              />
-              <UInput
-                v-else
-                v-model="state[g.name]"
-                :type="g.kind"
-                :placeholder="g.placeholder"
-              />
-            </UFormField>
-          </div>
+                    <UFormField
+                      v-if="g.notes && tickOf(g.name, o.value)"
+                      :label="g.notes.label"
+                      :hint="`${(tickOf(g.name, o.value)?.note ?? '').length}/${g.notes.max}`"
+                      class="ms-7"
+                    >
+                      <UInput
+                        :model-value="tickOf(g.name, o.value)?.note ?? ''"
+                        :maxlength="g.notes.max"
+                        @update:model-value="setNote(g, o.value, String($event))"
+                      />
+                    </UFormField>
+                  </div>
+                </fieldset>
+                <USelect
+                  v-else-if="g.kind === 'select'"
+                  v-model="state[g.name]"
+                  :items="g.options ?? []"
+                  value-key="value"
+                />
+                <UCheckbox
+                  v-else-if="g.kind === 'checkbox'"
+                  v-model="state[g.name]"
+                  :label="g.label"
+                  :description="g.help"
+                />
+                <UInputNumber
+                  v-else-if="g.kind === 'number'"
+                  v-model="state[g.name]"
+                />
+                <FieldMoney
+                  v-else-if="g.kind === 'money'"
+                  v-model="state[g.name]"
+                />
+                <FieldDate
+                  v-else-if="g.kind === 'date'"
+                  v-model="state[g.name]"
+                />
+                <FieldDateRange
+                  v-else-if="g.kind === 'daterange'"
+                  v-model="state[g.name]"
+                />
+                <FieldDateTime
+                  v-else-if="g.kind === 'datetime'"
+                  v-model="state[g.name]"
+                />
+                <UInput
+                  v-else
+                  v-model="state[g.name]"
+                  :type="g.kind"
+                  :placeholder="g.placeholder"
+                />
+              </UFormField>
+            </div>
+          </template>
         </UForm>
       </div>
     </template>

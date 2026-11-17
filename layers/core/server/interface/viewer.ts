@@ -6,7 +6,7 @@ import { useSetting } from '#kit'
 import type { Actor } from '#kit'
 import type { NavItem, ShellName } from '../../shared/navigation'
 import { allowedEntries, declaredEntries, holds, mayOpen } from './navigation'
-import { abilityList, entryLabelKey } from '../../shared/navigation'
+import { abilityList, entryLabelKey, moduleTabOf } from '../../shared/navigation'
 import { isMember } from '../identity/standings'
 
 export type Side = 'audience' | 'members' | 'console' | 'admin' | 'live'
@@ -41,7 +41,8 @@ export async function holdsConsole(actor: Actor): Promise<boolean> {
  */
 export async function holdsAdmin(actor: Actor): Promise<boolean> {
   for (const entry of await declaredEntries()) {
-    if (entry.menu === 'admin' && abilityList(entry.ability).length && holds(await mayOpen(actor, entry))) return true
+    // A module's tabs do not open Admin: console staff change their module's settings from the console.
+    if (entry.menu === 'admin' && !moduleTabOf(entry) && abilityList(entry.ability).length && holds(await mayOpen(actor, entry))) return true
   }
   return false
 }

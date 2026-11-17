@@ -253,10 +253,16 @@ describe('where settings are shown', () => {
   it('refuse scope, naming settingGroups', () => {
     expect(() => defineSettings('x', { 'a.b': { ...setting.boolean({ default: true, change: 'x.settings.manage' }), scope: 'site' } as any })).toThrow(/settingGroups/)
   })
-  it('put a group with no declaration on the module\'s own console page', () => {
+  it('put a group with no declaration on the module\'s own page in Admin, and one placed in the console on its console page', () => {
     const registry = buildRegistry([lost({})])
-    expect(registry.settingHomes.get('lost-property.items.keep-for')).toEqual({ page: 'lost-property.settings' })
-    expect(registry.settingPages.get('lost-property.settings')).toMatchObject({ place: 'console', to: '/console/lost-property/settings' })
+    expect(registry.settingHomes.get('lost-property.items.keep-for')).toEqual({ page: 'lost-property.admin' })
+    expect(registry.settingPages.get('lost-property.admin')).toMatchObject({ place: 'admin', group: 'modules', to: '/admin/modules/lost-property' })
+    const consoled = buildRegistry([lost({ settingGroups: { items: { place: 'console' } } })])
+    expect(consoled.settingHomes.get('lost-property.items.keep-for')).toEqual({ page: 'lost-property.settings' })
+    expect(consoled.settingPages.get('lost-property.settings')).toMatchObject({ place: 'console', to: '/console/lost-property/settings' })
+  })
+  it('keep About for the module\'s page', () => {
+    expect(() => buildRegistry([lost({ settingPages: { about: { place: 'admin', group: 'modules' } } })])).toThrow(/the platform makes itself/)
   })
   it('give every setting one home: a declared page, Advanced, a screen, or a setting\'s own screen', () => {
     const registry = buildRegistry([lost({
@@ -326,7 +332,7 @@ describe('the registry', () => {
       'lost-property.item.tidied': event({ version: 1, payload: z.object({ itemId: z.string() }), internal: true }),
     } } })
     const registry = buildRegistry([core, lost])
-    expect(registry.listeners.get('lost-property.item.found')).toEqual([{ module: 'core', listener: 'deliver-webhooks' }])
+    expect(registry.listeners.get('lost-property.item.found')).toEqual([{ module: 'core', listener: 'deliver-webhooks', deliverable: true }])
     expect(registry.listeners.get('lost-property.item.tidied')).toBeUndefined()
   })
   it('lets only core listen on deliverable', () => {

@@ -92,9 +92,11 @@ test.describe('someone in the console without the ability for one screen', () =>
     await noViolations(page)
   })
 
-  test('does not see a settings page they cannot change', async ({ page }) => {
-    const response = await visit(page, '/console/gallery/settings')
-    expect(response?.status()).toBe(403)
+  test('is offered no settings they cannot change: no cog, and the module page in Admin does not exist for them', async ({ page }) => {
+    await visit(page, '/console/gallery/list')
+    await expect(page.getByRole('link', { name: 'Gallery settings' })).toHaveCount(0)
+    const response = await visit(page, '/admin/modules/gallery')
+    expect(response?.status()).toBe(404)
   })
 })
 
@@ -271,9 +273,11 @@ for (const scheme of ['light', 'dark'] as const) {
       await context.close()
     })
 
-    test('the generated settings page: each setting shows its default, who may change it and a quoted tag', async ({ page }) => {
-      await visit(page, '/console/gallery/settings')
-      await expect(page.getByRole('heading', { level: 1, name: 'Gallery settings' })).toBeVisible()
+    test('the settings window: the cog opens the module\'s settings, each showing its default, who may change it and a quoted tag', async ({ page }) => {
+      await visit(page, '/console/gallery/list')
+      await page.getByRole('link', { name: 'Gallery settings' }).click()
+      await expect(page).toHaveURL(/settings=gallery/)
+      await expect(page.getByRole('dialog').getByRole('heading', { name: 'Gallery settings' })).toBeVisible()
       await expect(page.getByText('Quoted on public pages')).toBeVisible()
       await expect(page.getByText('Changed by people who can: Change the gallery\'s settings.').first()).toBeVisible()
       await noViolations(page)
@@ -282,7 +286,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('1 change')).toBeVisible()
       await page.getByRole('button', { name: 'Save Sample show settings' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
-      await visit(page, '/console/gallery/settings') // waits for hydration, as a bare reload does not
+      await visit(page, '/console/gallery/list?settings=gallery') // waits for hydration, as a bare reload does not
       await expect(page.getByLabel('Show title', { exact: true })).toHaveValue('Macbeth')
       await expect(page.getByText('Default: Hamlet.')).toBeVisible()
       await page.getByRole('button', { name: /Reset Show title to its default/ }).click()
@@ -291,7 +295,7 @@ for (const scheme of ['light', 'dark'] as const) {
     })
 
     test('a length of time is a number and a unit, and a whole number has steppers', async ({ page }) => {
-      await visit(page, '/console/gallery/settings')
+      await visit(page, '/console/gallery/list?settings=gallery')
       const amount = page.getByRole('spinbutton', { name: 'How long seats are held: How many' })
       await expect(amount).toHaveValue('15')
       await expect(page.getByRole('combobox', { name: 'How long seats are held: Unit of time' })).toContainText('minutes')
@@ -300,7 +304,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expect(page.getByText('1 change')).toBeVisible()
       await page.getByRole('button', { name: 'Save Sample show settings' }).click()
       await expect(page.getByText('Saved 1 change').first()).toBeVisible()
-      await visit(page, '/console/gallery/settings')
+      await visit(page, '/console/gallery/list?settings=gallery')
       await expect(page.getByRole('spinbutton', { name: 'How long seats are held: How many' })).toHaveValue('20')
       await expect(page.getByText('Default: 15 minutes.')).toBeVisible()
       await noViolations(page)
@@ -464,7 +468,13 @@ test.describe('the access scheme screens', () => {
     await page.getByRole('checkbox', { name: 'I use a wheelchair' }).click()
     await expect(page.getByRole('radio', { name: 'Stay in my wheelchair' })).toBeVisible()
     await expect(page.getByRole('radio', { name: 'Move to a seat' })).toBeVisible()
-    await expect(page.getByRole('radio', { name: 'No' })).toBeVisible()
+    // The needs question heads the form; a divider and "More about your visit" lead the rest.
+    await expect(page.getByRole('heading', { level: 2, name: 'Which of these make a visit harder for you?' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'More about your visit' })).toBeVisible()
+    // A companion is a tick box that asks how many only once ticked.
+    await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toHaveCount(0)
+    await page.getByRole('checkbox', { name: 'I require a companion/carer' }).click()
+    await expect(page.getByRole('combobox', { name: 'How many people come with you?' })).toBeVisible()
     await noViolations(page)
     if (process.env.PROSCENIUM_SHOTS) await page.screenshot({ path: `${process.env.PROSCENIUM_SHOTS}/form.png`, fullPage: true })
     await context.close()

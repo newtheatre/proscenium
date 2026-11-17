@@ -339,6 +339,35 @@ const keys = await signing.publicKeys('box-office.door-code') // for the device'
 - A signature proves the theatre issued a code. It does not prove what the code stands for is still
   valid, and a signed code is not a secret.
 
+## Secrets and keys
+
+A module declares what it reads under `secrets` (Worker secrets, set in the Cloudflare dashboard) or
+`credentials` (keys typed into the app). Only `CORE_ENCRYPTION_KEY`, `CORE_SESSION_KEY` and the
+break-glass `CORE_OWNER_RECOVERY` are secrets; every other key is a credential (Matt, 17 November).
+
+```ts
+credentials: {
+  MEMBERSHIP_LIST_KEY: credentialDecl({ needed: 'when-used', manage: 'membership.verification-list.manage', confirm: true }),
+},
+```
+
+- `credential(name, scope?)` reads it: the value saved for `scope` (a record, such as a payment
+  provider account), then the one saved for the whole site, then a Worker secret of the same name, so
+  a key already set in Cloudflare keeps working. Values are sealed with `CORE_ENCRYPTION_KEY` in
+  `core_credentials`; only the last four characters of a long one are kept in the clear, as a hint.
+- `manage` names the ability that may save or remove it on the shared keys form. A page shows that
+  form with **KeysCard** and the names it manages (`<KeysCard :names="['MEMBERSHIP_LIST_KEY']" />`);
+  it loads through `GET /api/core/credentials?names=`, saves through `POST /api/core/credentials`
+  (`{ keys: { NAME: value | null } }`, null removes), asks for a fresh sign-in and audits each by
+  name, never value. Keys the viewer may not manage are left out. Labels are
+  `<module>.credentials.<name>.label` and `.help`, the name lower-cased and kebab-cased without the
+  module's prefix (`membership.credentials.list-key.label`).
+- `confirm: true` is for a key whose replacement breaks what the old value made: the form asks
+  first, with `<module>.credentials.<name>.replace-warning`.
+- A credential saved per record on its own screen leaves `manage` out and saves through its own
+  route with `setCredential` and `clearCredential`, as Payments does for each provider account's
+  keys, drawing the fields with **CredentialFields**.
+
 ## Settings
 
 ```ts
@@ -393,8 +422,10 @@ settingGroups: {
 },
 ```
 
-A group not named is on the module's own page in its `place` (`console` by default:
-`/console/<module>/settings`; `admin`: `/admin/modules/<module>`). Core has no page of its own, so
+A group not named is on the module's own page in its `place` (`admin` by default: the Settings tab
+of the module's page in Admin, `/admin/modules/<module>`, which console staff open from the cog on
+the module's console pages; `console`: `/console/<module>/settings`). A named `admin` page is another
+tab, at `/admin/modules/<module>/<page>`; `about` is reserved for the About tab. Core has no page of its own, so
 each of its groups names a home; the table is `layers/core/module/settings.ts`. A single setting may
 carry `screen` where only part of its group is bespoke. A setting or group names a screen only once that screen shows and saves it: no setting may be reachable only through the API. Page ids are `<module>.<page>`, plus
 `core.advanced` and each module's `<module>.settings` and `<module>.admin`. A page's name is
