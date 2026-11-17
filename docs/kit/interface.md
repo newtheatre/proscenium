@@ -153,7 +153,10 @@ app's words, and says what the server would say for the same value.
   `form.value?.setErrors(fieldErrors(refusal))` (`useRefusal()`); `RefusalNotice` keeps the summary.
   `PageForm` does all of this itself.
 - **Do not disable the save button until the form is valid.** Let it be pressed and say what is
-  missing.
+  missing. A form with no schema of its own names what it needs with `needs()`:
+  `:validate="() => needs({ name: form.name, note: paid ? form.note : true })"`, each key the
+  `name` of its `UFormField`; `true` stands for a field not needed just now. Disable a button only
+  for something no field can fix (a lookup still loading, a till locked).
 - **Messages** come from `core.form.invalid.*` (`i18n/en-GB/validation.json`), installed for every
   schema on both the app and the server, so zod's own wording ("Too small: expected string to have
   >=1 characters") never reaches a person. A message a schema writes itself still wins.

@@ -40,6 +40,7 @@ async function close() {
   <UForm
     class="space-y-4"
     :state="{ countedMinor, note }"
+    :validate="() => needs({ countedMinor, varianceNote: difference ? note : true })"
     novalidate
     @submit="close"
   >
@@ -53,6 +54,7 @@ async function close() {
     <UFormField
       v-if="session.handlesCash"
       :label="t('payments.screens.close.counted')"
+      name="countedMinor"
       :help="t('payments.screens.close.counted-help')"
       required
       :error="refusal?.fields?.countedMinor ? refusal.reason : undefined"
@@ -73,6 +75,7 @@ async function close() {
     <UFormField
       v-if="difference"
       :label="t('payments.screens.close.reason')"
+      name="varianceNote"
       :help="t('payments.screens.close.reason-help')"
       required
       :error="refusal?.fields?.varianceNote ? refusal.reason : undefined"
@@ -86,7 +89,6 @@ async function close() {
     <UButton
       type="submit"
       :loading="busy"
-      :disabled="countedMinor === null || (!!difference && !note.trim())"
       :label="t('payments.screens.close.button')"
     />
   </UForm>

@@ -148,10 +148,12 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
         <UForm
           class="space-y-4"
           :state="form"
+          :validate="() => needs({ name: form.name })"
           novalidate
           @submit="save"
         >
           <UFormField
+            name="name"
             :label="t('front-of-house.checklists.name')"
             required
           >
@@ -262,7 +264,6 @@ const actions = (list: Checklist): DropdownMenuItem[][] => [
             <UButton
               type="submit"
               :label="editing ? t('front-of-house.save') : t('front-of-house.checklists.add-button')"
-              :disabled="!form.name.trim()"
             />
             <UButton
               v-if="editing"

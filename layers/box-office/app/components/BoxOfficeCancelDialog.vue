@@ -51,6 +51,7 @@ async function cancel() {
         id="box-office-cancel"
         class="space-y-4"
         :state="form"
+        :validate="() => needs({ reasonTermId: paid ? form.reasonTermId : true })"
         novalidate
         @submit="cancel"
       >
@@ -65,6 +66,7 @@ async function cancel() {
           />
         </UFormField>
         <UFormField
+          name="reasonTermId"
           :label="t('box-office.order.cancel.reason')"
           :required="paid"
         >
@@ -92,7 +94,6 @@ async function cancel() {
         form="box-office-cancel"
         :label="t('box-office.order.cancel.button')"
         color="error"
-        :disabled="paid && !form.reasonTermId"
       />
     </template>
   </UModal>

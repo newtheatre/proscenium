@@ -312,11 +312,13 @@ async function addMember() {
           <template #footer>
             <UForm
               :state="option"
+              :validate="() => needs({ name: option.name })"
               class="flex flex-wrap items-end gap-3"
               novalidate
               @submit="addOption"
             >
               <UFormField
+                name="name"
                 :label="t('membership.screens.lengths.name')"
                 :error="optionRefusal?.reason"
               >
@@ -339,7 +341,6 @@ async function addMember() {
                 color="neutral"
                 variant="outline"
                 loading-auto
-                :disabled="!option.name.trim()"
                 :label="t('membership.screens.lengths.add')"
               />
             </UForm>

@@ -136,6 +136,7 @@ function onStandard(v: Variant): string {
           v-if="raising"
           id="bar-raise"
           :state="raising"
+          :validate="() => needs({ ...(raising?.by === 'percent' ? { percent: raising?.percent } : { amountMinor: raising?.amountMinor }), effectiveFrom: raising?.later ? raising?.effectiveFrom : true })"
           class="space-y-4"
           novalidate
           @submit="send(!preview)"
@@ -219,7 +220,7 @@ function onStandard(v: Variant): string {
         <UButton
           type="submit"
           form="bar-raise"
-          :disabled="!raiseBody || (preview !== null && !preview.length)"
+          :disabled="preview !== null && !preview.length"
           :label="preview ? t('bar.screens.lists.raise.save', { count: preview.length }) : t('bar.screens.lists.raise.show-preview')"
         />
       </template>

@@ -54,6 +54,7 @@ async function cancel() {
         id="cancel-production"
         class="space-y-4"
         :state="form"
+        :validate="() => needs({ reasonTermId: form.reasonTermId })"
         novalidate
         @submit="cancel"
       >
@@ -85,6 +86,7 @@ async function cancel() {
           </li>
         </ul>
         <UFormField
+          name="reasonTermId"
           label="Reason"
           required
         >
@@ -112,7 +114,7 @@ async function cancel() {
         form="cancel-production"
         label="Cancel production"
         color="error"
-        :disabled="!form.reasonTermId || !!reach?.refusal"
+        :disabled="!!reach?.refusal"
       />
     </template>
   </UModal>
