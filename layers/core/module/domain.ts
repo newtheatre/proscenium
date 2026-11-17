@@ -53,8 +53,8 @@ export const settings = defineSettings('core', {
   'files.upload-timeout': setting.duration({ default: '1h', min: '5m', max: '24h', change: filesConfigure }),
 
   // Sending email (C-27, C-28, C-32). verified-domain is written only by the verify route.
-  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender, screen: '/admin/email', onChange: 'confirm' }),
-  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true, screen: '/admin/email', onChange: 'confirm' }),
+  'notifications.sending-domain': setting.text({ unset: true, maxLength: 253, change: sender, onChange: 'confirm' }),
+  'notifications.verified-domain': setting.text({ unset: true, maxLength: 253, change: sender, managed: true, onChange: 'confirm' }),
   'notifications.email-footer': setting.text({ unset: true, maxLength: 500, change: 'core.template.edit' }),
   // The delivery pipeline (C-29), renamed from notifications.* so the engineering half sits on the
   // Advanced page. Each retry waits four times as long as the one before.
