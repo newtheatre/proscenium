@@ -91,7 +91,16 @@ const refuse = (code: string, reason: string, status: number, remedy?: string): 
  * May this actor use this ability, on this record if one is given? Returns what allowed it, for
  * the audit row, or the refusal to show. 'signed-in' means any signed-in person.
  */
-export async function can(actor: Actor, ability: AbilityName | 'signed-in', recordIn?: Ref | readonly [string, string]): Promise<Decision> {
+export interface CanOptions {
+  /**
+   * Overrides the ability's own freshness: true asks for a sign-in re-asserted within
+   * core.access.fresh-within, false asks for none. Only settings saves use it (Matt, 16 November:
+   * re-authentication only for a setting that asks for confirmation or a reason).
+   */
+  fresh?: boolean
+}
+
+export async function can(actor: Actor, ability: AbilityName | 'signed-in', recordIn?: Ref | readonly [string, string], options: CanOptions = {}): Promise<Decision> {
   const record = Array.isArray(recordIn) ? { type: recordIn[0], id: recordIn[1] } : recordIn as Ref | undefined
   const signedIn = actor.kind === 'person' || actor.kind === 'setup'
   if (actor.kind === 'system' || actor.kind === 'job') return { allowed: true, by: actor.kind }
@@ -141,8 +150,9 @@ export async function can(actor: Actor, ability: AbilityName | 'signed-in', reco
   if (!by) return refuse('core.access.denied', 'You do not have permission to do this.', 403, 'Ask an administrator for this permission.')
 
   if (decl.assurance === 'strong' && actor.assurance !== 'strong') return refuse('core.access.needs-strong-sign-in', 'This needs a stronger sign-in.', 403, 'Sign in with a passkey or a second factor, then try again.')
-  if (decl.fresh) {
-    const within = typeof decl.fresh === 'string' ? parseDuration(decl.fresh) : await useSetting('core.access.fresh-within')
+  const fresh = options.fresh ?? decl.fresh
+  if (fresh) {
+    const within = typeof fresh === 'string' ? parseDuration(fresh) : await useSetting('core.access.fresh-within')
     if (!actor.reassertedAt || nowMs() - actor.reassertedAt > (within as number) * 1000) // not-policy: seconds to milliseconds
       return refuse('core.access.not-fresh', 'For your safety, confirm it is you before doing this.', 403, 'Confirm your sign-in, then try again.')
   }
@@ -185,8 +195,8 @@ async function holdsFact(name: string, actor: Actor, record?: Ref): Promise<bool
 }
 
 /** Throws the refusal when the check fails; returns what allowed it when it passes. */
-export async function requireAbility(actor: Actor, ability: AbilityName | 'signed-in', record?: Ref | readonly [string, string]): Promise<string> {
-  const decision = await can(actor, ability, record)
+export async function requireAbility(actor: Actor, ability: AbilityName | 'signed-in', record?: Ref | readonly [string, string], options?: CanOptions): Promise<string> {
+  const decision = await can(actor, ability, record, options)
   if (!decision.allowed) throw new Refusal(decision.code, decision.reason, { status: decision.status, remedy: decision.remedy })
   return decision.by
 }

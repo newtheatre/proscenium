@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { text } from 'drizzle-orm/sqlite-core'
 import { newId, isId, idTime, idSchema } from '#kit/ids'
-import { parseDuration, formatDuration } from '#kit/duration'
+import { parseDuration, formatDuration, unitsWithin, durationParts } from '#kit/duration'
 import { setting, defineSettings, validateSettingValue, formatSetting } from '#kit/settings'
 import { ability, defineAbilities, record, defineRecords } from '#kit/abilities'
 import { code, defineModule, event, job, task } from '#kit/manifest'
@@ -43,6 +43,27 @@ describe('durations', () => {
     expect(parseDuration('14d')).toBe(1_209_600)
     expect(formatDuration(7200)).toBe('2 hours')
     expect(() => parseDuration('soon')).toThrow()
+  })
+  it('count a month as 30 days and a year as 365, and read a value in the largest unit that divides it', () => {
+    expect(parseDuration('6mo')).toBe(180 * 86_400)
+    expect(parseDuration('7y')).toBe(2555 * 86_400)
+    expect(formatDuration(2555 * 86_400)).toBe('7 years')
+    expect(formatDuration(30 * 86_400)).toBe('1 month')
+    expect(formatDuration(400 * 86_400)).toBe('400 days')
+    expect(formatDuration(0)).toBe('0 minutes')
+  })
+  it('offer only units that can hold a value inside the limits', () => {
+    expect(unitsWithin(parseDuration('5m'), parseDuration('1h'))).toEqual(['hour', 'minute', 'second'])
+    expect(unitsWithin(parseDuration('365d'), parseDuration('3650d'))).toEqual(['year', 'month', 'week', 'day', 'hour', 'minute', 'second'])
+    expect(unitsWithin(parseDuration('1d'), parseDuration('30d'))).toEqual(['month', 'week', 'day', 'hour', 'minute', 'second'])
+    expect(unitsWithin(parseDuration('90m'), parseDuration('100m'))).toEqual(['minute', 'second'])
+  })
+  it('show a stored value in the largest offered unit that divides it', () => {
+    const offered = unitsWithin(parseDuration('5m'), parseDuration('1h'))
+    expect(durationParts(1800, offered)).toEqual({ count: 30, unit: 'minute' })
+    expect(durationParts(3600, offered)).toEqual({ count: 1, unit: 'hour' })
+    expect(durationParts(parseDuration('2555d'))).toEqual({ count: 7, unit: 'year' })
+    expect(durationParts(0, offered)).toEqual({ count: 0, unit: 'hour' })
   })
 })
 

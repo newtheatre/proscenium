@@ -318,6 +318,26 @@ components use `usePublicSettings()`, which sees only public settings. A value o
 cannot be saved. A quotable public setting can be quoted in content as
 `:setting{name="box-office.fees.booking"}`. `onChange: 'reason'` makes a change need a written
 reason and `onChange: 'confirm'` a second confirmation; the `change` ability still decides who may.
+Saving a setting asks for a fresh sign-in (`core.access.fresh-within`) only when it declares
+`onChange`, whatever the ability's own `fresh` says (Matt, 16 November); `can(..., { fresh })`
+is the override, and only the settings saves use it. A section is reset by saving it with
+`reset: true` on each of its settings.
+
+Durations may also be written `6mo` or `7y`; a month is 30 days and a year 365. `formatDuration`
+and the `DurationInput` component (a number and a unit, `v-model` in seconds, `min` and `max` as
+seconds or written durations) show a value in the largest unit that divides it exactly, and the
+control offers only units that can hold a value between the limits. A duration setting's label and
+help never name a unit, since the control does; the conformance run checks.
+
+Every change is in `core_setting_changes`. `GET /api/core/settings/history` lists them newest first,
+filtered by `key`, `module`, `page` and `actor`, paged with `before`; the whole history needs
+`core.audit.view` and each search is audited, while one setting's history is open to whoever may
+change it. Each settings item carries `lastChange`. `POST /api/core/settings/history/<id>/revert`
+sets the value back through the ordinary save, with the reason "Reverted"; back to the default is a
+reset, and a sensitive setting has no Revert.
+
+`core.lists.page-size` (25, 50 or 100, Advanced) is how many rows a list shows when its address
+gives no size.
 
 ### Pages of settings
 
