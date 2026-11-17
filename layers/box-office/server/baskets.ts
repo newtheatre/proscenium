@@ -3,13 +3,15 @@
 // nothing. The hold starts then and editing never moves its end. A basket has no account yet: it is
 // opened again with the token handed back here, which is stored only as its hash and stays the
 // browser's own through checkout.
-import { all, first, newId, nowMs, refuse, useSetting, type UnitView } from '#kit'
+import { all, first, newId, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
 import { getPerformance } from '#modules/core'
 import { orderLines } from './db/schema'
 import { claimSeats } from './capacity'
 import { hashOf, newReference, randomToken } from './codes'
 import { pricesFor } from './prices'
 import { poolsOf, salesOf } from './setup'
+import { entitle, type Buyer, type Requirement } from './entitlement'
+import { sellableTypes } from './ticket-types'
 
 export interface BasketLineInput { bandId: string, ticketTypeId: string, quantity: number }
 export interface BasketInput { performanceId: string, lines: BasketLineInput[] }
@@ -36,26 +38,28 @@ export async function offSaleAt(sales: { offSaleAt: number | null }, startsAt: n
   return sales.offSaleAt ?? startsAt - (await useSetting('box-office.sales.close-before') as number) * 1000 // not-policy: seconds to milliseconds
 }
 
-export interface PricedLine { bandId: string, ticketTypeId: string, amountMinor: number }
+export interface PricedLine { bandId: string, ticketTypeId: string, amountMinor: number, requirement: Requirement | null }
 
-/** Each ticket asked for, one line apiece, at the price in force at `at`, with the pools they come from. */
-export async function pricedLines(performanceId: string, asked: BasketLineInput[], at: number): Promise<{ pool: Map<string, { id: string }>, lines: PricedLine[], currency: string }> {
-  const [pools, prices, types] = await Promise.all([
-    poolsOf(performanceId),
-    pricesFor(performanceId, at),
-    all<{ id: string, needs_paid_ticket: number }>('SELECT id, needs_paid_ticket FROM box_office_ticket_types WHERE active = 1'),
-  ])
+/**
+ * Each ticket asked for, one line apiece, at the price in force at `at`, with the pools they come
+ * from. Complimentary tickets are never sold: they come only from an approved request. A type with
+ * requirements is checked for `buyer` (see entitlement.ts); `guard` adds its limits to the unit.
+ */
+export async function pricedLines(performanceId: string, asked: BasketLineInput[], at: number, buyer: Buyer): Promise<{ pool: Map<string, { id: string }>, lines: PricedLine[], currency: string, guard: (unit: UnitView) => void }> {
+  const [pools, prices, types] = await Promise.all([poolsOf(performanceId), pricesFor(performanceId, at), sellableTypes()])
   const pool = new Map(pools.map(p => [p.bandId, p]))
   const price = new Map(prices.map(p => [`${p.bandId} ${p.ticketTypeId}`, p]))
-  const type = new Map(types.map(t => [t.id, t]))
   for (const line of asked) {
-    if (!pool.has(line.bandId) || !type.has(line.ticketTypeId) || !price.has(`${line.bandId} ${line.ticketTypeId}`))
+    const type = types.get(line.ticketTypeId)
+    if (!pool.has(line.bandId) || !type || type.kind === 'complimentary' || !price.has(`${line.bandId} ${line.ticketTypeId}`))
       refuse('box-office.price.none', 'One of these tickets is not on sale for this performance.', { status: 422, remedy: 'Reload to see what is on sale.' })
   }
-  if (asked.some(l => type.get(l.ticketTypeId)!.needs_paid_ticket) && !asked.some(l => !type.get(l.ticketTypeId)!.needs_paid_ticket))
+  if (asked.some(l => types.get(l.ticketTypeId)!.needsPaidTicket) && !asked.some(l => !types.get(l.ticketTypeId)!.needsPaidTicket))
     refuse('box-office.order.companion-alone', 'A companion ticket is booked together with the ticket it accompanies.', { status: 422 })
-  const lines = asked.flatMap(l => Array.from({ length: l.quantity }, () => ({ bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: price.get(`${l.bandId} ${l.ticketTypeId}`)!.amountMinor })))
-  return { pool, lines, currency: prices[0]!.currency }
+  const each = asked.flatMap(l => Array.from({ length: l.quantity }, () => ({ bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: price.get(`${l.bandId} ${l.ticketTypeId}`)!.amountMinor })))
+  const entitled = await entitle(performanceId, each, types, buyer)
+  const lines = each.map((l, i) => ({ ...l, requirement: entitled.requirements[i] ?? null }))
+  return { pool, lines, currency: prices[0]!.currency, guard: entitled.guard }
 }
 
 /** Adds an online basket to the unit: every ticket asked for is held together, or nothing is. */
@@ -72,7 +76,7 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   const cap = sales.maxPerOrder ?? await useSetting('box-office.orders.seat-cap') as number
   if (quantity > cap) refuse('box-office.order.too-many', `At most ${cap} tickets in one order.`, { status: 422, remedy: 'For a larger group, ask the box office.' })
 
-  const { pool, lines, currency } = await pricedLines(input.performanceId, input.lines, at)
+  const { pool, lines, currency, guard } = await pricedLines(input.performanceId, input.lines, at, { channel: 'online', account: useContext().actor.accountId ?? null })
 
   unit.add({ sql: "UPDATE box_office_performance_sales SET updated_at = updated_at WHERE id = ? AND state = 'on_sale' AND (off_sale_at IS NULL OR off_sale_at > ?)", params: [sales.id, at] })
     .expect(1, NOT_ON_SALE.paused)
@@ -91,11 +95,13 @@ export async function createBasket(unit: UnitView, input: BasketInput): Promise<
   })
   unit.add({ sql: "INSERT INTO box_office_holds (id, kind, order_id, created_at, updated_at) VALUES (?, 'basket', ?, ?, ?)", params: [holdId, orderId, at, at] })
   const claimed = (await claimSeats(unit, { holdId, requests: input.lines.map(l => ({ poolId: pool.get(l.bandId)!.id, quantity: l.quantity })), expiresAt })).flat()
+  guard(unit)
   const lineIds = unit.insertSet(orderLines, lines.map((l, i) => ({
     orderId, kind: 'ticket', performanceId: input.performanceId, bandId: l.bandId, ticketTypeId: l.ticketTypeId, claimId: claimed[i], listMinor: l.amountMinor, discountMinor: 0, amountMinor: l.amountMinor, state: 'live',
+    requirementRef: l.requirement?.ref ?? null, requirementAccountId: l.requirement?.accountId ?? null,
   })))
   unit.expect(lines.length)
-  return { orderId, reference, token, expiresAt, currency, totalMinor, lines: lines.map((l, i) => ({ id: lineIds[i]!, ...l })) }
+  return { orderId, reference, token, expiresAt, currency, totalMinor, lines: lines.map((l, i) => ({ id: lineIds[i]!, bandId: l.bandId, ticketTypeId: l.ticketTypeId, amountMinor: l.amountMinor })) }
 }
 
 export interface BasketView {

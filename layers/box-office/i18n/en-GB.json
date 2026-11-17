@@ -40,6 +40,7 @@
   "box-office.abilities.performance.manage.label": "Set up sales for a performance",
   "box-office.abilities.performance.exceed-venue.label": "Sell more than the space holds",
   "box-office.abilities.pricing.manage.label": "Manage ticket types and prices",
+  "box-office.abilities.ticket-type.override-requirement.label": "Sell tickets for people who qualify, having checked by hand",
   "box-office.abilities.order.view.label": "See an order and its tickets",
   "box-office.abilities.order.sell.label": "Sell tickets at the desk",
   "box-office.abilities.order.take-payment.label": "Take payment for a reservation, and change it first",

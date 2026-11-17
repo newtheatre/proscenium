@@ -24,6 +24,10 @@ export default defineRoute({
   await getProduction(record!.id)
   const bands = new Set((await all<{ id: string }>('SELECT id FROM box_office_bands WHERE production_id = ?', record!.id)).map(b => b.id))
   if (input.prices.some(p => !bands.has(p.bandId))) refuse('box-office.band.not-found', 'One of these bands does not belong to this production.', { status: 422 })
+  // Complimentary tickets are given through an approved request, never priced, so none can be bought.
+  const comps = new Set((await all<{ id: string }>("SELECT id FROM box_office_ticket_types WHERE kind = 'complimentary'")).map(t => t.id))
+  if (input.prices.some(p => comps.has(p.ticketTypeId) && p.amountMinor !== null))
+    refuse('box-office.price.complimentary', 'Complimentary tickets are not priced: they are issued by approving a request for them.', { status: 422, remedy: 'Leave the Complimentary column out.' })
   const priceIds = setPrices(unit.view(), record!.id, await useSetting('core.locale.currency') as string, input.prices, actor.accountId ?? null)
   unit.audit({ action: 'update', record: ['core.production', record!.id], detail: { prices: priceIds.length } })
   return { priceIds }

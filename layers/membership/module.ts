@@ -155,6 +155,9 @@ export default defineModule({
     // Ends live memberships in the erasure batch (X4); claimed list entries are let go and emptied.
     'core.erasure-handler': [{ id: 'membership', file: 'membership' }],
     'box-office.door-code': [{ id: 'membership.card', file: 'card' }],
+    // The member price: a ticket type Box office keeps for anyone with a current membership of any
+    // scheme, checked when bought and again at the door. The theatre prices it per band.
+    'box-office.ticket-type': [{ id: 'member', name: 'Member', kind: 'standard', requirementRefs: ['membership:any'], sort: 10 }],
     'core.account-section': [
       { id: 'membership.mine', target: 'account' as const, side: 'audience' as const, ability: 'signed-in', component: 'MembershipMine', order: 35, to: '/account/membership', icon: 'i-lucide-id-card' },
     ],
