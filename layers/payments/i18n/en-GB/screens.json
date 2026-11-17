@@ -157,7 +157,7 @@
   "payments.screens.test.next.waiting-for-reader": "The amount is on the reader. Pay with a test card, then check.",
   "payments.screens.test.next.handoff": "Open the SumUp app to take the payment. It comes back here when done.",
   "payments.screens.test.next.redirect": "Open the provider's payment page to finish.",
-  "payments.screens.test.next.client-secret": "The payment is set up with the provider. Finishing it needs the online card form, which comes with checkout.",
+  "payments.screens.test.next.client-secret": "The payment is set up with Stripe. Pay with a test card, such as 4242 4242 4242 4242 with any future date and any security code.",
   "payments.screens.test.next.none": "The payment is waiting for its answer.",
   "payments.screens.test.open": "Open",
   "payments.screens.test.check": "Check again",
@@ -239,5 +239,13 @@
   "payments.screens.sessions.view.counting": "Being counted",
   "payments.screens.sessions.presets.7d": "Last 7 days",
   "payments.screens.sessions.presets.30d": "Last 30 days",
-  "payments.screens.sessions.row": "{till}, opened {when}"
+  "payments.screens.sessions.row": "{till}, opened {when}",
+  "payments.screens.test.pay": "Pay {amount} with the test card",
+  "payments.screens.card-form.loading": "Loading the card form…",
+  "payments.screens.card-form.unavailable": "The card form could not load.",
+  "payments.screens.card-form.unavailable-remedy": "Check your connection and reload the page. If it still does not load, pay another way or ask the box office.",
+  "payments.screens.card-form.failed": "The payment could not be made. Nothing has been taken. Try again, or use another card.",
+  "payments.screens.card-form.declined": "The card was not accepted. Nothing has been taken. Try another card.",
+  "payments.screens.card-form.secure": "Your card details go straight to Stripe, our payment provider, and are never stored by this site.",
+  "payments.screens.card-form.another-way": "Pay another way"
 }

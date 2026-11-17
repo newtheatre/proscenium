@@ -6,7 +6,8 @@
 import { sql } from 'drizzle-orm'
 import { first, nowMs, refuse, useContext, useSetting, type UnitView } from '#kit'
 import { findOrCreateAccount } from '#modules/core'
-import { collect, methodsFor, startAttempt, type StartResult } from '#modules/payments'
+import { collect, methodsFor, refreshIntent, startAttempt, type StartResult } from '#modules/payments'
+import { basketByToken, type BasketView } from './baskets'
 import { hashOf } from './codes'
 import { confirmOrder, type Confirmed } from './confirm'
 import { liveLines, ORDER, RAN_OUT, type OrderRow } from './orders'
@@ -86,4 +87,15 @@ export async function startPayment(input: { orderId: string, token: string, prov
   const offers = (await methodsFor('online')).filter(m => !input.providerAccountId || m.providerAccountId === input.providerAccountId)
   if (!offers.length) refuse('box-office.checkout.no-method', 'Online payment is not set up here.', { status: 409 })
   return startAttempt(order.intent_id, { method: offers[0]!.method, providerAccountId: offers[0]!.providerAccountId, origin: input.origin })
+}
+
+/**
+ * For a buyer who has just paid on the page, or come back from their bank: asks the provider now
+ * whether the money arrived, rather than waiting for its webhook, then says where the basket stands.
+ * Settling the payment confirms the order exactly as the webhook would.
+ */
+export async function checkPayment(orderId: string, token: string): Promise<BasketView> {
+  const order = await basketFor(orderId, token)
+  if (order.state === 'awaiting_payment' && order.intent_id) await refreshIntent(order.intent_id)
+  return (await basketByToken(orderId, token))!
 }

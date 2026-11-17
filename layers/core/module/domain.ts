@@ -187,6 +187,12 @@ export const points = {
    * its own screen where the matter is settled. Core runs every guard and stops on the first refusal.
    */
   'core.change-guard': point({ kind: 'code', contract: 'change-guard' }),
+  /**
+   * The booking button for a performance on the public pages, in one of five states. Box office
+   * contributes. With no answer, the performance's external booking link is used, then the
+   * production's; with neither, no button shows.
+   */
+  'core.booking-action': point({ kind: 'code', contract: 'booking-action' }),
   /** Whether an account may read the files of a record with `record` access, keyed by the record type. */
   'core.file-access': point({ kind: 'code', contract: 'file-access' }),
   /**
@@ -287,6 +293,8 @@ export const contributes = {
   'core.setup-step': [{ id: 'core.sender', required: true, to: '/admin/email', order: 20 }],
   'core.public-component': [{ id: 'setting' }],
   'core.record-resolver': [{ id: 'core.performance', file: 'performance' }],
+  // The production page's "Ready to publish?" checklist (R-35).
+  'core.record-check': ['summary', 'category', 'advisories', 'poster', 'dates'].map(n => ({ id: `core.production-${n}`, file: `production-${n}` })),
   'core.operating-day': [{ id: 'core.performances', table: 'core_performances', key: 'id', instant: 'starts_at', day: 'operating_day', done: 'completed_at' }],
   // The vocabularies core ships (part 2, group 3). Labels are the theatre's to change afterwards.
   'core.vocabulary': [

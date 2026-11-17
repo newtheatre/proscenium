@@ -5,7 +5,7 @@
 <script setup lang="ts">
 interface Provider { id: string, capabilities: string[], methods: { method: string, channels: string[] }[], pairsReaders: boolean, missingSecrets: string[] }
 interface Account { id: string, provider: string, label: string, channels: string[], mode: 'live' | 'test', externalRef: string | null, active: boolean }
-type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secret', secret: string } | { kind: 'waiting-for-reader' } | { kind: 'none' }
+type Next = { kind: 'redirect' | 'handoff', url: string } | { kind: 'client-secret', provider: string, secret: string, publishableKey: string } | { kind: 'waiting-for-reader' } | { kind: 'none' }
 
 const { t } = useT()
 const { $api } = useNuxtApp()
@@ -71,11 +71,14 @@ async function testPayment(a: Account) {
     run.busy = false
   }
 }
+// Where a test card that needs its bank's page comes back to: this screen.
+const returnUrl = `${useRequestURL().origin}/console/payments/providers`
 async function checkTest(a: Account) {
   const run = testing[a.id]
   if (!run?.intentId) return
   try {
-    const status = await $api<{ state: string, paidMinor: number, waiting: boolean }>(`/api/payments/intents/${run.intentId}` as string)
+    // Asks the provider now, so a test payment made in the card form shows without its webhook.
+    const status = await $api<{ state: string, paidMinor: number, waiting: boolean }>(`/api/payments/intents/${run.intentId}/refresh` as string, { method: 'POST', body: {} })
     run.state = status.waiting ? 'pending' : status.paidMinor > 0 ? 'succeeded' : status.state
   }
   catch (e) {
@@ -250,6 +253,13 @@ async function recordPayout() {
                       </p>
                       <template v-else>
                         <p>{{ t(`payments.screens.test.next.${testing[a.id]!.next!.kind}`) }}</p>
+                        <PaymentsCardForm
+                          v-if="testing[a.id]!.next!.kind === 'client-secret'"
+                          :next="testing[a.id]!.next as Extract<Next, { kind: 'client-secret' }>"
+                          :label="t('payments.screens.test.pay', { amount: money(100) })"
+                          :return-url="returnUrl"
+                          @submitted="checkTest(a)"
+                        />
                         <div class="flex flex-wrap gap-2">
                           <UButton
                             v-if="testing[a.id]!.next!.kind === 'handoff' || testing[a.id]!.next!.kind === 'redirect'"

@@ -23,6 +23,7 @@ import basketGet from '../../server/api/box-office/baskets/[id]/index.get'
 import reservePost from '../../server/api/box-office/baskets/[id]/reserve.post'
 import checkoutPost from '../../server/api/box-office/baskets/[id]/checkout.post'
 import payPost from '../../server/api/box-office/baskets/[id]/pay.post'
+import checkPost from '../../server/api/box-office/baskets/[id]/check.post'
 import confirmPost from '../../server/api/box-office/reservations/confirm.post'
 import releasePost from '../../server/api/box-office/orders/[id]/release.post'
 import keepPost from '../../server/api/box-office/orders/[id]/keep.post'
@@ -50,6 +51,9 @@ import compsPost from '../../server/api/box-office/comps/index.post'
 import compApprove from '../../server/api/box-office/comps/[id]/approve.post'
 import compDecline from '../../server/api/box-office/comps/[id]/decline.post'
 import compWithdraw from '../../server/api/box-office/comps/[id]/withdraw.post'
+import bookGet from '../../server/api/box-office/book/performances/[id].get'
+import publishProduction from '../../../core/server/api/core/productions/[id]/publish.post'
+import editProduction from '../../../core/server/api/core/productions/[id]/index.patch'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -76,6 +80,7 @@ export const handle = server({
   'POST /api/box-office/baskets/:id/reserve': reservePost,
   'POST /api/box-office/baskets/:id/checkout': checkoutPost,
   'POST /api/box-office/baskets/:id/pay': payPost,
+  'POST /api/box-office/baskets/:id/check': checkPost,
   'POST /api/box-office/reservations/confirm': confirmPost,
   'GET /api/box-office/orders/link': orderLinkGet,
   'GET /api/box-office/orders': ordersGet,
@@ -101,6 +106,9 @@ export const handle = server({
   'POST /api/box-office/comps/:id/approve': compApprove,
   'POST /api/box-office/comps/:id/decline': compDecline,
   'POST /api/box-office/comps/:id/withdraw': compWithdraw,
+  'GET /api/box-office/book/performances/:id': bookGet,
+  'POST /api/core/productions/:id/publish': publishProduction,
+  'PATCH /api/core/productions/:id': editProduction,
   'POST /api/payments/till/sale': tillSalePost,
   'POST /api/payments/till/summary': tillSummaryPost,
 })
