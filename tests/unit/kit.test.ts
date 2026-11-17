@@ -106,8 +106,9 @@ describe('abilities', () => {
   it('let a privileged ability that only reads, audited, skip freshness', () => {
     expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', fresh: false, audit: 'read' }) })).not.toThrow()
   })
-  it('refuse a privileged ability that says it is impliable', () => {
+  it('refuse an impliable ability that is privileged or on a record type', () => {
     expect(() => defineAbilities('finance', { 'ledger.read': ability({ risk: 'privileged', impliable: true }) })).toThrow(/risk normal/)
+    expect(() => defineAbilities('finance', { 'ledger.read': ability({ on: 'finance.ledger', impliable: true }) })).toThrow(/record type/)
   })
   it('name the module\'s own abilities by short name, and leave another module\'s to the registry', () => {
     expect(() => defineAbilities('finance', { 'ledger.read': ability({ implies: ['ledger.list'] }) })).toThrow(/not an ability of finance/)

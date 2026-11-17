@@ -18,7 +18,11 @@ export interface AbilityDecl {
    * and owned by core or a module this one lists under `requires`; the registry checks.
    */
   implies?: string[]
-  /** Another module's ability may imply this one. Only an ability of risk normal may say so. */
+  /**
+   * Another module's ability may imply this one. Whoever holds an ability that implies it, at any
+   * reach (site, module, record or fact), then holds it too, with no record. Only an ability of risk
+   * normal with no record type may say so.
+   */
   impliable?: boolean
   /** true: using it writes an audit entry. 'read': reads under it are audited too. */
   audit?: boolean | 'read'
@@ -76,7 +80,10 @@ export function defineAbilities<const M extends string, const A extends Record<s
       // Another module's ability is checked by the registry, which knows every module.
       if (full === `${module}.${implied}` && !(implied in abilities)) throw new DeclarationError(`abilities.${key}.implies`, `"${implied}" is not an ability of ${module}`)
     }
+    // An impliable ability comes with its implier at any reach, with no record, so it may neither be
+    // privileged nor guard sight of a record.
     if (decl.impliable && decl.risk === 'privileged') throw new DeclarationError(`abilities.${key}.impliable`, 'only an ability of risk normal may be implied by another module')
+    if (decl.impliable && decl.on) throw new DeclarationError(`abilities.${key}.impliable`, 'an ability on a record type cannot be impliable')
     // A privileged ability may skip freshness only when it reads and its reads are audited; one that
     // changes anything always needs a fresh sign-in.
     if (decl.risk === 'privileged' && decl.fresh === false && decl.audit !== 'read') throw new DeclarationError(`abilities.${key}.fresh`, "a privileged ability needs a fresh sign-in, unless it only reads and says audit: 'read'")

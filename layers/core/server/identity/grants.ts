@@ -89,13 +89,24 @@ export async function kitGrantsOf(accountId: string): Promise<Grant[]> {
   const out: Grant[] = []
   for (const grant of await liveGrantsOf(accountId)) {
     const via = `grant:${grant.id}`
+    const carried: string[] = []
     for (const ability of await roleAbilities(grant.role_id, grant.role_key)) {
       const declared = registry.abilities.get(ability)!
       if (grant.scope === 'site') out.push({ ability, via })
       else if (grant.scope === 'module') {
-        if (declared.module === grant.scope_module && (declared.decl.grantAt ?? ['site', 'module', 'record']).includes('module')) out.push({ ability, via })
+        if (declared.module === grant.scope_module && (declared.decl.grantAt ?? ['site', 'module', 'record']).includes('module')) {
+          out.push({ ability, via })
+          carried.push(ability)
+        }
       }
-      else if (declared.module === grant.scope_module) out.push({ ability, via, record: { type: grant.scope_type!, id: grant.scope_id! } })
+      else if (declared.module === grant.scope_module) {
+        out.push({ ability, via, record: { type: grant.scope_type!, id: grant.scope_id! } })
+        carried.push(ability)
+      }
+    }
+    // A scoped grant still brings the impliable abilities its abilities imply, with no record.
+    for (const ability of withImplied(carried)) {
+      if (registry.abilities.get(ability)!.decl.impliable && !out.some(g => g.ability === ability && !g.record)) out.push({ ability, via })
     }
   }
   context.cache[key] = out
