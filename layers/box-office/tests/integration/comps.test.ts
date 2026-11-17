@@ -83,4 +83,20 @@ describe('complimentary tickets', () => {
     const row = seen.body.performances.find((p: { id: string }) => p.id === h.performanceId)
     expect(row.bands.map((b: { id: string }) => b.id)).toContain(h.bandId)
   })
+  it('issues straight away, with no approver, when the theatre does not need approval', async () => {
+    await set('box-office.comps.needs-approval', false)
+    try {
+      expect((await req('GET', '/api/box-office/comps', undefined, requester)).body.needsApproval).toBe(false)
+      const asked = await ask()
+      expect(asked.status, JSON.stringify(asked.body)).toBe(200)
+      expect(asked.body.issued).toBe(true)
+      const [request] = await rows<{ state: string, order_id: string, decided_by: string }>('SELECT state, order_id, decided_by FROM box_office_comp_requests WHERE id = ?', asked.body.requestId)
+      expect(request).toMatchObject({ state: 'issued', decided_by: null })
+      expect(await rows('SELECT state, total_minor FROM box_office_orders WHERE id = ?', request!.order_id)).toEqual([{ state: 'confirmed', total_minor: 0 }])
+      expect((await req('GET', '/api/box-office/comps', undefined, approver)).body.waiting.map((r: { id: string }) => r.id)).not.toContain(asked.body.requestId)
+    }
+    finally {
+      await set('box-office.comps.needs-approval', true)
+    }
+  })
 })
