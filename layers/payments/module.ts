@@ -30,6 +30,12 @@ export default defineModule({
     'retention.webhooks': setting.duration({ default: '90d', min: '7d', max: '730d', change, audience: 'staff', onChange: 'confirm' }),
   }),
 
+  // R-37: every other group sits on /console/payments/settings, the module's own page; how long
+  // webhook bodies are kept is upkeep, on the shared Advanced page.
+  settingGroups: {
+    retention: { advanced: true },
+  },
+
   records: defineRecords('payments', {
     'provider-account': { table: 'payments_provider_accounts' },
     'intent': { table: 'payments_intents' },
