@@ -6,6 +6,7 @@
 <script setup lang="ts">
 import { parseTime } from '@internationalized/date'
 import { controlText, fromControl, sameValue, toControl, type RateControl } from '../../shared/controls'
+import { durationParts } from '../../kit/duration'
 
 interface SettingView {
   key: string
@@ -139,6 +140,8 @@ async function save(sectionId: string, settings: SettingView[]) {
 }
 
 const limit = (s: SettingView, which: 'min' | 'max') => typeof s[which] === 'number' ? s[which] : undefined
+/** A duration's limits are written like 5m or 14d. */
+const durationLimit = (s: SettingView, which: 'min' | 'max') => typeof s[which] === 'string' ? s[which] : undefined
 
 /** A time is stored as 19:30; the control works in clock times. */
 function timeOf(value: unknown) {
@@ -171,13 +174,11 @@ const words = () => ({
   duration: durationWords,
   money: (minor: number) => new Intl.NumberFormat(language.value, { style: 'currency', currency: currency.value }).format(minor / 10 ** (new Intl.NumberFormat(language.value, { style: 'currency', currency: currency.value }).resolvedOptions().maximumFractionDigits ?? 2)),
 })
-/** "30m" as "30 minutes", for the default and the confirmation. */
-function durationWords(text: string): string {
-  const match = /^(\d+)([smhdw])$/.exec(text)
-  if (!match) return text
+/** Seconds as words in the largest unit that divides them, 1800 as "30 minutes", for the default and the confirmation. */
+function durationWords(seconds: number): string {
+  const { count, unit } = durationParts(seconds)
   // The browser's own wording, so one hour is not "1 hours" in any language.
-  const unit = { s: 'second', m: 'minute', h: 'hour', d: 'day', w: 'week' }[match[2] as 's' | 'm' | 'h' | 'd' | 'w']
-  return new Intl.NumberFormat(language.value, { style: 'unit', unit, unitDisplay: 'long' }).format(Number(match[1]))
+  return new Intl.NumberFormat(language.value, { style: 'unit', unit, unitDisplay: 'long' }).format(count)
 }
 // A custom setting's own control: a component in its module's app/setting-editors folder, named for
 // the key (finance.year.starts is SettingFinanceYearStarts). Without one it is typed as text.
@@ -280,12 +281,14 @@ onMounted(() => {
                   class="w-48"
                   @update:model-value="onEdit(s, $event ?? '')"
                 />
-                <FieldDuration
+                <DurationInput
                   v-else-if="s.kind === 'duration'"
                   :model-value="draft[s.key]"
+                  :min="durationLimit(s, 'min')"
+                  :max="durationLimit(s, 'max')"
                   :disabled="!s.canChange"
                   :label="t(s.labelKey)"
-                  @update:model-value="onEdit(s, $event)"
+                  @update:model-value="onEdit(s, $event ?? null)"
                 />
                 <FieldColour
                   v-else-if="s.kind === 'colour'"
@@ -336,11 +339,11 @@ onMounted(() => {
                     @update:model-value="onRate(s, { count: $event ?? undefined })"
                   />
                   <span class="text-sm text-muted">{{ t('core.settings-page.rate-in') }}</span>
-                  <FieldDuration
+                  <DurationInput
                     :model-value="rate(s).per"
                     :disabled="!s.canChange"
                     :label="t('core.settings-page.rate-period', { setting: t(s.labelKey) })"
-                    @update:model-value="onRate(s, { per: $event ?? '' })"
+                    @update:model-value="onRate(s, { per: $event ?? undefined })"
                   />
                 </div>
                 <UInputTime
