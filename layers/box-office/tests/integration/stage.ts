@@ -38,6 +38,8 @@ import deskOrdersGet from '../../server/api/box-office/desk/orders.get'
 import tillSalePost from '../../../payments/server/api/payments/till/sale.post'
 import tillSummaryPost from '../../../payments/server/api/payments/till/summary.post'
 import orderCancelPost from '../../server/api/box-office/orders/link/cancel.post'
+import reportsSalesGet from '../../server/api/box-office/reports/sales.get'
+import reportsSalesCsv from '../../server/api/box-office/reports/sales.csv.get'
 import { createBasket, type Basket, type BasketLineInput } from '../../server/baskets'
 import { call, env, inContext, person, server, setModule } from '../../../../tests/integration/helpers'
 
@@ -77,6 +79,8 @@ export const handle = server({
   'POST /api/box-office/orders/:id/cancel': cancelPost,
   'POST /api/box-office/orders/:id/amend': amendPost,
   'GET /api/box-office/desk/orders': deskOrdersGet,
+  'GET /api/box-office/reports/sales': reportsSalesGet,
+  'GET /api/box-office/reports/sales.csv': reportsSalesCsv,
   'POST /api/payments/till/sale': tillSalePost,
   'POST /api/payments/till/summary': tillSummaryPost,
 })
