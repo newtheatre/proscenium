@@ -1,4 +1,26 @@
 {
   "forms.module.name": "Forms",
-  "forms.module.description": "The form builder: a theatre's own forms, with logic, versions and, where a form wants one, review and a decision."
+  "forms.module.description": "The form builder: a theatre's own forms, with logic, versions and, where a form wants one, review and a decision.",
+  "forms.settings-sections.limits": "Limits",
+  "forms.settings-sections.builder": "Building",
+  "forms.settings-sections.retention": "Keeping answers",
+  "forms.settings.limits.questions-per-form.label": "Most questions in one form",
+  "forms.settings.limits.questions-per-form.help": "A form with more questions than this cannot be saved.",
+  "forms.settings.limits.pages-per-form.label": "Most pages in one form",
+  "forms.settings.limits.pages-per-form.help": "A form with more pages than this cannot be saved.",
+  "forms.settings.limits.definition-size.label": "Largest form, in kilobytes",
+  "forms.settings.limits.definition-size.help": "The size of a form's questions and logic together, not of its answers.",
+  "forms.settings.limits.repeat-entries.label": "Most entries in a repeating group",
+  "forms.settings.limits.repeat-entries.help": "The most times a person may repeat one group of questions.",
+  "forms.settings.limits.condition-depth.label": "How deeply conditions nest",
+  "forms.settings.limits.condition-depth.help": "How many levels of \"all of\" and \"any of\" a condition may have.",
+  "forms.settings.builder.free-patterns.label": "Let authors write their own patterns",
+  "forms.settings.builder.free-patterns.help": "Allows a regular expression as a question's validation. The ready-made patterns are always offered.",
+  "forms.settings.retention.require-choice.label": "Ask how long answers are kept before publishing",
+  "forms.settings.retention.require-choice.help": "A form that asks for personal answers cannot be published until it says how long they are kept.",
+  "forms.abilities.form.create.label": "Start a new form",
+  "forms.abilities.form.edit.label": "Build and edit a form",
+  "forms.abilities.form.publish.label": "Publish a form",
+  "forms.abilities.settings.manage.label": "Change the forms settings",
+  "forms.navigation.groups.forms.label": "Forms"
 }
